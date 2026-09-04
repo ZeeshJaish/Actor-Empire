@@ -1,9 +1,11 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { APP_DISPLAY_VERSION } from './appVersion';
-import { exportAllGameData, replaceAllGameData } from './storage';
+import { exportPublicGameData, replaceAllVerifiedGameData } from './storage';
 import { migratePlayerSave } from './saveMigration';
 import { grantMigrationCarePackageIfEligible, markSaveTransferImported } from './migrationCarePackage';
 import { compactPlayerForTransfer, FULL_LOCAL_MIRROR_BUDGET_BYTES } from './saveCompaction';
+import { prepareVerifiedPlayerForPersistence } from './savePreparation';
+import type { VerifiedSaveBatchEntry } from './saveGenerations';
 import {
   exportMediaTransferRecords,
   importMediaTransferRecords,
@@ -21,7 +23,7 @@ interface AndroidSaveTransferPlugin {
   shareExport(options: { filename: string; content: string }): Promise<{ shared?: boolean }>;
 }
 
-interface SaveTransferEntry {
+export interface SaveTransferEntry {
   key: string;
   value: unknown;
 }
@@ -156,6 +158,10 @@ const getCanonicalSaveKey = (key: string) => (
   key === 'actorEmpireSave' ? 'actorEmpireSave_1' : key
 );
 
+export const selectPublicSaveTransferEntries = (entries: SaveTransferEntry[]): SaveTransferEntry[] => (
+  entries.filter(entry => getSaveSlotNumber(entry.key) !== null)
+);
+
 const compactPlayerValueForTransfer = async (value: unknown): Promise<Player> => {
   const migrated = migratePlayerSave(value as any);
   return compactPlayerForTransfer(migrated);
@@ -229,7 +235,7 @@ const getArchiveSummary = (entries: SaveTransferEntry[]) => {
 };
 
 const buildArchive = async (): Promise<SaveTransferArchive> => {
-  const indexedDbEntries = await compactTransferEntries(await exportAllGameData());
+  const indexedDbEntries = await compactTransferEntries(selectPublicSaveTransferEntries(await exportPublicGameData()));
   const localStorageEntries = await readActorEmpireLocalStorage();
   let mediaRecords: TransferMediaRecord[] = [];
   try {
@@ -405,25 +411,29 @@ const parseArchive = async (rawText: string): Promise<SaveTransferArchive> => {
   return archive;
 };
 
-const sanitizeImportEntries = async (entries: SaveTransferEntry[], archive: SaveTransferArchive) => {
+export interface PrepareSaveTransferImportContext {
+  archiveAppVersion: string;
+  importedAt: string;
+}
+
+export const prepareSaveTransferImportEntries = async (
+  entries: SaveTransferEntry[],
+  context: PrepareSaveTransferImportContext,
+): Promise<{ entries: VerifiedSaveBatchEntry[]; carePackageGranted: boolean }> => {
   let carePackageGranted = false;
-  const sanitizedEntries: SaveTransferEntry[] = [];
-  const importedAt = new Date().toISOString();
+  const sanitizedEntries: VerifiedSaveBatchEntry[] = [];
 
   for (const entry of entries.filter(entry => typeof entry.key === 'string' && entry.key.startsWith('actorEmpireSave'))) {
     const slot = getSaveSlotNumber(entry.key);
-    if (slot === null) {
-      sanitizedEntries.push(entry);
-      continue;
-    }
+    if (slot === null) continue;
 
     const sourceFingerprint = await hashTransferValue(entry.value);
     const importedPlayer = markSaveTransferImported(
       migratePlayerSave(entry.value as any),
       {
         sourceFingerprint,
-        archiveAppVersion: archive.appVersion,
-        importedAt,
+        archiveAppVersion: context.archiveAppVersion,
+        importedAt: context.importedAt,
       },
     );
     const carePackage = grantMigrationCarePackageIfEligible(importedPlayer, {
@@ -432,15 +442,17 @@ const sanitizeImportEntries = async (entries: SaveTransferEntry[], archive: Save
     });
     if (carePackage.granted) carePackageGranted = true;
     const compactedPlayer = await compactPlayerForTransfer(carePackage.player);
+    const prepared = prepareVerifiedPlayerForPersistence(compactedPlayer, 'IMPORT');
     sanitizedEntries.push({
-      key: getCanonicalSaveKey(entry.key),
-      value: compactedPlayer,
+      currentKey: getCanonicalSaveKey(entry.key),
+      player: prepared.player,
+      manifest: prepared.manifest,
     });
     await yieldToMainThread();
   }
 
   return {
-    entries: Array.from(new Map(sanitizedEntries.map(entry => [entry.key, entry])).values()),
+    entries: Array.from(new Map(sanitizedEntries.map(entry => [entry.currentKey, entry])).values()),
     carePackageGranted,
   };
 };
@@ -482,20 +494,30 @@ export const importSignedSaveArchiveFromFile = async (options?: SaveTransferImpo
   const archive = await parseArchive(rawText);
   await yieldToMainThread();
   reportProgress(options, 'COMPACTING', 'Migrating and compacting save slots...');
-  const importResult = await sanitizeImportEntries(archive.payload.indexedDb.entries, archive);
+  const importResult = await prepareSaveTransferImportEntries(archive.payload.indexedDb.entries, {
+    archiveAppVersion: archive.appVersion,
+    importedAt: new Date().toISOString(),
+  });
   const entries = importResult.entries;
   if (entries.length <= 0) {
     throw new Error('Transfer file does not contain any Actor Empire save slots.');
   }
 
-  reportProgress(options, 'WRITING', 'Writing save slots to this device...');
-  await replaceAllGameData(entries);
+  reportProgress(options, 'WRITING', 'Verifying and safely replacing save slots...');
+  await replaceAllVerifiedGameData(entries);
   reportProgress(options, 'MEDIA', 'Restoring compacted media...');
-  const mediaRecords = await importMediaTransferRecords(archive.payload.media?.records || []);
+  let mediaRecords = 0;
+  try {
+    mediaRecords = await importMediaTransferRecords(archive.payload.media?.records || []);
+  } catch {
+    // Save generations are already verified and promoted. Missing optional poster
+    // media must not misreport a successful career import as a destructive failure.
+    mediaRecords = 0;
+  }
   await restoreActorEmpireLocalStorage(archive.payload.localStorage);
   reportProgress(options, 'DONE', 'Save transfer restored.');
   return {
-    ...getArchiveSummary(entries),
+    ...getArchiveSummary(entries.map(entry => ({ key: entry.currentKey, value: entry.player }))),
     carePackageGranted: importResult.carePackageGranted,
     mediaRecords,
   };

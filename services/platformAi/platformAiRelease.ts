@@ -39,8 +39,8 @@ const clamp = (value: number, minimum: number, maximum: number): number => (
 const round = (value: number, precision = 100): number => Math.round(value * precision) / precision;
 
 /** Disclosed long-run balance thresholds, measured on the canonical 0-100 commercial score. */
-export const PLATFORM_AI_HIT_COMMERCIAL_SCORE = 85;
-export const PLATFORM_AI_FLOP_COMMERCIAL_SCORE = 74;
+export const PLATFORM_AI_HIT_COMMERCIAL_SCORE = 89;
+export const PLATFORM_AI_FLOP_COMMERCIAL_SCORE = 84.5;
 /**
  * A hit is measured against the audience scale and brand promise of the service
  * that released it. These public thresholds classify the same canonical
@@ -48,10 +48,10 @@ export const PLATFORM_AI_FLOP_COMMERCIAL_SCORE = 74;
  */
 export const PLATFORM_AI_OUTCOME_THRESHOLDS: Record<PlatformId, { hit: number; flop: number }> = {
     NETFLIX: { hit: PLATFORM_AI_HIT_COMMERCIAL_SCORE, flop: PLATFORM_AI_FLOP_COMMERCIAL_SCORE },
-    APPLE_TV: { hit: 85, flop: 81 },
-    DISNEY_PLUS: { hit: 88.5, flop: 85 },
-    HULU: { hit: 86, flop: 81.5 },
-    YOUTUBE: { hit: 89, flop: 85.5 },
+    APPLE_TV: { hit: 86, flop: 82 },
+    DISNEY_PLUS: { hit: 88, flop: 84 },
+    HULU: { hit: 84, flop: 80 },
+    YOUTUBE: { hit: 87.5, flop: 83.5 },
 };
 
 const activeCountryOperations = (platform: PlatformState): Map<string, NonNullable<PlatformState['ai']>['marketOperations'][number]> => (
@@ -216,6 +216,8 @@ export interface SchedulePlatformStreamingWindowInput {
     premiereAtAbsoluteWeek: number;
     localizationReadyAtAbsoluteWeek?: number;
     releasePattern?: PlatformAiReleasePattern;
+    /** Canonical turn-local plan snapshot; avoids rescanning a large historic slate during previews. */
+    planSnapshot?: PlatformAiContentPlan;
     /** Optional turn-local index; callers may reuse it across premiere previews. */
     projectIndex?: ReadonlyMap<string, IndustryProject>;
     /** Optional turn-local capacity count for this exact premiere week. */
@@ -239,7 +241,10 @@ export const schedulePlatformStreamingWindow = (
     const sourcePlatform = input.world.platforms?.[input.platformId];
     if (!sourcePlatform) return unchanged(input.world, null, 'PLATFORM_NOT_FOUND');
     const platform = normalizePlatformAiState(sourcePlatform, input.player.id, input.absoluteWeek);
-    const plan = findPlan(platform, input.planId);
+    const plan = input.planSnapshot?.id === input.planId
+        && input.planSnapshot.platformId === input.platformId
+        ? input.planSnapshot
+        : findPlan(platform, input.planId);
     if (!plan) return unchanged(input.world, null, 'PLAN_NOT_FOUND');
     if (input.premiereAtAbsoluteWeek <= input.absoluteWeek) return unchanged(input.world, plan, 'PREMIERE_NOT_FUTURE');
     if (platform.ai!.status !== 'ACTIVE') return unchanged(input.world, plan, 'COMPANY_INACTIVE');
@@ -260,8 +265,9 @@ export const schedulePlatformStreamingWindow = (
     const sourceProjectIds = plan.source === 'COMMISSIONED_ORIGINAL'
         ? [production!.canonicalProjectId]
         : plan.sourceProjectIds;
+    const sourceProjectsById = input.projectIndex || new Map(input.world.projects.map(project => [project.id, project]));
     if (!sourceProjectIds.length || (plan.source !== 'COMMISSIONED_ORIGINAL' && sourceProjectIds.some(projectId => (
-        !input.world.projects.some(project => project.id === projectId)
+        !sourceProjectsById.has(projectId)
     )))) {
         return unchanged(input.world, plan, 'SOURCE_NOT_FOUND');
     }
@@ -273,21 +279,28 @@ export const schedulePlatformStreamingWindow = (
     if (!hasSufficientLocalization(platform, plan)) {
         return unchanged(input.world, plan, 'LOCALIZATION_INSUFFICIENT');
     }
-    const localizationJobs = getReadyPlatformAiLocalizationJobs(
-        platform,
-        plan,
-        sourceProjectIds,
-        input.absoluteWeek,
-        input.world,
-        input.projectIndex,
-    );
-    if (localizationJobs.some(job => !job)) {
-        return unchanged(input.world, plan, 'LOCALIZATION_NOT_READY');
+    const cachedLocalizationReadyAtAbsoluteWeek = input.previewOnly
+        && Number.isFinite(input.localizationReadyAtAbsoluteWeek)
+        ? Math.max(input.absoluteWeek, Math.round(input.localizationReadyAtAbsoluteWeek!))
+        : null;
+    let localizationReadyAtAbsoluteWeek = cachedLocalizationReadyAtAbsoluteWeek;
+    if (localizationReadyAtAbsoluteWeek === null) {
+        const localizationJobs = getReadyPlatformAiLocalizationJobs(
+            platform,
+            plan,
+            sourceProjectIds,
+            input.absoluteWeek,
+            input.world,
+            input.projectIndex,
+        );
+        if (localizationJobs.some(job => !job)) {
+            return unchanged(input.world, plan, 'LOCALIZATION_NOT_READY');
+        }
+        localizationReadyAtAbsoluteWeek = Math.max(
+            input.absoluteWeek,
+            ...localizationJobs.map(job => job!.readyAtAbsoluteWeek!),
+        );
     }
-    const localizationReadyAtAbsoluteWeek = Math.max(
-        input.absoluteWeek,
-        ...localizationJobs.map(job => job!.readyAtAbsoluteWeek!),
-    );
 
     const contracts = new Map<string, OwnedStreamingCatalogLicense>();
     if (plan.source !== 'COMMISSIONED_ORIGINAL') {
@@ -313,7 +326,6 @@ export const schedulePlatformStreamingWindow = (
         return unchanged(input.world, plan, 'RELEASE_CAPACITY_EXCEEDED');
     }
 
-    const sourceProjectsById = input.projectIndex || new Map(input.world.projects.map(project => [project.id, project]));
     const releaseEntries: PlatformAiReleaseEntry[] = sourceProjectIds.map(projectId => {
         const mediaType = plan.source === 'COMMISSIONED_ORIGINAL'
             ? production!.projectType

@@ -17,6 +17,7 @@ import {
     getStreamingRightsContract,
     isStreamingLicenseActiveAt,
     millionsToFullCurrency,
+    normalizeStreamingRightsContractRegistry,
     registerStreamingRightsContract,
     validateStreamingRightsAvailability,
 } from '../streamingRightsCore';
@@ -25,6 +26,7 @@ import {
     getPlatformAiRightsRenewalContractId,
     getPlatformAiRightsRenewalId,
     getPlatformAiRightsRenewalObligationId,
+    markPlatformAiStateCanonicalForTurn,
     normalizePlatformAiRightsRenewals,
     normalizePlatformAiState,
     reconcilePlatformAiRightsRenewalObligations,
@@ -264,6 +266,7 @@ const resetInvalidSchedules = (
             premiereAtAbsoluteWeek: null,
             releasePattern: null,
             releaseEntries: [],
+            releaseReadiness: null,
             scheduledAtAbsoluteWeek: null,
         };
     });
@@ -298,6 +301,50 @@ const promoteObservedRenewalPayments = (platform: PlatformState): PlatformState 
         return { ...record, status: 'PAYMENT_SETTLED' as const };
     });
     return changed ? { ...platform, ai: { ...platform.ai!, rightsRenewals } } : platform;
+};
+
+const closePlansWithoutUsableRights = (
+    platform: PlatformState,
+    absoluteWeek: number,
+): PlatformState => {
+    const contractsById = new Map(platform.ai!.rightsContracts.map(contract => [contract.id, contract]));
+    const renewablePlanIds = new Set(platform.ai!.rightsRenewals
+        .filter(record => {
+            const renewalExpiresAt = record.nextStartsAtAbsoluteWeek + record.durationWeeks;
+            if (renewalExpiresAt < absoluteWeek) return false;
+            if (record.status === 'PENDING_PAYMENT' || record.status === 'PAYMENT_SETTLED') return true;
+            const renewal = record.renewalLicenseId ? contractsById.get(record.renewalLicenseId) : null;
+            return renewal?.status === 'ACTIVE' && renewal.expiresAtAbsoluteWeek >= absoluteWeek;
+        })
+        .map(record => record.platformContentPlanId));
+    let changed = false;
+    const closableStatuses = new Set<PlatformAiContentPlan['status']>([
+        'RIGHTS_READY', 'DELIVERED', 'LOCALIZED', 'SCHEDULED',
+    ]);
+    const slate = platform.ai!.slate.map(plan => {
+        if (plan.source === 'COMMISSIONED_ORIGINAL' || !closableStatuses.has(plan.status)
+            || !plan.rightsContractIds.length || renewablePlanIds.has(plan.id)) return plan;
+        const contracts = plan.rightsContractIds.flatMap(id => {
+            const contract = contractsById.get(id);
+            return contract ? [contract] : [];
+        });
+        if (contracts.some(contract => contract.status === 'ACTIVE' && contract.expiresAtAbsoluteWeek >= absoluteWeek)) {
+            return plan;
+        }
+        changed = true;
+        const transferred = contracts.some(contract => contract.status === 'TRANSFERRED_OUT');
+        return {
+            ...plan,
+            status: transferred ? 'SOLD' as const : 'CANCELLED' as const,
+            localizationReadyAtAbsoluteWeek: null,
+            premiereAtAbsoluteWeek: null,
+            releasePattern: null,
+            releaseEntries: [],
+            releaseReadiness: null,
+            scheduledAtAbsoluteWeek: null,
+        };
+    });
+    return changed ? { ...platform, ai: { ...platform.ai!, slate } } : platform;
 };
 
 const activateSettledRenewals = (
@@ -445,11 +492,11 @@ export const progressPlatformAiRightsLifecycle = (
     if (expiredLicenseIds.length) {
         platform = { ...platform, ai: { ...platform.ai!, rightsContracts } };
     }
-    const expiredCanonicalRegistry = expiredLicenseIds.reduce((registry, contractId) => {
+    const expiredCanonicalRegistry = normalizeStreamingRightsContractRegistry(expiredLicenseIds.reduce((registry, contractId) => {
         const canonical = registry?.[contractId];
         if (!canonical || canonical.status !== 'ACTIVE') return registry;
         return { ...registry, [contractId]: { ...canonical, status: 'EXPIRED' as const } };
-    }, input.world.streamingRightsContracts);
+    }, input.world.streamingRightsContracts));
     let world = updatePlatform(
         { ...input.world, streamingRightsContracts: expiredCanonicalRegistry },
         input.platformId,
@@ -461,6 +508,7 @@ export const progressPlatformAiRightsLifecycle = (
     world = updatePlatform(world, input.platformId, platform);
     const activated = activateSettledRenewals({ ...input, world }, platform);
     platform = activated.platform;
+    platform = closePlansWithoutUsableRights(platform, input.absoluteWeek);
     world = updatePlatform(world, input.platformId, platform);
     for (const contractId of activated.activatedRenewalLicenseIds) {
         const contract = platform.ai!.rightsContracts.find(candidate => candidate.id === contractId);
@@ -485,9 +533,10 @@ export const progressPlatformAiRightsLifecycle = (
     const alreadyQueuedLicenseIds = new Set(platform.ai!.rightsRenewals.map(record => record.previousLicenseId));
     const dueLicenseIds = platform.ai!.rightsContracts
         .filter(contract => (
-            contract.renewalOption
+            contract.status === 'ACTIVE'
+            && contract.renewalOption
             && !contract.permanentPurchase
-            && input.absoluteWeek >= contract.expiresAtAbsoluteWeek
+            && input.absoluteWeek === contract.expiresAtAbsoluteWeek
             && !alreadyQueuedLicenseIds.has(contract.id)
             && !Object.values(world.streamingRightsCalendar?.renewalCases || {})
                 .some(renewalCase => renewalCase.sourceContractId === contract.id)
@@ -495,6 +544,10 @@ export const progressPlatformAiRightsLifecycle = (
         .map(contract => contract.id)
         .sort();
     for (const licenseId of dueLicenseIds) {
+        const currentPlatform = world.platforms?.[input.platformId];
+        if (currentPlatform) {
+            markPlatformAiStateCanonicalForTurn(currentPlatform, input.player.id, input.absoluteWeek);
+        }
         const queued = queuePlatformAiRightsRenewal({ ...input, world, licenseId });
         if (!queued.changed || !queued.record) continue;
         world = queued.world;

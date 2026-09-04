@@ -1,7 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { INITIAL_PLAYER, Player, PastProject } from '../types';
-import { getActorCareerArc, getActorCareerArcTransition } from '../services/actorCareerArc';
+import {
+    getActorCareerArc,
+    getActorCareerArcTransition,
+    getActorCareerArcTransitionFromPrevious,
+} from '../services/actorCareerArc';
 
 const futurePotential: PastProject['futurePotential'] = {
     sequelChance: 0,
@@ -236,6 +240,30 @@ const comebackTransition = getActorCareerArcTransition(
     })
 );
 
+const previousComebackPlayer = clonePlayer({
+    stats: { ...INITIAL_PLAYER.stats, fame: 58, reputation: 42, experience: 60 },
+    pastProjects: [
+        project('miss-before-turnaround', 25, 4.8, 'FAILURE', 8_000_000, 70_000_000),
+        project('second-miss-before-turnaround', 26, 4.9, 'MAJOR_FAILURE', 9_000_000, 80_000_000),
+    ],
+});
+const currentComebackPlayer = clonePlayer({
+    stats: { ...INITIAL_PLAYER.stats, fame: 62, reputation: 55, experience: 64 },
+    pastProjects: [
+        ...previousComebackPlayer.pastProjects,
+        project('turnaround-hit', 27, 8.1, 'SUCCESS', 140_000_000, 30_000_000),
+    ],
+});
+const compactComebackTransition = getActorCareerArcTransitionFromPrevious(
+    getActorCareerArc(previousComebackPlayer),
+    currentComebackPlayer,
+);
+const unchangedPlayer = clonePlayer();
+const compactUnchangedTransition = getActorCareerArcTransitionFromPrevious(
+    getActorCareerArc(unchangedPlayer),
+    unchangedPlayer,
+);
+
 const comebackArc = getActorCareerArc(cases.find(item => item.expected === 'COMEBACK')!.player);
 const arcMetadataFailures = [
     !comebackArc.labelKey && 'COMEBACK arc should expose a translation labelKey',
@@ -246,6 +274,9 @@ const arcMetadataFailures = [
     comebackTransition?.previous.id !== 'FLOP_ERA' && `transition should start from FLOP_ERA, got ${comebackTransition?.previous.id || 'none'}`,
     comebackTransition?.current.id !== 'COMEBACK' && `transition should end at COMEBACK, got ${comebackTransition?.current.id || 'none'}`,
     comebackTransition?.logKey !== 'home.actorArc.COMEBACK.changeLog' && `transition should expose COMEBACK log key, got ${comebackTransition?.logKey || 'none'}`,
+    JSON.stringify(compactComebackTransition) !== JSON.stringify(getActorCareerArcTransition(previousComebackPlayer, currentComebackPlayer))
+        && 'compact previous-arc transition should match the full-player transition',
+    compactUnchangedTransition !== null && 'compact previous-arc transition should stay null when the arc is unchanged',
 ].filter(Boolean);
 
 const root = process.cwd();

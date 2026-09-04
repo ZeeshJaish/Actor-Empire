@@ -11,6 +11,7 @@ import type {
 import {
     buildPlatformContentCandidates,
     commitPlatformContentCandidate,
+    normalizePlatformAiState,
     normalizeWorldPlatformAi,
     resolvePlatformLocalizationLevel,
 } from '../services/platformAi';
@@ -165,7 +166,15 @@ assert.equal(originalCommit.changed, true);
 assert.equal(originalCommit.world.projects.length, world.projects.length, 'An original brief must not create a project in Phase 2.');
 assert.equal(originalCommit.plan?.status, 'BRIEF');
 assert.equal(originalCommit.plan?.industryProductionId, null);
+assert.equal(originalCommit.plan?.productionHoldStartedAtAbsoluteWeek, null);
+assert.equal(originalCommit.plan?.releaseReadiness, null);
 assert.equal('production' in originalCommit.plan!, false, 'Platform plans must reference producer-owned productions instead of nesting them.');
+assert.ok(
+    (originalCommit.plan?.localizationRequirements || []).every(requirement => (
+        !Object.prototype.hasOwnProperty.call(requirement, 'sourceProjectId')
+    )),
+    'A commissioned-original localization promise must omit its not-yet-created source project ID.',
+);
 assert.equal(originalCommit.world.platforms?.NETFLIX.ai?.rightsContracts.length, 0);
 const boundedSourcingWorld = structuredClone(world);
 boundedSourcingWorld.platforms!.NETFLIX.ai!.decisionHistory = Array.from({ length: 100 }, (_, index) => ({
@@ -272,6 +281,52 @@ assert.deepEqual(
     catalogueContracts.map(contract => contract.id).sort(),
 );
 assert.equal(catalogueCommit.world.projects.length, world.projects.length);
+const normalizedCataloguePlatform = normalizePlatformAiState(
+    structuredClone(catalogueCommit.world.platforms!.NETFLIX),
+    fixture.id,
+    ABSOLUTE_WEEK + 1,
+);
+assert.deepEqual(
+    [...new Set((normalizedCataloguePlatform.ai!.slate.find(plan => plan.id === catalogueCommit.plan!.id)
+        ?.localizationRequirements || []).map(requirement => requirement.sourceProjectId))].sort(),
+    catalogue.sourceProjectIds.slice().sort(),
+    'Reloading a catalogue plan must preserve localization promises for every component title.',
+);
+
+const mixedLanguageWorld = structuredClone(world);
+mixedLanguageWorld.projects = mixedLanguageWorld.projects.map(project => ({
+    ...project,
+    originalLanguageId: project.id === catalogue.sourceProjectIds[0] ? 'hindi' : 'english',
+}));
+const mixedLanguageNetflix = mixedLanguageWorld.platforms!.NETFLIX;
+mixedLanguageNetflix.ai!.marketOperations = mixedLanguageNetflix.ai!.marketOperations.map(operation => ({
+    ...operation,
+    status: operation.countryId === 'IN' || operation.countryId === 'JP' ? 'ACTIVE' : 'PLANNED',
+}));
+mixedLanguageNetflix.ai!.capabilities.activeCountryIds = ['IN', 'JP'];
+mixedLanguageNetflix.ai!.languageCapabilities = [{
+    languageId: 'hindi',
+    subtitleLevel: 2,
+    dubbingLevel: 2,
+    source: 'LANGUAGE_PACKAGE',
+    sourceReferenceId: 'mixed-catalogue-audit',
+    activatedAtAbsoluteWeek: ABSOLUTE_WEEK,
+}];
+const mixedLanguageCatalogueCommit = commitPlatformContentCandidate({
+    ...netflixInput,
+    world: mixedLanguageWorld,
+    candidate: catalogue,
+});
+assert.equal(mixedLanguageCatalogueCommit.changed, true);
+assert.equal(
+    mixedLanguageCatalogueCommit.plan?.localizationLevel,
+    'DUBS_AND_SUBTITLES',
+    'One catalogue title with no supported asset must not erase supported localization promised for the remaining titles.',
+);
+assert.ok(
+    (mixedLanguageCatalogueCommit.plan?.localizationRequirements?.length || 0) > 0,
+    'A mixed-language catalogue should persist its supported per-title localization requirements.',
+);
 
 const transferCommit = commitPlatformContentCandidate({
     player: fixture,

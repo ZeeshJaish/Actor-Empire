@@ -1805,7 +1805,7 @@ export const deTranslations: Record<TranslationKey, string> = {
         'forbes.studioProfile.acquisitionState.NOT_FOR_SALE.note': 'Ownership is firmly held.',
         'forbes.studioProfile.acquisitionState.OPEN_TO_OFFERS.label': 'Open to offers',
         'forbes.studioProfile.acquisitionState.OPEN_TO_OFFERS.note': 'The board will hear serious approaches.',
-        'forbes.studioProfile.acquisitionState.DISTRESSED.label': 'Distressed',
+        'forbes.studioProfile.acquisitionState.DISTRESSED.label': 'Vorstand unter Druck',
         'forbes.studioProfile.acquisitionState.DISTRESSED.note': 'Operating pressure is weakening leverage.',
         'forbes.studioProfile.acquisitionState.SEEKING_INVESTMENT.label': 'Seeking investment',
         'forbes.studioProfile.acquisitionState.SEEKING_INVESTMENT.note': 'Fresh capital could unlock the next slate.',

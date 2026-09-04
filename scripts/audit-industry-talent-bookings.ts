@@ -14,6 +14,7 @@ import {
     getIndustryProduction,
     normalizeIndustryProductions,
     removeIndustryProduction,
+    upsertCanonicalIndustryProduction,
     upsertIndustryProduction,
 } from '../services/industryProductions';
 import { migratePlayerSave } from '../services/saveMigration';
@@ -164,6 +165,11 @@ const withProduction = upsertIndustryProduction(sourceRegistry, production);
 assert.deepEqual(sourceRegistry, {}, 'Production upsert must not mutate the source registry.');
 assert.equal(getIndustryProduction(withProduction, production.id)?.writerId, null, 'Industry productions must use the in-house writer representation without fake NPCs.');
 assert.deepEqual(normalizeIndustryProductions(withProduction), withProduction, 'Normalized production registries should be idempotent.');
+assert.deepEqual(
+    upsertCanonicalIndustryProduction(withProduction, { ...production, paidMillions: 8 }),
+    upsertIndustryProduction(withProduction, { ...production, paidMillions: 8 }),
+    'Canonical production updates must preserve the full normalizer result without reparsing unrelated records.',
+);
 assert.deepEqual(removeIndustryProduction(withProduction, production.id), {}, 'Registry removal should be pure and deterministic.');
 
 const migrationInput = structuredClone(INITIAL_PLAYER) as Player;

@@ -7,13 +7,10 @@ import {
     type Player,
     type WorldState,
 } from '../../types';
-import { buildPlatformContentCandidates, commitPlatformContentCandidate } from './platformAiContentSourcing';
-import { choosePlatformContentCandidate } from './platformAiPlanning';
 import { commissionPlatformAiOriginal } from './platformAiCommissioning';
 import { progressPlatformAiProduction } from './platformAiProduction';
-import { commitPlatformResearch, progressPlatformResearch } from './platformAiResearch';
-import { choosePlatformResearchPortfolio } from './platformAiResearchPortfolio';
-import { choosePlatformMarketExpansion, commitPlatformMarketExpansion, progressPlatformMarketExpansion } from './platformAiMarkets';
+import { progressPlatformResearch } from './platformAiResearch';
+import { progressPlatformMarketExpansion } from './platformAiMarkets';
 import { settlePlatformAiEconomy } from './platformAiEconomy';
 import { progressPlatformAiRightsLifecycle } from './platformAiRightsLifecycle';
 import { planPlatformAiLocalization, progressPlatformAiLocalization } from './platformAiLocalization';
@@ -27,13 +24,19 @@ import { PLATFORM_AI_PROFILES } from './platformAiProfiles';
 import {
     markPlatformAiStateCanonicalForTurn,
     normalizePlatformAiState,
+    reconcilePlatformAiLocalizationObligations,
     resolvePlatformController,
 } from './platformAiState';
+import { adaptPlatformIntelligenceContext } from '../industryIntelligence/platformIntelligenceAdapter';
+import { processIndustryIntelligenceShadowCompany } from '../industryIntelligence/industryIntelligenceCoordinator';
+import { collectIndustryContentGlobalRecent } from '../industryIntelligence/industryContentShadow';
 import { getStreamingCountryMarketProfile } from '../streamingDayOneMarkets';
 import { progressPlatformAiDistressWorld } from './platformAiDistress';
-import { hasEligiblePlayerProductionStudio, hasOpenPlayerCommissionForPlan } from './platformAiPlayerCommissions';
+import { hasOpenPlayerCommissionForPlan } from './platformAiPlayerCommissions';
 import { getPlatformAiLocalizationRequirements } from './platformAiLocalizationCore';
 import { choosePlatformAiPremiere } from './platformAiReleaseReadiness';
+import { processPlatformAiRightsResaleWeek } from './platformAiRightsResale';
+import { executePlatformIntelligenceProposals } from './platformIntelligenceExecution';
 
 const PLATFORM_TURN_ORDER: PlatformId[] = ['NETFLIX', 'APPLE_TV', 'DISNEY_PLUS', 'HULU', 'YOUTUBE'];
 const MAX_PREMIERE_SEARCH_WEEKS = 52;
@@ -145,6 +148,9 @@ const ensureLocalizationJobs = (
 ): WorldState => {
     let nextWorld = world;
     const projectIndex = new Map(world.projects.map(project => [project.id, project]));
+    const existingJobKeys = new Set((nextWorld.platforms?.[platformId].ai?.localizationJobs || []).map(job => (
+        `${job.contentPlanId}\u0000${job.projectId}\u0000${job.languageId}\u0000${job.mode}`
+    )));
     const plans = (nextWorld.platforms?.[platformId].ai?.slate || [])
         .filter(plan => plan.status === 'RIGHTS_READY' || plan.status === 'DELIVERED')
         .sort((left, right) => left.id.localeCompare(right.id));
@@ -162,6 +168,8 @@ const ensureLocalizationJobs = (
             const project = projectIndex.get(projectId);
             const requirements = getPlatformAiLocalizationRequirements(currentPlatform, plan, project);
             for (const requirement of requirements.filter(item => item.mandatory && item.supported)) {
+                const jobKey = `${plan.id}\u0000${projectId}\u0000${requirement.languageId}\u0000${requirement.mode}`;
+                if (existingJobKeys.has(jobKey)) continue;
                 markCurrentPlatformCanonical(nextWorld, platformId, player.id, absoluteWeek);
                 const planned = planPlatformAiLocalization({
                     player: { ...player, world: nextWorld },
@@ -174,6 +182,7 @@ const ensureLocalizationJobs = (
                     languageId: requirement.languageId,
                     mode: requirement.mode,
                 });
+                if (planned.job) existingJobKeys.add(jobKey);
                 if (planned.changed) nextWorld = updatePlatform(nextWorld, platformId, planned.platform);
             }
         }
@@ -205,6 +214,8 @@ const scheduleReadyPlans = (
             projectIndex,
         );
         if (!prepared) continue;
+        const preparedPlan = prepared.world.platforms?.[platformId].ai?.slate.find(plan => plan.id === planId);
+        if (!preparedPlan) continue;
         const competingByWeek = new Map<number, {
             premiereTitleCount: number;
             scheduledTitleCount: number;
@@ -247,6 +258,7 @@ const scheduleReadyPlans = (
                 world: prepared.world,
                 platformId,
                 planId,
+                planSnapshot: preparedPlan,
                 absoluteWeek,
                 premiereAtAbsoluteWeek,
                 localizationReadyAtAbsoluteWeek: prepared.localizationReadyAtAbsoluteWeek,
@@ -300,6 +312,7 @@ const scheduleReadyPlans = (
                 world: prepared.world,
                 platformId,
                 planId,
+                planSnapshot: preparedPlan,
                 absoluteWeek,
                 premiereAtAbsoluteWeek: choice.premiereAtAbsoluteWeek,
                 localizationReadyAtAbsoluteWeek: prepared.localizationReadyAtAbsoluteWeek,
@@ -407,82 +420,6 @@ const retryPendingOriginalCommissions = (
     return nextWorld;
 };
 
-const runPlanningCycle = (
-    player: Player,
-    world: WorldState,
-    platformId: PlatformId,
-    absoluteWeek: number,
-): WorldState => {
-    let nextWorld = world;
-    markCurrentPlatformCanonical(nextWorld, platformId, player.id, absoluteWeek);
-    const researchPortfolio = choosePlatformResearchPortfolio({
-        player,
-        world: nextWorld,
-        platformId,
-        absoluteWeek,
-    });
-    for (const researchChoice of researchPortfolio.choices) {
-        markCurrentPlatformCanonical(nextWorld, platformId, player.id, absoluteWeek);
-        const committedResearch = commitPlatformResearch({
-            player,
-            world: nextWorld,
-            platformId,
-            absoluteWeek,
-            choice: researchChoice,
-        });
-        if (!committedResearch.changed) break;
-        nextWorld = committedResearch.world;
-    }
-    markCurrentPlatformCanonical(nextWorld, platformId, player.id, absoluteWeek);
-    const marketChoice = choosePlatformMarketExpansion({ player, world: nextWorld, platformId, absoluteWeek });
-    if (marketChoice) {
-        markCurrentPlatformCanonical(nextWorld, platformId, player.id, absoluteWeek);
-        nextWorld = commitPlatformMarketExpansion({
-            player,
-            world: nextWorld,
-            platformId,
-            absoluteWeek,
-            countryId: marketChoice.countryId,
-        }).world;
-    }
-    const platform = nextWorld.platforms?.[platformId];
-    if (!platform?.ai) return nextWorld;
-    markCurrentPlatformCanonical(nextWorld, platformId, player.id, absoluteWeek);
-    const candidates = buildPlatformContentCandidates({ player, world: nextWorld, platformId, absoluteWeek });
-    const candidate = choosePlatformContentCandidate({
-        player,
-        platformId,
-        absoluteWeek,
-        strategyCycle: platform.ai.strategyCycle,
-        strategySkill: platform.ai.competence.strategy,
-        candidates,
-        platform,
-    });
-    if (!candidate) return nextWorld;
-    markCurrentPlatformCanonical(nextWorld, platformId, player.id, absoluteWeek);
-    const committed = commitPlatformContentCandidate({
-        player,
-        world: nextWorld,
-        platformId,
-        absoluteWeek,
-        candidate,
-    });
-    nextWorld = committed.world;
-    if (committed.changed
-        && committed.plan?.source === 'COMMISSIONED_ORIGINAL'
-        && !hasEligiblePlayerProductionStudio(player, platformId)) {
-        markCurrentPlatformCanonical(nextWorld, platformId, player.id, absoluteWeek);
-        nextWorld = commissionPlatformAiOriginal({
-            player,
-            world: nextWorld,
-            platformId,
-            planId: committed.plan.id,
-            absoluteWeek,
-        }).world;
-    }
-    return nextWorld;
-};
-
 const presentationNews = (
     platformId: PlatformId,
     platform: PlatformState,
@@ -530,7 +467,7 @@ export const processPlatformAiWorldTurn = (
         const sourcePlatform = nextWorld.platforms?.[platformId];
         if (!sourcePlatform) continue;
         const normalizedAtCurrentWeek = normalizePlatformAiState(sourcePlatform, player.id, absoluteWeek);
-        const normalized: PlatformState = sourcePlatform.ai
+        let normalized: PlatformState = sourcePlatform.ai
             ? normalizedAtCurrentWeek
             : {
                 ...normalizedAtCurrentWeek,
@@ -543,6 +480,19 @@ export const processPlatformAiWorldTurn = (
                 },
             };
         if (normalized.ai!.lastProcessedAbsoluteWeek >= absoluteWeek) continue;
+        try {
+            const context = adaptPlatformIntelligenceContext({ ...player, world: nextWorld }, normalized, absoluteWeek);
+            const shadow = processIndustryIntelligenceShadowCompany({
+                context,
+                state: normalized.ai!.intelligence!,
+                globalRecentFingerprints: collectIndustryContentGlobalRecent(nextWorld, normalized.id),
+            });
+            if (shadow.changed) {
+                normalized = { ...normalized, ai: { ...normalized.ai!, intelligence: shadow.state } };
+            }
+        } catch {
+            // Shadow intelligence must never interrupt the authoritative platform turn.
+        }
         const knownEventIds = new Set(getPlatformAiPresentationEvents(normalized).map(event => event.id));
         knownPresentationEventIds.set(platformId, knownEventIds);
         nextWorld = updatePlatform(nextWorld, platformId, normalized);
@@ -593,10 +543,13 @@ export const processPlatformAiWorldTurn = (
         const beforePlanning = nextWorld.platforms![platformId];
         const planningDue = beforePlanning.ai!.status === 'ACTIVE'
             && absoluteWeek >= beforePlanning.ai!.nextPlanningAbsoluteWeek;
-        if (planningDue) {
-            nextWorld = runPlanningCycle(player, nextWorld, platformId, absoluteWeek);
-        }
-
+        const intelligenceExecution = executePlatformIntelligenceProposals({
+            player: { ...player, world: nextWorld },
+            world: nextWorld,
+            platformId,
+            absoluteWeek,
+        });
+        nextWorld = intelligenceExecution.world;
         const completedPlatform = nextWorld.platforms![platformId];
         const checkpointed: PlatformState = {
             ...completedPlatform,
@@ -616,6 +569,19 @@ export const processPlatformAiWorldTurn = (
 
     for (const platformId of PLATFORM_TURN_ORDER) {
         if (resolvePlatformController(player, platformId) !== 'PLAYER') {
+            const platform = nextWorld.platforms?.[platformId];
+            if (platform?.ai) {
+                nextWorld = updatePlatform(nextWorld, platformId, {
+                    ...platform,
+                    ai: {
+                        ...platform.ai,
+                        pendingOneTimeObligations: reconcilePlatformAiLocalizationObligations(
+                            platform.ai.pendingOneTimeObligations,
+                            platform.ai.localizationJobs,
+                        ),
+                    },
+                });
+            }
             markCurrentPlatformCanonical(nextWorld, platformId, player.id, absoluteWeek);
         }
     }
@@ -624,6 +590,31 @@ export const processPlatformAiWorldTurn = (
         world: nextWorld,
         absoluteWeek,
     }).world;
+    nextWorld = processPlatformAiRightsResaleWeek(
+        { ...player, world: nextWorld },
+        nextWorld,
+        absoluteWeek,
+    ).world;
+
+    // Cross-platform distress and resale can append or compact shared payment
+    // queues after an individual platform has settled its economy. Reconcile
+    // started localization work once more at the world handoff boundary.
+    for (const platformId of PLATFORM_TURN_ORDER) {
+        if (resolvePlatformController(player, platformId) === 'PLAYER') continue;
+        const platform = nextWorld.platforms?.[platformId];
+        if (!platform?.ai) continue;
+        nextWorld = updatePlatform(nextWorld, platformId, {
+            ...platform,
+            ai: {
+                ...platform.ai,
+                pendingOneTimeObligations: reconcilePlatformAiLocalizationObligations(
+                    platform.ai.pendingOneTimeObligations,
+                    platform.ai.localizationJobs,
+                ),
+            },
+        });
+        markCurrentPlatformCanonical(nextWorld, platformId, player.id, absoluteWeek);
+    }
 
     // Distress and rescue decisions are resolved after each platform's economy.
     // Build presentation from the final turn state so those major moves are not

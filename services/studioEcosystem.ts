@@ -15,6 +15,15 @@ export interface StudioProjectOutcome {
     profitMillions: number;
 }
 
+export interface ExactStudioProjectSettlement {
+    productionSpendMillions: number;
+    marketingSpendMillions: number;
+    studioReceiptsMillions: number;
+    netResultMillions: number;
+    cashAlreadySettled: boolean;
+    outcome?: StudioReleaseOutcome;
+}
+
 const clamp = (value: number, min = 0, max = 100) => Math.max(min, Math.min(max, Number.isFinite(value) ? value : min));
 const clampMoneyMillions = (value: number) => Math.max(0, Number.isFinite(value) ? value : 0);
 const roundOne = (value: number) => Math.round(value * 10) / 10;
@@ -138,9 +147,17 @@ export const evaluateStudioProjectOutcome = (project: IndustryProject): StudioPr
 export const applyStudioProjectOutcome = (
     world: WorldState,
     project: IndustryProject,
+    exactSettlement?: ExactStudioProjectSettlement,
 ): { world: WorldState; outcome: StudioProjectOutcome } => {
     const nextWorld = ensureStudioEcosystem(world);
-    const outcome = evaluateStudioProjectOutcome(project);
+    const evaluated = evaluateStudioProjectOutcome(project);
+    const outcome: StudioProjectOutcome = exactSettlement ? {
+        ...evaluated,
+        outcome: exactSettlement.outcome || (exactSettlement.netResultMillions >= exactSettlement.productionSpendMillions * 0.6 ? 'HIT' : exactSettlement.netResultMillions < 0 ? 'FLOP' : 'SOLID'),
+        budget: Math.round(exactSettlement.productionSpendMillions * 1_000_000),
+        profit: Math.round(exactSettlement.netResultMillions * 1_000_000),
+        profitMillions: exactSettlement.netResultMillions,
+    } : evaluated;
     const studio = normalizeStudioState(nextWorld.studios![project.studioId] || getDefaultStudioState(project.studioId));
     const qualitySignal = ((project.quality || 50) - 55) / 90;
     const profitValuationSignal = Math.max(-0.18, Math.min(0.28, outcome.profitMillions / Math.max(550, studio.valuation * 160)));
@@ -149,7 +166,7 @@ export const applyStudioProjectOutcome = (
     const valuationMultiplier = 1 + ((outcomeSignal + profitValuationSignal + qualitySignal * 0.025) * budgetSignal);
     const valuationFloor = getLegacyStudioValuationFloor(studio.id);
     const profitCashShare = outcome.profitMillions >= 0 ? 0.46 : 0.68;
-    const nextCash = studio.cashReserve + (outcome.profitMillions * profitCashShare);
+    const nextCash = exactSettlement?.cashAlreadySettled ? studio.cashReserve : studio.cashReserve + (outcome.profitMillions * profitCashShare);
     const momentumDelta = outcome.outcome === 'HIT'
         ? 12 + Math.min(8, outcome.profitMillions / 120)
         : outcome.outcome === 'FLOP'

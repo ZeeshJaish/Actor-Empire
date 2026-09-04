@@ -98,7 +98,6 @@ const pick = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)];
 export const generateWeeklyEvent = async (age: number, job: string, fame: number): Promise<string> => {
     // 50% chance of an idle week (no specific event)
     if (Math.random() < 0.5) {
-        await new Promise(resolve => setTimeout(resolve, 300));
         return pick(IDLE_EVENTS);
     }
 
@@ -111,10 +110,6 @@ export const generateWeeklyEvent = async (age: number, job: string, fame: number
     if (job === 'Unemployed') {
         pool = [...pool, ...UNEMPLOYED_EVENTS];
     }
-
-    // Simulate async delay slightly to feel like processing, 
-    // though not strictly necessary, it keeps the 'Loading...' state briefly visible which feels responsive.
-    await new Promise(resolve => setTimeout(resolve, 300));
 
     return pick(pool);
 };

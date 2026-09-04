@@ -45,7 +45,7 @@ const GUARANTEE_DISPOSITIONS = new Set<StreamingRightsGuaranteeDisposition>([
 ]);
 const TERRITORIES = new Set<StreamingLicenseTerritory>(['DOMESTIC', 'MULTI_REGION', 'GLOBAL']);
 const EXCLUSIVITY_TERMS = new Set<StreamingLicenseExclusivity>(['NON_EXCLUSIVE', 'EXCLUSIVE']);
-const LICENSE_STATUSES = new Set<StreamingCatalogLicenseStatus>(['ACTIVE', 'EXPIRED', 'TERMINATED']);
+const LICENSE_STATUSES = new Set<StreamingCatalogLicenseStatus>(['ACTIVE', 'EXPIRED', 'TERMINATED', 'TRANSFERRED_OUT']);
 const SELLER_TYPES = new Set<StreamingRightsSellerType>(['STUDIO', 'PLATFORM']);
 const WINDOW_TYPES = new Set<StreamingRightsWindowType>(['FIRST_WINDOW', 'SECOND_WINDOW', 'PERMANENT']);
 const CHANGE_OF_CONTROL_TERMS = new Set<StreamingRightsChangeOfControl>(['NONE', 'NOTICE', 'CONSENT_REQUIRED']);
@@ -58,6 +58,7 @@ const LEGACY_SOURCES = new Set([
 ]);
 const GUARANTEE_RECOUPMENT_TERMS = new Set<StreamingGuaranteeRecoupment>(['NON_RECOUPABLE', 'RECOUPABLE']);
 const PLATFORM_IDS = new Set<PlatformId>(['NETFLIX', 'APPLE_TV', 'DISNEY_PLUS', 'HULU', 'YOUTUBE']);
+const canonicalStreamingRightsRegistries = new WeakSet<object>();
 
 const asRecord = (value: unknown): Record<string, any> => (
     value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, any> : {}
@@ -209,12 +210,23 @@ const normalizeStreamingRightsContract = (value: unknown): StreamingRightsContra
         legacySource: LEGACY_SOURCES.has(source.legacySource)
             ? source.legacySource
             : undefined,
+        rootContractId: cleanText(source.rootContractId, id, 180),
+        parentContractId: cleanText(source.parentContractId, '', 180) || null,
+        rightsTransactionId: cleanText(source.rightsTransactionId, '', 180) || null,
+        transferredToContractId: cleanText(source.transferredToContractId, '', 180) || null,
+        transferredAtAbsoluteWeek: source.transferredAtAbsoluteWeek === null
+            || source.transferredAtAbsoluteWeek === undefined
+            ? null
+            : finiteWeek(source.transferredAtAbsoluteWeek),
     };
 };
 
 export const normalizeStreamingRightsContractRegistry = (
     value: unknown,
 ): StreamingRightsContractRegistry => {
+    if (value && typeof value === 'object' && canonicalStreamingRightsRegistries.has(value)) {
+        return value as StreamingRightsContractRegistry;
+    }
     const source = asRecord(value);
     const registry: StreamingRightsContractRegistry = {};
     Object.values(source).forEach(rawContract => {
@@ -222,15 +234,31 @@ export const normalizeStreamingRightsContractRegistry = (
         if (!contract || registry[contract.id]) return;
         registry[contract.id] = contract;
     });
+    canonicalStreamingRightsRegistries.add(registry);
     return registry;
 };
 
 export const getStreamingRightsContract = (
     registry: StreamingRightsContractRegistry | null | undefined,
     contractId: string,
-): StreamingRightsContract | null => (
-    normalizeStreamingRightsContractRegistry(registry)[cleanText(contractId, '', 180)] || null
-);
+): StreamingRightsContract | null => {
+    const canonicalId = cleanText(contractId, '', 180);
+    if (!canonicalId) return null;
+    const directValue = registry && Object.prototype.hasOwnProperty.call(registry, canonicalId)
+        ? registry[canonicalId]
+        : null;
+    if (
+        registry
+        && canonicalStreamingRightsRegistries.has(registry)
+        && directValue?.id === canonicalId
+    ) return directValue;
+    const direct = directValue ? normalizeStreamingRightsContract(directValue) : null;
+    if (direct?.id === canonicalId) return direct;
+    // Legacy/malformed saves may still carry a canonical contract under a
+    // non-canonical object key. Preserve that migration-safe fallback without
+    // paying the full-registry normalization cost on every normal lookup.
+    return normalizeStreamingRightsContractRegistry(registry)[canonicalId] || null;
+};
 
 export const registerStreamingRightsContract = (
     value: StreamingRightsContractRegistry | null | undefined,
@@ -246,6 +274,7 @@ export const registerStreamingRightsContract = (
         return { registry: originalRegistry, contract: existing, changed: false };
     }
     const nextRegistry = { ...registry, [normalizedCandidate.id]: normalizedCandidate };
+    canonicalStreamingRightsRegistries.add(nextRegistry);
     return { registry: nextRegistry, contract: normalizedCandidate, changed: true };
 };
 
@@ -324,6 +353,12 @@ export const createStreamingRightsContractFromLicense = (
  */
 export const migrateStreamingRightsContractRegistry = (player: Player): Player => {
     let registry = normalizeStreamingRightsContractRegistry(player.world.streamingRightsContracts);
+    const currentAbsoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+    const hasCanonicalRegistry = Object.keys(registry).length > 0;
+    const shouldImportBuyerProjection = (license: OwnedStreamingCatalogLicense): boolean => (
+        !hasCanonicalRegistry
+        || license.status === 'ACTIVE' && license.expiresAtAbsoluteWeek >= currentAbsoluteWeek
+    );
     const ownedIdentity = player.ownedStreamingPlatform?.identity;
     const ownedBuyer: StreamingRightsContractParty = {
         type: 'PLAYER_PLATFORM',
@@ -331,7 +366,7 @@ export const migrateStreamingRightsContractRegistry = (player: Player): Player =
         name: ownedIdentity?.name || 'Player streaming platform',
         platformId: null,
     };
-    (player.ownedStreamingPlatform?.catalogLicenses || []).forEach(license => {
+    (player.ownedStreamingPlatform?.catalogLicenses || []).filter(shouldImportBuyerProjection).forEach(license => {
         const result = registerStreamingRightsContract(registry, createStreamingRightsContractFromLicense({
             license,
             buyer: ownedBuyer,
@@ -344,7 +379,7 @@ export const migrateStreamingRightsContractRegistry = (player: Player): Player =
     Object.entries(player.world.platforms || {})
         .sort(([leftId], [rightId]) => leftId.localeCompare(rightId))
         .forEach(([platformId, platform]) => {
-            (platform.ai?.rightsContracts || []).forEach(license => {
+            (platform.ai?.rightsContracts || []).filter(shouldImportBuyerProjection).forEach(license => {
                 const buyer: StreamingRightsContractParty = {
                     type: 'AI_PLATFORM',
                     id: platformId,
@@ -361,7 +396,6 @@ export const migrateStreamingRightsContractRegistry = (player: Player): Player =
                 registry = result.registry;
             });
         });
-    const currentAbsoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
     const activeReleases = (player.activeReleases || []).map(release => {
         if (release.distributionPhase !== 'STREAMING' || !release.streaming?.platformId) return release;
         const referencedContractId = cleanText(release.streamingContractId || release.streaming.contractId, '', 180);

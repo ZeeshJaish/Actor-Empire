@@ -1,32 +1,20 @@
 
-import { WorldState, IndustryProject, StudioId, BudgetTier, Genre, Player, NPCActor, NewsItem, UniverseId, Universe, Festival, TargetAudience } from '../types';
+import { WorldState, IndustryProject, StudioId, BudgetTier, Genre, Player, NPCActor, NewsItem, Universe, Festival, TargetAudience, XPost } from '../types';
 import { STUDIO_CATALOG } from './studioLogic';
 import { NPC_DATABASE, calculateProjectFameMultiplier, isCastableActor } from './npcLogic';
 import { generateProjectTitle, getEstimatedBudget, generateProjectDetails } from './roleLogic';
-import { initUniverses, normalizeUniverseMap, processUniverseTurn } from './universeLogic';
+import { normalizeUniverseMap } from './universeLogic';
 import { processNpcVentures, syncNpcVenturesToStudios } from './npcVentureLogic';
 import { ALL_GENRES } from './genreCatalog';
-import { applyPassiveStudioEcosystemTurn, applyStudioProjectOutcome, ensureStudioEcosystem } from './studioEcosystem';
+import { ensureStudioEcosystem } from './studioEcosystem';
 import { getPlayerLanguage, t } from './i18n';
+import { getCanonicalScheduledRivals } from './industryWorld/publicIndustryProjection';
 
 // Helpers
 const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
 const GENRES: Genre[] = ALL_GENRES;
 const clampScore = (value: number) => Math.max(0, Math.min(100, Math.round(value)));
 const getWorldAbsoluteWeek = (year: number, week: number) => ((year - 1) * 52) + (week - 1);
-const getWorldYearWeek = (absoluteWeek: number) => ({
-    year: Math.floor(Math.max(0, absoluteWeek) / 52) + 1,
-    week: (Math.max(0, absoluteWeek) % 52) + 1,
-});
-const normalizeScheduledIndustryProject = (project: IndustryProject): IndustryProject => {
-    if (project.weekReleased >= 1 && project.weekReleased <= 52) return project;
-    const normalized = getWorldYearWeek(getWorldAbsoluteWeek(project.year, project.weekReleased));
-    return {
-        ...project,
-        year: normalized.year,
-        weekReleased: normalized.week,
-    };
-};
 
 export const FESTIVALS: Festival[] = [
     { id: 'sundance', name: '', nameKey: 'services.worldLogic.festival.sundance.name', weeks: [3, 4], prestigeReq: 60, cost: 100000, description: '', descriptionKey: 'services.worldLogic.festival.sundance.description' },
@@ -189,107 +177,21 @@ export const generateIndustryProject = (
 };
 
 // 2. Process World Turn (Runs Weekly)
-export const processWorldTurn = (player: Player): { world: WorldState, news: NewsItem[], logs: string[] } => {
+export const processWorldTurn = (player: Player): { world: WorldState, news: NewsItem[], socialPosts: XPost[], logs: string[] } => {
     const language = getPlayerLanguage(player);
     let newWorld = { ...player.world };
     const news: NewsItem[] = [];
+    const socialPosts: XPost[] = [];
     const logs: string[] = [];
+    const currentAbsoluteWeek = getWorldAbsoluteWeek(player.age, player.currentWeek);
     if (!newWorld.npcVentures) newWorld.npcVentures = {};
-    newWorld = syncNpcVenturesToStudios(newWorld);
+    newWorld = syncNpcVenturesToStudios(newWorld, currentAbsoluteWeek);
     newWorld = ensureStudioEcosystem(newWorld);
     newWorld.universes = normalizeUniverseMap(newWorld.universes, language);
 
-    // --- A. MAINTAIN RIVAL SCHEDULE ---
-    // Ensure we have at least 12 weeks of upcoming rivals
-    if (!newWorld.upcomingRivals) newWorld.upcomingRivals = [];
-    const currentAbsoluteWeek = getWorldAbsoluteWeek(player.age, player.currentWeek);
-    newWorld.upcomingRivals = newWorld.upcomingRivals
-        .map(normalizeScheduledIndustryProject)
-        .filter(project => getWorldAbsoluteWeek(project.year, project.weekReleased) >= currentAbsoluteWeek);
-
-    // Keep two rival releases queued for each of the next 12 weeks, including
-    // weeks that cross a birthday/year boundary.
-    for (let offset = 1; offset <= 12; offset += 1) {
-        const targetAbsoluteWeek = currentAbsoluteWeek + offset;
-        const target = getWorldYearWeek(targetAbsoluteWeek);
-        let scheduledForTarget = newWorld.upcomingRivals.filter(project => (
-            getWorldAbsoluteWeek(project.year, project.weekReleased) === targetAbsoluteWeek
-        )).length;
-        while (scheduledForTarget < 2) {
-            newWorld.upcomingRivals.push(generateIndustryProject(target.week, target.year));
-            scheduledForTarget += 1;
-        }
-    }
-
-    newWorld.upcomingRivals.sort((a, b) => (
-        getWorldAbsoluteWeek(a.year, a.weekReleased) - getWorldAbsoluteWeek(b.year, b.weekReleased)
-    ));
-
-    // --- B. RELEASE RIVALS FOR THIS WEEK ---
-    const rivalsToRelease = newWorld.upcomingRivals.filter(project => (
-        getWorldAbsoluteWeek(project.year, project.weekReleased) === currentAbsoluteWeek
-    ));
-    rivalsToRelease.forEach(project => {
-        newWorld.projects.unshift(project);
-        newWorld = applyStudioProjectOutcome(newWorld, project).world;
-
-        // Find and Pay the Lead Actor
-        const lead = NPC_DATABASE.find(n => n.id === project.leadActorId);
-        if (lead && lead.stats) {
-            // Fame Boost
-            const fameGain = project.budgetTier === 'HIGH' ? 3 : project.budgetTier === 'MID' ? 1 : 0.3;
-            lead.stats.fame = Math.min(100, lead.stats.fame + fameGain);
-            
-            // Salary Logic
-            let salary = 0;
-            if (project.budgetTier === 'HIGH') {
-                salary = 12000000 + Math.floor(Math.random() * 18000000); // $12M - $30M
-            } else if (project.budgetTier === 'MID') {
-                salary = 1500000 + Math.floor(Math.random() * 3500000); // $1.5M - $5M
-            } else {
-                salary = 50000 + Math.floor(Math.random() * 200000); // $50k - $250k
-            }
-
-            // Backend Logic
-            const estimatedBudget = getEstimatedBudget(project.budgetTier);
-            if (project.boxOffice > estimatedBudget * 2.5 && project.budgetTier !== 'LOW') {
-                // Hit! 1% to 4% backend
-                const points = 0.01 + (Math.random() * 0.03);
-                const backend = Math.floor(project.boxOffice * points);
-                salary += backend;
-            }
-
-            lead.netWorth += salary;
-        }
-
-        const directorNpc = NPC_DATABASE.find(n => n.name === project.directorName && n.occupation === 'DIRECTOR');
-        if (directorNpc && directorNpc.stats) {
-            const fameGain = project.budgetTier === 'HIGH' ? 2.2 : project.budgetTier === 'MID' ? 0.8 : 0.2;
-            directorNpc.stats.fame = Math.min(100, (directorNpc.stats.fame || 45) + fameGain);
-
-            let directorFee = 0;
-            if (project.budgetTier === 'HIGH') {
-                directorFee = 4_000_000 + Math.floor(Math.random() * 8_000_000);
-            } else if (project.budgetTier === 'MID') {
-                directorFee = 750_000 + Math.floor(Math.random() * 1_750_000);
-            } else {
-                directorFee = 25_000 + Math.floor(Math.random() * 125_000);
-            }
-
-            const estimatedBudget = getEstimatedBudget(project.budgetTier);
-            if (project.boxOffice > estimatedBudget * 2.5 && project.budgetTier !== 'LOW') {
-                directorFee += Math.floor(project.boxOffice * (0.003 + Math.random() * 0.012));
-            }
-
-            directorNpc.netWorth += directorFee;
-        }
-
-        const releaseNews = getIndustryReleaseNews(project, player, language);
-        if (releaseNews) news.push(releaseNews);
-    });
-    newWorld.upcomingRivals = newWorld.upcomingRivals.filter(project => (
-        getWorldAbsoluteWeek(project.year, project.weekReleased) > currentAbsoluteWeek
-    ));
+    // B7 compatibility projection: Release Wizard and old saves may still carry
+    // this field, but only canonical B6 schedules are allowed to populate it.
+    newWorld.upcomingRivals = getCanonicalScheduledRivals(newWorld, currentAbsoluteWeek, 12);
 
     // --- C. SIMULATE NPC ECONOMY (Passive) ---
     // Apply small market fluctuations to all NPCs to keep the Forbes list dynamic
@@ -300,98 +202,14 @@ export const processWorldTurn = (player: Player): { world: WorldState, news: New
         npc.netWorth += change;
     });
 
-    newWorld = applyPassiveStudioEcosystemTurn(newWorld, player.currentWeek, player.age).world;
-
     const ventureResult = processNpcVentures(player, newWorld);
     newWorld = ventureResult.world;
     news.push(...ventureResult.news);
     logs.push(...ventureResult.logs);
     newWorld.universes = normalizeUniverseMap(newWorld.universes, language);
 
-    if (!newWorld.universes || Object.keys(newWorld.universes).length === 0) {
-        newWorld.universes = initUniverses(language);
-    }
-
-    (Object.keys(newWorld.universes) as UniverseId[]).forEach(uid => {
-        const uni = newWorld.universes[uid];
-        const res = processUniverseTurn(player, uni);
-        newWorld.universes[uid] = res.universe;
-        news.push(...res.news);
-        
-        if (res.project) {
-            newWorld.projects.unshift(res.project);
-            newWorld = applyStudioProjectOutcome(newWorld, res.project).world;
-            news.push({
-                id: `news_uni_rel_${res.project.id}`,
-                headline: t(language, 'services.worldLogic.news.universeRelease.headline', { title: res.project.title }),
-                category: 'UNIVERSE',
-                week: player.currentWeek,
-                year: player.age,
-                impactLevel: 'HIGH'
-            });
-        }
-    });
-
-    // --- B. GENERATE NEW RELEASES & PAY NPCs ---
-    if (Math.random() < 0.7) { 
-        const project = generateIndustryProject(player.currentWeek, player.age);
-        newWorld.projects.unshift(project);
-        newWorld = applyStudioProjectOutcome(newWorld, project).world;
-
-        // Find and Pay the Lead Actor
-        const lead = NPC_DATABASE.find(n => n.id === project.leadActorId);
-        if (lead && lead.stats) {
-            // Fame Boost
-            const fameGain = project.budgetTier === 'HIGH' ? 3 : project.budgetTier === 'MID' ? 1 : 0.3;
-            lead.stats.fame = Math.min(100, lead.stats.fame + fameGain);
-            
-            // Salary Logic
-            let salary = 0;
-            if (project.budgetTier === 'HIGH') {
-                salary = 12000000 + Math.floor(Math.random() * 18000000); // $12M - $30M
-            } else if (project.budgetTier === 'MID') {
-                salary = 1500000 + Math.floor(Math.random() * 3500000); // $1.5M - $5M
-            } else {
-                salary = 50000 + Math.floor(Math.random() * 200000); // $50k - $250k
-            }
-
-            // Backend Logic
-            const estimatedBudget = getEstimatedBudget(project.budgetTier);
-            if (project.boxOffice > estimatedBudget * 2.5 && project.budgetTier !== 'LOW') {
-                // Hit! 1% to 4% backend
-                const points = 0.01 + (Math.random() * 0.03);
-                const backend = Math.floor(project.boxOffice * points);
-                salary += backend;
-            }
-
-            lead.netWorth += salary;
-        }
-
-        const directorNpc = NPC_DATABASE.find(n => n.name === project.directorName && n.occupation === 'DIRECTOR');
-        if (directorNpc && directorNpc.stats) {
-            const fameGain = project.budgetTier === 'HIGH' ? 2.2 : project.budgetTier === 'MID' ? 0.8 : 0.2;
-            directorNpc.stats.fame = Math.min(100, (directorNpc.stats.fame || 45) + fameGain);
-
-            let directorFee = 0;
-            if (project.budgetTier === 'HIGH') {
-                directorFee = 4_000_000 + Math.floor(Math.random() * 8_000_000);
-            } else if (project.budgetTier === 'MID') {
-                directorFee = 750_000 + Math.floor(Math.random() * 1_750_000);
-            } else {
-                directorFee = 25_000 + Math.floor(Math.random() * 125_000);
-            }
-
-            const estimatedBudget = getEstimatedBudget(project.budgetTier);
-            if (project.boxOffice > estimatedBudget * 2.5 && project.budgetTier !== 'LOW') {
-                directorFee += Math.floor(project.boxOffice * (0.003 + Math.random() * 0.012));
-            }
-
-            directorNpc.netWorth += directorFee;
-        }
-
-        const releaseNews = getIndustryReleaseNews(project, player, language);
-        if (releaseNews) news.push(releaseNews);
-    }
+    // B3/B5/B6 now own rival universes, production, release, talent settlement,
+    // and outcome materialization. This legacy turn must never mint a finished film.
 
     // Preserve the current and previous release years in full so early-year
     // contenders still exist when the following award season arrives.
@@ -401,5 +219,5 @@ export const processWorldTurn = (player: Player): { world: WorldState, news: New
         .slice(0, 20);
     newWorld.projects = [...awardsWindowProjects, ...olderProjects].slice(0, 320);
 
-    return { world: newWorld, news, logs };
+    return { world: newWorld, news, socialPosts, logs };
 };

@@ -704,7 +704,7 @@ const runCalendarSurfaceAudit = (): void => {
         onUpdatePlayer: () => undefined,
         onClose: () => undefined,
     }));
-    assert.match(markup, /Rights Calendar/);
+    assert.match(markup, /Rights Office/);
     assert.match(markup, /Custom Control/);
     assert.match(markup, /Action required/);
     assert.match(markup, /Monsoon City/);

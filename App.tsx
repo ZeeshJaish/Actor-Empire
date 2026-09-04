@@ -6,6 +6,7 @@ import { NewPlayerTutorialOverlay } from './components/NewPlayerTutorialOverlay'
 import { ProductionCrisisModal } from './components/ProductionCrisisModal';
 import { LifeEventModal } from './components/LifeEventModal';
 import { StockControlEventModal } from './components/StockControlEventModal';
+import { SaveRecoveryModal } from './components/SaveRecoveryModal';
 import { applyCrisisImpact } from './services/productionService';
 import { HomePage } from './views/HomePage';
 import { CareerPage } from './views/CareerPage';
@@ -40,7 +41,7 @@ import {
   type PendingRewardAdReceipt,
 } from './services/rewardedAdRecovery';
 import { ensureTrackingPermission } from './services/trackingService';
-import { createDeferredSaveSlotSummary, createSaveSlotSummary, deleteGameData, getGameSaveSummary, listGameDataKeys, loadGameData, saveGameData, writeGameSaveSummary, type SaveSlotSummary } from './services/storage';
+import { createDeferredSaveSlotSummary, createSaveSlotSummary, deleteVerifiedGameData, getGameSaveSummary, listGameDataKeys, loadVerifiedGameData, recoverPreviousGameData, saveVerifiedGameData, writeGameSaveSummary, type SaveSlotSummary } from './services/storage';
 import { buildLegacyStudioInheritance, createBloodlineSnapshot, getAbsoluteWeek, getLegacyInheritancePreview, getRelationshipAge, inferStreamingStartWeekAbsolute, inheritActorSkills, LEGACY_MIN_PLAYABLE_AGE } from './services/legacyLogic';
 import { handoffOwnedStreamingPlatformToHeir } from './services/streamingLegacy';
 import { applyPremiumPurchase, getRequiredPremiumProductForAsset, hasNoAds, isNonConsumablePremiumProduct, PremiumProductId, restoreWeeklyEnergy, spendPlayerEnergy, syncEnergyDisplay, syncWeeklyEnergyForCommitments } from './services/premiumLogic';
@@ -56,10 +57,15 @@ import { hydrateGenreXP } from './services/genreCatalog';
 import { createInstagramReferralOutcome } from './services/instagramOfferLogic';
 import { executeStockTrade } from './services/stockLogic';
 import { migratePlayerSave } from './services/saveMigration';
+import { prepareExternalPlayerUpdateForUi, prepareProcessedWeekForUi } from './services/playerUiState';
+import { yieldForWeekProcessingPaint } from './services/weekProcessingScheduler';
 import { exportSignedSaveArchive, importSignedSaveArchiveFromFile } from './services/saveTransfer';
 import { grantMigrationCarePackageIfEligible, MIGRATION_CARE_PACKAGE_CASH, MIGRATION_CARE_PACKAGE_ENERGY } from './services/migrationCarePackage';
 import { externalizeCustomPostersInPlayer } from './services/customPosterMedia';
 import { compactPlayerForPersistence } from './services/saveCompaction';
+import { prepareLocalStorageMirror } from './services/saveMirror';
+import { estimateSaveJsonBytes, prepareVerifiedPlayerForPersistence } from './services/savePreparation';
+import type { SaveIntegrityReason } from './services/saveIntegrity';
 import { buildAvailableNewPlayerTutorialState, writeNewPlayerTutorialState, type NewPlayerTutorialState } from './services/newPlayerTutorial';
 import { acceptOutsideProducerInvestmentOffer, counterOutsideProducerInvestmentOffer } from './services/outsideProductions';
 import { PHASE_ONE_ENERGY_COSTS } from './services/energyCosts';
@@ -99,6 +105,13 @@ type PendingMedicalPrompt = {
   conditionName: string;
   severity?: string;
   healthCap?: number;
+};
+
+type PendingSaveRecovery = {
+  slot: number;
+  storageKey: string;
+  previous: Player;
+  violations: string[];
 };
 
 const getMedicalPromptCooldownWeeks = (severity?: string) => {
@@ -478,6 +491,8 @@ export const App: React.FC = () => {
   const [activeSocialEvent, setActiveSocialEvent] = useState<{ event: SocialEvent, partnerId: string } | null>(null);
   const [pendingBabyNaming, setPendingBabyNaming] = useState<PendingBabyNaming | null>(null);
   const [pendingMedicalPrompt, setPendingMedicalPrompt] = useState<PendingMedicalPrompt | null>(null);
+  const [pendingSaveRecovery, setPendingSaveRecovery] = useState<PendingSaveRecovery | null>(null);
+  const [isRecoveringSave, setIsRecoveringSave] = useState(false);
   const [babyFirstNameInput, setBabyFirstNameInput] = useState('');
   const [babySurnameChoice, setBabySurnameChoice] = useState('');
   const [deathScreenPreviewPlayer, setDeathScreenPreviewPlayer] = useState<Player | null>(null);
@@ -503,6 +518,16 @@ export const App: React.FC = () => {
   useEffect(() => {
       playerRef.current = player;
   }, [player]);
+
+  useEffect(() => {
+      const persistStorage = navigator.storage?.persist;
+      if (typeof persistStorage !== 'function') return;
+      void persistStorage.call(navigator.storage).then(granted => {
+          addBreadcrumb('save_storage:persistence_request', { granted });
+      }).catch(error => {
+          recordNonFatal(error, 'save_storage_persistence_request_failed');
+      });
+  }, []);
 
   const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
   const getProcessedStoreTransactionIds = (state: Player): string[] => {
@@ -567,9 +592,7 @@ export const App: React.FC = () => {
     return () => cancelAnimationFrame(frame);
   }, [isStartupLoadingVisible, startupStudioBumperElapsed]);
 
-  const preparePlayerForPersistence = (nextPlayer: Player): Player => {
-      return compactPlayerForPersistence(nextPlayer);
-  };
+  const preparePlayerForPersistence = (nextPlayer: Player): Player => compactPlayerForPersistence(nextPlayer);
   const writeLocalStorageMirror = (slot: number, playerToSave: Player) => {
       const slotKey = `actorEmpireSave_${slot}`;
       const metadataKey = `${slotKey}_meta`;
@@ -588,13 +611,13 @@ export const App: React.FC = () => {
           }));
       };
       try {
-          const serialized = JSON.stringify(playerToSave);
-          if (serialized.length <= LOCAL_STORAGE_SAVE_MIRROR_BUDGET_BYTES) {
+          const mirrorPlan = prepareLocalStorageMirror(playerToSave, LOCAL_STORAGE_SAVE_MIRROR_BUDGET_BYTES);
+          if (mirrorPlan.kind === 'FULL') {
               try {
-                  localStorage.setItem(slotKey, serialized);
+                  localStorage.setItem(slotKey, mirrorPlan.serialized);
                   if (slot === 1) {
                       // Keep a small shadow copy for migration compatibility with older builds.
-                      localStorage.setItem('actorEmpireSave', serialized);
+                      localStorage.setItem('actorEmpireSave', mirrorPlan.serialized);
                   }
                   localStorage.removeItem(metadataKey);
                   writeGameSaveSummary(slotKey, playerToSave);
@@ -632,7 +655,13 @@ export const App: React.FC = () => {
   const persistSlotSave = async (
       slot: number,
       nextPlayer: Player,
-      options: { rethrow?: boolean; weekDiagnostic?: { runId: string; screen: string } } = {}
+      options: {
+          rethrow?: boolean;
+          weekDiagnostic?: { runId: string; screen: string };
+          reason?: SaveIntegrityReason;
+          currentIsUnverified?: boolean;
+          sourceByteEstimate?: number;
+      } = {}
   ): Promise<Player> => {
       if (options.weekDiagnostic) {
           markWeekProcessingStage('persist_prepare_start', nextPlayer, {
@@ -641,7 +670,27 @@ export const App: React.FC = () => {
               save_slot: slot,
           });
       }
-      const playerToSave = preparePlayerForPersistence(nextPlayer);
+      let prepared: ReturnType<typeof prepareVerifiedPlayerForPersistence>;
+      try {
+          prepared = prepareVerifiedPlayerForPersistence(nextPlayer, options.reason || 'AUTOSAVE', {
+              currentIsUnverified: options.currentIsUnverified === true,
+              sourceByteEstimate: options.sourceByteEstimate,
+          });
+      } catch (error) {
+          recordNonFatal(error, 'save_preparation_integrity_failed', {
+              slot,
+              reason: options.reason || 'AUTOSAVE',
+              age: nextPlayer.age,
+              week: nextPlayer.currentWeek,
+          });
+          if (options.rethrow) throw error;
+          setToastMessage({
+              title: 'Save Was Not Replaced',
+              subtext: 'The new save did not preserve your complete career. Your previous save remains untouched.',
+          });
+          return nextPlayer;
+      }
+      const playerToSave = prepared.player;
       if (options.weekDiagnostic) {
           markWeekProcessingStage('persist_prepare_done', playerToSave, {
               run_id: options.weekDiagnostic.runId,
@@ -654,8 +703,32 @@ export const App: React.FC = () => {
               save_slot: slot,
           });
       }
-      await saveGameData(`actorEmpireSave_${slot}`, playerToSave, { rethrow: options.rethrow });
+      try {
+          await saveVerifiedGameData(`actorEmpireSave_${slot}`, playerToSave, prepared.manifest, {
+              retainPrevious: prepared.retainPrevious,
+              needsRecoveryCheckpoint: prepared.needsRecoveryCheckpoint,
+          });
+      } catch (error) {
+          recordNonFatal(error, 'verified_save_failed', {
+              slot,
+              reason: options.reason || 'AUTOSAVE',
+              age: nextPlayer.age,
+              week: nextPlayer.currentWeek,
+          });
+          if (options.rethrow) throw error;
+          setToastMessage({
+              title: 'Save Was Not Replaced',
+              subtext: 'The new save failed its safety check. Your previous career remains untouched.',
+          });
+          return nextPlayer;
+      }
       setSaveSlotSummaries(prev => ({ ...prev, [slot]: createSaveSlotSummary(playerToSave) }));
+      if (prepared.needsRecoveryCheckpoint) {
+          setToastMessage({
+              title: 'Backup Recommended',
+              subtext: 'This large legacy career is now verified. Export a backup until its next safe checkpoint is created.',
+          });
+      }
       if (options.weekDiagnostic) {
           markWeekProcessingStage('indexeddb_write_done', playerToSave, {
               run_id: options.weekDiagnostic.runId,
@@ -683,7 +756,9 @@ export const App: React.FC = () => {
       const slotUpdates: Partial<Record<number, Player>> = {};
       for (const slot of PREMIUM_SAVE_SLOT_IDS) {
           if (slot === currentSlot) continue;
-          const sourcePlayer = saveSlots[slot] || await loadGameData(`actorEmpireSave_${slot}`);
+          const verifiedLoad = saveSlots[slot] ? null : await loadVerifiedGameData(`actorEmpireSave_${slot}`);
+          const sourcePlayer = saveSlots[slot]
+              || (verifiedLoad?.status === 'CURRENT' || verifiedLoad?.status === 'LEGACY_UNVERIFIED' ? verifiedLoad.player : null);
           if (!sourcePlayer) continue;
           const entitlementResult = applyPremiumEntitlementsToPlayer(migratePlayerSave(sourcePlayer), entitlementProductIds);
           if (!entitlementResult.changed) continue;
@@ -706,7 +781,11 @@ export const App: React.FC = () => {
       weekDiagnostic?: { runId: string; screen: string },
   ): Promise<Player> => {
       if (!currentSlot) return preparePlayerForPersistence(nextPlayer);
-      const playerToSave = await persistSlotSave(currentSlot, nextPlayer, { rethrow: true, weekDiagnostic });
+      const playerToSave = await persistSlotSave(currentSlot, nextPlayer, {
+          rethrow: true,
+          weekDiagnostic,
+          reason: 'PROCESS_WEEK',
+      });
       setSaveSlots(prev => ({ ...prev, [currentSlot]: playerToSave }));
       return playerToSave;
   };
@@ -1180,13 +1259,34 @@ export const App: React.FC = () => {
             const storageKey = summary?.storageKey || `actorEmpireSave_${slot}`;
             const storageKind = summary?.storageKind || 'indexeddb';
             let savedData: Player | null = null;
+            let currentIsUnverified = storageKind === 'localstorage';
+            let needsRecoveryCheckpoint = false;
+            let sourceByteEstimate: number | undefined;
             if (storageKind === 'localstorage') {
                 const raw = localStorage.getItem(storageKey);
                 savedData = raw ? JSON.parse(raw) as Player : null;
             } else {
-                savedData = await loadGameData(storageKey);
+                const verifiedLoad = await loadVerifiedGameData(storageKey);
+                if (verifiedLoad.status === 'RECOVERY_AVAILABLE') {
+                    setPendingSaveRecovery({
+                        slot,
+                        storageKey,
+                        previous: verifiedLoad.previous,
+                        violations: verifiedLoad.violations,
+                    });
+                    setCurrentSlot(null);
+                    return;
+                }
+                if (verifiedLoad.status === 'UNRECOVERABLE') {
+                    throw new Error('This career and its recovery generation could not be verified. Import a signed backup before deleting anything.');
+                }
+                if (verifiedLoad.status === 'MISSING') throw new Error(`Save slot ${slot} could not be loaded.`);
+                savedData = verifiedLoad.player;
+                currentIsUnverified = verifiedLoad.status === 'LEGACY_UNVERIFIED';
+                needsRecoveryCheckpoint = verifiedLoad.status === 'CURRENT' && verifiedLoad.needsRecoveryCheckpoint;
             }
             if (!savedData) throw new Error(`Save slot ${slot} could not be loaded.`);
+            if (currentIsUnverified) sourceByteEstimate = estimateSaveJsonBytes(savedData);
             const source = storageKind === 'localstorage'
                 ? (storageKey === 'actorEmpireSave' ? 'legacy-single-localstorage' : 'legacy-localstorage')
                 : (storageKey === 'actorEmpireSave' ? 'legacy-indexeddb' : 'indexeddb-slot');
@@ -1194,13 +1294,23 @@ export const App: React.FC = () => {
             existingSave = prepared.player;
             setSaveSlots(prev => ({ ...prev, [slot]: prepared.player }));
             setSaveSlotSummaries(prev => ({ ...prev, [slot]: createSaveSlotSummary(prepared.player) }));
-            if (prepared.shouldPersist || source !== 'indexeddb-slot') {
-                await persistSlotSave(slot, prepared.player);
+            if (currentIsUnverified || prepared.shouldPersist || source !== 'indexeddb-slot') {
+                await persistSlotSave(slot, prepared.player, {
+                    rethrow: true,
+                    reason: 'MIGRATION',
+                    currentIsUnverified,
+                    sourceByteEstimate,
+                });
             }
             if (prepared.carePackageGranted) {
                 setToastMessage({
                     title: 'Migration Care Package',
                     subtext: `$${MIGRATION_CARE_PACKAGE_CASH.toLocaleString()} cash and ${MIGRATION_CARE_PACKAGE_ENERGY} bonus energy added to your migrated save.`,
+                });
+            } else if (needsRecoveryCheckpoint) {
+                setToastMessage({
+                    title: 'Backup Recommended',
+                    subtext: 'Export this large career once. Its automatic previous-good checkpoint will be created on the next successful save.',
                 });
             }
             markTraceAction('selected_save_load_completed', { flow: 'save_select', save_slot: slot });
@@ -1209,7 +1319,9 @@ export const App: React.FC = () => {
             setCurrentSlot(null);
             setToastMessage({
                 title: 'Save Could Not Open',
-                subtext: 'Your save was left untouched. Please try opening this slot again.',
+                subtext: error instanceof Error
+                    ? error.message
+                    : 'Your save was left untouched. Please try opening this slot again.',
             });
             return;
         } finally {
@@ -1232,14 +1344,43 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleRecoverSave = async () => {
+    if (!pendingSaveRecovery || isRecoveringSave) return;
+    const recovery = pendingSaveRecovery;
+    setIsRecoveringSave(true);
+    try {
+        await recoverPreviousGameData(recovery.storageKey);
+        setPendingSaveRecovery(null);
+        setToastMessage({
+            title: 'Career Recovered',
+            subtext: `Restored ${recovery.previous.name} at age ${recovery.previous.age}, week ${recovery.previous.currentWeek}.`,
+        });
+        await handleSelectSlot(recovery.slot);
+    } catch (error) {
+        recordNonFatal(error, 'save_recovery_failed', { slot: recovery.slot });
+        setToastMessage({
+            title: 'Recovery Was Not Applied',
+            subtext: 'Both stored generations were left untouched. Try importing your signed backup.',
+        });
+    } finally {
+        setIsRecoveringSave(false);
+    }
+  };
+
+  const handleCancelSaveRecovery = () => {
+    if (isRecoveringSave) return;
+    setPendingSaveRecovery(null);
+    setCurrentSlot(null);
+  };
+
   const handleDeleteSlot = async (slot: number) => {
     const summary = saveSlotSummaries[slot];
     const storageKey = summary?.storageKey || `actorEmpireSave_${slot}`;
     if (summary?.storageKind !== 'localstorage') {
-        await deleteGameData(storageKey);
+        await deleteVerifiedGameData(storageKey);
     }
     if (storageKey !== `actorEmpireSave_${slot}`) {
-        await deleteGameData(`actorEmpireSave_${slot}`);
+        await deleteVerifiedGameData(`actorEmpireSave_${slot}`);
     }
     localStorage.removeItem(storageKey);
     localStorage.removeItem(`${storageKey}_meta`);
@@ -1256,8 +1397,7 @@ export const App: React.FC = () => {
   const handleExportGameData = async () => {
     try {
       if (gameStatus === 'PLAYING' && currentSlot) {
-        const playerToSave = preparePlayerForPersistence(player);
-        await saveGameData(`actorEmpireSave_${currentSlot}`, playerToSave);
+        const playerToSave = await persistSlotSave(currentSlot, player, { rethrow: true, reason: 'MANUAL' });
         writeLocalStorageMirror(currentSlot, playerToSave);
         setSaveSlots(prev => ({ ...prev, [currentSlot]: playerToSave }));
         setSaveSlotSummaries(prev => ({ ...prev, [currentSlot]: createSaveSlotSummary(playerToSave) }));
@@ -1639,21 +1779,11 @@ export const App: React.FC = () => {
   }, [toastMessage]);
 
   const handleUpdatePlayer = (updatedPlayer: Player) => { 
-      const migratedPlayer = migratePlayerSave(updatedPlayer);
-      const normalizedWorld = {
-          ...clone(INITIAL_PLAYER.world),
-          ...(migratedPlayer.world || {}),
-          universes: normalizeUniverseMap(migratedPlayer.world?.universes)
-      };
-      setPlayer({
-          ...migratedPlayer,
-          world: normalizedWorld,
-          awards: dedupeAwards(migratedPlayer.awards || []),
-          pastProjects: (migratedPlayer.pastProjects || []).map((project: any) => ({
-              ...project,
-              awards: dedupeAwards(project.awards || [])
-          }))
-      }); 
+      setPlayer(prepareExternalPlayerUpdateForUi(updatedPlayer));
+  };
+
+  const commitProcessedWeekPlayer = (processedPlayer: Player) => {
+      setPlayer(prepareProcessedWeekForUi(processedPlayer));
   };
 
   const handleQueueBabyNamingCheat = () => {
@@ -1727,6 +1857,7 @@ export const App: React.FC = () => {
     }
     weekProcessingLockRef.current = true;
     setIsProcessing(true);
+    await yieldForWeekProcessingPaint();
     const traceName = 'process_game_week';
     const startedAt = performance.now();
     const activePageName = Page[activePage] || String(activePage);
@@ -1891,7 +2022,7 @@ export const App: React.FC = () => {
         });
         syncedPlayerState = persistedPlayerState;
         suppressNextAutosaveRef.current = true;
-        handleUpdatePlayer(persistedPlayerState);
+        commitProcessedWeekPlayer(persistedPlayerState);
         addBreadcrumb('process_week:persisted', {
             age: syncedPlayerState.age,
             week: syncedPlayerState.currentWeek,
@@ -2742,7 +2873,7 @@ export const App: React.FC = () => {
   
   const handleRestartCareer = async () => {
     if (currentSlot) {
-        await deleteGameData(`actorEmpireSave_${currentSlot}`);
+        await deleteVerifiedGameData(`actorEmpireSave_${currentSlot}`);
         setSaveSlots(prev => ({ ...prev, [currentSlot]: null }));
         setPlayer(INITIAL_PLAYER);
         setGameStatus('CREATION');
@@ -2812,6 +2943,18 @@ export const App: React.FC = () => {
     <GameErrorBoundary onRecover={handleRecoverToMenu}>
     <div className="h-screen bg-black text-white font-sans selection:bg-amber-500 selection:text-black">
       <div className="fixed inset-0 z-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/30 via-zinc-950 to-zinc-950 pointer-events-none" />
+
+      {pendingSaveRecovery && (
+          <SaveRecoveryModal
+              playerName={pendingSaveRecovery.previous.name}
+              age={pendingSaveRecovery.previous.age}
+              week={pendingSaveRecovery.previous.currentWeek}
+              violations={pendingSaveRecovery.violations}
+              isRecovering={isRecoveringSave}
+              onRecover={handleRecoverSave}
+              onCancel={handleCancelSaveRecovery}
+          />
+      )}
       
       {/* SIMULATED AD OVERLAY */}
       {isShowingAd && (

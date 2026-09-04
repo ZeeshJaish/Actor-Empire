@@ -13,6 +13,7 @@ import { getPlayerLanguage, t } from '../../services/i18n';
 import { inferSeasonNumber } from '../../services/episodeRatings';
 import { CustomPosterImage } from '../../components/CustomPosterImage';
 import { resolveProjectType } from '../../services/businessLogic';
+import { getDynastyCareerArchives } from '../../services/dynastyCareer';
 
 interface ImdbAppProps {
   player: Player;
@@ -314,6 +315,7 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
   const [awardView, setAwardView] = useState<AwardView>('HOME');
   const [creditFilter, setCreditFilter] = useState<'ALL' | 'MOVIE' | 'TV'>('ALL');
   const [filmographyScope, setFilmographyScope] = useState<'CURRENT' | 'ARCHIVE'>('CURRENT');
+  const [selectedLegacyActorId, setSelectedLegacyActorId] = useState<string | null>(null);
   const [selectedProject, setSelectedProject] = useState<DisplayProject | null>(null);
   const [selectedShow, setSelectedShow] = useState<SelectedShow | null>(null);
   const [selectedUniverse, setSelectedUniverse] = useState<Universe | null>(null);
@@ -416,7 +418,10 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
   }).reverse();
 
   const fullList = [...activeList, ...pastList];
-  const legacyCareerArchive = player.flags?.legacyCareerArchive || (
+  const dynastyCareerArchives = getDynastyCareerArchives(player);
+  const legacyCareerArchive = dynastyCareerArchives.find((archive: any) => archive?.parent?.actorId === selectedLegacyActorId)
+      || dynastyCareerArchives[dynastyCareerArchives.length - 1]
+      || player.flags?.legacyCareerArchive || (
       Array.isArray(player.flags?.legacyStudioProjects)
           ? {
               parent: player.flags?.legacyParent,
@@ -1722,6 +1727,24 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                                      ? `${legacyFullList.length} titles and ${legacyAwardWins} awards are preserved here. These credits do not count as your personal roles.`
                                      : 'Your credits begin with this generation.'}
                              </p>
+                             {filmographyScope === 'ARCHIVE' && dynastyCareerArchives.length > 1 && (
+                                 <div className="mt-2 flex gap-1.5 overflow-x-auto px-1 pb-1" aria-label="Choose a family career archive">
+                                     {dynastyCareerArchives.map((archive: any) => {
+                                         const actorId = String(archive?.parent?.actorId || archive?.parent?.playerId || archive?.parent?.name);
+                                         const selectedActorId = selectedLegacyActorId || legacyCareerArchive?.parent?.actorId;
+                                         return (
+                                             <button
+                                                 key={actorId}
+                                                 type="button"
+                                                 onClick={() => setSelectedLegacyActorId(actorId)}
+                                                 className={`shrink-0 rounded-full border px-3 py-1.5 text-[9px] font-black uppercase tracking-wide ${actorId === selectedActorId ? 'border-yellow-400/50 bg-yellow-400/10 text-yellow-300' : 'border-zinc-800 bg-black/30 text-zinc-500'}`}
+                                             >
+                                                 {archive?.parent?.name || 'Previous generation'}
+                                             </button>
+                                         );
+                                     })}
+                                 </div>
+                             )}
                          </div>
                      )}
                      <div className="flex items-center justify-between mb-4">

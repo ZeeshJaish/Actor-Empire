@@ -29,7 +29,6 @@ import type {
   Player,
   StreamingLicenseExclusivity,
   StreamingLicenseTerritory,
-  StreamingRightsChangeOfControl,
   StreamingRightsRenewalCase,
   StreamingRightsWindowType,
 } from '../types';
@@ -50,6 +49,7 @@ import {
 import StreamingVisualScene from './StreamingVisualScene';
 import StreamingRightsCalendar, { getStreamingRightsTimingLabel } from './StreamingRightsCalendar';
 import { getStreamingRightsCalendar, normalizeStreamingRightsManagementState } from '../services/streamingRightsCalendar';
+import { getStreamingDayOneMarket } from '../services/streamingDayOneMarkets';
 import '../styles/streaming-rights-exchange.css';
 
 interface Props {
@@ -72,6 +72,13 @@ const formatMoney = (value: number): string => {
 const formatWindow = (value: StreamingRightsWindowType) => (
   value === 'FIRST_WINDOW' ? 'First window' : value === 'SECOND_WINDOW' ? 'Second window' : 'Permanent catalog'
 );
+
+const formatCountries = (countryIds: string[]): string => {
+  const names = countryIds.map(countryId => getStreamingDayOneMarket(countryId)?.country || countryId);
+  if (!names.length) return 'Worldwide';
+  if (names.length <= 2) return names.join(' + ');
+  return `${names.slice(0, 2).join(' + ')} +${names.length - 2}`;
+};
 
 const termsFromNegotiation = (negotiation: OwnedStreamingRightsNegotiation): StreamingRightsTermsInput => ({
   territory: negotiation.territory,
@@ -129,13 +136,17 @@ export default function StreamingRightsExchange({
   const activeNegotiations = platform.rightsNegotiations.filter(item => ['OPEN', 'COUNTERED', 'READY_TO_SIGN'].includes(item.status));
   const obligations = platform.rightsObligations.filter(item => item.status !== 'SATISFIED');
   const liveContracts = platform.catalogLicenses.filter(item => item.status === 'ACTIVE');
+  const selectedIsExactTransfer = Boolean(
+    selectedNegotiation?.sourceLicenseId
+    && (selectedNegotiation.kind === 'TRANSFER_OUT' || selectedNegotiation.sellerType === 'PLATFORM'),
+  );
 
   const openOpportunity = (opportunityId: string) => {
     const opportunity = opportunities.find(item => item.id === opportunityId);
     if (!opportunity) return;
     const result = openStreamingRightsNegotiation(player, opportunityId, createDefaultStreamingRightsTerms(opportunity));
     if (!result.changed || !result.negotiation) {
-      setFeedback('That market package is no longer available in this cycle.');
+      setFeedback(result.detail || 'That market package is no longer available in this cycle.');
       return;
     }
     onUpdatePlayer(result.player);
@@ -283,7 +294,7 @@ export default function StreamingRightsExchange({
                 <article
                   key={opportunity.id}
                   data-opportunity-id={opportunity.id}
-                  className={`rights-listing-card is-${opportunity.marketHeat.toLowerCase()}`}
+                  className={`rights-listing-card is-${opportunity.marketHeat.toLowerCase()} ${opportunity.kind === 'PLATFORM_TRADE' || opportunity.kind === 'TRANSFER_OUT' ? 'is-transfer' : ''}`}
                 >
                   <div className="rights-listing-poster" aria-hidden="true">
                     {opportunity.title.projectType === 'SERIES' ? <UsersRound size={30} /> : <Sparkles size={30} />}
@@ -291,22 +302,39 @@ export default function StreamingRightsExchange({
                   </div>
                   <div className="rights-listing-body">
                     <div className="rights-listing-meta">
-                      <span>{opportunity.kind === 'STUDIO_ACQUISITION' ? 'STUDIO WINDOW' : opportunity.kind === 'PLATFORM_TRADE' ? 'PLATFORM TRADE' : 'SELL YOUR WINDOW'}</span>
+                      <span>{opportunity.kind === 'STUDIO_ACQUISITION' ? 'STUDIO WINDOW' : opportunity.kind === 'PLATFORM_TRADE' ? 'RESALE LISTING' : opportunity.kind === 'TRANSFER_OUT' ? 'SELL REMAINING WINDOW' : 'SUBLICENSE OFFER'}</span>
                       <strong>{opportunity.marketHeat}</strong>
                     </div>
                     <h3>{opportunity.title.title}</h3>
-                    <p>{opportunity.kind === 'SUBLICENSE_OUT'
+                    <p>{opportunity.kind === 'PLATFORM_TRADE' || opportunity.kind === 'TRANSFER_OUT'
+                      ? 'The complete remaining licence moves to the buyer. Its scope and expiry do not reset.'
+                      : opportunity.kind === 'SUBLICENSE_OUT'
                       ? `${opportunity.rivalPlatformName} is scouting a regional window.`
                       : `${opportunity.sellerName} controls the offered ${formatWindow(opportunity.recommendedWindow).toLowerCase()}.`}</p>
+                    {opportunity.kind === 'PLATFORM_TRADE' || opportunity.kind === 'TRANSFER_OUT' ? (
+                      <div className="rights-transfer-chain" aria-label={`Original owner ${opportunity.originalOwnerName}. Current holder ${opportunity.currentHolderName}.`}>
+                        <span><small>Original owner</small><strong>{opportunity.originalOwnerName}</strong></span>
+                        <ChevronRight size={14} />
+                        <span><small>Current holder</small><strong>{opportunity.currentHolderName}</strong></span>
+                      </div>
+                    ) : null}
                     <dl>
                       <div><dt>Opening ask</dt><dd>{formatMoney(opportunity.quote.suggestedGuarantee)}</dd></div>
-                      <div><dt>{opportunity.kind === 'SUBLICENSE_OUT' ? 'Likely buyer' : 'Rival bid'}</dt><dd>{opportunity.rivalPlatformName}</dd></div>
-                      <div><dt>Territory</dt><dd>{opportunity.recommendedTerritory.replace('_', ' ')}</dd></div>
-                      <div><dt>Window</dt><dd>{formatWindow(opportunity.recommendedWindow)}</dd></div>
+                      <div><dt>{opportunity.kind === 'PLATFORM_TRADE' || opportunity.kind === 'TRANSFER_OUT' ? 'Exact scope' : opportunity.kind === 'SUBLICENSE_OUT' ? 'Likely buyer' : 'Rival bid'}</dt><dd>{opportunity.kind === 'PLATFORM_TRADE' || opportunity.kind === 'TRANSFER_OUT' ? formatCountries(opportunity.countryIds) : opportunity.rivalPlatformName}</dd></div>
+                      <div><dt>{opportunity.kind === 'PLATFORM_TRADE' || opportunity.kind === 'TRANSFER_OUT' ? 'Remaining term' : 'Territory'}</dt><dd>{opportunity.kind === 'PLATFORM_TRADE' || opportunity.kind === 'TRANSFER_OUT' ? `${opportunity.remainingWeeks} weeks remaining` : opportunity.recommendedTerritory.replace('_', ' ')}</dd></div>
+                      <div><dt>{opportunity.kind === 'PLATFORM_TRADE' || opportunity.kind === 'TRANSFER_OUT' ? 'Inherited deal' : 'Window'}</dt><dd>{opportunity.kind === 'PLATFORM_TRADE' || opportunity.kind === 'TRANSFER_OUT' ? `${opportunity.inheritedExclusivity === 'EXCLUSIVE' ? 'Exclusive' : 'Shared'} · ${opportunity.inheritedLicensorRevenueShare}% studio backend` : formatWindow(opportunity.recommendedWindow)}</dd></div>
                     </dl>
-                    <button type="button" onClick={() => openOpportunity(opportunity.id)}>
-                      {opportunity.kind === 'SUBLICENSE_OUT' ? <HandCoins size={17} /> : <Swords size={17} />}
-                      {opportunity.kind === 'SUBLICENSE_OUT' ? 'Open sales table' : 'Enter negotiation'} <ChevronRight size={17} />
+                    {opportunity.kind === 'PLATFORM_TRADE' || opportunity.kind === 'TRANSFER_OUT' ? (
+                      <div className={`rights-inherited-actions ${opportunity.incompatibilityDetail ? 'is-blocked' : ''}`}>
+                        <ShieldCheck size={13} />
+                        {opportunity.incompatibilityDetail || (opportunity.inheritedObligationCount
+                          ? `${opportunity.inheritedObligationCount} inherited ${opportunity.inheritedObligationCount === 1 ? 'action' : 'actions'}`
+                          : 'No inherited actions')}
+                      </div>
+                    ) : null}
+                    <button type="button" disabled={Boolean(opportunity.incompatibilityDetail)} title={opportunity.incompatibilityDetail || undefined} onClick={() => openOpportunity(opportunity.id)}>
+                      {opportunity.kind === 'SUBLICENSE_OUT' || opportunity.kind === 'TRANSFER_OUT' ? <HandCoins size={17} /> : <Swords size={17} />}
+                      {opportunity.kind === 'SUBLICENSE_OUT' ? 'Open sales table' : opportunity.kind === 'TRANSFER_OUT' ? 'Offer remaining licence' : opportunity.kind === 'PLATFORM_TRADE' ? 'Bid for exact licence' : 'Enter negotiation'} <ChevronRight size={17} />
                     </button>
                   </div>
                 </article>
@@ -353,17 +381,25 @@ export default function StreamingRightsExchange({
                   <strong>{formatMoney(selectedNegotiation.rivalBidAmount)} competing value</strong>
                   <small>Table expires after week {selectedNegotiation.expiresAtAbsoluteWeek}</small>
                 </div>
-                <div className="rights-term-grid">
+                {selectedIsExactTransfer ? <div className="rights-fixed-transfer-terms">
+                  <span>INHERITED LICENCE — FIXED</span>
+                  <strong>{formatCountries(selectedNegotiation.countryIds)} · {formatWindow(selectedNegotiation.windowType)} · {selectedNegotiation.exclusivity === 'EXCLUSIVE' ? 'Exclusive' : 'Shared'}</strong>
+                  <small>The price is negotiable. Scope, expiry, backend and attached obligations transfer unchanged.</small>
+                </div> : null}
+                <div className={`rights-term-grid ${selectedIsExactTransfer ? 'is-exact-transfer' : ''}`}>
+                  {!selectedIsExactTransfer ? <>
                   <label><span>Territory</span><select value={terms.territory} onChange={event => setTerms({ ...terms, territory: event.target.value as StreamingLicenseTerritory })}><option value="DOMESTIC">Domestic</option><option value="MULTI_REGION">Multi-region</option><option value="GLOBAL">Global</option></select></label>
                   <label><span>Window</span><select value={terms.windowType} onChange={event => setTerms({ ...terms, windowType: event.target.value as StreamingRightsWindowType })}><option value="FIRST_WINDOW">First window</option><option value="SECOND_WINDOW">Second window</option><option value="PERMANENT">Permanent catalog</option></select></label>
                   <label><span>Term</span><select value={terms.durationWeeks} onChange={event => setTerms({ ...terms, durationWeeks: Number(event.target.value) })}><option value={52}>52 weeks</option><option value={104}>104 weeks</option><option value={156}>156 weeks</option><option value={260}>260 weeks</option></select></label>
                   <label><span>Exclusivity</span><select value={terms.exclusivity} onChange={event => setTerms({ ...terms, exclusivity: event.target.value as StreamingLicenseExclusivity })}><option value="NON_EXCLUSIVE">Non-exclusive</option><option value="EXCLUSIVE">Exclusive</option></select></label>
-                  <label className="is-money"><span>{selectedNegotiation.kind === 'SUBLICENSE_OUT' ? 'Upfront asking price' : 'Minimum guarantee'}</span><input type="number" min={0} step={250000} value={terms.minimumGuarantee} onChange={event => setTerms({ ...terms, minimumGuarantee: Number(event.target.value) })} /><small>{formatMoney(terms.minimumGuarantee)}</small></label>
+                  </> : null}
+                  <label className="is-money"><span>{selectedIsExactTransfer ? 'Transfer price' : selectedNegotiation.kind === 'SUBLICENSE_OUT' ? 'Upfront asking price' : 'Minimum guarantee'}</span><input type="number" min={0} step={250000} value={terms.minimumGuarantee} onChange={event => setTerms({ ...terms, minimumGuarantee: Number(event.target.value) })} /><small>{formatMoney(terms.minimumGuarantee)}</small></label>
+                  {!selectedIsExactTransfer ? <>
                   <label><span>{selectedNegotiation.kind === 'SUBLICENSE_OUT' ? 'Your revenue share' : 'Platform revenue share'}</span><input type="range" min={45} max={90} value={terms.platformRevenueShare} onChange={event => setTerms({ ...terms, platformRevenueShare: Number(event.target.value) })} /><small>{terms.platformRevenueShare}% / {100 - terms.platformRevenueShare}%</small></label>
                   <label className="is-money"><span>Marketing guarantee</span><input type="number" min={0} step={250000} value={terms.marketingGuarantee} onChange={event => setTerms({ ...terms, marketingGuarantee: Number(event.target.value) })} /><small>{formatMoney(terms.marketingGuarantee)}</small></label>
-                  <label><span>Change of control</span><select value={terms.changeOfControl} onChange={event => setTerms({ ...terms, changeOfControl: event.target.value as StreamingRightsChangeOfControl })}><option value="NONE">No restriction</option><option value="NOTICE">Notice required</option><option value="CONSENT_REQUIRED">Consent required</option></select></label>
+                  </> : null}
                 </div>
-                <div className="rights-clause-board">
+                {!selectedIsExactTransfer ? <div className="rights-clause-board">
                   {([
                     ['renewalOption', 'Renewal option'],
                     ['sublicensingAllowed', 'Sublicensing allowed'],
@@ -375,7 +411,7 @@ export default function StreamingRightsExchange({
                   ))}
                   <span><ShieldCheck size={16} /> Cancellation penalty {formatMoney(terms.cancellationPenalty)}</span>
                   <span><UsersRound size={16} /> Audience target {terms.viewershipBonusThreshold.toLocaleString()} accounts</span>
-                </div>
+                </div> : <div className="rights-clause-board is-transfer"><ShieldCheck size={16} /><span>No studio consent, notice, or transfer participation. The original backend remains attached.</span></div>}
                 {selectedNegotiation.status === 'COUNTERED' ? (
                   <div className="rights-counteroffer">
                     <div><span>COUNTEROFFER RECEIVED</span><strong>{formatMoney(selectedNegotiation.counterMinimumGuarantee || 0)} • {selectedNegotiation.counterPlatformRevenueShare}% platform share</strong></div>

@@ -7,12 +7,19 @@ import {
     type StreamingRightsCalendarState,
     type StreamingRightsContract,
     type StreamingRightsControlMode,
+    type StreamingRightsDistributionPriority,
+    type StreamingRightsDurationPreference,
+    type StreamingRightsExclusivityPolicy,
+    type StreamingRightsFinancialPriority,
     type StreamingRightsManagementState,
+    type StreamingRightsPartnerPreference,
     type StreamingRightsRenewalCase,
     type StreamingRightsRenewalCaseRegistry,
     type StreamingRightsRenewalEconomics,
     type StreamingRightsRenewalPerformanceSnapshot,
     type StreamingRightsRenewalPreference,
+    type StreamingRightsStudioMandate,
+    type StreamingRightsTitleControlOverride,
 } from '../types';
 import { createDeterministicId, createDeterministicRng } from './deterministicRandom';
 import {
@@ -24,6 +31,10 @@ import {
 } from './streamingRightsCore';
 import { resolveStreamingRightsCompatibility } from './streamingRightsCompatibility';
 import { normalizeStreamingCataloguePackagePolicy } from './streamingCataloguePackages';
+import {
+    createStreamingRightsDelegationTrace,
+    normalizeStreamingRightsDelegationTrace,
+} from './streamingRightsDelegation';
 
 const DEFAULT_NOTICE_WEEKS = 8;
 const MAX_DIGESTS = 20;
@@ -60,6 +71,12 @@ const CONTROL_MODES = new Set<StreamingRightsControlMode>(['STRATEGY', 'CUSTOM',
 const PREFERENCES = new Set<StreamingRightsRenewalPreference>([
     'BALANCED', 'RENEW_WINNERS', 'RETEST_MARKET', 'UPFRONT_SECURITY', 'BACKEND_UPSIDE', 'RELATIONSHIP_FIRST',
 ]);
+const FINANCIAL_PRIORITIES = new Set<StreamingRightsFinancialPriority>(['UPFRONT_SECURITY', 'BALANCED_RETURN', 'BACKEND_UPSIDE']);
+const DISTRIBUTION_PRIORITIES = new Set<StreamingRightsDistributionPriority>(['GLOBAL_PARTNER', 'REGIONAL_OPTIMIZATION', 'BROAD_NON_EXCLUSIVE']);
+const EXCLUSIVITY_POLICIES = new Set<StreamingRightsExclusivityPolicy>(['ALLOW_WITHIN_LIMITS', 'RESTRICT', 'REQUIRE_APPROVAL']);
+const DURATION_PREFERENCES = new Set<StreamingRightsDurationPreference>(['SHORT', 'BALANCED', 'LONG']);
+const PARTNER_PREFERENCES = new Set<StreamingRightsPartnerPreference>(['STRONGEST_ECONOMICS', 'WIDEST_REACH', 'TRUSTED_RELATIONSHIPS']);
+const TITLE_CONTROL_OVERRIDES = new Set<StreamingRightsTitleControlOverride>(['MANUAL', 'DELEGATED']);
 const CASE_STATUSES = new Set<StreamingRightsRenewalCase['status']>([
     'WATCHING', 'OFFER_AVAILABLE', 'ACTION_REQUIRED', 'RENEWAL_SECURED', 'RETURNING_TO_MARKET',
     'LETTING_EXPIRE', 'NO_OFFER', 'EXPIRED',
@@ -70,6 +87,61 @@ const CASE_OUTCOMES = new Set<StreamingRightsRenewalCase['outcome']>([
 const OFFER_DISPOSITIONS = new Set<StreamingRightsRenewalCase['offerDisposition']>([
     'PENDING', 'OFFERED', 'DECLINED',
 ]);
+
+const normalizeStudioMandate = (
+    studioId: string,
+    value: unknown,
+    legacy: StreamingRightsManagementState['policy'],
+    legacyControlMode: StreamingRightsControlMode,
+): StreamingRightsStudioMandate => {
+    const source = asRecord(value);
+    const titleOverrides = Object.fromEntries(Object.entries(asRecord(source.titleOverrides))
+        .filter((entry): entry is [string, StreamingRightsTitleControlOverride] => (
+            Boolean(cleanText(entry[0])) && TITLE_CONTROL_OVERRIDES.has(entry[1] as StreamingRightsTitleControlOverride)
+        ))
+        .map(([projectId, override]) => [cleanText(projectId), override]));
+    const positiveMoney = Number(source.maximumAutomaticGuarantee);
+    const positiveDuration = Number(source.maximumAutomaticDurationWeeks);
+    return {
+        studioId: cleanText(studioId, 'player-studio', 120),
+        controlMode: CONTROL_MODES.has(source.controlMode as StreamingRightsControlMode)
+            ? source.controlMode as StreamingRightsControlMode
+            : legacyControlMode,
+        financialPriority: FINANCIAL_PRIORITIES.has(source.financialPriority as StreamingRightsFinancialPriority)
+            ? source.financialPriority as StreamingRightsFinancialPriority
+            : 'BALANCED_RETURN',
+        distributionPriority: DISTRIBUTION_PRIORITIES.has(source.distributionPriority as StreamingRightsDistributionPriority)
+            ? source.distributionPriority as StreamingRightsDistributionPriority
+            : 'REGIONAL_OPTIMIZATION',
+        exclusivityPolicy: EXCLUSIVITY_POLICIES.has(source.exclusivityPolicy as StreamingRightsExclusivityPolicy)
+            ? source.exclusivityPolicy as StreamingRightsExclusivityPolicy
+            : 'ALLOW_WITHIN_LIMITS',
+        durationPreference: DURATION_PREFERENCES.has(source.durationPreference as StreamingRightsDurationPreference)
+            ? source.durationPreference as StreamingRightsDurationPreference
+            : 'BALANCED',
+        partnerPreference: PARTNER_PREFERENCES.has(source.partnerPreference as StreamingRightsPartnerPreference)
+            ? source.partnerPreference as StreamingRightsPartnerPreference
+            : 'STRONGEST_ECONOMICS',
+        renewalPreference: PREFERENCES.has(source.renewalPreference as StreamingRightsRenewalPreference)
+            ? source.renewalPreference as StreamingRightsRenewalPreference
+            : legacy.preference,
+        maximumAutomaticGuarantee: Number.isFinite(positiveMoney) && positiveMoney > 0
+            ? Math.min(1_000_000_000, Math.round(positiveMoney))
+            : legacy.maximumAutomaticGuarantee,
+        maximumAutomaticDurationWeeks: Number.isFinite(positiveDuration) && positiveDuration >= 13
+            ? Math.max(13, Math.min(260, Math.round(positiveDuration)))
+            : legacy.maximumAutomaticDurationWeeks,
+        protectGlobalExclusives: source.protectGlobalExclusives === undefined
+            ? legacy.protectGlobalExclusives
+            : source.protectGlobalExclusives !== false,
+        protectFranchises: source.protectFranchises === undefined
+            ? legacy.protectFranchises
+            : source.protectFranchises !== false,
+        titleOverrides,
+        revision: Math.max(1, Math.round(finiteNonNegative(source.revision, 1))),
+        updatedAtAbsoluteWeek: Math.max(0, finiteWeek(source.updatedAtAbsoluteWeek, 0)),
+    };
+};
 
 export const normalizeStreamingRightsManagementState = (
     value: unknown,
@@ -82,23 +154,89 @@ export const normalizeStreamingRightsManagementState = (
     const preference = PREFERENCES.has(policy.preference as StreamingRightsRenewalPreference)
         ? policy.preference as StreamingRightsRenewalPreference
         : 'BALANCED';
+    const normalizedPolicy: StreamingRightsManagementState['policy'] = {
+        noticeWeeks: Math.max(2, Math.min(26, Math.round(finiteNonNegative(policy.noticeWeeks, DEFAULT_NOTICE_WEEKS)))),
+        preference,
+        autoRenewMinimumScore: finitePercent(policy.autoRenewMinimumScore, 62),
+        letWeakContractsExpireBelowScore: finitePercent(policy.letWeakContractsExpireBelowScore, 35),
+        maximumAutomaticGuarantee: Math.round(finiteNonNegative(policy.maximumAutomaticGuarantee, 150_000_000)),
+        maximumAutomaticDurationWeeks: Math.max(13, Math.min(260, Math.round(finiteNonNegative(policy.maximumAutomaticDurationWeeks, 104)))),
+        protectGlobalExclusives: policy.protectGlobalExclusives !== false,
+        protectFranchises: policy.protectFranchises !== false,
+    };
+    const studioMandates = Object.fromEntries(Object.entries(asRecord(source.studioMandates))
+        .map(([studioId, mandate]) => [cleanText(studioId), normalizeStudioMandate(studioId, mandate, normalizedPolicy, controlMode)])
+        .filter(([studioId]) => Boolean(studioId)));
     return {
         schemaVersion: STREAMING_RIGHTS_CALENDAR_SCHEMA_VERSION,
         controlMode,
-        policy: {
-            noticeWeeks: Math.max(2, Math.min(26, Math.round(finiteNonNegative(policy.noticeWeeks, DEFAULT_NOTICE_WEEKS)))),
-            preference,
-            autoRenewMinimumScore: finitePercent(policy.autoRenewMinimumScore, 62),
-            letWeakContractsExpireBelowScore: finitePercent(policy.letWeakContractsExpireBelowScore, 35),
-            maximumAutomaticGuarantee: Math.round(finiteNonNegative(policy.maximumAutomaticGuarantee, 150_000_000)),
-            maximumAutomaticDurationWeeks: Math.max(13, Math.min(260, Math.round(finiteNonNegative(policy.maximumAutomaticDurationWeeks, 104)))),
-            protectGlobalExclusives: policy.protectGlobalExclusives !== false,
-            protectFranchises: policy.protectFranchises !== false,
-        },
+        policy: normalizedPolicy,
         packagePolicy: normalizeStreamingCataloguePackagePolicy(source.packagePolicy),
         protectedProjectIds: uniqueText(source.protectedProjectIds),
         manualContractIds: uniqueText(source.manualContractIds),
+        studioMandates,
         updatedAtAbsoluteWeek: Math.max(0, finiteWeek(source.updatedAtAbsoluteWeek, 0)),
+    };
+};
+
+export const getStreamingRightsStudioMandate = (
+    player: Player,
+    studioId: string,
+): StreamingRightsStudioMandate => {
+    const management = normalizeStreamingRightsManagementState(player.streamingRightsManagement);
+    return getStreamingRightsStudioMandateFromManagement(management, studioId);
+};
+
+const getStreamingRightsStudioMandateFromManagement = (
+    management: StreamingRightsManagementState,
+    studioId: string,
+): StreamingRightsStudioMandate => {
+    const cleanStudioId = cleanText(studioId, 'player-studio', 120);
+    return management.studioMandates[cleanStudioId]
+        || normalizeStudioMandate(cleanStudioId, undefined, management.policy, management.controlMode);
+};
+
+export interface UpdateStreamingRightsStudioMandateInput {
+    studioId: string;
+    absoluteWeek: number;
+    patch: Partial<Omit<StreamingRightsStudioMandate, 'studioId' | 'revision' | 'updatedAtAbsoluteWeek'>>;
+}
+
+export const updateStreamingRightsStudioMandate = (
+    player: Player,
+    input: UpdateStreamingRightsStudioMandateInput,
+): Player => {
+    const management = normalizeStreamingRightsManagementState(player.streamingRightsManagement);
+    const studioId = cleanText(input.studioId, 'player-studio', 120);
+    const current = getStreamingRightsStudioMandate(player, studioId);
+    const candidate = normalizeStudioMandate(studioId, { ...current, ...input.patch }, management.policy, current.controlMode);
+    const comparable = (mandate: StreamingRightsStudioMandate) => JSON.stringify({
+        ...mandate,
+        revision: 0,
+        updatedAtAbsoluteWeek: 0,
+    });
+    if (comparable(candidate) === comparable(current)) return player;
+    const nextMandate: StreamingRightsStudioMandate = {
+        ...candidate,
+        revision: current.revision + 1,
+        updatedAtAbsoluteWeek: Math.max(0, Math.round(Number(input.absoluteWeek) || 0)),
+    };
+    return {
+        ...player,
+        streamingRightsManagement: {
+            ...management,
+            controlMode: nextMandate.controlMode,
+            policy: {
+                ...management.policy,
+                preference: nextMandate.renewalPreference,
+                maximumAutomaticGuarantee: nextMandate.maximumAutomaticGuarantee,
+                maximumAutomaticDurationWeeks: nextMandate.maximumAutomaticDurationWeeks,
+                protectGlobalExclusives: nextMandate.protectGlobalExclusives,
+                protectFranchises: nextMandate.protectFranchises,
+            },
+            studioMandates: { ...management.studioMandates, [studioId]: nextMandate },
+            updatedAtAbsoluteWeek: nextMandate.updatedAtAbsoluteWeek,
+        },
     };
 };
 
@@ -213,6 +351,9 @@ const normalizeRenewalCase = (value: unknown): StreamingRightsRenewalCase | null
         policyPreferenceAtOpen: PREFERENCES.has(source.policyPreferenceAtOpen) ? source.policyPreferenceAtOpen : 'BALANCED',
         protectionReasons: uniqueText(source.protectionReasons),
         delegatedReason: cleanText(source.delegatedReason) || null,
+        ...(normalizeStreamingRightsDelegationTrace(source.delegationTrace)
+            ? { delegationTrace: normalizeStreamingRightsDelegationTrace(source.delegationTrace) }
+            : {}),
         outcome: CASE_OUTCOMES.has(source.outcome) ? source.outcome : 'PENDING',
         replacementContractId: cleanText(source.replacementContractId) || null,
         resolvedAtAbsoluteWeek: source.resolvedAtAbsoluteWeek === null || source.resolvedAtAbsoluteWeek === undefined
@@ -527,6 +668,22 @@ export const classifyStreamingRightsRenewalControl = (
     };
 };
 
+const managementForStudioMandate = (
+    management: StreamingRightsManagementState,
+    mandate: StreamingRightsStudioMandate,
+): StreamingRightsManagementState => ({
+    ...management,
+    controlMode: mandate.controlMode,
+    policy: {
+        ...management.policy,
+        preference: mandate.renewalPreference,
+        maximumAutomaticGuarantee: mandate.maximumAutomaticGuarantee,
+        maximumAutomaticDurationWeeks: mandate.maximumAutomaticDurationWeeks,
+        protectGlobalExclusives: mandate.protectGlobalExclusives,
+        protectFranchises: mandate.protectFranchises,
+    },
+});
+
 const createRenewalCase = (
     contract: StreamingRightsContract,
     absoluteWeek: number,
@@ -659,20 +816,30 @@ export const processStreamingRightsCalendarWeek = (
 
     const contracts = normalizeStreamingRightsContractRegistry(player.world.streamingRightsContracts);
     const renewalCases = { ...state.renewalCases };
+    const renewalCaseByContractId = new Map(
+        Object.values(renewalCases).map(candidate => [candidate.sourceContractId, candidate]),
+    );
+    const managementBySellerId = new Map<string, StreamingRightsManagementState>();
     const createdCaseIds: string[] = [];
     const expiredContractIds: string[] = [];
 
     Object.values(contracts)
         .sort((left, right) => left.id.localeCompare(right.id))
         .forEach(contract => {
+            let contractManagement = managementBySellerId.get(contract.seller.id);
+            if (!contractManagement) {
+                const studioMandate = getStreamingRightsStudioMandateFromManagement(management, contract.seller.id);
+                contractManagement = managementForStudioMandate(management, studioMandate);
+                managementBySellerId.set(contract.seller.id, contractManagement);
+            }
             if (contract.permanentPurchase || contract.windowType === 'PERMANENT') return;
-            const noticeStart = Math.max(contract.startsAtAbsoluteWeek, contract.expiresAtAbsoluteWeek - management.policy.noticeWeeks);
-            const existingCase = Object.values(renewalCases)
-                .find(candidate => candidate.sourceContractId === contract.id);
+            const noticeStart = Math.max(contract.startsAtAbsoluteWeek, contract.expiresAtAbsoluteWeek - contractManagement.policy.noticeWeeks);
+            const existingCase = renewalCaseByContractId.get(contract.id);
             let renewalCase = existingCase;
             if (!renewalCase && week >= noticeStart) {
-                renewalCase = createRenewalCase(contract, week, management);
+                renewalCase = createRenewalCase(contract, week, contractManagement);
                 renewalCases[renewalCase.id] = renewalCase;
+                renewalCaseByContractId.set(contract.id, renewalCase);
                 createdCaseIds.push(renewalCase.id);
             }
             if (
@@ -682,7 +849,7 @@ export const processStreamingRightsCalendarWeek = (
                 && week <= contract.expiresAtAbsoluteWeek
             ) {
                 const offer = buildStreamingRightsRenewalOffer(player, contract, week);
-                const control = classifyStreamingRightsRenewalControl(player, contract, offer, management);
+                const control = classifyStreamingRightsRenewalControl(player, contract, offer, contractManagement);
                 renewalCase = {
                     ...renewalCase,
                     offerDisposition: offer.offerDisposition,
@@ -743,7 +910,9 @@ export const processStreamingRightsCalendarWeek = (
         const currentCalendar = normalizeStreamingRightsCalendarState(nextPlayer.world.streamingRightsCalendar);
         const candidate = currentCalendar.renewalCases[caseId];
         if (!candidate?.performance) continue;
-        const currentManagement = normalizeStreamingRightsManagementState(nextPlayer.streamingRightsManagement);
+        const baseManagement = normalizeStreamingRightsManagementState(nextPlayer.streamingRightsManagement);
+        const mandate = getStreamingRightsStudioMandate(nextPlayer, candidate.seller.id);
+        const currentManagement = managementForStudioMandate(baseManagement, mandate);
         let action: StreamingRightsRenewalAction;
         if (currentManagement.policy.preference === 'RETEST_MARKET') {
             action = 'RETURN_TO_MARKET';
@@ -765,6 +934,30 @@ export const processStreamingRightsCalendarWeek = (
         } else {
             action = 'LET_EXPIRE';
         }
+        const tracedCalendar = normalizeStreamingRightsCalendarState(nextPlayer.world.streamingRightsCalendar);
+        const tracedCase = tracedCalendar.renewalCases[caseId];
+        nextPlayer = updateRenewalCase(nextPlayer, tracedCalendar, {
+            ...tracedCase,
+            delegationTrace: createStreamingRightsDelegationTrace({
+                mandate,
+                rule: action === 'ACCEPT_RENEWAL'
+                    ? 'RENEWAL_SCORE_WITHIN_MANDATE'
+                    : action === 'RETURN_TO_MARKET' ? 'RETEST_MARKET_WITHIN_MANDATE' : 'WEAK_TITLE_WITHIN_MANDATE',
+                facts: {
+                    sourceContractId: candidate.sourceContractId,
+                    sourceProjectId: candidate.sourceProjectId,
+                    performanceScore: candidate.performance.performanceScore,
+                    relationshipScore: candidate.performance.relationshipScore,
+                    rivalInterestScore: candidate.performance.rivalInterestScore,
+                    minimumGuarantee: candidate.proposedEconomics?.minimumGuarantee ?? null,
+                    durationWeeks: candidate.proposedEconomics?.durationWeeks ?? null,
+                    territory: candidate.territory,
+                    exclusivity: candidate.exclusivity,
+                    action,
+                },
+                explanation: candidate.delegatedReason || 'Routine renewal completed inside the saved mandate.',
+            }),
+        });
         const delegated = resolveStreamingRightsRenewal(nextPlayer, {
             caseId,
             action,

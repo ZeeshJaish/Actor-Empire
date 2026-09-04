@@ -9,7 +9,8 @@ import {
 import { compactPlayerForPersistence } from '../services/saveCompaction';
 import { migratePlayerSave } from '../services/saveMigration';
 import { normalizePlatformAiState } from '../services/platformAi';
-import { __saveTransferTest } from '../services/saveTransfer';
+import { __saveTransferTest, prepareSaveTransferImportEntries, selectPublicSaveTransferEntries } from '../services/saveTransfer';
+import { verifySaveIntegrity } from '../services/saveIntegrity';
 import { readFileSync } from 'node:fs';
 
 const assert = (condition: unknown, message: string) => {
@@ -272,7 +273,7 @@ assert(compacted.commitments[0].projectDetails.castList.length === 28, 'Compacti
 assert(compacted.businesses[0].history.length === 520, 'Compaction should keep bounded business operating history.');
 assert(compacted.businesses[0].studioState.financeLedger.length === 260, 'Compaction should keep bounded studio finance ledgers.');
 assert(compacted.world.projects.length === 900, 'Compaction should keep bounded world release history.');
-assert(compacted.world.upcomingRivals.length === 32, 'Compaction should keep bounded upcoming rival slate.');
+assert(compacted.world.upcomingRivals.length === 0, 'Compaction must discard legacy rival cards that have no canonical B6 production schedule.');
 assert(compacted.flags.extraNPCs.some((npc: any) => npc.id === 'npc_keep_relationship'), 'Compaction should preserve referenced generated NPCs.');
 assert(compacted.flags.extraNPCs.some((npc: any) => npc.id === 'npc_background_519'), 'Compaction should preserve recent generated NPCs.');
 assert(!compacted.flags.extraNPCs.some((npc: any) => npc.id === 'npc_background_0'), 'Compaction should remove stale unreferenced generated NPCs.');
@@ -560,8 +561,27 @@ assert(
   'Week advance should await persistence before showing the processed week.'
 );
 assert(
-  appSource.includes('await saveGameData(`actorEmpireSave_${slot}`, playerToSave, { rethrow: options.rethrow });'),
-  'Slot persistence should be able to rethrow critical save failures.'
+  appSource.includes('await saveVerifiedGameData(`actorEmpireSave_${slot}`, playerToSave, prepared.manifest'),
+  'Slot persistence should promote only verified candidates.'
 );
+
+const preparedImport = await prepareSaveTransferImportEntries(
+  [{ key: 'actorEmpireSave_1', value: bulkyPlayer }],
+  { archiveAppVersion: '1.0.1', importedAt: '2026-09-02T00:00:00.000Z' },
+);
+assert(preparedImport.entries.length === 1, 'A signed slot must produce one staged import entry.');
+assert(preparedImport.entries[0].currentKey === 'actorEmpireSave_1', 'Legacy slot keys must resolve to canonical public keys.');
+assert(preparedImport.entries[0].manifest.reason === 'IMPORT', 'Imported generations must carry the import integrity reason.');
+assert(
+  verifySaveIntegrity(preparedImport.entries[0].player, preparedImport.entries[0].manifest).ok,
+  'Every staged transfer slot must carry a matching verified manifest.',
+);
+const publicOnly = selectPublicSaveTransferEntries([
+  { key: 'actorEmpireSave_1', value: bulkyPlayer },
+  { key: 'actorEmpireSave_1__previous', value: { internal: true } },
+  { key: 'actorEmpireSave_1__candidate', value: { internal: true } },
+  { key: 'unrelated', value: { internal: true } },
+]);
+assert(publicOnly.length === 1 && publicOnly[0].key === 'actorEmpireSave_1', 'Exports must contain only public current save slots.');
 
 console.log('Save transfer audit passed.');

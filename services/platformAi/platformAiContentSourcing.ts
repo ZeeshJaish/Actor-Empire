@@ -3,6 +3,7 @@ import type {
     IndustryProject,
     PlatformAiContentPlan,
     PlatformAiContentSource,
+    PlatformAiLocalizationLevel,
     PlatformAiStreamingWindow,
     PlatformState,
     PlatformId,
@@ -48,6 +49,7 @@ import {
 } from './platformAiProductionEscrow';
 import { resolveCapabilityBackedLocalizationPromise } from './platformAiLocalizationCore';
 import { getPlatformAiSpendingRestrictions } from './platformAiFinancing';
+import type { PlatformIntelligenceIntent } from './platformIntelligenceIntent';
 
 export interface PlatformAiContentCandidate {
     id: string;
@@ -269,8 +271,9 @@ const uniqueById = (candidates: PlatformAiContentCandidate[]): PlatformAiContent
     });
 };
 
-export const buildPlatformContentCandidates = (
+const buildPlatformContentCandidatesInternal = (
     input: PlatformAiSourcingInput,
+    intent?: PlatformIntelligenceIntent,
 ): PlatformAiContentCandidate[] => {
     const sourcePlatform = input.world.platforms?.[input.platformId];
     if (!sourcePlatform || resolvePlatformController(input.player, input.platformId) === 'PLAYER') return [];
@@ -308,13 +311,19 @@ export const buildPlatformContentCandidates = (
         && contract.status === 'ACTIVE'
         && isStreamingLicenseActiveAt(contract, input.absoluteWeek)
     )).map(contract => contract.sourceProjectId));
-    const released = getPlatformAiRightsMarketProjectUniverse(input.world.projects, input.absoluteWeek)
-        .filter(project => !alreadyCovered.has(project.id))
-        .slice()
-        .sort((left, right) => right.quality - left.quality || left.id.localeCompare(right.id));
+    const allowOriginal = !intent || intent.route === 'COMMISSION_ORIGINAL';
+    const allowLicense = !intent || intent.route === 'LICENSE_TITLE';
+    const allowAcquisition = !intent || intent.route === 'ACQUIRE_CATALOGUE' || intent.route === 'TRANSFER_OWNED_TITLE';
+    const needsRightsMarket = allowLicense || allowAcquisition;
+    const released = needsRightsMarket
+        ? getPlatformAiRightsMarketProjectUniverse(input.world.projects, input.absoluteWeek)
+            .filter(project => !alreadyCovered.has(project.id))
+            .slice()
+            .sort((left, right) => right.quality - left.quality || left.id.localeCompare(right.id))
+        : [];
     const candidates: PlatformAiContentCandidate[] = [];
 
-    if (activeOriginals < originalLimit) {
+    if (allowOriginal && activeOriginals < originalLimit) {
         const producerStudioId = selectProducerStudio(
             input.player.id,
             input.platformId,
@@ -322,17 +331,21 @@ export const buildPlatformContentCandidates = (
             ai.strategyCycle,
         );
         if (producerStudioId) {
-            const genre = profile.preferredGenres[ai.strategyCycle % profile.preferredGenres.length] || 'DRAMA';
-            const productionBudgetMillions = roundMillions(35 + profile.competence.production * 7.5);
+            const genre = intent?.primaryGenre
+                || profile.preferredGenres[ai.strategyCycle % profile.preferredGenres.length]
+                || 'DRAMA';
+            const productionBudgetMillions = intent?.targetBudgetMillions
+                ? roundMillions(intent.targetBudgetMillions)
+                : roundMillions(35 + profile.competence.production * 7.5);
             const depositMillions = roundMillions(productionBudgetMillions * 0.05);
             if (hasRunway(platform.cashReserve, runwayFloor, productionBudgetMillions)) {
                 candidates.push({
-                    id: createDeterministicId('platform_ai_candidate', input.player.id, input.platformId, input.absoluteWeek, ai.strategyCycle, 'ORIGINAL', genre, producerStudioId),
+                    id: createDeterministicId('platform_ai_candidate', input.player.id, input.platformId, input.absoluteWeek, ai.strategyCycle, 'ORIGINAL', intent?.contentFingerprintId || genre, producerStudioId),
                     source: 'COMMISSIONED_ORIGINAL',
                     title: `${platform.name} ${genre.replaceAll('_', ' ')} Original`,
-                    projectType: ai.strategyCycle % 3 === 0 ? 'SERIES' : 'MOVIE',
+                    projectType: intent?.projectType || (ai.strategyCycle % 3 === 0 ? 'SERIES' : 'MOVIE'),
                     genre,
-                    targetAudience: genre === 'CRIME' || genre === 'HORROR' ? 'R' : 'PG-13',
+                    targetAudience: intent?.targetAudience || (genre === 'CRIME' || genre === 'HORROR' ? 'R' : 'PG-13'),
                     sourceProjectIds: [],
                     producerStudioId,
                     streamingWindow: 'ORIGINAL_STREAMING_PREMIERE',
@@ -349,7 +362,7 @@ export const buildPlatformContentCandidates = (
         }
     }
 
-    if (activeRights < rightsLimit) {
+    if (needsRightsMarket && activeRights < rightsLimit) {
         const ownedProject = released.find(project => (
             profile.ownedStudioIds.includes(project.studioId)
             && rightsScope.countryIds.length > 0
@@ -363,7 +376,7 @@ export const buildPlatformContentCandidates = (
                 'PERMANENT',
             )
         ));
-        if (ownedProject) {
+        if (allowAcquisition && ownedProject) {
             candidates.push({
                 id: createDeterministicId('platform_ai_candidate', input.platformId, 'OWNED', ownedProject.id),
                 source: 'OWNED_STUDIO_TRANSFER',
@@ -399,7 +412,7 @@ export const buildPlatformContentCandidates = (
                 rightsWindowForProject(project, false),
             )
         ));
-        for (const project of licensable.slice(0, 2)) {
+        for (const project of (allowLicense ? licensable : []).slice(0, 2)) {
             const rightsCostMillions = calculatePlatformAiRightsValueMillions(project);
             if (!hasRunway(platform.cashReserve, runwayFloor, rightsCostMillions)) continue;
             candidates.push({
@@ -432,7 +445,7 @@ export const buildPlatformContentCandidates = (
             .map(([studioId, projects]) => ({ studioId, projects: projects.slice(0, 5) }))
             .filter(group => group.projects.length >= 3)
             .sort((left, right) => right.projects.length - left.projects.length || left.studioId.localeCompare(right.studioId));
-        const group = catalogueGroups[0];
+        const group = allowAcquisition ? catalogueGroups[0] : undefined;
         if (group) {
             const groupedCost = roundMillions(group.projects.reduce((sum, project) => sum + calculatePlatformAiRightsValueMillions(project), 0) * 0.75);
             if (hasRunway(platform.cashReserve, runwayFloor, groupedCost)) {
@@ -467,6 +480,27 @@ export const buildPlatformContentCandidates = (
         .slice(0, 6);
 };
 
+export const buildPlatformContentCandidates = (
+    input: PlatformAiSourcingInput,
+): PlatformAiContentCandidate[] => buildPlatformContentCandidatesInternal(input);
+
+/**
+ * B4 entry point. It evaluates only the canonical source family selected by
+ * the linked intelligence fingerprint, so original briefs never scan the
+ * released-title market and impossible rights intents fail closed.
+ */
+export const buildPlatformContentCandidatesForIntent = (
+    input: PlatformAiSourcingInput,
+    intent: PlatformIntelligenceIntent,
+): PlatformAiContentCandidate[] => (
+    intent.route === 'COMMISSION_ORIGINAL'
+        || intent.route === 'LICENSE_TITLE'
+        || intent.route === 'ACQUIRE_CATALOGUE'
+        || intent.route === 'TRANSFER_OWNED_TITLE'
+        ? buildPlatformContentCandidatesInternal(input, intent)
+        : []
+);
+
 const buildPlan = (
     input: CommitPlatformContentCandidateInput,
     platform: PlatformState,
@@ -483,27 +517,25 @@ const buildPlan = (
             sourceProjectId,
             originalLanguageId: input.world.projects.find(project => project.id === sourceProjectId)?.originalLanguageId || 'english',
         }));
-    const promises = sourceLanguages.map(source => resolveCapabilityBackedLocalizationPromise({
-        platform,
-        countryIds: capabilities.activeCountryIds,
-        originalLanguageId: source.originalLanguageId,
-        requestedLevel: requestedLocalizationLevel,
-    }));
-    const localizationLevel = promises.every(promise => promise.localizationLevel === requestedLocalizationLevel)
-        ? requestedLocalizationLevel
-        : promises.every(promise => promise.localizationLevel !== 'NONE') ? 'SUBTITLES' : 'NONE';
     const finalPromises = sourceLanguages.map(source => ({
         sourceProjectId: source.sourceProjectId,
         promise: resolveCapabilityBackedLocalizationPromise({
             platform,
             countryIds: capabilities.activeCountryIds,
             originalLanguageId: source.originalLanguageId,
-            requestedLevel: localizationLevel,
+            requestedLevel: requestedLocalizationLevel,
         }),
     }));
     const localizationRequirements = finalPromises.flatMap(({ sourceProjectId, promise }) => (
-        promise.requirements.map(requirement => ({ ...requirement, sourceProjectId }))
+        promise.requirements.map(requirement => sourceProjectId
+            ? { ...requirement, sourceProjectId }
+            : requirement)
     ));
+    const localizationLevel: PlatformAiLocalizationLevel = localizationRequirements.length === 0
+        ? 'NONE'
+        : finalPromises.some(({ promise }) => promise.localizationLevel === 'DUBS_AND_SUBTITLES')
+            ? 'DUBS_AND_SUBTITLES'
+            : 'SUBTITLES';
     return clampPlatformContentPlanSupport({
     id: planId,
     platformId: input.platformId,
@@ -541,9 +573,11 @@ const buildPlan = (
     premiereAtAbsoluteWeek: null,
     releasePattern: null,
     releaseEntries: [],
+    releaseReadiness: null,
     scheduledAtAbsoluteWeek: null,
     releasedAtAbsoluteWeek: null,
     industryProductionId: null,
+    productionHoldStartedAtAbsoluteWeek: null,
     forecast: {
         strategic: input.candidate.scores.strategic,
         creative: input.candidate.scores.creative,

@@ -26,9 +26,11 @@ import {
 } from '../services/platformAi';
 import {
     filterPlatformAiRightsContractsByRenewalState,
+    getPlatformAiNormalizationDiagnostics,
     getPlatformAiRightsRenewalContractId,
     normalizePlatformAiPendingOneTimeObligations,
     normalizePlatformAiRightsRenewals,
+    resetPlatformAiNormalizationDiagnostics,
 } from '../services/platformAi/platformAiState';
 import { getAbsoluteWeek } from '../services/legacyLogic';
 import {
@@ -36,6 +38,7 @@ import {
     isStreamingLicenseActiveAt,
     migrateStreamingRightsContractRegistry,
     millionsToFullCurrency,
+    normalizeStreamingRightsContractRegistry,
 } from '../services/streamingRightsCore';
 import { createPlatformAiFixture } from './helpers/platformAiFixture';
 
@@ -203,6 +206,16 @@ const afterBoundary = progressPlatformAiRightsLifecycle({
     absoluteWeek: EXPIRY_WEEK + 1,
 });
 assert.equal(afterBoundary.world.platforms!.NETFLIX.ai!.rightsContracts[0].status, 'EXPIRED');
+assert.equal(
+    afterBoundary.world.platforms!.NETFLIX.ai!.slate[0].status,
+    'CANCELLED',
+    'A rights-ready plan with no usable right or pending renewal must leave the active slate after expiry.',
+);
+assert.strictEqual(
+    normalizeStreamingRightsContractRegistry(afterBoundary.world.streamingRightsContracts),
+    afterBoundary.world.streamingRightsContracts,
+    'Expiry mutations must leave the shared rights registry canonically recognized in memory.',
+);
 assert.deepEqual(
     progressPlatformAiRightsLifecycle({
         player: boundaryPlayer,
@@ -266,6 +279,21 @@ expiringPlan.releaseEntries = [{
     localizationReadyAtAbsoluteWeek: BASE_WEEK, countryIds: ['US'], releasePattern: 'MOVIE_SINGLE_PREMIERE',
     installmentAbsoluteWeeks: [releaseWeek], status: 'SCHEDULED', releasedAtAbsoluteWeek: null, streamingWindowId: null,
 }];
+expiringPlan.releaseReadiness = {
+    evaluatedAtAbsoluteWeek: BASE_WEEK,
+    premiereAtAbsoluteWeek: releaseWeek,
+    latestRequiredAbsoluteWeek: releaseWeek,
+    ready: true,
+    blockers: [],
+    canonicalProjectIds: [projects[0].id],
+    rightsContractIds: ['contract-capacity-expiring'],
+    countryIds: ['US'],
+    localizationReadyAtAbsoluteWeek: BASE_WEEK,
+    scheduledTitleCount: 1,
+    releaseCapacity: 2,
+    selectionScore: 8,
+    selectionReasons: ['EARLY_AVAILABILITY'],
+};
 const occupyingPlan = makePlan('APPLE_TV', 'plan-capacity-occupying', projects[1].id, 'contract-capacity-occupying', 'SCHEDULED');
 occupyingPlan.premiereAtAbsoluteWeek = releaseWeek;
 occupyingPlan.scheduledAtAbsoluteWeek = BASE_WEEK;
@@ -305,6 +333,7 @@ assert.equal(resetPlan.status, 'RIGHTS_READY');
 assert.equal(resetPlan.premiereAtAbsoluteWeek, null);
 assert.equal(resetPlan.scheduledAtAbsoluteWeek, null);
 assert.deepEqual(resetPlan.releaseEntries, []);
+assert.equal(resetPlan.releaseReadiness, null, 'Schedule cancellation must clear its obsolete readiness passport.');
 assert.deepEqual(resetPlan.sourceProjectIds, expiringPlan.sourceProjectIds, 'Schedule cancellation must preserve canonical source identity.');
 assert.deepEqual(resetPlan.rightsContractIds, expiringPlan.rightsContractIds, 'Schedule cancellation must preserve the rights-planning identity.');
 const capacityLocalization = planPlatformAiLocalization({
@@ -394,6 +423,51 @@ assert.equal(queuedObligation.status, 'HELD');
 assert.equal(queuedObligation.amountMillions, RENEWAL_MG_MILLIONS);
 assert.equal(queued.world.platforms!.NETFLIX.ai!.rightsContracts.length, 1, 'No renewal licence may exist before settlement.');
 
+const massRenewalCount = 24;
+const massRenewalProjects = Array.from({ length: massRenewalCount }, (_, index) => makeProject(`mass-renewal-${index}`));
+const massRenewalPlans = massRenewalProjects.map((project, index) => (
+    makePlan('NETFLIX', `mass-renewal-plan-${index}`, project.id, `mass-renewal-contract-${index}`)
+));
+const massRenewalContracts = massRenewalProjects.map((project, index) => makeContract({
+    platformId: 'NETFLIX',
+    planId: massRenewalPlans[index].id,
+    project,
+    id: `mass-renewal-contract-${index}`,
+    renewalOption: true,
+}));
+const massRenewalPlatform = normalizedPlatform(renewalPlayer, 'NETFLIX');
+massRenewalPlatform.ai!.slate = massRenewalPlans;
+massRenewalPlatform.ai!.rightsContracts = massRenewalContracts;
+const massRenewalWorld = worldWith(renewalPlayer, massRenewalPlatform, massRenewalProjects);
+resetPlatformAiNormalizationDiagnostics();
+const massQueued = progressPlatformAiRightsLifecycle({
+    player: renewalPlayer,
+    world: massRenewalWorld,
+    platformId: 'NETFLIX',
+    absoluteWeek: EXPIRY_WEEK,
+});
+assert.equal(massQueued.queuedRenewalIds.length, massRenewalCount, 'Every due renewal must queue exactly once.');
+assert.ok(
+    getPlatformAiNormalizationDiagnostics().deepValidationCount <= 2,
+    'batch renewal progression must not deep-validate the growing platform state once per contract',
+);
+
+const missedRenewalPlatform = normalizedPlatform(renewalPlayer, 'NETFLIX');
+missedRenewalPlatform.ai!.slate = [renewalPlan];
+missedRenewalPlatform.ai!.rightsContracts = [renewalContract];
+const missedRenewalWorld = worldWith(renewalPlayer, missedRenewalPlatform, [renewalProject]);
+const missedRenewal = progressPlatformAiRightsLifecycle({
+    player: renewalPlayer,
+    world: missedRenewalWorld,
+    platformId: 'NETFLIX',
+    absoluteWeek: EXPIRY_WEEK + 3,
+});
+assert.deepEqual(
+    missedRenewal.queuedRenewalIds,
+    [],
+    'an AI platform must not retry a missed or no-longer-controlled renewal every week after expiry',
+);
+
 const cashPoorWorld = structuredClone(queued.world);
 cashPoorWorld.platforms!.NETFLIX.cashReserve = 0;
 cashPoorWorld.platforms!.NETFLIX.subscribers = 0;
@@ -423,8 +497,8 @@ const settled = settlePlatformAiEconomy({
 assert.equal(settled.platform.ai!.pendingOneTimeObligations.find(item => item.id === renewalRecord.obligationId)?.status, 'SETTLED');
 assert.equal(
     settled.platform.ai!.rightsRenewals.find(item => item.id === renewalRecord.id)?.status,
-    'PENDING_PAYMENT',
-    'Economy records settlement evidence; only the rights lifecycle may promote payment status.',
+    'PAYMENT_SETTLED',
+    'The economy must promote payment status in the same mutation that settles its canonical obligation.',
 );
 assert.equal(
     (settled.platform.ai!.rightsRenewals.find(item => item.id === renewalRecord.id) as any)?.paymentSettledAtAbsoluteWeek,
@@ -445,6 +519,66 @@ const settledWorld = {
     ...queued.world,
     platforms: { ...queued.world.platforms!, NETFLIX: settled.platform },
 };
+const settledReload = migratePlayerSave(compactPlayerForPersistence({ ...renewalPlayer, world: settledWorld }));
+assert.deepEqual(
+    settledReload.world.platforms!.NETFLIX.ai!.rightsRenewals,
+    settled.platform.ai!.rightsRenewals,
+    'A save boundary immediately after payment must not repair or rewrite renewal status.',
+);
+const saturatedSettlementPlatform = structuredClone(settled.platform);
+saturatedSettlementPlatform.ai!.pendingOneTimeObligations = [
+    ...saturatedSettlementPlatform.ai!.pendingOneTimeObligations,
+    ...Array.from({ length: 104 }, (_, index) => ({
+        id: `later-settled-obligation-${index}`,
+        category: 'DISCRETIONARY' as const,
+        amountMillions: 1,
+        createdWeek: EXPIRY_WEEK + 1 + index,
+        status: 'SETTLED' as const,
+        settledWeek: EXPIRY_WEEK + 1 + index,
+    })),
+];
+const normalizedSaturatedSettlement = normalizePlatformAiState(
+    saturatedSettlementPlatform,
+    renewalPlayer.id,
+    EXPIRY_WEEK + 105,
+);
+assert.equal(
+    normalizedSaturatedSettlement.ai!.rightsRenewals.find(item => item.id === renewalRecord.id)?.status,
+    'PAYMENT_SETTLED',
+    'A paid renewal awaiting activation must keep its settlement status when settled history exceeds the archive limit.',
+);
+assert.equal(
+    normalizedSaturatedSettlement.ai!.pendingOneTimeObligations.find(item => item.id === renewalRecord.obligationId)?.status,
+    'SETTLED',
+    'A paid renewal obligation is active lifecycle evidence and must not be compacted as ordinary settled history.',
+);
+const saturatedEconomyPlatform = {
+    ...normalizedSaturatedSettlement,
+    cashReserve: 0,
+    subscribers: 0,
+    ai: {
+        ...normalizedSaturatedSettlement.ai!,
+        financeHistory: [],
+        marketOperations: [],
+    },
+};
+const saturatedEconomy = settlePlatformAiEconomy({
+    player: {
+        ...renewalPlayer,
+        world: {
+            ...renewalPlayer.world,
+            platforms: { ...renewalPlayer.world.platforms!, NETFLIX: saturatedEconomyPlatform },
+        },
+    },
+    platform: saturatedEconomyPlatform,
+    absoluteWeek: EXPIRY_WEEK + 106,
+    discretionaryCostMillions: 1,
+});
+assert.equal(
+    saturatedEconomy.platform.ai!.pendingOneTimeObligations.find(item => item.id === renewalRecord.obligationId)?.amountMillions,
+    renewalRecord.minimumGuaranteeMillions,
+    'Weekly economy processing must preserve the exact paid-renewal obligation after the history cap is saturated.',
+);
 const activated = progressPlatformAiRightsLifecycle({
     player: { ...renewalPlayer, world: settledWorld },
     world: settledWorld,
@@ -466,6 +600,28 @@ assert.ok(
     'A renewed plan must become schedulable through the new canonical contract identity.',
 );
 assert.equal(activated.world.platforms!.NETFLIX.ai!.rightsRenewals[0].status, 'CONTRACTED');
+const saturatedContractedPlatform = structuredClone(activated.world.platforms!.NETFLIX);
+saturatedContractedPlatform.ai!.pendingOneTimeObligations = [
+    ...saturatedContractedPlatform.ai!.pendingOneTimeObligations,
+    ...Array.from({ length: 104 }, (_, index) => ({
+        id: `contracted-later-settled-obligation-${index}`,
+        category: 'DISCRETIONARY' as const,
+        amountMillions: 1,
+        createdWeek: EXPIRY_WEEK + 2 + index,
+        status: 'SETTLED' as const,
+        settledWeek: EXPIRY_WEEK + 2 + index,
+    })),
+];
+const normalizedSaturatedContracted = normalizePlatformAiState(
+    saturatedContractedPlatform,
+    renewalPlayer.id,
+    EXPIRY_WEEK + 106,
+);
+assert.equal(
+    normalizedSaturatedContracted.ai!.pendingOneTimeObligations.find(item => item.id === renewalRecord.obligationId)?.amountMillions,
+    renewalRecord.minimumGuaranteeMillions,
+    'Every retained contracted renewal must retain its exact settlement evidence beyond the ordinary history cap.',
+);
 const renewalLocalization = planPlatformAiLocalization({
     player: { ...renewalPlayer, world: activated.world },
     world: activated.world,
@@ -553,6 +709,7 @@ const turnResult = processPlatformAiWorldTurn(turnPlayer, turnWorld, EXPIRY_WEEK
 const turnRenewal = turnResult.world.platforms!.NETFLIX.ai!.rightsRenewals[0];
 assert.ok(turnRenewal);
 assert.equal(turnResult.world.platforms!.NETFLIX.ai!.pendingOneTimeObligations.find(item => item.id === turnRenewal.obligationId)?.status, 'SETTLED');
+assert.equal(turnRenewal.status, 'PAYMENT_SETTLED', 'The weekly turn must finish with payment evidence and renewal status synchronized.');
 assert.equal(turnResult.world.platforms!.NETFLIX.ai!.rightsContracts.filter(contract => contract.origin === 'RENEWAL').length, 0);
 
 // Acquired/player-controlled platforms are strict no-ops before normalization.
@@ -616,6 +773,22 @@ const repairedV4Ai = migratePlayerSave(compactPlayerForPersistence(malformedV4))
 assert.equal(repairedV4Ai.rightsRenewals.length, 1);
 assert.equal(repairedV4Ai.rightsRenewals[0].id, renewalRecord.id);
 assert.equal(repairedV4Ai.pendingOneTimeObligations.filter(item => item.id === renewalRecord.obligationId).length, 1);
+
+const unorderedObligations = [
+    { id: 'held-newer', category: 'CONTRACTUAL' as const, amountMillions: 3, createdWeek: 12, status: 'HELD' as const, settledWeek: null },
+    { id: 'settled-later', category: 'CONTRACTUAL' as const, amountMillions: 2, createdWeek: 4, status: 'SETTLED' as const, settledWeek: 9 },
+    { id: 'held-older', category: 'LOCALIZATION' as const, amountMillions: 1, createdWeek: 5, status: 'HELD' as const, settledWeek: null },
+];
+assert.deepEqual(
+    normalizePlatformAiPendingOneTimeObligations(unorderedObligations),
+    normalizePlatformAiPendingOneTimeObligations([...unorderedObligations].reverse()),
+    'Obligation priority and retained history must not depend on array insertion order.',
+);
+assert.deepEqual(
+    normalizePlatformAiPendingOneTimeObligations(unorderedObligations).map(item => item.id),
+    ['held-older', 'held-newer', 'settled-later'],
+    'Held obligations must settle oldest-first before deterministic settled history.',
+);
 
 // Unresolved payment work is never compacted away, even beyond the settled-history budget.
 const overflowObligations = normalizePlatformAiPendingOneTimeObligations([

@@ -8,7 +8,8 @@ import type {
     ProductionCalendar,
 } from '../../types';
 import { createDeterministicRng } from '../deterministicRandom';
-import { NPC_DATABASE } from '../npcLogic';
+import { evaluateDynastyTalentOffer } from '../dynastyCareer';
+import { getCanonicalIndustryTalentPool } from '../industryTalentSelection';
 
 const TIER_SCORE: Record<NPCActor['tier'], number> = {
     ICON: 100,
@@ -19,20 +20,6 @@ const TIER_SCORE: Record<NPCActor['tier'], number> = {
     UNKNOWN: 42,
 };
 
-const isStableIndustryTalent = (npc: NPCActor): boolean => (
-    npc.id.startsWith('celeb_act_') || npc.id.startsWith('celeb_dir_')
-);
-
-const getTalentPool = (player: Player): NPCActor[] => {
-    const extras = Array.isArray(player.flags?.extraNPCs) ? player.flags.extraNPCs as NPCActor[] : [];
-    const byId = new Map<string, NPCActor>();
-    NPC_DATABASE.filter(isStableIndustryTalent).forEach(npc => byId.set(npc.id, npc));
-    extras.forEach(npc => {
-        if (npc?.id && (npc.occupation === 'ACTOR' || npc.occupation === 'DIRECTOR')) byId.set(npc.id, npc);
-    });
-    return [...byId.values()].sort((left, right) => left.id.localeCompare(right.id));
-};
-
 const rankTalent = (
     candidates: NPCActor[],
     seed: string,
@@ -40,6 +27,7 @@ const rankTalent = (
     releaseMemory: readonly PlatformAiReleaseMemory[],
     role: 'ACTOR' | 'DIRECTOR',
     pairedActorId?: string | null,
+    candidateModifiers: ReadonlyMap<string, number> = new Map(),
 ): NPCActor[] => candidates
     .map(candidate => {
         const rng = createDeterministicRng(`${seed}:${candidate.id}`);
@@ -50,6 +38,7 @@ const rankTalent = (
             candidate,
             score: TIER_SCORE[candidate.tier]
                 + prestigeFit
+                + (candidateModifiers.get(candidate.id) || 0)
                 + getPlatformAiTalentMemoryModifier(releaseMemory, candidate.id, role)
                 + (role === 'DIRECTOR' && pairedActorId
                     ? getPlatformAiTalentPairMemoryModifier(releaseMemory, pairedActorId, candidate.id)
@@ -117,22 +106,34 @@ export const selectPlatformAiTalent = (
     // the gameplay availability rule until a future contracts/lawsuit pack.
     void input.productionCalendar;
     void input.bookings;
-    const pool = getTalentPool(input.player);
+    const pool = getCanonicalIndustryTalentPool(input.player);
     const releaseMemory = input.releaseMemory || [];
+    const absoluteWeek = Math.max(0, Math.round(input.productionCalendar.startedAbsoluteWeek || 0));
+    const offerDecisions = new Map(pool.map(candidate => [candidate.id, evaluateDynastyTalentOffer(input.player, candidate, {
+        platformId: input.platformId,
+        canonicalProjectId: input.canonicalProjectId,
+        genre: input.genre,
+        absoluteWeek,
+    })]));
+    const eligiblePool = pool.filter(candidate => offerDecisions.get(candidate.id)?.eligible !== false);
+    const offerModifiers = new Map([...offerDecisions.entries()].map(([id, decision]) => [id, decision.modifier]));
     const actors = rankTalent(
-        pool.filter(npc => npc.occupation === 'ACTOR'),
+        eligiblePool.filter(npc => npc.occupation === 'ACTOR'),
         `${input.player.id}:${input.platformId}:${input.canonicalProjectId}:ACTOR`,
         input.genre,
         releaseMemory,
         'ACTOR',
+        undefined,
+        offerModifiers,
     );
     const directors = rankTalent(
-        pool.filter(npc => npc.occupation === 'DIRECTOR'),
+        eligiblePool.filter(npc => npc.occupation === 'DIRECTOR'),
         `${input.player.id}:${input.platformId}:${input.canonicalProjectId}:DIRECTOR`,
         input.genre,
         releaseMemory,
         'DIRECTOR',
         actors[0]?.id,
+        offerModifiers,
     );
     if (!actors[0] || !directors[0]) return null;
     return { leadActor: actors[0], director: directors[0] };

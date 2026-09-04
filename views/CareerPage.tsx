@@ -4,7 +4,7 @@ import { Player, Commitment, OwnedProductionActionId, OwnedProductionTrackType }
 import { getBuzzLabel } from '../services/roleLogic';
 import { getAbsoluteWeek, getElapsedWeeks } from '../services/legacyLogic';
 import { getPlayerLanguage, t } from '../services/i18n';
-import { deriveOwnedProductionCareerItems } from '../services/ownedProductionCareer';
+import { deriveOwnedProductionCareerItems, getPlayerActingCommitments } from '../services/ownedProductionCareer';
 import { Film, Clapperboard, Trophy, Mic2, Video, Zap, PenTool, Coffee, TrendingUp, Twitter, Camera, Hourglass, CheckCircle2, Calendar } from 'lucide-react';
 
 interface CareerPageProps {
@@ -35,7 +35,7 @@ const getOwnedTrackIcon = (type: OwnedProductionTrackType, className: string) =>
 
 export const CareerPage: React.FC<CareerPageProps> = ({ player, onQuitJob, onRehearse, onOwnedProductionFocus }) => {
   const pendingApps = player.applications || [];
-  const actingCommitments = player.commitments.filter(c => c.type === 'ACTING_GIG');
+  const actingCommitments = getPlayerActingCommitments(player.commitments);
   const ownedProductionItems = deriveOwnedProductionCareerItems(player);
   const pastProjects = player.pastProjects || [];
   const language = getPlayerLanguage(player);

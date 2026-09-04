@@ -18,7 +18,7 @@ const checks = [
   [app, 'const indexedDbKeys = new Set(await listGameDataKeys())', 'Startup lists keys before reading full saves.'],
   [app, "cachedSummary || createDeferredSaveSlotSummary(saveKey, 'indexeddb')", 'Startup uses a cached or deferred summary.'],
   [app, 'if (!existingSave && saveSlotSummaries[slot])', 'The selected slot is loaded lazily.'],
-  [selectionSource, 'savedData = await loadGameData(storageKey)', 'The full IndexedDB save is read only after slot selection.'],
+  [selectionSource, 'const verifiedLoad = await loadVerifiedGameData(storageKey)', 'The full IndexedDB save is read and verified only after slot selection.'],
   [app, 'skipNextPlayingMigrationRef.current = true', 'A selected save is not deep-cloned again during PLAYING hydration.'],
   [app, "skipMigration ? { ...prev } : migratePlayerSave(prev)", 'Hydration keeps normal new-career migration while reusing a prepared save.'],
   [app, 'suppressNextAutosaveRef.current = true', 'A committed week suppresses the duplicate autosave.'],

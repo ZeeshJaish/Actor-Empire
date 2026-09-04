@@ -20,6 +20,9 @@ import {
     calculateStreamingCompetitionHealth,
     chooseStreamingEcosystemLaunchClass,
 } from './streamingPlatformCompetitionHealth';
+import { processIndustryIntelligenceShadowCompany } from './industryIntelligence/industryIntelligenceCoordinator';
+import { adaptStreamingEcosystemIntelligenceContext } from './industryIntelligence/streamingEcosystemIntelligenceAdapter';
+import type { IndustryContentFingerprint } from '../types';
 
 const ORIGINS: StreamingEcosystemOrigin[] = ['BOOTSTRAPPED', 'VENTURE_BACKED', 'TELECOM_BACKED', 'BROADCASTER_BACKED', 'STUDIO_SPINOFF', 'TECH_BACKED', 'CONGLOMERATE_BACKED', 'CELEBRITY_FOUNDED'];
 const NAME_PREFIXES: Record<string, string[]> = {
@@ -220,6 +223,7 @@ const progressOperator = (
     state: StreamingPlatformEcosystemState,
     operator: StreamingEcosystemOperator,
     absoluteWeek: number,
+    globalRecentFingerprints: IndustryContentFingerprint[],
 ): void => {
     if (operator.kind === 'CORE_GLOBAL' || operator.lifecycle === 'CLOSED' || operator.lifecycle === 'ACQUIRED') return;
     if ((operator.lastProcessedAbsoluteWeek ?? -1) >= absoluteWeek) return;
@@ -234,6 +238,7 @@ const progressOperator = (
     operator.consecutiveStressWeeks = operator.cashMillions < weeklyCost * 10 ? operator.consecutiveStressWeeks + 1 : 0;
     if (operator.consecutiveStressWeeks >= 8 && operator.lifecycle === 'ACTIVE') {
         operator.lifecycle = 'DISTRESSED';
+        operator.lastMaterialChangeAtAbsoluteWeek = absoluteWeek;
         addEvent(state, {
             id: createDeterministicId('streaming_ecosystem_event', operator.id, absoluteWeek, 'DISTRESS'),
             absoluteWeek, operatorId: operator.id, type: 'DISTRESS', countryId: operator.homeCountryId,
@@ -242,6 +247,7 @@ const progressOperator = (
         });
     } else if (operator.lifecycle === 'DISTRESSED' && operator.consecutiveStressWeeks === 0 && operator.cashMillions > weeklyCost * 20) {
         operator.lifecycle = 'ACTIVE';
+        operator.lastMaterialChangeAtAbsoluteWeek = absoluteWeek;
         addEvent(state, {
             id: createDeterministicId('streaming_ecosystem_event', operator.id, absoluteWeek, 'RECOVERY'),
             absoluteWeek, operatorId: operator.id, type: 'RECOVERY', countryId: operator.homeCountryId,
@@ -250,6 +256,7 @@ const progressOperator = (
     }
     if (operator.consecutiveStressWeeks >= 30 && operator.cashMillions < 0) {
         operator.lifecycle = 'CLOSED';
+        operator.lastMaterialChangeAtAbsoluteWeek = absoluteWeek;
         addEvent(state, {
             id: createDeterministicId('streaming_ecosystem_event', operator.id, absoluteWeek, 'CLOSED'),
             absoluteWeek, operatorId: operator.id, type: 'CLOSED', countryId: operator.homeCountryId,
@@ -271,6 +278,14 @@ const progressOperator = (
         state.markets[countryId] = { ...market, ...repaired, lastRebalancedAtAbsoluteWeek: absoluteWeek };
     }
     updateMarketVisibilityStreaks(operator, state);
+    if (operator.intelligence) {
+        const intelligence = processIndustryIntelligenceShadowCompany({
+            context: adaptStreamingEcosystemIntelligenceContext(operator, absoluteWeek),
+            state: operator.intelligence,
+            globalRecentFingerprints,
+        });
+        if (intelligence.changed) operator.intelligence = intelligence.state;
+    }
     operator.lastProcessedAbsoluteWeek = absoluteWeek;
 };
 
@@ -326,8 +341,43 @@ export const processStreamingPlatformEcosystemTurn = (
     }
     const state = structuredClone(normalized);
     const previousEventIds = new Set(state.eventHistory.map(event => event.id));
+    const coreRecent = Object.values(world.platforms || {}).flatMap(platform => (
+        (platform.ai?.intelligence?.content.selectedFingerprints || []).map(fingerprint => ({
+            fingerprint,
+            ecosystemOwnerId: null as string | null,
+        }))
+    ));
+    const ecosystemRecent = Object.values(state.operators).flatMap(item => (
+        (item.intelligence?.content.selectedFingerprints || []).map(fingerprint => ({
+            fingerprint,
+            ecosystemOwnerId: item.id as string | null,
+        }))
+    ));
+    const orderRecent = (left: typeof ecosystemRecent[number], right: typeof ecosystemRecent[number]) => (
+        right.fingerprint.createdAtAbsoluteWeek - left.fingerprint.createdAtAbsoluteWeek
+        || left.fingerprint.id.localeCompare(right.fingerprint.id)
+    );
+    let orderedRecent = [...ecosystemRecent, ...coreRecent].sort(orderRecent);
     for (const operator of Object.values(state.operators).sort((left, right) => left.id.localeCompare(right.id))) {
-        progressOperator(player, state, operator, absoluteWeek);
+        const globalRecentFingerprints = orderedRecent
+            .filter(item => item.ecosystemOwnerId !== operator.id)
+            .map(item => item.fingerprint)
+            .slice(0, 96);
+        const previousFingerprintIds = (state.operators[operator.id]?.intelligence?.content.selectedFingerprints || [])
+            .map(fingerprint => fingerprint.id);
+        progressOperator(player, state, operator, absoluteWeek, globalRecentFingerprints);
+        const currentFingerprints = state.operators[operator.id]?.intelligence?.content.selectedFingerprints || [];
+        const fingerprintSetChanged = currentFingerprints.length !== previousFingerprintIds.length
+            || currentFingerprints.some((fingerprint, index) => fingerprint.id !== previousFingerprintIds[index]);
+        if (fingerprintSetChanged) {
+            orderedRecent = [
+                ...orderedRecent.filter(item => item.ecosystemOwnerId !== operator.id),
+                ...currentFingerprints.map(fingerprint => ({
+                fingerprint,
+                ecosystemOwnerId: operator.id as string | null,
+                })),
+            ].sort(orderRecent);
+        }
     }
     const launched = maybeLaunchOperator(player, state, absoluteWeek);
     if (launched) {

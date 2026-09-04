@@ -1,4 +1,5 @@
 import { ActorSkills, BloodlineMember, NPCActor, Player, PortfolioItem, Relationship, StreamingState, UniverseId, ProjectType } from '../types';
+import { buildDynastySuccessionState } from './dynastyCareer';
 
 export const LEGACY_MIN_PLAYABLE_AGE = 18;
 export const LEGACY_INHERITANCE_TAX_RATE = 0.25;
@@ -335,6 +336,16 @@ export const buildLegacyStudioInheritance = (
         activeReleases: legacyCareerActiveReleases,
         awards: clone(player.awards || []),
     };
+    const sourceAbsoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+    const targetAbsoluteWeek = getAbsoluteWeek(options.heirAge ?? player.age, options.heirWeek ?? player.currentWeek);
+    const dynastySuccession = buildDynastySuccessionState({
+        player,
+        parentActor,
+        archive: legacyCareerArchive,
+        sourceAbsoluteWeek,
+        targetAbsoluteWeek,
+        isDeceased,
+    });
 
     return {
         parentActor,
@@ -349,6 +360,8 @@ export const buildLegacyStudioInheritance = (
             legacyParent,
             legacyStudioProjects: legacyProjects,
             legacyCareerArchive,
+            dynastyCareer: dynastySuccession.state,
+            dynastyCareerArchives: dynastySuccession.archives,
             extraNPCs
         }
     };

@@ -45,6 +45,10 @@ export {
     type ProgressPlatformAiDistressWorldResult,
 } from './platformAiDistress';
 export {
+    processPlatformAiRightsResaleWeek,
+    type PlatformAiRightsResaleWeekResult,
+} from './platformAiRightsResale';
+export {
     getPlatformAiProductionDuration,
     normalizePlatformAiAudienceSettlements,
     normalizePlatformAiRightsRenewals,
@@ -71,12 +75,36 @@ export {
 } from './platformAiRightsLifecycle';
 export {
     buildPlatformContentCandidates,
+    buildPlatformContentCandidatesForIntent,
     commitPlatformContentCandidate,
     type CommitPlatformContentCandidateInput,
     type CommitPlatformContentCandidateResult,
     type PlatformAiContentCandidate,
     type PlatformAiSourcingInput,
 } from './platformAiContentSourcing';
+export {
+    derivePlatformIntelligenceIntent,
+    type PlatformIntelligenceIntent,
+    type DerivePlatformIntelligenceIntentInput,
+} from './platformIntelligenceIntent';
+export {
+    executePlatformIntelligenceProposals,
+    type ExecutePlatformIntelligenceProposalsInput,
+    type ExecutePlatformIntelligenceProposalsResult,
+} from './platformIntelligenceExecution';
+export {
+    appendPlatformIntelligenceOutcome,
+    createInitialPlatformIntelligenceMigrationState,
+    normalizePlatformIntelligenceMigrationState,
+    PLATFORM_INTELLIGENCE_OUTCOME_LIMIT,
+    PLATFORM_INTELLIGENCE_PROCESSED_KEY_LIMIT,
+} from './platformIntelligenceMigration';
+export {
+    evaluateStreamingOperatorCanonicalBidderEligibility,
+    type StreamingOperatorBidderEligibility,
+    type StreamingOperatorBidderEligibilityInput,
+    type StreamingOperatorBidderIneligibility,
+} from './streamingOperatorBidderBridge';
 export {
     getPlatformAiCandidateLearningAdjustment,
     choosePlatformContentCandidate,

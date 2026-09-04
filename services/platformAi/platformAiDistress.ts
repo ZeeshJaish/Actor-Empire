@@ -25,12 +25,14 @@ import {
     registerStreamingRightsContract,
     validateStreamingRightsAvailability,
 } from '../streamingRightsCore';
+import { settleStreamingRightsTransfer } from '../streamingRightsTransactions';
 import { normalizeStreamingDayOneMarketIds, STREAMING_DAY_ONE_MARKETS } from '../streamingDayOneMarkets';
 import { calculatePlatformAiRightsValueMillions } from './platformAiContentSourcing';
 import { PLATFORM_AI_PROFILES } from './platformAiProfiles';
-import { resolvePlatformLocalizationLevel } from './platformAiResearch';
+import { clampPlatformContentPlanSupport, resolvePlatformLocalizationLevel } from './platformAiResearch';
 import { createUnfundedPlatformAiProductionEscrow } from './platformAiProductionEscrow';
 import {
+    appendPlatformAiExternalRecapitalizations,
     appendPlatformAiDecisions,
     normalizePlatformAiDistressEpisodes,
     normalizePlatformAiPendingOneTimeObligations,
@@ -51,6 +53,20 @@ const CATALOGUE_DISTRESS_DISCOUNT = 0.7;
 const RESTRUCTURED_INTEREST_MULTIPLIER = 0.5;
 
 const roundMillions = (value: number): number => Math.round(value * 1_000_000) / 1_000_000;
+
+const getProtectedOneTimeObligationIds = (
+    platform: PlatformState,
+    additionalIds: string[] = [],
+): Set<string> => new Set([
+    ...additionalIds,
+    ...(platform.ai?.localizationJobs || [])
+        .filter(job => job.status !== 'CANCELLED' && job.costMillions > 0)
+        .map(job => job.obligationId),
+    ...(platform.ai?.rightsRenewals || [])
+        .filter(record => record.paymentSettledAtAbsoluteWeek !== null)
+        .map(record => record.obligationId),
+    ...(platform.ai?.externalCommitments || []).map(commitment => commitment.obligationId),
+]);
 
 const territoryForCountryIds = (countryIds: readonly string[]): StreamingLicenseTerritory => (
     countryIds.length === STREAMING_DAY_ONE_MARKETS.length
@@ -450,9 +466,9 @@ const sellerEntitlements = (
         const countryIds = contract ? exactContractCountryIds(contract) : [];
         if (
             !project || !contract || contract.buyerPlatformId !== seller.id
-            || !contract.sublicensingAllowed || !countryIds.length
+            || !countryIds.length
             || !isStreamingLicenseActiveAt(contract, absoluteWeek)
-            || contract.expiresAtAbsoluteWeek < absoluteWeek + 1 + CATALOGUE_DEAL_DURATION_WEEKS
+            || contract.expiresAtAbsoluteWeek <= absoluteWeek + 1
         ) return [];
         return [{
             id: contract.id,
@@ -507,9 +523,12 @@ const selectBuyer = (
     absoluteWeek: number,
 ): CatalogueBuyerSelection | null => Object.values(world.platforms || {})
     .flatMap((candidate): CatalogueBuyerSelection[] => {
-        const eligibleCountryIds = normalizeStreamingDayOneMarketIds(
-            candidate.ai?.capabilities.activeCountryIds,
-        ).filter(countryId => entitlement.countryIds.includes(countryId)).sort();
+        const candidateCountryIds = normalizeStreamingDayOneMarketIds(candidate.ai?.capabilities.activeCountryIds);
+        const eligibleCountryIds = entitlement.sourceContractId
+            ? entitlement.countryIds.every(countryId => candidateCountryIds.includes(countryId))
+                ? [...entitlement.countryIds]
+                : []
+            : candidateCountryIds.filter(countryId => entitlement.countryIds.includes(countryId)).sort();
         if (
             candidate.id === seller.id
             || candidate.ai?.status !== 'ACTIVE'
@@ -534,9 +553,11 @@ const selectBuyer = (
             windowType: entitlement.windowType,
             exclusivity: 'NON_EXCLUSIVE',
             startsAtAbsoluteWeek: absoluteWeek + 1,
-            expiresAtAbsoluteWeek: absoluteWeek + 1 + CATALOGUE_DEAL_DURATION_WEEKS,
-            action: entitlement.sourceContractId ? 'SUBLICENSE' : 'LICENSE',
-            sourceContractId: entitlement.sourceContractId,
+            expiresAtAbsoluteWeek: entitlement.sourceContractId
+                ? entitlement.expiresAtAbsoluteWeek
+                : absoluteWeek + 1 + CATALOGUE_DEAL_DURATION_WEEKS,
+            action: 'LICENSE',
+            excludeLicenseIds: entitlement.sourceContractId ? [entitlement.sourceContractId] : [],
         });
         return availability.available ? [{
             buyer: candidate,
@@ -638,6 +659,9 @@ const queueCatalogueDeal = (
     const existing = deals.find(deal => deal.id === identity.id);
     if (existing) return world;
     const startsAtAbsoluteWeek = absoluteWeek + 1;
+    const expiresAtAbsoluteWeek = selected.entitlement.sourceContractId
+        ? selected.entitlement.expiresAtAbsoluteWeek
+        : startsAtAbsoluteWeek + CATALOGUE_DEAL_DURATION_WEEKS;
     const deal: PlatformAiCatalogueDistressDeal = {
         ...identity,
         episodeId: episode.id,
@@ -651,9 +675,9 @@ const queueCatalogueDeal = (
         countryIds: selected.countryIds,
         windowType: selected.windowType,
         priceMillions: selected.priceMillions,
-        durationWeeks: CATALOGUE_DEAL_DURATION_WEEKS,
+        durationWeeks: Math.max(1, expiresAtAbsoluteWeek - startsAtAbsoluteWeek),
         startsAtAbsoluteWeek,
-        expiresAtAbsoluteWeek: startsAtAbsoluteWeek + CATALOGUE_DEAL_DURATION_WEEKS,
+        expiresAtAbsoluteWeek,
         status: 'PENDING_PAYMENT',
         paymentDisposition: 'HELD',
         createdAtAbsoluteWeek: absoluteWeek,
@@ -669,7 +693,9 @@ const queueCatalogueDeal = (
         outcome: 'PENDING',
         enteredAtAbsoluteWeek: absoluteWeek,
         resolvedAtAbsoluteWeek: null,
-        reason: `${selected.entitlement.project.title} was offered as a 104-week non-exclusive licence.`,
+        reason: selected.entitlement.sourceContractId
+            ? `${selected.entitlement.project.title}'s exact remaining licence was offered for transfer.`
+            : `${selected.entitlement.project.title} was offered as a 104-week non-exclusive licence.`,
         referenceId: deal.id,
     };
     const nextSeller = updateEpisode(seller, episode.id, source => ({
@@ -691,7 +717,7 @@ const queueCatalogueDeal = (
                     status: 'HELD',
                     settledWeek: null,
                 },
-            ], new Set([deal.buyerObligationId])),
+            ], getProtectedOneTimeObligationIds(selected.buyer, [deal.buyerObligationId])),
         },
     };
     world = replacePlatform(world, nextSeller);
@@ -733,9 +759,13 @@ const dealIsCanonical = (
         && deal.buyerObligationId === identity.buyerObligationId
         && deal.buyerPlanId === identity.buyerPlanId
         && deal.buyerContractId === identity.buyerContractId
-        && deal.durationWeeks === CATALOGUE_DEAL_DURATION_WEEKS
+        && deal.durationWeeks === (deal.sourceContractId
+            ? deal.sellerEntitlementExpiresAtAbsoluteWeek - deal.startsAtAbsoluteWeek
+            : CATALOGUE_DEAL_DURATION_WEEKS)
         && deal.startsAtAbsoluteWeek === deal.createdAtAbsoluteWeek + 1
-        && deal.expiresAtAbsoluteWeek === deal.startsAtAbsoluteWeek + CATALOGUE_DEAL_DURATION_WEEKS
+        && deal.expiresAtAbsoluteWeek === (deal.sourceContractId
+            ? deal.sellerEntitlementExpiresAtAbsoluteWeek
+            : deal.startsAtAbsoluteWeek + CATALOGUE_DEAL_DURATION_WEEKS)
         && deal.sellerEntitlementExpiresAtAbsoluteWeek >= deal.expiresAtAbsoluteWeek
         && deal.countryIds.length > 0
         && deal.countryIds.every(countryId => entitlement.countryIds.includes(countryId))
@@ -763,10 +793,14 @@ const dealHasCanonicalImmutableRefundTerms = (
         && deal.buyerPlanId === identity.buyerPlanId
         && deal.buyerContractId === identity.buyerContractId
         && deal.priceMillions === canonicalPriceMillions(project)
-        && deal.durationWeeks === CATALOGUE_DEAL_DURATION_WEEKS
+        && deal.durationWeeks === (deal.sourceContractId
+            ? deal.sellerEntitlementExpiresAtAbsoluteWeek - deal.startsAtAbsoluteWeek
+            : CATALOGUE_DEAL_DURATION_WEEKS)
         && deal.createdAtAbsoluteWeek >= episode.startedAtAbsoluteWeek
         && deal.startsAtAbsoluteWeek === deal.createdAtAbsoluteWeek + 1
-        && deal.expiresAtAbsoluteWeek === deal.startsAtAbsoluteWeek + CATALOGUE_DEAL_DURATION_WEEKS
+        && deal.expiresAtAbsoluteWeek === (deal.sourceContractId
+            ? deal.sellerEntitlementExpiresAtAbsoluteWeek
+            : deal.startsAtAbsoluteWeek + CATALOGUE_DEAL_DURATION_WEEKS)
         && deal.sellerEntitlementExpiresAtAbsoluteWeek >= deal.expiresAtAbsoluteWeek
         && deal.countryIds.length > 0
         && deal.territory === territoryForCountryIds(deal.countryIds)
@@ -921,6 +955,7 @@ const cancelPendingDeal = (
                     buyer.ai.pendingOneTimeObligations.filter(item => (
                         item.id !== deal.buyerObligationId || item.status === 'SETTLED'
                     )),
+                    getProtectedOneTimeObligationIds(buyer),
                 ),
             },
         };
@@ -986,7 +1021,9 @@ export const reconcilePlatformAiCatalogueDistressDealsForMigration = (
         const impossibleTimeline = deal.createdAtAbsoluteWeek > absoluteWeek
             || deal.startsAtAbsoluteWeek !== deal.createdAtAbsoluteWeek + 1
             || deal.expiresAtAbsoluteWeek !== deal.startsAtAbsoluteWeek + deal.durationWeeks
-            || deal.durationWeeks !== CATALOGUE_DEAL_DURATION_WEEKS
+            || deal.durationWeeks !== (deal.sourceContractId
+                ? deal.sellerEntitlementExpiresAtAbsoluteWeek - deal.startsAtAbsoluteWeek
+                : CATALOGUE_DEAL_DURATION_WEEKS)
             || deal.sellerEntitlementExpiresAtAbsoluteWeek < deal.expiresAtAbsoluteWeek
             || deal.paymentDisposition !== 'HELD'
             || deal.paymentSettledAtAbsoluteWeek !== null
@@ -1066,6 +1103,7 @@ const buildBuyerPlan = (
     premiereAtAbsoluteWeek: null,
     releasePattern: null,
     releaseEntries: [],
+    releaseReadiness: null,
     scheduledAtAbsoluteWeek: null,
     releasedAtAbsoluteWeek: null,
     industryProductionId: null,
@@ -1101,8 +1139,8 @@ const transferPendingDeal = (
         exclusivity: 'NON_EXCLUSIVE',
         startsAtAbsoluteWeek: deal.startsAtAbsoluteWeek,
         expiresAtAbsoluteWeek: deal.expiresAtAbsoluteWeek,
-        action: deal.sourceContractId ? 'SUBLICENSE' : 'LICENSE',
-        sourceContractId: deal.sourceContractId,
+        action: 'LICENSE',
+        excludeLicenseIds: deal.sourceContractId ? [deal.sourceContractId] : [],
     });
     if (
         !availability.available
@@ -1112,6 +1150,70 @@ const transferPendingDeal = (
         || resolvePlatformController(player, buyer.id) === 'PLAYER'
     ) {
         return cancelPendingDeal(world, deal, absoluteWeek, 'Post-queue rights or control validation failed.');
+    }
+    if (deal.sourceContractId) {
+        const transfer = settleStreamingRightsTransfer(
+            { ...player, world },
+            {
+                sourceContractId: deal.sourceContractId,
+                seller: {
+                    type: 'AI_PLATFORM',
+                    id: seller.id,
+                    name: seller.name,
+                    platformId: seller.id,
+                },
+                buyer: {
+                    type: 'AI_PLATFORM',
+                    id: buyer.id,
+                    name: buyer.name,
+                    platformId: buyer.id,
+                },
+                askingPrice: millionsToFullCurrency(deal.priceMillions),
+                price: millionsToFullCurrency(deal.priceMillions),
+                absoluteWeek,
+                idempotencyKey: `platform-ai-distress-transfer:${deal.id}`,
+                controllerAtCommitment: { seller: 'AI', buyer: 'AI' },
+                buyerPaymentAlreadyCaptured: true,
+                successorContractId: deal.buyerContractId,
+            },
+        );
+        if ('reason' in transfer) {
+            return cancelPendingDeal(world, deal, absoluteWeek, transfer.detail);
+        }
+        seller = transfer.player.world.platforms![deal.sellerPlatformId];
+        buyer = transfer.player.world.platforms![deal.buyerPlatformId];
+        buyer = {
+            ...buyer,
+            ai: {
+                ...buyer.ai!,
+                slate: buyer.ai!.slate.some(plan => plan.id === deal.buyerPlanId)
+                    ? buyer.ai!.slate
+                    : [...buyer.ai!.slate, buildBuyerPlan(buyer, project, deal, absoluteWeek)],
+            },
+        };
+        seller = resolveSellerStage(
+            seller,
+            deal,
+            absoluteWeek,
+            'APPLIED',
+            `${project.title}'s remaining licence transferred to ${buyer.name}.`,
+        );
+        const transferred: PlatformAiCatalogueDistressDeal = {
+            ...deal,
+            status: 'TRANSFERRED',
+            paymentDisposition: 'CAPTURED',
+            paymentSettledAtAbsoluteWeek: buyer.ai!.pendingOneTimeObligations
+                .find(item => item.id === deal.buyerObligationId)?.settledWeek ?? absoluteWeek,
+            transferredAtAbsoluteWeek: absoluteWeek,
+        };
+        let next = replacePlatform(transfer.player.world, seller);
+        next = replacePlatform(next, buyer);
+        return {
+            ...next,
+            platformAiCatalogueDistressDeals: normalizePlatformAiCatalogueDistressDeals(
+                (next.platformAiCatalogueDistressDeals || []).map(item => item.id === deal.id ? transferred : item),
+            ),
+        };
     }
     const contract: OwnedStreamingCatalogLicense = createStreamingLicenseContract({
         id: deal.buyerContractId,
@@ -1201,12 +1303,17 @@ const resolvePendingCatalogueDeals = (
     sourceWorld: WorldState,
     absoluteWeek: number,
 ): WorldState => {
-    let world: WorldState = {
-        ...sourceWorld,
-        platformAiCatalogueDistressDeals: normalizePlatformAiCatalogueDistressDeals(
-            sourceWorld.platformAiCatalogueDistressDeals,
-        ),
-    };
+    const normalizedDeals = normalizePlatformAiCatalogueDistressDeals(
+        sourceWorld.platformAiCatalogueDistressDeals,
+    );
+    const sourceDeals = sourceWorld.platformAiCatalogueDistressDeals;
+    const canonicalDeals = Array.isArray(sourceDeals)
+        && JSON.stringify(sourceDeals) === JSON.stringify(normalizedDeals)
+        ? sourceDeals
+        : normalizedDeals;
+    let world: WorldState = canonicalDeals === sourceDeals
+        ? sourceWorld
+        : { ...sourceWorld, platformAiCatalogueDistressDeals: canonicalDeals };
     for (const sourceDeal of world.platformAiCatalogueDistressDeals) {
         const deal = world.platformAiCatalogueDistressDeals.find(item => item.id === sourceDeal.id)!;
         if (deal.status !== 'PENDING_PAYMENT') continue;
@@ -1414,11 +1521,14 @@ const progressPlatform = (
 ): PlatformState => {
     if (resolvePlatformController(player, source.id) === 'PLAYER') return source;
     let platform = normalizePlatformAiState(source, player.id, absoluteWeek);
-    let episodes = normalizePlatformAiDistressEpisodes(
+    const normalizedEpisodes = normalizePlatformAiDistressEpisodes(
         platform.ai!.distressEpisodes,
         platform.id,
         absoluteWeek,
     );
+    let episodes = JSON.stringify(normalizedEpisodes) === JSON.stringify(platform.ai!.distressEpisodes)
+        ? platform.ai!.distressEpisodes
+        : normalizedEpisodes;
     let episode = episodes.find(item => item.completedAtAbsoluteWeek === null) || null;
     const distressed = latestFinanceShowsDistress(platform);
     if (!distressed) {
@@ -1517,6 +1627,11 @@ const progressPlatform = (
                 `${withdrawable.countryProfile?.country || withdrawable.countryId || 'A weak market'} was suspended to reduce recurring cost.`,
                 withdrawable.id,
             );
+            const capabilities = {
+                ...platform.ai!.capabilities,
+                activeCountryIds: platform.ai!.capabilities.activeCountryIds
+                    .filter(countryId => countryId !== withdrawable.countryId),
+            };
             platform = {
                 ...platform,
                 ai: {
@@ -1524,11 +1639,8 @@ const progressPlatform = (
                     marketOperations: platform.ai!.marketOperations.map(operation => operation.id === withdrawable.id
                         ? { ...operation, status: 'SUSPENDED', suspendedAtAbsoluteWeek: absoluteWeek }
                         : operation),
-                    capabilities: {
-                        ...platform.ai!.capabilities,
-                        activeCountryIds: platform.ai!.capabilities.activeCountryIds
-                            .filter(countryId => countryId !== withdrawable.countryId),
-                    },
+                    capabilities,
+                    slate: platform.ai!.slate.map(plan => clampPlatformContentPlanSupport(plan, capabilities)),
                 },
             };
         } else {
@@ -1601,7 +1713,11 @@ const progressPlatform = (
                 ...platform,
                 ai: {
                     ...platform.ai!,
-                    externalRecapitalizations: [...platform.ai!.externalRecapitalizations, fundingRecord],
+                    externalRecapitalizations: appendPlatformAiExternalRecapitalizations(
+                        platform.ai!.externalRecapitalizations,
+                        [fundingRecord],
+                        platform.id,
+                    ),
                 },
             };
         } else {
@@ -1649,7 +1765,11 @@ const progressPlatform = (
                     debtMillions: roundMillions(
                         platform.ai!.debtMillions - arrearsReductionMillions - debtReductionMillions,
                     ),
-                    externalRecapitalizations: [...platform.ai!.externalRecapitalizations, settledRecord],
+                    externalRecapitalizations: appendPlatformAiExternalRecapitalizations(
+                        platform.ai!.externalRecapitalizations,
+                        [settledRecord],
+                        platform.id,
+                    ),
                     spendingRestrictions: getPlatformAiPostFundingRestrictions(absoluteWeek),
                     restructuringStartedAtAbsoluteWeek: absoluteWeek,
                     restructuringFailedAtAbsoluteWeek: null,
@@ -1771,9 +1891,9 @@ export const progressPlatformAiDistressWorld = (
     for (const platformId of Object.keys(world.platforms!).sort() as PlatformId[]) {
         const before = world.platforms![platformId];
         const after = progressPlatform({ ...input.player, world }, before, input.absoluteWeek);
-        if (JSON.stringify(after) !== JSON.stringify(before)) world = replacePlatform(world, after);
+        if (after !== before) world = replacePlatform(world, after);
         world = queueCatalogueDeal({ ...input.player, world }, world, platformId, input.absoluteWeek);
     }
-    const changed = JSON.stringify(world) !== JSON.stringify(input.world);
+    const changed = world !== input.world;
     return changed ? { world, changed: true } : { world: input.world, changed: false };
 };

@@ -115,6 +115,11 @@ assert.equal(
     null,
     'Profitable operations must not invent an arbitrary numeric loss runway.',
 );
+assert.equal(
+    calculateStreamingRunwayFromTrailingCosts({ cash: 20_000, trailingWeeklyOperatingCost: 20, trailingWeeklyNetCashFlow: -1 }).lossRunwayWeeks,
+    null,
+    'A loss runway beyond the canonical 100-year horizon must use the durable no-near-term-loss sentinel.',
+);
 
 // YouTube only monetizes four percent of its audience as paid subscribers.
 assert.equal(PLATFORM_AI_PROFILES.YOUTUBE.paidSubscriberShare, 0.04);
@@ -1566,8 +1571,8 @@ assert.deepEqual(
     (expenseClassResult.snapshot! as unknown as Record<string, unknown>).heldObligations,
     [
         { expenseClass: 'CONTRACTUAL', amountMillions: 20, status: 'ON_HOLD' },
-        { expenseClass: 'LOCALIZATION', amountMillions: 30, status: 'ON_HOLD' },
         { expenseClass: 'DISCRETIONARY', amountMillions: 10, status: 'ON_HOLD' },
+        { expenseClass: 'LOCALIZATION', amountMillions: 30, status: 'ON_HOLD' },
     ],
     'Every unfunded one-time expense must persist as ON_HOLD without becoming debt.',
 );
@@ -1667,9 +1672,9 @@ const pendingWeekOneQueue = (pendingWeekOne.platform.ai! as unknown as { pending
 assert.equal(pendingWeekOneQueue.length, 3);
 assert.deepEqual(pendingWeekOneQueue.map(item => [item.category, item.amountMillions, item.createdWeek, item.status]), [
     ['CONTRACTUAL', 20, ABSOLUTE_WEEK + 79, 'HELD'],
-    ['LOCALIZATION', 30, ABSOLUTE_WEEK + 79, 'HELD'],
     ['DISCRETIONARY', 10, ABSOLUTE_WEEK + 79, 'HELD'],
-]);
+    ['LOCALIZATION', 30, ABSOLUTE_WEEK + 79, 'HELD'],
+], 'Same-week obligations use a deterministic category order instead of call-site insertion order.');
 assert.equal(new Set(pendingWeekOneQueue.map(item => item.id)).size, 3, 'Each queued obligation has a stable distinct ID.');
 assert.equal(pendingWeekOne.snapshot!.debtIncurredMillions, 65.8, 'Only efficient recurring operations create debt.');
 const pendingHeldAgain = settlePlatformAiEconomy({ player: fixture, platform: pendingWeekOne.platform, absoluteWeek: ABSOLUTE_WEEK + 80 });

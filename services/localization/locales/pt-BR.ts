@@ -1805,7 +1805,7 @@ export const ptBRTranslations: Record<TranslationKey, string> = {
         'forbes.studioProfile.acquisitionState.NOT_FOR_SALE.note': 'A propriedade está firmemente mantida.',
         'forbes.studioProfile.acquisitionState.OPEN_TO_OFFERS.label': 'Aberto a ofertas',
         'forbes.studioProfile.acquisitionState.OPEN_TO_OFFERS.note': 'O conselho ouvirá abordagens sérias.',
-        'forbes.studioProfile.acquisitionState.DISTRESSED.label': 'Em dificuldade',
+        'forbes.studioProfile.acquisitionState.DISTRESSED.label': 'Conselho sob pressão',
         'forbes.studioProfile.acquisitionState.DISTRESSED.note': 'A pressão operacional está enfraquecendo a alavancagem.',
         'forbes.studioProfile.acquisitionState.SEEKING_INVESTMENT.label': 'Buscando investimento',
         'forbes.studioProfile.acquisitionState.SEEKING_INVESTMENT.note': 'Capital novo pode destravar o próximo slate.',

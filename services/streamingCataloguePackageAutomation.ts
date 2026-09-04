@@ -20,6 +20,8 @@ import {
 } from './streamingBidding';
 import { STREAMING_DAY_ONE_MARKETS } from './streamingDayOneMarkets';
 import { resolveStreamingPlatformBrandById } from './streamingPlatformBrandRegistry';
+import { getStreamingRightsStudioMandate } from './streamingRightsCalendar';
+import { createStreamingRightsDelegationTrace } from './streamingRightsDelegation';
 
 const PLATFORM_TERMS: Record<PlatformId, { baseBid: number; ceiling: number; quality: number }> = {
     NETFLIX: { baseBid: 24_000_000, ceiling: 620_000_000, quality: 72 },
@@ -118,8 +120,11 @@ export const processStreamingCataloguePackageStrategyAutomation = (
 ): ProcessStreamingCataloguePackageStrategyAutomationResult => {
     const week = Math.max(0, Math.round(Number(absoluteWeek) || 0));
     const management = player.streamingRightsManagement;
+    const candidateStudioId = Object.values(normalizeStreamingCataloguePackageRegistry(player.world.streamingCataloguePackages))
+        .find(cataloguePackage => cataloguePackage.lifecycle === 'READY' && cataloguePackage.createdAtAbsoluteWeek === week)?.seller.id;
+    const mandate = getStreamingRightsStudioMandate(player, candidateStudioId || 'player-studio');
     const policy = normalizeStreamingCataloguePackagePolicy(management?.packagePolicy);
-    if (management?.controlMode !== 'STRATEGY' || policy.automation !== 'ROUTINE_AUTOMATIC') {
+    if (mandate.controlMode !== 'STRATEGY' || policy.automation !== 'ROUTINE_AUTOMATIC') {
         return { player, processed: false, signedPackageIds: [], skippedReasons: [] };
     }
 
@@ -166,7 +171,7 @@ export const processStreamingCataloguePackageStrategyAutomation = (
     while (session.status === 'LIVE') session = advanceStreamingBiddingSession(session, 1);
     const referenceTotal = candidate.components.reduce((sum, component) => sum + component.referenceValue, 0);
     const minimumGuarantee = referenceTotal * policy.minimumGuaranteeRatio;
-    const preference = management?.policy?.preference || 'BALANCED';
+    const preference = mandate.renewalPreference;
     const selected = getStreamingBiddingClosingOffers(session)
         .filter(offer => offer.minimumGuarantee >= minimumGuarantee)
         .sort((left, right) => (
@@ -189,6 +194,20 @@ export const processStreamingCataloguePackageStrategyAutomation = (
         lifecycle: 'LIVE',
         biddingSessionId: acceptedSession.id,
         delegatedReason: `Strategy mandate selected ${selected.platformName} under ${preference.toLowerCase().replaceAll('_', ' ')} policy.`,
+        delegationTrace: createStreamingRightsDelegationTrace({
+            mandate,
+            rule: 'CATALOGUE_PACKAGE_WITHIN_MANDATE',
+            facts: {
+                packageId: candidate.id,
+                selectedPlatformId: selected.platformId,
+                totalGuarantee: selected.minimumGuarantee,
+                titleCount: candidate.components.length,
+                durationWeeks: candidate.maximumDurationWeeks,
+                exclusivity: candidate.requestedExclusivity,
+                countryCount: candidate.requestedCountryIds.length,
+            },
+            explanation: `Strategy mandate selected ${selected.platformName} under ${preference.toLowerCase().replaceAll('_', ' ')} policy.`,
+        }),
     };
     const prepared: Player = {
         ...player,

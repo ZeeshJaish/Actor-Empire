@@ -177,7 +177,10 @@ export const commitPlatformMarketExpansion = (
         && (planned.countryProfile?.localContentObligationPercent || 0) >= 20
         ? {
             partnerId: createDeterministicId('platform_ai_local_partner', input.platformId, countryId),
-            weeklyPremium: Math.max(100_000, Math.round(planned.weeklyOperatingCost * 0.08)),
+            weeklyPremium: Math.min(
+                Math.round(planned.weeklyOperatingCost * 0.25),
+                Math.max(100_000, Math.round(planned.weeklyOperatingCost * 0.08)),
+            ),
             performanceCeilingPercent: 92,
         }
         : null;

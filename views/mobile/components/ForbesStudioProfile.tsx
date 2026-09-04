@@ -20,7 +20,7 @@ import {
     TrendingUp,
     Users,
 } from 'lucide-react';
-import type { ForbesStudioProfile as ForbesStudioProfileData, StudioAcquisitionState } from '../../../services/forbesStudioProfile';
+import type { ForbesStudioProfile as ForbesStudioProfileData } from '../../../services/forbesStudioProfile';
 import type { GameLanguage, Player } from '../../../types';
 import {
     getForbesOwnershipCommand,
@@ -60,15 +60,6 @@ interface ForbesStudioProfileProps {
     language: GameLanguage;
 }
 
-const ACQUISITION_STATES: Record<StudioAcquisitionState, { labelKey: Parameters<typeof t>[1]; noteKey: Parameters<typeof t>[1]; className: string }> = {
-    NOT_FOR_SALE: { labelKey: 'forbes.studioProfile.acquisitionState.NOT_FOR_SALE.label', noteKey: 'forbes.studioProfile.acquisitionState.NOT_FOR_SALE.note', className: 'border-zinc-600/60 bg-zinc-800/70 text-zinc-200' },
-    OPEN_TO_OFFERS: { labelKey: 'forbes.studioProfile.acquisitionState.OPEN_TO_OFFERS.label', noteKey: 'forbes.studioProfile.acquisitionState.OPEN_TO_OFFERS.note', className: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300' },
-    DISTRESSED: { labelKey: 'forbes.studioProfile.acquisitionState.DISTRESSED.label', noteKey: 'forbes.studioProfile.acquisitionState.DISTRESSED.note', className: 'border-rose-500/40 bg-rose-500/10 text-rose-300' },
-    SEEKING_INVESTMENT: { labelKey: 'forbes.studioProfile.acquisitionState.SEEKING_INVESTMENT.label', noteKey: 'forbes.studioProfile.acquisitionState.SEEKING_INVESTMENT.note', className: 'border-sky-500/40 bg-sky-500/10 text-sky-300' },
-    PUBLICLY_TRADED: { labelKey: 'forbes.studioProfile.acquisitionState.PUBLICLY_TRADED.label', noteKey: 'forbes.studioProfile.acquisitionState.PUBLICLY_TRADED.note', className: 'border-violet-500/40 bg-violet-500/10 text-violet-300' },
-    AUCTION_EXPECTED: { labelKey: 'forbes.studioProfile.acquisitionState.AUCTION_EXPECTED.label', noteKey: 'forbes.studioProfile.acquisitionState.AUCTION_EXPECTED.note', className: 'border-amber-400/50 bg-amber-400/10 text-amber-300' },
-};
-
 const formatCompactMoney = (value: number) => value === 0 ? '$0' : formatMoney(value);
 
 export const ForbesStudioProfile: React.FC<ForbesStudioProfileProps> = ({
@@ -88,7 +79,6 @@ export const ForbesStudioProfile: React.FC<ForbesStudioProfileProps> = ({
     language,
 }) => {
     const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
-    const acquisition = ACQUISITION_STATES[profile.acquisitionState];
     const isProfitable = profile.profitability >= 0;
     const [ownershipCommandFeedback, setOwnershipCommandFeedback] = React.useState<string | null>(null);
     const acquisitionEligibility = getAcquisitionEligibility(profile, acquisitionCase, player);
@@ -188,14 +178,19 @@ export const ForbesStudioProfile: React.FC<ForbesStudioProfileProps> = ({
             </header>
 
             <main className="flex-1 overflow-y-auto px-4 pb-10 pt-4 custom-scrollbar">
-                <section className={`mb-5 rounded-2xl border p-4 ${acquisition.className}`}>
-                    <div className="mb-2 flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.22em]">
-                            <ShieldCheck size={15} /> {tr('forbes.studioProfile.acquisitionState')}
-                        </div>
-                        <span className="rounded-full border border-current/25 px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.16em]">{tr(acquisition.labelKey)}</span>
+                <section className={`mb-5 rounded-2xl border p-4 ${profile.distressEvidence.length ? 'border-rose-500/25 bg-rose-500/[0.06]' : 'border-white/[0.08] bg-white/[0.025]'}`}>
+                    <div className={`mb-3 flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.22em] ${profile.distressEvidence.length ? 'text-rose-300' : 'text-zinc-300'}`}>
+                        {profile.distressEvidence.length ? <TrendingDown size={15} /> : <ChartNoAxesCombined size={15} />}
+                        Market signals
                     </div>
-                    <p className="text-[11px] font-semibold leading-relaxed opacity-75">{tr(acquisition.noteKey)}</p>
+                    <div className="space-y-2">
+                        {profile.publicSignals.map((signal, index) => (
+                            <div key={`${profile.id}_signal_${index}`} className="flex items-start gap-2 text-[10px] font-semibold leading-relaxed text-zinc-400">
+                                <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${profile.distressEvidence.includes(signal) ? 'bg-rose-400' : 'bg-amber-400'}`} />
+                                <span>{signal}</span>
+                            </div>
+                        ))}
+                    </div>
                 </section>
 
                 <ForbesCompanyPosition

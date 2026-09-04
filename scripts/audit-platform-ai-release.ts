@@ -36,8 +36,10 @@ import {
     getPlatformAiLocalizationObligationId,
     getPlatformAiLocalizationRequirements,
     quotePlatformAiLocalization,
+    resolveCapabilityBackedLocalizationPromise,
 } from '../services/platformAi/platformAiLocalizationCore';
 import { getPlatformAiProductionEscrowFundingId } from '../services/platformAi/platformAiProductionEscrow';
+import { markPlatformAiStateCanonicalForTurn } from '../services/platformAi/platformAiState';
 import {
     getWorldAwardCategoryScore,
     isWorldProjectEligibleForAwardSeason,
@@ -50,16 +52,55 @@ const PREMIERE_WEEK = ABSOLUTE_WEEK + 4;
 
 const fixture = createPlatformAiFixture();
 
-assert.equal(PLATFORM_AI_HIT_COMMERCIAL_SCORE, 85, 'Long-run HIT threshold must remain disclosed and auditable.');
-assert.equal(PLATFORM_AI_FLOP_COMMERCIAL_SCORE, 74, 'Long-run FLOP threshold must remain disclosed and auditable.');
-assert.deepEqual(PLATFORM_AI_OUTCOME_THRESHOLDS, {
-    NETFLIX: { hit: 85, flop: 74 },
-    APPLE_TV: { hit: 85, flop: 81 },
-    DISNEY_PLUS: { hit: 88.5, flop: 85 },
-    HULU: { hit: 86, flop: 81.5 },
-    YOUTUBE: { hit: 89, flop: 85.5 },
-}, 'Each company must expose its audience-expectation thresholds for long-run balance review.');
+const partialLocalizationPlatform = normalizePlatformAiState(
+    fixture.world.platforms!.NETFLIX,
+    fixture.id,
+    ABSOLUTE_WEEK,
+);
+partialLocalizationPlatform.ai!.languageCapabilities = [{
+    languageId: 'hindi',
+    subtitleLevel: 2,
+    dubbingLevel: 2,
+    source: 'LANGUAGE_PACKAGE',
+    sourceReferenceId: 'partial-localization-audit',
+    activatedAtAbsoluteWeek: ABSOLUTE_WEEK,
+}];
+const partialLocalizationPromise = resolveCapabilityBackedLocalizationPromise({
+    platform: partialLocalizationPlatform,
+    countryIds: ['IN', 'JP'],
+    originalLanguageId: 'english',
+    requestedLevel: 'DUBS_AND_SUBTITLES',
+});
+assert.equal(
+    partialLocalizationPromise.localizationLevel,
+    'DUBS_AND_SUBTITLES',
+    'One unsupported market must not erase valid localization promises for every supported market.',
+);
+assert.deepEqual(
+    partialLocalizationPromise.requirements.map(requirement => ({
+        languageId: requirement.languageId,
+        mode: requirement.mode,
+        countryIds: requirement.countryIds,
+    })),
+    [{ languageId: 'hindi', mode: 'DUB', countryIds: ['IN'] }],
+    'Mixed-market planning should preserve supported assets while unsupported markets remain intentionally unlocalized.',
+);
 
+assert.equal(PLATFORM_AI_HIT_COMMERCIAL_SCORE, 89, 'Long-run Netflix HIT threshold must remain disclosed and auditable.');
+assert.equal(PLATFORM_AI_FLOP_COMMERCIAL_SCORE, 84.5, 'Long-run Netflix clear-flop threshold must preserve a meaningful lower tail.');
+assert.deepEqual(PLATFORM_AI_OUTCOME_THRESHOLDS, {
+    NETFLIX: { hit: 89, flop: 84.5 },
+    APPLE_TV: { hit: 86, flop: 82 },
+    DISNEY_PLUS: { hit: 88, flop: 84 },
+    HULU: { hit: 84, flop: 80 },
+    YOUTUBE: { hit: 87.5, flop: 83.5 },
+}, 'Each service should use a disclosed expectation band with room for solid releases.');
+for (const [platformId, thresholds] of Object.entries(PLATFORM_AI_OUTCOME_THRESHOLDS)) {
+    assert.ok(
+        thresholds.hit - thresholds.flop >= 4,
+        `${platformId} needs a meaningful SOLID band between clear hits and clear flops.`,
+    );
+}
 const project = (
     id: string,
     title: string,
@@ -917,6 +958,37 @@ const readyCatalogueLocalizationWorld = installLocalizationJobs(
         },
     },
 );
+const cachedPreviewPlatform = readyCatalogueLocalizationWorld.platforms!.APPLE_TV;
+const cachedPreviewPlan = cachedPreviewPlatform.ai!.slate.find(plan => plan.id === cataloguePlan.id)!;
+const cachedPreviewSlate = new Proxy(cachedPreviewPlatform.ai!.slate, {
+    get(target, property, receiver) {
+        if (property === 'find') throw new Error('cached preview must not rescan the complete slate');
+        return Reflect.get(target, property, receiver);
+    },
+});
+const cachedPreviewWorld: WorldState = {
+    ...readyCatalogueLocalizationWorld,
+    platforms: {
+        ...readyCatalogueLocalizationWorld.platforms!,
+        APPLE_TV: {
+            ...cachedPreviewPlatform,
+            ai: { ...cachedPreviewPlatform.ai!, slate: cachedPreviewSlate },
+        },
+    },
+};
+markPlatformAiStateCanonicalForTurn(cachedPreviewWorld.platforms!.APPLE_TV, fixture.id, ABSOLUTE_WEEK);
+assert.equal(schedulePlatformStreamingWindow({
+    player: fixture,
+    world: cachedPreviewWorld,
+    platformId: 'APPLE_TV',
+    planId: cataloguePlan.id,
+    planSnapshot: cachedPreviewPlan,
+    projectIndex: new Map(cachedPreviewWorld.projects.map(project => [project.id, project])),
+    absoluteWeek: ABSOLUTE_WEEK,
+    premiereAtAbsoluteWeek: PREMIERE_WEEK,
+    localizationReadyAtAbsoluteWeek: ABSOLUTE_WEEK,
+    previewOnly: true,
+}).changed, true, 'turn-local schedule previews should reuse the prepared plan and project index');
 const directlyScheduledCatalogue = schedulePlatformStreamingWindow({
     player: fixture,
     world: readyCatalogueLocalizationWorld,

@@ -1283,9 +1283,9 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
 
                         <StudioDivisionCard
                             wide
-                            eyebrow="CONTRACT WINDOWS"
-                            title="Rights Calendar"
-                            subtitle="Renewals, expiries and exact market returns"
+                            eyebrow="BUSINESS AFFAIRS"
+                            title="Rights Office"
+                            subtitle="Portfolio, mandates, relationships and statements"
                             icon={<Calendar size={22}/>}
                             accent="GOLD"
                             stats={[

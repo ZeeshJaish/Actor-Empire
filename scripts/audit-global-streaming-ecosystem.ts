@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {
+    STREAMING_ECOSYSTEM_CLOSED_DYNAMIC_OPERATOR_LIMIT,
     STREAMING_ECOSYSTEM_SCHEMA_VERSION,
     getVisibleGlobalStreamingCompanies,
     getVisibleStreamingCompaniesForMarket,
@@ -30,6 +31,25 @@ assert.equal(normalized.operators.CRAVE.homeCountryId, 'CA');
 assert.equal(normalized.operators.STAN.homeCountryId, 'AU');
 assert.equal(normalized.operators.SHOWMAX, undefined, 'A discontinued service must not remain in the active seed roster.');
 assert.equal(Object.keys(normalized.markets).length, 24);
+
+const closedDynamicHistory = structuredClone(normalized);
+for (let index = 0; index < STREAMING_ECOSYSTEM_CLOSED_DYNAMIC_OPERATOR_LIMIT + 4; index += 1) {
+    const closed = structuredClone(Object.values(normalized.operators)
+        .find(operator => operator.kind !== 'CORE_GLOBAL')!);
+    closed.id = `CLOSED_DYNAMIC_${index}`;
+    closed.name = `Closed Dynamic ${index}`;
+    closed.kind = 'DYNAMIC_FICTIONAL';
+    closed.lifecycle = 'CLOSED';
+    closed.lastProcessedAbsoluteWeek = 1_000 + index;
+    closed.lastMaterialChangeAtAbsoluteWeek = 1_000 + index;
+    closedDynamicHistory.operators[closed.id] = closed;
+}
+const compactedClosedDynamicHistory = normalizeStreamingPlatformEcosystem(closedDynamicHistory, 1_400);
+const retainedClosedDynamic = Object.values(compactedClosedDynamicHistory.operators)
+    .filter(operator => operator.kind === 'DYNAMIC_FICTIONAL' && operator.lifecycle === 'CLOSED');
+assert.equal(retainedClosedDynamic.length, STREAMING_ECOSYSTEM_CLOSED_DYNAMIC_OPERATOR_LIMIT);
+assert.equal(compactedClosedDynamicHistory.operators.CLOSED_DYNAMIC_0, undefined);
+assert.ok(compactedClosedDynamicHistory.operators[`CLOSED_DYNAMIC_${STREAMING_ECOSYSTEM_CLOSED_DYNAMIC_OPERATOR_LIMIT + 3}`]);
 
 for (const market of Object.values(normalized.markets)) {
     const total = market.shares.reduce((sum, item) => sum + item.sharePercent, 0)

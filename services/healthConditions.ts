@@ -512,6 +512,10 @@ export const applyHealthConditionIncident = (
     };
 };
 
+export const getOldAgeIncidentChance = (age: number): number => (
+    age < 68 ? 0 : 0.08 + Math.min(0.18, (age - 68) * 0.01)
+);
+
 export const processHealthConditionsWeek = (player: Player): HealthConditionWeekResult => {
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
     const language = getPlayerLanguage(player);
@@ -560,7 +564,7 @@ export const processHealthConditionsWeek = (player: Player): HealthConditionWeek
         queueCondition('stunt_fracture');
     }
 
-    if (player.age >= 68 && shouldTriggerIncident(player, absoluteWeek, 'old_age_complication', 0.08 + Math.min(0.18, (player.age - 68) * 0.01), 5)) {
+    if (player.age >= 68 && shouldTriggerIncident(player, absoluteWeek, 'old_age_complication', getOldAgeIncidentChance(player.age), 5)) {
         queueCondition('old_age_complication');
     }
 

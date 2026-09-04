@@ -78,6 +78,11 @@ const normalized = normalizeStreamingRightsContractRegistry({
 });
 
 assert.deepEqual(Object.keys(normalized), ['contract-1'], 'registry should normalize and deduplicate by canonical contract ID');
+assert.strictEqual(
+    normalizeStreamingRightsContractRegistry(normalized),
+    normalized,
+    'An in-memory canonical contract registry should not be rebuilt on every lookup path.',
+);
 const contract = normalized['contract-1'];
 assert.equal(contract.schemaVersion, 2, 'Phase 2 contract economics must migrate the canonical contract to schema v2');
 assert.equal(contract.idempotencyKey, 'signing:project-1');
@@ -102,6 +107,21 @@ assert.deepEqual(contract.settlement, {
     settledAtAbsoluteWeek: 202,
 });
 
+let canonicalContractEnumerationCount = 0;
+const canonicalContractProxy = new Proxy(contract, {
+    ownKeys(target) {
+        canonicalContractEnumerationCount += 1;
+        return Reflect.ownKeys(target);
+    },
+});
+normalized[contract.id] = canonicalContractProxy;
+assert.strictEqual(getStreamingRightsContract(normalized, contract.id), canonicalContractProxy);
+assert.equal(
+    canonicalContractEnumerationCount,
+    0,
+    'a direct lookup in a canonical registry must return the canonical contract without renormalizing it',
+);
+
 const competingRecord: StreamingRightsContract = {
     ...contract,
     titleAtSigning: 'Replacement must not win',
@@ -110,6 +130,18 @@ const duplicateRegistration = registerStreamingRightsContract(normalized, compet
 assert.equal(duplicateRegistration.changed, false, 'duplicate contract registration must be idempotent');
 assert.strictEqual(duplicateRegistration.registry, normalized, 'a duplicate registration should preserve registry identity');
 assert.equal(getStreamingRightsContract(duplicateRegistration.registry, ' contract-1 ')?.titleAtSigning, 'First Picture');
+
+let unrelatedContractReads = 0;
+const directLookupRegistry = { [contract.id]: contract } as Record<string, StreamingRightsContract>;
+Object.defineProperty(directLookupRegistry, 'unrelated-contract', {
+    enumerable: true,
+    get: () => {
+        unrelatedContractReads += 1;
+        return { id: '' } as StreamingRightsContract;
+    },
+});
+assert.equal(getStreamingRightsContract(directLookupRegistry, contract.id)?.id, contract.id);
+assert.equal(unrelatedContractReads, 0, 'canonical ID lookup must not normalize unrelated contracts');
 
 const secondRecord: StreamingRightsContract = {
     ...contract,

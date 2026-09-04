@@ -51,8 +51,12 @@ import {
     processStreamingRightsCalendarWeek,
     resolveStreamingRightsRenewal,
 } from './streamingRightsCalendar';
+import {
+    settleStreamingRightsSublicense,
+    settleStreamingRightsTransfer,
+} from './streamingRightsTransactions';
 
-export type StreamingRightsOpportunityKind = 'STUDIO_ACQUISITION' | 'PLATFORM_TRADE' | 'SUBLICENSE_OUT';
+export type StreamingRightsOpportunityKind = 'STUDIO_ACQUISITION' | 'PLATFORM_TRADE' | 'SUBLICENSE_OUT' | 'TRANSFER_OUT';
 
 export interface StreamingRightsOpportunity {
     id: string;
@@ -70,6 +74,14 @@ export interface StreamingRightsOpportunity {
     rivalPlatformName: string;
     rivalBidAmount: number;
     marketHeat: 'COOL' | 'ACTIVE' | 'HOT';
+    originalOwnerName: string;
+    currentHolderName: string;
+    countryIds: string[];
+    remainingWeeks: number;
+    inheritedExclusivity: StreamingLicenseExclusivity;
+    inheritedLicensorRevenueShare: number;
+    inheritedObligationCount: number;
+    incompatibilityDetail: string | null;
 }
 
 export interface StreamingRightsTermsInput {
@@ -126,10 +138,16 @@ const buildOpportunity = (
     sellerPlatformId: PlatformId | null,
     kind: StreamingRightsOpportunityKind,
     sourceLicenseId: string | null = null,
+    sourceContract: StreamingRightsContract | null = null,
 ): StreamingRightsOpportunity => {
-    const recommendedTerritory: StreamingLicenseTerritory = title.rating && title.rating >= 8 ? 'GLOBAL' : 'MULTI_REGION';
-    const recommendedWindow: StreamingRightsWindowType = sellerType === 'PLATFORM' ? 'SECOND_WINDOW' : 'FIRST_WINDOW';
-    const quote = getStreamingLicenseQuote(title, recommendedTerritory, kind === 'SUBLICENSE_OUT' ? 52 : 104, 'NON_EXCLUSIVE');
+    const recommendedTerritory: StreamingLicenseTerritory = sourceContract?.territory
+        || (title.rating && title.rating >= 8 ? 'GLOBAL' : 'MULTI_REGION');
+    const recommendedWindow: StreamingRightsWindowType = sourceContract?.windowType
+        || (sellerType === 'PLATFORM' ? 'SECOND_WINDOW' : 'FIRST_WINDOW');
+    const remainingWeeks = sourceContract
+        ? Math.max(1, sourceContract.expiresAtAbsoluteWeek - absoluteWeek)
+        : kind === 'SUBLICENSE_OUT' ? 52 : 104;
+    const quote = getStreamingLicenseQuote(title, recommendedTerritory, Math.min(520, remainingWeeks), sourceContract?.exclusivity || 'NON_EXCLUSIVE');
     const rival = chooseRival(platform.simulationSeed, `${kind}:${title.id}`, absoluteWeek, sellerPlatformId);
     const heatScore = rival.pressure * ((title.rating || 6.5) / 7);
     const marketHeat = heatScore >= 1.16 ? 'HOT' : heatScore >= 0.96 ? 'ACTIVE' : 'COOL';
@@ -149,6 +167,16 @@ const buildOpportunity = (
         rivalPlatformName: rival.name,
         rivalBidAmount: roundMoney(quote.suggestedGuarantee * rival.pressure),
         marketHeat,
+        originalOwnerName: sourceContract?.seller.name || sellerName,
+        currentHolderName: sourceContract?.buyer.name || sellerName,
+        countryIds: sourceContract?.countryIds?.slice().sort() || [],
+        remainingWeeks,
+        inheritedExclusivity: sourceContract?.exclusivity || 'NON_EXCLUSIVE',
+        inheritedLicensorRevenueShare: sourceContract?.licensorRevenueShare || 0,
+        inheritedObligationCount: sourceContract
+            ? Number((sourceContract.marketingGuarantee || 0) > 0) + Number((sourceContract.viewershipBonusThreshold || 0) > 0)
+            : 0,
+        incompatibilityDetail: null,
     };
 };
 
@@ -164,6 +192,7 @@ export const getStreamingRightsOpportunities = (player: Player): StreamingRights
     const inbound = getStreamingLicenseOpportunities(player).map(title => {
         const tradedTitle = platformTitles.get(title.id);
         const sellerPlatformId = tradedTitle?.streamingPlatform || null;
+        if (sellerPlatformId) return null;
         return buildOpportunity(
             platform,
             title,
@@ -172,14 +201,72 @@ export const getStreamingRightsOpportunities = (player: Player): StreamingRights
             sellerPlatformId || title.studioId,
             sellerPlatformId ? PLATFORMS[sellerPlatformId].name : title.studioName,
             sellerPlatformId,
-            sellerPlatformId ? 'PLATFORM_TRADE' : 'STUDIO_ACQUISITION',
+            'STUDIO_ACQUISITION',
         );
-    });
+    }).filter((opportunity): opportunity is StreamingRightsOpportunity => Boolean(opportunity));
+
+    const canonicalRegistry = normalizeStreamingRightsContractRegistry(player.world.streamingRightsContracts);
+    const canonicalPlatformTrades = Object.values(canonicalRegistry)
+        .filter(contract => (
+            contract.status === 'ACTIVE'
+            && contract.expiresAtAbsoluteWeek >= absoluteWeek
+            && !contract.permanentPurchase
+            && contract.buyer.type === 'AI_PLATFORM'
+            && Boolean(contract.buyer.platformId)
+        ))
+        .map(contract => {
+            const project = player.world.projects.find(item => item.id === contract.sourceProjectId);
+            const pastProject = (player.pastProjects || []).find(item => item.id === contract.sourceProjectId);
+            const root = canonicalRegistry[contract.rootContractId] || contract;
+            const opportunity = buildOpportunity(
+                platform,
+                {
+                    id: contract.sourceProjectId,
+                    title: contract.titleAtSigning,
+                    projectType: contract.projectType || 'MOVIE',
+                    genre: contract.genre || 'Licensed',
+                    rating: Number((project as any)?.rating || (pastProject as any)?.imdbRating || (pastProject as any)?.rating) || null,
+                    releaseYear: Number((project as any)?.year) || null,
+                    gross: Number((project as any)?.boxOffice || (pastProject as any)?.gross || contract.minimumGuarantee * 5),
+                    studioId: root.seller.id,
+                    studioName: root.seller.name,
+                    source: 'EXTERNAL_MARKET',
+                },
+                absoluteWeek,
+                'PLATFORM',
+                contract.buyer.id,
+                contract.buyer.name,
+                contract.buyer.platformId,
+                'PLATFORM_TRADE',
+                contract.id,
+                contract,
+            );
+            const compatibility = resolveStreamingRightsCompatibility({
+                world: player.world,
+                sourceProjectId: contract.sourceProjectId,
+                buyerPlatformId: null,
+                sellerPartyId: contract.buyer.id,
+                territory: contract.territory,
+                countryIds: contract.countryIds,
+                startsAtAbsoluteWeek: Math.max(absoluteWeek, contract.startsAtAbsoluteWeek),
+                expiresAtAbsoluteWeek: contract.expiresAtAbsoluteWeek,
+                windowType: contract.windowType,
+                exclusivity: contract.exclusivity,
+                action: 'LICENSE',
+                excludeContractIds: [contract.id],
+            });
+            return {
+                ...opportunity,
+                originalOwnerName: root.seller.name,
+                incompatibilityDetail: compatibility.available ? null : compatibility.summary,
+            };
+        });
 
     const activeLicenses = platform.catalogLicenses
-        .filter(license => license.status === 'ACTIVE' && license.expiresAtAbsoluteWeek >= absoluteWeek)
-        .filter(license => license.sublicensingAllowed);
-    const licensedOutbound = activeLicenses.map(license => buildOpportunity(
+        .filter(license => license.status === 'ACTIVE' && license.expiresAtAbsoluteWeek >= absoluteWeek);
+    const licensedOutbound = activeLicenses.flatMap(license => {
+        const canonical = canonicalRegistry[license.id] || null;
+        const shared = buildOpportunity(
         platform,
         {
             id: license.sourceProjectId,
@@ -200,7 +287,22 @@ export const getStreamingRightsOpportunities = (player: Player): StreamingRights
         null,
         'SUBLICENSE_OUT',
         license.id,
-    ));
+        canonical,
+        );
+        const transfer = buildOpportunity(
+            platform,
+            shared.title,
+            absoluteWeek,
+            'PLATFORM',
+            platform.identity?.slug || 'owned-platform',
+            platform.identity?.name || 'Your platform',
+            null,
+            'TRANSFER_OUT',
+            license.id,
+            canonical,
+        );
+        return license.sublicensingAllowed ? [shared, transfer] : [transfer];
+    });
     const originalOutbound = platform.originalCommissions
         .filter(commission => commission.status === 'RELEASED' && commission.canonicalProjectId)
         .filter(commission => commission.lifecycleDecision?.type === 'LICENSE_WINDOW')
@@ -226,7 +328,7 @@ export const getStreamingRightsOpportunities = (player: Player): StreamingRights
             'SUBLICENSE_OUT',
             `original:${commission.id}`,
         ));
-    return [...inbound, ...licensedOutbound, ...originalOutbound]
+    return [...inbound, ...canonicalPlatformTrades, ...licensedOutbound, ...originalOutbound]
         .filter(opportunity => !platform.rightsNegotiations.some(negotiation => (
             negotiation.idempotencyKey === `${opportunity.id}:${marketCycle(absoluteWeek)}`
             && ACTIVE_NEGOTIATION_STATUSES.has(negotiation.status)
@@ -505,8 +607,10 @@ export const createDefaultStreamingRightsTerms = (
     opportunity: StreamingRightsOpportunity,
 ): StreamingRightsTermsInput => ({
     territory: opportunity.kind === 'SUBLICENSE_OUT' ? 'DOMESTIC' : opportunity.recommendedTerritory,
-    durationWeeks: opportunity.kind === 'SUBLICENSE_OUT' ? 52 : 104,
-    exclusivity: 'NON_EXCLUSIVE',
+    durationWeeks: opportunity.remainingWeeks,
+    exclusivity: opportunity.sourceLicenseId && opportunity.kind !== 'SUBLICENSE_OUT'
+        ? opportunity.inheritedExclusivity
+        : 'NON_EXCLUSIVE',
     windowType: opportunity.recommendedWindow,
     minimumGuarantee: opportunity.quote.suggestedGuarantee,
     platformRevenueShare: opportunity.kind === 'SUBLICENSE_OUT' ? 62 : opportunity.quote.targetPlatformRevenueShare,
@@ -516,13 +620,13 @@ export const createDefaultStreamingRightsTerms = (
     renewalOption: true,
     sublicensingAllowed: opportunity.kind !== 'SUBLICENSE_OUT',
     sequelRightsIncluded: false,
-    changeOfControl: 'NOTICE',
+    changeOfControl: 'NONE',
     cancellationPenalty: roundMoney(opportunity.quote.suggestedGuarantee * 0.22),
 });
 
 const normalizeTerms = (terms: StreamingRightsTermsInput): StreamingRightsTermsInput => ({
     territory: ['DOMESTIC', 'MULTI_REGION', 'GLOBAL'].includes(terms.territory) ? terms.territory : 'MULTI_REGION',
-    durationWeeks: [26, 52, 104, 156, 260, 520].includes(terms.durationWeeks) ? terms.durationWeeks : 104,
+    durationWeeks: Math.max(1, Math.min(520, Math.round(Number(terms.durationWeeks) || 104))),
     exclusivity: terms.exclusivity === 'EXCLUSIVE' ? 'EXCLUSIVE' : 'NON_EXCLUSIVE',
     windowType: ['FIRST_WINDOW', 'SECOND_WINDOW', 'PERMANENT'].includes(terms.windowType) ? terms.windowType : 'SECOND_WINDOW',
     minimumGuarantee: roundMoney(clamp(terms.minimumGuarantee, 0, 5_000_000_000)),
@@ -533,7 +637,7 @@ const normalizeTerms = (terms: StreamingRightsTermsInput): StreamingRightsTermsI
     renewalOption: Boolean(terms.renewalOption),
     sublicensingAllowed: Boolean(terms.sublicensingAllowed),
     sequelRightsIncluded: Boolean(terms.sequelRightsIncluded),
-    changeOfControl: ['NONE', 'NOTICE', 'CONSENT_REQUIRED'].includes(terms.changeOfControl) ? terms.changeOfControl : 'NOTICE',
+    changeOfControl: 'NONE',
     cancellationPenalty: roundMoney(clamp(terms.cancellationPenalty, 0, 2_000_000_000)),
 });
 
@@ -568,6 +672,14 @@ export const openStreamingRightsNegotiation = (
     if (platform.lifecycle !== 'ACTIVE') return { player, changed: false, reason: 'NOT_ACTIVE' };
     const opportunity = getStreamingRightsOpportunities(player).find(item => item.id === opportunityId);
     if (!opportunity) return { player, changed: false, reason: 'NOT_FOUND' };
+    if (opportunity.incompatibilityDetail) {
+        return {
+            player,
+            changed: false,
+            reason: 'RIGHTS_UNAVAILABLE',
+            detail: opportunity.incompatibilityDetail,
+        };
+    }
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
     const idempotencyKey = `${opportunity.id}:${marketCycle(absoluteWeek)}`;
     const existing = platform.rightsNegotiations.find(item => item.idempotencyKey === idempotencyKey);
@@ -579,7 +691,9 @@ export const openStreamingRightsNegotiation = (
     const negotiation: OwnedStreamingRightsNegotiation = {
         id: createDeterministicId('streaming_rights_negotiation', platform.simulationSeed, idempotencyKey),
         idempotencyKey,
-        kind: opportunity.kind === 'SUBLICENSE_OUT' ? 'SUBLICENSE_OUT' : 'ACQUIRE',
+        kind: opportunity.kind === 'SUBLICENSE_OUT'
+            ? 'SUBLICENSE_OUT'
+            : opportunity.kind === 'TRANSFER_OUT' ? 'TRANSFER_OUT' : 'ACQUIRE',
         sourceProjectId: opportunity.title.id,
         sourceLicenseId: opportunity.sourceLicenseId,
         title: opportunity.title.title,
@@ -588,12 +702,18 @@ export const openStreamingRightsNegotiation = (
         sellerType: opportunity.sellerType,
         sellerId: opportunity.sellerId,
         sellerName: opportunity.sellerName,
-        buyerPlatformId: opportunity.kind === 'SUBLICENSE_OUT' ? opportunity.rivalPlatformId : null,
-        buyerName: opportunity.kind === 'SUBLICENSE_OUT' ? opportunity.rivalPlatformName : null,
+        buyerPlatformId: opportunity.kind === 'SUBLICENSE_OUT' || opportunity.kind === 'TRANSFER_OUT'
+            ? opportunity.rivalPlatformId : null,
+        buyerName: opportunity.kind === 'SUBLICENSE_OUT' || opportunity.kind === 'TRANSFER_OUT'
+            ? opportunity.rivalPlatformName : null,
         ...terms,
-        countryIds: getNegotiationCountrySnapshot(platform, terms.territory, sourceLicense),
-        rivalPlatformId: opportunity.kind === 'SUBLICENSE_OUT' ? null : opportunity.rivalPlatformId,
-        rivalPlatformName: opportunity.kind === 'SUBLICENSE_OUT' ? null : opportunity.rivalPlatformName,
+        countryIds: opportunity.kind === 'PLATFORM_TRADE' || opportunity.kind === 'TRANSFER_OUT'
+            ? opportunity.countryIds.slice().sort()
+            : getNegotiationCountrySnapshot(platform, terms.territory, sourceLicense),
+        rivalPlatformId: opportunity.kind === 'SUBLICENSE_OUT' || opportunity.kind === 'TRANSFER_OUT'
+            ? null : opportunity.rivalPlatformId,
+        rivalPlatformName: opportunity.kind === 'SUBLICENSE_OUT' || opportunity.kind === 'TRANSFER_OUT'
+            ? null : opportunity.rivalPlatformName,
         rivalBidAmount: opportunity.rivalBidAmount,
         marketHeat: opportunity.marketHeat,
         status: 'OPEN',
@@ -908,6 +1028,77 @@ export const signStreamingRightsDeal = (
             negotiation: signedNegotiation,
         };
     }
+    const canonicalTransferSource = negotiation.sourceLicenseId
+        ? getStreamingRightsContract(player.world.streamingRightsContracts, negotiation.sourceLicenseId)
+        : null;
+    const isInboundPlatformTransfer = Boolean(
+        negotiation.kind === 'ACQUIRE'
+        && negotiation.sellerType === 'PLATFORM'
+        && canonicalTransferSource,
+    );
+    const isOutboundPlatformTransfer = Boolean(
+        negotiation.kind === 'TRANSFER_OUT'
+        && canonicalTransferSource,
+    );
+    if (canonicalTransferSource && (isInboundPlatformTransfer || isOutboundPlatformTransfer)) {
+        const playerParty = {
+            type: 'PLAYER_PLATFORM' as const,
+            id: platform.identity?.slug || `player-platform:${player.id}`,
+            name: platform.identity?.name || 'Player streaming platform',
+            platformId: null,
+        };
+        const aiBuyerPlatformId = negotiation.buyerPlatformId;
+        if (isOutboundPlatformTransfer && !aiBuyerPlatformId) {
+            return { player, changed: false, reason: 'NOT_READY', detail: 'The resale buyer is missing.', negotiation };
+        }
+        const transfer = settleStreamingRightsTransfer(player, {
+            sourceContractId: canonicalTransferSource.id,
+            seller: isInboundPlatformTransfer ? canonicalTransferSource.buyer : playerParty,
+            buyer: isInboundPlatformTransfer ? playerParty : {
+                type: 'AI_PLATFORM',
+                id: aiBuyerPlatformId!,
+                name: negotiation.buyerName || PLATFORMS[aiBuyerPlatformId!].name,
+                platformId: aiBuyerPlatformId!,
+            },
+            askingPrice: Math.max(negotiation.minimumGuarantee, negotiation.rivalBidAmount || 0),
+            price: negotiation.minimumGuarantee,
+            absoluteWeek,
+            idempotencyKey: `owned-rights-transfer:${negotiation.id}`,
+            controllerAtCommitment: {
+                seller: isInboundPlatformTransfer ? 'AI' : 'PLAYER',
+                buyer: isInboundPlatformTransfer ? 'PLAYER' : 'AI',
+            },
+        });
+        if ('reason' in transfer) {
+            return {
+                player,
+                changed: false,
+                reason: transfer.reason === 'INSUFFICIENT_TREASURY' ? 'INSUFFICIENT_TREASURY'
+                    : transfer.reason === 'RIGHTS_UNAVAILABLE' ? 'RIGHTS_UNAVAILABLE'
+                        : 'NOT_READY',
+                detail: transfer.detail,
+                negotiation,
+            };
+        }
+        const signedNegotiation = { ...negotiation, status: 'SIGNED' as const, updatedAtAbsoluteWeek: absoluteWeek };
+        const transferredPlatform = normalizeOwnedStreamingPlatformState(
+            transfer.player.ownedStreamingPlatform,
+            transfer.player.id,
+        );
+        return {
+            player: {
+                ...transfer.player,
+                ownedStreamingPlatform: compactOwnedStreamingPlatformForPersistence({
+                    ...transferredPlatform,
+                    rightsNegotiations: transferredPlatform.rightsNegotiations.map(item => (
+                        item.id === negotiation.id ? signedNegotiation : item
+                    )),
+                }, transfer.player.id),
+            },
+            changed: true,
+            negotiation: signedNegotiation,
+        };
+    }
     const countryIds = negotiation.territory === 'GLOBAL'
         ? []
         : normalizeStreamingDayOneMarketIds(negotiation.countryIds).length
@@ -975,68 +1166,57 @@ export const signStreamingRightsDeal = (
             changeOfControl: negotiation.changeOfControl,
             cancellationPenalty: negotiation.cancellationPenalty,
         };
-        const buyerState = player.world.platforms?.[buyerPlatformId];
-        nextWorld = buyerState ? {
-            ...player.world,
-            platforms: {
-                ...player.world.platforms,
-                [buyerPlatformId]: {
-                    ...buyerState,
-                    cashReserve: Math.max(0, buyerState.cashReserve - negotiation.minimumGuarantee / 1_000_000),
-                },
-            },
-        } : player.world;
-        if (sourceLicense) {
-            const sublicenseProjection = {
-                ...sourceLicense,
-                id: deal.id,
-                buyerPlatformId,
-                licensorName: platform.identity?.name || 'Player streaming platform',
-                territory: deal.territory,
-                countryIds: deal.countryIds,
-                windowType: deal.windowType,
-                durationWeeks: deal.durationWeeks,
-                exclusivity: deal.exclusivity,
-                minimumGuarantee: deal.upfrontFee,
-                platformRevenueShare: deal.buyerRevenueShare,
-                studioRevenueShare: deal.sellerRevenueShare,
-                signedAtAbsoluteWeek: deal.signedAtAbsoluteWeek,
-                startsAtAbsoluteWeek: deal.startsAtAbsoluteWeek,
-                expiresAtAbsoluteWeek: deal.expiresAtAbsoluteWeek,
-                status: deal.status,
-                origin: 'PLATFORM_TRADE' as const,
-                sellerType: 'PLATFORM' as const,
-                sellerPlatformId: null,
-                changeOfControl: deal.changeOfControl,
-                cancellationPenalty: deal.cancellationPenalty,
-            };
-            const canonicalRegistration = registerStreamingRightsContract(
-                nextWorld.streamingRightsContracts,
-                createStreamingRightsContractFromLicense({
-                    license: sublicenseProjection,
-                    seller: {
-                        type: 'PLAYER_PLATFORM',
-                        id: platform.identity?.slug || `player-platform:${player.id}`,
-                        name: platform.identity?.name || 'Player streaming platform',
-                        platformId: null,
-                    },
-                    buyer: {
-                        type: 'AI_PLATFORM',
-                        id: buyerPlatformId,
-                        name: deal.buyerName,
-                        platformId: buyerPlatformId,
-                    },
-                    guaranteeDisposition: 'PAID',
-                    settledAtAbsoluteWeek: absoluteWeek,
-                }),
-            );
-            nextWorld = { ...nextWorld, streamingRightsContracts: canonicalRegistration.registry };
+        if (!sourceLicense) {
+            return { player, changed: false, reason: 'NOT_FOUND', detail: 'The canonical source licence is missing.', negotiation };
         }
+        const sublicense = settleStreamingRightsSublicense(player, {
+            sourceContractId: sourceLicense.id,
+            seller: {
+                type: 'PLAYER_PLATFORM',
+                id: platform.identity?.slug || `player-platform:${player.id}`,
+                name: platform.identity?.name || 'Player streaming platform',
+                platformId: null,
+            },
+            buyer: {
+                type: 'AI_PLATFORM',
+                id: buyerPlatformId,
+                name: deal.buyerName,
+                platformId: buyerPlatformId,
+            },
+            territory: deal.territory,
+            countryIds: deal.countryIds,
+            windowType: deal.windowType,
+            exclusivity: deal.exclusivity,
+            durationWeeks: deal.durationWeeks,
+            price: deal.upfrontFee,
+            buyerRevenueShare: deal.buyerRevenueShare,
+            absoluteWeek,
+            idempotencyKey: `owned-rights-sublicense:${negotiation.id}`,
+            successorContractId: deal.id,
+            controllerAtCommitment: { seller: 'PLAYER', buyer: 'AI' },
+        });
+        if ('reason' in sublicense) {
+            return {
+                player,
+                changed: false,
+                reason: sublicense.reason === 'INSUFFICIENT_TREASURY' ? 'INSUFFICIENT_TREASURY'
+                    : sublicense.reason === 'RIGHTS_UNAVAILABLE' || sublicense.reason === 'NOT_ACTIVE'
+                        ? 'RIGHTS_RESTRICTED' : 'NOT_READY',
+                detail: sublicense.detail,
+                negotiation,
+            };
+        }
+        nextWorld = sublicense.player.world;
+        const sublicensePlatform = normalizeOwnedStreamingPlatformState(
+            sublicense.player.ownedStreamingPlatform,
+            sublicense.player.id,
+        );
         nextPlatform = {
-            ...platform,
-            treasuryCash: platform.treasuryCash + negotiation.minimumGuarantee,
-            rightsNegotiations: platform.rightsNegotiations.map(item => item.id === negotiationId ? signedNegotiation : item),
-            sublicenseDeals: [...platform.sublicenseDeals, deal],
+            ...sublicensePlatform,
+            rightsNegotiations: sublicensePlatform.rightsNegotiations.map(item => item.id === negotiationId ? signedNegotiation : item),
+            sublicenseDeals: sublicensePlatform.sublicenseDeals.some(item => item.id === deal.id)
+                ? sublicensePlatform.sublicenseDeals
+                : [...sublicensePlatform.sublicenseDeals, deal],
         };
     } else {
         const licenseId = createDeterministicId('streaming_catalog_license', platform.simulationSeed, negotiation.id);
@@ -1326,43 +1506,15 @@ export const evaluateStreamingRightsCompliance = (
 export const applyStreamingRightsChangeOfControl = (
     player: Player,
     licenseId: string,
-    consentGranted: boolean,
+    _consentGranted: boolean,
 ): StreamingRightsActionResult => {
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     const license = platform.catalogLicenses.find(item => item.id === licenseId);
     if (!license) return { player, changed: false, reason: 'NOT_FOUND' };
-    const requiresConsent = license.changeOfControl === 'CONSENT_REQUIRED';
-    if (!requiresConsent || consentGranted) return { player, changed: false, reason: 'NOT_READY' };
-    const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
-    const penalty = Math.min(platform.treasuryCash, license.cancellationPenalty || 0);
-    const otherActiveRight = platform.catalogLicenses.some(item => (
-        item.id !== license.id && item.sourceProjectId === license.sourceProjectId && item.status === 'ACTIVE'
-    ));
-    const key = `rights-change-of-control:${license.id}`;
-    const ledger: OwnedStreamingLedgerEntry = {
-        id: createDeterministicId('streaming_event', platform.simulationSeed, key),
-        idempotencyKey: key,
-        absoluteWeek,
-        type: 'SYSTEM_REPAIR',
-        summary: `${license.titleAtSigning} terminated after change-of-control consent was denied.`,
-        source: 'SYSTEM',
-        metadata: { licenseId, penalty },
-    };
     return {
-        player: {
-            ...player,
-            ownedStreamingPlatform: compactOwnedStreamingPlatformForPersistence({
-                ...platform,
-                treasuryCash: platform.treasuryCash - penalty,
-                catalogLicenses: platform.catalogLicenses.map(item => item.id === licenseId ? { ...item, status: 'TERMINATED' } : item),
-                catalogProjectIds: otherActiveRight
-                    ? platform.catalogProjectIds
-                    : platform.catalogProjectIds.filter(id => id !== license.sourceProjectId),
-                eventLedger: platform.eventLedger.some(entry => entry.idempotencyKey === key)
-                    ? platform.eventLedger
-                    : [...platform.eventLedger, ledger],
-            }, player.id),
-        },
-        changed: true,
+        player,
+        changed: false,
+        reason: 'NOT_READY',
+        detail: 'Valid licence positions remain attached to the platform after a change of control.',
     };
 };

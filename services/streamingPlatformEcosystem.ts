@@ -29,8 +29,14 @@ import {
     getStreamingOthersBrand,
     resolveStreamingOperatorBrand,
 } from './streamingPlatformBrandRegistry';
+import { createDeterministicId } from './deterministicRandom';
+import {
+    createInitialIndustryIntelligenceState,
+    normalizeIndustryIntelligenceState,
+} from './industryIntelligence/industryIntelligenceState';
 
 export const STREAMING_ECOSYSTEM_SCHEMA_VERSION = 2;
+export const STREAMING_ECOSYSTEM_CLOSED_DYNAMIC_OPERATOR_LIMIT = 12;
 
 const OPERATOR_KINDS = new Set<StreamingEcosystemOperatorKind>(['CORE_GLOBAL', 'GLOBAL_REAL', 'REGIONAL_REAL', 'DYNAMIC_FICTIONAL']);
 const ORIGINS = new Set<StreamingEcosystemOrigin>(['BOOTSTRAPPED', 'VENTURE_BACKED', 'TELECOM_BACKED', 'BROADCASTER_BACKED', 'STUDIO_SPINOFF', 'TECH_BACKED', 'CONGLOMERATE_BACKED', 'CELEBRITY_FOUNDED']);
@@ -108,6 +114,7 @@ const normalizeOperator = (
     fallbackId: string,
     occupiedBrands: StreamingPlatformBrandPresentation[],
     operatorIndex: number,
+    absoluteWeek: number,
 ): StreamingEcosystemOperator | null => {
     const source = asRecord(value);
     const base = seed ? seedToOperator(seed) : null;
@@ -140,6 +147,15 @@ const normalizeOperator = (
     const activeCountryIds = uniqueStrings(source.activeCountryIds ?? base?.activeCountryIds, MARKET_IDS);
     if (!activeCountryIds.includes(homeCountryId)) activeCountryIds.push(homeCountryId);
     activeCountryIds.sort();
+    const intelligence = kind === 'CORE_GLOBAL' ? undefined : normalizeIndustryIntelligenceState(
+        source.intelligence,
+        createInitialIndustryIntelligenceState(
+            id,
+            'STREAMING_PLATFORM',
+            createDeterministicId('streaming_ecosystem_intelligence_seed', id),
+            absoluteWeek,
+        ),
+    );
     return {
         id, name, kind, corePlatformId, brand, origin, startingClass,
         homeCountryId,
@@ -164,6 +180,7 @@ const normalizeOperator = (
         consecutiveStressWeeks: Math.max(0, Math.round(finite(source.consecutiveStressWeeks))),
         lastMaterialChangeAtAbsoluteWeek: Math.max(0, Math.round(finite(source.lastMaterialChangeAtAbsoluteWeek))),
         lastProcessedAbsoluteWeek: Math.max(-1, Math.round(finite(source.lastProcessedAbsoluteWeek, -1))),
+        ...(intelligence ? { intelligence } : {}),
     };
 };
 
@@ -273,11 +290,24 @@ export const normalizeStreamingPlatformEcosystem = (
     const operators: Record<string, StreamingEcosystemOperator> = {};
     const occupiedBrands: StreamingPlatformBrandPresentation[] = [];
     for (const [operatorIndex, id] of [...operatorIds].sort().entries()) {
-        const normalized = normalizeOperator(sourceOperators[id], seedById.get(id) || null, id, occupiedBrands, operatorIndex);
+        const normalized = normalizeOperator(sourceOperators[id], seedById.get(id) || null, id, occupiedBrands, operatorIndex, absoluteWeek);
         if (normalized) {
             operators[normalized.id] = normalized;
             occupiedBrands.push(resolveStreamingOperatorBrand(normalized.id, normalized.name, normalized.brand));
         }
+    }
+    const retainedClosedDynamicIds = new Set(Object.values(operators)
+        .filter(operator => operator.kind === 'DYNAMIC_FICTIONAL' && operator.lifecycle === 'CLOSED')
+        .sort((left, right) => (
+            (right.lastMaterialChangeAtAbsoluteWeek || right.lastProcessedAbsoluteWeek || right.foundedAtAbsoluteWeek)
+            - (left.lastMaterialChangeAtAbsoluteWeek || left.lastProcessedAbsoluteWeek || left.foundedAtAbsoluteWeek)
+            || left.id.localeCompare(right.id)
+        ))
+        .slice(0, STREAMING_ECOSYSTEM_CLOSED_DYNAMIC_OPERATOR_LIMIT)
+        .map(operator => operator.id));
+    for (const operator of Object.values(operators)) {
+        if (operator.kind === 'DYNAMIC_FICTIONAL' && operator.lifecycle === 'CLOSED'
+            && !retainedClosedDynamicIds.has(operator.id)) delete operators[operator.id];
     }
     const validOperatorIds = new Set(Object.keys(operators));
     const sourceMarkets = asRecord(source.markets);

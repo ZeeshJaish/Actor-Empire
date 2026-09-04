@@ -16,6 +16,7 @@ import {
     syncAcquisitionDebtLedger,
 } from './acquisitionDebt';
 import { recalculateBusinessValuation } from './businessLogic';
+import { dematerializeStudioOwnership } from './industryWorld/studioOwnershipMaterializer';
 
 export type StudioSaleRequirementId =
     | 'PRODUCTION_HOUSE'
@@ -1302,7 +1303,15 @@ export const completeStudioSaleTransfer = (
         })),
     };
 
-    let nextPlayer = closeDebtForStudios(player, includedStudioIds);
+    let handoffPlayer = player;
+    includedStudioIds.forEach(includedStudioId => {
+        handoffPlayer = dematerializeStudioOwnership(
+            handoffPlayer,
+            includedStudioId,
+            currentAbsoluteWeek(player),
+        ).player;
+    });
+    let nextPlayer = closeDebtForStudios(handoffPlayer, includedStudioIds);
     const catalogRetention = moveRetainedCatalogToParent(nextPlayer, studio, includedStudioIds, transferTerms);
     nextPlayer = catalogRetention.player;
     const royaltyContract = makeRoyaltyContract(nextPlayer, studio, offer, includedStudioIds);

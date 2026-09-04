@@ -1,5 +1,6 @@
 import type { IndustryProductionCommitment, PlatformAiProductionRecord, StudioId } from '../types';
 import { normalizeProductionCalendar } from './productionCalendar';
+import { normalizeStudioAiProductionRecord } from './studioAi/studioAiProductionState';
 
 const STATUSES = new Set<IndustryProductionCommitment['status']>([
     'PLANNED',
@@ -7,6 +8,9 @@ const STATUSES = new Set<IndustryProductionCommitment['status']>([
     'PRODUCTION',
     'POST_PRODUCTION',
     'DELIVERED',
+    'AWAITING_RELEASE',
+    'TURNAROUND',
+    'RELEASED',
     'ON_HOLD',
     'CANCELLED',
 ]);
@@ -157,6 +161,7 @@ const normalizeIndustryProduction = (value: unknown, maxAbsoluteWeek: number): I
                 : 0,
     );
     const normalizedExecution = normalizeAiExecution(candidate.aiExecution, updatedAtAbsoluteWeek, maxAbsoluteWeek);
+    const normalizedStudioExecution = normalizeStudioAiProductionRecord(candidate.studioAiExecution, maxAbsoluteWeek);
     const paidMilestoneIds = normalizedExecution ? normalizedExecution.paidMilestoneIds.filter(milestone => {
         if (budgetMillions <= 0) return false;
         const commissioningPaid = roundMillions(budgetMillions * 0.05);
@@ -169,9 +174,12 @@ const normalizeIndustryProduction = (value: unknown, maxAbsoluteWeek: number): I
     }) : [];
     const aiExecution = normalizedExecution ? { ...normalizedExecution, paidMilestoneIds } : null;
     const candidateStatus = candidate.status && STATUSES.has(candidate.status) ? candidate.status : 'PLANNED';
-    const status = candidateStatus === 'DELIVERED' && paidMillions + 1e-9 < budgetMillions
+    const status = ['DELIVERED', 'AWAITING_RELEASE', 'RELEASED'].includes(candidateStatus) && paidMillions + 1e-9 < budgetMillions
         ? 'POST_PRODUCTION'
         : candidateStatus;
+    const source = candidate.source === 'STUDIO_INDEPENDENT' && normalizedStudioExecution
+        ? 'STUDIO_INDEPENDENT'
+        : 'PLATFORM_COMMISSION';
     const boundedProductionCalendar = productionCalendar.startedAbsoluteWeek === undefined
         ? productionCalendar
         : {
@@ -190,6 +198,7 @@ const normalizeIndustryProduction = (value: unknown, maxAbsoluteWeek: number): I
         producerStudioId: producerStudioId as StudioId,
         ...(candidate.commissioningPlatformId ? { commissioningPlatformId: candidate.commissioningPlatformId } : {}),
         ...(candidate.platformContentPlanId ? { platformContentPlanId: candidate.platformContentPlanId } : {}),
+        source,
         status,
         productionCalendar: boundedProductionCalendar,
         budgetMillions,
@@ -204,6 +213,14 @@ const normalizeIndustryProduction = (value: unknown, maxAbsoluteWeek: number): I
             : `${producerStudioId} Story Department`,
         writerSkill: Math.max(0, Math.min(100, safeNonNegative(candidate.writerSkill))),
         ...(aiExecution ? { aiExecution } : {}),
+        ...(normalizedStudioExecution ? { studioAiExecution: normalizedStudioExecution } : {}),
+        ...(candidate.studioAiSlateCommitmentId || normalizedStudioExecution?.slateCommitmentId
+            ? { studioAiSlateCommitmentId: String(candidate.studioAiSlateCommitmentId || normalizedStudioExecution?.slateCommitmentId) }
+            : {}),
+        ...(candidate.industryContentFingerprintId || normalizedStudioExecution?.fingerprintId
+            ? { industryContentFingerprintId: String(candidate.industryContentFingerprintId || normalizedStudioExecution?.fingerprintId) }
+            : {}),
+        ...(candidate.universeId ? { universeId: candidate.universeId } : {}),
         createdAtAbsoluteWeek,
         updatedAtAbsoluteWeek,
     };
@@ -228,15 +245,47 @@ export const getIndustryProduction = (
     registry: Record<string, IndustryProductionCommitment> | undefined,
     productionId: string,
     maxAbsoluteWeek = Number.MAX_SAFE_INTEGER,
-): IndustryProductionCommitment | null => normalizeIndustryProductions(registry, maxAbsoluteWeek)[productionId] || null;
+): IndustryProductionCommitment | null => {
+    const direct = registry?.[productionId];
+    // Canonical registries are keyed by the production id. Normalize just the
+    // requested record on this overwhelmingly common path; retain the full
+    // legacy repair path for old saves whose registry keys do not match ids.
+    if (direct?.id === productionId) {
+        return normalizeIndustryProduction(direct, maxAbsoluteWeek);
+    }
+    return normalizeIndustryProductions(registry, maxAbsoluteWeek)[productionId] || null;
+};
 
 export const upsertIndustryProduction = (
     registry: Record<string, IndustryProductionCommitment> | undefined,
     production: IndustryProductionCommitment,
-): Record<string, IndustryProductionCommitment> => normalizeIndustryProductions({
-    ...normalizeIndustryProductions(registry),
-    [production.id]: production,
-});
+): Record<string, IndustryProductionCommitment> => {
+    const normalizedRegistry = normalizeIndustryProductions(registry);
+    const normalizedProduction = normalizeIndustryProduction(production, Number.MAX_SAFE_INTEGER);
+    if (!normalizedProduction) return normalizedRegistry;
+    return Object.fromEntries(Object.entries({
+        ...normalizedRegistry,
+        [normalizedProduction.id]: normalizedProduction,
+    }).sort(([left], [right]) => left.localeCompare(right)));
+};
+
+/**
+ * Fast update for registries that have already crossed the save/runtime
+ * normalization boundary. The changed record is still normalized in full;
+ * unrelated canonical records are retained by reference instead of being
+ * reparsed for every production milestone in the same week.
+ */
+export const upsertCanonicalIndustryProduction = (
+    registry: Record<string, IndustryProductionCommitment> | undefined,
+    production: IndustryProductionCommitment,
+): Record<string, IndustryProductionCommitment> => {
+    const normalizedProduction = normalizeIndustryProduction(production, Number.MAX_SAFE_INTEGER);
+    if (!normalizedProduction) return registry || {};
+    return Object.fromEntries(Object.entries({
+        ...(registry || {}),
+        [normalizedProduction.id]: normalizedProduction,
+    }).sort(([left], [right]) => left.localeCompare(right)));
+};
 
 export const removeIndustryProduction = (
     registry: Record<string, IndustryProductionCommitment> | undefined,

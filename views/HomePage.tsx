@@ -45,6 +45,10 @@ import {
   createPlatformAiPlayerCommissionQaFixture,
   getPlatformAiPhase4QaSnapshot,
 } from '../services/platformAi';
+import {
+  buildStreamingRightsPhase8QaFixture,
+  getStreamingRightsPhase8QaSummary,
+} from '../services/streamingRightsQa';
 
 interface HomePageProps {
   player: Player;
@@ -1305,6 +1309,16 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
     onOpenProductionHouseCheat,
     setPage,
   });
+  const triggerStreamingRightsPhase8Qa = () => {
+      if (!onUpdatePlayer) return;
+      const { updatedPlayer: basePlayer, studio } = ensureCheatStudio();
+      const seededPlayer = buildStreamingRightsPhase8QaFixture(basePlayer, studio.id);
+      const summary = getStreamingRightsPhase8QaSummary(seededPlayer, studio.id);
+      onUpdatePlayer(seededPlayer);
+      setActiveCheatMenu('NONE');
+      onOpenProductionHouseCheat?.();
+      alert(`Rights Market A8 QA ready: ${summary.titleCount} titles, ${summary.contractCount} contracts, ${summary.renewalCount} renewal files, ${summary.protectedCount} protected decision, and ${summary.delegatedCount} delegated result.`);
+  };
   const triggerFranchiseQaScenario = (scenario: 'HOT' | 'TIRED' | 'RECAST' | 'CANDIDATE') => {
       if (!onUpdatePlayer) return;
 
@@ -3411,6 +3425,9 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                                   </button>
                                   <button onClick={triggerPlatformAiPhase4Qa} className="col-span-2 bg-cyan-950/50 hover:bg-cyan-900/60 border border-cyan-400/50 text-xs font-bold py-3 rounded-lg text-cyan-200 flex items-center justify-center gap-2">
                                       <Globe size={14}/> Platform AI Phase 4 QA
+                                  </button>
+                                  <button onClick={triggerStreamingRightsPhase8Qa} className="col-span-2 bg-amber-950/50 hover:bg-amber-900/60 border border-amber-400/50 text-xs font-bold py-3 rounded-lg text-amber-200 flex items-center justify-center gap-2">
+                                      <FileText size={14}/> Rights Market A8 QA
                                   </button>
                                   <button onClick={triggerFullStudioSlateQa} className="col-span-2 bg-emerald-900/30 hover:bg-emerald-900/50 border border-emerald-400/40 text-xs font-bold py-3 rounded-lg text-emerald-300">
                                       Fill Full Studio Slate

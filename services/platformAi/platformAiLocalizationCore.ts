@@ -175,10 +175,13 @@ export const resolveCapabilityBackedLocalizationPromise = (input: {
         (candidate === 'DUBS_AND_SUBTITLES' ? 2 : 1) <= requestedRank
     ))) {
         const requirements = buildRequirementsForLevel(input.platform, input.countryIds, originalLanguageId, level);
-        if (requirements.length && requirements.every(requirement => requirement.supported && requirement.capabilityTier > 0)) {
+        const supportedRequirements = requirements.filter(requirement => (
+            requirement.supported && requirement.capabilityTier > 0
+        ));
+        if (supportedRequirements.length) {
             return {
                 localizationLevel: level,
-                requirements: requirements.map(requirement => ({
+                requirements: supportedRequirements.map(requirement => ({
                     languageId: requirement.languageId,
                     mode: requirement.mode,
                     countryIds: requirement.countryIds,

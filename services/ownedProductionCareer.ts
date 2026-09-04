@@ -221,9 +221,16 @@ const average = (values: number[]) => {
 };
 
 export const isPlayerCastInProject = (commitment: Commitment): boolean => {
-    if (commitment.roleType) return true;
-    return Boolean(commitment.projectDetails?.castList?.some(member => member.actorId === 'PLAYER_SELF' || member.isPlayer));
+    const castList = commitment.projectDetails?.castList;
+    if (Array.isArray(castList) && castList.length > 0) {
+        return castList.some(member => member.actorId === 'PLAYER_SELF' || member.isPlayer);
+    }
+    return commitment.type === 'ACTING_GIG' && Boolean(commitment.roleType);
 };
+
+export const getPlayerActingCommitments = (commitments: readonly Commitment[] | undefined): Commitment[] => (
+    (commitments || []).filter(commitment => commitment.type === 'ACTING_GIG' && isPlayerCastInProject(commitment))
+);
 
 export const isPlayerDirectingProject = (commitment: Commitment): boolean => {
     const details = commitment.projectDetails;

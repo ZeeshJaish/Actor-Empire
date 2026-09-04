@@ -173,6 +173,15 @@ assert.ok(!deceasedInheritance.flags.extraNPCs.some((npc: any) => npc.id === dec
 
 const livingInheritance = buildLegacyStudioInheritance(makeParent(false), { isDeceased: false });
 assert.ok(livingInheritance.flags.extraNPCs.some((npc: any) => npc.id === livingInheritance.parentActor.id), 'living parent should be available as an actor connection');
+const livingDynastyMember = livingInheritance.flags.dynastyCareer?.members?.[livingInheritance.parentActor.id];
+assert.ok(livingDynastyMember, 'living succession should create one canonical dynasty career member');
+assert.equal(livingDynastyMember.status, 'ACTIVE', 'succession must not automatically retire a living former character');
+assert.equal(livingDynastyMember.ageAtSuccession, 62, 'the former character must retain their real age when control moves to a younger heir');
+assert.equal(
+    livingInheritance.flags.dynastyCareerArchives?.[livingInheritance.parentActor.id]?.pastProjects?.length,
+    2,
+    'the parent filmography should be stored under its stable actor id for multi-generation retrieval',
+);
 
 const heirInheritance = buildLegacyStudioInheritance(makeParent(true), {
     isDeceased: true,

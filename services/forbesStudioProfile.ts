@@ -66,6 +66,9 @@ export interface ForbesStudioProfile {
     facilitiesEstimated: boolean;
     keyTalent: ForbesStudioTalent[];
     assetDataSource: 'SAVE_DATA' | 'MIXED' | 'FORBES_ESTIMATE';
+    /** Publicly observable evidence. Internal AI company status is intentionally omitted. */
+    publicSignals: string[];
+    distressEvidence: string[];
 }
 
 interface ForbesStudioProfileInput {
@@ -232,6 +235,21 @@ export const buildForbesStudioProfile = (input: ForbesStudioProfileInput): Forbe
             ? Math.max(1, Math.min(5, Math.ceil(catalog.length / 2)))
             : catalog.length >= 2 ? 1 : 0;
     const facilities = usesPlayerAssets && input.playerFacilities?.length ? input.playerFacilities.slice(0, 4) : getEstimatedFacilities(studio);
+    const distressEvidence = [
+        ...(capital <= 0 ? ['Reported cash reserves are below zero.'] : []),
+        ...(profitability < 0 ? [`Recent tracked results imply a ${Math.abs(profitability).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })} loss.`] : []),
+        ...(resolvedFlops >= 2 && resolvedFlops > resolvedHits ? [`The latest tracked slate includes ${resolvedFlops} commercial misses against ${resolvedHits} hits.`] : []),
+    ];
+    const latestTitle = catalog[0];
+    const publicSignals = [
+        latestTitle
+            ? `${latestTitle.title} is the studio's latest tracked release, with ${latestTitle.outcome.toLowerCase()} reception.`
+            : 'No recent public release is recorded in the tracked catalogue.',
+        capital > 0
+            ? `Reported capital stands near ${capital.toLocaleString('en-US', { style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 1 })}.`
+            : 'Public filings indicate depleted operating capital.',
+        ...(distressEvidence.length ? distressEvidence : [`The tracked slate shows ${resolvedHits} hits and ${resolvedFlops} flops.`]),
+    ].slice(0, 4);
 
     return {
         id: studio.id,
@@ -260,5 +278,7 @@ export const buildForbesStudioProfile = (input: ForbesStudioProfileInput): Forbe
         facilitiesEstimated: !usesPlayerAssets || !input.playerFacilities?.length,
         keyTalent: getKeyTalent(input),
         assetDataSource: studio.isPlayerOwned ? 'SAVE_DATA' : venture ? 'MIXED' : 'FORBES_ESTIMATE',
+        publicSignals,
+        distressEvidence,
     };
 };

@@ -10,6 +10,8 @@ import {
   normalizePlatformAiAudienceSettlements,
   normalizePlatformAiDistressEpisodes,
   normalizePlatformAiLocalizationJobs,
+  markPlatformAiStateCanonicalForTurn,
+  normalizePlatformAiState,
   normalizePlatformAiPendingOneTimeObligations,
   normalizePlatformAiRightsContracts,
   normalizePlatformAiRightsRenewals,
@@ -31,9 +33,19 @@ import {
   normalizeStreamingRightsCalendarState,
   normalizeStreamingRightsManagementState,
 } from './streamingRightsCalendar';
+import { normalizeStreamingRightsOfficeState } from './streamingRightsOffice';
+import { normalizeDynastyCareerState } from './dynastyCareer';
+import { compactIndustryIntelligenceState } from './industryIntelligence';
+import { normalizeStudioAiState } from './studioAi/studioAiState';
 import {
   reconstructSignedStreamingCataloguePackages,
 } from './streamingCataloguePackages';
+import { normalizeStreamingRightsTransactionRegistry } from './streamingRightsTransactions';
+import {
+  getCanonicalScheduledRivals,
+  normalizeIndustryEventLedger,
+  reconcileIndustryMediaWorldWithEvents,
+} from './industryWorld';
 
 export const FULL_LOCAL_MIRROR_BUDGET_BYTES = 3_500_000;
 
@@ -58,6 +70,7 @@ const WORLD_PROJECT_MAX_ITEMS = 900;
 const EXTRA_NPC_RECENT_MAX_ITEMS = 360;
 const PLATFORM_AI_TERMINAL_SLATE_MAX_ITEMS = 104;
 const PLATFORM_AI_TERMINAL_RIGHTS_MAX_ITEMS = 104;
+const STREAMING_RIGHTS_TRANSACTION_SETTLED_MAX_ITEMS = 260;
 const PLATFORM_AI_TERMINAL_PRODUCTION_MAX_ITEMS = 104;
 const PLATFORM_AI_TERMINAL_TALENT_MAX_ITEMS = 208;
 const AWARD_HISTORY_MAX_ITEMS = 104;
@@ -65,6 +78,9 @@ const STREAMING_RIGHTS_TERMINAL_MAX_ITEMS = 240;
 const STREAMING_BIDDING_TERMINAL_MAX_ITEMS = 60;
 const STREAMING_ROYALTY_SETTLEMENT_MAX_ITEMS = 520;
 const STREAMING_CATALOGUE_PACKAGE_TERMINAL_MAX_ITEMS = 80;
+const STUDIO_AI_LEDGER_MAX_ITEMS = 104;
+const STUDIO_AI_EVENT_MAX_ITEMS = 48;
+const STUDIO_AI_DECISION_MAX_ITEMS = 48;
 
 type CompactTimelineEntry = {
   id: string;
@@ -230,6 +246,35 @@ const compactBusiness = (business: any) => {
   };
 };
 
+const compactStudioAiCompanies = (value: unknown, absoluteWeek: number) => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
+  return Object.fromEntries(Object.entries(value as Record<string, any>).map(([studioId, studio]) => {
+    if (!studio?.ai) return [studioId, studio];
+    const compactedStudio = {
+      ...studio,
+      ai: {
+        ...studio.ai,
+        ledger: trimRecent(studio.ai.ledger, STUDIO_AI_LEDGER_MAX_ITEMS) || [],
+        events: trimRecent(studio.ai.events, STUDIO_AI_EVENT_MAX_ITEMS) || [],
+        decisions: trimRecent(studio.ai.decisions, STUDIO_AI_DECISION_MAX_ITEMS) || [],
+        migrationKeys: trimRecent(studio.ai.migrationKeys, STUDIO_AI_LEDGER_MAX_ITEMS) || [],
+        handoffKeys: trimRecent(studio.ai.handoffKeys, STUDIO_AI_LEDGER_MAX_ITEMS) || [],
+        intelligence: studio.ai.intelligence
+          ? compactIndustryIntelligenceState(studio.ai.intelligence)
+          : undefined,
+        legacyVenture: studio.ai.legacyVenture ? {
+          ...studio.ai.legacyVenture,
+          history: trimHead(studio.ai.legacyVenture.history, 24) || [],
+        } : undefined,
+      },
+    };
+    return [studioId, {
+      ...compactedStudio,
+      ai: normalizeStudioAiState(compactedStudio, { absoluteWeek }),
+    }];
+  }));
+};
+
 const getProjectReferencedNpcIds = (project: any, referencedIds: Set<string>) => {
   if (!project || typeof project !== 'object') return;
   [project.directorId, project.actorId, project.npcId, project.sourceNpcId].forEach(id => {
@@ -281,7 +326,19 @@ const getReferencedNpcIds = (player: any): Set<string> => {
       });
     });
   });
+  Object.keys(normalizeDynastyCareerState(player).members).forEach(id => referencedIds.add(id));
   return referencedIds;
+};
+
+const compactDynastyCareerArchives = (player: any) => {
+  const archives = player.flags?.dynastyCareerArchives;
+  if (!archives || typeof archives !== 'object' || Array.isArray(archives)) return {};
+  return Object.fromEntries(Object.entries(archives).map(([actorId, archive]: [string, any]) => [actorId, {
+    ...archive,
+    pastProjects: Array.isArray(archive?.pastProjects) ? archive.pastProjects.map(compactPastProject) : [],
+    activeReleases: Array.isArray(archive?.activeReleases) ? archive.activeReleases.map(compactRelease) : [],
+    awards: Array.isArray(archive?.awards) ? archive.awards.slice(-120) : [],
+  }]));
 };
 
 const compactExtraNPCs = (player: any) => {
@@ -339,6 +396,8 @@ const getReferencedWorldProjectIds = (player: any, absoluteWeek: number): Set<st
     (ai?.releaseMemory || []).forEach((memory: any) => add(memory?.projectId));
     (ai?.rightsContracts || []).forEach((contract: any) => add(contract?.sourceProjectId));
   });
+  Object.values(player.world?.streamingRightsContracts || {})
+    .forEach((contract: any) => add(contract?.sourceProjectId));
   normalizePlatformAiCatalogueDistressDeals(player.world?.platformAiCatalogueDistressDeals)
     .filter(deal => deal.status === 'PENDING_PAYMENT')
     .forEach(deal => add(deal.sourceProjectId));
@@ -479,7 +538,10 @@ const compactPlatformAiSlate = (
     .filter((job: any) => job?.status !== 'CANCELLED')
     .forEach((job: any) => protectedPlanIds.add(stableHistoryId(job?.contentPlanId)));
   (Array.isArray(ai?.rightsContracts) ? ai.rightsContracts : [])
-    .filter((contract: any) => contract?.status === 'ACTIVE')
+    .filter((contract: any) => (
+      contract?.status === 'ACTIVE'
+      && Number(contract?.expiresAtAbsoluteWeek ?? Number.MAX_SAFE_INTEGER) >= absoluteWeek
+    ))
     .forEach((contract: any) => protectedPlanIds.add(stableHistoryId(contract?.platformContentPlanId)));
   (Array.isArray(ai?.rightsRenewals) ? ai.rightsRenewals : [])
     .filter((renewal: any) => renewal?.status !== 'CONTRACTED')
@@ -520,7 +582,12 @@ const compactPlatformAiSlate = (
   });
 };
 
-const compactPlatformAiRightsContracts = (contracts: any[], slate: any[], renewals: any[]): any[] => {
+const compactPlatformAiRightsContracts = (
+  contracts: any[],
+  slate: any[],
+  renewals: any[],
+  absoluteWeek: number,
+): any[] => {
   const referencedIds = new Set<string>();
   slate.forEach((plan: any) => {
     (Array.isArray(plan?.rightsContractIds) ? plan.rightsContractIds : [])
@@ -535,7 +602,10 @@ const compactPlatformAiRightsContracts = (contracts: any[], slate: any[], renewa
   return retainBoundedHistory({
     items: contracts,
     idOf: (contract: any) => stableHistoryId(contract?.id),
-    isProtected: (contract: any) => contract?.status === 'ACTIVE' || referencedIds.has(stableHistoryId(contract?.id)),
+    isProtected: (contract: any) => (
+      contract?.status === 'ACTIVE'
+      && Number(contract?.expiresAtAbsoluteWeek ?? Number.MAX_SAFE_INTEGER) >= absoluteWeek
+    ) || referencedIds.has(stableHistoryId(contract?.id)),
     activityWeekOf: (contract: any) => Math.max(
       Number(contract?.expiresAtAbsoluteWeek || 0),
       Number(contract?.startsAtAbsoluteWeek || 0),
@@ -560,7 +630,7 @@ const compactIndustryProductions = (
     items: productions,
     idOf: (production: any) => stableHistoryId(production?.id),
     isProtected: (production: any) => (
-      !['DELIVERED', 'CANCELLED'].includes(String(production?.status || ''))
+      !['DELIVERED', 'RELEASED', 'CANCELLED'].includes(String(production?.status || ''))
       || referencedIds.has(stableHistoryId(production?.id))
       || retainedAwardProjectIds.has(stableHistoryId(production?.canonicalProjectId))
     ),
@@ -599,6 +669,7 @@ const compactTalentBookingHistory = (value: unknown, platforms: any, productions
 
 const compactStreamingRightsContracts = (player: any): Record<string, any> => {
   const registry = normalizeStreamingRightsContractRegistry(player?.world?.streamingRightsContracts);
+  const absoluteWeek = getApproxAbsoluteWeek(Number(player?.age), Number(player?.currentWeek));
   const referencedIds = new Set<string>();
   (Array.isArray(player?.activeReleases) ? player.activeReleases : []).forEach((release: any) => {
     const contractId = stableHistoryId(release?.streamingContractId || release?.streaming?.contractId);
@@ -609,14 +680,17 @@ const compactStreamingRightsContracts = (player: any): Record<string, any> => {
     if (contractId) referencedIds.add(contractId);
   });
   (Array.isArray(player?.ownedStreamingPlatform?.catalogLicenses) ? player.ownedStreamingPlatform.catalogLicenses : [])
+    .filter((license: any) => license?.status === 'ACTIVE' && Number(license?.expiresAtAbsoluteWeek || 0) >= absoluteWeek)
     .forEach((license: any) => referencedIds.add(stableHistoryId(license?.id)));
   Object.values(player?.world?.platforms || {}).forEach((platform: any) => {
     (Array.isArray(platform?.ai?.rightsContracts) ? platform.ai.rightsContracts : [])
+      .filter((license: any) => license?.status === 'ACTIVE' && Number(license?.expiresAtAbsoluteWeek || 0) >= absoluteWeek)
       .forEach((license: any) => referencedIds.add(stableHistoryId(license?.id)));
   });
   const contracts = Object.values(registry);
   const protectedContracts = contracts.filter(contract => (
-    contract.status === 'ACTIVE' || referencedIds.has(contract.id)
+    contract.status === 'ACTIVE' && contract.expiresAtAbsoluteWeek >= absoluteWeek
+    || referencedIds.has(contract.id)
   ));
   const protectedIds = new Set(protectedContracts.map(contract => contract.id));
   const terminalContracts = contracts
@@ -627,7 +701,39 @@ const compactStreamingRightsContracts = (player: any): Record<string, any> => {
       || left.id.localeCompare(right.id)
     ))
     .slice(0, STREAMING_RIGHTS_TERMINAL_MAX_ITEMS);
-  return Object.fromEntries([...protectedContracts, ...terminalContracts].map(contract => [contract.id, contract]));
+  return normalizeStreamingRightsContractRegistry(
+    Object.fromEntries([...protectedContracts, ...terminalContracts].map(contract => [contract.id, contract])),
+  );
+};
+
+const compactStreamingRightsTransactions = (
+  value: unknown,
+  contracts: Record<string, any>,
+): Record<string, any> => {
+  const transactions = Object.values(normalizeStreamingRightsTransactionRegistry(value));
+  const contractReferencedTransactionIds = new Set(
+    Object.values(contracts)
+      .map((contract: any) => stableHistoryId(contract?.rightsTransactionId))
+      .filter(Boolean),
+  );
+  const protectedTransactions = transactions.filter(transaction => (
+    !['SETTLED', 'CANCELLED', 'INVALIDATED'].includes(transaction.status)
+    || contractReferencedTransactionIds.has(transaction.id)
+    || Boolean(contracts[transaction.sourceContractId])
+    || Boolean(transaction.successorContractId && contracts[transaction.successorContractId])
+  ));
+  const protectedIds = new Set(protectedTransactions.map(transaction => transaction.id));
+  const terminalTransactions = transactions
+    .filter(transaction => !protectedIds.has(transaction.id))
+    .sort((left, right) => (
+      Number(right.resolvedAtAbsoluteWeek || right.settledAtAbsoluteWeek || right.listedAtAbsoluteWeek)
+      - Number(left.resolvedAtAbsoluteWeek || left.settledAtAbsoluteWeek || left.listedAtAbsoluteWeek)
+      || left.id.localeCompare(right.id)
+    ))
+    .slice(0, STREAMING_RIGHTS_TRANSACTION_SETTLED_MAX_ITEMS);
+  return Object.fromEntries(
+    [...protectedTransactions, ...terminalTransactions].map(transaction => [transaction.id, transaction]),
+  );
 };
 
 const compactStreamingBiddingSessions = (value: unknown): Record<string, any> => {
@@ -684,9 +790,19 @@ const compactWorld = (player: any) => {
   const retainedAwardProjectIds = awardLinkedProjectIds(awardHistory);
   const platforms = world.platforms && typeof world.platforms === 'object'
     ? Object.fromEntries(Object.entries(world.platforms).map(([platformId, platformValue]) => {
-        const platform = platformValue as any;
-        if (!platform?.ai) return [platformId, platform];
-        if (acquiredPlatformIds.has(platformId)) return [platformId, platform];
+        const rawPlatform = platformValue as any;
+        if (!rawPlatform?.ai) return [platformId, rawPlatform];
+        if (acquiredPlatformIds.has(platformId)) return [platformId, rawPlatform];
+        // Bypass the one-turn WeakMap marker with a shallow wrapper so save
+        // compaction always starts from the same fully validated AI state that
+        // migration would restore. Protection and retention are then computed
+        // from canonical collections on the first pass, making compaction
+        // idempotent instead of changing future sourcing decisions on reload.
+        const platform = normalizePlatformAiState(
+          { ...rawPlatform },
+          String(player?.id || ''),
+          absoluteWeek,
+        ) as any;
         const externalCommitments = Number(platform.ai.schemaVersion) >= 7
           ? normalizePlatformAiExternalCommitments(
               platform.ai.externalCommitments,
@@ -738,6 +854,7 @@ const compactWorld = (player: any) => {
           rightsContracts,
           slate,
           rightsRenewals,
+          absoluteWeek,
         );
         const localizationJobs = normalizePlatformAiLocalizationJobs(
           platform.ai.localizationJobs,
@@ -762,6 +879,12 @@ const compactWorld = (player: any) => {
           new Set([
             ...externalCommitments.map(commitment => commitment.obligationId),
             ...protectedDistressObligationIds,
+            ...localizationJobs
+              .filter(job => job.status !== 'CANCELLED' && job.costMillions > 0)
+              .map(job => job.obligationId),
+            ...rightsRenewals
+              .filter(record => record.paymentSettledAtAbsoluteWeek !== null)
+              .map(record => record.obligationId),
           ]),
         );
         return [platformId, {
@@ -782,6 +905,9 @@ const compactWorld = (player: any) => {
             rightsRenewals,
             pendingOneTimeObligations,
             pendingAudienceSettlements: normalizePlatformAiAudienceSettlements(platform.ai.pendingAudienceSettlements),
+            intelligence: platform.ai.intelligence
+              ? compactIndustryIntelligenceState(platform.ai.intelligence)
+              : undefined,
           },
         }];
       }))
@@ -793,6 +919,10 @@ const compactWorld = (player: any) => {
   );
   const talentBookings = compactTalentBookingHistory(world.talentBookings, platforms, industryProductions);
   const streamingRightsContracts = compactStreamingRightsContracts({ ...player, world: { ...world, platforms } });
+  const streamingRightsTransactions = compactStreamingRightsTransactions(
+    world.streamingRightsTransactions,
+    streamingRightsContracts,
+  );
   const streamingBiddingSessions = compactStreamingBiddingSessions(world.streamingBiddingSessions);
   const streamingCataloguePackages = compactStreamingCataloguePackages(
     world.streamingCataloguePackages,
@@ -809,23 +939,29 @@ const compactWorld = (player: any) => {
     absoluteWeek,
   );
   const streamingRightsCalendar = normalizeStreamingRightsCalendarState(world.streamingRightsCalendar);
+  const streamingRightsOffice = normalizeStreamingRightsOfficeState(world.streamingRightsOffice);
+  const industryEvents = normalizeIndustryEventLedger(world.industryEvents);
+  const industryMedia = reconcileIndustryMediaWorldWithEvents(world.industryMedia, industryEvents);
   const retainedTalentBookingIds = new Set(talentBookings.map((booking: any) => stableHistoryId(booking?.id)));
   const platformsWithRetainedTalentRefs = platforms && typeof platforms === 'object'
     ? Object.fromEntries(Object.entries(platforms).map(([platformId, platformValue]) => {
         const platform = platformValue as any;
         if (!platform?.ai || acquiredPlatformIds.has(platformId)) return [platformId, platform];
-        return [platformId, {
+        const compactedPlatform = {
           ...platform,
           ai: {
             ...platform.ai,
             talentBookingRefs: (Array.isArray(platform.ai.talentBookingRefs) ? platform.ai.talentBookingRefs : [])
               .filter((id: unknown) => retainedTalentBookingIds.has(stableHistoryId(id))),
           },
-        }];
+        };
+        markPlatformAiStateCanonicalForTurn(compactedPlatform, String(player?.id || ''), absoluteWeek);
+        return [platformId, compactedPlatform];
       }))
     : platforms;
   const compactedWorld = {
     ...world,
+    studios: compactStudioAiCompanies(world.studios, absoluteWeek),
     platforms: platformsWithRetainedTalentRefs,
     platformAiCatalogueDistressDeals: catalogueDistressDeals,
     streamingRightsContracts,
@@ -836,11 +972,14 @@ const compactWorld = (player: any) => {
       : [],
     streamingRoyaltySettlements,
     streamingRightsCalendar,
+    streamingRightsOffice,
     streamingPlatformEcosystem,
+    industryEvents,
+    industryMedia,
     awardHistory,
     industryProductions,
     talentBookings,
-    upcomingRivals: Array.isArray(world.upcomingRivals) ? world.upcomingRivals.slice(0, 32) : [],
+    upcomingRivals: getCanonicalScheduledRivals({ ...world, industryProductions }, absoluteWeek, 12),
     musicIndustry: world.musicIndustry && typeof world.musicIndustry === 'object'
       ? {
           ...world.musicIndustry,
@@ -934,6 +1073,8 @@ export const compactPlayerForPersistence = (nextPlayer: Player): Player => {
     flags: {
       ...(nextPlayer.flags || {}),
       extraNPCs: compactExtraNPCs(nextPlayer),
+      dynastyCareer: normalizeDynastyCareerState(nextPlayer),
+      dynastyCareerArchives: compactDynastyCareerArchives(nextPlayer),
       recentTimeline,
       legacyHighlights,
       persistenceOptimizedAtWeek: currentAbsoluteWeek,

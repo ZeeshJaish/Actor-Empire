@@ -1,12 +1,13 @@
 import React, { useMemo, useState } from 'react';
-import { Player, Relationship, BloodlineMember } from '../types';
+import { Player, Relationship, BloodlineMember, type IndustryProductionCommitment } from '../types';
 import { MessageCircle, Phone, Coffee, Gift, Users, X, Zap, Heart, Baby, Gem, Crown, Flame, Music, Plane, Briefcase, Trophy, Film, DollarSign, Skull, Sparkles, Home, PawPrint, Scissors, Stethoscope } from 'lucide-react';
-import { calculateLegacyScore, getGenerationNumber, getInteractionAgeInWeeks, getLegacyInheritancePreview, getRelationshipAge, LEGACY_INHERITANCE_TAX_RATE, LEGACY_MIN_PLAYABLE_AGE } from '../services/legacyLogic';
+import { calculateLegacyScore, getAbsoluteWeek, getGenerationNumber, getInteractionAgeInWeeks, getLegacyInheritancePreview, getRelationshipAge, LEGACY_INHERITANCE_TAX_RATE, LEGACY_MIN_PLAYABLE_AGE } from '../services/legacyLogic';
 import { getDivorceLawyerCost, isChildAbandoned } from '../services/familyLogic';
 import { hasOwnedPremiumAssetInCollection } from '../services/premiumLogic';
 import { getPlayerLanguage, t } from '../services/i18n';
 import { ProfileBuilderGender, createSeededProfileSelection } from '../services/profileBuilder';
 import { exportProfilePortrait } from './avatar/profilePortraitRenderer';
+import { getDynastyMemberAge, normalizeDynastyCareerState } from '../services/dynastyCareer';
 
 interface SocialPageProps {
   player: Player;
@@ -55,6 +56,67 @@ const getFamilyProfileAvatar = (rel: Relationship, fallbackImage: string): strin
     console.warn('Family profile avatar generation failed, falling back to saved relationship image.', error);
     return fallbackImage;
   }
+};
+
+const DYNASTY_STATUS_LABELS: Record<string, string> = {
+  ACTIVE: 'Active',
+  SELECTIVE: 'Selective',
+  HIATUS: 'On hiatus',
+  RETIRED: 'Retired',
+  DECEASED: 'Deceased',
+};
+
+export const DynastyCareerLegacyPanel: React.FC<{ player: Player }> = ({ player }) => {
+  const state = normalizeDynastyCareerState(player);
+  const members = Object.values(state.members).sort((left, right) => left.generation - right.generation || left.name.localeCompare(right.name));
+  if (members.length === 0) return null;
+  const currentAbsoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+  const productions = Object.values(player.world?.industryProductions || {}) as IndustryProductionCommitment[];
+
+  return (
+    <section className="overflow-hidden rounded-[2rem] border border-amber-400/20 bg-zinc-950/85 shadow-[0_18px_60px_rgba(0,0,0,0.24)]">
+      <div className="flex items-end justify-between border-b border-white/10 px-5 py-4">
+        <div>
+          <div className="text-[9px] font-black uppercase tracking-[0.28em] text-amber-400/75">After the handoff</div>
+          <h3 className="mt-1 text-xl font-black text-white">Family careers</h3>
+        </div>
+        <Film size={18} className="text-amber-300/70" aria-hidden="true" />
+      </div>
+      <div className="divide-y divide-white/10">
+        {members.map(member => {
+          const activeTitles = member.currentProjectIds
+            .map(projectId => productions.find(production => production.canonicalProjectId === projectId)?.title)
+            .filter((title): title is string => Boolean(title));
+          const latestEvent = member.history[member.history.length - 1];
+          const isWorking = activeTitles.length > 0 && member.status !== 'DECEASED';
+          const status = isWorking ? 'Working' : (DYNASTY_STATUS_LABELS[member.status] || member.status);
+          const age = getDynastyMemberAge(member, currentAbsoluteWeek);
+          return (
+            <article key={member.npcId} className="grid grid-cols-[3.25rem_minmax(0,1fr)_auto] items-center gap-3 px-5 py-4">
+              <div className={`h-[3.25rem] w-[3.25rem] overflow-hidden rounded-2xl border ${member.status === 'DECEASED' ? 'border-zinc-700 grayscale opacity-70' : 'border-amber-400/25'}`}>
+                <img src={member.avatar} alt="" className="h-full w-full object-cover" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-baseline gap-2">
+                  <div className="truncate font-bold text-white">{member.name}</div>
+                  <span className="shrink-0 text-[9px] font-black uppercase tracking-wider text-zinc-600">G{member.generation}</span>
+                </div>
+                <div className="mt-0.5 truncate text-xs text-zinc-300">
+                  {isWorking ? activeTitles.join(' · ') : (latestEvent?.title || 'Career record preserved')}
+                </div>
+                <div className="mt-1 text-[10px] text-zinc-600">
+                  {member.status === 'DECEASED' ? `Age ${age} at final record` : `Age ${age} · Health ${Math.round(member.health)}`}
+                </div>
+              </div>
+              <div className={`rounded-full border px-2.5 py-1 text-[9px] font-black uppercase tracking-wide ${member.status === 'DECEASED' ? 'border-zinc-700 text-zinc-500' : isWorking ? 'border-emerald-400/25 bg-emerald-400/10 text-emerald-300' : 'border-amber-400/20 bg-amber-400/10 text-amber-200'}`}>
+                {status}
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
 };
 
 export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onContinueAsChild }) => {
@@ -659,6 +721,8 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
               <div className="text-sm text-zinc-400 mt-1">{children.length > 0 ? tr('connections.dynastyCanContinue') : tr('connections.noChildHeir')}</div>
             </div>
           </div>
+
+          <DynastyCareerLegacyPanel player={player} />
 
           <div className="rounded-[2rem] border border-zinc-800 bg-[radial-gradient(circle_at_top,rgba(245,158,11,0.14),rgba(24,24,27,0.92)_38%,rgba(9,9,11,1)_100%)] p-5 space-y-5">
             <div className="flex items-center justify-between">

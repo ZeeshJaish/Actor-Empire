@@ -27,6 +27,7 @@ import { resolveCapabilityBackedLocalizationPromise } from '../../../services/pl
 import { resolveStreamingPlatformBrandById } from '../../../services/streamingPlatformBrandRegistry';
 import { getPlatformAiSpendingRestrictions } from '../../../services/platformAi/platformAiFinancing';
 import { buildStreamingBiddingRightsLot } from '../../../services/streamingRightsCompatibility';
+import { getCanonicalScheduledRivals } from '../../../services/industryWorld/publicIndustryProjection';
 
 interface ReleaseWizardProps {
     player: Player;
@@ -1470,7 +1471,11 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
         onBack();
     };
 
-    const upcomingRivals = player.world.upcomingRivals || [];
+    const upcomingRivals = getCanonicalScheduledRivals(
+        player.world,
+        getAbsoluteWeek(player.age, player.currentWeek),
+        8,
+    );
     const rivalsThisWeek = upcomingRivals.filter(r => r.weekReleased === releaseWeek);
 
     return (

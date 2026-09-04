@@ -21,7 +21,7 @@ import type {
     StreamingRightsRenewalCase,
     StreamingRightsWindowType,
 } from '../types';
-import { STREAMING_CATALOGUE_PACKAGE_SCHEMA_VERSION } from '../types';
+import { STREAMING_CATALOGUE_PACKAGE_SCHEMA_VERSION, STREAMING_RIGHTS_CALENDAR_SCHEMA_VERSION } from '../types';
 import { createDeterministicId } from './deterministicRandom';
 import { PHASE_ONE_ENERGY_COSTS } from './energyCosts';
 import { getInheritedStudioProjects } from './legacyLogic';
@@ -33,6 +33,7 @@ import {
     normalizeStreamingRightsContractRegistry,
     registerStreamingRightsContract,
 } from './streamingRightsCore';
+import { normalizeStreamingRightsDelegationTrace } from './streamingRightsDelegation';
 import { buildStreamingBiddingRightsLot, resolveStreamingRightsCompatibility } from './streamingRightsCompatibility';
 import { normalizeStreamingDayOneMarketIds, STREAMING_DAY_ONE_MARKETS } from './streamingDayOneMarkets';
 
@@ -371,6 +372,9 @@ const normalizePackage = (value: unknown): StreamingCataloguePackage | null => {
             : 'CUSTOM',
         protectionReasons: uniqueText(source.protectionReasons),
         delegatedReason: typeof source.delegatedReason === 'string' ? source.delegatedReason : null,
+        ...(normalizeStreamingRightsDelegationTrace(source.delegationTrace)
+            ? { delegationTrace: normalizeStreamingRightsDelegationTrace(source.delegationTrace) }
+            : {}),
         manualApprovalRequired: Boolean(source.manualApprovalRequired),
         biddingSessionId: typeof source.biddingSessionId === 'string' ? source.biddingSessionId : null,
         acceptedOfferId: typeof source.acceptedOfferId === 'string' ? source.acceptedOfferId : null,
@@ -722,12 +726,13 @@ export const updateStreamingCataloguePackagePolicy = (
         ...player,
         streamingRightsManagement: {
             ...currentManagement,
-            schemaVersion: 1,
+            schemaVersion: STREAMING_RIGHTS_CALENDAR_SCHEMA_VERSION,
             controlMode,
             policy,
             packagePolicy,
             protectedProjectIds: uniqueText(currentManagement.protectedProjectIds),
             manualContractIds: uniqueText(currentManagement.manualContractIds),
+            studioMandates: asRecord(currentManagement.studioMandates) as StreamingRightsManagementState['studioMandates'],
             updatedAtAbsoluteWeek: Math.max(0, Math.round(absoluteWeek)),
         } as StreamingRightsManagementState,
     };

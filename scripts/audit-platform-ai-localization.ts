@@ -9,6 +9,7 @@ import {
     planPlatformAiLocalization,
     progressPlatformAiLocalization,
 } from '../services/platformAi';
+import { reconcilePlatformAiLocalizationObligations } from '../services/platformAi/platformAiState';
 import {
     getPlatformAiLocalizationJobId,
     getPlatformAiLocalizationObligationId,
@@ -164,6 +165,93 @@ const fundedEconomy = calculatePlatformAiWeeklyEconomy({
 const started = progressPlatformAiLocalization({ player, platform: fundedEconomy.platform, absoluteWeek: week + 1 });
 assert.equal(started.platform.ai!.localizationJobs[0].status, 'IN_PROGRESS');
 assert.equal(started.platform.ai!.localizationJobs[0].startedAtAbsoluteWeek, week + 1);
+const repairedStartedObligations = reconcilePlatformAiLocalizationObligations(
+    started.platform.ai!.pendingOneTimeObligations.filter(item => item.id !== planned.job!.obligationId),
+    started.platform.ai!.localizationJobs,
+);
+assert.deepEqual(
+    repairedStartedObligations.find(item => item.id === planned.job!.obligationId),
+    {
+        id: planned.job!.obligationId,
+        category: 'LOCALIZATION',
+        amountMillions: planned.job!.costMillions,
+        createdWeek: week,
+        status: 'SETTLED',
+        settledWeek: week + 1,
+    },
+    'Internal reconciliation must restore the settlement evidence for a job that has already started.',
+);
+const saturatedLocalizationHistory = structuredClone(started.platform);
+saturatedLocalizationHistory.ai!.pendingOneTimeObligations = [
+    ...saturatedLocalizationHistory.ai!.pendingOneTimeObligations,
+    ...Array.from({ length: 120 }, (_, index) => ({
+        id: `localization-history-${index}`,
+        category: 'DISCRETIONARY' as const,
+        amountMillions: 1,
+        createdWeek: week + 2 + index,
+        status: 'SETTLED' as const,
+        settledWeek: week + 2 + index,
+    })),
+];
+const saturatedReloadOnce = normalizePlatformAiState(saturatedLocalizationHistory, player.id, week + 130);
+const saturatedReloadTwice = normalizePlatformAiState(saturatedReloadOnce, player.id, week + 130);
+assert.equal(
+    saturatedReloadTwice.ai!.localizationJobs[0].status,
+    'IN_PROGRESS',
+    'A paid in-progress localization job must survive repeated normalization after obligation history saturation.',
+);
+assert.equal(
+    saturatedReloadTwice.ai!.pendingOneTimeObligations.find(item => item.id === planned.job!.obligationId)?.status,
+    'SETTLED',
+    'The settlement backing an in-progress localization job must remain protected from history compaction.',
+);
+const lowerTierPlatform = structuredClone(base);
+lowerTierPlatform.ai!.languageCapabilities = lowerTierPlatform.ai!.languageCapabilities.map(capability => (
+    capability.languageId === 'japanese'
+        ? { ...capability, subtitleLevel: 2 as const }
+        : capability
+));
+const lowerTierPlanned = planPlatformAiLocalization({
+    player,
+    world: worldFor(lowerTierPlatform),
+    platform: lowerTierPlatform,
+    absoluteWeek: week,
+    contentPlanId: plan.id,
+    projectId: plan.sourceProjectIds[0],
+    countryIds: ['JP'],
+    languageId: 'japanese',
+    mode: 'SUBTITLE',
+});
+assert.equal(lowerTierPlanned.job?.capabilityTierAtPlanning, 2);
+const lowerTierFunded = structuredClone(lowerTierPlanned.platform);
+lowerTierFunded.cashReserve = 10_000;
+const lowerTierEconomy = calculatePlatformAiWeeklyEconomy({
+    player: { ...player, world: worldFor(lowerTierFunded) },
+    platform: lowerTierFunded,
+    absoluteWeek: week + 1,
+});
+const lowerTierStarted = progressPlatformAiLocalization({
+    player,
+    platform: lowerTierEconomy.platform,
+    absoluteWeek: week + 1,
+});
+const upgradedCapabilityPlatform = structuredClone(lowerTierStarted.platform);
+upgradedCapabilityPlatform.ai!.languageCapabilities = upgradedCapabilityPlatform.ai!.languageCapabilities.map(capability => (
+    capability.languageId === 'japanese'
+        ? { ...capability, subtitleLevel: 3 as const }
+        : capability
+));
+const upgradedCapabilityReload = normalizePlatformAiState(upgradedCapabilityPlatform, player.id, week + 2);
+assert.equal(
+    upgradedCapabilityReload.ai!.localizationJobs[0]?.status,
+    'IN_PROGRESS',
+    'Improving a language capability must not invalidate a paid job quoted at an earlier tier.',
+);
+assert.equal(
+    upgradedCapabilityReload.ai!.localizationJobs[0]?.capabilityTierAtPlanning,
+    2,
+    'Persisted localization quotes must keep the capability tier captured at planning time.',
+);
 const readyWeek = week + 1 + started.platform.ai!.localizationJobs[0].leadWeeks;
 const ready = progressPlatformAiLocalization({ player, platform: started.platform, absoluteWeek: readyWeek });
 assert.equal(ready.platform.ai!.localizationJobs[0].status, 'READY');

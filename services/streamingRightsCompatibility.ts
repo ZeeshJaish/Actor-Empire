@@ -125,6 +125,46 @@ export interface BuildStreamingBiddingRightsLotResult {
 const CANONICAL_COUNTRY_IDS = STREAMING_DAY_ONE_MARKETS.map(market => market.id).sort();
 const WINDOW_TYPES: StreamingRightsWindowType[] = ['FIRST_WINDOW', 'SECOND_WINDOW', 'PERMANENT'];
 
+interface IndexedStreamingRightsContract {
+    contract: StreamingRightsContract;
+    registryOrder: number;
+}
+
+interface StreamingRightsRegistryCompatibilityIndex {
+    activeBySourceProjectId: Map<string, IndexedStreamingRightsContract[]>;
+    activeSequelBySourceProjectId: Map<string, IndexedStreamingRightsContract[]>;
+}
+
+const streamingRightsRegistryCompatibilityIndexes = new WeakMap<
+    Record<string, StreamingRightsContract>,
+    StreamingRightsRegistryCompatibilityIndex
+>();
+
+const getStreamingRightsRegistryCompatibilityIndex = (
+    registry: Record<string, StreamingRightsContract>,
+): StreamingRightsRegistryCompatibilityIndex => {
+    const existing = streamingRightsRegistryCompatibilityIndexes.get(registry);
+    if (existing) return existing;
+
+    const index: StreamingRightsRegistryCompatibilityIndex = {
+        activeBySourceProjectId: new Map(),
+        activeSequelBySourceProjectId: new Map(),
+    };
+    Object.values(registry).forEach((contract, registryOrder) => {
+        if (contract.status !== 'ACTIVE') return;
+        const indexed = { contract, registryOrder };
+        const active = index.activeBySourceProjectId.get(contract.sourceProjectId) || [];
+        active.push(indexed);
+        index.activeBySourceProjectId.set(contract.sourceProjectId, active);
+        if (!contract.sequelRightsIncluded) return;
+        const sequel = index.activeSequelBySourceProjectId.get(contract.sourceProjectId) || [];
+        sequel.push(indexed);
+        index.activeSequelBySourceProjectId.set(contract.sourceProjectId, sequel);
+    });
+    streamingRightsRegistryCompatibilityIndexes.set(registry, index);
+    return index;
+};
+
 const finiteWeek = (value: number, fallback = 0): number => (
     Number.isFinite(Number(value)) ? Math.max(0, Math.floor(Number(value))) : fallback
 );
@@ -308,24 +348,24 @@ export const resolveStreamingRightsCompatibility = (
         return { ...result, summary: summarize(result, registry) };
     }
 
-    const relatedIds = new Set(input.relatedProjectIds || []);
-    const exactContracts = Object.values(registry).filter(contract => (
-        !excludedIds.has(contract.id)
-        && contract.status === 'ACTIVE'
-        && contract.sourceProjectId === input.sourceProjectId
-    ));
-    const relatedContracts = Object.values(registry).filter(contract => (
-        !excludedIds.has(contract.id)
-        && contract.status === 'ACTIVE'
-        && contract.sequelRightsIncluded
-        && relatedIds.has(contract.sourceProjectId)
-        && windowsOverlap(
-            input.startsAtAbsoluteWeek,
-            input.expiresAtAbsoluteWeek,
-            contract.startsAtAbsoluteWeek,
-            contract.expiresAtAbsoluteWeek,
-        )
-    ));
+    const compatibilityIndex = getStreamingRightsRegistryCompatibilityIndex(registry);
+    const exactContracts = (compatibilityIndex.activeBySourceProjectId.get(input.sourceProjectId) || [])
+        .map(indexed => indexed.contract)
+        .filter(contract => !excludedIds.has(contract.id));
+    const relatedIds = Array.from(new Set(input.relatedProjectIds || []));
+    const relatedContracts = relatedIds
+        .flatMap(projectId => compatibilityIndex.activeSequelBySourceProjectId.get(projectId) || [])
+        .sort((left, right) => left.registryOrder - right.registryOrder)
+        .map(indexed => indexed.contract)
+        .filter(contract => (
+            !excludedIds.has(contract.id)
+            && windowsOverlap(
+                input.startsAtAbsoluteWeek,
+                input.expiresAtAbsoluteWeek,
+                contract.startsAtAbsoluteWeek,
+                contract.expiresAtAbsoluteWeek,
+            )
+        ));
     if (relatedContracts.length) {
         const overlappingCountries = requestedCountryIds.filter(countryId => relatedContracts.some(contract => (
             getContractCountryIds(contract).includes(countryId)

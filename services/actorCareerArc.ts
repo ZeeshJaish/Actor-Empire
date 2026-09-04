@@ -322,9 +322,10 @@ export const getActorCareerArc = (player: Player): ActorCareerArc => {
     ]);
 };
 
-export const getActorCareerArcTransition = (previousPlayer: Player, currentPlayer: Player): ActorCareerArcTransition | null => {
-    const previous = getActorCareerArc(previousPlayer);
-    const current = getActorCareerArc(currentPlayer);
+const buildActorCareerArcTransition = (
+    previous: ActorCareerArc,
+    current: ActorCareerArc,
+): ActorCareerArcTransition | null => {
     if (previous.id === current.id) return null;
     return {
         previous,
@@ -332,4 +333,16 @@ export const getActorCareerArcTransition = (previousPlayer: Player, currentPlaye
         logKey: current.changeLogKey,
         tone: getTransitionTone(current.id),
     };
+};
+
+export const getActorCareerArcTransitionFromPrevious = (
+    previous: ActorCareerArc,
+    currentPlayer: Player,
+): ActorCareerArcTransition | null => {
+    const current = getActorCareerArc(currentPlayer);
+    return buildActorCareerArcTransition(previous, current);
+};
+
+export const getActorCareerArcTransition = (previousPlayer: Player, currentPlayer: Player): ActorCareerArcTransition | null => {
+    return getActorCareerArcTransitionFromPrevious(getActorCareerArc(previousPlayer), currentPlayer);
 };

@@ -34,6 +34,31 @@ assert.ok(
     `One canonical turn may rebuild at most once per platform; observed ${turnDiagnostics.rebuildCount}.`,
 );
 
+processPlatformAiWorldTurn(
+    { ...player, world: result.world },
+    result.world,
+    absoluteWeek + 1,
+);
+const consecutiveTurnDiagnostics = getPlatformAiNormalizationDiagnostics();
+assert.ok(
+    consecutiveTurnDiagnostics.deepValidationCount <= 5,
+    `Internally canonical state must not be deeply revalidated every week; observed ${consecutiveTurnDiagnostics.deepValidationCount} validations across two turns.`,
+);
+
+const inMemoryCompacted = compactPlayerForPersistence({ ...player, world: result.world });
+const compactedAbsoluteWeek = getAbsoluteWeek(inMemoryCompacted.age, inMemoryCompacted.currentWeek);
+resetPlatformAiNormalizationDiagnostics();
+normalizePlatformAiState(
+    inMemoryCompacted.world.platforms!.NETFLIX,
+    inMemoryCompacted.id,
+    compactedAbsoluteWeek + 1,
+);
+assert.equal(
+    getPlatformAiNormalizationDiagnostics().deepValidationCount,
+    0,
+    'In-memory production compaction must preserve the trusted canonical marker.',
+);
+
 const serializedPlatform = JSON.parse(JSON.stringify(result.world.platforms!.NETFLIX));
 serializedPlatform.ai.status = 'FORGED_STATUS';
 resetPlatformAiNormalizationDiagnostics();

@@ -1,5 +1,22 @@
 
 import { addBreadcrumb, markTraceAction, recordNonFatal, startPerformanceTrace, stopPerformanceTrace } from './firebaseService';
+import type { Player } from '../types';
+import { verifySaveIntegrity, type SaveIntegrityManifest } from './saveIntegrity';
+import {
+  loadVerifiedGameData as loadVerifiedGeneration,
+  recoverPreviousGameData as recoverPreviousGeneration,
+  saveVerifiedGameData as saveVerifiedGeneration,
+  stageVerifiedGameDataBatch as stageVerifiedGenerationBatch,
+  promoteStagedGameDataBatch as promoteStagedGenerationBatch,
+  deleteSaveGenerationFamily,
+  type PromoteSaveGenerationInput,
+  type PromoteSaveGenerationBatchInput,
+  type RecoverSaveGenerationInput,
+  type SaveGenerationStore,
+  type StoredSaveGeneration,
+  type VerifiedGameLoad,
+  type VerifiedSaveBatchEntry,
+} from './saveGenerations';
 
 const DB_NAME = 'ActorEmpireDB';
 const STORE_NAME = 'saves';
@@ -119,6 +136,207 @@ const openDB = (): Promise<IDBDatabase> => {
       }
     };
   });
+};
+
+const readGameRecord = async (key: string): Promise<unknown | null> => {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const request = db.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME).get(key);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve(request.result ?? null);
+  });
+};
+
+const writeGameRecord = async (key: string, value: unknown): Promise<void> => {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORE_NAME, 'readwrite');
+    transaction.objectStore(STORE_NAME).put(value, key);
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+    transaction.onabort = () => reject(transaction.error || new Error('IndexedDB write aborted.'));
+  });
+};
+
+const removeGameRecord = async (key: string): Promise<void> => {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORE_NAME, 'readwrite');
+    transaction.objectStore(STORE_NAME).delete(key);
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+    transaction.onabort = () => reject(transaction.error || new Error('IndexedDB delete aborted.'));
+  });
+};
+
+const promoteIndexedDbGeneration = async ({ keys, retainPrevious }: PromoteSaveGenerationInput): Promise<void> => {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORE_NAME, 'readwrite');
+    const store = transaction.objectStore(STORE_NAME);
+    let current: unknown = null;
+    let currentManifest: unknown = null;
+    let candidate: StoredSaveGeneration | null = null;
+    let completedReads = 0;
+    const promoteAfterReads = () => {
+      completedReads += 1;
+      if (completedReads !== 3) return;
+      if (!candidate || !verifySaveIntegrity(candidate.player, candidate.manifest).ok) {
+        transaction.abort();
+        return;
+      }
+      if (
+        retainPrevious
+        && current
+        && currentManifest
+        && verifySaveIntegrity(current as Player, currentManifest as SaveIntegrityManifest).ok
+      ) {
+        store.put({
+          kind: 'ACTOR_EMPIRE_SAVE_GENERATION',
+          formatVersion: 1,
+          player: current as Player,
+          manifest: currentManifest as SaveIntegrityManifest,
+          needsRecoveryCheckpoint: false,
+        } satisfies StoredSaveGeneration, keys.previous);
+      }
+      store.put(candidate.player, keys.current);
+      store.put(candidate.manifest, keys.integrity);
+      store.delete(keys.candidate);
+    };
+    const currentRequest = store.get(keys.current);
+    currentRequest.onsuccess = () => { current = (currentRequest.result as unknown) ?? null; promoteAfterReads(); };
+    const integrityRequest = store.get(keys.integrity);
+    integrityRequest.onsuccess = () => { currentManifest = (integrityRequest.result as unknown) ?? null; promoteAfterReads(); };
+    const candidateRequest = store.get(keys.candidate);
+    candidateRequest.onsuccess = () => { candidate = (candidateRequest.result as StoredSaveGeneration | undefined) ?? null; promoteAfterReads(); };
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+    transaction.onabort = () => reject(transaction.error || new Error('Verified save promotion aborted.'));
+  });
+};
+
+const recoverIndexedDbGeneration = async ({ keys }: RecoverSaveGenerationInput): Promise<void> => {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORE_NAME, 'readwrite');
+    const store = transaction.objectStore(STORE_NAME);
+    let current: unknown = null;
+    let currentManifest: unknown = null;
+    let previous: StoredSaveGeneration | null = null;
+    let completedReads = 0;
+    const recoverAfterReads = () => {
+      completedReads += 1;
+      if (completedReads !== 3) return;
+      if (!previous) {
+        transaction.abort();
+        return;
+      }
+      store.put({ player: current, manifest: currentManifest, quarantinedAt: Date.now() }, keys.quarantine);
+      store.put(previous.player, keys.current);
+      store.put(previous.manifest, keys.integrity);
+    };
+    const currentRequest = store.get(keys.current);
+    currentRequest.onsuccess = () => { current = currentRequest.result ?? null; recoverAfterReads(); };
+    const integrityRequest = store.get(keys.integrity);
+    integrityRequest.onsuccess = () => { currentManifest = integrityRequest.result ?? null; recoverAfterReads(); };
+    const previousRequest = store.get(keys.previous);
+    previousRequest.onsuccess = () => { previous = previousRequest.result ?? null; recoverAfterReads(); };
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+    transaction.onabort = () => reject(transaction.error || new Error('Save recovery promotion aborted.'));
+  });
+};
+
+const promoteIndexedDbGenerationBatch = async ({ keys }: PromoteSaveGenerationBatchInput): Promise<void> => {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORE_NAME, 'readwrite');
+    const store = transaction.objectStore(STORE_NAME);
+    const snapshots = keys.map(generationKeys => ({
+      keys: generationKeys,
+      candidate: null as StoredSaveGeneration | null,
+      current: null as Player | null,
+      integrity: null as SaveIntegrityManifest | null,
+    }));
+    let pendingReads = snapshots.length * 3;
+    let abortedForValidation = false;
+    const finishRead = () => {
+      pendingReads -= 1;
+      if (pendingReads !== 0) return;
+      for (const snapshot of snapshots) {
+        if (!snapshot.candidate || !verifySaveIntegrity(snapshot.candidate.player, snapshot.candidate.manifest).ok) {
+          abortedForValidation = true;
+          transaction.abort();
+          return;
+        }
+      }
+      for (const snapshot of snapshots) {
+        if (snapshot.current && snapshot.integrity && verifySaveIntegrity(snapshot.current, snapshot.integrity).ok) {
+          store.put({
+            kind: 'ACTOR_EMPIRE_SAVE_GENERATION',
+            formatVersion: 1,
+            player: snapshot.current,
+            manifest: snapshot.integrity,
+            needsRecoveryCheckpoint: false,
+          } satisfies StoredSaveGeneration, snapshot.keys.previous);
+        }
+        store.put(snapshot.candidate!.player, snapshot.keys.current);
+        store.put(snapshot.candidate!.manifest, snapshot.keys.integrity);
+        store.delete(snapshot.keys.candidate);
+      }
+    };
+    snapshots.forEach(snapshot => {
+      const candidateRequest = store.get(snapshot.keys.candidate);
+      candidateRequest.onsuccess = () => { snapshot.candidate = candidateRequest.result ?? null; finishRead(); };
+      const currentRequest = store.get(snapshot.keys.current);
+      currentRequest.onsuccess = () => { snapshot.current = currentRequest.result ?? null; finishRead(); };
+      const integrityRequest = store.get(snapshot.keys.integrity);
+      integrityRequest.onsuccess = () => { snapshot.integrity = integrityRequest.result ?? null; finishRead(); };
+    });
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+    transaction.onabort = () => reject(transaction.error || new Error(
+      abortedForValidation ? 'Staged save batch failed integrity validation.' : 'Staged save batch promotion aborted.',
+    ));
+  });
+};
+
+const indexedDbGenerationStore: SaveGenerationStore = {
+  read: readGameRecord,
+  write: writeGameRecord,
+  remove: removeGameRecord,
+  promoteGeneration: promoteIndexedDbGeneration,
+  recoverGeneration: recoverIndexedDbGeneration,
+  promoteGenerationBatch: promoteIndexedDbGenerationBatch,
+};
+
+export const saveVerifiedGameData = async (
+  key: string,
+  player: Player,
+  manifest: SaveIntegrityManifest,
+  options: { retainPrevious?: boolean; needsRecoveryCheckpoint?: boolean } = {},
+): Promise<void> => saveVerifiedGeneration(indexedDbGenerationStore, key, player, manifest, options);
+
+export const loadVerifiedGameData = async (key: string): Promise<VerifiedGameLoad> => (
+  loadVerifiedGeneration(indexedDbGenerationStore, key)
+);
+
+export const recoverPreviousGameData = async (key: string): Promise<Player> => (
+  recoverPreviousGeneration(indexedDbGenerationStore, key)
+);
+
+export const replaceAllVerifiedGameData = async (entries: VerifiedSaveBatchEntry[]): Promise<void> => {
+  const staged = await stageVerifiedGenerationBatch(indexedDbGenerationStore, entries);
+  await promoteStagedGenerationBatch(indexedDbGenerationStore, staged);
+};
+
+export const deleteVerifiedGameData = async (key: string): Promise<void> => {
+  await deleteSaveGenerationFamily(indexedDbGenerationStore, key);
+  try {
+    localStorage.removeItem(`${SAVE_SUMMARY_PREFIX}${key}`);
+  } catch {
+    // IndexedDB deletion remains authoritative.
+  }
 };
 
 export const saveGameData = async (
@@ -245,7 +463,7 @@ export const listGameDataKeys = async (): Promise<string[]> => {
   }
 };
 
-export const exportAllGameData = async (): Promise<Array<{ key: string; value: any }>> => {
+export const exportPublicGameData = async (): Promise<Array<{ key: string; value: any }>> => {
   try {
       const db = await openDB();
       return await new Promise((resolve, reject) => {
@@ -259,7 +477,9 @@ export const exportAllGameData = async (): Promise<Array<{ key: string; value: a
         };
         request.onsuccess = async () => {
             try {
-                const keys = request.result.map(key => String(key));
+                const keys = request.result
+                  .map(key => String(key))
+                  .filter(key => key === 'actorEmpireSave' || /^actorEmpireSave_[1-3]$/.test(key));
                 const entries = await Promise.all(keys.map(async key => ({
                     key,
                     value: await loadGameData(key),
@@ -274,38 +494,5 @@ export const exportAllGameData = async (): Promise<Array<{ key: string; value: a
       console.error("Failed to export game data", err);
       recordNonFatal(err, 'export_game_data_failed');
       return [];
-  }
-};
-
-export const replaceAllGameData = async (entries: Array<{ key: string; value: any }>): Promise<void> => {
-  try {
-      const db = await openDB();
-      await new Promise<void>((resolve, reject) => {
-        const transaction = db.transaction(STORE_NAME, 'readwrite');
-        const store = transaction.objectStore(STORE_NAME);
-        const clearRequest = store.clear();
-
-        clearRequest.onerror = () => {
-            recordNonFatal(clearRequest.error, 'indexeddb_import_clear_failed');
-            reject(clearRequest.error);
-        };
-        clearRequest.onsuccess = () => resolve();
-      });
-
-      try {
-        Object.keys(localStorage)
-          .filter(key => key.startsWith(SAVE_SUMMARY_PREFIX))
-          .forEach(key => localStorage.removeItem(key));
-      } catch {
-        // Imported saves will rebuild their summaries below.
-      }
-
-      for (const entry of entries) {
-        await saveGameData(entry.key, entry.value);
-      }
-  } catch (err) {
-      console.error("Failed to import game data", err);
-      recordNonFatal(err, 'import_game_data_failed');
-      throw err;
   }
 };

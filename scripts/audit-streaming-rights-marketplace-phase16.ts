@@ -137,7 +137,10 @@ const opportunities = getStreamingRightsOpportunities(fixture);
 const studioOpportunity = opportunities.find(item => item.kind === 'STUDIO_ACQUISITION');
 assert(studioOpportunity, 'The rights floor should expose studio-to-platform acquisition opportunities.');
 assert(studioOpportunity?.rivalPlatformName && studioOpportunity.rivalBidAmount > 0, 'Every acquisition should carry financially bounded rival pressure.');
-assert(opportunities.some(item => item.kind === 'PLATFORM_TRADE' && item.sellerPlatformId === 'NETFLIX'), 'The rights floor should expose platform-to-platform catalog trading.');
+assert(
+    !opportunities.some(item => item.kind === 'PLATFORM_TRADE' && item.sourceLicenseId === null),
+    'A platform trade must never be fabricated from a title label without a canonical seller contract.',
+);
 
 const opened = openStreamingRightsNegotiation(fixture, studioOpportunity!.id);
 assert(opened.changed && opened.negotiation?.status === 'OPEN', 'A market listing should open a persisted term sheet.');
@@ -251,6 +254,12 @@ assert(
     'An outgoing sublicense must register the rival platform as the canonical buyer.',
 );
 assert(fixture.ownedStreamingPlatform.treasuryCash === treasuryBeforeSublicense + outgoingReady.minimumGuarantee, 'Sublicense cash should credit treasury exactly once.');
+const sublicenseTransaction = Object.values(fixture.world.streamingRightsTransactions || {}).find(transaction => (
+    transaction.kind === 'SUBLICENSE' && transaction.sourceContractId === acquiredLicense.id
+));
+assert(sublicenseTransaction, 'An outgoing sublicense must settle through the shared A6 transaction history.');
+assert(sublicenseTransaction?.sellerReceipt === outgoingReady.minimumGuarantee, 'The platform seller receives the complete sublicense fee.');
+assert(sublicenseTransaction?.originalOwnerParticipation === 0, 'A downstream sublicense does not create a transfer participation payment.');
 
 const earlyRenewal = openStreamingRightsRenewal(fixture, acquiredLicense.id);
 assert(!earlyRenewal.changed && earlyRenewal.reason === 'NOT_READY', 'A4 should keep a renewal closed before its saved notice window.');
@@ -285,8 +294,8 @@ const controlledFixture: Player = {
     },
 };
 const terminated = applyStreamingRightsChangeOfControl(controlledFixture, acquiredLicense.id, false);
-assert(terminated.changed, 'Denied change-of-control consent should terminate the protected contract.');
-assert(terminated.player.ownedStreamingPlatform.catalogLicenses.find(item => item.id === acquiredLicense.id)?.status === 'TERMINATED', 'Termination state should persist.');
+assert(!terminated.changed, 'A6 change of platform control must retain the acquired licence and its obligations.');
+assert(terminated.player.ownedStreamingPlatform.catalogLicenses.find(item => item.id === acquiredLicense.id)?.status === 'ACTIVE', 'A valid licence must not terminate solely because platform control changed.');
 
 const component = readFileSync(resolve(process.cwd(), 'components/StreamingRightsExchange.tsx'), 'utf8');
 const styles = readFileSync(resolve(process.cwd(), 'styles/streaming-rights-exchange.css'), 'utf8');

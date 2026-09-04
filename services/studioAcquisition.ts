@@ -16,6 +16,7 @@ import {
     buildStudioAcquisitionPortfolio,
     deriveAcquiredStudioFacilities,
 } from './studioAcquisitionAssets';
+import { materializeStudioOwnership } from './industryWorld/studioOwnershipMaterializer';
 
 export type AcquisitionCaseStatus = 'DRAFT' | 'OFFER_SUBMITTED' | 'COUNTERED' | 'RIVAL_BID' | 'ACCEPTED' | 'REJECTED' | 'CLOSED' | 'ACQUIRED';
 export type AcquisitionOfferType = 'CONSERVATIVE' | 'FAIR' | 'AGGRESSIVE' | 'MINORITY';
@@ -2240,9 +2241,21 @@ export const completeAcquisitionTransaction = ({
     // New acquisitions must carry their debt ledger from the signing moment.
     // This keeps future deals on the normal debt path while legacy migrations
     // can safely preserve their historical balances.
-    return result.success
-        ? { ...result, player: syncAcquisitionDebtLedger(result.player, 'SIGNED') }
-        : result;
+    if (!result.success) return result;
+    const playerWithDebt = syncAcquisitionDebtLedger(result.player, 'SIGNED');
+    if (!result.acquiredBusiness || !playerWithDebt.world?.studios?.[result.acquiredBusiness.id]?.ai) {
+        return { ...result, player: playerWithDebt };
+    }
+    const materialized = materializeStudioOwnership(
+        playerWithDebt,
+        result.acquiredBusiness.id,
+        toGameWeekIndex(player.age, player.currentWeek),
+    );
+    return {
+        ...result,
+        player: materialized.player,
+        acquiredBusiness: materialized.changed ? materialized.business : result.acquiredBusiness,
+    };
 };
 
 export const walkAwayFromAcquisition = ({

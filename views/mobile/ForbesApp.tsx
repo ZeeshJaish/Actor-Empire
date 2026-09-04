@@ -769,9 +769,6 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
                                             <div className="bg-white/5 px-2.5 py-1 rounded-full text-[8px] font-black text-zinc-400 border border-white/5 uppercase tracking-widest backdrop-blur-md whitespace-nowrap">
                                                 {plat.churnRate ? tr('forbes.churn', { value: plat.churnRate }) : tr('forbes.churnNA')}
                                             </div>
-                                            <div className="text-[8px] font-black uppercase tracking-widest" style={{ color: plat.lifecycle === 'DISTRESSED' ? '#fb7185' : plat.brand.primaryColor }}>
-                                                {plat.lifecycle || 'ACTIVE'}
-                                            </div>
                                             <div className="text-[8px] font-black uppercase tracking-widest text-zinc-600">
                                                 {plat.activeCountryIds?.length || 0} markets
                                             </div>

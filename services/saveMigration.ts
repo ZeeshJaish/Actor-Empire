@@ -21,6 +21,12 @@ import { mergeParentStudioTalentRosters } from './talentRoster';
 import { normalizeBackgroundCastingPlan, normalizeLivingEnsembleState } from './livingEnsemble';
 import { normalizeOwnedStreamingPlatformState } from './ownedStreamingPlatform';
 import { normalizeIndustryProductions } from './industryProductions';
+import {
+    getCanonicalScheduledRivals,
+    normalizeIndustryEventLedger,
+    normalizeIndustryMediaWorld,
+    reconcileIndustryMediaWorldWithEvents,
+} from './industryWorld';
 import { backfillActivePlayerCommitmentTalentBookings } from './talentBookings';
 import { normalizeWorldPlatformAi } from './platformAi/platformAiState';
 import { normalizePlatformAiPlayerCommissionOffers } from './platformAi/platformAiPlayerCommissions';
@@ -33,6 +39,7 @@ import {
     reconcilePlatformAiExternalCommitmentObligations,
 } from './platformAi/platformAiExternalCommitments';
 import { migrateStreamingRightsContractRegistry } from './streamingRightsCore';
+import { normalizeWorldStudioAiForSave } from './studioAi';
 import { normalizeStreamingBiddingSessionRegistry } from './streamingBidding';
 import { normalizeStreamingRoyaltySettlementRegistry } from './streamingContractSettlement';
 import { normalizeStreamingPlatformEcosystem } from './streamingPlatformEcosystem';
@@ -41,12 +48,19 @@ import {
     normalizeStreamingRightsManagementState,
 } from './streamingRightsCalendar';
 import { reconstructSignedStreamingCataloguePackages } from './streamingCataloguePackages';
+import { normalizeStreamingRightsTransactionRegistry } from './streamingRightsTransactions';
+import { normalizeStreamingRightsOfficeState } from './streamingRightsOffice';
+import { migrateLegacyDynastyCareerState } from './dynastyCareer';
 
-const SAVE_MIGRATION_VERSION = 28;
+const SAVE_MIGRATION_VERSION = 34;
 const RUNAWAY_STOCK_CASH_CEILING = 10_000_000_000_000;
 const ACQUISITION_RIVAL_BID_MAX_ROUNDS = 3;
 
-const clone = <T,>(value: T): T => value === undefined ? value : JSON.parse(JSON.stringify(value));
+const clone = <T,>(value: T): T => {
+    if (value === undefined) return value;
+    if (typeof structuredClone === 'function') return structuredClone(value);
+    return JSON.parse(JSON.stringify(value));
+};
 const clamp = (value: number, min = 0, max = 100) => Math.max(min, Math.min(max, Number.isFinite(value) ? value : min));
 const clampMoney = (value: number) => Math.max(0, Number.isFinite(value) ? value : 0);
 const toArray = <T,>(value: unknown): T[] => Array.isArray(value) ? value as T[] : [];
@@ -829,6 +843,10 @@ const migrateFlags = (flags: any, player: Player) => {
     if (!nextFlags.stockTakeoverEventDismissals || typeof nextFlags.stockTakeoverEventDismissals !== 'object') nextFlags.stockTakeoverEventDismissals = {};
     const tutorialState = normalizeNewPlayerTutorialState(nextFlags.newPlayerTutorial);
     if (tutorialState) nextFlags.newPlayerTutorial = tutorialState;
+    const dynastyMigration = migrateLegacyDynastyCareerState({ ...player, flags: nextFlags }, getAbsoluteWeek(player.age, player.currentWeek));
+    nextFlags.dynastyCareer = dynastyMigration.state;
+    nextFlags.dynastyCareerArchives = dynastyMigration.archives;
+    nextFlags.extraNPCs = dynastyMigration.extraNPCs;
     if (previousSaveMigrationVersion > 0 && previousSaveMigrationVersion !== SAVE_MIGRATION_VERSION) {
         nextFlags.previousSaveMigrationVersion = previousSaveMigrationVersion;
     }
@@ -1061,6 +1079,12 @@ export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
     const migratedPendingEvent = base.pendingEvent
         ? sanitizeMigratedAwardEvent(base.pendingEvent)
         : null;
+    const migratedAbsoluteWeek = getAbsoluteWeek(migratedAge, migratedCurrentWeek);
+    const migratedIndustryProductions = normalizeIndustryProductions(
+        base.world?.industryProductions,
+        migratedAbsoluteWeek,
+    );
+    const migratedIndustryEvents = normalizeIndustryEventLedger(base.world?.industryEvents);
     const playerWithStocks: Player = {
         ...base,
         id: String(base.id || INITIAL_PLAYER.id),
@@ -1079,10 +1103,15 @@ export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
                 base.world?.talentBookings,
                 base.commitments,
             ),
-            industryProductions: normalizeIndustryProductions(
-                base.world?.industryProductions,
-                getAbsoluteWeek(base.age, base.currentWeek),
-            ),
+            industryProductions: migratedIndustryProductions,
+            upcomingRivals: getCanonicalScheduledRivals({
+                ...(base.world || INITIAL_PLAYER.world),
+                industryProductions: migratedIndustryProductions,
+            }, migratedAbsoluteWeek, 12),
+            industryEvents: migratedIndustryEvents,
+            industryMedia: base.world?.industryMedia
+                ? reconcileIndustryMediaWorldWithEvents(base.world.industryMedia, migratedIndustryEvents)
+                : normalizeIndustryMediaWorld(undefined),
             platformAiPlayerCommissionOffers: normalizePlatformAiPlayerCommissionOffers(
                 base.world?.platformAiPlayerCommissionOffers,
                 getAbsoluteWeek(base.age, base.currentWeek),
@@ -1187,7 +1216,11 @@ export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
     const playerWithNormalizedPlatformAi: Player = {
         ...playerWithStocks,
         world: {
-            ...playerWithNormalizedPlatformAiWorld,
+            ...normalizeWorldStudioAiForSave(
+                playerWithStocks,
+                playerWithNormalizedPlatformAiWorld,
+                platformAiAbsoluteWeek,
+            ),
             streamingPlatformEcosystem: normalizeStreamingPlatformEcosystem(
                 playerWithNormalizedPlatformAiWorld.streamingPlatformEcosystem,
                 platformAiAbsoluteWeek,
@@ -1220,6 +1253,12 @@ export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
                 : -1,
             streamingRightsCalendar: normalizeStreamingRightsCalendarState(
                 playerWithStreamingContracts.world.streamingRightsCalendar,
+            ),
+            streamingRightsOffice: normalizeStreamingRightsOfficeState(
+                playerWithStreamingContracts.world.streamingRightsOffice,
+            ),
+            streamingRightsTransactions: normalizeStreamingRightsTransactionRegistry(
+                playerWithStreamingContracts.world.streamingRightsTransactions,
             ),
         },
     };

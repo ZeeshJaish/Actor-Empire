@@ -3,6 +3,7 @@ import type {
     IndustryProject,
     PlatformAiContentPlan,
     PlatformAiDistressEpisode,
+    PlatformAiExternalRecapitalization,
     PlatformId,
     PlatformState,
     Player,
@@ -24,7 +25,10 @@ import { migratePlayerSave } from '../services/saveMigration';
 import { processPlatformAiWorldTurn } from '../services/platformAi/platformAiTurn';
 import { settlePendingPlatformAiExternalCommitmentsForAcquisition } from '../services/platformAi/platformAiExternalCommitments';
 import { getStreamingRivalMoveCostMillions } from '../services/streamingCompetitiveWorld';
-import { normalizePlatformAiState } from '../services/platformAi/platformAiState';
+import {
+    appendPlatformAiExternalRecapitalizations,
+    normalizePlatformAiState,
+} from '../services/platformAi/platformAiState';
 import { createPlatformAiFixture } from './helpers/platformAiFixture';
 import {
     choosePlatformAiAdministrationOutcome,
@@ -35,6 +39,45 @@ const START_WEEK = 3_000;
 const closeTo = (actual: number, expected: number, message: string): void => {
     assert.ok(Math.abs(actual - expected) <= 0.000_001, `${message}: expected ${expected}, received ${actual}`);
 };
+
+const recapHistory = Array.from({ length: 16 }, (_, index): PlatformAiExternalRecapitalization => ({
+    id: `recap-${index}`,
+    idempotencyKey: `recap-${index}`,
+    episodeId: `episode-${index}`,
+    platformId: 'APPLE_TV',
+    status: 'SETTLED',
+    investorArchetype: 'MEDIA_GROUP',
+    offeredMillions: 100 + index,
+    settledMillions: 100 + index,
+    arrearsReductionMillions: 0,
+    debtReductionMillions: 100 + index,
+    cashRemainderMillions: 0,
+    dilutionPercent: 20,
+    autonomyPenalty: 29.17,
+    valuationConfidenceMultiplier: 0.8,
+    offeredAtAbsoluteWeek: index,
+    settledAtAbsoluteWeek: index,
+    cooldownUntilAbsoluteWeek: index + 104,
+    reason: 'Bounded recapitalization history audit.',
+}));
+const newestRecap: PlatformAiExternalRecapitalization = {
+    ...recapHistory[0],
+    id: 'recap-newest',
+    idempotencyKey: 'recap-newest',
+    episodeId: 'episode-newest',
+    offeredAtAbsoluteWeek: 100,
+    settledAtAbsoluteWeek: 100,
+    cooldownUntilAbsoluteWeek: 204,
+};
+const boundedRecapHistory = appendPlatformAiExternalRecapitalizations(
+    recapHistory,
+    [newestRecap],
+    'APPLE_TV',
+);
+assert.equal(boundedRecapHistory.length, 16, 'Runtime recapitalization writes must enforce the persistence history bound.');
+assert.equal(boundedRecapHistory[0].id, 'recap-1', 'The oldest recapitalization must be evicted first.');
+assert.equal(boundedRecapHistory.at(-1)?.id, newestRecap.id, 'The newest recapitalization must survive compaction.');
+assert.equal(boundedRecapHistory.at(-1)?.autonomyPenalty, 29.17, 'Recapitalization terms must survive runtime compaction exactly.');
 
 const withPlatform = (
     world: WorldState,
@@ -114,6 +157,19 @@ const replay = progressPlatformAiDistressWorld({
     absoluteWeek: START_WEEK,
 });
 assert.deepEqual(replay.world, opened.world, 'Replaying the same distress week must be an exact no-op.');
+
+const serializationTrapWorld = opened.world as WorldState & { toJSON?: () => never };
+Object.defineProperty(serializationTrapWorld, 'toJSON', {
+    configurable: true,
+    enumerable: false,
+    value: () => { throw new Error('whole-world serialization is forbidden in weekly distress progression'); },
+});
+assert.doesNotThrow(() => progressPlatformAiDistressWorld({
+    player: { ...fixture, world: serializationTrapWorld },
+    world: serializationTrapWorld,
+    absoluteWeek: START_WEEK,
+}));
+delete serializationTrapWorld.toJSON;
 
 const historyTruncatedWorld = withPlatform(opened.world, 'NETFLIX', platform => ({
     ...platform,
@@ -513,7 +569,8 @@ const catalogueDealFixture = (week: number): Player => {
                     cataloguePackageId: null,
                     contentSource: 'LICENSED_RELEASED_TITLE',
                     licensorName: 'Archive Studio',
-                    territory: 'GLOBAL',
+                    territory: 'DOMESTIC',
+                    countryIds: ['JP'],
                     durationWeeks: 260,
                     exclusivity: 'NON_EXCLUSIVE',
                     minimumGuarantee: 12_000_000,
@@ -552,15 +609,11 @@ assert.equal(queued.world.platformAiCatalogueDistressDeals?.length, 1, 'The cata
 const queuedDeal = queued.world.platformAiCatalogueDistressDeals![0];
 const queuedBuyer = queued.world.platforms![queuedDeal.buyerPlatformId];
 assert.equal(queuedDeal.status, 'PENDING_PAYMENT');
-assert.equal(queuedDeal.durationWeeks, 104);
-assert.equal(queuedDeal.expiresAtAbsoluteWeek, queuedDeal.startsAtAbsoluteWeek + 104);
+assert.equal(queuedDeal.durationWeeks, queuedDeal.sellerEntitlementExpiresAtAbsoluteWeek - queuedDeal.startsAtAbsoluteWeek);
+assert.equal(queuedDeal.expiresAtAbsoluteWeek, queuedDeal.sellerEntitlementExpiresAtAbsoluteWeek);
 assert.equal(queuedDeal.sourceContractId, 'distress-source-entitlement');
 assert.equal(queuedDeal.windowType, 'SECOND_WINDOW');
-assert.deepEqual(
-    queuedDeal.countryIds,
-    [...queuedBuyer.ai!.capabilities.activeCountryIds].sort(),
-    'A distress sublicense must freeze only the buyer markets covered by the seller entitlement.',
-);
+assert.deepEqual(queuedDeal.countryIds, ['JP'], 'A distress transfer must preserve the seller entitlement exactly.');
 assert.equal(queued.world.platforms!.NETFLIX.cashReserve, sellerCashBeforeQueue, 'Queueing may not credit the seller.');
 assert.equal(queuedBuyer.cashReserve, catalogueFixture.world.platforms![queuedDeal.buyerPlatformId].cashReserve, 'Queueing may not charge the buyer.');
 assert.equal(queuedBuyer.ai!.rightsContracts.length, 0, 'Queueing may not grant rights before payment.');
@@ -607,6 +660,18 @@ assert.equal(transferredBuyer.ai!.rightsContracts.filter(item => item.id === que
 assert.equal(transferredBuyer.ai!.rightsContracts.find(item => item.id === queuedDeal.buyerContractId)?.exclusivity, 'NON_EXCLUSIVE');
 assert.equal(transferredBuyer.ai!.rightsContracts.find(item => item.id === queuedDeal.buyerContractId)?.expiresAtAbsoluteWeek, queuedDeal.expiresAtAbsoluteWeek);
 assert.equal(
+    transferred.world.streamingRightsContracts?.['distress-source-entitlement']?.status,
+    'TRANSFERRED_OUT',
+    'The distressed seller must lose the transferred Japan licence.',
+);
+const distressTransaction = Object.values(transferred.world.streamingRightsTransactions || {}).find(transaction => (
+    transaction.sourceContractId === 'distress-source-entitlement'
+));
+assert.equal(distressTransaction?.kind, 'LICENSE_TRANSFER');
+assert.equal(distressTransaction?.sellerReceipt, queuedDeal.priceMillions * 1_000_000);
+assert.equal(distressTransaction?.originalOwner.name, 'Archive Studio');
+assert.equal(distressTransaction?.originalOwnerParticipation, 0);
+assert.equal(
     transferred.world.streamingRightsContracts?.[queuedDeal.buyerContractId]?.buyer.platformId,
     queuedDeal.buyerPlatformId,
     'A settled distress catalogue trade must register its canonical streaming contract.',
@@ -641,19 +706,7 @@ const royaltyBuyerEconomy = settlePlatformAiEconomy({
 });
 assert.ok((royaltyBuyerEconomy.snapshot?.partnerRevenueShareCostMillions || 0) > 0, 'The active platform-trade licence must incur recurring share.');
 const immutableRoyaltyAllocations = (royaltyBuyerEconomy.snapshot as any)?.platformTradeRoyaltyAllocations || [];
-assert.deepEqual(
-    immutableRoyaltyAllocations.map((allocation: any) => ({
-        contractId: allocation.contractId,
-        sellerPlatformId: allocation.sellerPlatformId,
-        amountMillions: allocation.amountMillions,
-    })),
-    [{
-        contractId: queuedDeal.buyerContractId,
-        sellerPlatformId: queuedDeal.sellerPlatformId,
-        amountMillions: royaltyBuyerEconomy.snapshot!.partnerRevenueShareCostMillions,
-    }],
-    'Buyer settlement must persist the exact per-contract PLATFORM_TRADE allocation.',
-);
+assert.deepEqual(immutableRoyaltyAllocations, [], 'The reseller must not receive the original studio backend after selling the licence.');
 royaltyWorld = withPlatform(royaltyWorld, queuedDeal.buyerPlatformId, () => royaltyBuyerEconomy.platform);
 const royaltyRoundTrip = migratePlayerSave({
     ...catalogueFixture,
@@ -663,11 +716,11 @@ const royaltyRoundTrip = migratePlayerSave({
 });
 royaltyWorld = royaltyRoundTrip.world;
 assert.ok(
-    royaltyWorld.platforms![queuedDeal.buyerPlatformId].ai!.decisionHistory.some(decision => (
+    !royaltyWorld.platforms![queuedDeal.buyerPlatformId].ai!.decisionHistory.some(decision => (
         decision.absoluteWeek === royaltyWeek
         && decision.type === 'PLATFORM_TRADE_ROYALTY_ALLOCATION'
     )),
-    'The immutable buyer royalty allocation must survive a real save migration round trip.',
+    'The buyer must not fabricate a reseller royalty allocation after reload.',
 );
 royaltyWorld = withPlatform(royaltyWorld, queuedDeal.buyerPlatformId, platform => ({
     ...platform,
@@ -716,8 +769,8 @@ const royaltySettled = progressPlatformAiDistressWorld({
 });
 closeTo(
     royaltySettled.world.platforms!.NETFLIX.cashReserve - sellerBeforeRoyalty,
-    immutableRoyaltyAllocations[0].amountMillions,
-    'The exact persisted PLATFORM_TRADE allocation must be credited even if the buyer slate changes later in the turn.',
+    0,
+    'The former holder receives no recurring royalty after the full transfer.',
 );
 assert.deepEqual(
     progressPlatformAiDistressWorld({
@@ -742,6 +795,13 @@ assert.equal(
     withdrawnSeller.ai!.marketOperations.filter(operation => operation.status === 'ACTIVE').length,
     activeMarketsBeforeWithdrawal - 1,
     'The region stage must suspend exactly one weak active market when available.',
+);
+const withdrawnActiveCountryIds = new Set(withdrawnSeller.ai!.capabilities.activeCountryIds);
+assert.ok(
+    withdrawnSeller.ai!.slate
+        .filter(plan => !['RELEASED', 'CANCELLED', 'SOLD'].includes(plan.status))
+        .every(plan => plan.releaseCountryIds.every(countryId => withdrawnActiveCountryIds.has(countryId))),
+    'Withdrawing from a market must repair every live unreleased plan before the weekly world is persisted.',
 );
 const restructuredWorld = progressPlatformAiDistressWorld({
     player: { ...catalogueFixture, world: withdrew.world },
@@ -1061,6 +1121,7 @@ let expiringWorld = withPlatform(expiringFixture.world, 'NETFLIX', platform => (
         slate: [],
         rightsContracts: platform.ai!.rightsContracts.map(contract => ({
             ...contract,
+            durationWeeks: 60,
             expiresAtAbsoluteWeek: queueWeek + 340,
         })),
     },
@@ -1071,6 +1132,7 @@ expiringWorld = {
         ...expiringWorld.streamingRightsContracts,
         'distress-source-entitlement': {
             ...expiringWorld.streamingRightsContracts!['distress-source-entitlement'],
+            durationWeeks: 60,
             expiresAtAbsoluteWeek: queueWeek + 340,
         },
     },
@@ -1080,10 +1142,10 @@ const expiringRejected = progressPlatformAiDistressWorld({
     world: expiringWorld,
     absoluteWeek: queueWeek + 300,
 });
-assert.equal(expiringRejected.world.platformAiCatalogueDistressDeals?.length, 0, 'A sublicense may not outlive the seller source entitlement.');
+assert.equal(expiringRejected.world.platformAiCatalogueDistressDeals?.length, 1, 'A short remaining licence may be sold without inventing a longer term.');
 assert.equal(
-    expiringRejected.world.platforms!.NETFLIX.ai!.distressEpisodes[0].stageResults.at(-1)?.outcome,
-    'UNAVAILABLE',
+    expiringRejected.world.platformAiCatalogueDistressDeals?.[0].expiresAtAbsoluteWeek,
+    queueWeek + 340,
 );
 
 const disallowedFixture = catalogueDealFixture(queueWeek + 325);
@@ -1112,11 +1174,11 @@ const disallowedResult = progressPlatformAiDistressWorld({
     world: disallowedWorld,
     absoluteWeek: queueWeek + 325,
 });
-assert.equal(disallowedResult.world.platformAiCatalogueDistressDeals?.length || 0, 0);
+assert.equal(disallowedResult.world.platformAiCatalogueDistressDeals?.length || 0, 1);
 assert.equal(
-    disallowedResult.world.platforms!.NETFLIX.ai!.distressEpisodes[0].stageResults.at(-1)?.outcome,
-    'UNAVAILABLE',
-    'A projection cannot sublicense when the canonical source contract forbids it.',
+    disallowedResult.world.platformAiCatalogueDistressDeals?.[0].sourceContractId,
+    'distress-source-entitlement',
+    'A full transfer remains valid even when the source contract forbids sublicensing.',
 );
 
 const acquisitionCancelled = cancelPendingPlatformAiCatalogueDistressDealsForAcquisition({

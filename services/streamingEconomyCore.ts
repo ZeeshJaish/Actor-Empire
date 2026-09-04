@@ -107,9 +107,14 @@ export const calculateStreamingRunwayFromTrailingCosts = (input: StreamingRunway
     const cash = bounded(input.cash);
     const operatingCost = bounded(input.trailingWeeklyOperatingCost);
     const netCashFlow = bounded(input.trailingWeeklyNetCashFlow, -Number.MAX_SAFE_INTEGER);
+    const measuredLossRunwayWeeks = netCashFlow < 0 ? cash / Math.abs(netCashFlow) : null;
     return {
         reserveCoverageWeeks: operatingCost > 0 ? cash / operatingCost : 5_200,
-        lossRunwayWeeks: netCashFlow < 0 ? cash / Math.abs(netCashFlow) : null,
+        // Beyond the simulation's 100-year economic horizon, preserve the same
+        // durable sentinel used by save migration instead of an unstable huge number.
+        lossRunwayWeeks: measuredLossRunwayWeeks !== null && measuredLossRunwayWeeks < 5_200
+            ? measuredLossRunwayWeeks
+            : null,
     };
 };
 

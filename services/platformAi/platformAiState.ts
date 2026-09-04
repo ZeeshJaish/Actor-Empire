@@ -43,6 +43,10 @@ import {
 } from '../../types';
 import { createDeterministicId } from '../deterministicRandom';
 import {
+    createInitialIndustryIntelligenceState,
+    normalizeIndustryIntelligenceState,
+} from '../industryIntelligence/industryIntelligenceState';
+import {
     STREAMING_DAY_ONE_MARKETS,
     getStreamingCountryMarketProfile,
     normalizeStreamingDayOneMarketIds,
@@ -80,6 +84,7 @@ import {
     normalizePlatformAiExternalCommitments,
     reconcilePlatformAiExternalCommitmentObligations,
 } from './platformAiExternalCommitments';
+import { normalizePlatformIntelligenceMigrationState } from './platformIntelligenceMigration';
 
 const TECHNOLOGY_BRANCHES: StreamingTechnologyBranch[] = [
     'DELIVERY_CAPACITY', 'PLAYBACK_QUALITY', 'RELIABILITY', 'DATA_RECOMMENDATIONS',
@@ -245,14 +250,29 @@ export const normalizePlatformAiPendingOneTimeObligations = (
         }
     }
     const obligations = Array.from(byId.values());
-    const held = obligations.filter(obligation => obligation.status === 'HELD');
+    const obligationOrder = (
+        left: PlatformAiPendingOneTimeObligation,
+        right: PlatformAiPendingOneTimeObligation,
+    ): number => (
+        left.createdWeek - right.createdWeek
+        || left.category.localeCompare(right.category)
+        || left.id.localeCompare(right.id)
+    );
+    const settlementOrder = (
+        left: PlatformAiPendingOneTimeObligation,
+        right: PlatformAiPendingOneTimeObligation,
+    ): number => (
+        (left.settledWeek ?? left.createdWeek) - (right.settledWeek ?? right.createdWeek)
+        || obligationOrder(left, right)
+    );
+    const held = obligations.filter(obligation => obligation.status === 'HELD').sort(obligationOrder);
     const protectedSettled = obligations.filter(obligation => (
         obligation.status === 'SETTLED' && protectedSettledIds.has(obligation.id)
-    ));
+    )).sort(settlementOrder);
     const retainedIds = new Set(protectedSettled.map(obligation => obligation.id));
     const settled = obligations.filter(obligation => (
         obligation.status === 'SETTLED' && !retainedIds.has(obligation.id)
-    ));
+    )).sort(settlementOrder);
     const settledCapacity = Math.max(
         0,
         ONE_TIME_OBLIGATION_HISTORY_LIMIT - held.length - protectedSettled.length,
@@ -407,7 +427,13 @@ export const reconcilePlatformAiRightsRenewalObligations = (
     protectedSettledIds: Set<string> = new Set(),
 ): PlatformAiPendingOneTimeObligation[] => {
     const renewalObligationIds = new Set(renewals.map(record => record.obligationId));
-    const retained = normalizePlatformAiPendingOneTimeObligations(value, protectedSettledIds).filter(obligation => (
+    const lifecycleProtectedSettledIds = new Set([
+        ...protectedSettledIds,
+        ...renewals
+            .filter(record => record.paymentSettledAtAbsoluteWeek !== null)
+            .map(record => record.obligationId),
+    ]);
+    const retained = normalizePlatformAiPendingOneTimeObligations(value, lifecycleProtectedSettledIds).filter(obligation => (
         !obligation.id.startsWith('platform_ai_rights_renewal_obligation_')
         || renewalObligationIds.has(obligation.id)
     ));
@@ -427,7 +453,7 @@ export const reconcilePlatformAiRightsRenewalObligations = (
     return normalizePlatformAiPendingOneTimeObligations([
         ...retained.filter(obligation => !renewalObligationIds.has(obligation.id)),
         ...canonicalRenewalObligations,
-    ], protectedSettledIds);
+    ], lifecycleProtectedSettledIds);
 };
 
 export const reconcilePlatformAiRightsRenewalStatuses = (
@@ -613,14 +639,18 @@ export const normalizePlatformAiLocalizationJobs = (
         const exactSupport = exactLanguageId && exactMode
             ? resolvePlatformAiLocalizationModeSupport({ languageCapabilities }, exactLanguageId, exactMode)
             : null;
+        const requestedCapabilityTier = Math.round(Number(raw.capabilityTierAtPlanning));
+        const exactCapabilityTier = requestedCapabilityTier >= 1 && requestedCapabilityTier <= 3
+            ? requestedCapabilityTier as 1 | 2 | 3
+            : exactSupport?.tier || 0;
         const candidates = legacy
             ? Array.from(legacyRequirements.values())
-            : exactSupport?.supported && exactSupport.tier > 0
+            : exactSupport?.supported && exactCapabilityTier > 0 && exactSupport.tier >= exactCapabilityTier
                 ? [{
                     languageId: exactLanguageId,
                     mode: exactMode!,
                     countryIds: savedCountryIds,
-                    tier: exactSupport.tier as 1 | 2 | 3,
+                    tier: exactCapabilityTier as 1 | 2 | 3,
                 }]
                 : [];
         const legacyCostTotal = Math.max(0, Number(raw.costMillions) || 0);
@@ -759,18 +789,32 @@ export const reconcilePlatformAiLocalizationObligations = (
     ));
     const canonical = livePaidJobs.map(job => {
         const existing = byId.get(job.obligationId);
+        const jobSettlementWeek = job.status !== 'WAITING_FOR_FUNDS'
+            && job.startedAtAbsoluteWeek !== null
+            && Number.isFinite(job.startedAtAbsoluteWeek)
+            && job.startedAtAbsoluteWeek >= job.createdAtAbsoluteWeek
+                ? Math.round(job.startedAtAbsoluteWeek)
+                : null;
         if (
             existing?.category === 'LOCALIZATION'
             && existing.amountMillions === job.costMillions
             && existing.createdWeek === job.createdAtAbsoluteWeek
             && (
-                existing.status === 'HELD'
+                existing.status === 'HELD' && jobSettlementWeek === null
                 || existing.status === 'SETTLED'
                     && existing.settledWeek !== null
                     && Number.isFinite(existing.settledWeek)
                     && existing.settledWeek >= existing.createdWeek
             )
         ) return existing;
+        if (jobSettlementWeek !== null) return {
+            id: job.obligationId,
+            category: 'LOCALIZATION' as const,
+            amountMillions: job.costMillions,
+            createdWeek: job.createdAtAbsoluteWeek,
+            status: 'SETTLED' as const,
+            settledWeek: jobSettlementWeek,
+        };
         const legacy = job.legacyObligationId ? byId.get(job.legacyObligationId) : null;
         if (
             legacy?.category === 'LOCALIZATION'
@@ -966,11 +1010,11 @@ const buildStartingCapabilities = (platform: PlatformState): PlatformAiCapabilit
             getPlatformAiOperatingProfile(platform.id).startingCountryIds,
         ),
         technologyLevels,
-        ...localizationCoverageFromContentOperations(technologyLevels.CONTENT_OPERATIONS),
+        ...getPlatformAiLocalizationCoverageFromContentOperations(technologyLevels.CONTENT_OPERATIONS),
     };
 };
 
-const localizationCoverageFromContentOperations = (level: number): Pick<PlatformAiCapabilities, 'subtitleCoveragePercent' | 'dubCoveragePercent'> => ({
+export const getPlatformAiLocalizationCoverageFromContentOperations = (level: number): Pick<PlatformAiCapabilities, 'subtitleCoveragePercent' | 'dubCoveragePercent'> => ({
     subtitleCoveragePercent: level >= 22 ? clampPercent(35 + (level - 22) * 2) : 0,
     dubCoveragePercent: level >= 40 ? clampPercent(20 + (level - 40) * 2) : 0,
 });
@@ -1372,7 +1416,7 @@ const PLATFORM_AI_STREAMING_WINDOWS = new Set([
     'OWNED_STUDIO_STREAMING_WINDOW',
 ]);
 
-const normalizePlatformAiLocalizationPromises = (
+export const normalizePlatformAiLocalizationPromises = (
     value: unknown,
     releaseCountryIds: string[],
     localizationLevel: PlatformAiLocalizationLevel,
@@ -1398,10 +1442,12 @@ const normalizePlatformAiLocalizationPromises = (
             capabilityTierAtPromise: tier as 1 | 2 | 3,
             mandatory: raw.mandatory !== false,
         };
-        byKey.set(`${languageId}:${mode}:${countryIds.join(',')}`, promise);
+        byKey.set(`${promise.sourceProjectId || ''}:${languageId}:${mode}:${countryIds.join(',')}`, promise);
     }
     return Array.from(byKey.values()).sort((left, right) => (
-        left.languageId.localeCompare(right.languageId) || left.mode.localeCompare(right.mode)
+        (left.sourceProjectId || '').localeCompare(right.sourceProjectId || '')
+        || left.languageId.localeCompare(right.languageId)
+        || left.mode.localeCompare(right.mode)
     ));
 };
 
@@ -1422,9 +1468,7 @@ const normalizePlatformAiSlate = (
         || !PLATFORM_AI_PLAN_STATUSES.has(plan.status)
         || !PLATFORM_AI_STREAMING_WINDOWS.has(plan.streamingWindow)
         || !Array.isArray(plan.sourceProjectIds)
-        || !plan.sourceProjectIds.every(projectId => typeof projectId === 'string' && Boolean(projectId.trim()))
         || !Array.isArray(plan.rightsContractIds)
-        || !plan.rightsContractIds.every(contractId => typeof contractId === 'string' && Boolean(contractId.trim()))
         || !isRecord(plan.forecast)
         || !['strategic', 'creative', 'commercial', 'prestige', 'risk'].every(field => (
             isFiniteNumberInRange(plan.forecast[field as keyof PlatformAiContentPlan['forecast']], 0, 100)
@@ -1447,7 +1491,10 @@ const normalizePlatformAiSlate = (
         : legacyRegions.size
             ? capabilities.activeCountryIds.filter(countryId => legacyRegions.has(getStreamingCountryMarketProfile(countryId)?.regionId || ''))
             : capabilities.activeCountryIds.slice();
-    const releaseCountryIds = requestedCountries.filter(countryId => capabilities.activeCountryIds.includes(countryId));
+    const historicalPlan = ['RELEASED', 'CANCELLED', 'SOLD'].includes(plan.status);
+    const releaseCountryIds = historicalPlan
+        ? requestedCountries
+        : requestedCountries.filter(countryId => capabilities.activeCountryIds.includes(countryId));
     const normalizePlanWeek = (week: unknown): number | null => (
         week != null && Number.isFinite(Number(week))
             ? Math.max(0, Math.round(Number(week)))
@@ -1468,14 +1515,20 @@ const normalizePlatformAiSlate = (
     });
     const isUnfundedBrief = productionEscrow.status === 'UNFUNDED' && plan.status === 'BRIEF';
     const normalizedHoldWeek = normalizePlanWeek(plan.productionHoldStartedAtAbsoluteWeek);
-    const localizationLevel = clampLocalization(plan.localizationLevel, capabilities);
+    const localizationLevel = historicalPlan && ['NONE', 'SUBTITLES', 'DUBS_AND_SUBTITLES'].includes(plan.localizationLevel)
+        ? plan.localizationLevel
+        : clampLocalization(plan.localizationLevel, capabilities);
     const releaseEntries = normalizeReleaseEntries(plan.releaseEntries);
     return [{
         ...currentPlan,
         id: plan.id.trim(),
         title: plan.title.trim(),
-        sourceProjectIds: plan.sourceProjectIds.map(projectId => projectId.trim()),
-        rightsContractIds: plan.rightsContractIds.map(contractId => contractId.trim()),
+        sourceProjectIds: [...new Set(plan.sourceProjectIds
+            .filter((projectId): projectId is string => typeof projectId === 'string' && Boolean(projectId.trim()))
+            .map(projectId => projectId.trim()))],
+        rightsContractIds: [...new Set(plan.rightsContractIds
+            .filter((contractId): contractId is string => typeof contractId === 'string' && Boolean(contractId.trim()))
+            .map(contractId => contractId.trim()))],
         localizationLevel,
         localizationRequirements: normalizePlatformAiLocalizationPromises(
             plan.localizationRequirements,
@@ -1807,6 +1860,15 @@ const normalizePlatformAiExternalRecapitalizations = (
         .slice(-16);
 };
 
+export const appendPlatformAiExternalRecapitalizations = (
+    current: PlatformAiExternalRecapitalization[],
+    additions: PlatformAiExternalRecapitalization[],
+    platformId: PlatformId,
+): PlatformAiExternalRecapitalization[] => normalizePlatformAiExternalRecapitalizations(
+    [...current, ...additions],
+    platformId,
+);
+
 const normalizePlatformAiAdministration = (value: unknown): PlatformAiAdministrationState | null => {
     if (!isRecord(value)) return null;
     const episodeId = String(value.episodeId || '').trim();
@@ -1984,6 +2046,29 @@ const hasOnlyFiniteNumbers = (value: unknown, seen = new WeakSet<object>()): boo
         : Object.values(value).every(item => hasOnlyFiniteNumbers(item, seen));
 };
 
+const isStructurallyEqual = (
+    left: unknown,
+    right: unknown,
+    seen = new WeakMap<object, object>(),
+): boolean => {
+    if (Object.is(left, right)) return true;
+    if (!left || !right || typeof left !== 'object' || typeof right !== 'object') return false;
+    const seenRight = seen.get(left);
+    if (seenRight) return seenRight === right;
+    seen.set(left, right);
+    if (Array.isArray(left) || Array.isArray(right)) {
+        if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+        return left.every((item, index) => isStructurallyEqual(item, right[index], seen));
+    }
+    const leftRecord = left as Record<string, unknown>;
+    const rightRecord = right as Record<string, unknown>;
+    const leftKeys = Object.keys(leftRecord);
+    const rightKeys = Object.keys(rightRecord);
+    if (leftKeys.length !== rightKeys.length) return false;
+    return leftKeys.every(key => Object.prototype.hasOwnProperty.call(rightRecord, key)
+        && isStructurallyEqual(leftRecord[key], rightRecord[key], seen));
+};
+
 const isCanonicalCapabilities = (value: unknown): value is PlatformAiCapabilities => {
     if (!isRecord(value) || !Array.isArray(value.activeCountryIds) || !isRecord(value.technologyLevels)) return false;
     if (!value.activeCountryIds.every(countryId => typeof countryId === 'string')) return false;
@@ -1996,7 +2081,7 @@ const isCanonicalCapabilities = (value: unknown): value is PlatformAiCapabilitie
         !isFiniteNumberInRange(value.subtitleCoveragePercent, 0, 100, true)
         || !isFiniteNumberInRange(value.dubCoveragePercent, 0, 100, true)
     ) return false;
-    const derivedLocalization = localizationCoverageFromContentOperations(Number(value.technologyLevels.CONTENT_OPERATIONS));
+    const derivedLocalization = getPlatformAiLocalizationCoverageFromContentOperations(Number(value.technologyLevels.CONTENT_OPERATIONS));
     if (
         value.subtitleCoveragePercent !== derivedLocalization.subtitleCoveragePercent
         || value.dubCoveragePercent !== derivedLocalization.dubCoveragePercent
@@ -2010,7 +2095,7 @@ const isCanonicalCapabilities = (value: unknown): value is PlatformAiCapabilitie
 
 const STREAMING_LICENSE_TERRITORIES = new Set(['DOMESTIC', 'MULTI_REGION', 'GLOBAL']);
 const STREAMING_LICENSE_EXCLUSIVITY = new Set(['NON_EXCLUSIVE', 'EXCLUSIVE']);
-const STREAMING_LICENSE_STATUSES = new Set(['ACTIVE', 'EXPIRED', 'TERMINATED']);
+const STREAMING_LICENSE_STATUSES = new Set(['ACTIVE', 'EXPIRED', 'TERMINATED', 'TRANSFERRED_OUT']);
 const STREAMING_LICENSE_ORIGINS = new Set([
     'STARTER',
     'STUDIO_MARKET',
@@ -2068,7 +2153,7 @@ const isCanonicalNormalizedCollection = <T,>(
     normalize: (source: unknown) => T[],
 ): value is T[] => (
     Array.isArray(value)
-    && JSON.stringify(normalize(value)) === JSON.stringify(value)
+    && isStructurallyEqual(normalize(value), value)
 );
 
 const isCanonicalAudienceSettlementHistory = (value: unknown): value is PlatformAiAudienceSettlement[] => {
@@ -2139,7 +2224,7 @@ const isCanonicalRightsRenewalHistory = (
 ): value is PlatformAiRightsRenewalRecord[] => {
     if (!Array.isArray(value)) return false;
     const normalized = normalizePlatformAiRightsRenewals(value, platformId, rightsContracts);
-    if (JSON.stringify(normalized) !== JSON.stringify(value)) return false;
+    if (!isStructurallyEqual(normalized, value)) return false;
     const obligationsById = new Map(pendingOneTimeObligations.map(obligation => [obligation.id, obligation]));
     const contractsById = new Map(rightsContracts.map(contract => [contract.id, contract]));
     return normalized.every(record => {
@@ -2226,7 +2311,7 @@ const isCanonicalPlatformAiState = (
         false,
     ))) return false;
     const researchBackedContentOperationsLevel = getResearchBackedContentOperationsLevel(candidate.researchQueue);
-    const researchBackedCoverage = localizationCoverageFromContentOperations(researchBackedContentOperationsLevel);
+    const researchBackedCoverage = getPlatformAiLocalizationCoverageFromContentOperations(researchBackedContentOperationsLevel);
     if (
         candidate.capabilities.technologyLevels.CONTENT_OPERATIONS !== researchBackedContentOperationsLevel
         || candidate.capabilities.subtitleCoveragePercent !== researchBackedCoverage.subtitleCoveragePercent
@@ -2257,8 +2342,8 @@ const isCanonicalPlatformAiState = (
     if (!isCanonicalNormalizedCollection(candidate.externalRecapitalizations, source => (
         normalizePlatformAiExternalRecapitalizations(source, platformId)
     ))) return false;
-    if (JSON.stringify(normalizePlatformAiAdministration(candidate.administration)) !== JSON.stringify(candidate.administration)) return false;
-    if (JSON.stringify(normalizePlatformAiSpendingRestrictions(candidate.spendingRestrictions)) !== JSON.stringify(candidate.spendingRestrictions)) return false;
+    if (!isStructurallyEqual(normalizePlatformAiAdministration(candidate.administration), candidate.administration)) return false;
+    if (!isStructurallyEqual(normalizePlatformAiSpendingRestrictions(candidate.spendingRestrictions), candidate.spendingRestrictions)) return false;
     if (!isCanonicalNormalizedCollection(candidate.externalCommitments, source => (
         normalizePlatformAiExternalCommitments(
             source,
@@ -2293,21 +2378,21 @@ const isCanonicalPlatformAiState = (
         candidate.slate,
         candidate.languageCapabilities,
     ))) return false;
-    if (JSON.stringify(reconcilePlatformAiLocalizationObligations(
+    if (!isStructurallyEqual(reconcilePlatformAiLocalizationObligations(
         candidate.pendingOneTimeObligations,
         candidate.localizationJobs,
-    )) !== JSON.stringify(candidate.pendingOneTimeObligations)) return false;
-    if (JSON.stringify(normalizePlatformAiPendingOneTimeObligations(
+    ), candidate.pendingOneTimeObligations)) return false;
+    if (!isStructurallyEqual(normalizePlatformAiPendingOneTimeObligations(
         reconcilePlatformAiExternalCommitmentObligations(
             candidate.pendingOneTimeObligations,
             candidate.externalCommitments,
         ),
         protectedLocalizationObligationIds,
-    )) !== JSON.stringify(candidate.pendingOneTimeObligations)) return false;
-    if (JSON.stringify(filterPlatformAiRightsContractsByRenewalState(
+    ), candidate.pendingOneTimeObligations)) return false;
+    if (!isStructurallyEqual(filterPlatformAiRightsContractsByRenewalState(
         candidate.rightsContracts,
         candidate.rightsRenewals,
-    )) !== JSON.stringify(candidate.rightsContracts)) return false;
+    ), candidate.rightsContracts)) return false;
     if (!hasOnlyFiniteNumbers(value)) return false;
     if (!COMPETENCE_FIELDS.every(field => isFiniteNumberInRange(candidate.competence[field], 0, 10))) return false;
     if (!PLATFORM_AI_STATUSES.has(String(candidate.status))) return false;
@@ -2357,7 +2442,7 @@ export const normalizePlatformAiState = (
     absoluteWeek: number,
 ): PlatformState => {
     const turnMarker = canonicalTurnStates.get(platform);
-    if (turnMarker?.absoluteWeek === absoluteWeek) {
+    if (turnMarker && turnMarker.absoluteWeek <= absoluteWeek) {
         normalizationDiagnostics.turnCacheHitCount += 1;
         return platform;
     }
@@ -2408,7 +2493,7 @@ export const normalizePlatformAiState = (
         researchQueue,
     );
     capabilities.technologyLevels.CONTENT_OPERATIONS = getResearchBackedContentOperationsLevel(researchQueue);
-    Object.assign(capabilities, localizationCoverageFromContentOperations(capabilities.technologyLevels.CONTENT_OPERATIONS));
+    Object.assign(capabilities, getPlatformAiLocalizationCoverageFromContentOperations(capabilities.technologyLevels.CONTENT_OPERATIONS));
     const languageCapabilities = normalizeLanguageCapabilities(
         existing?.languageCapabilities,
         platform.id,
@@ -2464,7 +2549,15 @@ export const normalizePlatformAiState = (
             pendingOneTimeObligations,
             externalCommitments,
         ),
-        new Set(externalCommitments.map(commitment => commitment.obligationId)),
+        new Set([
+            ...externalCommitments.map(commitment => commitment.obligationId),
+            ...localizationJobs
+                .filter(job => job.status !== 'CANCELLED' && job.costMillions > 0)
+                .map(job => job.obligationId),
+            ...rightsRenewals
+                .filter(record => record.paymentSettledAtAbsoluteWeek !== null)
+                .map(record => record.obligationId),
+        ]),
     );
     const debtMillions = finiteNonNegative(existing?.debtMillions);
     const effectiveCompetenceDelta = Number(existing?.effectiveCompetenceDelta);
@@ -2588,6 +2681,21 @@ export const normalizePlatformAiState = (
             : 5.2,
         outstandingApprovedContentMillions: finiteNonNegative(existing?.outstandingApprovedContentMillions),
         outstandingApprovedResearchMillions: finiteNonNegative(existing?.outstandingApprovedResearchMillions),
+        intelligence: {
+            ...normalizeIndustryIntelligenceState(
+                existing?.intelligence,
+                createInitialIndustryIntelligenceState(
+                platform.id,
+                'STREAMING_PLATFORM',
+                createDeterministicId('platform_intelligence_seed', platform.id, playerId),
+                absoluteWeek,
+                ),
+            ),
+            platformMigration: normalizePlatformIntelligenceMigrationState(
+                existing?.intelligence?.platformMigration ?? (existing as PlatformAiRuntimeState & { intelligenceMigration?: unknown } | undefined)?.intelligenceMigration,
+                absoluteWeek,
+            ),
+        },
     };
     return { ...platform, ai };
 };

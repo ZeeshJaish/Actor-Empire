@@ -213,6 +213,43 @@ const titleMatchOnly = resolveStreamingRightsCompatibility({
 });
 assert.equal(titleMatchOnly.status, 'AVAILABLE', 'matching display titles must never join canonical rights');
 
+let registryEnumerationCount = 0;
+const indexedRegistryTarget = Object.fromEntries(Array.from({ length: 200 }, (_, index) => {
+    const contract = createContract({
+        id: `indexed-contract-${index}`,
+        sourceProjectId: `indexed-project-${index}`,
+        countryIds: [index % 2 === 0 ? 'US' : 'IN'],
+    });
+    return [contract.id, contract];
+}));
+const indexedRegistry = new Proxy(indexedRegistryTarget, {
+    ownKeys(target) {
+        registryEnumerationCount += 1;
+        return Reflect.ownKeys(target);
+    },
+});
+const indexedWorld = { streamingRightsContracts: indexedRegistry } as any;
+const indexedCompatibilityInput = {
+    world: indexedWorld,
+    sourceProjectId: 'indexed-project-50',
+    relatedProjectIds: ['indexed-project-51'],
+    buyerPlatformId: 'APPLE_TV' as const,
+    territory: 'DOMESTIC' as const,
+    countryIds: ['GB'],
+    startsAtAbsoluteWeek: 20,
+    expiresAtAbsoluteWeek: 52,
+    windowType: 'FIRST_WINDOW' as const,
+    exclusivity: 'EXCLUSIVE' as const,
+};
+resolveStreamingRightsCompatibility(indexedCompatibilityInput);
+const enumerationCountAfterWarmup = registryEnumerationCount;
+resolveStreamingRightsCompatibility(indexedCompatibilityInput);
+assert.equal(
+    registryEnumerationCount,
+    enumerationCountAfterWarmup,
+    'repeated compatibility checks against the same immutable registry must reuse a project index',
+);
+
 const partialLotBuild = buildStreamingBiddingRightsLot({
     world: worldWith(indiaExclusive),
     sourceProjectId: 'picture-1',

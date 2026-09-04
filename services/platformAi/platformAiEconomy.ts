@@ -36,9 +36,9 @@ import {
 import {
     appendPlatformAiDecisions,
     normalizePlatformAiAudienceSettlements,
-    normalizePlatformAiPendingOneTimeObligations,
     normalizePlatformAiState,
     normalizeWorldPlatformAi,
+    reconcilePlatformAiRightsRenewalObligations,
     resolvePlatformController,
 } from './platformAiState';
 
@@ -425,7 +425,7 @@ export const calculatePlatformAiWeeklyEconomy = (
     for (const commitment of ai.externalCommitments) {
         protectedLocalizationObligationIds.add(commitment.obligationId);
     }
-    const pendingOneTimeObligations = normalizePlatformAiPendingOneTimeObligations([
+    const pendingOneTimeObligations = reconcilePlatformAiRightsRenewalObligations([
         ...ai.pendingOneTimeObligations,
         ...requestedOneTimeCosts.map(item => ({
             id: createDeterministicId(
@@ -441,7 +441,7 @@ export const calculatePlatformAiWeeklyEconomy = (
             status: 'HELD' as const,
             settledWeek: null,
         })),
-    ], protectedLocalizationObligationIds);
+    ], ai.rightsRenewals, protectedLocalizationObligationIds);
     const heldAtOpening = pendingOneTimeObligations.filter(obligation => obligation.status === 'HELD');
     const oneTimeAccrued = (category: PlatformAiExpenseClass): number => roundMillions(heldAtOpening
         .filter(obligation => obligation.category === category)
@@ -482,8 +482,8 @@ export const calculatePlatformAiWeeklyEconomy = (
         .filter(commitment => commitment.status === 'PENDING_PAYMENT')
         .map(commitment => [commitment.obligationId, commitment]));
     let externalCommitmentShortfallMillions = 0;
-    const nextPendingOneTimeObligations = normalizePlatformAiPendingOneTimeObligations(
-        pendingOneTimeObligations.map((obligation): PlatformAiPendingOneTimeObligation => {
+    const settledPendingOneTimeObligations = pendingOneTimeObligations.map(
+        (obligation): PlatformAiPendingOneTimeObligation => {
             if (obligation.status === 'SETTLED') return obligation;
             const externalCommitment = pendingExternalByObligationId.get(obligation.id);
             if (externalCommitment) {
@@ -503,11 +503,10 @@ export const calculatePlatformAiWeeklyEconomy = (
                 settledByCategory[obligation.category] + obligation.amountMillions,
             );
             return { ...obligation, status: 'SETTLED', settledWeek: input.absoluteWeek };
-        }),
-        protectedLocalizationObligationIds,
+        },
     );
     const heldAtOpeningIds = new Set(heldAtOpening.map(obligation => obligation.id));
-    const newlySettledObligationIds = new Set(nextPendingOneTimeObligations
+    const newlySettledObligationIds = new Set(settledPendingOneTimeObligations
         .filter(obligation => (
             heldAtOpeningIds.has(obligation.id)
             && obligation.status === 'SETTLED'
@@ -518,9 +517,18 @@ export const calculatePlatformAiWeeklyEconomy = (
         record.status === 'PENDING_PAYMENT'
         && record.paymentSettledAtAbsoluteWeek === null
         && newlySettledObligationIds.has(record.obligationId)
-            ? { ...record, paymentSettledAtAbsoluteWeek: input.absoluteWeek }
+            ? {
+                ...record,
+                status: 'PAYMENT_SETTLED' as const,
+                paymentSettledAtAbsoluteWeek: input.absoluteWeek,
+            }
             : record
     ));
+    const nextPendingOneTimeObligations = reconcilePlatformAiRightsRenewalObligations(
+        settledPendingOneTimeObligations,
+        rightsRenewals,
+        protectedLocalizationObligationIds,
+    );
     const localizationJobs = ai.localizationJobs.map(job => (
         job.status === 'WAITING_FOR_FUNDS'
         && job.startedAtAbsoluteWeek === null

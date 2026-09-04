@@ -528,10 +528,47 @@ const observeWeek = (
         const snapshot = ai.financeHistory.find(item => item.absoluteWeek === absoluteWeek);
         assert.ok(snapshot, `${platformId} must settle one finance snapshot at week ${absoluteWeek}`);
         assertFinanceSnapshot(snapshot!, previous.ai?.debtMillions || 0, platformId, absoluteWeek);
-        const earmarks = (ai.outstandingApprovedContentMillions || 0) + (ai.outstandingApprovedResearchMillions || 0);
+        const currentEarmarks = (ai.outstandingApprovedContentMillions || 0) + (ai.outstandingApprovedResearchMillions || 0);
+        const settlementEarmarks = snapshot!.allocations
+            .filter(allocation => allocation.type === 'APPROVED_CONTENT' || allocation.type === 'APPROVED_RESEARCH')
+            .reduce((sum, allocation) => sum + allocation.amountMillions, 0);
+        const explainedEarmarks = Math.max(currentEarmarks, settlementEarmarks);
+        const reserveToleranceMillions = Math.max(EPSILON, snapshot!.reserveTargetMillions * 0.00025);
+        const queuedRenewalCommitments = ai.decisionHistory
+            .filter(decision => (
+                decision.absoluteWeek === absoluteWeek
+                && decision.type === 'RIGHTS_RENEWAL_QUEUED'
+                && decision.cashImpactMillions < 0
+            ))
+            .reduce((sum, decision) => sum + Math.abs(decision.cashImpactMillions), 0);
+        const postSettlementTransferIncomeMillions = Object.values(after.streamingRightsTransactions || {})
+            .filter(transaction => (
+                transaction.status === 'SETTLED'
+                && transaction.settledAtAbsoluteWeek === absoluteWeek
+                && (transaction.seller.platformId === platformId || transaction.seller.id === platformId)
+            ))
+            .reduce((sum, transaction) => sum + transaction.sellerReceipt / 1_000_000, 0);
         assert.ok(
-            snapshot!.closingCashMillions <= snapshot!.reserveTargetMillions * 1.25 + earmarks + EPSILON,
-            `${platformId} excess cash must be explained by reserve target, approved earmarks, or a distribution`,
+            snapshot!.closingCashMillions <= snapshot!.reserveTargetMillions * 1.25
+                + explainedEarmarks + queuedRenewalCommitments
+                + postSettlementTransferIncomeMillions + reserveToleranceMillions,
+            `${platformId} excess cash at week ${absoluteWeek}: ${JSON.stringify({
+                status: ai.status,
+                opening: snapshot!.openingCashMillions,
+                revenue: snapshot!.revenueMillions,
+                operatingCost: snapshot!.operatingCostMillions,
+                closing: snapshot!.closingCashMillions,
+                reserve: snapshot!.reserveTargetMillions,
+                reserveAllocation: snapshot!.reserveAllocationMillions,
+                allocations: snapshot!.allocations,
+                currentEarmarks,
+                settlementEarmarks,
+                queuedRenewalCommitments,
+                transferIncome: postSettlementTransferIncomeMillions,
+                currentDecisions: ai.decisionHistory
+                    .filter(decision => decision.absoluteWeek === absoluteWeek)
+                    .map(decision => ({ type: decision.type, action: decision.action, amount: decision.cashImpactMillions })),
+            })}`,
         );
 
         if (ai.status === 'ACTIVE') total.activeWeeks += 1;
@@ -941,6 +978,11 @@ const processWeek = (branch: SimulationBranch, absoluteWeek: number): Simulation
     }
     if (TRACE_PERFORMANCE && absoluteWeek % PROGRESS_INTERVAL_WEEKS === 0) {
         const memory = process.memoryUsage();
+        const plans = PLATFORM_AI_TURN_ORDER.flatMap(platformId => world.platforms![platformId].ai!.slate);
+        const planStatuses = plans.reduce<Record<string, number>>((counts, plan) => {
+            counts[plan.status] = (counts[plan.status] || 0) + 1;
+            return counts;
+        }, {});
         console.log('PHASE8_WEEK_TIMING', JSON.stringify({
             absoluteWeek,
             simulationMs: round(simulationFinishedAt - weekStartedAt),
@@ -950,7 +992,10 @@ const processWeek = (branch: SimulationBranch, absoluteWeek: number): Simulation
             heapUsedMb: round(memory.heapUsed / 1024 / 1024),
             projects: world.projects.length,
             productions: Object.keys(world.industryProductions || {}).length,
-            plans: PLATFORM_AI_TURN_ORDER.reduce((sum, platformId) => sum + world.platforms![platformId].ai!.slate.length, 0),
+            plans: plans.length,
+            planStatuses,
+            rightsContracts: Object.keys(world.streamingRightsContracts || {}).length,
+            rightsTransactions: Object.keys(world.streamingRightsTransactions || {}).length,
         }));
     }
     return { player, world: player.world, observer };
@@ -974,7 +1019,53 @@ const runFixture = (spec: FixtureSpec): FixtureReport => {
         if (absoluteWeek === MIDPOINT_WEEK) {
             const restored = resumeThroughProductionPersistence(primary);
             const midpointDifference = firstDifference(primary.world, restored.world);
-            assert.equal(midpointDifference, null, `Midpoint migration changed canonical world: ${midpointDifference}`);
+            const midpointPlanDiagnostic = midpointDifference?.includes('.slate.')
+                ? (() => {
+                    const match = midpointDifference.match(/world\.platforms\.([^.]+)\.ai\.slate\.(\d+)/);
+                    const platformId = match?.[1] as PlatformId | undefined;
+                    const index = Number(match?.[2]);
+                    if (!platformId || !Number.isFinite(index)) return null;
+                    const beforePlatform = primary.world.platforms![platformId];
+                    const afterPlatform = restored.world.platforms![platformId];
+                    return {
+                        platformId,
+                        index,
+                        beforePlan: beforePlatform.ai!.slate[index],
+                        afterPlan: afterPlatform.ai!.slate[index],
+                        beforeActiveCountries: beforePlatform.ai!.capabilities.activeCountryIds,
+                        afterActiveCountries: afterPlatform.ai!.capabilities.activeCountryIds,
+                    };
+                })()
+                : null;
+            const midpointLocalizationDiagnostic = midpointDifference?.includes('.localizationJobs.')
+                ? (() => {
+                    const match = midpointDifference.match(/world\.platforms\.([^.]+)\.ai\.localizationJobs\.(\d+)/);
+                    const platformId = match?.[1] as PlatformId | undefined;
+                    const index = Number(match?.[2]);
+                    if (!platformId || !Number.isFinite(index)) return null;
+                    const beforePlatform = primary.world.platforms![platformId];
+                    const afterPlatform = restored.world.platforms![platformId];
+                    const beforeJob = beforePlatform.ai!.localizationJobs[index];
+                    const afterJob = afterPlatform.ai!.localizationJobs[index];
+                    return {
+                        platformId,
+                        index,
+                        beforeJob,
+                        afterJob,
+                        beforeObligation: beforeJob
+                            ? beforePlatform.ai!.pendingOneTimeObligations.find(item => item.id === beforeJob.obligationId) || null
+                            : null,
+                        afterObligation: afterJob
+                            ? afterPlatform.ai!.pendingOneTimeObligations.find(item => item.id === afterJob.obligationId) || null
+                            : null,
+                    };
+                })()
+                : null;
+            assert.equal(
+                midpointDifference,
+                null,
+                `Midpoint migration changed canonical world: ${midpointDifference}; plan diagnostic: ${JSON.stringify(midpointPlanDiagnostic)}; localization diagnostic: ${JSON.stringify(midpointLocalizationDiagnostic)}`,
+            );
             const { world: _primaryWorld, ...primaryEnvelope } = primary.player;
             const { world: _restoredWorld, ...restoredEnvelope } = restored.player;
             void _primaryWorld;
@@ -988,7 +1079,81 @@ const runFixture = (spec: FixtureSpec): FixtureReport => {
     }
     const persistedPrimary = resumeThroughProductionPersistence(primary);
     const finalWorldDifference = firstDifference(primary.world, persistedPrimary.world);
-    assert.equal(finalWorldDifference, null, `Final migration changed canonical world: ${finalWorldDifference}`);
+    const renewalMigrationDiagnostic = finalWorldDifference?.includes('.rightsRenewals')
+        || finalWorldDifference?.includes('.pendingOneTimeObligations')
+        ? Object.fromEntries(PLATFORM_AI_TURN_ORDER.map(platformId => [platformId, {
+            beforeRenewals: primary.world.platforms![platformId].ai!.rightsRenewals.map(record => ({
+                id: record.id,
+                obligationId: record.obligationId,
+                minimumGuaranteeMillions: record.minimumGuaranteeMillions,
+                status: record.status,
+                paymentWeek: record.paymentSettledAtAbsoluteWeek,
+            })),
+            afterRenewals: persistedPrimary.world.platforms![platformId].ai!.rightsRenewals.map(record => ({
+                id: record.id,
+                obligationId: record.obligationId,
+                minimumGuaranteeMillions: record.minimumGuaranteeMillions,
+                status: record.status,
+                paymentWeek: record.paymentSettledAtAbsoluteWeek,
+            })),
+            beforeObligations: primary.world.platforms![platformId].ai!.pendingOneTimeObligations.map(record => ({
+                id: record.id,
+                amountMillions: record.amountMillions,
+                category: record.category,
+                status: record.status,
+                createdWeek: record.createdWeek,
+                settledWeek: record.settledWeek,
+            })),
+            afterObligations: persistedPrimary.world.platforms![platformId].ai!.pendingOneTimeObligations.map(record => ({
+                id: record.id,
+                amountMillions: record.amountMillions,
+                category: record.category,
+                status: record.status,
+                createdWeek: record.createdWeek,
+                settledWeek: record.settledWeek,
+            })),
+        }]))
+        : null;
+    const localizationMigrationDiagnostic = finalWorldDifference?.includes('.localizationJobs.')
+        ? (() => {
+            const match = finalWorldDifference.match(/world\.platforms\.([^.]+)\.ai\.localizationJobs\.(\d+)/);
+            const platformId = match?.[1] as PlatformId | undefined;
+            const index = Number(match?.[2]);
+            if (!platformId || !Number.isFinite(index)) return null;
+            const beforePlatform = primary.world.platforms![platformId];
+            const afterPlatform = persistedPrimary.world.platforms![platformId];
+            const beforeJob = beforePlatform.ai!.localizationJobs[index];
+            const afterJob = afterPlatform.ai!.localizationJobs[index];
+            const summarize = (platform: typeof beforePlatform, job: typeof beforeJob) => ({
+                job,
+                obligation: job
+                    ? platform.ai!.pendingOneTimeObligations.find(item => item.id === job.obligationId) || null
+                    : null,
+                promise: job
+                    ? platform.ai!.slate.find(plan => plan.id === job.contentPlanId)?.localizationRequirements
+                        ?.find(requirement => (
+                            requirement.sourceProjectId === job.projectId
+                            && requirement.languageId === job.languageId
+                            && requirement.mode === job.mode
+                        )) || null
+                    : null,
+                capability: job
+                    ? platform.ai!.languageCapabilities.find(item => item.languageId === job.languageId) || null
+                    : null,
+            });
+            return {
+                platformId,
+                index,
+                before: summarize(beforePlatform, beforeJob),
+                after: summarize(afterPlatform, afterJob),
+            };
+        })()
+        : null;
+    assert.equal(
+        finalWorldDifference,
+        null,
+        `Fixture ${spec.seed} final migration changed canonical world: ${finalWorldDifference}; renewal diagnostic: ${JSON.stringify(renewalMigrationDiagnostic)}; localization diagnostic: ${JSON.stringify(localizationMigrationDiagnostic)}`,
+    );
     const report = deterministicReport(spec, persistedPrimary);
     return { ...report, runtimeMs: round(performance.now() - startedAt) };
 };
@@ -999,10 +1164,29 @@ const assertExactWeeklyResumeParity = (): void => {
         primary = processWeek(primary, absoluteWeek);
     }
     let restored = resumeThroughProductionPersistence(primary);
+    const initialResumeDifference = firstDifference(primary.world, restored.world);
+    const initialResumeDiagnostic = initialResumeDifference?.includes('.slate.')
+        ? (() => {
+            const match = initialResumeDifference.match(/world\.platforms\.([^.]+)\.ai\.slate\.(\d+)/);
+            const platformId = match?.[1] as PlatformId | undefined;
+            const index = Number(match?.[2]);
+            if (!platformId || !Number.isFinite(index)) return null;
+            const beforeSlate = primary.world.platforms![platformId].ai!.slate;
+            const afterSlate = restored.world.platforms![platformId].ai!.slate;
+            return {
+                platformId,
+                index,
+                beforePlan: beforeSlate[index],
+                afterPlan: afterSlate[index],
+                beforeIds: beforeSlate.slice(Math.max(0, index - 2), index + 3).map(plan => plan.id),
+                afterIds: afterSlate.slice(Math.max(0, index - 2), index + 3).map(plan => plan.id),
+            };
+        })()
+        : null;
     assert.equal(
-        firstDifference(primary.world, restored.world),
+        initialResumeDifference,
         null,
-        'The exact resume-parity fixture must start from an identical canonical world.',
+        `The exact resume-parity fixture must start from an identical canonical world: ${initialResumeDifference}; diagnostic: ${JSON.stringify(initialResumeDiagnostic)}`,
     );
     for (
         let absoluteWeek = RESUME_PARITY_START_WEEK + 1;

@@ -3,6 +3,7 @@ import type {
     Business,
     Commitment,
     Genre,
+    IndustryContentFingerprint,
     LogEntry,
     Message,
     NewsItem,
@@ -153,6 +154,54 @@ const hasAutonomousProductionRunway = (studio: Business, estimatedBudget: number
         Math.min(75_000_000, Math.round(estimatedBudget * 0.2)),
     );
     return Number(studio.balance || 0) >= estimatedBudget + operatingReserve;
+};
+
+const formatMatchesMandate = (fingerprint: IndustryContentFingerprint, mandate: StudioOperatingMandate) => {
+    const projectType = fingerprint.format === 'MOVIE' ? 'MOVIE' : 'SERIES';
+    if (mandate.focus === 'MOVIES_FIRST' || mandate.focus === 'PRESTIGE_AWARDS') return projectType === 'MOVIE';
+    if (mandate.focus === 'SERIES_FIRST') return projectType === 'SERIES';
+    return true;
+};
+
+const sourceMatchesFingerprint = (
+    fingerprint: IndustryContentFingerprint,
+    source: SubsidiaryProjectSource,
+) => {
+    if (['ORIGINAL', 'INTERNAL_DEVELOPMENT', 'INHERITED'].includes(fingerprint.sourceIntent)) return source === 'ORIGINAL';
+    if (['ACQUIRED_IP', 'LICENSED_WORK'].includes(fingerprint.sourceIntent)) return source === 'OWNED_IP';
+    if (['SEQUEL', 'PREQUEL', 'REBOOT', 'SPIN_OFF'].includes(fingerprint.sourceIntent)) return source === 'FRANCHISE';
+    if (['UNIVERSE_ENTRY', 'UNIVERSE_CROSSOVER', 'UNIVERSE_EVENT'].includes(fingerprint.sourceIntent)) return source === 'UNIVERSE';
+    return false;
+};
+
+const getInheritedIntelligenceCandidate = (
+    studio: Business,
+    mandate: StudioOperatingMandate,
+    source: SubsidiaryProjectSource,
+) => {
+    const intelligence = studio.studioState?.industryHandoffSnapshot?.ai.intelligence;
+    if (!intelligence) return null;
+    const usedIds = new Set((studio.studioState?.subsidiaryProjectProposals || [])
+        .map(item => item.industryContentFingerprintId)
+        .filter((id): id is string => Boolean(id)));
+    const candidates = intelligence.content.selectedFingerprints
+        .filter(item => item.ownerCompanyId === studio.id)
+        .filter(item => item.lifecycle === 'SELECTED')
+        .filter(item => !usedIds.has(item.id))
+        .filter(item => formatMatchesMandate(item, mandate))
+        .filter(item => sourceMatchesFingerprint(item, source))
+        .map(fingerprint => ({
+            fingerprint,
+            decision: intelligence.proposals
+                .filter(item => item.contentFingerprintId === fingerprint.id)
+                .sort((left, right) => right.score.total - left.score.total || right.confidence - left.confidence)[0],
+        }))
+        .sort((left, right) => (
+            (right.decision?.score.total || 0) - (left.decision?.score.total || 0)
+            || right.fingerprint.createdAtAbsoluteWeek - left.fingerprint.createdAtAbsoluteWeek
+            || left.fingerprint.id.localeCompare(right.fingerprint.id)
+        ));
+    return candidates[0] || null;
 };
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
@@ -308,6 +357,7 @@ const buildSubsidiaryProjectDetails = (
         franchiseId: proposal.franchiseId,
         universeId: proposal.universeId,
         installmentNumber: proposal.installmentNumber,
+        industryContentFingerprintId: proposal.industryContentFingerprintId,
     };
 };
 
@@ -495,15 +545,21 @@ export const planSubsidiaryProject = (player: Player, studio: Business): Subsidi
     if (mandate.autoProduction === 'PAUSED') return null;
 
     const seed = `${studio.id}:${player.age}:${player.currentWeek}:${studio.studioState?.subsidiaryProjectProposals?.length || 0}`;
-    const projectType = chooseProjectType(mandate, seed);
     const sourceDecision = chooseSource(player, studio, mandate, seed);
-    const genre = chooseGenre(mandate, studio, `${seed}:genre`);
+    const inheritedIntelligence = getInheritedIntelligenceCandidate(studio, mandate, sourceDecision.source);
+    const projectType = inheritedIntelligence
+        ? inheritedIntelligence.fingerprint.format === 'MOVIE' ? 'MOVIE' : 'SERIES'
+        : chooseProjectType(mandate, seed);
+    const genre = inheritedIntelligence?.fingerprint.primaryGenre || chooseGenre(mandate, studio, `${seed}:genre`);
     const budgetTier = getBudgetTier(mandate, sourceDecision.source, studio);
     const estimatedBudget = getBudgetValue(budgetTier, projectType, mandate);
     if (!hasAutonomousProductionRunway(studio, estimatedBudget)) return null;
     const title = createTitle(seed, genre, sourceDecision.sourceLabel);
     const logic = [
         ...sourceDecision.logic,
+        ...(inheritedIntelligence ? [
+            `Inherited strategy selected from the studio's saved content intelligence${inheritedIntelligence.decision ? ` (decision score ${Math.round(inheritedIntelligence.decision.score.total)})` : ''}.`,
+        ] : []),
         `${projectType === 'SERIES' ? 'Series' : 'Movie'} format chosen from the ${mandate.focus.replaceAll('_', ' ').toLowerCase()} focus.`,
         `${budgetTier.toLowerCase()} budget chosen from ${mandate.budgetAppetite.toLowerCase()} appetite and ${formatMoneyShort(studio.balance)} studio capital.`,
         `${genre.replaceAll('_', ' ').toLowerCase()} genre selected from objective, creative appetite and rights fit.`,
@@ -530,6 +586,8 @@ export const planSubsidiaryProject = (player: Player, studio: Business): Subsidi
         franchiseId: sourceDecision.franchiseId,
         universeId: sourceDecision.universeId,
         installmentNumber: sourceDecision.installmentNumber,
+        industryContentFingerprintId: inheritedIntelligence?.fingerprint.id,
+        inheritedDecisionScore: inheritedIntelligence?.decision?.score.total,
         logline: createLogline(studio, partialProposal, mandate),
         mandateSnapshot: mandate,
         logic,
@@ -573,6 +631,7 @@ const createProjectAssetsFromProposal = (
             proposal.source.toLowerCase(),
             proposal.budgetTier.toLowerCase(),
             proposal.mandateSnapshot.objective.toLowerCase(),
+            ...(proposal.industryContentFingerprintId ? [`industry-fingerprint:${proposal.industryContentFingerprintId}`] : []),
         ],
         franchiseId: proposal.franchiseId,
         universeId: proposal.universeId,

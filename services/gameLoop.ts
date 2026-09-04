@@ -58,18 +58,21 @@ import { generateAgentOffers, generateManagerOffer, generateDirectOffer, getRand
 import { processStockMarket, calculatePortfolioValue, getDividendPayout, initializeStocks } from './stockLogic';
 import { AWARD_CALENDAR, checkAwardEligibility, AwardDefinition, createCanonicalAwardNominationId, resolveCanonicalAwardSeason, generateFullBallot, getAwardCeremonyYear, sanitizeAwardCeremonyEvent, sanitizeAwardHistoryEntries, sanitizeAwardRecords } from './awardLogic';
 import { createDeterministicId } from './deterministicRandom';
+import { isPlayerCastInProject, isPlayerDirectingProject } from './ownedProductionCareer';
+import { processDynastyCareerWeek } from './dynastyCareer';
 import { PLATFORM_AI_PROFILES } from './platformAi/platformAiProfiles';
 import {
     generatePlatformAiPlayerCommissionOffers,
-    processStreamingIndustryWorldWeek,
     syncPlatformAiPlayerCommissionProductions,
 } from './platformAi';
+import { processIndustryWorldWeek } from './industryWorld';
 import { calculateStreamingAdvertisingRevenueFullCurrency, calculateStreamingSubscriptionRevenueFullCurrency } from './streamingEconomyCore';
 import { attributeStreamingTitleRevenue, settleStreamingContractRoyaltyForPlayer } from './streamingContractSettlement';
 import { processStreamingRightsCalendarWeek } from './streamingRightsCalendar';
 import { processStreamingCataloguePackagesWeek } from './streamingCataloguePackages';
 import { processStreamingCataloguePackageStrategyAutomation } from './streamingCataloguePackageAutomation';
-import { processWorldTurn, generateIndustryProject } from './worldLogic'; 
+import { processStreamingRightsOfficeWeek } from './streamingRightsOffice';
+import { processWorldTurn } from './worldLogic';
 import { generateFamousMovieOpportunity, generateCameoOffer } from './famousMovieLogic'; 
 import { calculateYoutubeCreatorScore, generateMusicVideoFeatureOffer, generateYoutubeBrandDeal, generateYoutubeCollabOffer, getYoutubePublicImageLabel, processYoutubeChannel } from './youtubeLogic';
 import { getInstagramPostComments, pickInstagramMicroBrand } from './instagramLogic';
@@ -130,7 +133,7 @@ import {
 import { evaluatePostReleaseReality } from './marketingReality';
 import { applyHealthConditionIncident, getHealthConditionLabel, processHealthConditionsWeek } from './healthConditions';
 import { addMusicCultureMoment, applyMusicImpactToHiddenStats, calculateProjectMusicImpact, calculateWeeklySoundtrackRevenue, createMusicCultureMoment, getMusicArtistCatalog, mergeSoundtrackRevenueBreakdowns, processMusicIndustryWeek, withAutomaticMusicPlan } from './musicIndustry';
-import { getActorCareerArcTransition } from './actorCareerArc';
+import { getActorCareerArc, getActorCareerArcTransitionFromPrevious } from './actorCareerArc';
 import { applyInvestorPayoutMemory, calculateInvestorPayout, processInvestorLeadershipChanges } from './projectInvestors';
 import { buildOutsideProducerInvestmentMessage, generateOutsideProducerInvestmentOffers, getOutsideProducerOfferCadenceWeeks, processOutsideProductionsWeek } from './outsideProductions';
 import { buildEpisodeRatingsStory, generateEpisodeRatings, getEpisodeRatingsGameplayImpact } from './episodeRatings';
@@ -1539,7 +1542,7 @@ export const processGameWeek = async (
     };
     emitLoopStage('state_cloned');
     const language = getPlayerLanguage(nextPlayer);
-    const actorArcBeforeWeek = JSON.parse(JSON.stringify(nextPlayer)) as Player;
+    const actorArcBeforeWeek = getActorCareerArc(nextPlayer);
     const getCommitmentDisplayName = (commitment: Commitment, currentLanguage: GameLanguage = language) => {
         if (!commitment.nameKey) return commitment.name;
         const translated = t(currentLanguage, commitment.nameKey);
@@ -2076,6 +2079,9 @@ export const processGameWeek = async (
         const worldResult = processWorldTurn(nextPlayer);
         nextPlayer.world = worldResult.world;
         nextPlayer.news = [...worldResult.news, ...nextPlayer.news].slice(0, 50);
+        if (worldResult.socialPosts.length > 0) {
+            nextPlayer.x.feed = [...worldResult.socialPosts, ...(nextPlayer.x.feed || [])].slice(0, 80);
+        }
         if (worldResult.logs?.length) {
             worldResult.logs.forEach(message => logsToAdd.push({ msg: `🏢 ${message}`, type: 'neutral' }));
         }
@@ -4026,7 +4032,12 @@ export const processGameWeek = async (
     
     nextPlayer.commitments.forEach(c => {
         let updatedC = { ...c };
-        if (c.type === 'ACTING_GIG' && (c.projectPhase === 'AUDITION' || c.projectPhase === 'PRODUCTION')) {
+        const isPersonalCareerRole = c.type === 'ACTING_GIG'
+            ? isPlayerCastInProject(c)
+            : c.type === 'DIRECTOR_GIG'
+                ? (isPlayerDirectingProject(c) || !c.projectDetails?.directorId)
+                : c.type === 'WRITER_GIG';
+        if (c.type === 'ACTING_GIG' && isPersonalCareerRole && (c.projectPhase === 'AUDITION' || c.projectPhase === 'PRODUCTION')) {
             const passivePoints = calculatePassiveGain(nextPlayer.stats.talent);
             if (passivePoints > 0) {
                 if (c.projectPhase === 'AUDITION') updatedC.auditionPerformance = Math.min(100, (updatedC.auditionPerformance || 0) + passivePoints);
@@ -4085,7 +4096,7 @@ export const processGameWeek = async (
                 logsToAdd.push({ msg: `🎬 Pre-production wrapped for "${updatedC.name}". Filming begins!`, type: 'positive' });
                 nextCommitments.push({ ...updatedC, projectPhase: 'PRODUCTION', phaseWeeksLeft: duration, totalPhaseDuration: duration, productionPerformance: 0 });
                 // FIX: Grant +1 Experience here for roles that skipped the 'AUDITION' phase (like Direct Offers) to ensure progression
-                nextPlayer.stats.experience = Math.min(100, nextPlayer.stats.experience + 1);
+                if (isPersonalCareerRole) nextPlayer.stats.experience = Math.min(100, nextPlayer.stats.experience + 1);
             } else { nextCommitments.push({ ...updatedC, phaseWeeksLeft: weeksLeft }); }
         } else if (updatedC.projectPhase === 'AUDITION') {
             if (weeksLeft <= 0) {
@@ -4172,7 +4183,7 @@ export const processGameWeek = async (
                 logsToAdd.push({ msg: `🎬 Creative Decision needed for "${updatedC.name}"!`, type: 'neutral' });
             }
 
-            const productionHealthIncident = getProductionHealthIncident(nextPlayer, updatedC);
+            const productionHealthIncident = isPersonalCareerRole ? getProductionHealthIncident(nextPlayer, updatedC) : null;
             if (productionHealthIncident) {
                 const incident = applyHealthConditionIncident(nextPlayer, productionHealthIncident, {
                     sourceLabel: `Production on "${updatedC.name}"`,
@@ -4310,7 +4321,7 @@ export const processGameWeek = async (
                     logsToAdd.push({ msg: `🌍 RELEASE DAY: "${updatedC.name}" hits theaters! IMDb Page Created.`, type: 'positive' });
                 }
                 
-                if (updatedC.lumpSum) {
+                if (updatedC.lumpSum && isPersonalCareerRole) {
                     let finalPay = updatedC.lumpSum;
                     if (updatedC.agentCommission) {
                         const commAmt = Math.floor(finalPay * updatedC.agentCommission);
@@ -4322,17 +4333,19 @@ export const processGameWeek = async (
                 }
                 
                 if (updatedC.projectDetails) {
-                    const releaseExperienceGain = calculateProjectExperienceGain(
-                        getPlayerProjectRoleType(updatedC.roleType, updatedC.projectDetails.castList),
-                        imdb,
-                        updatedC.projectDetails.budgetTier,
-                        updatedC.projectDetails.isFamous,
-                        isStudioProject
-                    );
-	                    nextPlayer.stats.experience = Math.min(100, nextPlayer.stats.experience + releaseExperienceGain);
-	                    rewardGenreExperience(nextPlayer, updatedC.projectDetails.genre, Math.max(1, releaseExperienceGain * 0.8));
-	                    if (releaseExperienceGain > 1) {
-	                        logsToAdd.push({ msg: `🎭 Career XP: "${updatedC.name}" added ${releaseExperienceGain} experience from a meaningful credit.`, type: 'positive' });
+                    if (isPersonalCareerRole) {
+                        const releaseExperienceGain = calculateProjectExperienceGain(
+                            getPlayerProjectRoleType(updatedC.roleType, updatedC.projectDetails.castList),
+                            imdb,
+                            updatedC.projectDetails.budgetTier,
+                            updatedC.projectDetails.isFamous,
+                            isStudioProject
+                        );
+	                        nextPlayer.stats.experience = Math.min(100, nextPlayer.stats.experience + releaseExperienceGain);
+	                        rewardGenreExperience(nextPlayer, updatedC.projectDetails.genre, Math.max(1, releaseExperienceGain * 0.8));
+	                        if (releaseExperienceGain > 1) {
+	                            logsToAdd.push({ msg: `🎭 Career XP: "${updatedC.name}" added ${releaseExperienceGain} experience from a meaningful credit.`, type: 'positive' });
+	                        }
 	                    }
 
                     let accumulatedBuzz = updatedC.promotionalBuzz || 0;
@@ -6410,15 +6423,34 @@ export const processGameWeek = async (
         signed_packages: streamingCataloguePackageAutomationResult.signedPackageIds.length,
     });
 
+    emitLoopStage('streaming_rights_office_start', { absolute_week: enteredStreamingAbsoluteWeek });
+    const streamingRightsOfficeResult = processStreamingRightsOfficeWeek(nextPlayer, enteredStreamingAbsoluteWeek);
+    nextPlayer = streamingRightsOfficeResult.player;
+    if (streamingRightsOfficeResult.digest) {
+        logsToAdd.push({
+            msg: `🗂️ Rights Office: ${streamingRightsOfficeResult.digest.summary}.`,
+            type: streamingRightsOfficeResult.digest.actionRequired > 0 ? 'negative' : 'neutral',
+        });
+    }
+    emitLoopStage('streaming_rights_office_done', {
+        absolute_week: enteredStreamingAbsoluteWeek,
+        action_required: streamingRightsOfficeResult.digest?.actionRequired || 0,
+        delegated_decisions: streamingRightsOfficeResult.digest?.delegatedDecisions || 0,
+    });
+
     emitLoopStage('streaming_industry_start');
-    const streamingIndustryResult = processStreamingIndustryWorldWeek(
+    const streamingIndustryResult = processIndustryWorldWeek(
         nextPlayer,
         nextPlayer.world,
         enteredStreamingAbsoluteWeek,
     );
+    nextPlayer = streamingIndustryResult.player;
     nextPlayer.world = streamingIndustryResult.world;
-    nextPlayer.news = [...streamingIndustryResult.news, ...nextPlayer.news].slice(0, 50);
     streamingIndustryResult.logs.forEach(message => logsToAdd.push({ msg: `🏢 ${message}`, type: 'neutral' }));
+    const dynastyCareerResult = processDynastyCareerWeek(nextPlayer, enteredStreamingAbsoluteWeek);
+    nextPlayer = dynastyCareerResult.player;
+    nextPlayer.news = [...dynastyCareerResult.news, ...nextPlayer.news].slice(0, 50);
+    dynastyCareerResult.logs.forEach(message => logsToAdd.push({ msg: `👑 ${message}`, type: 'neutral' }));
     const playerCommissionGeneration = generatePlatformAiPlayerCommissionOffers(
         nextPlayer,
         enteredStreamingAbsoluteWeek,
@@ -6971,7 +7003,7 @@ export const processGameWeek = async (
         subsidiaries: nextPlayer.businesses?.filter(business => (business as any).parentStudioId).length || 0,
     });
 
-    const actorArcTransition = getActorCareerArcTransition(actorArcBeforeWeek, nextPlayer);
+    const actorArcTransition = getActorCareerArcTransitionFromPrevious(actorArcBeforeWeek, nextPlayer);
     const currentArcAbsoluteWeek = getAbsoluteWeek(nextPlayer.age, nextPlayer.currentWeek);
     const lastArcNotificationWeek = Number(nextPlayer.flags?.lastActorArcNotificationAbsoluteWeek ?? -999);
     const arcNotificationReady = currentArcAbsoluteWeek - lastArcNotificationWeek >= 4;

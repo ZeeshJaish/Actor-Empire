@@ -186,6 +186,22 @@
 .rights-listing-body dl div { display: grid; gap: 2px; padding: 8px; border-radius: 10px; background: rgba(255,255,255,.035); }
 .rights-listing-body dt { color: #64748b; font-size: .57rem; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
 .rights-listing-body dd { overflow: hidden; margin: 0; color: #e2e8f0; font-size: .69rem; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
+.rights-transfer-chain {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: -2px 0 11px;
+  padding: 7px 0;
+  color: #65748a;
+  border-top: 1px solid rgba(148,163,184,.1);
+  border-bottom: 1px solid rgba(148,163,184,.1);
+}
+.rights-transfer-chain > span { min-width: 0; flex: 1; display: grid; gap: 2px; }
+.rights-transfer-chain > span:last-child { text-align: right; }
+.rights-transfer-chain small { color: #65748a; font-size: .52rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.rights-transfer-chain strong { overflow: hidden; color: #dbe7f4; font-size: .65rem; text-overflow: ellipsis; white-space: nowrap; }
+.rights-inherited-actions { display: flex; align-items: center; gap: 6px; margin: -5px 0 10px; color: #6ee7b7; font-size: .58rem; font-weight: 750; }
+.rights-inherited-actions.is-blocked { color: #fb923c; }
 .rights-listing-body > button,
 .rights-empty-board button,
 .rights-empty-deal button,
@@ -204,6 +220,21 @@
   font-size: .72rem;
   font-weight: 800;
 }
+.rights-listing-body > button:disabled { cursor: not-allowed; opacity: .42; }
+
+.rights-fixed-transfer-terms {
+  display: grid;
+  gap: 5px;
+  margin: 14px 18px 0;
+  padding: 12px 0;
+  border-top: 1px solid rgba(103,232,249,.18);
+  border-bottom: 1px solid rgba(103,232,249,.18);
+}
+.rights-fixed-transfer-terms span { color: #67e8f9; font-size: .58rem; font-weight: 850; letter-spacing: .11em; }
+.rights-fixed-transfer-terms strong { color: #e6fbff; font-size: .76rem; }
+.rights-fixed-transfer-terms small { color: #748399; font-size: .62rem; line-height: 1.5; }
+.rights-term-grid.is-exact-transfer { grid-template-columns: minmax(220px, .55fr); }
+.rights-clause-board.is-transfer { display: flex; align-items: center; gap: 8px; color: #a9b6c8; font-size: .65rem; }
 
 .rights-empty-board,
 .rights-empty-deal {
@@ -386,6 +417,8 @@
   .rights-listing-body { padding: 13px; }
   .rights-listing-body dl { grid-template-columns: 1fr; }
   .rights-listing-body dl div:nth-child(n+3) { display: none; }
+  .rights-listing-card.is-transfer .rights-listing-body dl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .rights-listing-card.is-transfer .rights-listing-body dl div:nth-child(n+3) { display: grid; }
   .rights-negotiation-table > header { align-items: start; flex-direction: column; padding: 16px; }
   .rights-rival-strip { grid-template-columns: auto 1fr; padding: 11px 16px; }
   .rights-rival-strip strong, .rights-rival-strip small { grid-column: 2; }

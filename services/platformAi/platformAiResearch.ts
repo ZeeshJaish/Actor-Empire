@@ -25,7 +25,13 @@ import {
     previewStreamingTechnologyProject,
 } from '../streamingTechnologyCampus';
 import { fullCurrencyToMillions } from '../streamingRightsCore';
-import { appendPlatformAiDecisions, normalizePlatformAiState, resolvePlatformController } from './platformAiState';
+import {
+    appendPlatformAiDecisions,
+    getPlatformAiLocalizationCoverageFromContentOperations,
+    normalizePlatformAiLocalizationPromises,
+    normalizePlatformAiState,
+    resolvePlatformController,
+} from './platformAiState';
 import { createPlatformAiEfficiencySnapshot } from './platformAiEfficiency';
 import { getPlatformAiOperatingProfile } from './platformAiOperatingProfiles';
 import {
@@ -100,14 +106,38 @@ export const clampPlatformContentPlanSupport = (
 ): PlatformAiContentPlan => {
     const supportedLocalization = resolvePlatformLocalizationLevel(capabilities);
     const requestedLocalization = plan.localizationLevel || 'NONE';
-    const localizationLevel = LOCALIZATION_RANK[requestedLocalization] <= LOCALIZATION_RANK[supportedLocalization]
+    const historical = ['RELEASED', 'CANCELLED', 'SOLD'].includes(plan.status);
+    const localizationLevel = historical
         ? requestedLocalization
-        : supportedLocalization;
+        : LOCALIZATION_RANK[requestedLocalization] <= LOCALIZATION_RANK[supportedLocalization]
+            ? requestedLocalization
+            : supportedLocalization;
     const supportedCountries = new Set(normalizeStreamingDayOneMarketIds(capabilities.activeCountryIds));
+    const releaseCountryIds = normalizeStreamingDayOneMarketIds(plan.releaseCountryIds);
+    const nextReleaseCountryIds = historical
+        ? releaseCountryIds
+        : releaseCountryIds.filter(countryId => supportedCountries.has(countryId));
+    const releaseCountrySet = new Set(nextReleaseCountryIds);
+    const supportedLocalizationRequirements = historical
+        ? plan.localizationRequirements
+        : localizationLevel === 'NONE'
+            ? []
+            : (plan.localizationRequirements || []).flatMap(requirement => {
+                if (localizationLevel === 'SUBTITLES' && requirement.mode !== 'SUBTITLE') return [];
+                const countryIds = normalizeStreamingDayOneMarketIds(requirement.countryIds)
+                    .filter(countryId => releaseCountrySet.has(countryId)).sort();
+                return countryIds.length ? [{ ...requirement, countryIds }] : [];
+            });
+    const localizationRequirements = normalizePlatformAiLocalizationPromises(
+        supportedLocalizationRequirements,
+        nextReleaseCountryIds,
+        localizationLevel,
+    );
     return {
         ...plan,
         localizationLevel,
-        releaseCountryIds: normalizeStreamingDayOneMarketIds(plan.releaseCountryIds).filter(countryId => supportedCountries.has(countryId)),
+        localizationRequirements,
+        releaseCountryIds: nextReleaseCountryIds,
     };
 };
 
@@ -298,7 +328,11 @@ export const progressPlatformResearch = (
         return item;
     });
     if (!changedItems.length) return { world: input.world, changed: false, changedItems: [], item: null, reason: 'UNCHANGED' };
-    const capabilities = { ...ai.capabilities, technologyLevels };
+    const capabilities = {
+        ...ai.capabilities,
+        technologyLevels,
+        ...getPlatformAiLocalizationCoverageFromContentOperations(technologyLevels.CONTENT_OPERATIONS),
+    };
     const slate = ai.slate.map(plan => clampPlatformContentPlanSupport(plan, capabilities));
     const nextPlatform = {
         ...platform,

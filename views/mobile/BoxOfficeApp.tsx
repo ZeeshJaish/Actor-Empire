@@ -4,12 +4,14 @@ import { PLATFORMS } from '../../services/streamingLogic';
 import { getBoxOfficeRegionLabel, getBoxOfficeRegionShortLabel, getCinemaChainById } from '../../services/cinemaChains';
 import { getProjectIdentityLabel } from '../../services/genreCatalog';
 import { getProjectReleaseLabel } from '../../services/releaseTiming';
-import { getStreamingWeeksUntilStart } from '../../services/legacyLogic';
+import { getAbsoluteWeek, getStreamingWeeksUntilStart } from '../../services/legacyLogic';
 import { getPlayerLanguage, t } from '../../services/i18n';
 import { ArrowLeft, BarChart3, TrendingUp, ChevronRight, Radio, Trophy, Building2, Medal } from 'lucide-react';
 import { CinemaChainLogo } from '../lifestyle/business/components/CinemaChainLogo';
 import { getProjectFundingEconomics } from '../../services/projectFundingEconomics';
 import { RolePerformanceReport } from '../../components/RolePerformanceReport';
+import { getDynastyCareerArchives } from '../../services/dynastyCareer';
+import { getCanonicalReleasedMarketProjects } from '../../services/industryWorld/publicIndustryProjection';
 
 interface BoxOfficeAppProps {
   player: Player;
@@ -80,16 +82,6 @@ type BoxOfficeArchiveEntry = {
     releaseRecord: ActiveRelease;
 };
 
-const SIMULATED_WEEKLY_MARKET: Omit<WeeklyChartEntry, 'weeklyGross' | 'previousGross' | 'studioReceipts' | 'runWeek'>[] = [
-    { id: 'market_starfall', title: 'Starfall Empire', source: 'MARKET', screens: 18400, budget: 210_000_000, imdbRating: 7.4 },
-    { id: 'market_lakehouse', title: 'Lakehouse Letters', source: 'MARKET', screens: 5200, budget: 42_000_000, imdbRating: 8.1 },
-    { id: 'market_hardline', title: 'Hardline Unit', source: 'MARKET', screens: 11200, budget: 96_000_000, imdbRating: 6.9 },
-    { id: 'market_little_moon', title: 'Little Moon Club', source: 'MARKET', screens: 3100, budget: 14_000_000, imdbRating: 8.4 },
-    { id: 'market_haunted_signal', title: 'The Haunted Signal', source: 'MARKET', screens: 7400, budget: 28_000_000, imdbRating: 6.6 },
-    { id: 'market_palace_heist', title: 'Palace Heist', source: 'MARKET', screens: 9800, budget: 72_000_000, imdbRating: 7.2 },
-    { id: 'market_frost_city', title: 'Frost City', source: 'MARKET', screens: 4300, budget: 38_000_000, imdbRating: 7.8 }
-];
-
 const hashString = (value: string): number => {
     let hash = 2166136261;
     for (let index = 0; index < value.length; index += 1) {
@@ -114,7 +106,13 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
   
   // Safe access to arrays
   const activeReleases = player.activeReleases || [];
-  const legacyCareerArchive = player.flags?.legacyCareerArchive || (
+  const dynastyCareerArchives = getDynastyCareerArchives(player);
+  const legacyCareerArchive = dynastyCareerArchives.length > 0
+      ? {
+          pastProjects: dynastyCareerArchives.flatMap(archive => Array.isArray(archive.pastProjects) ? archive.pastProjects : []),
+          activeReleases: dynastyCareerArchives.flatMap(archive => Array.isArray(archive.activeReleases) ? archive.activeReleases : []),
+        }
+      : player.flags?.legacyCareerArchive || (
       Array.isArray(player.flags?.legacyStudioProjects)
           ? {
               pastProjects: player.flags.legacyStudioProjects,
@@ -340,24 +338,28 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
   };
 
   const getSimulatedMarketEntries = (): WeeklyChartEntry[] => {
-      const weekSeed = Math.max(1, player.currentWeek || 1);
-      return SIMULATED_WEEKLY_MARKET.map((entry, index) => {
-          const releaseAge = ((weekSeed + index * 2) % 6) + 1;
-          const baseOpening = Math.max(8_000_000, entry.budget * (0.32 + (index % 3) * 0.08));
-          const holdCurve = Math.pow(0.63 + ((entry.imdbRating || 7) - 6.5) * 0.035, Math.max(0, releaseAge - 1));
-          const marketPulse = 0.88 + (((weekSeed * (index + 3)) % 17) / 50);
-          const weeklyGross = Math.round(baseOpening * holdCurve * marketPulse);
-          const previousGross = releaseAge <= 1
-              ? undefined
-              : Math.round(baseOpening * Math.pow(0.63 + ((entry.imdbRating || 7) - 6.5) * 0.035, Math.max(0, releaseAge - 2)) * (0.92 + (((weekSeed + index) % 11) / 60)));
-          const studioShare = 0.51 + (index % 4) * 0.015;
-
+      const currentAbsolute = getAbsoluteWeek(player.age, player.currentWeek);
+      return getCanonicalReleasedMarketProjects(player.world, currentAbsolute, 8).map(project => {
+          const releasedAbsolute = getAbsoluteWeek(project.year, project.weekReleased);
+          const runWeek = Math.max(1, currentAbsolute - releasedAbsolute + 1);
+          const rating = project.rating || Math.max(1, Math.min(10, project.quality / 10));
+          const opening = Math.max(250_000, project.boxOffice * (0.3 + Math.min(0.1, Math.max(0, rating - 6.5) * 0.02)));
+          const hold = 0.54 + Math.min(0.18, Math.max(0, rating - 6) * 0.04);
+          const weeklyGross = Math.round(opening * Math.pow(hold, runWeek - 1));
+          const previousGross = runWeek <= 1 ? undefined : Math.round(opening * Math.pow(hold, runWeek - 2));
+          const budget = project.budgetTier === 'BLOCKBUSTER' ? 220_000_000 : project.budgetTier === 'HIGH' ? 130_000_000 : project.budgetTier === 'MID' ? 60_000_000 : 18_000_000;
+          const screens = project.budgetTier === 'BLOCKBUSTER' ? 18_000 : project.budgetTier === 'HIGH' ? 11_000 : project.budgetTier === 'MID' ? 5_500 : 2_000;
           return {
-              ...entry,
+              id: project.id,
+              title: project.title,
+              source: 'MARKET',
               weeklyGross,
               previousGross,
-              studioReceipts: Math.round(weeklyGross * studioShare),
-              runWeek: releaseAge
+              studioReceipts: Math.round(weeklyGross * 0.52),
+              screens,
+              runWeek,
+              budget,
+              imdbRating: rating,
           };
       });
   };

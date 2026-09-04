@@ -282,6 +282,8 @@ export interface StreamingEcosystemOperator {
     lastMaterialChangeAtAbsoluteWeek: number;
     /** Optional only at legacy-save and fixture boundaries; normalization materializes it. */
     lastProcessedAbsoluteWeek?: number;
+    /** Private B2/B3 decision memory; never a canonical rights registry. */
+    intelligence?: IndustryIntelligenceState;
 }
 
 export interface StreamingEcosystemMarketShare {
@@ -305,6 +307,138 @@ export interface StreamingEcosystemEvent {
     headline: string;
     detail: string;
     countryId: string | null;
+}
+
+export type IndustryEventImportance = 'LOW' | 'MEDIUM' | 'HIGH';
+
+export type IndustryEventType =
+    | 'COMPANY_LAUNCHED'
+    | 'COMPANY_PROMOTED'
+    | 'COMPANY_EXPANDED'
+    | 'COMPANY_DISTRESS'
+    | 'COMPANY_RECOVERED'
+    | 'COMPANY_FUNDED'
+    | 'COMPANY_RESTRUCTURED'
+    | 'COMPANY_ACQUIRED'
+    | 'COMPANY_CLOSED'
+    | 'PROJECT_GREENLIT'
+    | 'PROJECT_CAST'
+    | 'PROJECT_DELAYED'
+    | 'PROJECT_OVERRUN'
+    | 'PROJECT_HELD'
+    | 'PROJECT_SOLD'
+    | 'PROJECT_CANCELLED'
+    | 'PROJECT_RELEASE_PLANNED'
+    | 'PROJECT_RELEASED'
+    | 'PROJECT_HIT'
+    | 'PROJECT_FLOP'
+    | 'PROJECT_SLEEPER'
+    | 'RIGHTS_DEAL'
+    | 'RIGHTS_TRANSFER'
+    | 'FRANCHISE_DECISION'
+    | 'AWARD_NOMINATED'
+    | 'AWARD_WON'
+    | 'PARTNERSHIP_REPEATED';
+
+export type IndustryEventEvidenceKind =
+    | 'COMPANY'
+    | 'PROJECT'
+    | 'PRODUCTION'
+    | 'PLATFORM'
+    | 'RIGHTS_CONTRACT'
+    | 'TRANSACTION'
+    | 'AWARD';
+
+export interface IndustryEventEvidence {
+    kind: IndustryEventEvidenceKind;
+    id: string;
+    metric?: string;
+    value?: number | string;
+}
+
+export interface IndustryEventFact {
+    schemaVersion: 1;
+    id: string;
+    idempotencyKey: string;
+    absoluteWeek: number;
+    type: IndustryEventType;
+    importance: IndustryEventImportance;
+    companyId?: string;
+    companyName?: string;
+    projectId?: string;
+    productionId?: string;
+    platformId?: string;
+    rightsContractId?: string;
+    transactionId?: string;
+    awardEventId?: string;
+    headline: string;
+    detail: string;
+    evidence: IndustryEventEvidence[];
+}
+
+export interface IndustryEventLedgerState {
+    schemaVersion: 1;
+    lastProcessedAbsoluteWeek: number;
+    lastProjectedAbsoluteWeek: number;
+    events: IndustryEventFact[];
+    publishedEventKeys: string[];
+}
+
+export type IndustryMediaStoryStage =
+    | 'EMERGING'
+    | 'DEVELOPING'
+    | 'CONFIRMED'
+    | 'RESOLVED'
+    | 'FADED'
+    | 'SUPERSEDED';
+
+export type IndustryMediaStoryCategory =
+    | 'COMPANY'
+    | 'PROJECT_DEVELOPMENT'
+    | 'PROJECT_PRODUCTION'
+    | 'PROJECT_RELEASE'
+    | 'PROJECT_OUTCOME'
+    | 'RIGHTS'
+    | 'FRANCHISE'
+    | 'AWARDS'
+    | 'PARTNERSHIP';
+
+export type IndustryMediaChannel = 'NEWS' | 'X' | 'INSTAGRAM' | 'YOUTUBE';
+
+export interface IndustryMediaStory {
+    schemaVersion: 1;
+    id: string;
+    subjectKey: string;
+    category: IndustryMediaStoryCategory;
+    stage: IndustryMediaStoryStage;
+    importance: IndustryEventImportance;
+    primaryIndustryEventId: string;
+    industryEventIds: string[];
+    firstAbsoluteWeek: number;
+    lastAdvancedAbsoluteWeek: number;
+    nextEligiblePublicationWeek?: number;
+    headline: string;
+    detail: string;
+    channelEligibility: IndustryMediaChannel[];
+    publishedChannels: IndustryMediaChannel[];
+    companyId?: string;
+    companyName?: string;
+    platformId?: string;
+    projectId?: string;
+    productionId?: string;
+    rightsContractId?: string;
+    transactionId?: string;
+    awardEventId?: string;
+    resolutionIndustryEventId?: string;
+    resolutionAbsoluteWeek?: number;
+}
+
+export interface IndustryMediaWorldState {
+    schemaVersion: 1;
+    lastProcessedAbsoluteWeek: number;
+    stories: IndustryMediaStory[];
+    eventStoryIndex: Record<string, string>;
+    publishedBeatKeys: string[];
 }
 
 export interface StreamingPlatformEcosystemState {
@@ -1025,6 +1159,10 @@ export interface SubsidiaryProjectProposal {
     franchiseId?: string;
     universeId?: UniverseId;
     installmentNumber?: number;
+    /** B7 lineage back to the compact B3 idea retained at acquisition. */
+    industryContentFingerprintId?: string;
+    /** Saved B2 decision score used by the subsidiary mandate adapter. */
+    inheritedDecisionScore?: number;
     logline: string;
     mandateSnapshot: StudioOperatingMandate;
     logic: string[];
@@ -1234,6 +1372,16 @@ export interface StudioState {
     mergerPreIntegrationBalance?: number;
     mergerPreIntegrationStats?: BusinessStats;
     saleDeck?: StudioSaleDeck;
+    /** Exact private company state captured when compact AI control becomes player gameplay. */
+    industryHandoffSnapshot?: StudioIndustryHandoffSnapshot;
+}
+
+export interface StudioIndustryHandoffSnapshot {
+    schemaVersion: 1;
+    sourceStudioId: StudioId;
+    materializedAtAbsoluteWeek: number;
+    ai: StudioAiRuntimeState;
+    activeIndustryProductionIds: string[];
 }
 
 export interface GenreMarketTrend {
@@ -1973,6 +2121,15 @@ export interface ProjectDetails {
     musicPlan?: ProjectMusicPlan;
     investorPlan?: ProjectInvestorPlan;
     investorPayouts?: ProjectInvestorPayoutSummary;
+    /** B7 lineage for an active production inherited through company ownership. */
+    industryProductionId?: string;
+    canonicalIndustryProjectId?: string;
+    inheritedFromStudioAi?: boolean;
+    inheritedPaidMillions?: number;
+    inheritedProblemIds?: string[];
+    inheritedProductionStatus?: IndustryProductionStatus;
+    /** Stable private-industry idea lineage when a subsidiary develops inherited strategy. */
+    industryContentFingerprintId?: string;
 }
 
 export interface ReleasePlanningDraft {
@@ -3909,10 +4066,10 @@ export type StreamingStarterCatalogPackageId = 'CURATED_PREMIERE' | 'BROAD_APPEA
 export type StreamingLicenseTerritory = 'DOMESTIC' | 'MULTI_REGION' | 'GLOBAL';
 export type StreamingLicenseExclusivity = 'NON_EXCLUSIVE' | 'EXCLUSIVE';
 export type StreamingCatalogNegotiationStatus = 'BUILDING' | 'COUNTERED' | 'READY_TO_SIGN';
-export type StreamingCatalogLicenseStatus = 'ACTIVE' | 'EXPIRED' | 'TERMINATED';
+export type StreamingCatalogLicenseStatus = 'ACTIVE' | 'EXPIRED' | 'TERMINATED' | 'TRANSFERRED_OUT';
 export type StreamingRightsSellerType = 'STUDIO' | 'PLATFORM';
 export type StreamingRightsWindowType = 'FIRST_WINDOW' | 'SECOND_WINDOW' | 'PERMANENT';
-export type StreamingRightsNegotiationKind = 'ACQUIRE' | 'RENEW' | 'SUBLICENSE_OUT';
+export type StreamingRightsNegotiationKind = 'ACQUIRE' | 'RENEW' | 'SUBLICENSE_OUT' | 'TRANSFER_OUT';
 export type StreamingRightsNegotiationStatus =
     | 'OPEN'
     | 'COUNTERED'
@@ -4043,12 +4200,71 @@ export interface StreamingRightsContract extends OwnedStreamingCatalogLicense {
     cumulativeRoyaltyPaid: number;
     settlement: StreamingRightsContractSettlement;
     legacySource?: StreamingRightsContractLegacySource;
+    /** Original studio-to-platform contract at the start of this rights chain. */
+    rootContractId: string;
+    /** Immediately preceding contract position; null for an original grant. */
+    parentContractId: string | null;
+    /** A6 transaction that created this successor; null for an original grant. */
+    rightsTransactionId: string | null;
+    /** Successor contract after a full transfer closes this position. */
+    transferredToContractId: string | null;
+    transferredAtAbsoluteWeek: number | null;
 }
 
 export type StreamingRightsContractRegistry = Record<string, StreamingRightsContract>;
 
-export const STREAMING_RIGHTS_CALENDAR_SCHEMA_VERSION = 1 as const;
+export const STREAMING_RIGHTS_TRANSACTION_SCHEMA_VERSION = 1 as const;
+export type StreamingRightsTransactionKind = 'LICENSE_TRANSFER' | 'SUBLICENSE' | 'PERMANENT_ACQUISITION';
+export type StreamingRightsTransactionStatus = 'LISTED' | 'OPEN' | 'ACCEPTED' | 'SETTLED' | 'CANCELLED' | 'INVALIDATED';
+export type StreamingRightsTransactionController = 'AI' | 'PLAYER';
+
+export interface StreamingRightsTransaction {
+    schemaVersion: typeof STREAMING_RIGHTS_TRANSACTION_SCHEMA_VERSION;
+    id: string;
+    idempotencyKey: string;
+    kind: StreamingRightsTransactionKind;
+    status: StreamingRightsTransactionStatus;
+    originalOwner: StreamingRightsContractParty;
+    seller: StreamingRightsContractParty;
+    buyer: StreamingRightsContractParty;
+    sourceContractId: string;
+    rootContractId: string;
+    successorContractId: string | null;
+    sourceProjectId: string;
+    title: string;
+    territory: StreamingLicenseTerritory;
+    countryIds: string[];
+    exclusivity: StreamingLicenseExclusivity;
+    windowType: StreamingRightsWindowType;
+    startsAtAbsoluteWeek: number;
+    expiresAtAbsoluteWeek: number;
+    askingPrice: number;
+    acceptedPrice: number;
+    sellerReceipt: number;
+    /** Downstream transfers never create a new payment to the original studio. */
+    originalOwnerParticipation: 0;
+    controllerAtCommitment: {
+        seller: StreamingRightsTransactionController;
+        buyer: StreamingRightsTransactionController;
+    };
+    groupId: string | null;
+    listedAtAbsoluteWeek: number;
+    committedAtAbsoluteWeek: number | null;
+    settledAtAbsoluteWeek: number | null;
+    resolvedAtAbsoluteWeek: number | null;
+    resolutionReason: string | null;
+}
+
+export type StreamingRightsTransactionRegistry = Record<string, StreamingRightsTransaction>;
+
+export const STREAMING_RIGHTS_CALENDAR_SCHEMA_VERSION = 2 as const;
 export type StreamingRightsControlMode = 'STRATEGY' | 'CUSTOM' | 'FULL';
+export type StreamingRightsFinancialPriority = 'UPFRONT_SECURITY' | 'BALANCED_RETURN' | 'BACKEND_UPSIDE';
+export type StreamingRightsDistributionPriority = 'GLOBAL_PARTNER' | 'REGIONAL_OPTIMIZATION' | 'BROAD_NON_EXCLUSIVE';
+export type StreamingRightsExclusivityPolicy = 'ALLOW_WITHIN_LIMITS' | 'RESTRICT' | 'REQUIRE_APPROVAL';
+export type StreamingRightsDurationPreference = 'SHORT' | 'BALANCED' | 'LONG';
+export type StreamingRightsPartnerPreference = 'STRONGEST_ECONOMICS' | 'WIDEST_REACH' | 'TRUSTED_RELATIONSHIPS';
+export type StreamingRightsTitleControlOverride = 'MANUAL' | 'DELEGATED';
 export type StreamingRightsRenewalPreference =
     | 'BALANCED'
     | 'RENEW_WINNERS'
@@ -4085,6 +4301,33 @@ export interface StreamingRightsRenewalPolicy {
     protectFranchises: boolean;
 }
 
+export interface StreamingRightsStudioMandate {
+    studioId: string;
+    controlMode: StreamingRightsControlMode;
+    financialPriority: StreamingRightsFinancialPriority;
+    distributionPriority: StreamingRightsDistributionPriority;
+    exclusivityPolicy: StreamingRightsExclusivityPolicy;
+    durationPreference: StreamingRightsDurationPreference;
+    partnerPreference: StreamingRightsPartnerPreference;
+    renewalPreference: StreamingRightsRenewalPreference;
+    maximumAutomaticGuarantee: number;
+    maximumAutomaticDurationWeeks: number;
+    protectGlobalExclusives: boolean;
+    protectFranchises: boolean;
+    titleOverrides: Record<string, StreamingRightsTitleControlOverride>;
+    revision: number;
+    updatedAtAbsoluteWeek: number;
+}
+
+export interface StreamingRightsDelegationTrace {
+    mandateStudioId: string;
+    mandateRevision: number;
+    controlMode: StreamingRightsControlMode;
+    rule: string;
+    facts: Record<string, string | number | boolean | null>;
+    explanation: string;
+}
+
 export interface StreamingRightsManagementState {
     schemaVersion: typeof STREAMING_RIGHTS_CALENDAR_SCHEMA_VERSION;
     controlMode: StreamingRightsControlMode;
@@ -4092,6 +4335,7 @@ export interface StreamingRightsManagementState {
     packagePolicy?: StreamingCataloguePackagePolicy;
     protectedProjectIds: string[];
     manualContractIds: string[];
+    studioMandates: Record<string, StreamingRightsStudioMandate>;
     updatedAtAbsoluteWeek: number;
 }
 
@@ -4146,6 +4390,7 @@ export interface StreamingRightsRenewalCase {
     policyPreferenceAtOpen: StreamingRightsRenewalPreference;
     protectionReasons: string[];
     delegatedReason: string | null;
+    delegationTrace?: StreamingRightsDelegationTrace | null;
     outcome: StreamingRightsRenewalOutcome;
     replacementContractId: string | null;
     resolvedAtAbsoluteWeek: number | null;
@@ -4170,6 +4415,27 @@ export interface StreamingRightsCalendarState {
     renewalCases: StreamingRightsRenewalCaseRegistry;
     digests: StreamingRightsCalendarDigest[];
     urgentNoticeKeys: string[];
+    lastProcessedAbsoluteWeek: number;
+}
+
+export const STREAMING_RIGHTS_OFFICE_SCHEMA_VERSION = 1 as const;
+
+export interface StreamingRightsOfficeDigest {
+    id: string;
+    absoluteWeek: number;
+    actionRequired: number;
+    delegatedDecisions: number;
+    renewals: number;
+    expiries: number;
+    packages: number;
+    transfers: number;
+    royaltySettlements: number;
+    summary: string;
+}
+
+export interface StreamingRightsOfficeState {
+    schemaVersion: typeof STREAMING_RIGHTS_OFFICE_SCHEMA_VERSION;
+    digests: StreamingRightsOfficeDigest[];
     lastProcessedAbsoluteWeek: number;
 }
 
@@ -4407,6 +4673,7 @@ export interface StreamingCataloguePackage {
     controlModeAtCreation: StreamingRightsControlMode;
     protectionReasons: string[];
     delegatedReason: string | null;
+    delegationTrace?: StreamingRightsDelegationTrace | null;
     manualApprovalRequired: boolean;
     biddingSessionId: string | null;
     acceptedOfferId: string | null;
@@ -5971,6 +6238,11 @@ export interface NewsItem {
     impactLevel: 'LOW' | 'MEDIUM' | 'HIGH';
     projectId?: string;
     universeId?: UniverseId;
+    /** B7 shared public-world fact reference. */
+    industryEventId?: string;
+    /** C1 shared media-story reference. */
+    mediaStoryId?: string;
+    companyId?: string;
 }
 
 export interface Message {
@@ -6065,6 +6337,12 @@ export interface InstaPost {
     hasSaved?: boolean;
     isPlayer: boolean;
     contentImage?: string; 
+    /** B7 shared public-world fact reference. */
+    industryEventId?: string;
+    /** C1 shared media-story reference. */
+    mediaStoryId?: string;
+    companyId?: string;
+    projectId?: string;
 }
 
 export interface XPost {
@@ -6088,6 +6366,12 @@ export interface XPost {
     controversyScore?: number;
     sentiment?: 'SUPPORTIVE' | 'MESSY' | 'FUNNY' | 'INDUSTRY' | 'NEUTRAL';
     quoteOfId?: string;
+    /** B7 shared public-world fact reference. */
+    industryEventId?: string;
+    /** C1 shared media-story reference. */
+    mediaStoryId?: string;
+    companyId?: string;
+    projectId?: string;
 }
 
 export interface StudioContract {
@@ -6370,6 +6654,9 @@ export interface IndustryProject {
     physicalProducerStudioId?: StudioId;
     platformContentSource?: PlatformAiContentSource;
     platformContentPlanId?: string;
+    /** Stable B5 lineage for AI-studio projects materialized by the temporary legacy bridge. */
+    studioAiSlateCommitmentId?: string;
+    industryContentFingerprintId?: string;
     releaseStrategy?: ReleaseStrategy;
     /** Every platform window is retained so non-exclusive licences can coexist. */
     streamingWindows?: PlatformAiProjectStreamingWindow[];
@@ -6425,6 +6712,12 @@ export interface Universe {
     name: string;
     description?: string;
     studioId: StudioId;
+    /** Canonical owner metadata for studio- and platform-originated universes. */
+    ownerCompanyId?: string;
+    ownerCompanyKind?: IndustryCompanyKind;
+    /** Stable private-intelligence lineage; WorldState.universes remains authoritative. */
+    blueprintId?: string;
+    originFingerprintId?: string;
     currentPhase: UniversePhase | string;
     saga: number | string;
     currentSagaName?: string;
@@ -6609,8 +6902,86 @@ export type IndustryProductionStatus =
     | 'PRODUCTION'
     | 'POST_PRODUCTION'
     | 'DELIVERED'
+    | 'AWAITING_RELEASE'
+    | 'TURNAROUND'
+    | 'RELEASED'
     | 'ON_HOLD'
     | 'CANCELLED';
+
+export type IndustryProductionSource = 'PLATFORM_COMMISSION' | 'STUDIO_INDEPENDENT';
+export type StudioAiProductionMilestone = 'PRE_PRODUCTION_START' | 'PRODUCTION_START' | 'POST_PRODUCTION_START' | 'DELIVERY';
+export type StudioAiProductionCheckpoint = 'PRODUCTION_START' | 'PRODUCTION_35' | 'PRODUCTION_70' | 'POST_PRODUCTION_START';
+export type StudioAiProductionProblemType = 'DELAY' | 'OVERRUN' | 'QUALITY_LOSS' | 'TALENT_ISSUE' | 'FINANCING_HOLD' | 'POST_PRODUCTION_DIFFICULTY';
+export type StudioAiProductionRecovery = 'NONE' | 'CONTINGENCY_SPEND' | 'SCHEDULE_EXTENSION' | 'SCOPE_REDUCTION' | 'QUALITY_PROTECTION' | 'RELEASE_DELAY' | 'FINANCING_HOLD' | 'TURNAROUND' | 'CANCEL';
+export type StudioAiReleaseMode = 'LIMITED_THEATRICAL' | 'WIDE_THEATRICAL' | 'EVENT_THEATRICAL' | 'PRESTIGE_THEATRICAL' | 'STREAMING_ONLY' | 'THEATRICAL_THEN_STREAMING' | 'HOLD' | 'TURNAROUND';
+
+export interface StudioAiProductionProblem {
+    id: string;
+    checkpoint: StudioAiProductionCheckpoint;
+    type: StudioAiProductionProblemType;
+    severity: number;
+    occurredAtAbsoluteWeek: number;
+    delayWeeks: number;
+    overrunMillions: number;
+    qualityImpact: number;
+    response: StudioAiProductionRecovery;
+    responseAppliedAtAbsoluteWeek: number | null;
+}
+
+export interface StudioAiProductionTalent {
+    leadActorId: string;
+    leadActorName: string;
+    directorId: string;
+    directorName: string;
+    packageScore: number;
+    estimatedCostMillions: number;
+}
+
+export interface StudioAiFinalQuality {
+    creativeQuality: number;
+    executionQuality: number;
+    commercialPotential: number;
+    prestigePotential: number;
+    downsideRisk: number;
+}
+
+export interface StudioAiCommercialResult {
+    releasedAtAbsoluteWeek: number;
+    theatricalGrossMillions: number;
+    streamingValueMillions: number;
+    studioReceiptsMillions: number;
+    productionSpendMillions: number;
+    marketingSpendMillions: number;
+    netResultMillions: number;
+    rating: number;
+    outcome: 'HIT' | 'SOLID' | 'FLOP';
+}
+
+export interface StudioAiProductionRecord {
+    schemaVersion: 1;
+    source: 'STUDIO_INDEPENDENT';
+    slateCommitmentId: string;
+    fingerprintId: string;
+    /** Immutable creative input retained after bounded planning history evicts the source fingerprint. */
+    fingerprintSnapshot?: IndustryContentFingerprint;
+    originalProducerStudioId?: StudioId;
+    controllerAtLastProgression: StudioAiController;
+    selectedReleaseMode: StudioAiReleaseMode | null;
+    publicReleaseStrategy: ReleaseStrategy | null;
+    releasePlannedAtAbsoluteWeek?: number;
+    plannedReleaseAbsoluteWeek?: number;
+    releaseBlockedReason?: 'MISSING_STREAMING_RIGHTS' | 'INSUFFICIENT_MARKETING' | 'RELEASE_CAPACITY' | 'NONE';
+    talentSelected: boolean;
+    talent: StudioAiProductionTalent | null;
+    finalQuality: StudioAiFinalQuality | null;
+    result: StudioAiCommercialResult | null;
+    problems: StudioAiProductionProblem[];
+    paidMilestoneIds?: StudioAiProductionMilestone[];
+    processedKeys: string[];
+    holdStartedAtAbsoluteWeek?: number | null;
+    nextReviewAbsoluteWeek?: number | null;
+    lastProgressedAbsoluteWeek: number;
+}
 
 export interface IndustryProductionCommitment {
     id: string;
@@ -6621,6 +6992,7 @@ export interface IndustryProductionCommitment {
     producerStudioId: StudioId;
     commissioningPlatformId?: PlatformId;
     platformContentPlanId?: string;
+    source?: IndustryProductionSource;
     status: IndustryProductionStatus;
     productionCalendar: ProductionCalendar;
     budgetMillions: number;
@@ -6632,11 +7004,277 @@ export interface IndustryProductionCommitment {
     writerSkill: number;
     /** Deterministic execution metadata for AI-commissioned productions. */
     aiExecution?: PlatformAiProductionRecord;
+    /** B6 deterministic execution metadata for independent AI-studio productions. */
+    studioAiExecution?: StudioAiProductionRecord;
+    studioAiSlateCommitmentId?: string;
+    industryContentFingerprintId?: string;
+    universeId?: UniverseId;
     createdAtAbsoluteWeek: number;
     updatedAtAbsoluteWeek: number;
+    /** Exactly-once B7 boundary between compact rival AI and detailed player workflow. */
+    playerHandoff?: {
+        schemaVersion: 1;
+        playerCommitmentId: string;
+        materializedAtAbsoluteWeek: number;
+        lastPlayerControlledAbsoluteWeek: number;
+        dematerializedAtAbsoluteWeek: number | null;
+    };
+}
+
+export const INDUSTRY_INTELLIGENCE_SCHEMA_VERSION = 1 as const;
+
+export type IndustryCompanyKind = 'PRODUCTION_STUDIO' | 'STREAMING_PLATFORM';
+export type IndustryDecisionLane = 'CONTENT_STRATEGY' | 'PRODUCTION_REVIEW' | 'RELEASE_REVIEW' | 'FINANCE_REVIEW' | 'MARKET_EXPANSION' | 'CAPABILITY_GROWTH';
+export type IndustryCapabilityDimension = 'DEVELOPMENT' | 'CREATIVE' | 'PRODUCTION' | 'FINANCE' | 'MARKETING_DISCOVERY' | 'DISTRIBUTION_MARKET' | 'NEGOTIATION' | 'TALENT_RELATIONSHIP' | 'TECHNOLOGY' | 'CATALOGUE' | 'LOCALIZATION';
+export type IndustryIntelligenceProposalStatus = 'SHADOW' | 'PROPOSED' | 'ACCEPTED' | 'REJECTED' | 'EXECUTED' | 'EXPIRED' | 'SUPERSEDED';
+export type IndustryIntelligenceReasonCode =
+    | 'STRATEGIC_NEED'
+    | 'AUDIENCE_OPPORTUNITY'
+    | 'CAPABILITY_GAP'
+    | 'COMPETITIVE_PRESSURE'
+    | 'RELATIONSHIP_VALUE'
+    | 'FINANCIAL_PRESSURE'
+    | 'CAPACITY_PRESSURE'
+    | 'FATIGUE_PRESSURE'
+    | 'PLAYER_CONTROLLED'
+    | 'TERMINAL_COMPANY'
+    | 'INSUFFICIENT_RUNWAY'
+    | 'INSUFFICIENT_CAPACITY'
+    | 'SPENDING_RESTRICTED'
+    | 'MISSING_CAPABILITY'
+    | 'RIGHTS_CONFLICT'
+    | 'DUPLICATE_COMMITMENT'
+    | 'NO_ELIGIBLE_OPTION';
+
+export interface IndustryIntelligenceScore {
+    total: number;
+    need: number;
+    strategyFit: number;
+    expectedUpside: number;
+    relationshipValue: number;
+    competitiveValue: number;
+    financialRisk: number;
+    capacityPressure: number;
+    fatigue: number;
+    executionRisk: number;
+}
+
+export interface IndustryIntelligenceLearningSample {
+    id: string;
+    evidenceId: string;
+    absoluteWeek: number;
+    lane: IndustryDecisionLane;
+    outcomeScore: number;
+    capabilityDelta: number;
+    momentumDelta: number;
+}
+
+export interface IndustryIntelligenceLearningState {
+    averageOutcomeByLane: Partial<Record<IndustryDecisionLane, number>>;
+    capabilityProgress: Partial<Record<IndustryCapabilityDimension, number>>;
+    repetitionFatigue: number;
+    franchiseFatigue: number;
+    samples: IndustryIntelligenceLearningSample[];
+    processedEvidenceIds: string[];
+}
+
+export interface IndustryIntelligenceProposal {
+    id: string;
+    idempotencyKey: string;
+    companyId: string;
+    companyKind: IndustryCompanyKind;
+    lane: IndustryDecisionLane;
+    decisionCycle: number;
+    absoluteWeek: number;
+    actionFamily: string;
+    optionId: string;
+    urgency: number;
+    confidence: number;
+    expectedExposureMillions: number;
+    affordabilityCeilingMillions: number;
+    score: IndustryIntelligenceScore;
+    reasonCodes: IndustryIntelligenceReasonCode[];
+    uncertaintyKey: string;
+    /** B3 winner consumed by later canonical activation phases. */
+    contentFingerprintId?: string;
+    status: IndustryIntelligenceProposalStatus;
+    nextReviewAbsoluteWeek: number;
+}
+
+export type IndustryIntelligenceShadowDivergence =
+    | 'MATCH'
+    | 'ACT_VS_HOLD'
+    | 'ACTION_FAMILY_DIFFERENCE'
+    | 'EXPOSURE_BAND_DIFFERENCE'
+    | 'TIMING_DIFFERENCE'
+    | 'ELIGIBILITY_DIFFERENCE'
+    | 'NO_AUTHORITATIVE_OBSERVATION';
+
+export interface IndustryIntelligenceShadowComparison {
+    id: string;
+    idempotencyKey: string;
+    companyId: string;
+    lane: IndustryDecisionLane;
+    absoluteWeek: number;
+    proposalId: string;
+    shadowActionFamily: string;
+    authoritativeActionFamily: string | null;
+    divergence: IndustryIntelligenceShadowDivergence;
+}
+
+export type IndustryContentFormat = 'MOVIE' | 'SERIES' | 'LIMITED_SERIES';
+export type IndustryContentSourceIntent =
+    | 'ORIGINAL'
+    | 'INTERNAL_DEVELOPMENT'
+    | 'PLATFORM_ORIGINAL'
+    | 'INDIVIDUAL_COMMISSION'
+    | 'LICENSED_WORK'
+    | 'ACQUIRED_IP'
+    | 'SEQUEL'
+    | 'PREQUEL'
+    | 'REBOOT'
+    | 'SPIN_OFF'
+    | 'UNIVERSE_ENTRY'
+    | 'UNIVERSE_CROSSOVER'
+    | 'UNIVERSE_EVENT'
+    | 'INHERITED';
+export type IndustryContentRelationship =
+    | 'STANDALONE'
+    | 'SEQUEL'
+    | 'PREQUEL'
+    | 'REBOOT'
+    | 'SPIN_OFF'
+    | 'UNIVERSE_ENTRY'
+    | 'UNIVERSE_CROSSOVER'
+    | 'UNIVERSE_EVENT'
+    | 'FOUND_UNIVERSE';
+export type IndustryContentLifecycle = 'SELECTED' | 'COMMITTED' | 'PUBLIC' | 'MATERIALIZED' | 'ABANDONED' | 'CANCELLED';
+export type IndustryContentReleasePath = 'THEATRICAL_FIRST' | 'STREAMING_FIRST' | 'HYBRID' | 'LIMITED_EVENT';
+export type IndustryUniverseBlueprintLifecycle = 'PLANNED' | 'EMERGING' | 'ACTIVE' | 'PAUSED' | 'RETIRED' | 'FAILED' | 'MATERIALIZED';
+
+export interface IndustryBudgetSuitability {
+    minimumMillions: number;
+    idealLowMillions: number;
+    idealHighMillions: number;
+    ambitiousMaximumMillions: number;
+}
+
+export interface IndustryContentFingerprint {
+    id: string;
+    seed: string;
+    ownerCompanyId: string;
+    ownerCompanyKind: IndustryCompanyKind;
+    format: IndustryContentFormat;
+    primaryGenre: Genre;
+    secondaryGenre?: Genre;
+    subgenre: string;
+    tone: string;
+    theme: string;
+    setting: string;
+    period: string;
+    targetAudience: string;
+    originalLanguage: string;
+    priorityMarket: string;
+    commercialIntent: number;
+    prestigeIntent: number;
+    creativeRisk: number;
+    starPowerTarget: number;
+    releasePath: IndustryContentReleasePath;
+    sourceIntent: IndustryContentSourceIntent;
+    relationship: IndustryContentRelationship;
+    budgetSuitability: IndustryBudgetSuitability;
+    noveltySignature: string;
+    noveltyScore: number;
+    createdAtAbsoluteWeek: number;
+    decisionCycle: number;
+    lifecycle: IndustryContentLifecycle;
+    sourceRightId?: string;
+    relatedFingerprintId?: string;
+    universeBlueprintId?: string;
+    canonicalProjectId?: string;
+    canonicalUniverseId?: UniverseId;
+}
+
+export interface IndustryUniverseBlueprint {
+    id: string;
+    seed: string;
+    ownerCompanyId: string;
+    ownerCompanyKind: IndustryCompanyKind;
+    anchorFingerprintId: string;
+    coreWorldSignature: string;
+    creativePillars: string[];
+    supportedFormats: IndustryContentFormat[];
+    branchFamilies: string[];
+    currentSagaLabel: string;
+    currentPhaseLabel: string;
+    plannedCadenceWeeks: number;
+    financialScale: number;
+    crossoverPotential: number;
+    confidence: number;
+    momentum: number;
+    fatigue: number;
+    lifecycle: IndustryUniverseBlueprintLifecycle;
+    createdAtAbsoluteWeek: number;
+    updatedAtAbsoluteWeek: number;
+    canonicalUniverseId?: UniverseId;
+}
+
+export interface IndustryContentIntelligenceState {
+    selectedFingerprints: IndustryContentFingerprint[];
+    universeBlueprints: IndustryUniverseBlueprint[];
+    recentNoveltySignatures: string[];
+    materializationKeys: string[];
+}
+
+export interface IndustryIntelligenceState {
+    schemaVersion: typeof INDUSTRY_INTELLIGENCE_SCHEMA_VERSION;
+    companyId: string;
+    companyKind: IndustryCompanyKind;
+    seed: string;
+    lastProcessedAbsoluteWeek: number;
+    nextDueAbsoluteWeek: Record<IndustryDecisionLane, number | null>;
+    decisionCycleByLane: Record<IndustryDecisionLane, number>;
+    momentum: number;
+    learning: IndustryIntelligenceLearningState;
+    proposals: IndustryIntelligenceProposal[];
+    shadowComparisons: IndustryIntelligenceShadowComparison[];
+    processedKeys: string[];
+    content: IndustryContentIntelligenceState;
+    /** Streaming-only B4 execution ledger; absent for studio shadow intelligence. */
+    platformMigration?: PlatformIntelligenceMigrationState;
 }
 
 export type PlatformAiController = 'AI' | 'PLAYER';
+export type PlatformIntelligenceIntentRoute =
+    | 'COMMISSION_ORIGINAL'
+    | 'LICENSE_TITLE'
+    | 'ACQUIRE_CATALOGUE'
+    | 'TRANSFER_OWNED_TITLE'
+    | 'RESEARCH_TECHNOLOGY'
+    | 'RESEARCH_LOCALIZATION'
+    | 'ENTER_MARKET'
+    | 'LOCALIZE_COMMITTED_CONTENT'
+    | 'HOLD';
+export type PlatformIntelligenceOutcomeStatus = 'EXECUTED' | 'REJECTED' | 'HELD';
+
+export interface PlatformIntelligenceOutcome {
+    id: string;
+    proposalId: string;
+    proposalKey: string;
+    intentRoute: PlatformIntelligenceIntentRoute;
+    status: PlatformIntelligenceOutcomeStatus;
+    absoluteWeek: number;
+    reason: string;
+    canonicalReferenceIds: string[];
+}
+
+export interface PlatformIntelligenceMigrationState {
+    schemaVersion: 1;
+    activatedAtAbsoluteWeek: number;
+    legacyPlanningRetiredAtAbsoluteWeek: number;
+    processedProposalKeys: string[];
+    outcomes: PlatformIntelligenceOutcome[];
+}
 export type PlatformAiCompanyStatus = 'ACTIVE' | 'DISTRESSED' | 'RESTRUCTURING' | 'DORMANT';
 export type PlatformAiContentSource = 'COMMISSIONED_ORIGINAL' | 'LICENSED_RELEASED_TITLE' | 'OWNED_STUDIO_TRANSFER' | 'CATALOGUE_ACQUISITION';
 export type PlatformAiPlanStatus = 'SCOUTED' | 'BRIEF' | 'PRODUCER_SELECTED' | 'GREENLIT' | 'IN_PRODUCTION' | 'NEGOTIATING' | 'CONTRACTED' | 'RIGHTS_READY' | 'DELIVERED' | 'LOCALIZED' | 'SCHEDULED' | 'RELEASED' | 'ON_HOLD' | 'CANCELLED' | 'SOLD';
@@ -6968,7 +7606,7 @@ export interface PlatformAiProductionRecord {
     paidMilestoneIds: Array<'COMMISSIONING' | 'PROGRESS_35' | 'PROGRESS_70' | 'DELIVERY'>;
     controllerAtLastProgression: PlatformAiController;
     lastProgressedAbsoluteWeek: number;
-    holdReason: 'INSUFFICIENT_CASH' | 'SCHEDULE_CONFLICT' | 'FAILURE_RESPONSE_UNAVAILABLE' | null;
+    holdReason: 'INSUFFICIENT_CASH' | 'SCHEDULE_CONFLICT' | 'FAILURE_RESPONSE_UNAVAILABLE' | 'TALENT_DECEASED' | null;
 }
 
 export type PlatformAiProductionEscrowStatus = 'UNFUNDED' | 'FUNDED' | 'SETTLED';
@@ -7381,6 +8019,7 @@ export interface PlatformAiRuntimeState {
     debtInterestRateAnnualPercent: number;
     outstandingApprovedContentMillions?: number;
     outstandingApprovedResearchMillions?: number;
+    intelligence?: IndustryIntelligenceState;
 }
 
 export interface PlatformState {
@@ -7416,6 +8055,151 @@ export interface NPCStudioState {
     ownerNpcId?: string;
     ownerName?: string;
     isNpcVenture?: boolean;
+    ai?: StudioAiRuntimeState;
+}
+
+export const STUDIO_AI_RUNTIME_SCHEMA_VERSION = 1 as const;
+
+export type StudioAiController = 'AI' | 'PLAYER';
+export type StudioAiCompanyStatus = 'ACTIVE' | 'DISTRESSED' | 'RESTRUCTURING' | 'DORMANT' | 'SOLD_MERGED' | 'CLOSED';
+export type StudioAiOrigin = 'ESTABLISHED' | 'REGIONAL' | 'GENERATED' | 'PLATFORM_OWNED' | 'PLAYER_FOUNDED';
+export type StudioAiStrategy = 'BALANCED' | 'PRESTIGE' | 'COMMERCIAL' | 'FRANCHISE' | 'GENRE_SPECIALIST' | 'CREATOR_LED';
+export type StudioAiLaunchClass = 'ESTABLISHED_MAJOR' | 'ESTABLISHED_LABEL' | 'BOOTSTRAPPED_BOUTIQUE' | 'FOUNDER_BACKED' | 'INVESTOR_BACKED' | 'BREAKOUT_COMPANY' | 'STRATEGIC_SPINOUT' | 'MAJOR_CHALLENGER';
+
+export interface StudioAiCompetence {
+    development: number;
+    creative: number;
+    finance: number;
+    production: number;
+    marketing: number;
+    distribution: number;
+    negotiation: number;
+    talentRelations: number;
+}
+
+export interface StudioAiProfile {
+    strategy: StudioAiStrategy;
+    launchClass: StudioAiLaunchClass;
+    riskTolerance: number;
+    budgetAppetite: number;
+    creativePatience: number;
+    franchiseDependence: number;
+    prestigeAmbition: number;
+    financialDiscipline: number;
+}
+
+export interface StudioAiFinanceState {
+    debtPrincipalMillions: number;
+    weeklyOperatingCostMillions: number;
+    committedSpendMillions: number;
+    runwayWeeks: number;
+    consecutiveLossWeeks: number;
+    restructuringStartedAtAbsoluteWeek: number | null;
+}
+
+export interface StudioAiCapacityState {
+    developmentSlots: number;
+    productionSlots: number;
+    releaseSlotsPerQuarter: number;
+    committedDevelopmentSlots: number;
+    committedProductionSlots: number;
+}
+
+export type StudioAiSlateStatus = 'DEVELOPING' | 'REWRITE' | 'ON_HOLD' | 'GREENLIT' | 'HANDED_OFF' | 'TURNAROUND' | 'ABANDONED' | 'CANCELLED';
+export type StudioAiSlateSource = 'INDEPENDENT' | 'COMMISSION';
+
+export interface StudioAiSlateScores {
+    creative: number;
+    commercial: number;
+    prestige: number;
+    execution: number;
+    financialRisk: number;
+    greenlightConfidence: number;
+}
+
+export interface StudioAiSlateCommitment {
+    id: string;
+    proposalId: string;
+    proposalKey: string;
+    fingerprintId: string;
+    source: StudioAiSlateSource;
+    industryProductionId?: string;
+    commissioningPlatformId?: PlatformId;
+    status: StudioAiSlateStatus;
+    createdAtAbsoluteWeek: number;
+    updatedAtAbsoluteWeek: number;
+    nextReviewAbsoluteWeek: number | null;
+    developmentSpendMillions: number;
+    rewriteCount: number;
+    proposedBudgetMillions: number;
+    proposalSnapshot?: {
+        confidence: number;
+        affordabilityCeilingMillions: number;
+        score: IndustryIntelligenceScore;
+        uncertaintyKey: string;
+    };
+    greenlightBudgetMillions?: number;
+    greenlitAtAbsoluteWeek?: number;
+    scores?: StudioAiSlateScores;
+    legacyReleaseConsumedAtAbsoluteWeek?: number;
+}
+
+export interface StudioAiSlateState {
+    schemaVersion: 1;
+    activatedAtAbsoluteWeek: number;
+    legacyProjectOriginRetiredAtAbsoluteWeek: number;
+    commitments: StudioAiSlateCommitment[];
+    processedProposalKeys: string[];
+    processedReviewKeys: string[];
+}
+
+export type StudioAiLedgerCategory = 'CATALOGUE_OPERATIONS' | 'DEVELOPMENT' | 'REWRITE' | 'PRODUCTION' | 'RELEASE_MARKETING' | 'RIGHTS_INCOME' | 'TURNAROUND' | 'OPERATING_COST' | 'DEBT_SERVICE' | 'PROJECT_OUTCOME' | 'SHORTFALL_BORROWING' | 'OWNERSHIP_HANDOFF';
+
+export interface StudioAiLedgerEntry {
+    id: string;
+    absoluteWeek: number;
+    category: StudioAiLedgerCategory;
+    amountMillions: number;
+    balanceAfterMillions: number;
+    description: string;
+}
+
+export interface StudioAiEventRecord {
+    id: string;
+    absoluteWeek: number;
+    type: 'MIGRATED' | 'STATUS_CHANGED' | 'OWNERSHIP_CHANGED' | 'VENTURE_SYNCED';
+    summary: string;
+}
+
+export interface StudioAiDecisionRecord {
+    id: string;
+    absoluteWeek: number;
+    type: 'FOUNDATION_WEEK' | 'OWNERSHIP_HANDOFF';
+    summary: string;
+}
+
+export interface StudioAiRuntimeState {
+    schemaVersion: typeof STUDIO_AI_RUNTIME_SCHEMA_VERSION;
+    studioId: StudioId;
+    origin: StudioAiOrigin;
+    controller: StudioAiController;
+    status: StudioAiCompanyStatus;
+    seed: string;
+    profile: StudioAiProfile;
+    competence: StudioAiCompetence;
+    finance: StudioAiFinanceState;
+    capacity: StudioAiCapacityState;
+    ledger: StudioAiLedgerEntry[];
+    decisions: StudioAiDecisionRecord[];
+    events: StudioAiEventRecord[];
+    /** Temporary compatibility payload while the older venture scheduler is retired in B2-B5. */
+    legacyVenture?: NpcVentureState;
+    migrationKeys: string[];
+    handoffKeys: string[];
+    lastProcessedAbsoluteWeek: number;
+    intelligence?: IndustryIntelligenceState;
+    /** B5 compact private development and greenlight slate. */
+    slate?: StudioAiSlateState;
 }
 
 export type NpcVentureArchetype = 'PRESTIGE_LABEL' | 'COMMERCIAL_STUDIO' | 'GENRE_HOUSE' | 'CREATOR_MEDIA' | 'AWARDS_BOUTIQUE';
@@ -7471,13 +8255,17 @@ export interface WorldState {
     platformAiPlayerCommissionOffers?: Record<string, PlatformAiPlayerCommissionOffer>;
     platformAiCatalogueDistressDeals?: PlatformAiCatalogueDistressDeal[];
     streamingRightsContracts?: StreamingRightsContractRegistry;
+    streamingRightsTransactions?: StreamingRightsTransactionRegistry;
     streamingRightsCalendar?: StreamingRightsCalendarState;
+    streamingRightsOffice?: StreamingRightsOfficeState;
     streamingBiddingSessions?: StreamingBiddingSessionRegistry;
     streamingCataloguePackages?: StreamingCataloguePackageRegistry;
     streamingCataloguePackageDigests?: StreamingCataloguePackageDigest[];
     streamingCataloguePackagesLastProcessedWeek?: number;
     streamingRoyaltySettlements?: StreamingRoyaltySettlementRegistry;
     streamingPlatformEcosystem?: StreamingPlatformEcosystemState;
+    industryEvents?: IndustryEventLedgerState;
+    industryMedia?: IndustryMediaWorldState;
     npcVentures?: Record<string, NpcVentureState>;
     npcVentureLastProcessedAbsoluteWeek?: number;
     musicIndustry?: MusicIndustryState;
@@ -7779,6 +8567,52 @@ export interface BloodlineMember {
     legacyScore?: number;
 }
 
+export type DynastyCareerStatus = 'ACTIVE' | 'SELECTIVE' | 'HIATUS' | 'RETIRED' | 'DECEASED';
+export type DynastyCareerEventType = 'SUCCESSION' | 'PROJECT_JOINED' | 'PROJECT_COMPLETED' | 'HIATUS_STARTED' | 'RETURNED' | 'RETIRED' | 'DIED';
+
+export interface DynastyCareerEvent {
+    id: string;
+    type: DynastyCareerEventType;
+    absoluteWeek: number;
+    title: string;
+    detail: string;
+    projectId?: string;
+}
+
+export interface DynastyCareerMember {
+    id: string;
+    playerId: string;
+    npcId: string;
+    name: string;
+    avatar: string;
+    gender: Gender;
+    generation: number;
+    ageAtSuccession: number;
+    successionAbsoluteWeek: number;
+    health: number;
+    fame: number;
+    talent: number;
+    ambition: number;
+    selectivity: number;
+    familyLoyalty: number;
+    status: DynastyCareerStatus;
+    currentProjectIds: string[];
+    completedProjectIds: string[];
+    lastDecisionAbsoluteWeek: number;
+    nextDecisionAbsoluteWeek: number;
+    hiatusUntilAbsoluteWeek?: number;
+    retiredAtAbsoluteWeek?: number;
+    diedAtAbsoluteWeek?: number;
+    deathCause?: string;
+    history: DynastyCareerEvent[];
+}
+
+export interface DynastyCareerState {
+    schemaVersion: 1;
+    members: Record<string, DynastyCareerMember>;
+    lastProcessedAbsoluteWeek: number;
+}
+
 export interface FamilyObligation {
     id: string;
     type: 'CHILD_SUPPORT' | 'ALIMONY';
@@ -8048,6 +8882,7 @@ export const INITIAL_PLAYER: Player = {
         },
         protectedProjectIds: [],
         manualContractIds: [],
+        studioMandates: {},
         updatedAtAbsoluteWeek: 0,
     },
     world: { 
@@ -8105,12 +8940,25 @@ export const INITIAL_PLAYER: Player = {
         upcomingRivals: [],
         talentBookings: [],
         industryProductions: {},
+        industryEvents: {
+            schemaVersion: 1,
+            lastProcessedAbsoluteWeek: -1,
+            lastProjectedAbsoluteWeek: -1,
+            events: [],
+            publishedEventKeys: [],
+        },
         streamingRightsContracts: {},
+        streamingRightsTransactions: {},
         streamingRightsCalendar: {
             schemaVersion: STREAMING_RIGHTS_CALENDAR_SCHEMA_VERSION,
             renewalCases: {},
             digests: [],
             urgentNoticeKeys: [],
+            lastProcessedAbsoluteWeek: -1,
+        },
+        streamingRightsOffice: {
+            schemaVersion: STREAMING_RIGHTS_OFFICE_SCHEMA_VERSION,
+            digests: [],
             lastProcessedAbsoluteWeek: -1,
         },
         streamingBiddingSessions: {},

@@ -1,15 +1,19 @@
-import { AuditionOpportunity, BudgetTier, GameLanguage, Genre, IndustryProject, NewsItem, NpcVentureArchetype, NpcVentureState, Player, ProjectType, RoleType, WorldState } from '../types';
+import { AuditionOpportunity, BudgetTier, GameLanguage, Genre, IndustryContentFingerprint, IndustryProject, NewsItem, NpcVentureArchetype, NpcVentureState, Player, ProjectType, RoleType, StudioAiSlateCommitment, WorldState } from '../types';
 import { NPC_DATABASE, calculateProjectFameMultiplier } from './npcLogic';
 import { calculateProjectPay, generateProjectDetails, generateProjectTitle, getEstimatedBudget } from './roleLogic';
 import { getEnabledGlobalCreatorSocialProfiles } from './youtubeLogic';
 import { getPlayerLanguage, t } from './i18n';
 import { createDeterministicId, createDeterministicRng } from './deterministicRandom';
+import { migrateNpcVentureToStudio, projectStudioToNpcVenture } from './studioAi';
 
 const pick = <T>(arr: T[], rng: () => number = Math.random): T => arr[Math.floor(rng() * arr.length)];
 const VENTURE_VARIANT_SEPARATOR = ' || ';
 const pickVentureVariant = (language: GameLanguage, key: string, vars: Record<string, string | number> = {}, rng: () => number = Math.random) =>
     pick(t(language, key, vars).split(VENTURE_VARIANT_SEPARATOR), rng);
+// Preserve the venture scheduler's legacy epoch so existing saves do not replay a
+// year of launches. Canonical studio-AI timestamps use the shared zero-based epoch.
 const absWeek = (year: number, week: number) => (year * 52) + week;
+const studioAbsWeek = (year: number, week: number) => ((Math.max(1, year) - 1) * 52) + (Math.max(1, week) - 1);
 
 const MAX_ACTIVE_VENTURES = 12;
 const MAX_TOTAL_VENTURES = 20;
@@ -177,10 +181,19 @@ const getVentureBudgetTier = (venture: NpcVentureState, rng: () => number = crea
     return tier;
 };
 
-const createVentureProject = (player: Player, venture: NpcVentureState, rng: () => number): IndustryProject => {
-    const budgetTier = getVentureBudgetTier(venture, rng);
-    const budget = getEstimatedBudget(budgetTier, rng);
-    const genre = pick(ARCHETYPE_GENRES[venture.archetype], rng);
+const getBudgetTierForMillions = (budgetMillions: number): BudgetTier => budgetMillions >= 100 ? 'HIGH' : budgetMillions >= 25 ? 'MID' : 'LOW';
+
+const createVentureProject = (
+    player: Player,
+    venture: NpcVentureState,
+    rng: () => number,
+    commitment: StudioAiSlateCommitment,
+    fingerprint?: IndustryContentFingerprint,
+): IndustryProject => {
+    const committedBudgetMillions = commitment.greenlightBudgetMillions || commitment.proposedBudgetMillions;
+    const budgetTier = getBudgetTierForMillions(committedBudgetMillions);
+    const budget = Math.max(1_000_000, Math.round(committedBudgetMillions * 1_000_000));
+    const genre = fingerprint?.primaryGenre || pick(ARCHETYPE_GENRES[venture.archetype], rng);
     const talentPool = getTalentPool(player);
     const actorPool = talentPool.filter(n => n.occupation === 'ACTOR');
     const owner = talentPool.find(n => n.id === venture.ownerNpcId);
@@ -203,7 +216,7 @@ const createVentureProject = (player: Player, venture: NpcVentureState, rng: () 
     const boxOffice = Math.floor(budget * fameMultiplier * hypeMultiplier * qualityMultiplier * volatility);
 
     return {
-        id: createDeterministicId('npc_venture_project', player.id, venture.id, absWeek(player.age, player.currentWeek), venture.projectsReleased),
+        id: createDeterministicId('npc_venture_project', player.id, venture.id, commitment.id),
         title: generateProjectTitle([], rng),
         genre,
         studioId: venture.id,
@@ -216,31 +229,21 @@ const createVentureProject = (player: Player, venture: NpcVentureState, rng: () 
         leadActorName: lead?.name || 'Unknown Actor',
         directorName: director?.name || 'Unknown Director',
         reviews: quality >= 78 ? 'HIT' : quality <= 38 ? 'FLOP' : 'MIXED',
+        studioAiSlateCommitmentId: commitment.id,
+        industryContentFingerprintId: commitment.fingerprintId,
     };
 };
 
-export const syncNpcVenturesToStudios = (world: WorldState): WorldState => {
+export const syncNpcVenturesToStudios = (world: WorldState, absoluteWeek = Math.max(0, world.npcVentureLastProcessedAbsoluteWeek || 0)): WorldState => {
     if (!world.npcVentures) world.npcVentures = {};
     if (!world.studios) world.studios = {};
 
     Object.values(world.npcVentures).forEach(venture => {
-        if (venture.status !== 'ACTIVE') {
-            delete world.studios?.[venture.id];
-            return;
-        }
-
-        world.studios![venture.id] = {
-            id: venture.id,
-            name: venture.name,
-            valuation: Math.max(0.01, venture.valuation),
-            reputation: venture.reputation,
-            cashReserve: Math.max(0, Math.floor(venture.cashReserve)),
-            recentHits: venture.hits,
-            archetype: getArchetypeLabel('en', venture.archetype).toUpperCase(),
-            ownerNpcId: venture.ownerNpcId,
-            ownerName: venture.ownerName,
-            isNpcVenture: true,
-        };
+        world.studios![venture.id] = migrateNpcVentureToStudio(
+            venture,
+            world.studios![venture.id],
+            absoluteWeek,
+        );
     });
 
     return world;
@@ -249,11 +252,16 @@ export const syncNpcVenturesToStudios = (world: WorldState): WorldState => {
 export const processNpcVentures = (player: Player, world: WorldState): { world: WorldState; news: NewsItem[]; logs: string[] } => {
     const language = getPlayerLanguage(player);
     if (!world.npcVentures) world.npcVentures = {};
+    Object.keys(world.npcVentures).forEach(ventureId => {
+        const canonical = world.studios?.[ventureId];
+        const projection = canonical ? projectStudioToNpcVenture(canonical) : null;
+        if (projection) world.npcVentures![ventureId] = projection;
+    });
     const news: NewsItem[] = [];
     const logs: string[] = [];
     const currentAbs = absWeek(player.age, player.currentWeek);
     if ((world.npcVentureLastProcessedAbsoluteWeek ?? -1) >= currentAbs) {
-        return { world: syncNpcVenturesToStudios(world), news, logs };
+        return { world: syncNpcVenturesToStudios(world, studioAbsWeek(player.age, player.currentWeek)), news, logs };
     }
 
     const activeVentures = Object.values(world.npcVentures).filter(v => v.status === 'ACTIVE');
@@ -283,64 +291,8 @@ export const processNpcVentures = (player: Player, world: WorldState): { world: 
         venture.valuation = Math.max(0.01, venture.valuation * (1 + (rng() * 0.024 - 0.009)));
         venture.cashReserve = Math.max(-30, venture.cashReserve + (venture.valuation * 0.3));
 
-        if (player.currentWeek >= venture.nextProjectWeek || (venture.nextProjectWeek > 52 && player.currentWeek + 52 >= venture.nextProjectWeek)) {
-            const project = createVentureProject(player, venture, rng);
-            const budget = getEstimatedBudget(project.budgetTier, rng);
-            const profit = project.boxOffice - budget;
-            const profitM = profit / 1_000_000;
-            const outcome: 'HIT' | 'SOLID' | 'FLOP' = profit > budget * 0.8 || project.quality >= 80 ? 'HIT' : profit < -budget * 0.25 || project.quality < 40 ? 'FLOP' : 'SOLID';
-
-            venture.projectsReleased += 1;
-            venture.lastProjectWeek = player.currentWeek;
-            venture.nextProjectWeek = player.currentWeek + 10 + Math.floor(rng() * 18);
-            venture.cashReserve += profitM;
-            venture.valuation = Math.max(0.01, venture.valuation + (profitM / 850) + (outcome === 'HIT' ? 0.05 : outcome === 'FLOP' ? -0.04 : 0.01));
-            venture.hype = Math.max(0, Math.min(100, venture.hype + (outcome === 'HIT' ? 12 : outcome === 'FLOP' ? -13 : 3)));
-            venture.reputation = Math.max(0, Math.min(100, venture.reputation + (outcome === 'HIT' ? 5 : outcome === 'FLOP' ? -6 : 1)));
-            if (outcome === 'HIT') venture.hits += 1;
-            if (outcome === 'FLOP') venture.flops += 1;
-            venture.history = [{
-                id: project.id,
-                title: project.title,
-                week: player.currentWeek,
-                year: player.age,
-                budgetTier: project.budgetTier,
-                quality: project.quality,
-                revenue: project.boxOffice,
-                profit,
-                outcome,
-            }, ...venture.history].slice(0, 8);
-            world.projects.unshift(project);
-
-            if (outcome === 'HIT') {
-                news.push(makeNews(
-                    fill(pickVentureVariant(language, 'services.npcVenture.hit.headline', {}, rng), venture, language, { Title: project.title }),
-                    player,
-                    'HIGH',
-                    t(language, 'services.npcVenture.hit.subtext', {
-                        leadActorName: project.leadActorName,
-                        directorName: project.directorName,
-                    }),
-                    `hit:${venture.id}:${project.id}`,
-                ));
-            } else if (outcome === 'FLOP') {
-                news.push(makeNews(
-                    fill(pickVentureVariant(language, 'services.npcVenture.flop.headline', {}, rng), venture, language, { Title: project.title }),
-                    player,
-                    'MEDIUM',
-                    t(language, 'services.npcVenture.flop.subtext', { ventureName: venture.name }),
-                    `flop:${venture.id}:${project.id}`,
-                ));
-            } else if (rng() < 0.35) {
-                news.push(makeNews(
-                    fill(pickVentureVariant(language, 'services.npcVenture.development.headline', {}, rng), venture, language, { Title: project.title }),
-                    player,
-                    'LOW',
-                    t(language, 'services.npcVenture.development.subtext', { ventureName: venture.name }),
-                    `development:${venture.id}:${project.id}`,
-                ));
-            }
-        }
+        // B6 owns physical production and release. This legacy projection no longer
+        // consumes greenlights or fabricates an instant public project.
 
         const shouldClose = venture.projectsReleased >= 2 && (venture.cashReserve < 0 || (venture.flops >= 3 && venture.hits === 0) || venture.valuation < 0.025);
         if (shouldClose) {
@@ -372,7 +324,7 @@ export const processNpcVentures = (player: Player, world: WorldState): { world: 
     }
 
     world.npcVentureLastProcessedAbsoluteWeek = currentAbs;
-    return { world: syncNpcVenturesToStudios(world), news, logs };
+    return { world: syncNpcVenturesToStudios(world, studioAbsWeek(player.age, player.currentWeek)), news, logs };
 };
 
 export const generateNpcVentureRoleOffer = (player: Player): { opportunity: AuditionOpportunity; venture: NpcVentureState } | null => {

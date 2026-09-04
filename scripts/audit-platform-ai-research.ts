@@ -484,6 +484,17 @@ const partnershipMarket = commitPlatformMarketExpansion({
 assert.equal(partnershipMarket.changed, true);
 assert.ok((partnershipMarket.operation as any).platformAiPartnership);
 assert.ok((partnershipMarket.operation as any).platformAiPartnership.weeklyPremium > 0);
+const normalizedPartnershipPlatform = normalizePlatformAiState(
+    structuredClone(partnershipMarket.world.platforms![platformId]),
+    player.id,
+    absoluteWeek,
+);
+assert.equal(
+    normalizedPartnershipPlatform.ai!.marketOperations.find(operation => operation.countryId === 'FR')
+        ?.platformAiPartnership?.weeklyPremium,
+    partnershipMarket.operation.platformAiPartnership?.weeklyPremium,
+    'A committed local-partnership premium must already satisfy its persisted canonical cap.',
+);
 const boundedMarketWorld = structuredClone(initialWorld);
 boundedMarketWorld.platforms![platformId].ai!.decisionHistory = hundredDecisionHistory;
 const boundedMarket = commitPlatformMarketExpansion({ player, world: boundedMarketWorld, platformId, absoluteWeek, countryId: marketChoice.countryId });
@@ -547,6 +558,13 @@ const unsupportedPlan = {
     id: 'support-clamp-audit',
     localizationLevel: 'DUBS_AND_SUBTITLES',
     releaseCountryIds: ['US', 'ZZ'],
+    localizationRequirements: [{
+        languageId: 'spanish',
+        mode: 'SUBTITLE',
+        countryIds: ['US', 'JP'],
+        capabilityTierAtPromise: 1,
+        mandatory: true,
+    }],
 } as PlatformAiContentPlan;
 const clampedPlan = clampPlatformContentPlanSupport(unsupportedPlan, {
     ...capabilities,
@@ -556,6 +574,38 @@ const clampedPlan = clampPlatformContentPlanSupport(unsupportedPlan, {
 });
 assert.deepEqual(clampedPlan.releaseCountryIds, ['US']);
 assert.equal(clampedPlan.localizationLevel, 'SUBTITLES');
+assert.deepEqual(clampedPlan.localizationRequirements?.[0].countryIds, ['US']);
+const canonicalLocalizationPlan = clampPlatformContentPlanSupport({
+    ...unsupportedPlan,
+    localizationLevel: 'SUBTITLES',
+    localizationRequirements: [
+        { sourceProjectId: 'project-z', languageId: 'spanish', mode: 'SUBTITLE', countryIds: ['US'], capabilityTierAtPromise: 1, mandatory: true },
+        { sourceProjectId: 'project-a', languageId: 'french', mode: 'SUBTITLE', countryIds: ['US'], capabilityTierAtPromise: 1, mandatory: true },
+    ],
+}, {
+    ...capabilities,
+    activeCountryIds: ['US'],
+    subtitleCoveragePercent: 35,
+    dubCoveragePercent: 0,
+});
+assert.deepEqual(
+    canonicalLocalizationPlan.localizationRequirements?.map(requirement => requirement.sourceProjectId),
+    ['project-a', 'project-z'],
+    'Runtime plans must use the same canonical localization order as save migration.',
+);
+const historicalPlan = clampPlatformContentPlanSupport({
+    ...unsupportedPlan,
+    status: 'SOLD',
+    releaseCountryIds: ['US', 'JP'],
+}, {
+    ...capabilities,
+    activeCountryIds: ['US'],
+});
+assert.deepEqual(
+    historicalPlan.releaseCountryIds,
+    ['US', 'JP'],
+    'Terminal plans must preserve their historical release scope after a platform exits a market.',
+);
 
 // Content commitment must save support from the normalized operation authority, never stale raw capabilities.
 const staleSupportWorld = structuredClone(initialWorld) as any;
