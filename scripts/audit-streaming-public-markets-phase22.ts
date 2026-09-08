@@ -129,6 +129,7 @@ const createFixture = (): Player => {
                 soundIdentKey: 'ASCENT',
                 brandPromiseId: 'EVENT_HOUSE',
                 foundedAtAbsoluteWeek: absoluteWeek - 80,
+                publicManifesto: 'Event stories built for a worldwide audience.',
             },
             launchCommit: {
                 id: 'phase22-launch',
@@ -198,6 +199,10 @@ const createFixture = (): Player => {
                     ceoName: 'Rhea Kane',
                     ceoPersonality: 'Patient consolidator',
                     strategy: 'SCALE_DOMINANCE',
+                    baseMonthlyPrice: 15.99,
+                    perceivedValue: 86,
+                    activeRegionIds: ['NORTH_AMERICA'],
+                    copiedTechnologyBranches: [],
                     cashReserveMillions: 80_000,
                     subscribersMillions: 220,
                     technology: 90,

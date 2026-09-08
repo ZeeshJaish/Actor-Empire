@@ -52,7 +52,7 @@ import { normalizeStreamingRightsTransactionRegistry } from './streamingRightsTr
 import { normalizeStreamingRightsOfficeState } from './streamingRightsOffice';
 import { migrateLegacyDynastyCareerState } from './dynastyCareer';
 
-const SAVE_MIGRATION_VERSION = 34;
+const SAVE_MIGRATION_VERSION = 40;
 const RUNAWAY_STOCK_CASH_CEILING = 10_000_000_000_000;
 const ACQUISITION_RIVAL_BID_MAX_ROUNDS = 3;
 

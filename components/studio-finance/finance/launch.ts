@@ -308,12 +308,14 @@ export interface AnchorTitle {
 }
 
 export interface CatalogueState {
+  established?: boolean;
+  hasDraft?: boolean;
+  hoursEstimated?: boolean;
+  readyForLaunch?: boolean;
   /** Everything that could be on the service on night one. */
   titles: number;
   hours: number;
-  /** What an opening night actually needs — the bar readiness is measured
-      against, so a hundred titles reads as a hundred titles rather than
-      overflowing a twelve-slot shelf. */
+  /** Strategy-specific depth guide, not a legal launch requirement. */
   hoursNeeded: number;
   ownedAvailable: number;
   ownedLinked: number;
@@ -423,6 +425,40 @@ export interface LaunchDraft {
   storefrontId?: string;
   /** The player's working pricing. Starts as a copy of data.pricing. */
   pricing?: PricingSettings;
+}
+
+const copyLaunchPricing = (pricing: PricingSettings): PricingSettings => ({
+  ...pricing,
+  streams: [...pricing.streams],
+  plans: pricing.plans.map(plan => ({ ...plan, featureIds: [...plan.featureIds] })),
+  ads: { ...pricing.ads },
+  rentals: { ...pricing.rentals },
+  premium: { ...pricing.premium },
+  daypass: { ...pricing.daypass },
+  sponsor: { ...pricing.sponsor },
+  metered: { ...pricing.metered },
+  patron: { ...pricing.patron },
+});
+
+/**
+ * Restores the player's in-progress launch choices after visiting another HQ
+ * room. Confirmed game state remains canonical; this is only the working copy
+ * that would otherwise disappear when the wizard unmounts.
+ */
+export function resolveLaunchDraftAfterDetour(
+  canonicalDraft: LaunchDraft,
+  retainedDraft: LaunchDraft | null | undefined,
+): LaunchDraft {
+  const source = retainedDraft ?? canonicalDraft;
+  return {
+    ...source,
+    selectedCountryIds: [...source.selectedCountryIds],
+    ...(source.tierPrices ? { tierPrices: { ...source.tierPrices } } : {}),
+    ...('customAudio' in source
+      ? { customAudio: source.customAudio ? { ...source.customAudio } : source.customAudio }
+      : {}),
+    ...(source.pricing ? { pricing: copyLaunchPricing(source.pricing) } : {}),
+  };
 }
 
 export interface LaunchHandlers {

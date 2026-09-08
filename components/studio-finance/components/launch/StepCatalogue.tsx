@@ -11,11 +11,10 @@ export function StepCatalogue({ data, handlers }: StepProps) {
   const c = data.catalogue;
   const depth = c.hours / Math.max(1, c.hoursNeeded);
   const tone = depth >= 1.2 ? 'good' : depth >= 0.8 ? 'warn' : 'bad';
-  const verdict = depth >= 1.2
-    ? 'Deep enough that a household cannot reach the end of it in the first month.'
-    : depth >= 0.8
-      ? 'Watchable, but thin. Subscribers who finish the shelf in week one do not renew in week five.'
-      : 'Not an opening catalogue yet. There is nothing here to keep a household.';
+  const verdict = !c.titles ? 'No available opening titles yet. Add content or finish your productions.'
+    : c.readyForLaunch === false ? 'Some opening markets still need available titles. Review country coverage before launch.'
+      : depth >= 1 ? 'A broader shelf gives households more reasons to stay. Keep planning new releases.'
+        : 'You have available titles, but a thin shelf. More variety can help retain subscribers.';
 
   return (
     <>
@@ -25,24 +24,24 @@ export function StepCatalogue({ data, handlers }: StepProps) {
       <section className={`cat-shelf is-${tone}`}>
         <header>
           <div>
-            <p className="sf-eyebrow">Ready for opening night</p>
+            <p className="sf-eyebrow">Available opening titles</p>
             <p className="cat-shelf-figure">{compactCount(c.titles)}<i>titles</i></p>
           </div>
           <div className="is-end">
-            <p className="sf-eyebrow">Watching time</p>
+            <p className="sf-eyebrow">{c.hoursEstimated ? 'Estimated watching time' : 'Watching time'}</p>
             <p className="cat-shelf-hours">{compactCount(c.hours)}<i>hours</i></p>
           </div>
         </header>
 
         {/* Depth against the bar an opening needs. Past the mark it keeps
             counting, because more is genuinely better here. */}
-        <div className="cat-depth" role="img" aria-label={`${c.hours} hours against ${c.hoursNeeded} needed`}>
+        <div className="cat-depth" role="img" aria-label={`${c.hours} hours against a ${c.hoursNeeded}-hour depth guide`}>
           <i style={{ width: `${Math.min(100, (c.hours / Math.max(1, c.hoursNeeded)) * 100)}%` }} />
           <span className="cat-depth-mark" style={{ left: `${Math.min(100, (c.hoursNeeded / Math.max(c.hours, c.hoursNeeded)) * 100)}%` }} aria-hidden="true" />
         </div>
         <p className="cat-depth-line">
           <b className={`sf-tone-${tone}`}>{(c.hours / Math.max(1, c.hoursNeeded)).toFixed(1)}×</b>
-          what an opening night needs · {compactCount(c.hoursNeeded)} hours is the bar
+          catalogue depth guide · {compactCount(c.hoursNeeded)} hours, not a launch requirement
         </p>
 
         {/* The rail scrolls, so a hundred titles is a hundred titles. */}
@@ -105,13 +104,14 @@ export function StepCatalogue({ data, handlers }: StepProps) {
       </section>
 
       <p className="lw-rule">{c.shelfStrategy}</p>
+      <p className="lw-rule">Buying content does not schedule it. Premiere night still needs a locked slate of at least three titles, including a delivered Original.</p>
 
       <div className="lw-actions">
         <button type="button" className="sf-btn sf-btn--ghost" onClick={() => handlers.onOpenContentDesk?.()}>
           Open Content Desk
         </button>
         <button type="button" className="sf-btn sf-btn--primary" onClick={() => handlers.onAssembleCatalogue?.()}>
-          Assemble opening catalogue
+          {c.established ? 'Review opening catalogue' : c.hasDraft ? 'Continue opening catalogue' : 'Build opening catalogue'}
         </button>
       </div>
     </>

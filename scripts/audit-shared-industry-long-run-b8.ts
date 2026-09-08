@@ -17,6 +17,12 @@ const requestedResumeComparisonStart = Math.round(Number(process.env.B8_LONG_COM
 const compactSummary = process.env.B8_LONG_SUMMARY === '1';
 const minimalReport = process.env.B8_LONG_MINIMAL_REPORT === '1';
 const reportPath = process.env.B8_LONG_REPORT_PATH?.trim();
+const recordValues = <T extends object>(record: T | null | undefined): Array<T[keyof T]> => (
+    Object.values(record || {}) as Array<T[keyof T]>
+);
+const recordEntries = <T extends object>(record: T | null | undefined): Array<[string, T[keyof T]]> => (
+    Object.entries(record || {}) as Array<[string, T[keyof T]]>
+);
 const checkpoints: number[] = SHARED_INDUSTRY_B8_CHECKPOINTS.filter(week => week <= horizonWeeks);
 if (!checkpoints.includes(horizonWeeks)) checkpoints.push(horizonWeeks);
 const results = [];
@@ -69,7 +75,7 @@ const certificationSummaries = results.map(result => ({
         rightsContracts: Object.keys(result.player.world.streamingRightsContracts || {}).length,
         industryEvents: result.player.world.industryEvents?.events.length || 0,
         ecosystemOperators: Object.keys(result.player.world.streamingPlatformEcosystem?.operators || {}).length,
-        closedEcosystemOperators: Object.values(result.player.world.streamingPlatformEcosystem?.operators || {})
+        closedEcosystemOperators: recordValues(result.player.world.streamingPlatformEcosystem?.operators)
             .filter(operator => operator.lifecycle === 'CLOSED').length,
     },
     finalDigest: result.uninterruptedDigest,
@@ -86,25 +92,25 @@ const summaries = minimalReport ? certificationSummaries : results.map(result =>
         rightsContracts: Object.keys(result.player.world.streamingRightsContracts || {}).length,
         industryEvents: result.player.world.industryEvents?.events.length || 0,
         ecosystemOperators: Object.keys(result.player.world.streamingPlatformEcosystem?.operators || {}).length,
-        closedEcosystemOperators: Object.values(result.player.world.streamingPlatformEcosystem?.operators || {})
+        closedEcosystemOperators: recordValues(result.player.world.streamingPlatformEcosystem?.operators)
             .filter(operator => operator.lifecycle === 'CLOSED').length,
     },
     rightsLifecycle: {
-        expiredByHorizon: Object.values(result.player.world.streamingRightsContracts || {})
+        expiredByHorizon: recordValues(result.player.world.streamingRightsContracts)
             .filter(contract => contract.expiresAtAbsoluteWeek < result.report.horizonWeeks).length,
-        permanent: Object.values(result.player.world.streamingRightsContracts || {})
+        permanent: recordValues(result.player.world.streamingRightsContracts)
             .filter(contract => contract.permanentPurchase || contract.expiresAtAbsoluteWeek >= Number.MAX_SAFE_INTEGER).length,
-        byStatus: Object.values(result.player.world.streamingRightsContracts || {}).reduce<Record<string, number>>((counts, contract) => {
+        byStatus: recordValues(result.player.world.streamingRightsContracts).reduce<Record<string, number>>((counts, contract) => {
             counts[contract.status] = (counts[contract.status] || 0) + 1;
             return counts;
         }, {}),
     },
-    platformCollections: Object.fromEntries(Object.entries(result.player.world.platforms || {}).map(([platformId, platform]) => [platformId, {
+    platformCollections: Object.fromEntries(recordEntries(result.player.world.platforms).map(([platformId, platform]) => [platformId, {
         slate: platform.ai?.slate.length || 0,
-        slateByStatus: (platform.ai?.slate || []).reduce<Record<string, number>>((counts, plan) => {
+        slateByStatus: (platform.ai?.slate || []).reduce((counts: Record<string, number>, plan: { status: string }) => {
             counts[plan.status] = (counts[plan.status] || 0) + 1;
             return counts;
-        }, {}),
+        }, {} as Record<string, number>),
         rightsContracts: platform.ai?.rightsContracts.length || 0,
         expiredRightsByHorizon: (platform.ai?.rightsContracts || [])
             .filter(contract => contract.expiresAtAbsoluteWeek < result.report.horizonWeeks).length,
@@ -112,25 +118,25 @@ const summaries = minimalReport ? certificationSummaries : results.map(result =>
         renewals: platform.ai?.rightsRenewals.length || 0,
     }])),
     studioCollections: {
-        byStatus: Object.values(result.player.world.studios || {}).reduce<Record<string, number>>((counts, studio) => {
+        byStatus: recordValues(result.player.world.studios).reduce<Record<string, number>>((counts, studio) => {
             const status = studio.ai?.status || 'ACTIVE';
             counts[status] = (counts[status] || 0) + 1;
             return counts;
         }, {}),
-        slateByStatus: Object.values(result.player.world.studios || {})
+        slateByStatus: recordValues(result.player.world.studios)
             .flatMap(studio => studio.ai?.slate?.commitments || [])
             .reduce<Record<string, number>>((counts, commitment) => {
                 counts[commitment.status] = (counts[commitment.status] || 0) + 1;
                 return counts;
             }, {}),
-        activeProductions: Object.values(result.player.world.industryProductions || {})
+        activeProductions: recordValues(result.player.world.industryProductions)
             .filter(production => !['RELEASED', 'CANCELLED'].includes(production.status)).length,
-        productionsByStatus: Object.values(result.player.world.industryProductions || {})
+        productionsByStatus: recordValues(result.player.world.industryProductions)
             .reduce<Record<string, number>>((counts, production) => {
                 counts[production.status] = (counts[production.status] || 0) + 1;
                 return counts;
             }, {}),
-        deliveredDiagnostics: Object.values(result.player.world.industryProductions || {})
+        deliveredDiagnostics: recordValues(result.player.world.industryProductions)
             .filter(production => production.status === 'DELIVERED')
             .reduce((counts, production) => {
                 const execution = production.studioAiExecution;
@@ -157,12 +163,12 @@ const summaries = minimalReport ? certificationSummaries : results.map(result =>
                 oldestProgressAgeWeeks: 0,
             }),
         cash: {
-            zeroOrLess: Object.values(result.player.world.studios || {}).filter(studio => studio.cashReserve <= 0).length,
-            underOneMillion: Object.values(result.player.world.studios || {}).filter(studio => studio.cashReserve < 1).length,
-            min: Math.min(...Object.values(result.player.world.studios || {}).map(studio => studio.cashReserve)),
-            max: Math.max(...Object.values(result.player.world.studios || {}).map(studio => studio.cashReserve)),
+            zeroOrLess: recordValues(result.player.world.studios).filter(studio => studio.cashReserve <= 0).length,
+            underOneMillion: recordValues(result.player.world.studios).filter(studio => studio.cashReserve < 1).length,
+            min: Math.min(...recordValues(result.player.world.studios).map(studio => studio.cashReserve)),
+            max: Math.max(...recordValues(result.player.world.studios).map(studio => studio.cashReserve)),
         },
-        oldestHoldWeeks: Math.max(0, ...Object.values(result.player.world.industryProductions || {})
+        oldestHoldWeeks: Math.max(0, ...recordValues(result.player.world.industryProductions)
             .filter(production => production.status === 'ON_HOLD')
             .map(production => result.report.horizonWeeks - (production.studioAiExecution?.holdStartedAtAbsoluteWeek || result.report.horizonWeeks))),
     },

@@ -508,6 +508,11 @@ export const processWorldReactions = (player: Player): Player => {
         lastProcessedWeek: player.currentWeek,
         lastHeadlineId: news?.id || previousState?.lastHeadlineId,
     };
+    const shouldLog = state.controlledStudioCount > 0 && (
+        state.antiMonopolyPressure > 0
+        || state.rivalRetaliationRisk > 0
+        || state.employeeDepartureRisk > 0
+    );
 
     return {
         ...player,
@@ -526,7 +531,7 @@ export const processWorldReactions = (player: Player): Player => {
                 feed: [xPost, ...(player.x?.feed || []).filter(post => post.id !== xPost.id)].slice(0, 80),
             }
             : player.x,
-        logs: [{
+        logs: [...(shouldLog ? [{
             week: player.currentWeek,
             year: player.age,
             message: t(language, 'services.worldReactions.log.weekly', {
@@ -535,6 +540,6 @@ export const processWorldReactions = (player: Player): Player => {
                 employeeRisk: state.employeeDepartureRisk
             }),
             type: state.antiMonopolyPressure >= 60 ? 'negative' as const : 'neutral' as const,
-        }, ...(player.logs || [])].slice(0, 50),
+        }] : []), ...(player.logs || [])].slice(0, 50),
     };
 };

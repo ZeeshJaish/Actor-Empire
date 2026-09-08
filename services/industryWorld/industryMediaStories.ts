@@ -88,8 +88,10 @@ const channelEligibilityFor = (event: IndustryEventFact): IndustryMediaChannel[]
         'COMPANY_LAUNCHED', 'PROJECT_CAST', 'PROJECT_RELEASED', 'AWARD_WON',
     ].includes(event.type)) channels.push('INSTAGRAM');
     if ([
-        'FRANCHISE_DECISION', 'PROJECT_RELEASED', 'PROJECT_HIT', 'PROJECT_FLOP',
-        'PROJECT_SLEEPER', 'AWARD_NOMINATED', 'AWARD_WON',
+        'PROJECT_GREENLIT', 'PROJECT_CAST', 'FRANCHISE_DECISION', 'PROJECT_RELEASED', 'PROJECT_HIT', 'PROJECT_FLOP',
+        'PROJECT_SLEEPER', 'AWARD_NOMINATED', 'AWARD_WON', 'RIGHTS_DEAL',
+        'RIGHTS_TRANSFER', 'COMPANY_FUNDED', 'COMPANY_ACQUIRED', 'COMPANY_CLOSED',
+        'PARTNERSHIP_REPEATED',
     ].includes(event.type)) channels.push('YOUTUBE');
     return [...new Set(channels)];
 };

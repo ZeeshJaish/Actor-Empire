@@ -578,8 +578,8 @@ export const getStreamingLaunchProgramView = (player: Player): StreamingLaunchPr
         && platform.serviceConfiguration.pricing.streams.length
         && (!platform.serviceConfiguration.pricing.streams.includes('subs') || platform.serviceConfiguration.pricing.plans.length),
     );
-    const hasCatalogue = Boolean(platform.starterCatalog);
     const catalogueCoverage = getStreamingOpeningCatalogueView(player);
+    const hasCatalogue = Boolean(platform.starterCatalog && catalogueCoverage.titles.some(title => title.available));
     const launchDefinitionSignature = getStreamingLaunchDefinitionSignature(player);
     const blueprintSaved = Boolean(
         platform.launchProgram.lastBlueprintSignature

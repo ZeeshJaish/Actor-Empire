@@ -17,7 +17,8 @@ import {
 } from './ownedStreamingPlatform';
 import { getOwnedStreamingProgramEntries } from './streamingOriginals';
 import { commitStreamingQuarterSeasonCycle } from './streamingQuarterSeason';
-import { evaluateStreamingRightsCompliance } from './streamingRightsMarketplace';
+import { evaluateStreamingRightsCompliance, processStreamingPrivateOffersWeek } from './streamingRightsMarketplace';
+import { processStreamingBuyerAuctionsWeek } from './streamingBuyerAuctions';
 import {
     completeDueStreamingTechnologyProjects,
     getStreamingTechnologyWeeklyCost,
@@ -402,8 +403,15 @@ const buildNextWeekHook = (
 export const processOwnedStreamingPlatformWeek = (
     player: Player,
 ): { player: Player; processed: boolean; snapshot: OwnedStreamingWeeklySnapshot | null } => {
-    const normalizedPlatform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+    const auctionSessionSnapshot = player.ownedStreamingPlatform.buyerAuctionSessions
+        .map(session => `${session.id}:${session.status}`).join('|');
+    player = processStreamingBuyerAuctionsWeek(player);
+    const auctionsChanged = auctionSessionSnapshot !== player.ownedStreamingPlatform.buyerAuctionSessions
+        .map(session => `${session.id}:${session.status}`).join('|');
+    const privateOffers = processStreamingPrivateOffersWeek(player, absoluteWeek);
+    player = privateOffers.player;
+    const normalizedPlatform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     const launchCommit = normalizedPlatform.launchCommit;
     const weekKey = `owned-streaming-week:${absoluteWeek}`;
     if (
@@ -412,7 +420,7 @@ export const processOwnedStreamingPlatformWeek = (
         || absoluteWeek <= launchCommit.committedAtAbsoluteWeek
         || normalizedPlatform.processedWeekKeys.includes(weekKey)
     ) {
-        return { player, processed: false, snapshot: null };
+        return { player, processed: auctionsChanged || privateOffers.resolvedOfferIds.length > 0, snapshot: null };
     }
     const leadershipCompletion = completeDueStreamingExecutiveDevelopment(normalizedPlatform, absoluteWeek);
     const researchCompletion = advanceDueStreamingResearchPrograms(leadershipCompletion.platform, absoluteWeek);

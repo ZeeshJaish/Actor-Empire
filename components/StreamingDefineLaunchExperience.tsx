@@ -48,6 +48,7 @@ import type {
   Country,
   LaunchBlocker,
   LaunchData,
+  LaunchDraft,
   LaunchStepId,
   PricingSettings,
 } from './studio-finance/finance/launch';
@@ -59,11 +60,14 @@ interface Props {
   onClose: () => void;
   onOpenFinance: () => void;
   onOpenCatalogue: () => void;
+  onOpenContentDesk?: () => void;
   onOpenBuild: () => void;
   onOpenPricing: () => void;
   onOpenTechnology: () => void;
   mode?: 'OPENING' | 'EXPANSION';
   initialStep?: StreamingDefineLaunchStepId;
+  initialDraft?: LaunchDraft | null;
+  onDraftChange?: (draft: LaunchDraft) => void;
 }
 
 const STEP_FROM_CANONICAL: Record<StreamingDefineLaunchStepId, LaunchStepId> = {
@@ -205,24 +209,33 @@ const buildCountry = (market: typeof STREAMING_DAY_ONE_MARKETS[number]): Country
 const buildCatalogue = (player: Player): CatalogueState => {
   const view = getStreamingOpeningCatalogueView(player);
   const platform = player.ownedStreamingPlatform;
-  const titles = view.titles.length;
-  const hours = view.titles.reduce((total, title) => total + (title.projectType === 'SERIES' ? 8 : 2), 0);
+  const available = view.titles.filter(title => title.available);
+  const titles = available.length;
+  const hours = available.reduce((total, title) => total + title.hours, 0);
+  const depthGuide = platform.starterCatalog?.packageId === 'BROAD_APPEAL' ? 80 : platform.starterCatalog?.packageId === 'PRESTIGE_VAULT' ? 30 : 40;
   const genreCounts = new Map<string, number>();
-  view.titles.forEach(title => genreCounts.set(title.genre, (genreCounts.get(title.genre) || 0) + 1));
+  available.forEach(title => {
+    const genre = title.genre.toLowerCase().replaceAll('_', ' ').replace(/\b\w/g, letter => letter.toUpperCase());
+    genreCounts.set(genre, (genreCounts.get(genre) || 0) + 1);
+  });
   const genreCoverage = Array.from(genreCounts.entries()).map(([name, count]) => ({ name, share: titles ? (count / titles) * 100 : 0 }));
   const expectedGenres = ['Drama', 'Comedy', 'Thriller', 'Documentary', 'Family'];
   return {
     titles,
     hours,
-    hoursNeeded: 260,
-    ownedAvailable: view.titles.filter(title => title.source !== 'LICENSED').length,
+    established: Boolean(platform.starterCatalog),
+    hasDraft: Boolean(platform.contentMarketDraft || platform.catalogSetupDraft),
+    hoursEstimated: available.some(title => title.hoursEstimated),
+    readyForLaunch: view.rightsReady,
+    hoursNeeded: depthGuide,
+    ownedAvailable: getEligibleOwnedStreamingTitles(player).length,
     ownedLinked: view.titles.filter(title => title.source !== 'LICENSED').length,
-    externalLicences: view.titles.filter(title => title.source === 'LICENSED').length,
-    activeAgreements: platform.catalogLicenses.filter(license => license.status === 'ACTIVE').length,
+    externalLicences: available.filter(title => title.source === 'LICENSED').length,
+    activeAgreements: platform.catalogLicenses.filter(license => license.status === 'ACTIVE' && license.startsAtAbsoluteWeek <= getAbsoluteWeek(player.age, player.currentWeek) && license.expiresAtAbsoluteWeek > getAbsoluteWeek(player.age, player.currentWeek)).length,
     genreCoverage,
     gaps: expectedGenres.filter(genre => !genreCounts.has(genre)),
-    readiness: Math.min(1, hours / 260),
-    anchors: view.titles.slice(0, 4).map(title => ({
+    readiness: Math.min(1, hours / depthGuide),
+    anchors: available.slice(0, 4).map(title => ({
       id: title.projectId,
       name: title.title,
       format: title.projectType === 'SERIES' ? 'Series' : 'Film',
@@ -230,8 +243,8 @@ const buildCatalogue = (player: Player): CatalogueState => {
       note: title.source === 'ORIGINAL' ? 'Opening original' : title.source === 'OWNED' ? 'Owned library' : 'Licensed title',
     })),
     shelfStrategy: platform.starterCatalog
-      ? `${view.strategyLabel}. Network demand and pricing update whenever this catalogue changes.`
-      : 'Choose a catalogue strategy and link real titles in the Content Desk.',
+      ? `${view.strategyLabel}. ${view.rightsReadyCountryCount}/${view.openingCountryCount} opening markets have available titles. ${view.titles.length - titles} titles await production or available rights. Depth is guidance, not a legal launch requirement.`
+      : 'Build your opening catalogue in Content Market. Purchased rights and studio imports return here automatically.',
   };
 };
 
@@ -464,6 +477,8 @@ function OpeningLaunchExperience(props: Props) {
     <LaunchWizard
       data={data}
       initialStep={STEP_FROM_CANONICAL[currentStep] || 'markets'}
+      initialDraft={props.initialDraft}
+      onDraftChange={props.onDraftChange}
       onExit={props.onClose}
       onOpenStudioFinance={props.onOpenFinance}
       onStepChange={(step) => update(setStreamingDefineLaunchStep(props.player, STEP_TO_CANONICAL[step]))}
@@ -517,7 +532,7 @@ function OpeningLaunchExperience(props: Props) {
         if (result.changed) update(result.player);
       }}
       onAssembleCatalogue={props.onOpenCatalogue}
-      onOpenContentDesk={props.onOpenCatalogue}
+      onOpenContentDesk={props.onOpenContentDesk || props.onOpenCatalogue}
       onSaveBlueprint={() => {
         const result = saveStreamingLaunchBlueprint(props.player);
         if (result.changed) update(result.player);

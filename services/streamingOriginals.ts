@@ -16,6 +16,7 @@ import type {
 } from '../types';
 import { createDeterministicId } from './deterministicRandom';
 import { getAbsoluteWeek } from './legacyLogic';
+import { getStreamingContentAvailability } from './streamingContentAvailability';
 import {
     compactOwnedStreamingPlatformForPersistence,
     normalizeOwnedStreamingPlatformState,
@@ -207,7 +208,6 @@ export const saveStreamingOriginalDraft = (
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     if (
         !['FOUNDING', 'ACTIVE'].includes(platform.lifecycle)
-        || !platform.starterCatalog
         || platform.originalCommissions.some(commission => !commission.canonicalProjectId)
     ) return player;
     const gaps = getStreamingAudienceGaps(player);
@@ -259,7 +259,6 @@ export const commissionFirstStreamingOriginal = (
     const draft = platform.originalCommissionDraft;
     if (
         !['FOUNDING', 'ACTIVE'].includes(platform.lifecycle)
-        || !platform.starterCatalog
         || platform.originalCommissions.some(commission => !commission.canonicalProjectId)
         || !draft
     ) {
@@ -579,6 +578,7 @@ export const getOwnedStreamingProgramEntries = (player: Player): OwnedStreamingS
         });
     return [...openingEntries, ...scheduledOriginals, ...laterLicensedEntries].filter((entry, index, all) => (
         all.findIndex(candidate => candidate.projectId === entry.projectId) === index
+        && getStreamingContentAvailability(player, entry.projectId).available
     )).sort((left, right) => left.launchWeek - right.launchWeek);
 };
 

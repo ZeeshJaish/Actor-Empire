@@ -13,6 +13,7 @@ import { CustomPosterImage } from '../../../CustomPosterImage';
 import type { AnchorTitle, Approach } from '../../finance/launch';
 import { Poster } from '../Poster';
 import type { StepProps } from './LaunchWizard';
+import { ResearchLockMark } from './ResearchLockMark';
 
 export function StepStorefront({ data, draft, patch, handlers }: StepProps) {
   const firstLayout = data.storefronts.some(option => option.id === draft.storefrontId)
@@ -41,7 +42,7 @@ export function StepStorefront({ data, draft, patch, handlers }: StepProps) {
             <h2 id="st-preview-title">{preview.name}</h2>
           </div>
           <span className={`st-preview-state${previewLock ? ' is-research' : applied ? ' is-applied' : ''}`}>
-            {previewLock ? 'Preview only' : applied ? 'Applied' : 'Ready'}
+            {previewLock ? 'Research preview' : applied ? 'Applied' : 'Ready'}
           </span>
         </header>
 
@@ -63,7 +64,7 @@ export function StepStorefront({ data, draft, patch, handlers }: StepProps) {
           </ul>
           {previewLock ? (
             <button type="button" className="st-research-link" onClick={() => handlers.onOpenTechnology?.()}>
-              <span><b>Research required</b><em>{previewLock}</em></span><i aria-hidden="true">↗</i>
+              <ResearchLockMark reason={previewLock} /><i aria-hidden="true">↗</i>
             </button>
           ) : null}
         </div>
@@ -92,8 +93,12 @@ export function StepStorefront({ data, draft, patch, handlers }: StepProps) {
                   onClick={() => setPreviewId(option.id)}
                 >
                   <LayoutGlyph composition={option.layout || 'hero'} layoutId={option.id} />
-                  <span><b>{option.name}</b><em>{lock ? 'Research' : isApplied ? 'Applied' : 'Base layout'}</em></span>
-                  {lock ? <i className="st-pick-lock" aria-hidden="true">◇</i> : null}
+                  <span>
+                    <b>{option.name}</b>
+                    {lock
+                      ? <ResearchLockMark reason={lock} compact />
+                      : <em>{isApplied ? 'Applied' : 'Base layout'}</em>}
+                  </span>
                 </button>
               );
             })}

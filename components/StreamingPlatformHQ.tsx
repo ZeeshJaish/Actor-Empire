@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {BadgeCheck, BarChart3, Banknote, Building2, Check, ChevronRight, CircleDot, Clapperboard, Compass, Crown, Eye, Film, Gauge, Globe2, Home, Layers3, LockKeyhole, Play, RadioTower, Rocket, Server, ShieldCheck, Sparkles, TrendingUp, UsersRound, WalletCards, X, type LucideIcon} from 'lucide-react';
 import type {
   OwnedStreamingLaunchRehearsalSnapshot,
@@ -80,7 +80,10 @@ import {
   type PricingSel as StreamingPricingSelection,
 } from './streaming-transplant/StreamingPricingExperience';
 import StreamingFinanceRoom from './streaming-transplant/StreamingFinanceRoom';
+import StreamingContentMarket from './StreamingContentMarket';
+import { establishContentMarketCatalogue } from '../services/streamingContentMarket';
 import StreamingDefineLaunchWizard from './StreamingDefineLaunchExperience';
+import type { LaunchDraft } from './studio-finance/finance/launch';
 import {
   PremiereNight as StreamingPremiereExperience,
   type PremiereInputs as StreamingPremiereInputs,
@@ -169,6 +172,8 @@ interface Props {
   onOpenOriginalProduction?: (target: { studioId: string; scriptId: string; commissionId: string }) => void;
   onOpenBank?: () => void;
   initialDestination?: 'HOME' | 'FINANCE';
+  initialContentMarketOfferId?: string;
+  onContentMarketOfferConsumed?: () => void;
 }
 
 const SECTION_ICONS: Record<StreamingHqSection, LucideIcon> = {
@@ -261,7 +266,7 @@ function EmptyState({
   );
 }
 
-export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, onReturnToGame, onOpenOriginalProduction, onOpenBank, initialDestination = 'HOME' }: Props) {
+export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, onReturnToGame, onOpenOriginalProduction, onOpenBank, initialDestination = 'HOME', initialContentMarketOfferId, onContentMarketOfferConsumed }: Props) {
   const platform = player.ownedStreamingPlatform;
   const identity = platform.identity!;
   const snapshot = useMemo(() => getStreamingHqSnapshot(player), [player]);
@@ -302,6 +307,8 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
   const [showProductLab, setShowProductLab] = useState(false);
   const [showLeadershipSuite, setShowLeadershipSuite] = useState(false);
   const [showCatalogSetup, setShowCatalogSetup] = useState(false);
+  const [showContentMarket, setShowContentMarket] = useState(Boolean(initialContentMarketOfferId));
+  const [catalogueReturnToLaunch, setCatalogueReturnToLaunch] = useState(false);
   const [catalogSetupInitialStep, setCatalogSetupInitialStep] = useState<0 | 2 | undefined>(undefined);
   const [catalogDeskInitialTab, setCatalogDeskInitialTab] = useState<'PROGRAM' | 'COVERAGE' | 'LANGUAGES'>('PROGRAM');
   const [catalogSurface, setCatalogSurface] = useState<'SETUP' | 'DESK'>('SETUP');
@@ -327,6 +334,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
   const [showDefineLaunch, setShowDefineLaunch] = useState(false);
   const [defineLaunchMode, setDefineLaunchMode] = useState<'OPENING' | 'EXPANSION'>('OPENING');
   const [defineLaunchInitialStep, setDefineLaunchInitialStep] = useState<StreamingDefineLaunchStepId | undefined>(undefined);
+  const launchDraftRef = useRef<LaunchDraft | null>(null);
   const [showCinematicBuild, setShowCinematicBuild] = useState(false);
   const [showCinematicPricing, setShowCinematicPricing] = useState(false);
   const [showFinanceRoom, setShowFinanceRoom] = useState(initialDestination === 'FINANCE');
@@ -337,6 +345,12 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
   const [buildRunResult, setBuildRunResult] = useState<StreamingBuildRunResult | null>(null);
   const buildCommittedPlayerRef = useRef<Player | null>(null);
   const [companyFeedback, setCompanyFeedback] = useState('');
+
+  useEffect(() => {
+    if (!initialContentMarketOfferId) return;
+    setShowContentMarket(true);
+    onContentMarketOfferConsumed?.();
+  }, [initialContentMarketOfferId, onContentMarketOfferConsumed]);
 
   const openFinanceRoom = (
     tab: 'SNAPSHOT' | 'CAPITAL' = 'SNAPSHOT',
@@ -640,14 +654,14 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
           ],
         },
         {
-          id: 'CONTENT', label: 'CONTENT', sub: 'Catalogue, marketplace & Originals',
+          id: 'CONTENT', label: 'CONTENT', sub: 'Catalogue, Content Market & Originals',
           statLabel: 'OPENING CATALOGUE',
           stat: platform.starterCatalog ? `${openingCatalogue.titles.length} TITLES · ${openingCatalogue.rightsReadyCountryCount}/${openingCatalogue.openingCountryCount} MARKETS` : 'NOT ASSEMBLED',
           pressure: !platform.starterCatalog ? 'urgent' : openingCatalogue.rightsReady ? 'calm' : 'watch',
           note: !platform.starterCatalog ? 'The opening shelves need a catalogue.' : undefined,
           chips: [
             { id: 'CATALOGUE', label: 'CATALOGUE', alert: !platform.starterCatalog },
-            { id: 'MARKETPLACE', label: 'MARKETPLACE' },
+            { id: 'MARKETPLACE', label: 'CONTENT MARKET' },
             { id: 'ORIGINALS', label: 'ORIGINALS' },
             { id: 'RIGHTS', label: 'RIGHTS' },
             { id: 'LOCALIZATION', label: 'LOCALIZATION', alert: !openingCatalogue.qualityReady },
@@ -685,7 +699,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
           note: !platform.starterCatalog ? 'The opening shelves are empty.' : undefined,
           chips: [
             { id: 'CATALOGUE', label: 'CATALOGUE', alert: !platform.starterCatalog },
-            { id: 'MARKETPLACE', label: 'MARKETPLACE' },
+            { id: 'MARKETPLACE', label: 'CONTENT MARKET' },
             { id: 'ORIGINALS', label: 'ORIGINALS', alert: (platform.originalCommissions || []).length === 0 },
             { id: 'RIGHTS', label: 'RIGHTS', alert: !platform.starterCatalog },
             { id: 'LOCALIZATION', label: 'LOCALIZATION', alert: platform.localizationOperations.jobs.some(job => job.status !== 'READY') },
@@ -844,7 +858,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
     return {
       id: titleDossierInitialProjectId,
       title,
-      kind: performance?.source === 'ORIGINAL' || catalogue?.kind === 'ORIGINAL' ? 'ORIGINAL' : 'LICENSED',
+      kind: catalogue?.kind || (performance?.source === 'ORIGINAL' ? 'ORIGINAL' : performance?.source === 'OWNED_LIBRARY' ? 'OWNED' : 'LICENSED'),
       format: String(performance?.projectType || catalogue?.format || 'Film'),
       genre: performance?.genre || catalogue?.genre || 'Drama',
       hue: commandDeckBrand.hue,
@@ -852,7 +866,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
       status: catalogue?.status || 'ON THE SERVICE',
       chartRank: cinematicAudienceState.chart.find(row => row.mine && row.title === title)?.rank,
       rating: performance ? Math.max(1, Math.min(10, performance.satisfactionScore / 10)) : undefined,
-      rightsWeeksLeft: catalogue?.rights?.weeksLeft,
+      rightsWeeksLeft: catalogue?.rights?.endsInWeeks,
       viewers: performance?.viewingAccounts || catalogue?.views || 0,
       completion,
       subsAcquired: Math.round((performance?.viewingAccounts || 0) * 0.03),
@@ -1233,16 +1247,20 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
   const closeCatalogSetup = () => {
     setShowCatalogSetup(false);
     setCatalogSetupInitialStep(undefined);
+    if (catalogueReturnToLaunch) {
+      setCatalogueReturnToLaunch(false);
+      setDefineLaunchInitialStep('CATALOGUE');
+      setShowDefineLaunch(true);
+    }
     window.requestAnimationFrame(() => mainRef.current?.scrollTo({ top: 0, behavior: 'smooth' }));
   };
 
   const openStarterCatalogueRoute = (step: 0 | 2) => {
-    setCatalogSurface('SETUP');
-    setCatalogSetupInitialStep(step);
-    setShowCatalogSetup(true);
+    setShowContentMarket(true);
   };
 
   const openCatalogueSurface = (tab: 'PROGRAM' | 'COVERAGE' | 'LANGUAGES' = 'PROGRAM') => {
+    if (!platform.starterCatalog) { setShowContentMarket(true); return; }
     setCatalogDeskInitialTab(tab);
     setCatalogSetupInitialStep(undefined);
     setCatalogSurface(platform.starterCatalog ? 'DESK' : 'SETUP');
@@ -1519,11 +1537,8 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
       if (chip === 'CATALOGUE') {
         return openCatalogueSurface('PROGRAM');
       }
-      if (chip === 'MARKETPLACE') return platform.starterCatalog
-        ? setShowRightsExchange(true)
-        : openCatalogueSurface('PROGRAM');
+      if (chip === 'MARKETPLACE') return setShowContentMarket(true);
       if (chip === 'ORIGINALS') {
-        if (!platform.starterCatalog) return openCatalogueSurface('PROGRAM');
         return platform.originalCommissions.length
           ? setShowOriginalsStudio(true)
           : setShowOriginalCommissioning(true);
@@ -1624,7 +1639,16 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
         brand={commandDeckBrand}
         state={cinematicContentState}
         initialTab={contentInitialTab}
-        onBack={() => selectSection('HOME')}
+        onAddContent={() => setShowContentMarket(true)}
+        onReviewCatalogue={() => openCatalogueSurface('COVERAGE')}
+        onOpenSlate={() => setShowSlatePlanner(true)}
+        onBack={() => {
+          if (catalogueReturnToLaunch) {
+            setCatalogueReturnToLaunch(false);
+            setDefineLaunchInitialStep('CATALOGUE');
+            setShowDefineLaunch(true);
+          } else selectSection('HOME');
+        }}
         onOpenTitle={title => {
           setTitleDossierInitialProjectId(title.id);
           setShowTitleDossier(true);
@@ -1635,17 +1659,15 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
             eyebrow: 'RIGHTS MARKET',
             title: 'License released titles',
             description: 'Negotiate a temporary streaming window for a completed film or series.',
-            status: !platform.starterCatalog ? 'OPENING ROUTE' : platform.lifecycle === 'ACTIVE' ? 'MARKET OPEN' : 'AFTER OPENING NIGHT',
-            disabled: Boolean(platform.starterCatalog && platform.lifecycle !== 'ACTIVE'),
-            onSelect: () => platform.starterCatalog ? setShowRightsExchange(true) : openStarterCatalogueRoute(2),
+            status: 'CONTENT MARKET',
+            onSelect: () => setShowContentMarket(true),
           },
           {
             id: 'ORIGINAL',
             eyebrow: 'NEW PRODUCTION',
             title: 'Commission an Original',
             description: 'Order a new project and send it into a real production-house workflow.',
-            status: platform.starterCatalog ? 'AVAILABLE' : 'CATALOGUE REQUIRED',
-            disabled: !platform.starterCatalog,
+            status: 'PRODUCTION REQUIRED',
             onSelect: () => setShowOriginalCommissioning(true),
           },
           {
@@ -1653,10 +1675,8 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
             eyebrow: 'YOUR PRODUCTION HOUSE',
             title: 'Bring from my studio',
             description: 'Link released titles you already control without inventing an internal sale.',
-            status: !platform.starterCatalog
-              ? eligibleOwnedStreamingTitles.length ? `${eligibleOwnedStreamingTitles.length} ELIGIBLE` : 'NO RELEASED TITLES'
-              : 'OPENING LIBRARY LINKED',
-            disabled: Boolean(platform.starterCatalog || eligibleOwnedStreamingTitles.length === 0),
+            status: eligibleOwnedStreamingTitles.length ? `${eligibleOwnedStreamingTitles.length} RELEASED` : 'NO RELEASED TITLES',
+            disabled: eligibleOwnedStreamingTitles.length === 0,
             onSelect: () => openStarterCatalogueRoute(0),
           },
           {
@@ -1664,8 +1684,8 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
             eyebrow: 'LIBRARY ACQUISITION',
             title: 'Acquire a catalogue',
             description: 'Purchase a packaged library and its negotiated rights in one transaction.',
-            status: 'RESEARCH REQUIRED',
-            disabled: true,
+            status: 'CONTENT MARKET',
+            onSelect: () => setShowContentMarket(true),
           },
         ]}
         onRenew={() => setShowRightsExchange(true)}
@@ -1750,6 +1770,13 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
         }}
         onOpenCatalogue={() => {
           setShowDefineLaunch(false);
+          setCatalogueReturnToLaunch(true);
+          if (platform.starterCatalog) openCatalogueSurface('PROGRAM');
+          else setShowContentMarket(true);
+        }}
+        onOpenContentDesk={() => {
+          setShowDefineLaunch(false);
+          setCatalogueReturnToLaunch(true);
           setContentInitialTab('LIBRARY');
           selectSection('CONTENT');
         }}
@@ -1767,6 +1794,8 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
         }}
         mode={defineLaunchMode}
         initialStep={defineLaunchInitialStep}
+        initialDraft={launchDraftRef.current}
+        onDraftChange={(draft) => { launchDraftRef.current = draft; }}
       />
     );
   }
@@ -2114,15 +2143,38 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
           }}
         />
       ) : null}
+      {showContentMarket && !showOriginalCommissioning && !showCatalogSetup && !showRightsExchange ? (
+        <StreamingContentMarket
+          player={player} brand={commandDeckBrand} onUpdatePlayer={persist}
+          initialOfferId={initialContentMarketOfferId}
+          returnToLaunch={catalogueReturnToLaunch}
+          onClose={() => {
+            setShowContentMarket(false);
+            if (catalogueReturnToLaunch) {
+              setCatalogueReturnToLaunch(false);
+              setDefineLaunchInitialStep('CATALOGUE');
+              setShowDefineLaunch(true);
+            } else { setContentInitialTab('LIBRARY'); selectSection('CONTENT'); }
+          }}
+          onOpenFinance={() => openFinanceRoom('CAPITAL', 'INJECT')}
+          onCommission={() => setShowOriginalCommissioning(true)}
+          onResumeLegacy={() => { setCatalogSurface('SETUP'); setCatalogSetupInitialStep(undefined); setShowCatalogSetup(true); }}
+          onExistingNegotiations={() => setShowRightsExchange(true)}
+          onReview={() => {
+            if (platform.starterCatalog) { setShowContentMarket(false); openCatalogueSurface('PROGRAM'); }
+            else setCompanyFeedback('Add a title to establish your opening catalogue.');
+          }}
+        />
+      ) : null}
       {showCatalogSetup ? catalogSurface === 'DESK' && platform.starterCatalog ? (
         <StreamingOpeningCatalogueDesk
           player={player}
           onUpdatePlayer={onUpdatePlayer!}
           onClose={closeCatalogSetup}
           initialTab={catalogDeskInitialTab}
-          onOpenRightsMarket={() => { setShowCatalogSetup(false); setShowRightsExchange(true); }}
+          onOpenRightsMarket={() => { setShowCatalogSetup(false); setShowContentMarket(true); }}
           onOpenSlate={() => { setShowCatalogSetup(false); setShowSlatePlanner(true); }}
-          onOpenFinance={() => { setShowCatalogSetup(false); openFinanceRoom('CAPITAL', 'INJECT'); }}
+          onOpenFinance={() => { openFinanceRoom('CAPITAL', 'INJECT'); }}
           onOpenTechnology={() => { setShowCatalogSetup(false); setShowTechnologyCampus(true); }}
         />
       ) : (
@@ -2145,7 +2197,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
           }}
         />
       ) : null}
-      {showOriginalsStudio && platform.starterCatalog ? (
+      {showOriginalsStudio ? (
         <StreamingOriginalsStudio
           player={player}
           onUpdatePlayer={persist}
@@ -2169,10 +2221,10 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
           }}
         />
       ) : null}
-      {showRightsExchange && platform.starterCatalog ? (
+      {showRightsExchange ? (
         <StreamingRightsExchange
           player={player}
-          onUpdatePlayer={persist}
+          onUpdatePlayer={next => persist(!next.ownedStreamingPlatform.starterCatalog && next.ownedStreamingPlatform.catalogProjectIds.length ? establishContentMarketCatalogue(next) : next)}
           onClose={() => setShowRightsExchange(false)}
           onOpenTitleDossier={projectId => {
             setShowRightsExchange(false);

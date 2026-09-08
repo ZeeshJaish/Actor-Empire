@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { GameLanguage, Player, NewsCategory, NewsItem } from '../../types';
 import { ArrowLeft, BarChart3, BriefcaseBusiness, ChevronRight, Clapperboard, Flame, Newspaper, Radio, Search, Sparkles, UserRound } from 'lucide-react';
 import { getPlayerLanguage, t } from '../../services/i18n';
+import { IndustryClaimBadge, IndustryClaimContextPanel, getIndustryClaimPresentation } from './IndustryClaimContext';
+import { IndustryNarrativeContext } from './IndustryNarrativeContext';
 
 interface NewsAppProps {
   player: Player;
@@ -48,6 +50,7 @@ const getTabLabel = (tab: NewsViewTab, language: GameLanguage) => {
 };
 
 const getSource = (item: NewsItem, language: GameLanguage) => {
+  if (item.sourceName) return item.sourceName;
   const text = `${item.headline} ${item.subtext || ''}`.toLowerCase();
   if (/forbes|wealth|rank|rich/.test(text)) return t(language, 'news.source.forbes');
   if (/box office|opening|weekend|gross|audience/.test(text)) return t(language, 'news.source.boxOffice');
@@ -191,6 +194,10 @@ const StoryDetail: React.FC<{
 }> = ({ item, player, language, onClose }) => {
   const chips = getImpactChips(item, language);
   const tags = getTags(item, player, language);
+  const claimContext = getIndustryClaimPresentation(player, item.mediaClaimId);
+  const narrativeSubjectKey = item.mediaStoryId
+    ? player.world.industryMedia?.stories.find(story => story.id === item.mediaStoryId)?.subjectKey
+    : item.projectId ? `project:${item.projectId}` : item.companyId ? `company:${item.companyId}` : undefined;
 
   return (
     <div className="absolute inset-0 z-50 bg-black/70 backdrop-blur-md flex items-end">
@@ -200,6 +207,7 @@ const StoryDetail: React.FC<{
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="text-[10px] font-black uppercase tracking-[0.24em] text-red-400">{getSource(item, language)}</div>
+              {item.byline && <div className="mt-1 text-[10px] font-sans font-bold text-zinc-500">By {item.byline}</div>}
               <h2 className="mt-3 text-3xl font-black leading-[0.95] text-white tracking-tight">{item.headline}</h2>
             </div>
             <button onClick={onClose} className="shrink-0 px-4 py-2 rounded-full bg-white text-black text-xs font-black uppercase tracking-widest">
@@ -208,6 +216,18 @@ const StoryDetail: React.FC<{
           </div>
 
           {item.subtext && <p className="mt-5 text-base leading-relaxed font-sans text-zinc-300">{item.subtext}</p>}
+
+          {claimContext && (
+            <div className="mt-5 -mx-5">
+              <IndustryClaimContextPanel {...claimContext} />
+            </div>
+          )}
+
+          {narrativeSubjectKey && (
+            <div className="mt-5 -mx-5">
+              <IndustryNarrativeContext player={player} subjectKey={narrativeSubjectKey} />
+            </div>
+          )}
 
           <div className="mt-5 rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-4">
             <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.22em] text-zinc-500">
@@ -245,6 +265,7 @@ const StoryDetail: React.FC<{
 
 const NewsAppLegacy: React.FC<NewsAppProps> = ({ player, onBack }) => {
   const [tab, setTab] = useState<NewsCategory>('TOP_STORY');
+  const [selectedStory, setSelectedStory] = useState<NewsItem | null>(null);
   const language = getPlayerLanguage(player);
   const newsItems = player.news || [];
   const filteredNews = tab === 'TOP_STORY'
@@ -270,18 +291,26 @@ const NewsAppLegacy: React.FC<NewsAppProps> = ({ player, onBack }) => {
             {filteredNews.length === 0 ? <div className="p-8 text-center text-zinc-600 font-sans text-sm">{t(language, 'news.noNews')}</div> : (
                 <div className="divide-y divide-zinc-900">
                     {filteredNews.map((item, idx) => (
-                        <div key={item.id} className={`p-4 ${idx === 0 && tab === 'TOP_STORY' ? 'bg-zinc-900 pb-6' : ''}`}>
+                        <button type="button" onClick={() => setSelectedStory(item)} key={item.id} className={`block w-full p-4 text-left ${idx === 0 && tab === 'TOP_STORY' ? 'bg-zinc-900 pb-6' : ''}`}>
                             {idx === 0 && tab === 'TOP_STORY' && <div className="mb-2"><span className="bg-red-600 text-white text-[9px] font-sans font-bold px-2 py-0.5 rounded uppercase mb-2 inline-block">{t(language, 'news.breaking')}</span></div>}
+                            <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 font-sans text-[9px] font-bold uppercase tracking-[0.16em] text-red-500">
+                                <span>{getSource(item, language)}</span>
+                                {item.byline && <span className="normal-case tracking-normal text-zinc-500">By {item.byline}</span>}
+                                {item.mediaClaimId && getIndustryClaimPresentation(player, item.mediaClaimId) && (
+                                  <IndustryClaimBadge claim={getIndustryClaimPresentation(player, item.mediaClaimId)!.claim} compact />
+                                )}
+                            </div>
                             <div className="flex justify-between items-start mb-1"><h3 className={`${idx === 0 && tab === 'TOP_STORY' ? 'text-2xl leading-tight' : 'text-lg leading-snug'} font-bold text-zinc-100`}>{item.headline}</h3></div>
                             {item.subtext && <p className={`text-zinc-400 font-sans ${idx === 0 && tab === 'TOP_STORY' ? 'text-sm mt-2' : 'text-xs mt-1'}`}>{item.subtext}</p>}
                             <div className="flex items-center gap-2 mt-3"><span className="text-[10px] text-zinc-600 font-sans uppercase">{t(language, 'common.week')} {item.week} • {t(language, 'common.year')} {item.year}</span></div>
-                        </div>
+                        </button>
                     ))}
                 </div>
             )}
             <div className="p-8 text-center border-t border-zinc-900 mt-4"><div className="text-zinc-700 font-serif italic text-lg opacity-30">{t(language, 'news.brand')}</div><div className="text-[10px] text-zinc-800 font-sans mt-1 uppercase tracking-widest">{t(language, 'news.endOfFeed')}</div></div>
         </div>
         <div className="absolute bottom-1 left-0 right-0 flex justify-center pb-2 z-50 pointer-events-none"><div className="w-32 h-1 bg-white/20 rounded-full"></div></div>
+        {selectedStory && <StoryDetail item={selectedStory} player={player} language={language} onClose={() => setSelectedStory(null)} />}
     </div>
   );
 };

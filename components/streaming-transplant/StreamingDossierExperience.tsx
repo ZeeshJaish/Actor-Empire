@@ -24,7 +24,7 @@ export interface DnaAxis { label: string; value: number }   // 0-100
 export interface DossierTitle {
   id: string;
   title: string;
-  kind: 'ORIGINAL' | 'LICENSED';
+  kind: 'ORIGINAL' | 'LICENSED' | 'OWNED';
   format: string;                 // Film | Series | Collection
   genre: string;
   hue: number;
@@ -98,7 +98,7 @@ export const TitleDossier: React.FC<{
           <div className={css.dosghost} style={{ fontFamily: tf.stack }}>{t.title}</div>
           <h1 className={css.dostitle}>{t.title}</h1>
           <div className={css.dossub}>
-            {t.kind === 'ORIGINAL' ? 'ORIGINAL' : 'LICENSED'} {t.format.toUpperCase()} · {t.genre.toUpperCase()}
+            {t.kind === 'ORIGINAL' ? 'ORIGINAL' : t.kind === 'OWNED' ? 'STUDIO IMPORT' : 'LICENSED'} {t.format.toUpperCase()} · {t.genre.toUpperCase()}
           </div>
         </div>
 
@@ -202,12 +202,12 @@ export const TitleDossier: React.FC<{
                 <button className={css.dact} onClick={() => onAction?.('spinoff')}>COMMISSION A SPIN-OFF</button>
                 <button className={css.dact} onClick={() => onAction?.('licence')}>LICENCE IT OUT</button>
               </>
-            ) : (
+            ) : t.kind === 'LICENSED' ? (
               <>
                 <button className={cx(css.dact, css.primary)} onClick={() => onAction?.('renew-rights')}>RENEW THE RIGHTS</button>
                 <button className={cx(css.dact, css.danger)} onClick={() => onAction?.('lapse')}>LET IT LAPSE</button>
               </>
-            )}
+            ) : <p className={css.actnote}>Imported from your production house. Existing grants elsewhere still limit where this title can play.</p>}
             <button className={css.dact} onClick={() => onAction?.('artwork')}>CHANGE ARTWORK</button>
             <button className={css.dact} onClick={() => onAction?.('hero')}>PUT ON HOMEPAGE HERO</button>
           </div>

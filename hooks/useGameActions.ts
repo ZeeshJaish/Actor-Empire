@@ -10,6 +10,7 @@ import { hasOwnedPremiumAssetInCollection, spendPlayerEnergy } from '../services
 import { applyParenthoodAbandonment, applyPartnerBreakup, applyDivorceOutcome, getPregnancyCarrier, getPregnancyFeedbackCopy, reconnectWithChild } from '../services/familyLogic';
 import { getPlayerLanguage, t } from '../services/i18n';
 import { OWNED_PRODUCTION_ACTIONS, applyOwnedProductionFocusAction, getOwnedProductionActionProgress } from '../services/ownedProductionCareer';
+import { applyProjectPromotionAttribution } from '../services/projectPromotionAttribution';
 
 interface GameActionsProps {
     player: Player;
@@ -176,7 +177,7 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
             ...nextState.x.feed,
         ].slice(0, 50);
     };
-    
+
     // Helper for updating player and saving asynchronously
     const handleGenericUpdate = (updater: (prev: Player) => Player, logMessage?: string) => {
         setPlayer(prev => {
@@ -184,7 +185,7 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
             if (logMessage) {
                 // Ensure logs don't grow infinitely here too
                 const newLog = { week: next.currentWeek, year: next.age, message: logMessage, type: 'neutral' as const };
-                next.logs = [...next.logs, newLog].slice(-50); 
+                next.logs = [...next.logs, newLog].slice(-50);
             }
             return next;
         });
@@ -198,24 +199,24 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
 
         setPlayer(prev => {
             const cIndex = prev.commitments.findIndex(c => c.id === commitmentId);
-            if (cIndex === -1) return prev; 
+            if (cIndex === -1) return prev;
             const c = prev.commitments[cIndex];
             let updatedC = { ...c }; let msg = "";
-            
+
             if (c.projectPhase === 'PRE_PRODUCTION') {
                 if (prev.energy.current < 10) return prev;
                 if ((c.auditionPerformance || 0) >= 100) return prev;
 
                 const gain = 2;
-                updatedC.auditionPerformance = Math.min(100, (c.auditionPerformance || 0) + gain); 
+                updatedC.auditionPerformance = Math.min(100, (c.auditionPerformance || 0) + gain);
                 msg = `Table Read complete. Prep: ${Math.round(updatedC.auditionPerformance)}%`;
-                
+
                 const newCommitments = [...prev.commitments]; newCommitments[cIndex] = updatedC;
                 const newLog: LogEntry = { week: prev.currentWeek, year: prev.age, message: msg, type: 'neutral' };
-                const newState = { 
-                    ...prev, 
+                const newState = {
+                    ...prev,
                     stats: { ...prev.stats, experience: prev.stats.experience + 1 },
-                    commitments: newCommitments, 
+                    commitments: newCommitments,
                     logs: [...prev.logs, newLog].slice(-50)
                 };
                 spendPlayerEnergy(newState, 10, `Career prep: ${c.name}`);
@@ -229,7 +230,7 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
                const gain = calculateAuditionGain(prev, c.roleType || 'MINOR', c.auditionPerformance || 0);
                updatedC.auditionPerformance = Math.min(100, (c.auditionPerformance || 0) + gain);
                msg = `Rehearsed audition. Prep: ${Math.round(updatedC.auditionPerformance)}%`;
-               
+
                const newCommitments = [...prev.commitments]; newCommitments[cIndex] = updatedC;
                const newLog: LogEntry = { week: prev.currentWeek, year: prev.age, message: msg, type: 'neutral' };
                const newState = { ...prev, commitments: newCommitments, logs: [...prev.logs, newLog].slice(-50)};
@@ -244,20 +245,20 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
                const gain = calculateProductionGain(prev, c.roleType || 'MINOR', c.productionPerformance || 0, isOverworked, c.type);
                updatedC.productionPerformance = Math.min(100, (c.productionPerformance || 0) + gain);
                msg = `Rehearsed scene. Perf: ${Math.round(updatedC.productionPerformance)}%`;
-               
+
                const newCommitments = [...prev.commitments]; newCommitments[cIndex] = updatedC;
                const newLog: LogEntry = { week: prev.currentWeek, year: prev.age, message: msg, type: 'neutral' };
                const newState = { ...prev, commitments: newCommitments, logs: [...prev.logs, newLog].slice(-50)};
                spendPlayerEnergy(newState, 20, `Scene rehearsal: ${c.name}`);
                return newState;
             }
-            
+
             return prev;
         });
     };
 
     const handlePromotionAction = (actionId: string) => {
-        const parts = actionId.split('_'); 
+        const parts = actionId.split('_');
         const type = parts[1];
         const targetGigId = parts.slice(2).join('_');
 
@@ -284,11 +285,10 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
 
         setPlayer(prev => {
             let energyCost = 0;
-            let buzzDelta = 0;
             let logMsg = "";
             let toastTitle = "";
             let toastSub = "";
-            
+
             let newInstaPosts = prev.instagram.posts;
             let newInstaFeed = prev.instagram.feed;
             let newXPosts = prev.x.posts;
@@ -297,64 +297,86 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
             if (type === 'IG') {
                 energyCost = 10;
                 if (prev.energy.current < energyCost) return prev;
-                
-                buzzDelta = 2; 
+
                 logMsg = `Posted promo on Instagram for ${commitment.name}.`;
                 toastTitle = "Instagram Post Shared";
                 toastSub = `Followers react to ${commitment.name}`;
 
+                const publicationId = `post_promo_${Date.now()}`;
                 const newPost: InstaPost = {
-                    id: `post_promo_${Date.now()}`,
+                    id: publicationId,
                     authorId: 'PLAYER', authorName: prev.name, authorHandle: prev.instagram.handle, authorAvatar: prev.avatar,
                     type: 'ANNOUNCEMENT',
                     caption: `So excited for you all to see ${commitment.name}! 🎬✨ #ComingSoon`,
                     week: prev.currentWeek, year: prev.age,
                     likes: Math.floor(prev.stats.followers * 0.1),
                     comments: Math.floor(prev.stats.followers * 0.005),
-                    isPlayer: true
+                    isPlayer: true,
+                    promotedProjectId: commitment.id,
                 };
                 newInstaPosts = [newPost, ...newInstaPosts];
                 newInstaFeed = [newPost, ...newInstaFeed];
-            } 
+            }
             else if (type === 'X') {
                 energyCost = 15;
                 if (prev.energy.current < energyCost) return prev;
 
-                buzzDelta = 3; 
                 logMsg = `Tweeted hype for ${commitment.name}.`;
                 toastTitle = "Posted on X";
                 toastSub = "Your tweet is gaining traction.";
 
+                const publicationId = `x_promo_${Date.now()}`;
                 const newPost: XPost = {
-                    id: `x_promo_${Date.now()}`,
+                    id: publicationId,
                     authorId: 'PLAYER', authorName: prev.name, authorHandle: prev.x.handle, authorAvatar: prev.avatar,
                     content: `${commitment.name} is going to be special. Can't wait. 🍿`,
                     timestamp: prev.currentWeek,
                     likes: Math.floor(prev.stats.followers * 0.05),
                     retweets: Math.floor(prev.stats.followers * 0.01),
                     replies: Math.floor(prev.stats.followers * 0.005),
-                    isPlayer: true, isLiked: false, isRetweeted: false, isVerified: prev.stats.fame > 50
+                    isPlayer: true, isLiked: false, isRetweeted: false, isVerified: prev.stats.fame > 50,
+                    promotedProjectId: commitment.id,
                 };
                 newXPosts = [newPost, ...newXPosts];
                 newXFeed = [newPost, ...newXFeed];
             }
 
-            const currentBuzz = commitment.promotionalBuzz || 0;
-            const newBuzz = Math.max(-50, Math.min(50, currentBuzz + buzzDelta));
-            const updatedCommitment = { ...commitment, promotionalBuzz: newBuzz };
-            const newCommitments = prev.commitments.map(c => c.id === commitment.id ? updatedCommitment : c);
-
             setToastMessage({ title: toastTitle, subtext: toastSub });
 
-            const newState = {
+            const newState: Player = {
                 ...prev,
-                commitments: newCommitments,
                 logs: [...prev.logs, { week: prev.currentWeek, year: prev.age, message: logMsg, type: 'positive' as const }].slice(-50),
                 instagram: { ...prev.instagram, posts: newInstaPosts, feed: newInstaFeed },
                 x: { ...prev.x, posts: newXPosts, feed: newXFeed }
             };
             spendPlayerEnergy(newState, energyCost, `Promotion: ${commitment.name}`);
-            return newState;
+            const publication = type === 'IG' ? newInstaPosts[0] : newXPosts[0];
+            const promotion = applyProjectPromotionAttribution(newState, {
+                projectId: commitment.id,
+                publicationId: publication.id,
+                channel: type === 'IG' ? 'INSTAGRAM' : 'X',
+                promotionType: type === 'IG' ? 'ANNOUNCEMENT' : 'PROJECT_PROMO',
+                absoluteWeek: getAbsoluteWeek(prev.age, prev.currentWeek),
+                reach: publication.likes,
+                engagement: publication.likes,
+            });
+            const attributionId = promotion.attribution?.id;
+            if (!attributionId) return promotion.player;
+            return type === 'IG' ? {
+                ...promotion.player,
+                instagram: {
+                    ...promotion.player.instagram,
+                    posts: promotion.player.instagram.posts.map(post => post.id === publication.id ? { ...post, promotionAttributionId: attributionId } : post),
+                    feed: promotion.player.instagram.feed.map(post => post.id === publication.id ? { ...post, promotionAttributionId: attributionId } : post),
+                },
+            } : {
+                ...promotion.player,
+                x: {
+                    ...promotion.player.x,
+                    posts: promotion.player.x.posts.map(post => post.id === publication.id ? { ...post, promotionAttributionId: attributionId } : post),
+                    feed: promotion.player.x.feed.map(post => post.id === publication.id ? { ...post, promotionAttributionId: attributionId } : post),
+                },
+            };
         });
     };
 
@@ -417,7 +439,7 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
                 spendPlayerEnergy(newPlayer, energy, `Training: ${genre}`);
                 rewardGenreExperience(newPlayer, genre, 1);
                 newPlayer.logs.push({
-                    week: prev.currentWeek, year: prev.age, 
+                    week: prev.currentWeek, year: prev.age,
                     message: tr('actions.improve.genreLog', { genre }), type: 'neutral'
                 });
                 newPlayer.logs = newPlayer.logs.slice(-50);
@@ -429,9 +451,9 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
             const newWriterStats = prev.writerStats ? { ...prev.writerStats } : { creativity: 0, dialogue: 0, structure: 0 };
             let msg = tr('actions.improve.completedLog', { label: option.label });
             let toastType = tr('actions.improve.activityCompleteTitle');
-            
+
             Object.entries(option.gains).forEach(([key, val]) => {
-                if (typeof val !== 'number') return; 
+                if (typeof val !== 'number') return;
                 if (key in newStats && key !== 'skills') {
                     const statKey = key as keyof Stats;
                     const currentVal = newStats[statKey] as number;
@@ -489,7 +511,7 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
                 logs: [...prev.logs, { week: prev.currentWeek, year: prev.age, message: msg, type: 'neutral' as const }].slice(-50)
             };
             spendPlayerEnergy(newState, option.energyCost, `Improve: ${option.label}`);
-            
+
             setToastMessage({ title: toastType, subtext: msg });
             return newState;
         });
@@ -508,10 +530,10 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
               setToastMessage({ title: tr('actions.relationship.blockedTitle'), subtext: tr('actions.relationship.familyRomanceBlockedSubtext') });
               return prev;
           }
-          
+
           let logMsg = "";
           let newCloseness = partner.closeness;
-          let newRelation: Relationship['relation'] = partner.relation; 
+          let newRelation: Relationship['relation'] = partner.relation;
           let energyCost = 0;
           let moneyCost = 0;
           let newRelationships = [...prev.relationships];
@@ -522,11 +544,11 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
           if (action === 'EVENT_RESOLUTION' && eventOutcome) {
               logMsg = eventOutcome.logMessage;
               if (eventOutcome.impact.relationship) newCloseness = Math.min(100, newCloseness + eventOutcome.impact.relationship);
-              if (eventOutcome.impact.money) moneyCost = -eventOutcome.impact.money; 
+              if (eventOutcome.impact.money) moneyCost = -eventOutcome.impact.money;
               statsUpdate = { ...eventOutcome.impact };
               delete (statsUpdate as any).relationship;
               delete (statsUpdate as any).money;
-          } 
+          }
           else {
               const flavorPool = getFlavorTexts(language, action);
               const flavorText = flavorPool.length > 0 ? flavorPool[Math.floor(Math.random() * flavorPool.length)] : "";
@@ -534,7 +556,7 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
 	              if (action === 'DATE') {
 	                  energyCost = 20; moneyCost = 200; newCloseness = Math.min(100, newCloseness + 10);
 	                  logMsg = tr('services.socialEvents.actionLog.DATE', { partnerName: partner.name, flavor: flavorText });
-	              } 
+	              }
 	              else if (action === 'CLUBBING') {
 	                  energyCost = 40; moneyCost = 500; newCloseness = Math.min(100, newCloseness + 8);
 	                  logMsg = tr('services.socialEvents.actionLog.CLUBBING', { partnerName: partner.name, flavor: flavorText });
@@ -648,7 +670,7 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
 	              }
           }
 
-          if (prev.money < moneyCost || prev.energy.current < energyCost) return prev; 
+          if (prev.money < moneyCost || prev.energy.current < energyCost) return prev;
 
           const newPlayerStats = { ...prev.stats };
           // Apply all stats from statsUpdate generically, capping appropriately
@@ -665,7 +687,7 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
           });
 
           if ((eventOutcome?.impact as any)?.money) {
-              moneyCost -= (eventOutcome?.impact as any).money; 
+              moneyCost -= (eventOutcome?.impact as any).money;
           }
 
 	          newRelationships[idx] = { ...partner, closeness: Math.max(0, Math.min(100, newCloseness)), relation: newRelation, lastInteractionWeek: prev.currentWeek, lastInteractionAbsolute: getAbsoluteWeek(prev.age, prev.currentWeek) };
@@ -706,7 +728,7 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
           }
           spendPlayerEnergy(nextState, energyCost, logMsg || `Social: ${action}`);
           return nextState;
-          
+
       });
     };
 
@@ -834,14 +856,14 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
             const potentialEvents = getSocialEvents(language, type);
             if (potentialEvents && potentialEvents.length > 0) {
                 const evt = potentialEvents[Math.floor(Math.random() * potentialEvents.length)];
-                setActiveSocialEvent({ 
-                    event: { id: `soc_evt_${Date.now()}`, title: evt.title, description: evt.desc, options: evt.options }, 
-                    partnerId: id 
+                setActiveSocialEvent({
+                    event: { id: `soc_evt_${Date.now()}`, title: evt.title, description: evt.desc, options: evt.options },
+                    partnerId: id
                 });
                 return;
             }
         }
-        handlePartnerAction(id, type, null); 
+        handlePartnerAction(id, type, null);
     };
 
     const handleIntimacyChoice = (choice: 'PROTECTED' | 'UNPROTECTED', partnerId: string) => {
@@ -849,7 +871,7 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
           const idx = prev.relationships.findIndex(r => r.id === partnerId);
           if (idx === -1) return prev;
           const partner = prev.relationships[idx];
-          
+
           const energyCost = 30;
           let newCloseness = Math.min(100, partner.closeness + 5);
           let logMsg = `Spent intimate time with ${partner.name}.`;
@@ -858,7 +880,7 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
           let scheduledActivePregnancy: Player['activePregnancy'] | undefined;
 
           const chance = choice === 'UNPROTECTED' ? 0.3 : 0.01;
-          
+
           const pregnancyCarrier = getPregnancyCarrier(prev.gender, partner.gender);
 
           if (pregnancyCarrier === 'NONE') {
@@ -897,19 +919,19 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
                 return prev;
             }
 
-            const oldState = prev.instagram.npcStates[npc.id] || { 
-                npcId: npc.id, 
-                isFollowing: false, 
-                isFollowedBy: false, 
-                relationshipScore: 0, 
+            const oldState = prev.instagram.npcStates[npc.id] || {
+                npcId: npc.id,
+                isFollowing: false,
+                isFollowedBy: false,
+                relationshipScore: 0,
                 relationshipLevel: 'Stranger',
                 lastInteractionWeek: prev.currentWeek,
                 hasMet: false,
-                chatHistory: [] 
+                chatHistory: []
             };
 
             const newScore = Math.min(100, Math.max(0, oldState.relationshipScore + res.relationshipDelta));
-            
+
             // Add to chat history
             const newChat = [...(oldState.chatHistory || [])];
             if (res.playerText) newChat.push({ sender: 'PLAYER', text: res.playerText, timestamp: Date.now() });
@@ -946,7 +968,7 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
                 setToastMessage({ title: tr('actions.npc.newConnectionTitle'), subtext: tr('actions.npc.newConnectionSubtext', { npcName: npc.name }) });
             } else if (res.success) {
                 // Update closeness if already in relationships
-                updatedRelationships = updatedRelationships.map(r => 
+                updatedRelationships = updatedRelationships.map(r =>
                     r.npcId === npc.id ? { ...r, closeness: newScore, lastInteractionWeek: prev.currentWeek } : r
                 );
             }
@@ -955,8 +977,8 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
                 setToastMessage({ title: tr('actions.npc.relationshipImprovedTitle'), subtext: tr('actions.npc.relationshipImprovedSubtext', { npcName: npc.name, delta: res.relationshipDelta.toString() }) });
             }
 
-            const nextState = { 
-                ...prev, 
+            const nextState = {
+                ...prev,
                 instagram: {
                     ...prev.instagram,
                     followers: prev.instagram.followers + followerGain,
@@ -968,7 +990,7 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
                 relationships: updatedRelationships
             };
             spendPlayerEnergy(nextState, res.energyCost, `Networking: ${npc.name}`);
-            return nextState; 
+            return nextState;
         });
     };
 

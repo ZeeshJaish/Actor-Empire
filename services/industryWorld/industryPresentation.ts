@@ -1,6 +1,8 @@
 import type {
     IndustryEventFact,
     IndustryEventLedgerState,
+    IndustryMediaInstitution,
+    IndustryMediaPersonality,
     IndustryMediaStory,
     IndustryMediaWorldState,
     InstaPost,
@@ -15,6 +17,10 @@ import {
 } from './industryEventLedger';
 import { normalizeIndustryMediaWorld } from './industryMediaLedger';
 import { advanceIndustryMediaStories } from './industryMediaStories';
+import { assignIndustryMediaCoverage } from './industryMediaCoverage';
+import { createIndustryMediaAvatar } from './industryMediaIdentities';
+import { createIndustryMediaVoice, type IndustryMediaVoiceResult } from './industryMediaVoice';
+import { ensureIndustryMediaDiscussion } from './industryMediaDiscussions';
 
 const NEWS_LIMIT = 50;
 const X_FEED_LIMIT = 80;
@@ -105,39 +111,72 @@ const engagementFor = (event: IndustryEventFact) => {
     };
 };
 
-const eventNews = (event: IndustryEventFact, player: Player, mediaStoryId?: string): NewsItem => ({
+interface IndustryMediaAuthorship {
+    institution: IndustryMediaInstitution;
+    personality?: IndustryMediaPersonality;
+    voice: IndustryMediaVoiceResult;
+}
+
+const eventNews = (
+    event: IndustryEventFact,
+    player: Player,
+    mediaStoryId?: string,
+    authorship?: IndustryMediaAuthorship,
+): NewsItem => ({
     id: `news_${event.id}`,
-    headline: event.headline,
-    subtext: event.detail,
+    headline: authorship?.voice.headline || event.headline,
+    subtext: authorship?.voice.detail || event.detail,
     category: newsCategory(event),
     week: player.currentWeek,
     year: player.age,
     impactLevel: event.importance,
     industryEventId: event.id,
     ...(mediaStoryId ? { mediaStoryId } : {}),
+    ...(authorship ? {
+        mediaInstitutionId: authorship.institution.id,
+        sourceName: authorship.institution.name,
+    } : {}),
+    ...(authorship?.personality ? {
+        mediaPersonalityId: authorship.personality.id,
+        byline: authorship.personality.name,
+    } : {}),
     ...(event.companyId ? { companyId: event.companyId } : {}),
     ...(event.projectId ? { projectId: event.projectId } : {}),
 });
 
-const eventXPost = (event: IndustryEventFact, mediaStoryId?: string): XPost => {
+const eventXPost = (
+    event: IndustryEventFact,
+    mediaStoryId?: string,
+    authorship?: IndustryMediaAuthorship,
+): XPost => {
     const engagement = engagementFor(event);
+    const institution = authorship?.institution;
+    const personality = authorship?.personality;
     return {
         id: `x_${event.id}`,
-        authorId: 'industry_desk',
-        authorName: 'Industry Desk',
-        authorHandle: '@industrydesk',
-        authorAvatar: '',
-        content: `${event.headline} ${event.detail}`,
+        authorId: personality?.id || institution?.id || 'industry_desk',
+        authorName: personality?.name || institution?.name || 'Industry Desk',
+        authorHandle: personality?.handle || institution?.handles.X || '@industrydesk',
+        authorAvatar: personality
+            ? createIndustryMediaAvatar(personality.name, institution?.primaryColor || '#52525B')
+            : institution
+                ? createIndustryMediaAvatar(institution.shortName, institution.primaryColor)
+                : '',
+        content: authorship?.voice.content || `${event.headline} ${event.detail}`,
         timestamp: event.absoluteWeek,
         ...engagement,
         isPlayer: false,
         isLiked: false,
         isRetweeted: false,
-        isVerified: true,
+        isVerified: personality?.verified ?? true,
         postType: 'FILM_OPINION',
-        sentiment: 'INDUSTRY',
+        sentiment: personality?.signatureRole === 'ANTAGONIST'
+            ? 'MESSY'
+            : personality?.signatureRole === 'SUPPORTER' ? 'SUPPORTIVE' : 'INDUSTRY',
         industryEventId: event.id,
         ...(mediaStoryId ? { mediaStoryId } : {}),
+        ...(institution ? { mediaInstitutionId: institution.id } : {}),
+        ...(personality ? { mediaPersonalityId: personality.id } : {}),
         ...(event.companyId ? { companyId: event.companyId } : {}),
         ...(event.projectId ? { projectId: event.projectId } : {}),
     };
@@ -147,16 +186,25 @@ const eventInstagramPost = (
     event: IndustryEventFact,
     player: Player,
     mediaStoryId?: string,
+    authorship?: IndustryMediaAuthorship,
 ): InstaPost => {
     const engagement = engagementFor(event);
+    const institution = authorship?.institution;
+    const personality = authorship?.personality;
+    const authorName = personality?.name || institution?.name || event.companyName || 'Industry Desk';
+    const authorHandle = personality?.handle
+        || institution?.handles.INSTAGRAM
+        || `@${(event.companyName || 'industrydesk').toLowerCase().replace(/[^a-z0-9]+/g, '')}`;
     return {
         id: `instagram_${event.id}`,
-        authorId: event.companyId || 'industry_desk',
-        authorName: event.companyName || 'Industry Desk',
-        authorHandle: `@${(event.companyName || 'industrydesk').toLowerCase().replace(/[^a-z0-9]+/g, '')}`,
-        authorAvatar: '',
+        authorId: personality?.id || institution?.id || event.companyId || 'industry_desk',
+        authorName,
+        authorHandle,
+        authorAvatar: personality
+            ? createIndustryMediaAvatar(personality.name, institution?.primaryColor || '#52525B')
+            : institution ? createIndustryMediaAvatar(institution.shortName, institution.primaryColor) : '',
         type: event.type === 'AWARD_WON' ? 'CELEBRATION' : 'ANNOUNCEMENT',
-        caption: `${event.headline}\n\n${event.detail}`,
+        caption: authorship?.voice.content || `${event.headline}\n\n${event.detail}`,
         week: player.currentWeek,
         year: player.age,
         likes: engagement.likes * 2,
@@ -166,6 +214,8 @@ const eventInstagramPost = (
         isPlayer: false,
         industryEventId: event.id,
         ...(mediaStoryId ? { mediaStoryId } : {}),
+        ...(institution ? { mediaInstitutionId: institution.id } : {}),
+        ...(personality ? { mediaPersonalityId: personality.id } : {}),
         ...(event.companyId ? { companyId: event.companyId } : {}),
         ...(event.projectId ? { projectId: event.projectId } : {}),
     };
@@ -208,18 +258,53 @@ export const projectIndustryEvents = (
     const instaPosts: InstaPost[] = [];
     const publicationKeys = [...ledger.publishedEventKeys];
     const selected = selectEditorialEvents(eligible);
+    const authorshipFor = (
+        event: IndustryEventFact,
+        mediaStoryId: string | undefined,
+        channel: 'NEWS' | 'X' | 'INSTAGRAM',
+    ): IndustryMediaAuthorship | undefined => {
+        if (!mediaStoryId) return undefined;
+        const story = mediaWorld.stories.find(item => item.id === mediaStoryId);
+        if (!story) return undefined;
+        const coverage = assignIndustryMediaCoverage({
+            state: mediaWorld,
+            story,
+            event,
+            channel,
+            player,
+            absoluteWeek,
+        });
+        mediaWorld = coverage.state;
+        return {
+            institution: coverage.institution,
+            personality: coverage.personality,
+            voice: createIndustryMediaVoice({
+                event,
+                story,
+                institution: coverage.institution,
+                personality: coverage.personality,
+                assignment: coverage.assignment,
+                channel,
+            }),
+        };
+    };
     selected.forEach(event => {
         const mediaStoryId = mediaWorld.eventStoryIndex[event.id];
         if (shouldPublishNews(event) && !published.has(newsKey(event))) {
-            news.push(eventNews(event, player, mediaStoryId));
+            news.push(eventNews(event, player, mediaStoryId, authorshipFor(event, mediaStoryId, 'NEWS')));
             publicationKeys.push(newsKey(event));
         }
         if (shouldPublishX(event) && !published.has(xKey(event))) {
-            xPosts.push(eventXPost(event, mediaStoryId));
+            xPosts.push(eventXPost(event, mediaStoryId, authorshipFor(event, mediaStoryId, 'X')));
             publicationKeys.push(xKey(event));
         }
         if (shouldPublishInstagram(event) && !published.has(instagramKey(event))) {
-            instaPosts.push(eventInstagramPost(event, player, mediaStoryId));
+            instaPosts.push(eventInstagramPost(
+                event,
+                player,
+                mediaStoryId,
+                authorshipFor(event, mediaStoryId, 'INSTAGRAM'),
+            ));
             publicationKeys.push(instagramKey(event));
         }
     });
@@ -256,26 +341,15 @@ export const projectIndustryEvents = (
             clearedDueStoryIds.add(story.id);
             return;
         }
-        const engagement = engagementFor(latestEvent);
+        const authored = eventXPost(
+            latestEvent,
+            story.id,
+            authorshipFor(latestEvent, story.id, 'X'),
+        );
         xPosts.push({
+            ...authored,
             id: `x_story_${story.id}_${story.lastAdvancedAbsoluteWeek}`,
-            authorId: 'industry_desk',
-            authorName: 'Industry Desk',
-            authorHandle: '@industrydesk',
-            authorAvatar: '',
-            content: `${story.headline} remains part of the industry conversation. ${story.detail}`,
             timestamp: absoluteWeek,
-            ...engagement,
-            isPlayer: false,
-            isLiked: false,
-            isRetweeted: false,
-            isVerified: true,
-            postType: 'FILM_OPINION',
-            sentiment: 'INDUSTRY',
-            industryEventId: latestEvent.id,
-            mediaStoryId: story.id,
-            ...(story.companyId ? { companyId: story.companyId } : {}),
-            ...(story.projectId ? { projectId: story.projectId } : {}),
         });
         publishedBeatKeys.push(beatKey);
         publishedBeatSet.add(beatKey);
@@ -305,6 +379,23 @@ export const projectIndustryEvents = (
             };
         }),
         publishedBeatKeys,
+    });
+
+    xPosts.forEach((post, index) => {
+        if (!post.industryEventId || !post.mediaStoryId || !post.mediaPersonalityId) return;
+        const event = ledger.events.find(item => item.id === post.industryEventId);
+        const story = mediaWorld.stories.find(item => item.id === post.mediaStoryId);
+        if (!event || !story) return;
+        const result = ensureIndustryMediaDiscussion({
+            state: mediaWorld,
+            story,
+            event,
+            post,
+            player,
+            absoluteWeek,
+        });
+        mediaWorld = result.state;
+        xPosts[index] = result.post;
     });
 
     const nextPlayer: Player = news.length || xPosts.length || instaPosts.length ? {

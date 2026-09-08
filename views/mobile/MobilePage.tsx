@@ -54,7 +54,7 @@ interface MobilePageProps {
   onAudition?: (opportunity: AuditionOpportunity) => void;
   onTakeJob?: (job: Commitment) => void;
   onQuitJob?: (id: string) => void;
-  onPost?: (type: InstaPostType, caption: string, image?: string) => void;
+  onPost?: (type: InstaPostType, caption: string, image?: string, campaignParticipation?: { campaignId: string; mode: 'JOIN' | 'THANK' }, promotedProjectId?: string) => void;
   onReactInstagramPost?: (postId: string, action: 'LIKE' | 'SAVE') => void;
   onRespondInstagramDM?: (npc: NPCActor, actionId: string, accepted: boolean) => void;
   onFollowNPC?: (npc: NPCActor) => void;
@@ -68,8 +68,9 @@ interface MobilePageProps {
   onPerformSponsorship?: (sponId: string, action: SponsorshipActionType) => void;
   onDeleteMessage?: (id: string) => void;
   onTradeStock?: (stockId: string, amount: number) => void;
-  onUpdatePlayer?: (player: Player) => void; 
+  onUpdatePlayer?: (player: Player) => void;
   onOpenRightsMarket?: (opportunityId?: string) => void;
+  onOpenStreamingContentOffer?: (offerId: string) => void;
   onOpenStudioContinuation?: (studioId?: string, scriptId?: string) => void;
   onOpenPlatformCommission?: (studioId: string, offerId: string) => void;
   onNavVisibilityChange?: (visible: boolean) => void;
@@ -170,7 +171,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
       props.player?.inbox,
   ]);
 
-  if (!props.player) return null; 
+  if (!props.player) return null;
 
   const language = getPlayerLanguage(props.player);
   const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
@@ -415,12 +416,12 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
           // CHECK FOR UNIVERSE CONTRACT (Multi-Film)
           if (opp.universeContract) {
               const contract = opp.universeContract;
-              
+
               // We split the salary across the films for simplicity, or give signing bonus now
               // Let's give 20% signing bonus now, rest per film
               const signingBonus = Math.floor(salary * 0.2);
               const perFilmSalary = Math.floor((salary - signingBonus) / contract.films.length);
-              
+
               // Immediate payout
               updatedPlayer.money += signingBonus;
               updatedPlayer.logs.push({ week: updatedPlayer.currentWeek, year: updatedPlayer.age, message: `Signed Multi-Picture Deal! Bonus: $${signingBonus.toLocaleString()}`, type: 'positive' });
@@ -445,12 +446,12 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
 
               contract.films.forEach((film, index) => {
                   const isFirst = index === 0;
-                  
+
                   // Clone project details but update title/role for specific film
-                  const filmDetails = { 
-                      ...opp.project, 
-                      title: film.title, 
-                      subtype: film.type 
+                  const filmDetails = {
+                      ...opp.project,
+                      title: film.title,
+                      subtype: film.type
                   };
                   const identifiedFilmDetails = applyOpportunityIdentityToProject({
                       ...opp,
@@ -463,16 +464,16 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                       name: film.title,
                       type: 'ACTING_GIG',
                       roleType: film.role,
-                      energyCost: 0, 
+                      energyCost: 0,
                       income: 0,
                       lumpSum: perFilmSalary,
                       payoutType: 'LUMPSUM',
                       projectDetails: identifiedFilmDetails,
                       // First movie starts now, others are SCHEDULED
-                      projectPhase: isFirst ? 'PRE_PRODUCTION' : 'SCHEDULED', 
+                      projectPhase: isFirst ? 'PRE_PRODUCTION' : 'SCHEDULED',
                       phaseWeeksLeft: isFirst ? getPhaseDuration('PRE_PRODUCTION') : film.weeksOffset, // Use offset as waiting time
                       totalPhaseDuration: isFirst ? getPhaseDuration('PRE_PRODUCTION') : film.weeksOffset,
-                      auditionPerformance: 100, 
+                      auditionPerformance: 100,
                       productionPerformance: 50,
                       agentCommission: props.player!.team.agent?.commission || 0,
                       royaltyPercentage: royalty
@@ -492,7 +493,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                   lumpSum: salary,
                   payoutType: 'LUMPSUM',
                   projectDetails: applyOpportunityIdentityToProject(opp, updatedPlayer),
-                  projectPhase: 'PRE_PRODUCTION', 
+                  projectPhase: 'PRE_PRODUCTION',
                   phaseWeeksLeft: getPhaseDuration('PRE_PRODUCTION'),
                   totalPhaseDuration: getPhaseDuration('PRE_PRODUCTION'),
                   auditionPerformance: 100,
@@ -505,7 +506,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
           }
 
           updatedPlayer.commitments = [...updatedPlayer.commitments, ...newCommitments];
-      } 
+      }
       else if (msg.type === 'OFFER_SPONSORSHIP') {
           const offer = msg.data as SponsorshipOffer;
           if (!offer) {
@@ -628,9 +629,9 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
   const handlePerformSponsorship = (sponId: string, action: SponsorshipActionType) => {
       const sponIndex = props.player!.activeSponsorships.findIndex(s => s.id === sponId);
       if (sponIndex === -1) return;
-      
+
       const spon = props.player!.activeSponsorships[sponIndex];
-      
+
       // Energy Check
       if (props.player!.energy.current < spon.requirements.energyCost) {
           showToast(tr('mobile.toast.notEnoughEnergy'), "bg-rose-500");
@@ -682,7 +683,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
           npcId: match.npcId,
           age: match.age
       };
-      
+
       handleUpdatePlayer({
           ...props.player!,
           dating: { ...props.player!.dating, matches: newMatches },
@@ -705,11 +706,11 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
               agent,
               availableAgents: (props.player!.team.availableAgents || []).filter(candidate => candidate.id !== agent.id)
           },
-          logs: [...props.player!.logs, { 
-              week: props.player!.currentWeek, 
-              year: props.player!.age, 
-              message: `Hired ${agent.name}. Paid annual fee of $${agent.annualFee.toLocaleString()}.`, 
-              type: 'neutral' 
+          logs: [...props.player!.logs, {
+              week: props.player!.currentWeek,
+              year: props.player!.age,
+              message: `Hired ${agent.name}. Paid annual fee of $${agent.annualFee.toLocaleString()}.`,
+              type: 'neutral'
           }]
       });
       showToast(tr('mobile.toast.agentHired'), "bg-emerald-500");
@@ -728,11 +729,11 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
               manager,
               availableManagers: (props.player!.team.availableManagers || []).filter(candidate => candidate.id !== manager.id)
           },
-          logs: [...props.player!.logs, { 
-              week: props.player!.currentWeek, 
-              year: props.player!.age, 
-              message: `Hired ${manager.name}. Paid annual fee of $${manager.annualFee.toLocaleString()}.`, 
-              type: 'neutral' 
+          logs: [...props.player!.logs, {
+              week: props.player!.currentWeek,
+              year: props.player!.age,
+              message: `Hired ${manager.name}. Paid annual fee of $${manager.annualFee.toLocaleString()}.`,
+              type: 'neutral'
           }]
       });
       showToast(tr('mobile.toast.managerHired'), "bg-emerald-500");
@@ -745,7 +746,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
         <div className={isFullBleedApp ? "h-full w-full overflow-hidden bg-black relative" : "w-full max-w-xs h-full max-h-[650px] bg-black border-[6px] border-zinc-800 rounded-[3rem] overflow-hidden relative shadow-2xl ring-1 ring-zinc-700"}>
             {/* Notch */}
             {!isFullBleedApp && <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-32 h-6 bg-zinc-900 rounded-b-xl z-50"></div>}
-            
+
             <div className="w-full h-full bg-cover bg-center relative overflow-hidden" style={{ backgroundImage: 'linear-gradient(to bottom, #1e1b4b, #312e81)' }}>
                 {/* Status Bar */}
                 {!isFullBleedApp && <div className="h-8 w-full flex justify-between items-center px-6 pt-2 text-[10px] text-white font-medium z-20 relative">
@@ -760,7 +761,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                 {/* TOAST NOTIFICATION (Inside Phone Screen for better Z-index/Visibility) */}
                 {toast && (
                     <div className={`absolute top-14 left-1/2 -translate-x-1/2 z-[100] ${toast.color} text-white px-4 py-2 rounded-full shadow-2xl flex items-center gap-2 text-xs font-bold animate-in slide-in-from-top fade-in w-max max-w-[90%] justify-center border border-white/10`}>
-                        {toast.color.includes('rose') ? <AlertCircle size={16} /> : <CheckCircle size={16} />} 
+                        {toast.color.includes('rose') ? <AlertCircle size={16} /> : <CheckCircle size={16} />}
                         {toast.msg}
                     </div>
                 )}
@@ -769,22 +770,22 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                 {appMode === 'HOME' && (
                     <div className="h-full w-full p-4 pt-10 flex flex-col animate-in fade-in duration-300" data-tutorial-id="mobile-phone-home">
                         <div className="grid grid-cols-4 gap-x-4 gap-y-8 mt-4">
-                            <AppIcon 
-                                icon={<MessageSquare size={26} fill="white" />} 
-                                color="bg-green-500" 
-                                label={tr('mobile.messages')} 
-                                onClick={() => setAppMode('MESSAGES')} 
-                                badge={unreadMessages} 
+                            <AppIcon
+                                icon={<MessageSquare size={26} fill="white" />}
+                                color="bg-green-500"
+                                label={tr('mobile.messages')}
+                                onClick={() => setAppMode('MESSAGES')}
+                                badge={unreadMessages}
                                 tutorialId="mobile-messages-app"
                             />
-                            <AppIcon 
-                                icon={<Search size={26} />} 
-                                color="bg-indigo-600" 
-                                label="CastLink" 
-                                onClick={() => setAppMode('CASTLINK')} 
+                            <AppIcon
+                                icon={<Search size={26} />}
+                                color="bg-indigo-600"
+                                label="CastLink"
+                                onClick={() => setAppMode('CASTLINK')}
                                 tutorialId="mobile-castlink-app"
                             />
-                            
+
                             {/* SOCIAL FOLDER */}
                             <div className="flex flex-col items-center gap-1 group cursor-pointer" onClick={() => setAppMode('SOCIAL_FOLDER')} data-tutorial-id="mobile-social-folder">
                                 <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-2xl p-2 grid grid-cols-2 gap-1 shadow-lg group-active:scale-95 transition-transform overflow-hidden">
@@ -802,57 +803,57 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                                 <span className="text-[10px] text-white font-medium drop-shadow-md">{tr('mobile.social')}</span>
                             </div>
 
-                            <AppIcon 
-                                icon={<Newspaper size={26} />} 
-                                color="bg-red-600" 
-                                label={tr('mobile.news')} 
-                                onClick={() => setAppMode('NEWS')} 
+                            <AppIcon
+                                icon={<Newspaper size={26} />}
+                                color="bg-red-600"
+                                label={tr('mobile.news')}
+                                onClick={() => setAppMode('NEWS')}
                                 tutorialId="mobile-news-app"
                             />
-                            <AppIcon 
-                                label="IMDb" 
-                                color="bg-yellow-400" 
-                                onClick={() => setAppMode('IMDB')} 
+                            <AppIcon
+                                label="IMDb"
+                                color="bg-yellow-400"
+                                onClick={() => setAppMode('IMDB')}
                                 customContent={<span className="font-black text-xs tracking-tighter border-2 border-black px-1 rounded text-black">IMDb</span>}
                                 tutorialId="mobile-imdb-app"
                             />
-                            <AppIcon 
-                                icon={<BarChart3 size={26} />} 
-                                color="bg-emerald-600" 
-                                label={tr('mobile.boxOffice')} 
-                                onClick={() => setAppMode('BOXOFFICE')} 
+                            <AppIcon
+                                icon={<BarChart3 size={26} />}
+                                color="bg-emerald-600"
+                                label={tr('mobile.boxOffice')}
+                                onClick={() => setAppMode('BOXOFFICE')}
                                 tutorialId="mobile-boxoffice-app"
                             />
-                            <AppIcon 
-                                icon={<Users size={26} />} 
-                                color="bg-blue-500" 
-                                label={tr('mobile.team')} 
-                                onClick={() => setAppMode('TEAM')} 
+                            <AppIcon
+                                icon={<Users size={26} />}
+                                color="bg-blue-500"
+                                label={tr('mobile.team')}
+                                onClick={() => setAppMode('TEAM')}
                                 tutorialId="mobile-team-app"
                             />
-                            <AppIcon 
-                                icon={<Landmark size={26} />} 
-                                color="bg-[#004b87]" 
-                                label={tr('mobile.bank')} 
-                                onClick={() => setAppMode('BANK')} 
+                            <AppIcon
+                                icon={<Landmark size={26} />}
+                                color="bg-[#004b87]"
+                                label={tr('mobile.bank')}
+                                onClick={() => setAppMode('BANK')}
                                 tutorialId="mobile-bank-app"
                             />
-                            <AppIcon 
-                                icon={<TrendingUp size={26} />} 
-                                color="bg-black" 
-                                label={tr('mobile.forbes')} 
+                            <AppIcon
+                                icon={<TrendingUp size={26} />}
+                                color="bg-black"
+                                label={tr('mobile.forbes')}
                                 onClick={() => setAppMode('FORBES')}
-                                customContent={<span className="font-serif font-black text-xs tracking-tighter text-white">FORBES</span>} 
+                                customContent={<span className="font-serif font-black text-xs tracking-tighter text-white">FORBES</span>}
                                 tutorialId="mobile-forbes-app"
                             />
-                            <AppIcon 
-                                icon={<Activity size={26} />} 
-                                color="bg-zinc-800" 
-                                label={tr('mobile.stocks')} 
-                                onClick={() => setAppMode('STOCKS')} 
+                            <AppIcon
+                                icon={<Activity size={26} />}
+                                color="bg-zinc-800"
+                                label={tr('mobile.stocks')}
+                                onClick={() => setAppMode('STOCKS')}
                                 tutorialId="mobile-stocks-app"
                             />
-                            
+
                             {/* DATING FOLDER */}
                             <div className="flex flex-col items-center gap-1 group cursor-pointer" onClick={() => setAppMode('DATING_FOLDER')} data-tutorial-id="mobile-dating-folder">
                                 <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-2xl p-2 grid grid-cols-2 gap-1 shadow-lg group-active:scale-95 transition-transform overflow-hidden">
@@ -870,11 +871,11 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                             </div>
 
                             {/* GUIDE APP (Updated Icon) */}
-                            <AppIcon 
-                                icon={<Map size={26} />} 
-                                color="bg-zinc-800" 
-                                label={tr('mobile.guide')} 
-                                onClick={() => setAppMode('GUIDE')} 
+                            <AppIcon
+                                icon={<Map size={26} />}
+                                color="bg-zinc-800"
+                                label={tr('mobile.guide')}
+                                onClick={() => setAppMode('GUIDE')}
                                 tutorialId="mobile-guide-app"
                             />
 
@@ -884,50 +885,51 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
 
                 {/* APPS */}
                 {appMode === 'INSTAGRAM' && (
-                    <InstagramApp 
-                        player={props.player} 
-                        onBack={() => setAppMode('SOCIAL_FOLDER')} 
-                        onPost={props.onPost!} 
+                    <InstagramApp
+                        player={props.player}
+                        onBack={() => setAppMode('SOCIAL_FOLDER')}
+                        onPost={props.onPost!}
                         onReactPost={props.onReactInstagramPost!}
                         onRespondDM={props.onRespondInstagramDM!}
-                        onFollow={props.onFollowNPC!} 
-                        onInteract={props.onInteractNPC!} 
+                        onFollow={props.onFollowNPC!}
+                        onInteract={props.onInteractNPC!}
                     />
                 )}
                 {appMode === 'X' && (
-                    <XApp 
-                        player={props.player} 
+                    <XApp
+                        player={props.player}
                         onBack={() => setAppMode('SOCIAL_FOLDER')}
-                        onUpdatePlayer={handleUpdatePlayer} 
+                        onUpdatePlayer={handleUpdatePlayer}
                     />
                 )}
                 {appMode === 'YOUTUBE' && (
-                    <YoutubeApp 
-                        player={props.player} 
+                    <YoutubeApp
+                        player={props.player}
                         onBack={() => setAppMode('SOCIAL_FOLDER')}
-                        onUpdatePlayer={handleUpdatePlayer} 
+                        onUpdatePlayer={handleUpdatePlayer}
                     />
                 )}
                 {appMode === 'BOXOFFICE' && (
                     <BoxOfficeApp player={props.player} onBack={() => setAppMode('HOME')} />
                 )}
                 {appMode === 'CASTLINK' && (
-                    <CastLinkApp 
-                        player={props.player} 
-                        onBack={() => setAppMode('HOME')} 
-                        onAudition={props.onAudition!} 
-                        onTakeJob={props.onTakeJob!} 
-                        onQuitJob={props.onQuitJob!} 
+                    <CastLinkApp
+                        player={props.player}
+                        onBack={() => setAppMode('HOME')}
+                        onAudition={props.onAudition!}
+                        onTakeJob={props.onTakeJob!}
+                        onQuitJob={props.onQuitJob!}
                     />
                 )}
                 {appMode === 'MESSAGES' && (
-                    <MessagesApp 
-                        player={props.player} 
-                        onBack={() => setAppMode('HOME')} 
+                    <MessagesApp
+                        player={props.player}
+                        onBack={() => setAppMode('HOME')}
                         onAccept={handleAcceptMessage} // Use local smart handler
-                        onDelete={props.onDeleteMessage!} 
+                        onDelete={props.onDeleteMessage!}
                         onMarkRead={handleMarkMessageRead}
                         onOpenRightsMarket={props.onOpenRightsMarket}
+                        onOpenStreamingContentOffer={props.onOpenStreamingContentOffer}
                         onOpenStudioContinuation={props.onOpenStudioContinuation}
                         onDeclinePlatformCommission={handleDeclinePlatformCommission}
                         onOpenStudioAcquisition={(studioId, studioName) => {
@@ -956,13 +958,13 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                     />
                 )}
                 {appMode === 'TEAM' && (
-                    <TeamApp 
-                        player={props.player} 
-                        onBack={() => setAppMode('HOME')} 
-                        onHireAgent={handleHireAgent} 
-                        onFireAgent={props.onFireAgent!} 
-                        onHireManager={handleHireManager} 
-                        onFireManager={props.onFireManager!} 
+                    <TeamApp
+                        player={props.player}
+                        onBack={() => setAppMode('HOME')}
+                        onHireAgent={handleHireAgent}
+                        onFireAgent={props.onFireAgent!}
+                        onHireManager={handleHireManager}
+                        onFireManager={props.onFireManager!}
 	                        onPerformSponsorship={handlePerformSponsorship} // New Handler
 	                        onUpdatePlayer={handleUpdatePlayer}
 	                        onShowToast={showToast}
@@ -1010,19 +1012,19 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                 {appMode === 'BANK' && (
                     <BankApp player={props.player} onBack={() => setAppMode('HOME')} onUpdatePlayer={handleUpdatePlayer} />
                 )}
-                
+
                 {/* DATING GROUP */}
                 {appMode === 'DATING_FOLDER' && (
-                    <DatingFolder 
+                    <DatingFolder
                         onBack={() => setAppMode('HOME')}
                         onOpenTinder={() => setAppMode('TINDER')}
                         onOpenLuxe={() => setAppMode('LUXE')}
                     />
                 )}
                 {appMode === 'TINDER' && (
-                    <TinderApp 
-                        player={props.player} 
-                        onBack={() => setAppMode('DATING_FOLDER')} 
+                    <TinderApp
+                        player={props.player}
+                        onBack={() => setAppMode('DATING_FOLDER')}
                         onUpdatePlayer={handleUpdatePlayer}
                         onDateSuccess={handleTinderDateSuccess}
                         onTriggerBabyNaming={props.onTriggerBabyNaming}
@@ -1034,7 +1036,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
 
                 {/* SOCIAL GROUP */}
                 {appMode === 'SOCIAL_FOLDER' && (
-                    <SocialFolder 
+                    <SocialFolder
                         onBack={() => setAppMode('HOME')}
                         onOpenX={() => setAppMode('X')}
                         onOpenInsta={() => setAppMode('INSTAGRAM')}

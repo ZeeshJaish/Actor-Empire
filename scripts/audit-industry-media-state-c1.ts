@@ -33,7 +33,7 @@ const normalized = normalizeIndustryMediaWorld({
     eventStoryIndex: { stale_event: 'missing_story' },
     publishedBeatKeys: ['beat:one', '', 'beat:one'],
 });
-assert.equal(normalized.schemaVersion, 1);
+assert.equal(normalized.schemaVersion, 7);
 assert.equal(normalized.lastProcessedAbsoluteWeek, 701);
 assert.equal(normalized.stories.length, 1, 'duplicate and malformed stories must not survive normalization');
 assert.equal(normalized.eventStoryIndex.event_release, valid.id, 'event index must be rebuilt from retained stories');
@@ -78,5 +78,10 @@ assert.equal(Object.keys(bounded.eventStoryIndex).length,
 
 const replay = normalizeIndustryMediaWorld(bounded);
 assert.deepEqual(replay, bounded, 'normalized media state must be idempotent across reloads');
+assert.equal(
+    replay,
+    bounded,
+    'an already normalized in-memory media state should reuse its canonical object during one week pipeline',
+);
 
 console.log('Industry media C1 state audit passed.');

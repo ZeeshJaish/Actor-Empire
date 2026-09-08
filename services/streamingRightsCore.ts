@@ -586,8 +586,10 @@ export interface ProductionStreamingRightsContractInput {
     sellerStudioName: string;
     sellerPartyType?: 'PLAYER_STUDIO' | 'NPC_STUDIO';
     buyerPlatformId: PlatformId;
+    cataloguePackageId?: string | null;
     minimumGuarantee: number;
     platformRevenueShare: number;
+    marketingGuarantee?: number;
     productionFunding?: number;
     futureSeasonFunding?: number;
     guaranteeRecoupment?: StreamingGuaranteeRecoupment;
@@ -645,7 +647,7 @@ export const registerProductionStreamingRightsContract = (
         },
         buyerPlatformId: input.buyerPlatformId,
         platformContentPlanId: null,
-        cataloguePackageId: null,
+        cataloguePackageId: input.cataloguePackageId || null,
         licensorName: input.sellerStudioName,
         territory: input.territory || 'GLOBAL',
         countryIds: input.countryIds || [],
@@ -653,6 +655,7 @@ export const registerProductionStreamingRightsContract = (
         exclusivity: input.exclusivity || 'EXCLUSIVE',
         minimumGuarantee: input.minimumGuarantee,
         platformRevenueShare: input.platformRevenueShare,
+        marketingGuarantee: input.marketingGuarantee,
         signedAtAbsoluteWeek,
         startsAtAbsoluteWeek,
         status: 'ACTIVE',

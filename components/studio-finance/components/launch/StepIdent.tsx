@@ -19,6 +19,7 @@ import {
   playStreamingIdentPreview,
   type StreamingIdentPreviewId,
 } from '../../../../services/streamingIdentAudio';
+import { ResearchLockMark } from './ResearchLockMark';
 
 /* Each sound has a rhythm the preview animates to — that is the only honest
    way to show sound on a screen that cannot play it. */
@@ -240,10 +241,11 @@ export function StepIdent({ data, draft, patch, free, handlers }: StepProps) {
                 className={`${on ? 'id-kit is-on' : 'id-kit'}${lock ? ' is-locked' : ''}${previewing && lock ? ' is-preview' : ''}${purchased ? ' is-purchased' : ''}`}
                 onClick={() => previewPackage(option.id, Boolean(lock))}
               >
-                {lock && <span className="id-kit-research">Research</span>}
                 <b>{option.name}</b>
                 <em>{option.included ? 'Included' : `${money(option.cost)}${purchased ? ' · Bought' : ''}`}</em>
-                <s>{lock ? 'Tap to preview' : `${option.frames.length} surface${option.frames.length > 1 ? 's' : ''}`}</s>
+                {lock
+                  ? <ResearchLockMark reason={lock} />
+                  : <s>{option.frames.length} surface{option.frames.length > 1 ? 's' : ''}</s>}
               </button>
             );
           })}
@@ -269,7 +271,7 @@ export function StepIdent({ data, draft, patch, free, handlers }: StepProps) {
             {previewPack.effect && <p className="id-kiteffect">Studio effect · {previewPack.effect}</p>}
             {previewLock && (
               <div className="id-research-gate">
-                <span><b>Research required</b><em>{previewLock}</em></span>
+                <ResearchLockMark reason={previewLock} />
                 {handlers.onOpenTechnology && <button type="button" onClick={handlers.onOpenTechnology}>Open research</button>}
               </div>
             )}

@@ -1,3 +1,4 @@
+import { getOwnedPlatformPackageCountryIds } from './streamingContentAvailability';
 import type {
     OwnedStreamingLedgerEntry,
     OwnedStreamingPlatformState,
@@ -99,6 +100,8 @@ export interface StreamingRightsTermsInput {
     sequelRightsIncluded: boolean;
     changeOfControl: StreamingRightsChangeOfControl;
     cancellationPenalty: number;
+    /** Optional exact market subset for Content Market private proposals. */
+    countryIds?: string[];
 }
 
 export interface StreamingRightsActionResult {
@@ -108,6 +111,187 @@ export interface StreamingRightsActionResult {
     detail?: string;
     negotiation?: OwnedStreamingRightsNegotiation;
 }
+
+const privateOfferResponseMessage = (
+    negotiation: OwnedStreamingRightsNegotiation,
+    absoluteWeek: number,
+): Player['inbox'][number] => {
+    const accepted = negotiation.responseStatus === 'SELLER_ACCEPTED';
+    const countered = negotiation.responseStatus === 'SELLER_COUNTERED';
+    const subject = accepted
+        ? `${negotiation.sellerName} accepts your offer`
+        : countered
+            ? `${negotiation.sellerName} sent revised terms`
+            : negotiation.responseStatus === 'RIGHTS_SOLD'
+                ? `${negotiation.title} is no longer available`
+                : `${negotiation.sellerName} declined your offer`;
+    return {
+        id: negotiation.responseMessageId || createDeterministicId(
+            'streaming_private_offer_message',
+            negotiation.id,
+            String(negotiation.proposalVersion || 1),
+        ),
+        sender: `${negotiation.sellerName} · Business Affairs`,
+        subject,
+        text: negotiation.responseReason || 'The rights holder has replied to your private offer.',
+        type: 'RIGHTS_NEGOTIATION',
+        data: {
+            streamingPrivateOfferId: negotiation.id,
+            negotiation: {
+                opportunityId: negotiation.id,
+                status: accepted ? 'READY_TO_SIGN' : countered ? 'COUNTERED' : 'DECLINED',
+                round: negotiation.proposalVersion || 1,
+                currentOffer: negotiation.minimumGuarantee,
+                counterAmount: negotiation.counterMinimumGuarantee,
+                agreedAmount: accepted ? negotiation.minimumGuarantee : null,
+                responseSummary: negotiation.responseReason,
+                signByAbsoluteWeek: negotiation.signingDeadlineAbsoluteWeek,
+            },
+        },
+        isRead: false,
+        weekSent: (absoluteWeek % 52) + 1,
+    };
+};
+
+/** Resolves only saved CM2 proposals whose persisted due week has arrived. */
+export const processStreamingPrivateOffersWeek = (
+    player: Player,
+    absoluteWeek: number = getAbsoluteWeek(player.age, player.currentWeek),
+): { player: Player; resolvedOfferIds: string[] } => {
+    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+    const resolvedOfferIds: string[] = [];
+    const messages = [...(player.inbox || [])];
+    let changed = false;
+    const rightsNegotiations = platform.rightsNegotiations.map(current => {
+        if (
+            ['SELLER_ACCEPTED', 'SELLER_COUNTERED'].includes(current.responseStatus || '')
+            && current.signingDeadlineAbsoluteWeek != null
+            && absoluteWeek > current.signingDeadlineAbsoluteWeek
+            && ['READY_TO_SIGN', 'COUNTERED'].includes(current.status)
+        ) {
+            changed = true;
+            return {
+                ...current,
+                status: 'EXPIRED' as const,
+                responseStatus: 'EXPIRED' as const,
+                responseReason: 'The signing window closed before the agreement was completed.',
+                updatedAtAbsoluteWeek: absoluteWeek,
+            };
+        }
+        if (
+            current.responseStatus !== 'AWAITING_RESPONSE'
+            || current.responseDueAbsoluteWeek == null
+            || current.responseDueAbsoluteWeek > absoluteWeek
+            || current.processedProposalVersion === current.proposalVersion
+        ) return current;
+
+        const startsAtAbsoluteWeek = absoluteWeek;
+        const expiresAtAbsoluteWeek = current.windowType === 'PERMANENT'
+            ? Number.MAX_SAFE_INTEGER
+            : startsAtAbsoluteWeek + current.durationWeeks;
+        const compatibility = validateStreamingRightsAvailability({
+            player,
+            world: player.world,
+            sourceProjectId: current.sourceProjectId,
+            buyerPlatformId: null,
+            sellerPartyId: current.sellerId,
+            territory: current.territory,
+            countryIds: current.territory === 'GLOBAL' ? [] : current.countryIds,
+            windowType: current.windowType,
+            exclusivity: current.exclusivity,
+            startsAtAbsoluteWeek,
+            expiresAtAbsoluteWeek,
+            action: 'LICENSE',
+            sourceContractId: null,
+            excludeLicenseIds: current.sourceLicenseId ? [current.sourceLicenseId] : [],
+        });
+
+        let status: OwnedStreamingRightsNegotiation['status'];
+        let responseStatus: NonNullable<OwnedStreamingRightsNegotiation['responseStatus']>;
+        let responseReason: string;
+        let counterMinimumGuarantee: number | null = null;
+        let counterPlatformRevenueShare: number | null = null;
+        let signingDeadlineAbsoluteWeek: number | null = null;
+        if (!compatibility.available) {
+            status = 'LOST';
+            responseStatus = 'RIGHTS_SOLD';
+            responseReason = `The available ${current.territory === 'GLOBAL' ? 'worldwide' : 'market'} rights changed while your offer was under review. No money was charged.`;
+        } else {
+            const referencePrice = Math.max(1, current.rivalBidAmount);
+            const relationshipWins = platform.rightsNegotiations.filter(item => (
+                item.id !== current.id && item.sellerId === current.sellerId && item.status === 'SIGNED'
+            )).length;
+            const rng = createDeterministicRng(`${platform.simulationSeed}:private-offer-outcome:${current.id}:${current.proposalVersion}`);
+            const cashScore = current.minimumGuarantee / referencePrice;
+            const sellerShare = 100 - current.platformRevenueShare;
+            const economics = cashScore * 0.69
+                + clamp(sellerShare / 35, 0, 1.35) * 0.13
+                + clamp(current.marketingGuarantee / referencePrice, 0, 0.2) * 0.35
+                + clamp(current.viewershipBonusAmount / referencePrice, 0, 0.2) * 0.2;
+            const clauses = (current.exclusivity === 'NON_EXCLUSIVE' ? 0.035 : -0.025)
+                + (current.renewalOption ? -0.015 : 0.02)
+                + (current.sublicensingAllowed ? -0.025 : 0.015)
+                + (current.sequelRightsIncluded ? -0.03 : 0.015)
+                + (current.changeOfControl === 'CONSENT_REQUIRED' ? 0.025 : current.changeOfControl === 'NOTICE' ? 0.01 : -0.01)
+                + Math.min(0.05, relationshipWins * 0.015);
+            const heatThreshold = current.marketHeat === 'HOT' ? 0.98 : current.marketHeat === 'ACTIVE' ? 0.91 : 0.84;
+            const score = economics + clauses + (rng() - 0.5) * 0.06;
+            if (score >= heatThreshold) {
+                status = 'READY_TO_SIGN';
+                responseStatus = 'SELLER_ACCEPTED';
+                signingDeadlineAbsoluteWeek = absoluteWeek + 3;
+                responseReason = `${current.sellerName} accepted the complete term sheet. You have three processed weeks to sign; the rights remain available until signature.`;
+            } else if (score >= heatThreshold - 0.23) {
+                status = 'COUNTERED';
+                responseStatus = 'SELLER_COUNTERED';
+                counterMinimumGuarantee = roundMoney(Math.max(current.minimumGuarantee * 1.08, referencePrice * (current.marketHeat === 'HOT' ? 0.96 : 0.9)));
+                counterPlatformRevenueShare = Math.round(clamp(current.platformRevenueShare - 3, 45, 90));
+                signingDeadlineAbsoluteWeek = absoluteWeek + 3;
+                responseReason = `${current.sellerName} wants ${counterMinimumGuarantee.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })} upfront and a ${100 - counterPlatformRevenueShare}% rights-holder share. The revision is open for three processed weeks.`;
+            } else {
+                status = 'LOST';
+                responseStatus = 'SELLER_DECLINED';
+                responseReason = current.marketHeat === 'HOT'
+                    ? 'The offer did not match the value or competitive interest around these rights. No money was charged.'
+                    : 'The rights holder could not support the proposed economics and closed this round. No money was charged.';
+            }
+        }
+        const responseMessageId = createDeterministicId('streaming_private_offer_message', current.id, String(current.proposalVersion || 1));
+        const negotiation: OwnedStreamingRightsNegotiation = {
+            ...current,
+            status,
+            round: Math.max(current.round, current.proposalVersion || 1),
+            counterMinimumGuarantee,
+            counterPlatformRevenueShare,
+            responseStatus,
+            responseReason,
+            respondedAtAbsoluteWeek: absoluteWeek,
+            processedProposalVersion: current.proposalVersion || 1,
+            signingDeadlineAbsoluteWeek,
+            responseMessageId,
+            updatedAtAbsoluteWeek: absoluteWeek,
+            expiresAtAbsoluteWeek: signingDeadlineAbsoluteWeek || absoluteWeek,
+        };
+        if (!messages.some(message => message.id === responseMessageId)) {
+            messages.push(privateOfferResponseMessage(negotiation, absoluteWeek));
+        }
+        changed = true;
+        resolvedOfferIds.push(current.id);
+        return negotiation;
+    });
+    if (!changed) return { player, resolvedOfferIds };
+    return {
+        player: {
+            ...player,
+            inbox: messages,
+            ownedStreamingPlatform: compactOwnedStreamingPlatformForPersistence({
+                ...platform,
+                rightsNegotiations,
+            }, player.id),
+        },
+        resolvedOfferIds,
+    };
+};
 
 const ACTIVE_NEGOTIATION_STATUSES = new Set(['OPEN', 'COUNTERED', 'READY_TO_SIGN']);
 const PLATFORM_IDS = Object.keys(PLATFORMS) as PlatformId[];
@@ -182,7 +366,7 @@ const buildOpportunity = (
 
 export const getStreamingRightsOpportunities = (player: Player): StreamingRightsOpportunity[] => {
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
-    if (platform.lifecycle !== 'ACTIVE') return [];
+    if (!['FOUNDING', 'ACTIVE'].includes(platform.lifecycle)) return [];
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
     const platformTitles = new Map(
         (player.pastProjects || [])
@@ -354,18 +538,20 @@ export interface OwnedStreamingCataloguePackagePurchaseResult {
     detail?: string;
 }
 
-const getOwnedPlatformPackageCountryIds = (platform: OwnedStreamingPlatformState): string[] => {
-    const active = normalizeStreamingDayOneMarketIds(platform.marketOperations
-        .filter(operation => operation.scope === 'COUNTRY' && operation.status === 'ACTIVE' && operation.countryId)
-        .map(operation => operation.countryId));
-    return (active.length ? active : ['US', 'CA', 'MX']).slice().sort();
-};
+export interface OwnedStreamingCataloguePackagePurchaseOptions {
+    /** Auction settlement may replace the listed guarantee while retaining the frozen per-title allocation weights. */
+    totalGuarantee?: number;
+    licensorRevenueShare?: number;
+    skipEnergyCost?: boolean;
+}
+
+export { getOwnedPlatformPackageCountryIds } from './streamingContentAvailability';
 
 export const getStreamingCataloguePackageOpportunities = (
     player: Player,
 ): StreamingCataloguePackageOpportunity[] => {
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
-    if (platform.lifecycle !== 'ACTIVE') return [];
+    if (!['FOUNDING', 'ACTIVE'].includes(platform.lifecycle)) return [];
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
     const countryIds = getOwnedPlatformPackageCountryIds(platform);
     const sourceProjectById = new Map((player.world.projects || []).map(project => [project.id, project]));
@@ -482,6 +668,7 @@ export const getStreamingCataloguePackageOpportunities = (
 export const signOwnedStreamingCataloguePackage = (
     player: Player,
     opportunityId: string,
+    options: OwnedStreamingCataloguePackagePurchaseOptions = {},
 ): OwnedStreamingCataloguePackagePurchaseResult => {
     const registry = normalizeStreamingCataloguePackageRegistry(player.world.streamingCataloguePackages);
     const existing = registry[opportunityId];
@@ -490,16 +677,37 @@ export const signOwnedStreamingCataloguePackage = (
         return { player, changed: false, package: existing, contracts: existing.componentContractIds.map(id => contracts[id]).filter(Boolean) };
     }
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
-    if (platform.lifecycle !== 'ACTIVE') return { player, changed: false, contracts: [], package: null, reason: 'NOT_ACTIVE' };
+    if (!['FOUNDING', 'ACTIVE'].includes(platform.lifecycle)) return { player, changed: false, contracts: [], package: null, reason: 'NOT_ACTIVE' };
     const opportunity = getStreamingCataloguePackageOpportunities(player).find(candidate => candidate.id === opportunityId);
     if (!opportunity) return { player, changed: false, contracts: [], package: null, reason: 'NOT_FOUND' };
-    if (platform.treasuryCash < opportunity.totalGuarantee) {
+    const totalGuarantee = Math.max(0, Math.round(options.totalGuarantee ?? opportunity.totalGuarantee));
+    const licensorRevenueShare = options.licensorRevenueShare == null
+        ? null
+        : Math.round(clamp(options.licensorRevenueShare, 0, 40));
+    const allocationTotal = Math.max(1, opportunity.rows.reduce((sum, row) => sum + row.minimumGuarantee, 0));
+    let allocated = 0;
+    const effectiveRows = opportunity.rows.map((row, index) => {
+        const minimumGuarantee = index === opportunity.rows.length - 1
+            ? Math.max(0, totalGuarantee - allocated)
+            : Math.floor((totalGuarantee * row.minimumGuarantee / allocationTotal) / 100_000) * 100_000;
+        allocated += minimumGuarantee;
+        const sellerShare = licensorRevenueShare ?? row.licensorRevenueShare;
+        return {
+            ...row,
+            minimumGuarantee,
+            licensorRevenueShare: sellerShare,
+            platformRevenueShare: 100 - sellerShare,
+            referenceAllocation: minimumGuarantee,
+            expectedTotalCost: minimumGuarantee + row.expectedRoyaltyCost,
+        };
+    });
+    if (platform.treasuryCash < totalGuarantee) {
         return { player, changed: false, contracts: [], package: opportunity.package, reason: 'INSUFFICIENT_TREASURY' };
     }
-    if (player.energy.current < PHASE_ONE_ENERGY_COSTS.STREAMING_DEAL_ACCEPT) {
+    if (!options.skipEnergyCost && player.energy.current < PHASE_ONE_ENERGY_COSTS.STREAMING_DEAL_ACCEPT) {
         return { player, changed: false, contracts: [], package: opportunity.package, reason: 'INSUFFICIENT_ENERGY' };
     }
-    for (const row of opportunity.rows) {
+    for (const row of effectiveRows) {
         const compatibility = resolveStreamingRightsCompatibility({
             world: player.world,
             sourceProjectId: row.componentProjectId,
@@ -521,7 +729,7 @@ export const signOwnedStreamingCataloguePackage = (
     const componentById = new Map(opportunity.package.components.map(component => [component.sourceProjectId, component]));
     let contractRegistry = normalizeStreamingRightsContractRegistry(player.world.streamingRightsContracts);
     const contracts: StreamingRightsContract[] = [];
-    opportunity.rows.forEach((row, index) => {
+    effectiveRows.forEach((row, index) => {
         const component = componentById.get(row.componentProjectId)!;
         const license = createStreamingLicenseContract({
             id: createDeterministicId('owned_streaming_catalogue_contract', opportunity.id, row.componentProjectId, index),
@@ -571,6 +779,9 @@ export const signOwnedStreamingCataloguePackage = (
         ...opportunity.package,
         lifecycle: 'SIGNED',
         signedAtAbsoluteWeek: opportunity.package.createdAtAbsoluteWeek,
+        totalGuarantee,
+        totalExpectedExposure: effectiveRows.reduce((sum, row) => sum + row.expectedTotalCost, 0),
+        acceptedTerms: effectiveRows,
         componentContractIds: contracts.map(contract => contract.id).sort(),
     };
     const ledger: OwnedStreamingLedgerEntry = {
@@ -580,13 +791,13 @@ export const signOwnedStreamingCataloguePackage = (
         type: 'LICENSE_SIGNED',
         summary: `${signedPackage.name} joined the catalogue through ${contracts.length} title contracts.`,
         source: 'PLAYER_ACTION',
-        metadata: { cataloguePackageId: signedPackage.id, minimumGuarantee: opportunity.totalGuarantee },
+        metadata: { cataloguePackageId: signedPackage.id, minimumGuarantee: totalGuarantee },
     };
     const nextPlayer: Player = {
         ...player,
         ownedStreamingPlatform: compactOwnedStreamingPlatformForPersistence({
             ...platform,
-            treasuryCash: platform.treasuryCash - opportunity.totalGuarantee,
+            treasuryCash: platform.treasuryCash - totalGuarantee,
             catalogLicenses: [...platform.catalogLicenses, ...contracts],
             catalogProjectIds: Array.from(new Set([...platform.catalogProjectIds, ...contracts.map(contract => contract.sourceProjectId)])),
             eventLedger: platform.eventLedger.some(entry => entry.idempotencyKey === ledger.idempotencyKey)
@@ -599,7 +810,9 @@ export const signOwnedStreamingCataloguePackage = (
             streamingCataloguePackages: { ...registry, [signedPackage.id]: signedPackage },
         },
     };
-    spendPlayerEnergy(nextPlayer, PHASE_ONE_ENERGY_COSTS.STREAMING_DEAL_ACCEPT, `Catalogue acquisition: ${signedPackage.name}`);
+    if (!options.skipEnergyCost) {
+        spendPlayerEnergy(nextPlayer, PHASE_ONE_ENERGY_COSTS.STREAMING_DEAL_ACCEPT, `Catalogue acquisition: ${signedPackage.name}`);
+    }
     return { player: nextPlayer, changed: true, contracts, package: signedPackage };
 };
 
@@ -639,6 +852,7 @@ const normalizeTerms = (terms: StreamingRightsTermsInput): StreamingRightsTermsI
     sequelRightsIncluded: Boolean(terms.sequelRightsIncluded),
     changeOfControl: 'NONE',
     cancellationPenalty: roundMoney(clamp(terms.cancellationPenalty, 0, 2_000_000_000)),
+    countryIds: normalizeStreamingDayOneMarketIds(terms.countryIds),
 });
 
 const FALLBACK_MARKET_IDS = ['US', 'CA', 'MX'];
@@ -649,9 +863,7 @@ const getNegotiationCountrySnapshot = (
     sourceLicense?: OwnedStreamingPlatformState['catalogLicenses'][number] | null,
 ): string[] => {
     if (territory === 'GLOBAL') return [];
-    const activeCountryIds = normalizeStreamingDayOneMarketIds(platform.marketOperations
-        .filter(operation => operation.scope === 'COUNTRY' && operation.status === 'ACTIVE' && operation.countryId)
-        .map(operation => operation.countryId));
+    const activeCountryIds = getOwnedPlatformPackageCountryIds(platform);
     const sourceCountryIds = sourceLicense
         ? sourceLicense.territory === 'GLOBAL'
             ? activeCountryIds
@@ -669,7 +881,7 @@ export const openStreamingRightsNegotiation = (
     inputTerms?: StreamingRightsTermsInput,
 ): StreamingRightsActionResult => {
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
-    if (platform.lifecycle !== 'ACTIVE') return { player, changed: false, reason: 'NOT_ACTIVE' };
+    if (!['FOUNDING', 'ACTIVE'].includes(platform.lifecycle)) return { player, changed: false, reason: 'NOT_ACTIVE' };
     const opportunity = getStreamingRightsOpportunities(player).find(item => item.id === opportunityId);
     if (!opportunity) return { player, changed: false, reason: 'NOT_FOUND' };
     if (opportunity.incompatibilityDetail) {
@@ -685,11 +897,32 @@ export const openStreamingRightsNegotiation = (
     const existing = platform.rightsNegotiations.find(item => item.idempotencyKey === idempotencyKey);
     if (existing) return { player, changed: false, reason: 'ALREADY_OPEN', negotiation: existing };
     const terms = normalizeTerms(inputTerms || createDefaultStreamingRightsTerms(opportunity));
+    const availableTreasury = Math.max(0, platform.treasuryCash - platform.costCommitments
+        .filter(commitment => commitment.status === 'COMMITTED')
+        .reduce((sum, commitment) => sum + commitment.committedAmount, 0));
+    if (!['SUBLICENSE_OUT', 'TRANSFER_OUT'].includes(opportunity.kind) && terms.minimumGuarantee > availableTreasury) {
+        return {
+            player,
+            changed: false,
+            reason: 'INSUFFICIENT_TREASURY',
+            detail: 'Available platform funds cannot support this proposal.',
+        };
+    }
     const sourceLicense = opportunity.sourceLicenseId
         ? platform.catalogLicenses.find(license => license.id === opportunity.sourceLicenseId)
         : null;
+    const requestedCountryIds = normalizeStreamingDayOneMarketIds(terms.countryIds);
+    const defaultCountryIds = opportunity.kind === 'PLATFORM_TRADE' || opportunity.kind === 'TRANSFER_OUT'
+        ? opportunity.countryIds.slice().sort()
+        : getNegotiationCountrySnapshot(platform, terms.territory, sourceLicense);
+    const countryIds = terms.territory === 'GLOBAL'
+        ? []
+        : (requestedCountryIds.length ? requestedCountryIds.filter(id => !defaultCountryIds.length || defaultCountryIds.includes(id)) : defaultCountryIds)
+            .slice(0, terms.territory === 'DOMESTIC' ? 1 : undefined)
+            .sort();
+    const negotiationId = createDeterministicId('streaming_rights_negotiation', platform.simulationSeed, idempotencyKey);
     const negotiation: OwnedStreamingRightsNegotiation = {
-        id: createDeterministicId('streaming_rights_negotiation', platform.simulationSeed, idempotencyKey),
+        id: negotiationId,
         idempotencyKey,
         kind: opportunity.kind === 'SUBLICENSE_OUT'
             ? 'SUBLICENSE_OUT'
@@ -707,9 +940,7 @@ export const openStreamingRightsNegotiation = (
         buyerName: opportunity.kind === 'SUBLICENSE_OUT' || opportunity.kind === 'TRANSFER_OUT'
             ? opportunity.rivalPlatformName : null,
         ...terms,
-        countryIds: opportunity.kind === 'PLATFORM_TRADE' || opportunity.kind === 'TRANSFER_OUT'
-            ? opportunity.countryIds.slice().sort()
-            : getNegotiationCountrySnapshot(platform, terms.territory, sourceLicense),
+        countryIds,
         rivalPlatformId: opportunity.kind === 'SUBLICENSE_OUT' || opportunity.kind === 'TRANSFER_OUT'
             ? null : opportunity.rivalPlatformId,
         rivalPlatformName: opportunity.kind === 'SUBLICENSE_OUT' || opportunity.kind === 'TRANSFER_OUT'
@@ -737,6 +968,43 @@ export const openStreamingRightsNegotiation = (
     };
 };
 
+export const openStreamingPrivateOffer = (
+    player: Player,
+    opportunityId: string,
+    inputTerms: StreamingRightsTermsInput,
+): StreamingRightsActionResult => {
+    const opened = openStreamingRightsNegotiation(player, opportunityId, inputTerms);
+    if (!opened.changed || !opened.negotiation) return opened;
+    const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+    const platform = normalizeOwnedStreamingPlatformState(opened.player.ownedStreamingPlatform, opened.player.id);
+    const responseRng = createDeterministicRng(`${platform.simulationSeed}:private-offer-response:${opened.negotiation.id}:1`);
+    const responseDueAbsoluteWeek = absoluteWeek + 2 + (responseRng() >= 0.5 ? 1 : 0);
+    const negotiation: OwnedStreamingRightsNegotiation = {
+        ...opened.negotiation,
+        proposalVersion: 1,
+        submittedAtAbsoluteWeek: absoluteWeek,
+        responseDueAbsoluteWeek,
+        responseStatus: 'AWAITING_RESPONSE',
+        responseReason: null,
+        respondedAtAbsoluteWeek: null,
+        processedProposalVersion: null,
+        signingDeadlineAbsoluteWeek: null,
+        responseMessageId: null,
+        expiresAtAbsoluteWeek: responseDueAbsoluteWeek,
+    };
+    return {
+        player: {
+            ...opened.player,
+            ownedStreamingPlatform: compactOwnedStreamingPlatformForPersistence({
+                ...platform,
+                rightsNegotiations: platform.rightsNegotiations.map(item => item.id === negotiation.id ? negotiation : item),
+            }, opened.player.id),
+        },
+        changed: true,
+        negotiation,
+    };
+};
+
 export const reviseStreamingRightsNegotiation = (
     player: Player,
     negotiationId: string,
@@ -750,12 +1018,36 @@ export const reviseStreamingRightsNegotiation = (
     const sourceLicense = current.sourceLicenseId
         ? platform.catalogLicenses.find(license => license.id === current.sourceLicenseId)
         : null;
+    const defaultCountryIds = getNegotiationCountrySnapshot(platform, terms.territory, sourceLicense);
+    const requestedCountryIds = normalizeStreamingDayOneMarketIds(terms.countryIds);
+    const isPrivateOffer = Boolean(current.proposalVersion);
+    const proposalVersion = isPrivateOffer ? (current.proposalVersion || 0) + 1 : undefined;
+    const responseRng = proposalVersion
+        ? createDeterministicRng(`${platform.simulationSeed}:private-offer-response:${current.id}:${proposalVersion}`)
+        : null;
+    const responseDueAbsoluteWeek = responseRng ? absoluteWeek + 2 + (responseRng() >= 0.5 ? 1 : 0) : null;
     const negotiation = {
         ...current,
         ...terms,
-        countryIds: getNegotiationCountrySnapshot(platform, terms.territory, sourceLicense),
+        countryIds: terms.territory === 'GLOBAL' ? [] : (requestedCountryIds.length ? requestedCountryIds : defaultCountryIds)
+            .slice(0, terms.territory === 'DOMESTIC' ? 1 : undefined)
+            .sort(),
         status: 'OPEN' as const,
         updatedAtAbsoluteWeek: absoluteWeek,
+        ...(isPrivateOffer ? {
+            proposalVersion,
+            submittedAtAbsoluteWeek: absoluteWeek,
+            responseDueAbsoluteWeek,
+            responseStatus: 'AWAITING_RESPONSE' as const,
+            responseReason: null,
+            respondedAtAbsoluteWeek: null,
+            processedProposalVersion: null,
+            signingDeadlineAbsoluteWeek: null,
+            responseMessageId: null,
+        } : {}),
+        counterMinimumGuarantee: null,
+        counterPlatformRevenueShare: null,
+        expiresAtAbsoluteWeek: responseDueAbsoluteWeek || current.expiresAtAbsoluteWeek,
     };
     return {
         player: {
@@ -777,6 +1069,9 @@ export const submitStreamingRightsOffer = (
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     const current = platform.rightsNegotiations.find(item => item.id === negotiationId);
     if (!current || !ACTIVE_NEGOTIATION_STATUSES.has(current.status)) return { player, changed: false, reason: 'NOT_FOUND' };
+    if (current.responseStatus === 'AWAITING_RESPONSE' && current.responseDueAbsoluteWeek != null) {
+        return { player, changed: true, negotiation: current };
+    }
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
     if (absoluteWeek > current.expiresAtAbsoluteWeek) return { player, changed: false, reason: 'NOT_READY' };
     const rng = createDeterministicRng(`${platform.simulationSeed}:rights-offer:${current.id}:${current.round + 1}`);
@@ -858,7 +1153,42 @@ export const acceptStreamingRightsCounter = (
         minimumGuarantee: current.counterMinimumGuarantee,
         platformRevenueShare: current.counterPlatformRevenueShare,
         status: 'READY_TO_SIGN',
+        responseStatus: current.responseStatus ? 'SELLER_ACCEPTED' : current.responseStatus,
+        responseReason: current.responseStatus
+            ? `You accepted ${current.sellerName}'s revised terms. Complete signature before the deadline.`
+            : current.responseReason,
         updatedAtAbsoluteWeek: getAbsoluteWeek(player.age, player.currentWeek),
+    };
+    return {
+        player: {
+            ...player,
+            ownedStreamingPlatform: compactOwnedStreamingPlatformForPersistence({
+                ...platform,
+                rightsNegotiations: platform.rightsNegotiations.map(item => item.id === negotiationId ? negotiation : item),
+            }, player.id),
+        },
+        changed: true,
+        negotiation,
+    };
+};
+
+export const withdrawStreamingRightsNegotiation = (
+    player: Player,
+    negotiationId: string,
+): StreamingRightsActionResult => {
+    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+    const current = platform.rightsNegotiations.find(item => item.id === negotiationId);
+    if (!current || !['OPEN', 'COUNTERED', 'READY_TO_SIGN'].includes(current.status)) {
+        return { player, changed: false, reason: 'NOT_READY' };
+    }
+    const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+    const negotiation: OwnedStreamingRightsNegotiation = {
+        ...current,
+        status: 'WITHDRAWN',
+        responseStatus: current.responseStatus ? 'WITHDRAWN' : current.responseStatus,
+        responseReason: 'You withdrew this proposal. No money was charged and no rights were granted.',
+        updatedAtAbsoluteWeek: absoluteWeek,
+        expiresAtAbsoluteWeek: absoluteWeek,
     };
     return {
         player: {
@@ -916,10 +1246,22 @@ export const signStreamingRightsDeal = (
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     const negotiation = platform.rightsNegotiations.find(item => item.id === negotiationId);
     if (!negotiation || negotiation.status !== 'READY_TO_SIGN') return { player, changed: false, reason: 'NOT_READY' };
-    if (negotiation.kind !== 'SUBLICENSE_OUT' && platform.treasuryCash < negotiation.minimumGuarantee) {
+    const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+    if (negotiation.signingDeadlineAbsoluteWeek != null && absoluteWeek > negotiation.signingDeadlineAbsoluteWeek) {
+        return {
+            player,
+            changed: false,
+            reason: 'NOT_READY',
+            detail: 'The signing window has expired. No money was charged.',
+            negotiation,
+        };
+    }
+    const availableTreasury = Math.max(0, platform.treasuryCash - platform.costCommitments
+        .filter(commitment => commitment.status === 'COMMITTED')
+        .reduce((sum, commitment) => sum + commitment.committedAmount, 0));
+    if (negotiation.kind !== 'SUBLICENSE_OUT' && availableTreasury < negotiation.minimumGuarantee) {
         return { player, changed: false, reason: 'INSUFFICIENT_TREASURY', negotiation };
     }
-    const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
     const sourceLicense = negotiation.sourceLicenseId
         ? platform.catalogLicenses.find(item => item.id === negotiation.sourceLicenseId)
         : null;
@@ -983,6 +1325,7 @@ export const signStreamingRightsDeal = (
         const signedNegotiation = {
             ...negotiation,
             status: 'SIGNED' as const,
+            responseStatus: negotiation.responseStatus ? 'SIGNED' as const : negotiation.responseStatus,
             updatedAtAbsoluteWeek: absoluteWeek,
         };
         const replacement = resolved.player.world.streamingRightsContracts?.[resolved.replacementContractId];
@@ -1080,7 +1423,7 @@ export const signStreamingRightsDeal = (
                 negotiation,
             };
         }
-        const signedNegotiation = { ...negotiation, status: 'SIGNED' as const, updatedAtAbsoluteWeek: absoluteWeek };
+        const signedNegotiation = { ...negotiation, status: 'SIGNED' as const, responseStatus: negotiation.responseStatus ? 'SIGNED' as const : negotiation.responseStatus, updatedAtAbsoluteWeek: absoluteWeek };
         const transferredPlatform = normalizeOwnedStreamingPlatformState(
             transfer.player.ownedStreamingPlatform,
             transfer.player.id,
@@ -1139,7 +1482,7 @@ export const signStreamingRightsDeal = (
             negotiation,
         };
     }
-    const signedNegotiation = { ...negotiation, status: 'SIGNED' as const, updatedAtAbsoluteWeek: absoluteWeek };
+    const signedNegotiation = { ...negotiation, status: 'SIGNED' as const, responseStatus: negotiation.responseStatus ? 'SIGNED' as const : negotiation.responseStatus, updatedAtAbsoluteWeek: absoluteWeek };
     let nextPlatform = platform;
     let nextWorld = player.world;
     if (negotiation.kind === 'SUBLICENSE_OUT') {
@@ -1457,11 +1800,17 @@ export const evaluateStreamingRightsCompliance = (
             ? platform.growthActions
                 .filter(action => action.projectId === obligation.sourceProjectId && action.status === 'APPLIED')
                 .reduce((sum, action) => sum + action.cashCost, 0)
-            : platform.weeklyHistory.reduce((sum, snapshot) => (
-                sum + (snapshot.operations?.titlePerformance || [])
-                    .filter(performance => performance.projectId === obligation.sourceProjectId)
-                    .reduce((titleSum, performance) => titleSum + performance.viewingAccounts, 0)
-            ), 0);
+            : obligation.type === 'FUTURE_GREENLIGHT'
+                ? platform.originalCommissions.some(commission => (
+                    commission.producerStudioId === obligation.counterpartyId
+                    && commission.commissionedAtAbsoluteWeek >= (obligation.createdAtAbsoluteWeek || 0)
+                    && ['GREENLIT', 'IN_PRODUCTION', 'DELIVERED', 'RELEASED'].includes(commission.status)
+                )) ? 1 : 0
+                : platform.weeklyHistory.reduce((sum, snapshot) => (
+                    sum + (snapshot.operations?.titlePerformance || [])
+                        .filter(performance => performance.projectId === obligation.sourceProjectId)
+                        .reduce((titleSum, performance) => titleSum + performance.viewingAccounts, 0)
+                ), 0);
         if (observedAmount >= obligation.targetAmount) {
             const key = `rights-obligation-satisfied:${obligation.id}`;
             if (obligation.successPayment > 0 && !platform.eventLedger.some(entry => entry.idempotencyKey === key)) {
@@ -1487,7 +1836,11 @@ export const evaluateStreamingRightsCompliance = (
                     idempotencyKey: key,
                     absoluteWeek,
                     type: 'SYSTEM_REPAIR',
-                    summary: `${obligation.title} breached its ${obligation.type === 'MARKETING_SPEND' ? 'marketing guarantee' : 'viewership obligation'}.`,
+                    summary: `${obligation.title} breached its ${obligation.type === 'MARKETING_SPEND'
+                        ? 'marketing guarantee'
+                        : obligation.type === 'FUTURE_GREENLIGHT'
+                            ? 'future-original greenlight promise'
+                            : 'viewership obligation'}.`,
                     source: 'WEEK_PROCESSOR',
                     metadata: { obligationId: obligation.id, penalty: obligation.breachPenalty },
                 });

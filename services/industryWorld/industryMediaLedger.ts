@@ -7,8 +7,14 @@ import type {
     IndustryMediaWorldState,
 } from '../../types';
 import { normalizeIndustryEventLedger } from './industryEventLedger';
+import { normalizeIndustryMediaIdentityCollections } from './industryMediaIdentities';
+import { normalizeIndustryMediaDiscussionCollections } from './industryMediaDiscussions';
+import { normalizeIndustryMediaYoutubeCollections } from './industryMediaYoutube';
+import { normalizeIndustryMediaFandomCollections } from './industryMediaFandoms';
+import { normalizeIndustryMediaClaimCollections } from './industryMediaClaimsState';
+import { normalizeIndustryMediaC7Collections } from './industryMediaC7State';
 
-export const INDUSTRY_MEDIA_SCHEMA_VERSION = 1 as const;
+export const INDUSTRY_MEDIA_SCHEMA_VERSION = 7 as const;
 export const INDUSTRY_MEDIA_STORY_LIMIT = 240;
 export const INDUSTRY_MEDIA_STORY_EVENT_LIMIT = 24;
 export const INDUSTRY_MEDIA_PUBLISHED_KEY_LIMIT = 480;
@@ -22,6 +28,7 @@ const CATEGORIES = new Set<IndustryMediaStoryCategory>([
 ]);
 const IMPORTANCE = new Set<IndustryEventImportance>(['LOW', 'MEDIUM', 'HIGH']);
 const CHANNELS = new Set<IndustryMediaChannel>(['NEWS', 'X', 'INSTAGRAM', 'YOUTUBE']);
+const normalizedIndustryMediaWorlds = new WeakSet<object>();
 
 const cleanText = (value: unknown): string => typeof value === 'string' ? value.trim() : '';
 const optionalText = (value: unknown): string | undefined => cleanText(value) || undefined;
@@ -79,7 +86,7 @@ const normalizeStory = (value: unknown): IndustryMediaStory | null => {
     const resolutionIndustryEventId = optionalText(candidate.resolutionIndustryEventId);
 
     return {
-        schemaVersion: INDUSTRY_MEDIA_SCHEMA_VERSION,
+        schemaVersion: 1,
         id,
         subjectKey,
         category,
@@ -144,7 +151,11 @@ const removeEventConflicts = (stories: IndustryMediaStory[]): IndustryMediaStory
 };
 
 export const normalizeIndustryMediaWorld = (value: unknown): IndustryMediaWorldState => {
+    if (value && typeof value === 'object' && normalizedIndustryMediaWorlds.has(value)) {
+        return value as IndustryMediaWorldState;
+    }
     const source = value && typeof value === 'object' ? value as Partial<IndustryMediaWorldState> : {};
+    const identities = normalizeIndustryMediaIdentityCollections(source);
     const byId = new Map<string, IndustryMediaStory>();
     (Array.isArray(source.stories) ? source.stories : []).forEach(raw => {
         const story = normalizeStory(raw);
@@ -154,11 +165,46 @@ export const normalizeIndustryMediaWorld = (value: unknown): IndustryMediaWorldS
         left.firstAbsoluteWeek - right.firstAbsoluteWeek || left.id.localeCompare(right.id)
     ));
     const stories = removeEventConflicts(boundStories(ordered));
+    const storyById = new Map(stories.map(story => [story.id, story]));
+    const personalities = identities.personalities.map(personality => ({
+        ...personality,
+        recentStoryIds: personality.recentStoryIds.filter(storyId => storyById.has(storyId)),
+    }));
+    const storyAssignments = identities.storyAssignments.filter(assignment => {
+        const story = storyById.get(assignment.storyId);
+        return Boolean(story?.industryEventIds.includes(assignment.industryEventId));
+    });
+    const discussionCollections = normalizeIndustryMediaDiscussionCollections(
+        source,
+        stories,
+        new Set(identities.institutions.map(item => item.id)),
+        new Set(personalities.map(item => item.id)),
+    );
+    const youtubeCollections = normalizeIndustryMediaYoutubeCollections(
+        source,
+        stories,
+        new Set(identities.institutions.map(item => item.id)),
+        new Set(personalities.map(item => item.id)),
+        discussionCollections.playerResponses,
+    );
+    const fandomCollections = normalizeIndustryMediaFandomCollections(
+        source,
+        stories,
+        new Set(discussionCollections.playerResponses.map(item => item.id)),
+        new Set(youtubeCollections.youtubeVideos.map(item => item.id)),
+    );
+    const claimCollections = normalizeIndustryMediaClaimCollections(
+        source,
+        stories,
+        new Set(identities.institutions.map(item => item.id)),
+        new Set(personalities.map(item => item.id)),
+    );
+    const c7Collections = normalizeIndustryMediaC7Collections(source, stories, personalities);
     const eventStoryIndex: Record<string, string> = {};
     stories.forEach(story => story.industryEventIds.forEach(eventId => {
         eventStoryIndex[eventId] = story.id;
     }));
-    return {
+    const normalized: IndustryMediaWorldState = {
         schemaVersion: INDUSTRY_MEDIA_SCHEMA_VERSION,
         lastProcessedAbsoluteWeek: safeWeek(source.lastProcessedAbsoluteWeek),
         stories,
@@ -167,7 +213,18 @@ export const normalizeIndustryMediaWorld = (value: unknown): IndustryMediaWorldS
             source.publishedBeatKeys,
             INDUSTRY_MEDIA_PUBLISHED_KEY_LIMIT,
         ),
+        institutions: identities.institutions,
+        personalities,
+        subjectStances: identities.subjectStances,
+        storyAssignments,
+        ...discussionCollections,
+        ...youtubeCollections,
+        ...fandomCollections,
+        ...claimCollections,
+        ...c7Collections,
     };
+    normalizedIndustryMediaWorlds.add(normalized);
+    return normalized;
 };
 
 export const reconcileIndustryMediaWorldWithEvents = (

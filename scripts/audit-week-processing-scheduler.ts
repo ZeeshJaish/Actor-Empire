@@ -11,4 +11,20 @@ await pending;
 events.push('processing-started');
 
 assert.deepEqual(events, ['frame-scheduled', 'caller-returned', 'processing-started']);
+
+const stalledStartedAt = performance.now();
+await yieldForWeekProcessingPaint(
+    () => undefined,
+    { fallbackMs: 8 },
+);
+assert(
+    performance.now() - stalledStartedAt < 250,
+    'A browser frame callback that never arrives must not permanently block week processing.',
+);
+
+await yieldForWeekProcessingPaint(
+    () => { throw new Error('frame scheduler unavailable'); },
+    { fallbackMs: 8 },
+);
+
 console.log('Week processing scheduler audit passed.');

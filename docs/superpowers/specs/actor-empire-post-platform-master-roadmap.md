@@ -1,14 +1,14 @@
 # Actor Empire Post-Platform Master Roadmap
 
-**Living document version:** 24
-**Last updated:** 2026-09-04
+**Living document version:** 34
+**Last updated:** 2026-09-06
 **Audience:** The user, future Codex chats, and Actor Empire development
 **Status authority:** This file is the canonical status and sequencing authority for post-Platform-AI work
-**Current next phase:** Project C Phase C2 design approval — Media Institutions and Recurring Personalities
+**Current next phase:** None approved — Project C exit is complete
 
 ## How to use this document
 
-Use this same file at the beginning of every future Project A or Project B development session.
+Use this same file at the beginning of every future Project A, Project B, or Project C development session.
 
 At the start of a session:
 
@@ -65,6 +65,28 @@ These retain deeper historical reasoning and implementation evidence, but this l
 - Project C Phase C1 completion report: `../reports/2026-09-04-canonical-media-story-arcs-c1-report.md`
 - Project C Phase C1 implementation plan: `../plans/2026-09-04-canonical-media-story-arcs-c1.md`
 - Project C Phase C1 design: `2026-09-04-canonical-media-story-arcs-c1-design.md`
+- Project C Phase C2 completion report: `../reports/2026-09-05-media-institutions-recurring-personalities-c2-report.md`
+- Project C Phase C2 implementation plan: `../plans/2026-09-04-media-institutions-recurring-personalities-c2.md`
+- Project C Phase C2 design: `2026-09-04-media-institutions-recurring-personalities-c2-design.md`
+- Project C Phase C3 completion report: `../reports/2026-09-05-x-discussions-player-responses-c3-report.md`
+- Project C Phase C3 implementation plan: `../plans/2026-09-05-x-discussions-player-responses-c3.md`
+- Project C Phase C3 design: `2026-09-05-x-discussions-player-responses-c3-design.md`
+- Project C Phase C4 completion report: `../reports/2026-09-05-youtube-creator-culture-c4-report.md`
+- Project C Phase C4 implementation plan: `../plans/2026-09-05-youtube-creator-culture-c4.md`
+- Project C Phase C4 design: `2026-09-05-youtube-creator-culture-c4-design.md`
+- Project C Phase C5 completion report: `../reports/2026-09-05-fandoms-instagram-public-campaigns-c5-report.md`
+- Project C Phase C5 implementation plan: `../plans/2026-09-05-fandoms-instagram-public-campaigns-c5.md`
+- Project C Phase C5 design: `2026-09-05-fandoms-instagram-public-campaigns-c5-design.md`
+- Project C Phase C6 completion report: `../reports/2026-09-05-rumours-leaks-predictions-resolution-c6-report.md`
+- Project C Phase C6 implementation plan: `../plans/2026-09-05-rumours-leaks-predictions-resolution-c6.md`
+- Project C Phase C6 design: `2026-09-05-rumours-leaks-predictions-resolution-c6-design.md`
+- Project C Phase C7 completion report: `../reports/2026-09-06-long-term-narratives-feuds-pr-c7-report.md`
+- Project C Phase C7 implementation plan: `../plans/2026-09-06-long-term-narratives-feuds-pr-c7.md`
+- Project C Phase C7 design: `2026-09-06-long-term-narratives-feuds-pr-c7-design.md`
+- Project C Phase C8 completion report: `../reports/2026-09-06-project-c-variety-balance-performance-c8-report.md`
+- Project C Phase C8 implementation plan: `../plans/2026-09-06-project-c-variety-balance-performance-c8.md`
+- Project C Phase C8 design: `2026-09-06-project-c-variety-balance-performance-c8-design.md`
+- Shared Week Progress resilience report: `../reports/2026-09-06-week-progress-resilience-c8r-report.md`
 - Approved stats-driven industry remap: `2026-09-02-stats-driven-industry-simulation-remap-design.md`
 - Project A detailed v2 plan: `2026-08-26-unified-rights-active-bidding-master-plan-v2.md`
 - Historical Project B detailed v1 plan and baseline audit: `2026-08-30-general-production-studio-ai-master-plan-v1.md` (superseded by the approved remap for B2–B8)
@@ -97,7 +119,14 @@ If a supporting document conflicts with this file, this file controls the curren
 | Project B — Shared Industry Intelligence | B7 | **COMPLETE** | Exact ownership materialization, player-standard subsidiary control, one event ledger/coordinator, public identity parity, and legacy rival cutover exist |
 | Project B — Shared Industry Intelligence | B8 | **COMPLETE** | Five-regime 400-year matrix, midpoint parity, save growth, mature Process Week, browser, build, and regression gates pass; physical low-end Android timing remains release-device QA |
 | Project C — Shared Industry Reactions and Media World | C1 | **COMPLETE** | Canonical facts now form bounded, deterministic, multi-week stories shared by News, X, and Instagram |
-| Project C — Shared Industry Reactions and Media World | C2 | **NEXT — DESIGN APPROVAL** | Add recurring publications, journalists, critics, hostile/supportive commentators, and fan-theory creator identities |
+| Project C — Shared Industry Reactions and Media World | C2 | **COMPLETE** | Stable publications and recurring fact-safe media personalities now author deterministic News, X, and Instagram coverage |
+| Project C — Shared Industry Reactions and Media World | C3 | **COMPLETE** | Saved fact-safe X discussions, optional player responses, and exact-once next-week public consequences exist; C7 now owns passive PR modification |
+| Project C — Shared Industry Reactions and Media World | C4 | **COMPLETE** | Saved fact-grounded YouTube videos, recurring creator performance, deterministic feed presentation, and bounded cross-platform echoes exist |
+| Project C — Shared Industry Reactions and Media World | C5 | **COMPLETE** | Persistent fandoms, saved multi-week campaigns, Instagram culture, bounded X echoes, and optional composer-based participation exist |
+| Project C — Shared Industry Reactions and Media World | C6 | **COMPLETE** | Labelled rumours, rare safe leaks, predictions, typed truth resolution, and bounded source track records now share one evidence lineage |
+| Project C — Shared Industry Reactions and Media World | C7 | **COMPLETE** | Evidence-backed narrative memory, qualified feuds, passive publicist protection/amplification, and exact-once project promotion attribution exist |
+| Project C — Shared Industry Reactions and Media World | C8 | **COMPLETE** | Fresh-save week progression, composed long-run media certification, save parity, variety, mature performance, browser, build, TypeScript, and regression gates pass; physical low-end Android timing remains release-device QA |
+| Shared Week Progress resilience | C8R | **COMPLETE** | Paint and IndexedDB waits are bounded, timed-out writes abort, verified state remains atomic, and caught failures offer retry, backup export, or safe menu recovery |
 | Legal/lawsuit and contract-dispute pack | Later project | **DEFERRED** | Do not simulate a fake partial legal system inside A or B |
 | Future-output and multi-picture deals | Later project | **DEFERRED** | Reconsider only after commission relationships and contract/legal systems are mature |
 
@@ -1103,15 +1132,52 @@ Project B is complete only when:
 Project C is active after the approved Project B exit. It deepens presentation while B7 remains the canonical fact stream.
 
 - **C1 — COMPLETE:** Canonical Media Story Arcs.
-- **C2 — NEXT:** Media Institutions and Recurring Personalities.
-- **C3:** X Discussions, Public Statements, and Player Responses.
-- **C4:** YouTube Theory, Breakdown, and Creator Culture.
-- **C5:** Fandoms, Instagram, and Public Campaigns.
-- **C6:** Rumours, Leaks, Predictions, and Resolution.
-- **C7:** Long-Term Narratives, Feuds, and Media Control.
-- **C8:** Variety, Balance, Mobile Performance, and Long-Run Audit.
+- **C2 — COMPLETE:** Media Institutions and Recurring Personalities.
+- **C3 — COMPLETE:** X Discussions, Public Statements, and Player Responses.
+- **C4 — COMPLETE:** YouTube Theory, Breakdown, and Creator Culture.
+- **C5 — COMPLETE:** Fandoms, Instagram, and Public Campaigns.
+- **C6 — COMPLETE:** Rumours, Leaks, Predictions, and Resolution.
+- **C7 — COMPLETE:** Long-Term Narratives, Feuds, PR, and Media Memory.
+- **C8 — COMPLETE:** Variety, Balance, Mobile Performance, and Long-Run Audit.
 
 All Project C templates and personalities must consume saved facts rather than inventing a parallel simulation. They may interpret, criticize, support, speculate with labelled uncertainty, or react, but cannot independently change money, rights, projects, ownership, relationships, awards, production, or company outcomes.
+
+### C4 delivered — YouTube Theory, Breakdown, and Creator Culture
+
+- Existing C1 stories, C2 recurring personalities, C3 resolved responses, and B7 canonical facts now create saved YouTube theory, explainer, business-breakdown, review, response-analysis, and creator-reaction videos.
+- Theory is explicitly labelled as speculation, confirmed evidence remains separately visible, and C3 consequences are referenced without being applied again.
+- NPC creator channels retain deterministic subscribers, views, credibility, momentum, sponsor appeal, outcomes, and bounded recent-video histories without touching the player's YouTube economy.
+- The existing YouTube Home and Watch surfaces now blend player uploads, music releases, C4 industry videos, and deterministic filler with `All`, `Film & TV`, `Theories`, and `Industry` filters.
+- Industry thumbnails, creator avatars, and their watch comments remain local/offline-safe; optional X and Instagram echoes preserve event, story, and video lineage.
+- Industry-media schema is 4 and save migration is 37, with bounded normalization, orphan cleanup, and old-save compatibility.
+
+### C5 delivered — Fandoms, Instagram, and Public Campaigns
+
+- Important story subjects can now form deterministic persistent fandoms with recognizable fan-run names, handles, local artwork, archetypes, audience size, loyalty, activity, coordination, optimism, and volatility.
+- Eligible fandoms organize saved `SPARK → RALLY → PEAK → AFTERMATH → CLOSED` campaign arcs across entered weeks, with deterministic outcomes from `BREAKOUT` through `MESSY` and at most one start/two published moments per week.
+- Ten campaign families cover countdowns, watch parties, fan edits, award drives, save requests, universe continuation, defense, celebration, casting wishes, and temporary hashtag clashes without presenting fan wishes as facts.
+- The existing Instagram feed, Search, post detail, profiles, and composer now show campaign context and fandom history. Joining or thanking a player-related campaign uses the ordinary post/energy limits; ignoring it is safe.
+- Campaign moments may echo into X with the same event/story/fandom/campaign lineage. C5 never changes canonical projects, rights, production, ownership, money, ratings, awards, or the player's YouTube channel.
+- Industry-media schema is 5 and save migration is 38, with limits of 96 fandoms, 160 campaigns, 6 moments per campaign, 12 recent campaigns/8 subject relations per fandom, and 640 processed campaign keys.
+
+### C6 delivered — Rumours, Leaks, Predictions, and Resolution
+
+- C1 stories and retained B7 facts can now produce bounded, visibly labelled rumours and predictions; rare leaks require a real saved, leak-eligible AI intention and never expose player-controlled or acquired-company private plans.
+- Every claim stores typed targets, stable subject/source/evidence lineage, publication-time wording, confidence, expiry, and resolution data. Later B7 facts confirm, partly confirm, refute, supersede, or expire claims without headline-text matching.
+- C2 institutions and personalities now build compact category-specific track records. The player sees human-readable source history rather than a raw hidden reliability score.
+- News, X, YouTube, and Instagram reuse one claim context: what is known, what is claimed, and what later happened. C4 creators and C5 fandoms can discuss a claim without turning commentary into evidence or rerolling their own outcomes.
+- Player responses remain optional and reuse C3. Silence and no comment are safe; only a voluntarily published, unambiguous statement may receive one small capped later credibility/controversy consequence when canonical truth resolves it.
+- The entered-week coordinator resolves existing claims before creating at most one new claim, publishes at most two C6 editorial beats, and retains deterministic exact-once processing.
+- Industry-media schema is 6 and save migration is 39, with limits of 192 claims, 640 processed keys, 12 evidence IDs, 4 resolution IDs, 16 recent claims per source, and 8 category summaries per source.
+
+### C7 delivered — Long-Term Narratives, Feuds, PR, and Media Memory
+
+- Canonical B7 events and C1 story subjects now build bounded long-term narratives with saved supporting and contradictory landmarks, progression stages, and factual News/X retrospective beats inside an eight-week cooldown.
+- C2 recurring personalities remember affinity, respect, trust, tension, familiarity, and landmark interactions. Public feuds require hostile evidence across three distinct entered weeks and can build, cool, reconcile, or resolve.
+- C3 outcomes and C6 resolutions feed relationship memory without reapplying their effects. Signature antagonists and supporters retain their voice bounds while remaining truth-safe.
+- The existing publicist passively amplifies positive media effects and mitigates negative effects by tier and weekly capacity. Team shows concrete after-action results; C7 adds no recommendations, custom mode, posting chore, or auto-publishing.
+- Existing Career, press, X, Instagram, and YouTube promotion can target one eligible active project through a shared exact-once service. Repetition creates fatigue; projectless posts do nothing; signed bad-press results stay negative; Release Wizard remains the only paid-marketing authority.
+- News, X, Instagram, YouTube, and Team reuse the existing app surfaces. Industry-media schema is 7 and save migration is 40, with bounded narrative, relationship, PR, promotion, and exact-once collections.
 
 ## Legal, lawsuit, and contract-dispute pack
 
@@ -1183,6 +1249,92 @@ Before this living roadmap was created:
 Fresh phase work must rerun the checks appropriate to its current code boundary.
 
 ## Change log
+
+### Version 34 — 2026-09-06
+
+- Recorded the user's Project C exit approval after C1–C8 and the C8R week-progress resilience addendum completed their engineering gates.
+- Corrected the stale follow-on status that still marked C8 as `NEXT` and closed the current phase queue without automatically starting another project.
+- Retained physical low-memory Android testing as release-device QA rather than treating it as an unfinished Project C feature phase.
+
+### Version 33 — 2026-09-06
+
+- Extended C8R through the existing Android memory-warning bridge with a verified foreground checkpoint of only the latest fully committed week.
+- Refused memory-pressure saves while Process Week owns the lock, preserving the previous verified generation instead of risking a partial-week snapshot.
+- Kept storage failure observable without false success, synced the production bundle into Capacitor, and passed an Android debug build; physical low-memory kill/recreation remains release-device QA because no device or emulator was connected.
+
+### Version 32 — 2026-09-06
+
+- Completed the C8R Week Progress Resilience pass without changing or skipping any canonical weekly simulation system.
+- Added a bounded paint fallback, bounded and abortable IndexedDB transactions, blocked-open handling, late-connection cleanup, and transaction-completion save semantics.
+- Added stage-aware Retry Week, Export Backup, and Return to Menu recovery while retaining the prior verified generation until the new week is safely promoted.
+- Reused the existing save integrity, candidate generation, compaction, signed transfer, diagnostics, and large-save protections.
+- Passed focused resilience, save, migration, transfer, fresh-week, large-save, performance, TypeScript, build, and local-browser checks; physical low-memory Android remains release-device QA.
+
+### Version 31 — 2026-09-06
+
+- Completed Project C Phase C8 and advanced the programme to Project C exit review.
+- Certified fresh-save progression, composed long-run media variety and balance, save parity, mature Process Week performance, production build, TypeScript, regression, and browser gates.
+- Retained physical low-end Android timing as release-device QA rather than claiming desktop proxy evidence as device proof.
+
+### Version 30 — 2026-09-06
+
+- Completed Project C Phase C7 with bounded evidence-backed narratives, saved landmarks, factual retrospective News/X beats, and shared narrative context across News, X, Instagram, and industry YouTube.
+- Expanded recurring personalities into persistent relationships and qualified feuds that require hostile evidence across three distinct entered weeks and can build, cool, reconcile, or resolve without changing business outcomes.
+- Replaced recommendation-heavy publicist UI with automatic tier/capacity-based positive amplification and damage mitigation plus concrete Team after-action reporting; outcome labels and effect direction remain unchanged.
+- Connected existing Career, press, X, Instagram, and YouTube promotion to one exact-once project attribution service with selected-project isolation, six-week fatigue, signed press results, and no duplicate energy or marketing charge.
+- Advanced industry-media schema to 7 and save migration to 40 with bounded C7 state and old-save compatibility.
+- Passed all twelve focused C7 audits, C1–C6 aggregate regressions, all seven B7 checks, save integrity/generations, social and marketing checks, TypeScript, production build, whitespace validation, and local-app browser smoke. The complete 400-year/device matrix remains C8.
+- Advanced the approval gate to C8 — Variety, Balance, Mobile Performance, and Long-Run Audit.
+
+### Version 29 — 2026-09-05
+
+- Completed Project C Phase C6 with visibly distinct rumours, rare safe leaks, predictions, typed canonical-fact resolution, and compact category-specific source records.
+- Connected the same claim lineage to existing News, X, YouTube, Instagram, C3 responses, C4 creator coverage, and C5 fandom reaction without creating another truth or gameplay simulation.
+- Protected player-controlled/acquired-company intentions, kept silence safe, and isolated autonomous claim processing from money, energy, projects, ratings, revenue, rights, production, awards, ownership, company state, and AI plans.
+- Advanced industry-media schema to 6 and save migration to 39 with bounded normalization, orphan cleanup, exact-once week processing, and old-save compatibility.
+- Passed all ten focused C6 audits, C1–C5 compatibility, B7, existing YouTube event/merch checks, production build, whitespace validation, and local browser smoke. Repository-wide lint remains blocked only by older B8/streaming audit-fixture type errors outside C6.
+- Advanced the approval gate to C7 — Long-Term Narratives, Feuds, and Media Control. The combined 400-year/device certification remains C8 and was not repeated for C6.
+
+### Version 28 — 2026-09-05
+
+- Completed Project C Phase C5 with bounded persistent fandoms and deterministic multi-week public campaigns grounded in retained B7 events and C1 stories.
+- Added six fandom archetypes, ten campaign families, saved major moments, stable outcomes, local offline-safe identities, and exact event/story/fandom/campaign lineage across Instagram and optional X echoes.
+- Extended the existing Instagram feed, Search, post detail, fandom profiles, and composer; Join/Thank retain ordinary posting limits and `Let fans lead`/silence create no gameplay penalty.
+- Kept C5 isolated from money, project quality, ratings, rights, production, ownership, company state, and the player's YouTube economy; only explicit participation may apply tightly capped Instagram follower, loyalty, and controversy effects.
+- Advanced industry-media schema to 5 and save migration to 38 with limits of 96 fandoms, 160 campaigns, 6 moments per campaign, and 640 processed keys.
+- Passed all eight focused C5 audits, C1–C4 compatibility including C1's 20,800-week run, all seven B7 audits, existing YouTube event/merch checks, production build, and local-app boot. Repository-wide lint remains blocked only by older B8/streaming audit-fixture type errors outside C5.
+- Advanced the approval gate to C6 — Rumours, Leaks, Predictions, and Resolution; the combined Project C 400-year/device certification remains C8.
+
+### Version 27 — 2026-09-05
+
+- Completed Project C Phase C4 with saved fact-grounded YouTube videos and bounded recurring creator-channel performance.
+- Added six editorial formats, explicit theory/speculation wording, separate confirmed evidence and interpretation, and safe reuse of resolved C3 response outcomes without duplicate gameplay effects.
+- Connected C4 to the entered-week coordinator and existing YouTube Home/Watch experience with deterministic feed ordering, four lightweight filters, local offline-safe creator presentation, and bounded X/Instagram promotional echoes.
+- Kept NPC creator economics isolated from `Player.youtube`, company ledgers, fame, reputation, controversy, relationships, rights, projects, production, ownership, contracts, and awards.
+- Advanced industry-media schema to 4 and save migration to 37 with limits of 160 videos, 80 creator channels, 16 recent videos per channel, 8 comments and 12 evidence IDs per video, and 640 processed keys.
+- Passed all seven focused C4 audits, C1-C3 compatibility including the 20,800-week C1 run, all seven B7 audits, existing YouTube event/merch checks, production build, and mobile-width local-app boot smoke. Repository-wide lint remains blocked only by older B8/streaming audit-fixture type errors outside C4.
+- Advanced the approval gate to C5 — Fandoms, Instagram, and Public Campaigns; combined Project C 400-year/device certification remains C8.
+
+### Version 26 — 2026-09-05
+
+- Completed Project C Phase C3 with bounded deterministic X discussions backed by valid B7 event, C1 story, and C2 media-identity lineage.
+- Added recurring-personality discussion turns, one optional official player response per event, two-week response windows, six tones, reply/quote/formal-statement formats, personal/studio voice, and publicist recommendations without auto-publishing.
+- Added exact-once next-entered-week resolution with saved `LANDED`, `MIXED`, `BACKFIRED`, or `IGNORED` outcomes and tightly bounded reputation, controversy, follower, media-stance, and discussion-heat effects.
+- Preserved safe silence, ordinary legacy X interactions, and the rule that media responses cannot change money, energy, fame, projects, production, rights, ownership, contracts, awards, or company outcomes.
+- Advanced industry-media schema to 3 and save migration to 36, with pending-first compaction and explicit discussion/turn/response/key bounds.
+- Passed all six focused C3 audits, C2 and core C1 compatibility checks, all seven B7 audits, the production build, and a 390 × 844 local-browser boot smoke. Repository-wide TypeScript checking remains blocked by older streaming/B8 audit-fixture errors outside C3.
+- Advanced the approval gate to C4 — YouTube Theory, Breakdown, and Creator Culture; the combined 400-year/device certification remains C8.
+
+### Version 25 — 2026-09-05
+
+- Completed Project C Phase C2 with a schema-version-2 media world containing bounded institutions, recurring personalities, subject stances, and per-story channel assignments.
+- Added ten global/regional anchor outlets and fourteen anchor voices, including a persistent antagonist, supporter, critics, analysts, reporters, and theory creators with local offline-safe avatars.
+- Added deterministic regional, editorial-role, fatigue, stance, and signature-voice selection while retaining C1's two-story weekly budget and B7's canonical fact authority.
+- Added fact, analysis, opinion, and explicitly labelled speculation templates with numeric/prohibited-claim validation and neutral fallback.
+- Added saved source/byline presentation in News and persistent media profiles in X and Instagram without adding a new player-management screen.
+- Advanced save migration to version 35, removed orphan media references during compaction, and reserved bounded stance memory for signature relationships.
+- Passed all six focused C2 audits, four focused C1 compatibility audits, all seven B7 audits, TypeScript checking, and the production build. The focused C2 fixture covered 188 weeks; the combined 400-year and device-performance certification remains C8 scope by approval.
+- Advanced the approval gate to C3 — X Discussions, Public Statements, and Player Responses.
 
 ### Version 24 — 2026-09-04
 

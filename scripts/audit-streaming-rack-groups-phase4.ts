@@ -27,7 +27,6 @@ const baseFacility: OwnedStreamingFacility = {
     type: 'PRIVATE_CAGE',
     role: 'CORE_ORIGIN',
     installedRacks: 4,
-    purchasedAtAbsoluteWeek: 100,
     rackGroups: [
         { id: 'ORIGIN', name: 'Master library', rackCount: 2, duty: 'CONTENT_ORIGIN' },
         { id: 'EDGE', name: 'Fast cache', rackCount: 1, duty: 'LOCAL_EDGE' },

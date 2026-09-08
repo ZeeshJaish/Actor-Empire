@@ -1,12 +1,16 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Player, InstaPost, InstaPostType, NPCActor, NPCState, InteractionType } from '../../types';
+import { Player, InstaPost, InstaPostType, NPCActor, NPCState, InteractionType, IndustryMediaCampaign, IndustryMediaCampaignParticipationMode, IndustryMediaFandom } from '../../types';
 import { NPC_DATABASE } from '../../services/npcLogic';
 import { getEnabledGlobalCreatorSocialProfiles } from '../../services/youtubeLogic';
+import { getIndustryMediaCampaignParticipationDraft, getIndustryMediaSocialProfiles } from '../../services/industryWorld';
 import { getInstagramPostComments, getInstagramPresetCaption, getLocalizedInstagramPostConfig, INSTAGRAM_POST_CONFIGS } from '../../services/instagramLogic';
 import { getPlayerLanguage, t } from '../../services/i18n';
 import { loadMediaBlob, pruneMediaStore, saveMediaBlob } from '../../services/mediaStorage';
 import { Camera, Heart, MessageCircle, Send, Search, User, Grid, ArrowLeft, Video, Sparkles, Popcorn, Zap, XCircle, Check, Briefcase, Handshake, Smile, Lock, Coffee, Images, Clapperboard, Flame, Shirt, Bookmark, BarChart3, ImagePlus, Music2 } from 'lucide-react';
+import { IndustryClaimContextPanel, getIndustryClaimPresentation } from './IndustryClaimContext';
+import { IndustryNarrativeContext } from './IndustryNarrativeContext';
+import { getEligiblePromotionProjects } from '../../services/projectPromotionAttribution';
 
 type InstagramFitMode = 'cover' | 'contain';
 const INSTAGRAM_IMAGE_SIZE = 1080;
@@ -116,10 +120,162 @@ const InstagramPostVisual: React.FC<{
     );
 };
 
+const formatFandomAudience = (value: number): string => {
+    if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}m`;
+    if (value >= 1_000) return `${(value / 1_000).toFixed(value >= 100_000 ? 0 : 1)}k`;
+    return Math.max(0, value).toLocaleString();
+};
+
+export const buildIndustryFandomProfilePosts = (
+    fandom: IndustryMediaFandom,
+    campaigns: IndustryMediaCampaign[],
+    feed: InstaPost[],
+): InstaPost[] => {
+    const real = feed.filter(post => post.fandomId === fandom.id).slice(0, 9);
+    if (real.length >= 9) return real;
+    const campaignPool = campaigns.filter(campaign => campaign.fandomId === fandom.id)
+        .sort((left, right) => right.lastAdvancedAbsoluteWeek - left.lastAdvancedAbsoluteWeek);
+    const typeCycle: InstaPostType[] = ['CAROUSEL', 'REEL', 'ANNOUNCEMENT', 'BTS', 'CELEBRATION', 'INDUSTRY_NEWS'];
+    const synthetic = Array.from({ length: 9 - real.length }, (_, index): InstaPost => {
+        const campaign = campaignPool[index % Math.max(1, campaignPool.length)];
+        const absoluteWeek = campaign?.lastAdvancedAbsoluteWeek ?? fandom.lastActiveAbsoluteWeek;
+        const reach = campaign?.reach ?? fandom.size;
+        return {
+            id: `fandom_profile_${fandom.id}_${index}`,
+            authorId: fandom.id,
+            authorName: fandom.name,
+            authorHandle: fandom.handle,
+            authorAvatar: fandom.avatar,
+            type: typeCycle[index % typeCycle.length],
+            caption: campaign?.moments[index % Math.max(1, campaign.moments.length)]?.caption
+                || campaign?.headline
+                || `${fandom.subjectName} community archive. Fan-run, not official.`,
+            week: (absoluteWeek % 52) + 1,
+            year: Math.floor(absoluteWeek / 52) + 1,
+            likes: Math.max(20, Math.round(reach * (0.025 + (index % 4) * 0.006))),
+            comments: Math.max(3, Math.round(reach * 0.004)),
+            isPlayer: false,
+            mood: campaign?.outcome === 'MESSY' ? 'MESSY' : 'SUPPORTIVE',
+            fandomId: fandom.id,
+            ...(campaign ? {
+                campaignId: campaign.id,
+                industryEventId: campaign.industryEventId,
+                mediaStoryId: campaign.mediaStoryId,
+            } : {}),
+        };
+    });
+    return [...real, ...synthetic];
+};
+
+export const IndustryFandomTrendStrip: React.FC<{
+    fandoms: IndustryMediaFandom[];
+    campaigns: IndustryMediaCampaign[];
+    onOpen: (fandom: IndustryMediaFandom) => void;
+}> = ({ fandoms, campaigns, onOpen }) => {
+    const active = campaigns
+        .filter(campaign => campaign.stage !== 'CLOSED')
+        .sort((left, right) => right.heat - left.heat || right.reach - left.reach)
+        .slice(0, 6);
+    if (!active.length) return null;
+    return (
+        <section className="mb-5" aria-label="Trending entertainment fandoms">
+            <div className="mb-3 flex items-end justify-between px-1">
+                <div>
+                    <div className="text-[10px] font-black uppercase tracking-[0.22em] text-zinc-500">Trending in entertainment</div>
+                    <div className="mt-1 text-xs text-zinc-400">Fan-run moments moving this week</div>
+                </div>
+                <Flame size={16} className="text-orange-400" />
+            </div>
+            <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-2 no-scrollbar">
+                {active.map(campaign => {
+                    const fandom = fandoms.find(item => item.id === campaign.fandomId);
+                    if (!fandom) return null;
+                    return (
+                        <button
+                            key={campaign.id}
+                            onClick={() => onOpen(fandom)}
+                            className="relative min-w-[168px] overflow-hidden rounded-[1.4rem] border border-white/10 bg-zinc-950 p-3 text-left active:scale-[0.98]"
+                        >
+                            <span className="absolute inset-y-0 left-0 w-1" style={{ backgroundColor: fandom.primaryColor }} />
+                            <div className="flex items-center gap-2.5">
+                                <img src={fandom.avatar} alt="" className="h-10 w-10 rounded-full object-cover ring-1 ring-white/10" />
+                                <div className="min-w-0">
+                                    <div className="truncate text-xs font-black text-white">{fandom.name}</div>
+                                    <div className="mt-0.5 text-[10px] text-zinc-500">{formatFandomAudience(fandom.size)} supporters</div>
+                                </div>
+                            </div>
+                            <div className="mt-3 truncate text-[11px] font-black" style={{ color: fandom.primaryColor }}>{campaign.hashtag}</div>
+                            <div className="mt-1 text-[9px] font-bold uppercase tracking-[0.16em] text-zinc-600">{campaign.stage.toLowerCase()} · heat {campaign.heat}</div>
+                        </button>
+                    );
+                })}
+            </div>
+        </section>
+    );
+};
+
+export const IndustryCampaignContextPanel: React.FC<{
+    campaign: IndustryMediaCampaign;
+    fandom: IndustryMediaFandom;
+    onParticipate: (mode: IndustryMediaCampaignParticipationMode) => void;
+    onLetFansLead: () => void;
+}> = ({ campaign, fandom, onParticipate, onLetFansLead }) => {
+    const active = campaign.stage !== 'CLOSED';
+    const canParticipate = active && campaign.playerRelated && !campaign.playerParticipation;
+    return (
+        <section className="relative overflow-hidden rounded-[1.65rem] border border-white/10 bg-zinc-950 px-4 py-4">
+            <span className="absolute inset-y-0 left-0 w-1" style={{ backgroundColor: fandom.primaryColor }} />
+            <div className="flex items-start gap-3">
+                <img src={fandom.avatar} alt="" className="h-11 w-11 rounded-full object-cover ring-1 ring-white/10" />
+                <div className="min-w-0 flex-1">
+                    <div className="text-[9px] font-black uppercase tracking-[0.22em] text-zinc-500">Fan-led campaign · {campaign.stage.toLowerCase()}</div>
+                    <div className="mt-1 text-sm font-black text-white">{campaign.headline}</div>
+                    <div className="mt-1 text-xs leading-relaxed text-zinc-400">Started by {fandom.name}, not an official studio campaign.</div>
+                </div>
+            </div>
+            <div className="mt-4 flex items-center justify-between border-y border-white/5 py-3">
+                <div className="text-sm font-black" style={{ color: fandom.primaryColor }}>{campaign.hashtag}</div>
+                <div className="text-[10px] font-bold text-zinc-500">{formatFandomAudience(campaign.participation)} joined</div>
+            </div>
+            <div className="mt-3 flex items-center gap-1" aria-label={`Campaign stage ${campaign.stage}`}>
+                {(['SPARK', 'RALLY', 'PEAK', 'AFTERMATH', 'CLOSED'] as const).map((stage, index, stages) => {
+                    const currentIndex = stages.indexOf(campaign.stage);
+                    return (
+                        <React.Fragment key={stage}>
+                            <span
+                                className={`h-1.5 w-1.5 rounded-full ${index <= currentIndex ? 'bg-white' : 'bg-zinc-800'}`}
+                                title={stage.toLowerCase()}
+                            />
+                            {index < stages.length - 1 && <span className={`h-px flex-1 ${index < currentIndex ? 'bg-white/50' : 'bg-zinc-800'}`} />}
+                        </React.Fragment>
+                    );
+                })}
+            </div>
+            {canParticipate && (
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                    <button onClick={() => onParticipate('JOIN')} className="rounded-xl bg-white px-3 py-2.5 text-[11px] font-black text-black active:scale-[0.98]">Join the moment</button>
+                    <button onClick={() => onParticipate('THANK')} className="rounded-xl border border-white/15 bg-zinc-900 px-3 py-2.5 text-[11px] font-black text-white active:scale-[0.98]">Thank the fans</button>
+                    <button onClick={onLetFansLead} className="col-span-2 py-1 text-[10px] font-bold text-zinc-500">Let fans lead</button>
+                </div>
+            )}
+            {campaign.playerParticipation && (
+                <div className="mt-3 text-[10px] font-black uppercase tracking-[0.18em] text-emerald-400">
+                    You {campaign.playerParticipation.mode === 'THANK' ? 'thanked the community' : 'joined this moment'}
+                </div>
+            )}
+            {!active && campaign.outcome && (
+                <div className="mt-3 text-[10px] font-black uppercase tracking-[0.18em] text-zinc-400">
+                    Final momentum · {campaign.outcome.charAt(0)}{campaign.outcome.slice(1).toLowerCase()}
+                </div>
+            )}
+        </section>
+    );
+};
+
 interface InstagramAppProps {
   player: Player;
   onBack: () => void;
-  onPost: (type: InstaPostType, caption: string, image?: string) => void;
+  onPost: (type: InstaPostType, caption: string, image?: string, campaignParticipation?: { campaignId: string; mode: IndustryMediaCampaignParticipationMode }, promotedProjectId?: string) => void;
   onReactPost: (postId: string, action: 'LIKE' | 'SAVE') => void;
   onRespondDM: (npc: NPCActor, actionId: string, accepted: boolean) => void;
   onFollow: (npc: NPCActor) => void;
@@ -128,15 +284,18 @@ interface InstagramAppProps {
 
 export const InstagramApp: React.FC<InstagramAppProps> = ({ player, onBack, onPost, onReactPost, onRespondDM, onFollow, onInteract }) => {
   const [tab, setTab] = useState<'FEED' | 'SEARCH' | 'PROFILE'>('FEED');
-  const [view, setView] = useState<'MAIN' | 'NPC_PROFILE' | 'DM_LIST' | 'DM' | 'POST_DETAIL'>('MAIN');
+  const [view, setView] = useState<'MAIN' | 'NPC_PROFILE' | 'FANDOM_PROFILE' | 'DM_LIST' | 'DM' | 'POST_DETAIL'>('MAIN');
   const [dmReturnView, setDmReturnView] = useState<'DM_LIST' | 'NPC_PROFILE'>('DM_LIST');
   const [selectedNPC, setSelectedNPC] = useState<NPCActor | null>(null);
   const [selectedPost, setSelectedPost] = useState<InstaPost | null>(null);
-  
+  const [selectedFandom, setSelectedFandom] = useState<IndustryMediaFandom | null>(null);
+  const [pendingCampaignParticipation, setPendingCampaignParticipation] = useState<{ campaignId: string; mode: IndustryMediaCampaignParticipationMode } | null>(null);
+
   // Post Creation State
   const [isCreatingPost, setIsCreatingPost] = useState(false);
   const [postCaption, setPostCaption] = useState('');
   const [selectedPresetType, setSelectedPresetType] = useState<InstaPostType>('LIFESTYLE');
+  const [promotedProjectId, setPromotedProjectId] = useState('');
   const [imageSourceUrl, setImageSourceUrl] = useState<string | null>(null);
   const [imageZoom, setImageZoom] = useState(1);
   const [imageOffsetX, setImageOffsetX] = useState(0);
@@ -149,13 +308,18 @@ export const InstagramApp: React.FC<InstagramAppProps> = ({ player, onBack, onPo
   const chatEndRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const imageSourceUrlRef = useRef<string | null>(null);
-  
+
   // Safe Access
   const feed = player.instagram?.feed || [];
   const posts = player.instagram?.posts || [];
   const npcStates = (player.instagram?.npcStates || {}) as Record<string, NPCState>;
   const creatorProfiles = getEnabledGlobalCreatorSocialProfiles(player);
-  const npcPool = [...NPC_DATABASE, ...(Array.isArray(player.flags?.extraNPCs) ? player.flags.extraNPCs : []), ...creatorProfiles]
+  const mediaProfiles = player.world.industryMedia
+      ? getIndustryMediaSocialProfiles(player.world.industryMedia)
+      : [];
+  const fandoms = player.world.industryMedia?.fandoms || [];
+  const campaigns = player.world.industryMedia?.campaigns || [];
+  const npcPool = [...NPC_DATABASE, ...(Array.isArray(player.flags?.extraNPCs) ? player.flags.extraNPCs : []), ...creatorProfiles, ...mediaProfiles]
     .filter((npc, idx, arr) => arr.findIndex(entry => entry.id === npc.id) === idx);
 
   // Post Conditions
@@ -169,6 +333,7 @@ export const InstagramApp: React.FC<InstagramAppProps> = ({ player, onBack, onPo
   const language = getPlayerLanguage(player);
   const tr = (key: string, vars?: Record<string, string | number>) => t(language, key, vars);
   const selectedConfig = getLocalizedInstagramPostConfig(selectedPresetType, language);
+  const eligiblePromotionProjects = useMemo(() => getEligiblePromotionProjects(player), [player.commitments]);
   const dmContacts = npcPool
       .map(npc => ({ npc, state: npcStates[npc.id] }))
       .filter(entry => (entry.state?.chatHistory || []).length > 0)
@@ -179,6 +344,13 @@ export const InstagramApp: React.FC<InstagramAppProps> = ({ player, onBack, onPo
       });
   const selectedNpcState = selectedNPC ? npcStates[selectedNPC.id] : undefined;
   const selectedPendingDmAction = selectedNpcState?.chatHistory?.find(msg => msg.sender === 'NPC' && msg.action?.status === 'PENDING')?.action;
+  const selectedFandomCampaigns = selectedFandom
+      ? campaigns.filter(campaign => campaign.fandomId === selectedFandom.id)
+          .sort((left, right) => right.lastAdvancedAbsoluteWeek - left.lastAdvancedAbsoluteWeek)
+      : [];
+  const selectedFandomPosts = selectedFandom
+      ? buildIndustryFandomProfilePosts(selectedFandom, campaigns, feed)
+      : [];
 
   const getDmActionTitle = (kind?: string) => {
       if (kind === 'IG_REFERRAL') return 'Casting Referral';
@@ -275,6 +447,11 @@ export const InstagramApp: React.FC<InstagramAppProps> = ({ player, onBack, onPo
       setView('NPC_PROFILE');
   };
 
+  const handleFandomClick = (fandom: IndustryMediaFandom) => {
+      setSelectedFandom(fandom);
+      setView('FANDOM_PROFILE');
+  };
+
   const handleOpenDM = () => {
       setDmReturnView('NPC_PROFILE');
       setView('DM');
@@ -302,6 +479,9 @@ export const InstagramApp: React.FC<InstagramAppProps> = ({ player, onBack, onPo
       } else if (view === 'NPC_PROFILE') {
           setView('MAIN');
           setSelectedNPC(null);
+      } else if (view === 'FANDOM_PROFILE') {
+          setView('MAIN');
+          setSelectedFandom(null);
       } else {
           onBack();
       }
@@ -316,6 +496,7 @@ export const InstagramApp: React.FC<InstagramAppProps> = ({ player, onBack, onPo
   const getPostAvatar = (post: InstaPost) => {
       if (post.isPlayer) return player.avatar;
       const npc = npcPool.find(entry => entry.id === post.authorId || entry.handle === post.authorHandle);
+      if (post.mediaPersonalityId || post.mediaInstitutionId) return post.authorAvatar || npc?.avatar || '';
       return post.authorAvatar || npc?.avatar || `https://api.dicebear.com/8.x/pixel-art/svg?seed=${encodeURIComponent(post.authorHandle || post.authorName || 'IG')}`;
   };
 
@@ -341,6 +522,29 @@ export const InstagramApp: React.FC<InstagramAppProps> = ({ player, onBack, onPo
   const openPostDetail = (post: InstaPost) => {
       setSelectedPost(post);
       setView('POST_DETAIL');
+  };
+
+  const selectedCampaign = selectedPost?.campaignId
+      ? campaigns.find(campaign => campaign.id === selectedPost.campaignId)
+      : undefined;
+  const selectedCampaignFandom = selectedCampaign
+      ? fandoms.find(fandom => fandom.id === selectedCampaign.fandomId)
+      : undefined;
+  const selectedClaimContext = getIndustryClaimPresentation(player, selectedPost?.mediaClaimId || selectedCampaign?.mediaClaimId);
+  const selectedNarrativeSubjectKey = selectedPost?.mediaStoryId
+      ? player.world.industryMedia?.stories.find(story => story.id === selectedPost.mediaStoryId)?.subjectKey
+      : undefined;
+
+  const beginCampaignParticipation = (
+      campaign: IndustryMediaCampaign,
+      fandom: IndustryMediaFandom,
+      mode: IndustryMediaCampaignParticipationMode,
+  ) => {
+      const draft = getIndustryMediaCampaignParticipationDraft(campaign, fandom, mode);
+      setSelectedPresetType(draft.postType);
+      setPostCaption(draft.caption);
+      setPendingCampaignParticipation({ campaignId: campaign.id, mode });
+      setIsCreatingPost(true);
   };
 
   const getRelationshipLabel = (score: number) => {
@@ -379,6 +583,8 @@ export const InstagramApp: React.FC<InstagramAppProps> = ({ player, onBack, onPo
       setIsCreatingPost(false);
       setPostCaption('');
       setSelectedPresetType('LIFESTYLE');
+      setPromotedProjectId('');
+      setPendingCampaignParticipation(null);
       resetImageDraft();
   };
 
@@ -405,7 +611,7 @@ export const InstagramApp: React.FC<InstagramAppProps> = ({ player, onBack, onPo
   const handleCreatePost = async () => {
       if (isImageProcessing) return;
       let finalCaption = postCaption.trim();
-      
+
       // If user didn't write anything, pick a random preset
       if (!finalCaption) {
           finalCaption = getInstagramPresetCaption(selectedPresetType, language);
@@ -430,8 +636,8 @@ export const InstagramApp: React.FC<InstagramAppProps> = ({ player, onBack, onPo
           setIsImageProcessing(false);
           return;
       }
-      
-      onPost(selectedPresetType, finalCaption, contentMediaId);
+
+      onPost(selectedPresetType, finalCaption, contentMediaId, pendingCampaignParticipation || undefined, promotedProjectId || undefined);
       setIsImageProcessing(false);
       closeCreator();
   };
@@ -489,7 +695,7 @@ export const InstagramApp: React.FC<InstagramAppProps> = ({ player, onBack, onPo
 
   return (
     <div className="absolute inset-0 bg-black flex flex-col z-40 text-white animate-in slide-in-from-right duration-300 overflow-hidden font-sans">
-        
+
         {/* HEADER */}
         <div className="p-4 pt-12 pb-3 border-b border-zinc-800 flex items-center justify-between shrink-0 bg-black z-10">
             {view === 'MAIN' ? (
@@ -527,7 +733,13 @@ export const InstagramApp: React.FC<InstagramAppProps> = ({ player, onBack, onPo
                 <>
                     <button onClick={handleBackNav} className="p-1 -ml-2"><ArrowLeft size={22}/></button>
                     <div className="font-bold text-sm truncate flex-1 text-center pr-6">
-                        {view === 'POST_DETAIL' ? selectedPost?.authorHandle : view === 'DM_LIST' ? 'Messages' : selectedNPC?.handle}
+                        {view === 'POST_DETAIL'
+                            ? selectedPost?.authorHandle
+                            : view === 'DM_LIST'
+                                ? 'Messages'
+                                : view === 'FANDOM_PROFILE'
+                                    ? selectedFandom?.handle
+                                    : selectedNPC?.handle}
                     </div>
                 </>
             )}
@@ -572,24 +784,25 @@ export const InstagramApp: React.FC<InstagramAppProps> = ({ player, onBack, onPo
                                 feed.map(post => {
                                     // If author is NPC, find them to link click
                                     const authorNPC = npcPool.find(n => n.id === post.authorId);
-                                    
+                                    const authorFandom = post.fandomId ? fandoms.find(item => item.id === post.fandomId) : undefined;
+
                                     // Fix: Use player avatar directly if it's the player's post, to avoid large base64 strings in post object
                                     const avatarSrc = getPostAvatar(post);
 
                                     return (
                                         <div key={post.id} className="mb-6 border-b border-zinc-900 pb-4">
                                             <div className="flex items-center gap-2 px-3 mb-2">
-                                                <img 
-                                                    src={avatarSrc} 
-                                                    className="w-8 h-8 rounded-full object-cover cursor-pointer" 
-                                                    onClick={() => authorNPC && handleNPCClick(authorNPC)}
+                                                <img
+                                                    src={avatarSrc}
+                                                    className="w-8 h-8 rounded-full object-cover cursor-pointer"
+                                                    onClick={() => authorFandom ? handleFandomClick(authorFandom) : authorNPC && handleNPCClick(authorNPC)}
                                                 />
                                                 <div className="flex-1">
-                                                    <div className="font-bold text-xs cursor-pointer" onClick={() => authorNPC && handleNPCClick(authorNPC)}>{post.authorHandle}</div>
+                                                    <div className="font-bold text-xs cursor-pointer" onClick={() => authorFandom ? handleFandomClick(authorFandom) : authorNPC && handleNPCClick(authorNPC)}>{post.authorHandle}</div>
                                                     {!post.isPlayer && <div className="text-[10px] text-zinc-500">Suggested for you</div>}
                                                 </div>
                                             </div>
-                                            
+
                                             {/* VISUAL */}
                                             <button onClick={() => openPostDetail(post)} className="w-full block">
                                                 <InstagramPostVisual post={post} getPostStyle={getPostStyle} />
@@ -611,6 +824,9 @@ export const InstagramApp: React.FC<InstagramAppProps> = ({ player, onBack, onPo
                                                     <span className="font-bold mr-2">{post.authorHandle}</span>
                                                     {post.caption}
                                                 </div>
+                                                {post.campaignId && (
+                                                    <div className="mt-2 text-[10px] font-black uppercase tracking-[0.16em] text-orange-300/80">Fan campaign · follow the moment</div>
+                                                )}
                                                 <button onClick={() => openPostDetail(post)} className="text-[11px] text-zinc-500 mt-2">
                                                     View all {formatFollowers(post.comments)} comments
                                                 </button>
@@ -629,15 +845,38 @@ export const InstagramApp: React.FC<InstagramAppProps> = ({ player, onBack, onPo
                     <div className="flex-1 overflow-y-auto bg-black p-4 custom-scrollbar">
                         <div className="relative mb-4">
                             <Search className="absolute left-3 top-2.5 text-zinc-500" size={16} />
-                            <input 
-                                type="text" 
-                                placeholder="Search" 
+                            <input
+                                type="text"
+                                placeholder="Search"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 className="w-full bg-zinc-900 rounded-xl py-2 pl-10 pr-4 text-sm text-white focus:outline-none"
                             />
                         </div>
+                        {!searchQuery.trim() && (
+                            <IndustryFandomTrendStrip fandoms={fandoms} campaigns={campaigns} onOpen={handleFandomClick} />
+                        )}
                         <div className="space-y-4">
+                            {fandoms.filter(fandom => {
+                                const query = searchQuery.trim().toLowerCase();
+                                return !query
+                                    || fandom.name.toLowerCase().includes(query)
+                                    || fandom.handle.toLowerCase().includes(query)
+                                    || fandom.subjectName.toLowerCase().includes(query);
+                            }).map(fandom => (
+                                <button
+                                    key={fandom.id}
+                                    onClick={() => handleFandomClick(fandom)}
+                                    className="flex w-full items-center gap-3 rounded-xl p-2 text-left active:bg-zinc-900"
+                                >
+                                    <img src={fandom.avatar} alt="" className="h-12 w-12 rounded-full object-cover ring-1 ring-white/10" />
+                                    <div className="min-w-0 flex-1">
+                                        <div className="truncate text-sm font-black">{fandom.name}</div>
+                                        <div className="truncate text-xs text-zinc-500">{fandom.handle} · {formatFandomAudience(fandom.size)} supporters</div>
+                                    </div>
+                                    <span className="text-[9px] font-black uppercase tracking-[0.15em]" style={{ color: fandom.primaryColor }}>Fan community</span>
+                                </button>
+                            ))}
                             {npcPool.filter(n => n.name.toLowerCase().includes(searchQuery.toLowerCase())).map(npc => {
                                 const isFollowing = npcStates[npc.id]?.isFollowing || false;
                                 return (
@@ -645,12 +884,12 @@ export const InstagramApp: React.FC<InstagramAppProps> = ({ player, onBack, onPo
                                         <img src={npc.avatar} className="w-12 h-12 rounded-full object-cover" />
                                         <div className="flex-1">
                                             <div className="font-bold text-sm flex items-center gap-1">
-                                                {npc.name} 
+                                                {npc.name}
                                                 {npc.tier === 'A_LIST' && <div className="bg-blue-500 rounded-full p-0.5"><Check size={8} strokeWidth={4} /></div>}
                                             </div>
                                             <div className="text-xs text-zinc-500">{npc.handle}</div>
                                         </div>
-                                        <button 
+                                        <button
                                             onClick={(e) => { e.stopPropagation(); onFollow(npc); }}
                                             className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-colors ${isFollowing ? 'bg-zinc-800 text-zinc-300' : 'bg-blue-600 text-white'}`}
                                         >
@@ -810,6 +1049,23 @@ export const InstagramApp: React.FC<InstagramAppProps> = ({ player, onBack, onPo
                 </InstagramPostVisual>
 
                 <div className="p-4 space-y-4 pb-32">
+                    {selectedCampaign && selectedCampaignFandom && (
+                        <IndustryCampaignContextPanel
+                            campaign={selectedCampaign}
+                            fandom={selectedCampaignFandom}
+                            onParticipate={(mode) => beginCampaignParticipation(selectedCampaign, selectedCampaignFandom, mode)}
+                            onLetFansLead={() => undefined}
+                        />
+                    )}
+                    {selectedClaimContext && <IndustryClaimContextPanel {...selectedClaimContext} compact />}
+                    {selectedNarrativeSubjectKey && (
+                        <IndustryNarrativeContext
+                            player={player}
+                            subjectKey={selectedNarrativeSubjectKey}
+                            personalityId={selectedPost.mediaPersonalityId}
+                            compact
+                        />
+                    )}
                     <div className="flex items-center justify-between">
                         <div className="flex gap-4">
                             <Heart
@@ -914,7 +1170,7 @@ export const InstagramApp: React.FC<InstagramAppProps> = ({ player, onBack, onPo
                         </div>
                     </div>
                     <div className="font-bold text-sm flex items-center gap-1">
-                        {selectedNPC.name} 
+                        {selectedNPC.name}
                         {selectedNPC.tier === 'A_LIST' && <Check size={12} className="text-blue-500 bg-white rounded-full p-0.5" strokeWidth={4} />}
                     </div>
                     <div className="text-xs text-zinc-400 mb-2">
@@ -922,13 +1178,13 @@ export const InstagramApp: React.FC<InstagramAppProps> = ({ player, onBack, onPo
                     </div>
                     <div className="text-xs text-zinc-300 mb-4">{selectedNPC.bio}</div>
                     <div className="flex gap-2">
-                        <button 
+                        <button
                             onClick={() => onFollow(selectedNPC)}
                             className={`flex-1 py-2 rounded-lg text-sm font-bold transition-colors ${npcStates[selectedNPC.id]?.isFollowing ? 'bg-zinc-800 text-white' : 'bg-blue-600 text-white'}`}
                         >
                             {npcStates[selectedNPC.id]?.isFollowing ? 'Following' : 'Follow'}
                         </button>
-                        <button 
+                        <button
                             onClick={handleOpenDM}
                             className="flex-1 py-2 bg-zinc-800 text-white rounded-lg text-sm font-bold"
                         >
@@ -936,7 +1192,7 @@ export const InstagramApp: React.FC<InstagramAppProps> = ({ player, onBack, onPo
                         </button>
                     </div>
                 </div>
-                
+
                 <div className="grid grid-cols-3 gap-0.5">
                     {selectedNpcProfilePosts.map(post => (
                         <button key={post.id} onClick={() => openPostDetail(post)} className="relative block overflow-hidden active:opacity-80">
@@ -954,6 +1210,51 @@ export const InstagramApp: React.FC<InstagramAppProps> = ({ player, onBack, onPo
             </div>
         )}
 
+        {view === 'FANDOM_PROFILE' && selectedFandom && (
+            <div className="flex-1 overflow-y-auto bg-black custom-scrollbar animate-in slide-in-from-right duration-300">
+                <div className="relative overflow-hidden border-b border-zinc-900 p-4">
+                    <div className="absolute inset-x-0 top-0 h-24 opacity-20" style={{ background: `linear-gradient(135deg, ${selectedFandom.primaryColor}, transparent 70%)` }} />
+                    <div className="relative flex items-center gap-4 pt-2">
+                        <img src={selectedFandom.avatar} alt="" className="h-20 w-20 rounded-full object-cover ring-2 ring-black outline outline-1 outline-white/15" />
+                        <div className="min-w-0 flex-1">
+                            <div className="truncate text-lg font-black">{selectedFandom.name}</div>
+                            <div className="text-xs text-zinc-500">{selectedFandom.handle}</div>
+                            <div className="mt-2 flex gap-4 text-center">
+                                <div><div className="text-sm font-black">{selectedFandomPosts.length}</div><div className="text-[9px] text-zinc-500">Posts</div></div>
+                                <div><div className="text-sm font-black">{formatFandomAudience(selectedFandom.size)}</div><div className="text-[9px] text-zinc-500">Supporters</div></div>
+                                <div><div className="text-sm font-black">{selectedFandomCampaigns.length}</div><div className="text-[9px] text-zinc-500">Campaigns</div></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="relative mt-4 text-xs leading-relaxed text-zinc-300">{selectedFandom.bio}</div>
+                    <div className="relative mt-2 text-[9px] font-black uppercase tracking-[0.18em] text-zinc-600">Fan-run · not an official account</div>
+                </div>
+
+                {selectedFandomCampaigns[0] && (
+                    <div className="p-4">
+                        <IndustryCampaignContextPanel
+                            campaign={selectedFandomCampaigns[0]}
+                            fandom={selectedFandom}
+                            onParticipate={(mode) => beginCampaignParticipation(selectedFandomCampaigns[0], selectedFandom, mode)}
+                            onLetFansLead={() => undefined}
+                        />
+                    </div>
+                )}
+
+                <div className="grid grid-cols-3 gap-0.5 border-t border-zinc-900">
+                    {selectedFandomPosts.length ? selectedFandomPosts.map(post => (
+                        <button key={post.id} onClick={() => openPostDetail(post)} className="relative block overflow-hidden active:opacity-80">
+                            <InstagramPostVisual post={post} getPostStyle={getPostStyle}>
+                                <span className="absolute bottom-2 left-2 right-2 truncate text-[8px] font-black uppercase tracking-widest text-white/70">{post.campaignId ? 'Fan campaign' : post.type}</span>
+                            </InstagramPostVisual>
+                        </button>
+                    )) : (
+                        <div className="col-span-3 py-12 text-center text-xs text-zinc-600">The community is gathering its first posts.</div>
+                    )}
+                </div>
+            </div>
+        )}
+
         {view === 'DM' && selectedNPC && (
             <div className="flex-1 flex flex-col bg-black animate-in slide-in-from-right duration-300 min-h-0">
                 <div className="p-4 border-b border-zinc-800 bg-zinc-950 shrink-0">
@@ -967,8 +1268,8 @@ export const InstagramApp: React.FC<InstagramAppProps> = ({ player, onBack, onPo
                                 <span className="text-[10px] text-zinc-500">{(npcStates[selectedNPC.id]?.relationshipScore || 0)}/100</span>
                             </div>
                             <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                                <div 
-                                    className={`h-full transition-all duration-500 ${getRelationshipLabel(npcStates[selectedNPC.id]?.relationshipScore || 0).bar}`} 
+                                <div
+                                    className={`h-full transition-all duration-500 ${getRelationshipLabel(npcStates[selectedNPC.id]?.relationshipScore || 0).bar}`}
                                     style={{ width: `${(npcStates[selectedNPC.id]?.relationshipScore || 0)}%` }}
                                 ></div>
                             </div>
@@ -1184,6 +1485,21 @@ export const InstagramApp: React.FC<InstagramAppProps> = ({ player, onBack, onPo
                                 className="w-full bg-black text-white p-3 rounded-2xl border border-zinc-800 focus:outline-none focus:border-zinc-600 min-h-[86px] text-sm resize-none"
                             />
                         </div>
+
+                        {eligiblePromotionProjects.length > 0 && ['ANNOUNCEMENT', 'BTS', 'REEL', 'CELEBRATION'].includes(selectedPresetType) && (
+                            <div className="rounded-[1.5rem] border border-zinc-800 bg-zinc-950 p-3">
+                                <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Feature a project <span className="text-zinc-700">· optional</span></div>
+                                <select
+                                    value={promotedProjectId}
+                                    onChange={event => setPromotedProjectId(event.target.value)}
+                                    className="mt-2 w-full rounded-2xl border border-zinc-800 bg-black p-3 text-sm font-bold text-white focus:border-pink-500 focus:outline-none"
+                                >
+                                    <option value="">No project attached</option>
+                                    {eligiblePromotionProjects.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}
+                                </select>
+                                <div className="mt-2 text-[11px] text-zinc-600">Repeated promotion has diminishing returns, so you can spread attention across your slate.</div>
+                            </div>
+                        )}
 
                         <div className="space-y-3">
                             <div className="flex items-end justify-between gap-3 px-1">

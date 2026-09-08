@@ -3,6 +3,7 @@ import { INITIAL_PLAYER } from '../types';
 import { compactIndustryIntelligenceState, createInitialIndustryIntelligenceState, normalizeIndustryIntelligenceState } from '../services/industryIntelligence';
 import { compareProtectedSaveState } from '../services/saveIntegrity';
 import { normalizePlatformAiState } from '../services/platformAi';
+import { compactPlayerForPersistence } from '../services/saveCompaction';
 
 const fallback = createInitialIndustryIntelligenceState('NETFLIX', 'STREAMING_PLATFORM', 'save_seed', 300);
 const malformed = normalizeIndustryIntelligenceState({
@@ -34,5 +35,29 @@ after.world.platforms!.NETFLIX.ai!.intelligence!.content.recentNoveltySignatures
 const comparison = compareProtectedSaveState(before, after);
 assert.equal(comparison.ok, false, 'B3 memory mutation must be detected by save-integrity protection');
 assert.ok(comparison.violations.includes('industry intelligence state changed'));
+
+const freshGeneratedContentPlayer = structuredClone(INITIAL_PLAYER);
+freshGeneratedContentPlayer.world.platforms!.NETFLIX = normalizePlatformAiState(
+    freshGeneratedContentPlayer.world.platforms!.NETFLIX,
+    freshGeneratedContentPlayer.id,
+    300,
+);
+const generatedState = structuredClone(compacted);
+const generatedFingerprint = generatedState.content.selectedFingerprints[0] as typeof generatedState.content.selectedFingerprints[number] & Record<string, unknown>;
+delete generatedFingerprint.sourceRightId;
+delete generatedFingerprint.relatedFingerprintId;
+delete generatedFingerprint.universeBlueprintId;
+delete generatedFingerprint.canonicalProjectId;
+delete generatedFingerprint.canonicalUniverseId;
+freshGeneratedContentPlayer.world.platforms!.NETFLIX.ai!.intelligence = generatedState;
+const freshGeneratedContentSaveComparison = compareProtectedSaveState(
+    freshGeneratedContentPlayer,
+    compactPlayerForPersistence(freshGeneratedContentPlayer),
+);
+assert.deepEqual(
+    freshGeneratedContentSaveComparison,
+    { ok: true },
+    'A newly generated content fingerprint must survive first persistence without optional-key shape drift',
+);
 
 console.log('Industry Content B3 save audit passed.');

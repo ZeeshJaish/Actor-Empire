@@ -62,6 +62,7 @@ const createFixture = (): Player => {
                 soundIdentKey: 'ASCENT',
                 brandPromiseId: 'EVENT_HOUSE',
                 foundedAtAbsoluteWeek: absoluteWeek - 100,
+                publicManifesto: 'Event stories built for a worldwide audience.',
             },
             foundingProfile: {
                 incorporationModel: 'FIXED_V7',
@@ -344,7 +345,7 @@ player.world.platforms!.HULU.ai!.rightsContracts.push({
     renewalOption: true,
     sublicensingAllowed: false,
     sequelRightsIncluded: false,
-    changeOfControl: 'ASSIGNABLE',
+    changeOfControl: 'NOTICE',
     cancellationPenalty: 0,
     renewedFromLicenseId: null,
 });
@@ -356,7 +357,7 @@ player.ownedStreamingPlatform.competitiveWorld.moves.push({
     platformName: 'Hulu',
     ceoName: 'Mara Voss',
     type: 'EXECUTIVE_POACH',
-    battlefront: 'LEADERSHIP',
+    battlefront: 'TALENT',
     targetRegionId: null,
     targetTechnologyBranch: null,
     strategyReason: 'Canonical acquisition-liability fixture.',

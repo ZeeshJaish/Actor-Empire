@@ -18,6 +18,7 @@ import {
 } from '../../finance/launch';
 import type { StepProps } from './LaunchWizard';
 import { compactCount, money, moneyPrecise, pct } from '../../finance/format';
+import { ResearchLockMark } from './ResearchLockMark';
 
 const GROUPS = [
   { id: 'quality' as const, label: 'Picture & sound' },
@@ -113,7 +114,9 @@ export function StepPricing({ data, draft, patch, chosen, handlers }: StepProps)
                     {row ? <s>{money(row.monthly)}</s> : <s className="is-off">off</s>}
                   </span>
                   <em>{stream.line}</em>
-                  <span className="pr-pick-real">{lock ? `Research required · ${lock}` : stream.real}</span>
+                  {lock
+                    ? <ResearchLockMark reason={lock} />
+                    : <span className="pr-pick-real">{stream.real}</span>}
                 </button>
               </li>
             );
@@ -195,7 +198,8 @@ export function StepPricing({ data, draft, patch, chosen, handlers }: StepProps)
                                     : [...plan.featureIds, feature.id],
                                 })}
                               >
-                                {feature.name}
+                                <span className="pr-chip-name">{feature.name}</span>
+                                {lock && <ResearchLockMark reason={lock} compact />}
                               </button>
                             );
                           })}

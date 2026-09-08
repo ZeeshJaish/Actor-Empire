@@ -81,6 +81,7 @@ import {
     type OwnedStreamingOriginalCommissionDraft,
     type OwnedStreamingStarterCatalog,
     type OwnedStreamingWeeklySnapshot,
+    type StreamingBuyerAuctionSession,
     type PlatformId,
     type StreamingInfrastructureStrategy,
     type StreamingCatalogLicenseStatus,
@@ -349,7 +350,7 @@ const RIGHTS_WINDOW_TYPES: StreamingRightsWindowType[] = ['FIRST_WINDOW', 'SECON
 const RIGHTS_NEGOTIATION_KINDS: StreamingRightsNegotiationKind[] = ['ACQUIRE', 'RENEW', 'SUBLICENSE_OUT', 'TRANSFER_OUT'];
 const RIGHTS_NEGOTIATION_STATUSES: StreamingRightsNegotiationStatus[] = ['OPEN', 'COUNTERED', 'READY_TO_SIGN', 'SIGNED', 'LOST', 'WITHDRAWN', 'EXPIRED'];
 const RIGHTS_CHANGE_OF_CONTROL: StreamingRightsChangeOfControl[] = ['NONE', 'NOTICE', 'CONSENT_REQUIRED'];
-const RIGHTS_OBLIGATION_TYPES: StreamingRightsObligationType[] = ['MARKETING_SPEND', 'VIEWERSHIP_THRESHOLD'];
+const RIGHTS_OBLIGATION_TYPES: StreamingRightsObligationType[] = ['MARKETING_SPEND', 'VIEWERSHIP_THRESHOLD', 'FUTURE_GREENLIGHT'];
 const RIGHTS_OBLIGATION_STATUSES: StreamingRightsObligationStatus[] = ['PENDING', 'ON_TRACK', 'SATISFIED', 'BREACHED'];
 const PROJECT_TYPES = ['MOVIE', 'SERIES'] as const;
 const GENRES = ['ACTION', 'DRAMA', 'COMEDY', 'ROMANCE', 'THRILLER', 'MYSTERY', 'HORROR', 'SCI_FI', 'ADVENTURE', 'SUPERHERO', 'MUSICAL', 'BIOPIC', 'SPORTS', 'ANIMATION', 'FANTASY', 'CRIME', 'DOCUMENTARY'] as const;
@@ -2670,7 +2671,11 @@ const normalizeCatalogLicense = (value: unknown): OwnedStreamingCatalogLicense |
         startsAtAbsoluteWeek,
         expiresAtAbsoluteWeek,
         status: isOneOf(source.status, CATALOG_LICENSE_STATUSES, 'ACTIVE'),
-        origin: isOneOf(source.origin, ['STARTER', 'STUDIO_MARKET', 'PLATFORM_TRADE', 'RENEWAL'] as const, 'STARTER'),
+        origin: isOneOf(source.origin, ['STARTER', 'STUDIO_MARKET', 'PLATFORM_TRADE', 'RENEWAL', 'OWNED_STUDIO_TRANSFER', 'CATALOGUE_ACQUISITION'] as const, 'STARTER'),
+        buyerPlatformId: isOneOf(source.buyerPlatformId, PLATFORM_IDS, null),
+        platformContentPlanId: cleanText(source.platformContentPlanId, '', 180) || null,
+        cataloguePackageId: cleanText(source.cataloguePackageId, '', 180) || null,
+        contentSource: source.contentSource as OwnedStreamingCatalogLicense['contentSource'],
         sellerType: isOneOf(source.sellerType, RIGHTS_SELLER_TYPES, 'STUDIO'),
         sellerPlatformId: isOneOf(source.sellerPlatformId, PLATFORM_IDS, 'NETFLIX') === source.sellerPlatformId
             ? source.sellerPlatformId
@@ -2736,6 +2741,15 @@ const normalizeRightsNegotiation = (value: unknown): OwnedStreamingRightsNegotia
         createdAtAbsoluteWeek: Math.max(0, Math.round(clamp(source.createdAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
         updatedAtAbsoluteWeek: Math.max(0, Math.round(clamp(source.updatedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
         expiresAtAbsoluteWeek: Math.max(0, Math.round(clamp(source.expiresAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
+        proposalVersion: source.proposalVersion == null ? undefined : Math.max(1, Math.round(clamp(source.proposalVersion, 1, 1000, 1))),
+        submittedAtAbsoluteWeek: source.submittedAtAbsoluteWeek == null ? null : Math.max(0, Math.round(clamp(source.submittedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
+        responseDueAbsoluteWeek: source.responseDueAbsoluteWeek == null ? null : Math.max(0, Math.round(clamp(source.responseDueAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
+        responseStatus: isOneOf(source.responseStatus, ['AWAITING_RESPONSE', 'SELLER_COUNTERED', 'SELLER_ACCEPTED', 'SELLER_DECLINED', 'RIGHTS_SOLD', 'WITHDRAWN', 'EXPIRED', 'SIGNED'] as const, null),
+        responseReason: cleanText(source.responseReason, '', 260) || null,
+        respondedAtAbsoluteWeek: source.respondedAtAbsoluteWeek == null ? null : Math.max(0, Math.round(clamp(source.respondedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
+        processedProposalVersion: source.processedProposalVersion == null ? null : Math.max(1, Math.round(clamp(source.processedProposalVersion, 1, 1000, 1))),
+        signingDeadlineAbsoluteWeek: source.signingDeadlineAbsoluteWeek == null ? null : Math.max(0, Math.round(clamp(source.signingDeadlineAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
+        responseMessageId: cleanText(source.responseMessageId, '', 180) || null,
     };
 };
 
@@ -2792,6 +2806,142 @@ const normalizeRightsObligation = (value: unknown): OwnedStreamingRightsObligati
         resolvedAtAbsoluteWeek: source.resolvedAtAbsoluteWeek == null
             ? null
             : Math.max(0, Math.round(clamp(source.resolvedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
+        counterpartyId: cleanText(source.counterpartyId, '', 180) || null,
+        createdAtAbsoluteWeek: source.createdAtAbsoluteWeek == null
+            ? null
+            : Math.max(0, Math.round(clamp(source.createdAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
+    };
+};
+
+const normalizeBuyerAuctionSession = (value: unknown): StreamingBuyerAuctionSession | null => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const source = asRecord(value);
+    const lotSource = asRecord(source.lot);
+    const id = cleanText(source.id, '', 160);
+    const listingId = cleanText(lotSource.listingId, '', 180);
+    const sourceProjectId = cleanText(lotSource.sourceProjectId, '', 180);
+    if (!id || !listingId || !sourceProjectId) return null;
+    const allowedSource = asRecord(lotSource.allowedTerms);
+    const prioritySource = asRecord(lotSource.sellerPriorities);
+    const lot = {
+        id: cleanText(lotSource.id, `buyer-auction-lot:${listingId}`, 180),
+        listingId,
+        listingSignature: cleanText(lotSource.listingSignature, '', 4_000),
+        listingKind: isOneOf(lotSource.listingKind, ['TITLE', 'CATALOGUE_PACKAGE'] as const, 'TITLE'),
+        sourceProjectId,
+        title: cleanText(lotSource.title, 'Untitled auction', 160),
+        projectType: isOneOf(lotSource.projectType, ['MOVIE', 'SERIES'] as const, 'MOVIE'),
+        genre: cleanText(lotSource.genre, 'DRAMA', 80),
+        sellerId: cleanText(lotSource.sellerId, 'unknown-seller', 180),
+        sellerName: cleanText(lotSource.sellerName, 'Rights holder', 160),
+        sourceLicenseId: cleanText(lotSource.sourceLicenseId, '', 180) || null,
+        territory: isOneOf(lotSource.territory, LICENSE_TERRITORIES, 'MULTI_REGION'),
+        countryIds: normalizeStreamingDayOneMarketIds(lotSource.countryIds).sort(),
+        excludedCountryIds: normalizeStreamingDayOneMarketIds(lotSource.excludedCountryIds).sort(),
+        windowType: isOneOf(lotSource.windowType, RIGHTS_WINDOW_TYPES, 'SECOND_WINDOW'),
+        exclusivity: isOneOf(lotSource.exclusivity, LICENSE_EXCLUSIVITY, 'NON_EXCLUSIVE'),
+        durationWeeks: Math.round(clamp(lotSource.durationWeeks, 1, 520, 104)),
+        startsAtAbsoluteWeek: Math.max(0, Math.round(clamp(lotSource.startsAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
+        referenceValue: Math.round(clamp(lotSource.referenceValue, 1, 5_000_000_000)),
+        minimumGuarantee: Math.round(clamp(lotSource.minimumGuarantee, 1, 5_000_000_000)),
+        minimumBidIncrement: Math.round(clamp(lotSource.minimumBidIncrement, 100_000, 1_000_000_000)),
+        reserveSellerValue: Math.round(clamp(lotSource.reserveSellerValue, 1, 10_000_000_000)),
+        allowedTerms: {
+            backendMinimum: Math.round(clamp(allowedSource.backendMinimum, 0, 40)),
+            backendMaximum: Math.round(clamp(allowedSource.backendMaximum, 0, 40)),
+            marketingMaximum: Math.round(clamp(allowedSource.marketingMaximum, 0, 2_000_000_000)),
+            futureGreenlightAllowed: Boolean(allowedSource.futureGreenlightAllowed),
+            futureGreenlightReserve: Math.round(clamp(allowedSource.futureGreenlightReserve, 0, 2_000_000_000)),
+        },
+        sellerPriorities: {
+            cash: clamp(prioritySource.cash, 0.5, 1.5, 1),
+            backend: clamp(prioritySource.backend, 0.5, 1.5, 1),
+            marketing: clamp(prioritySource.marketing, 0.5, 1.5, 1),
+            futureGreenlight: clamp(prioritySource.futureGreenlight, 0.5, 1.5, 1),
+        },
+        notice: cleanText(lotSource.notice, '', 280) || null,
+        cataloguePackageId: cleanText(lotSource.cataloguePackageId, '', 180) || null,
+        catalogueComponentIds: uniqueStrings(lotSource.catalogueComponentIds, 40),
+    } satisfies StreamingBuyerAuctionSession['lot'];
+    if (!lot.countryIds.length || lot.allowedTerms.backendMaximum < lot.allowedTerms.backendMinimum) return null;
+    const bidIds = new Set<string>();
+    const bids = asArray<unknown>(source.bids).map(item => {
+        const bidSource = asRecord(item);
+        const bidId = cleanText(bidSource.id, '', 180);
+        if (!bidId || bidIds.has(bidId)) return null;
+        bidIds.add(bidId);
+        return {
+            id: bidId,
+            sessionId: id,
+            bidderId: cleanText(bidSource.bidderId, '', 180),
+            bidderName: cleanText(bidSource.bidderName, 'Bidder', 140),
+            platformId: isOneOf(bidSource.platformId, PLATFORM_IDS, null),
+            isPlayer: Boolean(bidSource.isPlayer),
+            revision: Math.max(1, Math.round(clamp(bidSource.revision, 1, 20, 1))),
+            status: isOneOf(bidSource.status, ['ACTIVE', 'OUTBID', 'WITHDRAWN', 'WON', 'LOST'] as const, 'OUTBID'),
+            replacesBidId: cleanText(bidSource.replacesBidId, '', 180) || null,
+            minimumGuarantee: Math.round(clamp(bidSource.minimumGuarantee, 0, 5_000_000_000)),
+            licensorRevenueShare: Math.round(clamp(bidSource.licensorRevenueShare, 0, 40)),
+            marketingGuarantee: Math.round(clamp(bidSource.marketingGuarantee, 0, 2_000_000_000)),
+            futureGreenlight: Boolean(bidSource.futureGreenlight),
+            guaranteedExposure: Math.round(clamp(bidSource.guaranteedExposure, 0, 10_000_000_000)),
+            sellerValue: Math.round(clamp(bidSource.sellerValue, 0, 10_000_000_000)),
+            createdAtActiveSecond: Math.max(0, Math.round(clamp(bidSource.createdAtActiveSecond, 0, 45))),
+        };
+    }).filter((item): item is NonNullable<typeof item> => Boolean(item)).slice(-80);
+    const rivals = asArray<unknown>(source.rivals).map(item => {
+        const rival = asRecord(item);
+        const platformId = isOneOf(rival.platformId, PLATFORM_IDS, null);
+        if (!platformId) return null;
+        return {
+            bidderId: cleanText(rival.bidderId, platformId, 180),
+            platformId,
+            platformName: cleanText(rival.platformName, platformId, 140),
+            color: cleanText(rival.color, '#777777', 40),
+            cashAvailable: Math.round(clamp(rival.cashAvailable, 0, 100_000_000_000)),
+            sellerValueCeiling: Math.round(clamp(rival.sellerValueCeiling, 0, 100_000_000_000)),
+            preferredBackend: Math.round(clamp(rival.preferredBackend, 0, 40)),
+            marketingLimit: Math.round(clamp(rival.marketingLimit, 0, 2_000_000_000)),
+            nextActionSecond: Math.max(1, Math.round(clamp(rival.nextActionSecond, 1, 45))),
+            revision: Math.max(0, Math.round(clamp(rival.revision, 0, 20))),
+            status: isOneOf(rival.status, ['WATCHING', 'ACTIVE', 'FINAL', 'WITHDRAWN'] as const, 'WATCHING'),
+            currentBidId: cleanText(rival.currentBidId, '', 180) || null,
+        };
+    }).filter((item): item is NonNullable<typeof item> => Boolean(item)).slice(0, 8);
+    const events = asArray<unknown>(source.events).map(item => {
+        const event = asRecord(item);
+        const eventId = cleanText(event.id, '', 180);
+        if (!eventId) return null;
+        return {
+            id: eventId,
+            type: isOneOf(event.type, ['OPENED', 'BID_PLACED', 'BID_REVISED', 'RIVAL_BID', 'RIVAL_WITHDREW', 'CLOSED', 'SETTLED', 'INVALIDATED'] as const, 'OPENED'),
+            activeSecond: Math.max(0, Math.round(clamp(event.activeSecond, 0, 45))),
+            bidderId: cleanText(event.bidderId, '', 180) || null,
+            bidId: cleanText(event.bidId, '', 180) || null,
+        };
+    }).filter((item): item is NonNullable<typeof item> => Boolean(item)).slice(-120);
+    return {
+        id,
+        idempotencyKey: cleanText(source.idempotencyKey, id, 180),
+        lot,
+        status: isOneOf(source.status, ['LIVE', 'WON', 'LOST', 'NO_SALE', 'WITHDRAWN', 'INVALIDATED'] as const, 'INVALIDATED'),
+        openedAtAbsoluteWeek: Math.max(0, Math.round(clamp(source.openedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
+        roomSecondsRemaining: Math.max(0, Math.round(clamp(source.roomSecondsRemaining, 0, 45))),
+        activeSecondsElapsed: Math.max(0, Math.round(clamp(source.activeSecondsElapsed, 0, 45))),
+        hardClosesAtSecond: 45,
+        materialEventCount: Math.max(0, Math.round(clamp(source.materialEventCount, 0, 100))),
+        lastRealtimeAtMs: Math.max(0, Math.round(clamp(source.lastRealtimeAtMs, 0, Number.MAX_SAFE_INTEGER))),
+        playerBidderId: cleanText(source.playerBidderId, 'player-platform', 180),
+        playerBidId: cleanText(source.playerBidId, '', 180) || null,
+        rivals,
+        bids,
+        events,
+        leaderBidId: cleanText(source.leaderBidId, '', 180) || null,
+        winnerBidId: cleanText(source.winnerBidId, '', 180) || null,
+        closedAtActiveSecond: source.closedAtActiveSecond == null ? null : Math.max(0, Math.round(clamp(source.closedAtActiveSecond, 0, 45))),
+        settledAtAbsoluteWeek: source.settledAtAbsoluteWeek == null ? null : Math.max(0, Math.round(clamp(source.settledAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
+        resultReason: cleanText(source.resultReason, '', 300) || null,
+        outcomeMessageId: cleanText(source.outcomeMessageId, '', 180) || null,
     };
 };
 
@@ -3434,6 +3584,18 @@ export const normalizeOwnedStreamingPlatformState = (
             line => line.lineId,
         ).slice(-OWNED_STREAMING_PRODUCT_LINE_LIMIT),
         catalogSetupDraft: normalizeCatalogSetupDraft(source.catalogSetupDraft),
+        contentMarketDraft: source.contentMarketDraft && typeof source.contentMarketDraft === 'object' ? {
+            tab: ['ALL', 'MOVIE', 'SERIES', 'COLLECTIONS', 'OWNED', 'OFFERS', 'AUCTIONS'].includes(source.contentMarketDraft.tab) ? source.contentMarketDraft.tab : 'ALL',
+            search: String(source.contentMarketDraft.search || '').slice(0, 100),
+            selectedId: typeof source.contentMarketDraft.selectedId === 'string' ? source.contentMarketDraft.selectedId.slice(0, 200) : null,
+            ownedIds: Array.isArray(source.contentMarketDraft.ownedIds) ? Array.from(new Set<string>(source.contentMarketDraft.ownedIds.filter((id: unknown) => typeof id === 'string'))).slice(0, 500) : [],
+        } : null,
+        buyerAuctionSessions: dedupeByKey(
+            asArray<unknown>(source.buyerAuctionSessions)
+                .map(normalizeBuyerAuctionSession)
+                .filter((session): session is StreamingBuyerAuctionSession => Boolean(session)),
+            session => session.id,
+        ).slice(-40),
         starterCatalog: normalizeStarterCatalog(source.starterCatalog),
         catalogLicenses: dedupeByKey(
             asArray<unknown>(source.catalogLicenses)

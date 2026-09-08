@@ -20,6 +20,7 @@ interface MessagesAppProps {
   onDelete: (id: string) => void;
   onMarkRead: (id: string) => void;
   onOpenRightsMarket?: (opportunityId?: string) => void;
+  onOpenStreamingContentOffer?: (offerId: string) => void;
   onOpenStudioAcquisition?: (studioId?: string, studioName?: string) => void;
   onOpenStudioContinuation?: (studioId?: string, scriptId?: string) => void;
   onDeclinePlatformCommission?: (offerId: string) => void;
@@ -30,7 +31,7 @@ interface MessagesAppProps {
   onImmersiveReviewChange?: (active: boolean) => void;
 }
 
-export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAccept, onDelete, onMarkRead, onOpenRightsMarket, onOpenStudioAcquisition, onOpenStudioContinuation, onDeclinePlatformCommission, onResolveShareholderVote, onImmersiveReviewChange }) => {
+export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAccept, onDelete, onMarkRead, onOpenRightsMarket, onOpenStreamingContentOffer, onOpenStudioAcquisition, onOpenStudioContinuation, onDeclinePlatformCommission, onResolveShareholderVote, onImmersiveReviewChange }) => {
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [activeShareholderVoteId, setActiveShareholderVoteId] = useState<string | null>(null);
@@ -45,7 +46,7 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
   const outsideInvestmentEnergyCost = PHASE_ONE_ENERGY_COSTS.OUTSIDE_PRODUCER_INVESTMENT_ACCEPT;
   const hasCollabSigningEnergy = player.energy.current >= collaborationSigningEnergyCost;
   const hasOutsideInvestmentEnergy = player.energy.current >= outsideInvestmentEnergyCost;
-  
+
   // State for the full-screen contract view
   const [contractViewData, setContractViewData] = useState<{
       type: 'ROLE' | 'AUDITION' | 'NEGOTIATION';
@@ -57,6 +58,9 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
   const selectedRightsStatus = selectedMessage?.type === 'RIGHTS_NEGOTIATION'
       ? selectedMessage.data?.negotiation?.status
       : undefined;
+  const selectedBuyerAuctionId = selectedMessage?.type === 'RIGHTS_NEGOTIATION'
+      ? String(selectedMessage.data?.streamingBuyerAuctionId || '')
+      : '';
   const selectedRightsAccepted = selectedRightsStatus === 'ACCEPTED' || selectedRightsStatus === 'READY_TO_SIGN';
   const selectedStudioAcquisitionMessage = selectedMessage?.type === 'STUDIO_ACQUISITION'
       ? selectedMessage
@@ -237,13 +241,13 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
       // Simulate counter offer logic (In a real app this would update the message state)
       // For this UI demo, we will just alert and close for now, or assume it's accepted for gameplay flow
       alert(tr('messages.counterOfferSent', { salary: salary.toLocaleString(), royalty }));
-      
+
       // Update the local data to reflect the "Accepted" counter
       if (selectedMessage && contractViewData?.data) {
           const updatedMsg = { ...selectedMessage };
           (updatedMsg.data as NegotiationData).currentOffer = salary;
           (updatedMsg.data as NegotiationData).royaltyPercentage = royalty;
-          
+
           onAccept(updatedMsg); // Accept immediately for gameplay smoothness
           setContractViewData(null);
           setSelectedMessage(null);
@@ -259,7 +263,7 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
           || selectedMessage.type === 'OFFER_MUSIC_VIDEO_FEATURE';
       if (needsCollabSigningEnergy && !hasCollabSigningEnergy) return;
       setIsProcessing(true);
-      
+
       setTimeout(() => {
           onAccept(selectedMessage);
           setIsProcessing(false);
@@ -334,7 +338,7 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
   if (contractViewData) {
       const isNeg = contractViewData.type === 'NEGOTIATION';
       const isAudition = contractViewData.type === 'AUDITION';
-      
+
       return (
           <ProjectDetailView
               opportunity={contractViewData.opportunity}
@@ -343,7 +347,7 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
               currentOffer={isNeg ? contractViewData.data?.currentOffer : undefined}
               currentRoyalty={isNeg ? contractViewData.data?.royaltyPercentage : undefined}
               onCounter={handleCounterOffer}
-              
+
               // Standard Props
               onBack={() => setContractViewData(null)}
               onAction={handleSignDeal}
@@ -358,17 +362,17 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
   // --- RENDER: MESSAGE LIST / DETAIL ---
   return (
     <div className="absolute inset-0 bg-slate-50 flex flex-col z-40 text-slate-900 animate-in slide-in-from-right duration-300 font-sans" data-tutorial-id="mobile-inbox">
-        
+
         {/* HEADER */}
         <div className="bg-white p-4 pt-12 pb-3 shadow-sm border-b border-slate-200 flex items-center gap-3 z-10 sticky top-0">
-            <button 
+            <button
                 onClick={() => {
                     if (outsideInvestmentReview) {
                         setOutsideInvestmentReview(false);
                         return;
                     }
                     selectedMessage ? setSelectedMessage(null) : onBack();
-                }} 
+                }}
                 className="flex shrink-0 items-center gap-1 font-medium text-slate-600 hover:text-slate-900"
             >
                 <ArrowLeft size={20} /> {outsideInvestmentReview ? 'Summary' : selectedMessage ? tr('messages.inbox') : tr('messages.home')}
@@ -380,7 +384,7 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
 
         {/* CONTENT */}
         <div className="flex-1 overflow-y-auto bg-slate-50">
-            
+
             {/* LIST */}
             {!selectedMessage && (
                 <div>
@@ -395,7 +399,7 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                 const platformBrand = resolveMessagePlatformBrand(msg);
                                 return (
                                 <button
-                                    key={msg.id} 
+                                    key={msg.id}
                                     onClick={() => handleOpenMessage(msg)}
                                     className={`w-full p-4 flex gap-4 text-left hover:bg-slate-50 transition-colors ${!msg.isRead ? 'bg-blue-50/60' : ''}`}
                                 >
@@ -411,7 +415,7 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                         </div>
                                     ) : (
                                     <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-bold shrink-0 shadow-sm ${
-                                        msg.type.includes('OFFER') ? 'bg-gradient-to-br from-indigo-500 to-purple-600' : 
+                                        msg.type.includes('OFFER') ? 'bg-gradient-to-br from-indigo-500 to-purple-600' :
                                         msg.type === 'CASTING_FEEDBACK' ? 'bg-gradient-to-br from-sky-600 to-indigo-700' :
                                         msg.type === 'STUDIO_ACQUISITION' ? 'bg-gradient-to-br from-amber-500 to-emerald-800' :
                                         msg.type === 'SHAREHOLDER_VOTE' ? 'bg-gradient-to-br from-sky-700 to-emerald-700' :
@@ -687,8 +691,8 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                 )}
                             </div>
                             <div className="px-6 py-6 text-slate-900">
-                                <p className="text-sm leading-7 text-slate-700">{selectedMessage.data?.negotiation?.responseSummary || selectedMessage.text}</p>
-                                <div className="my-6 grid grid-cols-2 gap-px overflow-hidden border border-black/15 bg-black/15">
+                                <p className="text-sm leading-7 text-slate-700">{selectedMessage.data?.negotiation?.responseSummary || selectedMessage.text || (selectedMessage as any).body}</p>
+                                {!selectedBuyerAuctionId && <div className="my-6 grid grid-cols-2 gap-px overflow-hidden border border-black/15 bg-black/15">
                                     <div className="bg-[#f3ede0] p-4">
                                         <div className="text-[9px] font-black uppercase tracking-widest text-black/40">Your offer</div>
                                         <div className="mt-2 font-mono text-base font-black">{formatMoney(selectedMessage.data?.negotiation?.currentOffer)}</div>
@@ -704,7 +708,7 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                             )}
                                         </div>
                                     </div>
-                                </div>
+                                </div>}
                                 {selectedMessage.data?.negotiation?.creativeGuarantee && (
                                     <div className="border-l-4 border-amber-700 bg-amber-900/[0.06] p-4">
                                         <div className="text-[9px] font-black uppercase tracking-widest text-amber-800">
@@ -717,15 +721,19 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                 )}
                                 <div className="mt-6 flex items-center gap-3 border-t border-black/15 pt-5">
                                     <ShieldCheck size={20} className="shrink-0 text-amber-700" />
-                                    <p className="text-xs font-bold leading-relaxed text-slate-600">
-                                        Continue in Development Lab → Market → Properties. Money moves only after you sign.
-                                    </p>
+                                    <p className="text-xs font-bold leading-relaxed text-slate-600">{selectedBuyerAuctionId
+                                        ? 'The complete auction record, winning terms, rights scope, and settlement remain available in Content Market.'
+                                        : 'Continue in Development Lab → Market → Properties. Money moves only after you sign.'}</p>
                                 </div>
                                 <button
-                                    onClick={() => onOpenRightsMarket?.(selectedMessage.data?.negotiation?.opportunityId)}
+                                    onClick={() => selectedBuyerAuctionId
+                                        ? onOpenStreamingContentOffer?.(selectedBuyerAuctionId)
+                                        : selectedMessage.data?.streamingPrivateOfferId
+                                        ? onOpenStreamingContentOffer?.(String(selectedMessage.data.streamingPrivateOfferId))
+                                        : onOpenRightsMarket?.(selectedMessage.data?.negotiation?.opportunityId)}
                                     className={`mt-5 flex min-h-12 w-full items-center justify-center gap-2 px-4 text-xs font-black uppercase tracking-[0.14em] text-white ${selectedRightsAccepted ? 'bg-emerald-700' : 'bg-slate-900'}`}
                                 >
-                                    Open Property Deal <ChevronRight size={17} />
+                                    {selectedBuyerAuctionId ? 'Open Auction Result' : selectedMessage.data?.streamingPrivateOfferId ? 'Open Your Offer' : 'Open Property Deal'} <ChevronRight size={17} />
                                 </button>
                             </div>
                         </div>
@@ -893,7 +901,7 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                             <div className="absolute top-0 right-0 p-8 opacity-5">
                                 <Heart size={200} />
                             </div>
-                            
+
                             <div className="relative z-10">
                                 {/* Sender Icon */}
                                 <div className="flex justify-center mb-6">
@@ -901,10 +909,10 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                         👨‍💻
                                     </div>
                                 </div>
-                                
+
                                 <h2 className="text-2xl font-serif text-center mb-4 font-bold tracking-wide">{selectedMessage.subject}</h2>
                                 <div className="w-12 h-1 bg-gradient-to-r from-transparent via-amber-500 to-transparent mx-auto mb-8"></div>
-                                
+
                                 <div className="space-y-4 text-sm font-sans text-zinc-300 leading-relaxed text-left">
                                     {selectedMessage.text.split('\n').map((line, i) => (
                                         line.trim() === '' ? <br key={i}/> : <p key={i}>{line}</p>
@@ -1424,12 +1432,12 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                         <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
                                             <Star size={14} className="text-amber-400"/> {selectedMessage.type === 'OFFER_AUDITION' ? tr('messages.auditionInvite') : tr('messages.castOffer')}
                                         </div>
-                                        
+
                                         {(() => {
-                                            const opp = selectedMessage.type === 'OFFER_NEGOTIATION' 
-                                                ? (selectedMessage.data as NegotiationData).opportunity 
+                                            const opp = selectedMessage.type === 'OFFER_NEGOTIATION'
+                                                ? (selectedMessage.data as NegotiationData).opportunity
                                                 : (selectedMessage.data as AuditionOpportunity);
-                                            
+
                                             const pay = selectedMessage.type === 'OFFER_NEGOTIATION'
                                                 ? (selectedMessage.data as NegotiationData).currentOffer
                                                 : (selectedMessage.data as AuditionOpportunity).estimatedIncome;
@@ -1469,7 +1477,7 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                                             </div>
                                                         </div>
                                                     )}
-                                                    
+
                                                     <div className="flex items-end justify-between mb-6 border-t border-white/10 pt-4">
                                                         <div>
                                                             <div className="text-[10px] text-slate-500 uppercase font-bold">{tr('messages.salary')}</div>
@@ -1483,7 +1491,7 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                                         )}
                                                     </div>
 
-	                                                    <button 
+	                                                    <button
 	                                                        onClick={handleOpenContract}
 	                                                        disabled={!hasValidContract || selectedMessage.isExpired}
 	                                                        className="w-full py-4 bg-white text-slate-900 rounded-xl font-bold text-sm hover:bg-slate-100 transition-colors shadow-lg flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
@@ -1629,7 +1637,7 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                     )}
 
                     {/* Delete */}
-                    <button 
+                    <button
                         onClick={handleDelete}
                         className="w-full mt-6 py-4 border border-slate-200 text-slate-400 rounded-xl font-bold text-xs hover:bg-rose-50 hover:text-rose-500 hover:border-rose-200 transition-colors flex items-center justify-center gap-2"
                     >

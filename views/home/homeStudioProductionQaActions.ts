@@ -439,6 +439,11 @@ export const createHomeStudioProductionQaActions = ({
       project.hiddenStats.scriptQuality = 86;
       project.hiddenStats.directorQuality = 84;
       project.hiddenStats.castingStrength = 82;
+      if (scenario === 'AWAITING_RELEASE') {
+          delete project.releaseStrategy;
+          delete project.screeningStrategy;
+          delete project.releaseDate;
+      }
       const commitmentId = `cheat_studio_commit_${Date.now()}`;
       if (isFundedPremiere) {
           const fundedBudget = 65_800_000;
@@ -537,13 +542,6 @@ export const createHomeStudioProductionQaActions = ({
                       ...project,
                       releaseDate: player.currentWeek + 1
                   }
-                  : scenario === 'AWAITING_RELEASE'
-                  ? {
-                      ...project,
-                      releaseStrategy: 'THEATRICAL',
-                      screeningStrategy: 'NATIONAL',
-                      releaseDate: player.currentWeek + 1
-                  }
                   : project,
               projectPhase: scenario === 'FUNDED_PREMIERE' ? 'AWAITING_RELEASE' : scenario,
               phaseWeeksLeft: scenario === 'PLANNING' ? 1 : scenario === 'PRODUCTION' ? 1 : 1,
@@ -564,9 +562,14 @@ export const createHomeStudioProductionQaActions = ({
 
       onUpdatePlayer(nextPlayer);
       closeMenu();
+      if (scenario === 'AWAITING_RELEASE') {
+          onOpenProductionHouseCheat?.();
+      }
       alert(
           scenario === 'FUNDED_PREMIERE'
               ? 'Funded-premiere QA is ready. Open the release-ready season in your studio to verify the Disney+ contract.'
+              : scenario === 'AWAITING_RELEASE'
+              ? 'Awaiting Release movie is ready. Tap it in your active slate to launch the Release Wizard.'
               : `Studio QA scenario ready: ${scenario.replace(/_/g, ' ')}. Age Up once for the result.`
       );
   };

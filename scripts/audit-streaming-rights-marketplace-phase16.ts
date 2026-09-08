@@ -16,6 +16,7 @@ import {
     getStreamingRightsOpportunities,
     openStreamingRightsNegotiation,
     openStreamingRightsRenewal,
+    processStreamingPrivateOffersWeek,
     signStreamingRightsDeal,
     signOwnedStreamingCataloguePackage,
     submitStreamingRightsOffer,
@@ -99,6 +100,10 @@ const driveToSignature = (player: Player, negotiationId: string): Player => {
     for (let round = 0; round < 3; round += 1) {
         const negotiation = current.ownedStreamingPlatform.rightsNegotiations.find(item => item.id === negotiationId);
         if (!negotiation || negotiation.status === 'READY_TO_SIGN' || negotiation.status === 'LOST') break;
+        if (negotiation.responseStatus === 'AWAITING_RESPONSE' && negotiation.responseDueAbsoluteWeek != null) {
+            current = processStreamingPrivateOffersWeek(current, negotiation.responseDueAbsoluteWeek).player;
+            continue;
+        }
         if (negotiation.status === 'COUNTERED') {
             const accepted = acceptStreamingRightsCounter(current, negotiationId);
             assert(accepted.changed, 'A live counteroffer should be acceptible.');

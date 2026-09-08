@@ -1,12 +1,33 @@
 
 import React, { useMemo, useState } from 'react';
-import { Player, XPost, NPCActor, NPCState } from '../../types';
+import {
+    Player,
+    XPost,
+    NPCActor,
+    NPCState,
+    IndustryMediaResponseFormat,
+    IndustryMediaResponseSpeaker,
+    IndustryMediaResponseTone,
+    IndustryMediaInstitution,
+    IndustryMediaPersonality,
+} from '../../types';
 import { generateXFeed, generateTrendingTopics, isIndustryInfoPost } from '../../services/xLogic';
 import { NPC_DATABASE } from '../../services/npcLogic';
 import { getEnabledGlobalCreatorSocialProfiles } from '../../services/youtubeLogic';
+import {
+    createIndustryMediaAvatar,
+    getIndustryMediaResponseDraft,
+    getIndustryMediaResponseOpportunity,
+    getIndustryMediaSocialProfiles,
+    submitIndustryMediaResponse,
+} from '../../services/industryWorld';
+import { getAbsoluteWeek } from '../../services/legacyLogic';
 import { spendPlayerEnergy } from '../../services/premiumLogic';
 import { getPlayerLanguage, t } from '../../services/i18n';
 import { ArrowLeft, Home, Search, PenTool, Heart, Repeat, MessageCircle, MoreHorizontal, Check, User, Mail, Calendar, MapPin, Link as LinkIcon, Bell, Star, XCircle, Flame, ShieldCheck, Laugh, Megaphone, Film, Users, MessageSquareQuote } from 'lucide-react';
+import { IndustryClaimBadge, IndustryClaimContextPanel, IndustrySourceTrackRecord, getIndustryClaimPresentation } from './IndustryClaimContext';
+import { IndustryNarrativeContext } from './IndustryNarrativeContext';
+import { applyProjectPromotionAttribution, getEligiblePromotionProjects } from '../../services/projectPromotionAttribution';
 
 interface XAppProps {
     player: Player;
@@ -65,6 +86,156 @@ const X_QUOTE_BANK_KEYS = {
     reply: ['x.quote.reply.0', 'x.quote.reply.1', 'x.quote.reply.2', 'x.quote.reply.3'],
 } as const;
 
+const C3_TONE_LABELS: Record<IndustryMediaResponseTone, string> = {
+    CLARIFY: 'Clarify',
+    ACKNOWLEDGE: 'Acknowledge',
+    DEFEND: 'Defend',
+    CHALLENGE: 'Challenge',
+    HUMOUR: 'Humour',
+    APPRECIATION: 'Appreciation',
+};
+
+const C3_FORMAT_LABELS: Record<IndustryMediaResponseFormat, string> = {
+    REPLY: 'Direct reply',
+    QUOTE: 'Quote response',
+    STATEMENT: 'Formal statement',
+};
+
+interface IndustryMediaDiscussionPanelProps {
+    player: Player;
+    sourcePost: XPost;
+    absoluteWeek: number;
+    onUpdatePlayer: (player: Player) => void;
+}
+
+export const IndustryMediaDiscussionPanel: React.FC<IndustryMediaDiscussionPanelProps> = ({
+    player,
+    sourcePost,
+    absoluteWeek,
+    onUpdatePlayer,
+}) => {
+    const [tone, setTone] = useState<IndustryMediaResponseTone>('CLARIFY');
+    const [format, setFormat] = useState<IndustryMediaResponseFormat>('REPLY');
+    const [speaker, setSpeaker] = useState<IndustryMediaResponseSpeaker>('PERSONAL');
+    const opportunity = getIndustryMediaResponseOpportunity(player, sourcePost, absoluteWeek);
+    const media = player.world.industryMedia;
+    const discussion = opportunity.discussion || media?.discussions.find(item => item.id === sourcePost.mediaDiscussionId);
+    const response = opportunity.existingResponse
+        || media?.playerResponses.find(item => item.discussionId === discussion?.id);
+    const personalityById = new Map<string, IndustryMediaPersonality>((media?.personalities || []).map(item => [item.id, item]));
+    const institutionById = new Map<string, IndustryMediaInstitution>((media?.institutions || []).map(item => [item.id, item]));
+    const canPublish = opportunity.isEligible
+        && opportunity.allowedFormats.includes(format)
+        && opportunity.allowedSpeakers.includes(speaker);
+    const draft = getIndustryMediaResponseDraft(player, sourcePost, tone, format, absoluteWeek);
+    const responseTones = sourcePost.mediaClaimId
+        ? (['CLARIFY', 'CHALLENGE', 'HUMOUR'] as IndustryMediaResponseTone[])
+        : (Object.keys(C3_TONE_LABELS) as IndustryMediaResponseTone[]);
+    const responseToneLabel = (item: IndustryMediaResponseTone) => sourcePost.mediaClaimId
+        ? ({ CLARIFY: 'Deny the report', CHALLENGE: 'Challenge the source', HUMOUR: 'Tease the audience' } as Partial<Record<IndustryMediaResponseTone, string>>)[item] || C3_TONE_LABELS[item]
+        : C3_TONE_LABELS[item];
+
+    const publish = () => {
+        if (!canPublish) return;
+        const result = submitIndustryMediaResponse({ player, sourcePost, tone, format, speaker, absoluteWeek });
+        if (result.accepted) onUpdatePlayer(result.player);
+    };
+
+    if (!discussion) return null;
+    return (
+        <div className="border-b border-zinc-800 bg-zinc-950/35 p-4" data-c3-discussion={discussion.id}>
+            <div className="flex items-center justify-between gap-3">
+                <div>
+                    <div className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-400">Public discussion</div>
+                    <div className="mt-1 text-xs text-zinc-500">Real media voices responding to the same confirmed story</div>
+                </div>
+                <div className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${discussion.heat >= 65 ? 'bg-red-500/10 text-red-300' : 'bg-zinc-900 text-zinc-400'}`}>
+                    {discussion.heat >= 65 ? 'Heated' : 'Active'}
+                </div>
+            </div>
+
+            <div className="mt-4 border-l border-zinc-800 pl-3">
+                {discussion.turns.map(turn => {
+                    const personality = turn.mediaPersonalityId ? personalityById.get(turn.mediaPersonalityId) : undefined;
+                    const institution = turn.mediaInstitutionId ? institutionById.get(turn.mediaInstitutionId) : undefined;
+                    const isPlayerTurn = turn.kind === 'PLAYER';
+                    const name = isPlayerTurn ? player.name : personality?.name || institution?.name || 'Public reaction';
+                    const handle = isPlayerTurn ? player.x.handle : personality?.handle || institution?.handles.X || '@industry';
+                    const avatar = isPlayerTurn
+                        ? player.avatar
+                        : personality?.avatar || institution?.avatar || createIndustryMediaAvatar(name, institution?.primaryColor || '#3F3F46');
+                    return (
+                        <div key={turn.id} className="relative flex gap-3 pb-4 last:pb-1">
+                            <img src={avatar} alt="" className="h-8 w-8 shrink-0 rounded-full border border-zinc-800 bg-zinc-900 object-cover" />
+                            <div className="min-w-0 flex-1">
+                                <div className="flex min-w-0 items-baseline gap-1.5">
+                                    <span className="truncate text-xs font-black text-white">{name}</span>
+                                    <span className="truncate text-[10px] text-zinc-600">{handle}</span>
+                                </div>
+                                <div className="mt-1 text-sm leading-relaxed text-zinc-300">{turn.content}</div>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+
+            {response ? (
+                <div className={`mt-4 rounded-xl border px-3 py-3 ${response.status === 'PENDING' ? 'border-amber-500/20 bg-amber-500/5' : 'border-blue-500/20 bg-blue-500/5'}`}>
+                    <div className="text-xs font-black text-white">
+                        {response.status === 'PENDING' ? 'Response published' : `Public reaction: ${response.outcome?.toLowerCase()}`}
+                    </div>
+                    <div className="mt-1 text-[11px] leading-relaxed text-zinc-400">
+                        {response.status === 'PENDING' ? 'The reaction will settle when you process the next week.' : 'The result is saved and will not reroll.'}
+                    </div>
+                </div>
+            ) : opportunity.isEligible ? (
+                <div className="mt-4 border-t border-zinc-800 pt-4">
+                    <div className="rounded-xl bg-blue-500/[0.06] px-3 py-2.5 text-[11px] leading-relaxed text-blue-100">
+                        Respond in your own voice, or leave the discussion alone. Silence has no automatic penalty.
+                    </div>
+                    <div className="mt-3 border-l-2 border-blue-500 pl-3">
+                        <div className="text-[9px] font-black uppercase tracking-[0.18em] text-zinc-600">Draft preview</div>
+                        <div className="mt-1 text-xs leading-relaxed text-zinc-300">{draft}</div>
+                    </div>
+                    <div className="mt-4 text-[10px] font-black uppercase tracking-[0.18em] text-zinc-500">Your tone</div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                        {responseTones.map(item => (
+                            <button key={item} onClick={() => setTone(item)} className={`rounded-full border px-3 py-1.5 text-xs font-bold ${tone === item ? 'border-blue-400 bg-blue-500/15 text-blue-200' : 'border-zinc-800 text-zinc-400'}`}>
+                                {responseToneLabel(item)}
+                            </button>
+                        ))}
+                    </div>
+                    <div className="mt-4 text-[10px] font-black uppercase tracking-[0.18em] text-zinc-500">Publish as</div>
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                        {opportunity.allowedFormats.map(item => (
+                            <button key={item} onClick={() => setFormat(item)} className={`rounded-xl border px-3 py-2 text-left text-xs font-bold ${format === item ? 'border-blue-400 bg-blue-500/10 text-white' : 'border-zinc-800 text-zinc-400'}`}>
+                                {C3_FORMAT_LABELS[item]}
+                            </button>
+                        ))}
+                    </div>
+                    {opportunity.allowedSpeakers.length > 1 && (
+                        <div className="mt-3 flex gap-2">
+                            {opportunity.allowedSpeakers.map(item => (
+                                <button key={item} onClick={() => setSpeaker(item)} className={`text-[11px] font-bold ${speaker === item ? 'text-blue-300' : 'text-zinc-600'}`}>
+                                    {item === 'PERSONAL' ? 'Personal account' : 'Studio voice'}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                    <button onClick={publish} disabled={!canPublish} className="mt-4 w-full rounded-full bg-white px-4 py-3 text-sm font-black text-black disabled:opacity-40">
+                        Publish response
+                    </button>
+                    <div className="mt-2 text-center text-[10px] text-zinc-600">No comment publishes nothing · Silence has no penalty · Open through week {discussion.responseClosesAbsoluteWeek}</div>
+                </div>
+            ) : (
+                <div className="mt-4 text-xs text-zinc-500">
+                    {opportunity.reason === 'WINDOW_CLOSED' ? 'The official response window has closed. Silence caused no penalty.' : 'This discussion can be read, but it does not require a response.'}
+                </div>
+            )}
+        </div>
+    );
+};
+
 export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) => {
     const language = getPlayerLanguage(player);
     const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
@@ -93,9 +264,20 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
     const [composeOpen, setComposeOpen] = useState(false);
     const [composeType, setComposeType] = useState<XPostType>('GENERAL');
     const [tweetContent, setTweetContent] = useState('');
+    const [promotedProjectId, setPromotedProjectId] = useState('');
+    const eligiblePromotionProjects = useMemo(() => getEligiblePromotionProjects(player), [player.commitments]);
     const [selectedProfile, setSelectedProfile] = useState<NPCActor | null>(null); // Null means viewing own profile
     const [selectedPost, setSelectedPost] = useState<XPost | null>(null);
-    
+    const selectedClaimContext = getIndustryClaimPresentation(player, selectedPost?.mediaClaimId);
+    const selectedNarrativeSubjectKey = selectedPost?.mediaStoryId
+        ? player.world.industryMedia?.stories.find(story => story.id === selectedPost.mediaStoryId)?.subjectKey
+        : undefined;
+    const selectedSourceRecord = selectedProfile
+        ? [...(player.world.industryMedia?.sourceRecords || [])]
+            .filter(record => record.sourceId === selectedProfile.id)
+            .sort((left, right) => right.calls - left.calls || right.lastResolvedAbsoluteWeek - left.lastResolvedAbsoluteWeek)[0]
+        : undefined;
+
     // Initialize feed if empty or outdated
     const [feed, setFeed] = useState<XPost[]>(() => {
         if (player.x.feed.length === 0 || player.x.lastPostWeek !== player.currentWeek) {
@@ -110,7 +292,10 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
     const npcStates = (player.instagram?.npcStates || {}) as Record<string, NPCState>;
     const npcPool = useMemo(() => {
         const creators = getEnabledGlobalCreatorSocialProfiles(player);
-        return [...NPC_DATABASE, ...(Array.isArray(player.flags?.extraNPCs) ? player.flags.extraNPCs : []), ...creators]
+        const mediaProfiles = player.world.industryMedia
+            ? getIndustryMediaSocialProfiles(player.world.industryMedia)
+            : [];
+        return [...NPC_DATABASE, ...(Array.isArray(player.flags?.extraNPCs) ? player.flags.extraNPCs : []), ...creators, ...mediaProfiles]
             .filter((npc, index, arr) => arr.findIndex(entry => entry.id === npc.id) === index) as NPCActor[];
     }, [player]);
     const profilePosts = useMemo(() => {
@@ -159,7 +344,7 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
 
     const handlePost = () => {
         if (!tweetContent.trim()) return;
-        
+
         // FIX: Don't duplicate massive avatar strings if custom.
         const avatarToSave = player.avatar.startsWith('data:') ? '' : player.avatar;
 
@@ -167,19 +352,19 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
         const currentXFollowers = Math.max(0, player.x.followers);
         const fameFactor = Math.max(1, player.stats.fame);
         const typeConfig = getXPostTypeConfig(composeType);
-        
+
         // Base reach is followers + random fame boost (Twitter algorithm can be volatile)
         // Even with 0 followers, hashtags give reach
         const baseReach = (30 + (currentXFollowers * 0.15) + (fameFactor * 40)) * typeConfig.reach;
-        
+
         // Quality/Timing Roll (0.5x to 2.5x - Twitter is more volatile)
         const qualityMultiplier = 0.5 + (Math.random() * 2.0);
-        
+
         // Engagement Rate: X generally has lower engagement rate than IG (1% - 4%)
-        const engagementRate = 0.01 + (Math.random() * 0.04); 
-        
+        const engagementRate = 0.01 + (Math.random() * 0.04);
+
         let likes = Math.floor(baseReach * engagementRate * qualityMultiplier);
-        
+
         // Pity likes for new accounts so it's not 0
         if (likes <= 0) likes = Math.floor(Math.random() * 3) + 1;
 
@@ -201,7 +386,7 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
         if (currentXFollowers < 500) conversionRate += 0.05;
 
         let organicGain = Math.floor(likes * conversionRate);
-        
+
         // Minimum gain for active users
         if (organicGain === 0 && likes > 10) organicGain = 1;
 
@@ -226,7 +411,8 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
 	            replyList: getXReplyBank(composeType).sort(() => 0.5 - Math.random()).slice(0, 4),
 	            quoteList: getXQuoteBank('player').sort(() => 0.5 - Math.random()).slice(0, 2),
             controversyScore: Math.max(0, typeConfig.controversy + Math.floor(Math.random() * 4)),
-            sentiment: typeConfig.controversy >= 7 ? 'MESSY' : composeType === 'JOKE' ? 'FUNNY' : composeType === 'CAREER' ? 'INDUSTRY' : 'NEUTRAL'
+            sentiment: typeConfig.controversy >= 7 ? 'MESSY' : composeType === 'JOKE' ? 'FUNNY' : composeType === 'CAREER' ? 'INDUSTRY' : 'NEUTRAL',
+            ...(promotedProjectId ? { promotedProjectId } : {}),
         };
 
         const updatedPosts = [newPost, ...player.x.posts];
@@ -234,7 +420,7 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
         const reputationDelta = typeConfig.reputation;
         const controversyDelta = Math.max(-8, typeConfig.controversy);
         const logType = controversyDelta >= 7 ? 'negative' as const : 'positive' as const;
-        
+
         const nextPlayer = {
             ...player,
             stats: {
@@ -263,20 +449,38 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
 	            }, ...player.logs].slice(0, 50)
         };
         spendPlayerEnergy(nextPlayer, 5, `X: ${typeConfig.label}`);
-        onUpdatePlayer(nextPlayer);
-        
-        setFeed(updatedFeed);
+        const promotion = promotedProjectId ? applyProjectPromotionAttribution(nextPlayer, {
+            projectId: promotedProjectId,
+            publicationId: newPost.id,
+            channel: 'X',
+            promotionType: 'PROJECT_PROMO',
+            absoluteWeek: getAbsoluteWeek(player.age, player.currentWeek),
+            reach: likes + retweets * 2 + replies * 3,
+            engagement: likes + retweets + replies,
+        }) : undefined;
+        const attributedPlayer = promotion?.attribution ? {
+            ...promotion.player,
+            x: {
+                ...promotion.player.x,
+                posts: promotion.player.x.posts.map(post => post.id === newPost.id ? { ...post, promotionAttributionId: promotion.attribution!.id } : post),
+                feed: promotion.player.x.feed.map(post => post.id === newPost.id ? { ...post, promotionAttributionId: promotion.attribution!.id } : post),
+            },
+        } : (promotion?.player || nextPlayer);
+        onUpdatePlayer(attributedPlayer);
+
+        setFeed(attributedPlayer.x.feed);
         setTweetContent('');
+        setPromotedProjectId('');
         setComposeOpen(false);
     };
 
     const toggleLike = (postId: string) => {
         const updatedFeed = feed.map(p => {
             if (p.id === postId) {
-                return { 
-                    ...p, 
-                    isLiked: !p.isLiked, 
-                    likes: p.isLiked ? p.likes - 1 : p.likes + 1 
+                return {
+                    ...p,
+                    isLiked: !p.isLiked,
+                    likes: p.isLiked ? p.likes - 1 : p.likes + 1
                 };
             }
             return p;
@@ -288,10 +492,10 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
     const toggleRetweet = (postId: string) => {
         const updatedFeed = feed.map(p => {
             if (p.id === postId) {
-                return { 
-                    ...p, 
-                    isRetweeted: !p.isRetweeted, 
-                    retweets: p.isRetweeted ? p.retweets - 1 : p.retweets + 1 
+                return {
+                    ...p,
+                    isRetweeted: !p.isRetweeted,
+                    retweets: p.isRetweeted ? p.retweets - 1 : p.retweets + 1
                 };
             }
             return p;
@@ -435,17 +639,27 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
 
     const TweetCard: React.FC<{ post: XPost }> = ({ post }) => {
         // FIX: Use player avatar directly if it's the player's post
-        const avatarSrc = post.isPlayer ? player.avatar : post.authorAvatar;
+        const mediaProfile = npcPool.find(npc => npc.id === post.mediaPersonalityId || npc.id === post.authorId);
+        const avatarSrc = post.isPlayer
+            ? player.avatar
+            : (post.authorAvatar || mediaProfile?.avatar || createIndustryMediaAvatar(post.authorName, '#3F3F46'));
         const isIndustryPost = isIndustryInfoPost(post);
+        const canOpenAuthorProfile = !isIndustryPost || Boolean(post.mediaPersonalityId && mediaProfile);
+        const discussion = post.mediaDiscussionId
+            ? player.world.industryMedia?.discussions.find(item => item.id === post.mediaDiscussionId)
+            : undefined;
+        const voiceCount = discussion
+            ? new Set(discussion.turns.map(turn => turn.mediaPersonalityId).filter(Boolean)).size
+            : 0;
 
         return (
             <div onClick={() => openPostDetail(post)} className="p-4 flex gap-3 border-b border-zinc-800 hover:bg-white/5 transition-colors cursor-pointer">
-                <div className="shrink-0" onClick={(e) => { e.stopPropagation(); if (!isIndustryPost) handleProfileClick(post.authorId); }}>
+                <div className="shrink-0" onClick={(e) => { e.stopPropagation(); if (canOpenAuthorProfile) handleProfileClick(post.authorId); }}>
                     <img src={avatarSrc} className="w-10 h-10 rounded-full object-cover bg-zinc-800 border border-zinc-800" />
                 </div>
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1 mb-0.5">
-                        <span className={`font-bold text-white truncate max-w-[140px] ${isIndustryPost ? '' : 'hover:underline'}`} onClick={(e) => { e.stopPropagation(); if (!isIndustryPost) handleProfileClick(post.authorId); }}>{post.authorName}</span>
+                        <span className={`font-bold text-white truncate max-w-[140px] ${canOpenAuthorProfile ? 'hover:underline' : ''}`} onClick={(e) => { e.stopPropagation(); if (canOpenAuthorProfile) handleProfileClick(post.authorId); }}>{post.authorName}</span>
                         {post.isVerified && <div className="text-blue-400"><Check size={14} className="bg-white rounded-full text-blue-500 fill-blue-500" /></div>}
                         <span className="text-zinc-500 text-sm truncate">{post.authorHandle} · {post.timestamp === player.currentWeek ? '2h' : '1d'}</span>
                     </div>
@@ -453,6 +667,14 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                         <div className="mb-2 inline-flex rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.18em] text-blue-300">
                             {tr('x.industryInfo')}
                         </div>
+                    )}
+                    {discussion && (
+                        <div className="mb-2 ml-1 inline-flex rounded-full border border-zinc-700 bg-zinc-900 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.16em] text-zinc-300">
+                            Discussion · {voiceCount} voices
+                        </div>
+                    )}
+                    {post.mediaClaimId && getIndustryClaimPresentation(player, post.mediaClaimId) && (
+                        <div className="mb-2"><IndustryClaimBadge claim={getIndustryClaimPresentation(player, post.mediaClaimId)!.claim} compact /></div>
                     )}
                     <div className="text-sm text-zinc-200 leading-normal mb-3 whitespace-pre-wrap">
                         {post.content}
@@ -462,7 +684,7 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                             {tr('x.quotedPost')}
                         </div>
                     )}
-                    
+
                     {/* Action Bar */}
                     <div className="flex justify-between text-zinc-500 max-w-xs pr-2">
                         <button className="flex items-center gap-1 group hover:text-blue-400 transition-colors">
@@ -503,7 +725,12 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                     <div className="flex-1 overflow-y-auto custom-scrollbar pb-24">
                         <div className="p-4 border-b border-zinc-800">
                             <div className="flex gap-3">
-                                <img src={selectedPost.isPlayer ? player.avatar : selectedPost.authorAvatar} className="w-12 h-12 rounded-full object-cover bg-zinc-800" />
+                                <img
+                                    src={selectedPost.isPlayer
+                                        ? player.avatar
+                                        : selectedPost.authorAvatar || npcPool.find(npc => npc.id === selectedPost.mediaPersonalityId || npc.id === selectedPost.authorId)?.avatar || createIndustryMediaAvatar(selectedPost.authorName, '#3F3F46')}
+                                    className="w-12 h-12 rounded-full object-cover bg-zinc-800"
+                                />
                                 <div className="min-w-0 flex-1">
                                     <div className="flex items-center gap-1">
                                         <div className="font-black text-white truncate">{selectedPost.authorName}</div>
@@ -513,11 +740,22 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                                 </div>
                             </div>
                             <div className="mt-4 whitespace-pre-wrap text-[17px] leading-relaxed text-white">{selectedPost.content}</div>
+                            {selectedClaimContext && <div className="mt-3"><IndustryClaimBadge claim={selectedClaimContext.claim} /></div>}
                             <div className="mt-4 flex flex-wrap gap-2 text-[11px] font-black uppercase tracking-widest">
                                 <span className="rounded-full bg-zinc-900 px-3 py-1 text-zinc-400">{selectedPost.timestamp === player.currentWeek ? tr('x.thisWeek') : tr('x.weekLabel', { week: selectedPost.timestamp })}</span>
                                 {(selectedPost.controversyScore || 0) > 0 && <span className="rounded-full bg-red-500/10 px-3 py-1 text-red-300">{tr('x.heatValue', { value: selectedPost.controversyScore || 0 })}</span>}
                             </div>
                         </div>
+
+                        {selectedClaimContext && <IndustryClaimContextPanel {...selectedClaimContext} />}
+                        {selectedNarrativeSubjectKey && (
+                            <IndustryNarrativeContext
+                                player={player}
+                                subjectKey={selectedNarrativeSubjectKey}
+                                personalityId={selectedPost.mediaPersonalityId}
+                                compact
+                            />
+                        )}
 
                         <div className="grid grid-cols-3 border-b border-zinc-800 text-center">
                             <div className="p-3"><div className="font-black">{formatNumber(selectedPost.replies)}</div><div className="text-[10px] text-zinc-500 uppercase">{tr('x.replies')}</div></div>
@@ -525,7 +763,7 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                             <div className="p-3"><div className="font-black">{formatNumber(selectedPost.likes)}</div><div className="text-[10px] text-zinc-500 uppercase">{tr('x.likes')}</div></div>
                         </div>
 
-                        {!selectedPost.isPlayer && (
+                        {!selectedPost.isPlayer && !selectedPost.mediaDiscussionId && (
                             <div className="p-4 border-b border-zinc-800">
                                 <div className="text-xs font-black uppercase tracking-widest text-zinc-500 mb-3">{tr('x.respond')}</div>
                                 <div className="grid grid-cols-2 gap-2">
@@ -544,7 +782,17 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                             </div>
                         )}
 
-                        <div className="p-4 space-y-4">
+                        {selectedPost.mediaDiscussionId ? (
+                            <IndustryMediaDiscussionPanel
+                                player={player}
+                                sourcePost={selectedPost}
+                                absoluteWeek={getAbsoluteWeek(player.age, player.currentWeek)}
+                                onUpdatePlayer={nextPlayer => {
+                                    setFeed(nextPlayer.x.feed);
+                                    onUpdatePlayer(nextPlayer);
+                                }}
+                            />
+                        ) : <div className="p-4 space-y-4">
                             <div>
                                 <div className="mb-3 text-xs font-black uppercase tracking-widest text-zinc-500">{tr('x.replies')}</div>
 	                                {(selectedPost.replyList && selectedPost.replyList.length > 0 ? selectedPost.replyList : getXReplyBank(selectedPost.postType || 'GENERAL')).map((reply, index) => (
@@ -565,11 +813,11 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                                     </div>
                                 ))}
                             </div>
-                        </div>
+                        </div>}
                     </div>
                 </div>
             )}
-            
+
             {/* --- HEADER --- */}
             {tab === 'HOME' ? (
                 <div className="sticky top-0 z-20 bg-black/80 backdrop-blur-md border-b border-zinc-800">
@@ -616,7 +864,7 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
 
             {/* --- MAIN CONTENT AREA --- */}
             <div className="flex-1 overflow-y-auto custom-scrollbar">
-                
+
                 {/* 1. HOME FEED */}
                 {tab === 'HOME' && (
                     <div className="pb-20">
@@ -660,12 +908,12 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                                             <img src={npc.avatar} className="w-10 h-10 rounded-full object-cover" />
                                             <div className="flex-1 min-w-0">
                                                 <div className="font-bold text-white truncate flex items-center gap-1">
-                                                    {npc.name} 
+                                                    {npc.name}
                                                     {(npc.tier === 'A_LIST' || npc.tier === 'ESTABLISHED') && <Check size={12} className="bg-white rounded-full text-black p-0.5" strokeWidth={4}/>}
                                                 </div>
                                                 <div className="text-zinc-500 text-sm truncate">{npc.handle}</div>
                                             </div>
-                                            <button 
+                                            <button
                                                 onClick={(e) => { e.stopPropagation(); handleFollowToggle(npc); }}
                                                 className={`px-4 py-1.5 rounded-full text-sm font-bold border transition-colors ${isFollowing ? 'bg-transparent border-zinc-600 text-white' : 'bg-white text-black border-white'}`}
                                             >
@@ -696,7 +944,7 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                                 {selectedProfile ? (
                                     <div className="flex gap-2">
                                         <button className="w-9 h-9 rounded-full border border-zinc-600 flex items-center justify-center text-white"><Mail size={16}/></button>
-                                        <button 
+                                        <button
                                             onClick={() => handleFollowToggle(selectedProfile)}
                                             className={`px-5 py-1.5 rounded-full text-sm font-bold border ${npcStates[selectedProfile.id]?.isFollowing ? 'border-zinc-600 text-white' : 'bg-white text-black border-white'}`}
                                         >
@@ -718,7 +966,7 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                                 <div className="text-sm text-white mb-3">
                                     {selectedProfile ? selectedProfile.bio : `Actor based in Los Angeles. Living the dream. 🎬`}
                                 </div>
-                                
+
                                 <div className="flex flex-wrap gap-x-4 gap-y-2 text-zinc-500 text-sm mb-3">
                                     <div className="flex items-center gap-1"><MapPin size={14}/> Los Angeles, CA</div>
                                     <div className="flex items-center gap-1"><LinkIcon size={14}/> <span className="text-blue-400">imdb.com/name</span></div>
@@ -731,10 +979,16 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                                     <div>
                                         <span className="font-bold text-white">
                                             {formatNumber(selectedProfile ? selectedProfile.followers : (player.x.followers || 0))}
-                                        </span> 
+                                        </span>
                                         <span className="text-zinc-500">{tr('x.followers')}</span>
                                     </div>
                                 </div>
+                                {selectedSourceRecord && <div className="mt-4"><IndustrySourceTrackRecord record={selectedSourceRecord} /></div>}
+                                {selectedProfile && player.world.industryMedia?.personalities.some(item => item.id === selectedProfile.id) && (
+                                    <div className="mt-4 -mx-4">
+                                        <IndustryNarrativeContext player={player} subjectKey={`company:${player.id}`} personalityId={selectedProfile.id} compact />
+                                    </div>
+                                )}
                             </div>
                         </div>
 
@@ -782,7 +1036,7 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
             </div>
 
             {/* --- FLOATING ACTION BUTTON --- */}
-            <button 
+            <button
                 onClick={() => { setComposeType('GENERAL'); setComposeOpen(true); }}
                 className="absolute bottom-20 right-4 w-14 h-14 bg-blue-500 rounded-full flex items-center justify-center shadow-lg shadow-blue-900/20 active:scale-90 transition-transform z-30"
             >
@@ -865,6 +1119,21 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                                     autoFocus
                                 />
                             </div>
+
+                            {eligiblePromotionProjects.length > 0 && ['CAREER', 'FILM_OPINION'].includes(composeType) && (
+                                <div className="rounded-[1.5rem] border border-zinc-800 bg-zinc-950 p-3">
+                                    <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Link a project <span className="text-zinc-700">· optional</span></div>
+                                    <select
+                                        value={promotedProjectId}
+                                        onChange={event => setPromotedProjectId(event.target.value)}
+                                        className="mt-2 w-full rounded-2xl border border-zinc-800 bg-black p-3 text-sm font-bold text-white focus:border-blue-500 focus:outline-none"
+                                    >
+                                        <option value="">General post</option>
+                                        {eligiblePromotionProjects.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}
+                                    </select>
+                                    <div className="mt-2 text-[11px] text-zinc-600">Only the selected production receives promotional buzz.</div>
+                                </div>
+                            )}
 
                             <div className="space-y-3">
                                 <div className="px-1">

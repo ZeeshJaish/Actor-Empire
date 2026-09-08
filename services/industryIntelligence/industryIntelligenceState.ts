@@ -367,6 +367,62 @@ export const compactIndustryIntelligenceState = (
         Math.max(0, state.lastProcessedAbsoluteWeek + 1),
         ),
     );
+
+    // Newly generated content intentionally omits optional links until a later
+    // lifecycle step supplies them. Keep that exact object shape during the
+    // first persistence pass: adding own-properties whose value is `undefined`
+    // is semantically harmless, but it changes the save-integrity fingerprint.
+    const preserveAbsentOptionalKeys = (
+        target: Record<string, unknown>,
+        source: Record<string, unknown> | undefined,
+        keys: string[],
+    ) => {
+        if (!source) return;
+        keys.forEach(key => {
+            if (!Object.prototype.hasOwnProperty.call(source, key)) delete target[key];
+        });
+    };
+    const sourceContent = record(state.content);
+    const sourceFingerprints = new Map(
+        (Array.isArray(sourceContent.selectedFingerprints) ? sourceContent.selectedFingerprints : [])
+            .map(item => record(item))
+            .filter(item => typeof item.id === 'string')
+            .map(item => [item.id as string, item]),
+    );
+    compacted.content.selectedFingerprints.forEach(fingerprint => preserveAbsentOptionalKeys(
+        fingerprint as unknown as Record<string, unknown>,
+        sourceFingerprints.get(fingerprint.id),
+        [
+            'secondaryGenre',
+            'sourceRightId',
+            'relatedFingerprintId',
+            'universeBlueprintId',
+            'canonicalProjectId',
+            'canonicalUniverseId',
+        ],
+    ));
+    const sourceBlueprints = new Map(
+        (Array.isArray(sourceContent.universeBlueprints) ? sourceContent.universeBlueprints : [])
+            .map(item => record(item))
+            .filter(item => typeof item.id === 'string')
+            .map(item => [item.id as string, item]),
+    );
+    compacted.content.universeBlueprints.forEach(blueprint => preserveAbsentOptionalKeys(
+        blueprint as unknown as Record<string, unknown>,
+        sourceBlueprints.get(blueprint.id),
+        ['canonicalUniverseId'],
+    ));
+    const sourceProposals = new Map(
+        (Array.isArray(state.proposals) ? state.proposals : [])
+            .map(item => record(item))
+            .filter(item => typeof item.id === 'string')
+            .map(item => [item.id as string, item]),
+    );
+    compacted.proposals.forEach(proposal => preserveAbsentOptionalKeys(
+        proposal as unknown as Record<string, unknown>,
+        sourceProposals.get(proposal.id),
+        ['contentFingerprintId'],
+    ));
     return state.platformMigration
         ? { ...compacted, platformMigration: state.platformMigration }
         : compacted;

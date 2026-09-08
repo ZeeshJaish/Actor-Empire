@@ -43,6 +43,7 @@ const createFixture = (): Player => {
                 soundIdentKey: 'ASCENT',
                 brandPromiseId: 'EVENT_HOUSE',
                 foundedAtAbsoluteWeek: launchWeek - 10,
+                publicManifesto: 'Event stories built for a worldwide audience.',
             },
             capacity: {
                 baselineConcurrentStreams: 1_500_000,
@@ -50,6 +51,7 @@ const createFixture = (): Player => {
             },
             infrastructureSetup: {
                 capacityPackageId: 'GROWTH',
+                networkPlacements: [],
                 rolloutPace: 'STANDARD',
                 storageCapacityHours: 36_000,
                 reliabilityTarget: 99.75,

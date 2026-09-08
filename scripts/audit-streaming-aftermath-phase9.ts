@@ -33,6 +33,7 @@ const createFixture = (): Player => {
                 soundIdentKey: 'PULSE',
                 brandPromiseId: 'BALANCED',
                 foundedAtAbsoluteWeek: 2_100,
+                publicManifesto: 'One screen for every kind of story.',
             },
             launchCommit: {
                 id: 'launch-commit',

@@ -7,6 +7,8 @@ import { hydrateGenreXP } from './genreCatalog';
 import { getMusicArtistCatalog } from './musicIndustry';
 import { getPlayerLanguage, t } from './i18n';
 import { spendPlayerEnergy } from './premiumLogic';
+import { createDeterministicRng } from './deterministicRandom';
+import { createIndustryMediaAvatar } from './industryWorld/industryMediaIdentities';
 
 export const YOUTUBE_MONETIZATION_SUBS = 1000;
 export const YOUTUBE_MONETIZATION_VIEWS = 4000;
@@ -550,15 +552,15 @@ const getYoutubeVideoTypeLabel = (language: GameLanguage, type: YoutubeVideoType
 );
 
 const VIDEO_TEMPLATES = [
-    "My Morning Routine ☀️", 
-    "I ATE ONLY PURPLE FOOD FOR 24 HOURS", 
-    "Room Tour 2024", 
-    "Reacting to my old videos (CRINGE)", 
-    "Storytime: My Worst Audition", 
-    "Vlog: A Day in Los Angeles", 
-    "Makeup Tutorial - Red Carpet Look", 
-    "Q&A - Answering your assumptions", 
-    "Try not to laugh challenge", 
+    "My Morning Routine ☀️",
+    "I ATE ONLY PURPLE FOOD FOR 24 HOURS",
+    "Room Tour 2024",
+    "Reacting to my old videos (CRINGE)",
+    "Storytime: My Worst Audition",
+    "Vlog: A Day in Los Angeles",
+    "Makeup Tutorial - Red Carpet Look",
+    "Q&A - Answering your assumptions",
+    "Try not to laugh challenge",
     "Gaming Setup Tour",
     "How I got my agent",
     "What's in my bag?",
@@ -568,7 +570,7 @@ const VIDEO_TEMPLATES = [
 ];
 
 export const generateYoutubeFeed = (player: Player): YoutubeVideo[] => {
-    const feed: YoutubeVideo[] = [];
+    const feed: YoutubeVideo[] = [...(player.youtube?.videos || [])];
     const recentMusicVideos = (player.world?.musicIndustry?.recentReleases || [])
         .filter(release => ['VIDEO', 'SINGLE', 'EP', 'ALBUM'].includes(release.kind))
         .slice(0, 6)
@@ -598,14 +600,83 @@ export const generateYoutubeFeed = (player: Player): YoutubeVideo[] => {
         }));
 
     feed.push(...recentMusicVideos);
-    
-    // Generate 10 random videos from NPCs
+
+    const mediaWorld = player.world?.industryMedia;
+    if (mediaWorld) {
+        const personalityById = new Map(mediaWorld.personalities.map(item => [item.id, item]));
+        const institutionById = new Map(mediaWorld.institutions.map(item => [item.id, item]));
+        const channelByPersonalityId = new Map(mediaWorld.creatorChannels.map(item => [item.personalityId, item]));
+        const industryVideos = [...mediaWorld.youtubeVideos]
+            .sort((left, right) => right.publishedAbsoluteWeek - left.publishedAbsoluteWeek || left.id.localeCompare(right.id))
+            .slice(0, 16)
+            .map((video): YoutubeVideo | null => {
+                const personality = personalityById.get(video.personalityId);
+                const channel = channelByPersonalityId.get(video.personalityId);
+                if (!personality || !channel) return null;
+                const institution = video.institutionId ? institutionById.get(video.institutionId) : undefined;
+                const yearUploaded = Math.floor(video.publishedAbsoluteWeek / 52) + 1;
+                const weekUploaded = (video.publishedAbsoluteWeek % 52) + 1;
+                const type: YoutubeVideoType = video.format === 'THEORY' ? 'STORYTIME'
+                    : video.format === 'RESPONSE_ANALYSIS' ? 'Q_AND_A'
+                        : video.format === 'REVIEW_AFTERMATH' ? 'VLOG' : 'STORYTIME';
+                return {
+                    id: video.id,
+                    title: video.title,
+                    type,
+                    thumbnailColor: 'bg-zinc-900',
+                    views: video.views,
+                    likes: video.likes,
+                    earnings: 0,
+                    weekUploaded,
+                    yearUploaded,
+                    isPlayer: false,
+                    authorName: personality.name,
+                    qualityScore: video.outcome === 'BREAKOUT' ? 92 : video.outcome === 'HIT' ? 82
+                        : video.outcome === 'FLOP' ? 42 : 68,
+                    weeklyHistory: [],
+                    comments: [...video.comments],
+                    industryContext: {
+                        videoId: video.id,
+                        industryEventId: video.industryEventId,
+                        mediaStoryId: video.mediaStoryId,
+                        personalityId: personality.id,
+                        ...(institution ? { institutionId: institution.id } : {}),
+                        format: video.format,
+                        claimMode: video.claimMode,
+                        summary: video.summary,
+                        confirmedFacts: video.confirmedFacts,
+                        ...(video.interpretation ? { interpretation: video.interpretation } : {}),
+                        creatorSubscribers: channel.subscribers,
+                        creatorCredibility: channel.credibility,
+                        creatorAvatar: createIndustryMediaAvatar(
+                            personality.name,
+                            institution?.primaryColor || video.thumbnail.primaryColor,
+                        ),
+                        primaryColor: video.thumbnail.primaryColor,
+                        secondaryColor: video.thumbnail.secondaryColor,
+                        thumbnailLabel: video.thumbnail.label,
+                        thumbnailMotif: video.thumbnail.motif,
+                        outcome: video.outcome,
+                        ...(video.responseOutcome ? { responseOutcome: video.responseOutcome } : {}),
+                    },
+                };
+            })
+            .filter((video): video is YoutubeVideo => Boolean(video));
+        feed.push(...industryVideos);
+    }
+
+    const currentAbsoluteWeek = (Math.max(1, player.age) - 1) * 52
+        + (Math.max(1, Math.min(52, player.currentWeek)) - 1);
+    const rng = createDeterministicRng(`youtube-home-feed:${player.id}:${currentAbsoluteWeek}`);
+    const feedCreators = [...NPC_DATABASE, ...getEnabledGlobalCreatorProfiles(player)];
+    const colors = ['bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-yellow-500', 'bg-pink-500', 'bg-indigo-500'];
+
+    // Stable background culture keeps the feed populated without changing on reopen.
     for(let i=0; i<10; i++) {
-        const feedCreators = [...NPC_DATABASE, ...getEnabledGlobalCreatorProfiles(player)];
-        const npc = feedCreators[Math.floor(Math.random() * feedCreators.length)];
-        const views = Math.floor(Math.random() * 500000) + 1000;
-        const weeksAgo = Math.floor(Math.random() * 4);
-        
+        const npc = feedCreators[Math.floor(rng() * feedCreators.length)];
+        const views = Math.floor(rng() * 500000) + 1000;
+        const weeksAgo = Math.floor(rng() * 4);
+
         // Handle year wrap for fake feed
         let uploadWeek = player.currentWeek - weeksAgo;
         let uploadYear = player.age;
@@ -613,12 +684,12 @@ export const generateYoutubeFeed = (player: Player): YoutubeVideo[] => {
              uploadWeek += 52;
              uploadYear -= 1;
         }
-        
+
         feed.push({
-            id: `yt_feed_${i}_${Date.now()}`,
-            title: VIDEO_TEMPLATES[Math.floor(Math.random() * VIDEO_TEMPLATES.length)],
+            id: `yt_feed_${currentAbsoluteWeek}_${i}_${npc.id}`,
+            title: VIDEO_TEMPLATES[Math.floor(rng() * VIDEO_TEMPLATES.length)],
             type: 'VLOG',
-            thumbnailColor: ['bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-yellow-500', 'bg-pink-500', 'bg-indigo-500'][Math.floor(Math.random()*7)],
+            thumbnailColor: colors[Math.floor(rng() * colors.length)],
             views: views,
             likes: Math.floor(views * 0.05),
             earnings: 0,
@@ -631,9 +702,15 @@ export const generateYoutubeFeed = (player: Player): YoutubeVideo[] => {
             comments: []
         });
     }
-    
-    // Sort by views (Popularity)
-    return feed.sort((a,b) => b.views - a.views);
+
+    const seen = new Set<string>();
+    return feed
+        .filter(video => {
+            if (!video.id || seen.has(video.id)) return false;
+            seen.add(video.id);
+            return true;
+        })
+        .sort((a, b) => b.views - a.views || a.id.localeCompare(b.id));
 };
 
 export const getWeeksSinceYoutubeUpload = (
@@ -793,34 +870,34 @@ export const processYoutubeChannel = (player: Player): { channel: YoutubeChannel
         // Absolute week calculation to handle year wrap correctly
         const videoYear = video.yearUploaded || player.age; // Fallback for legacy data
         const age = getWeeksSinceYoutubeUpload(player.age, player.currentWeek, video.weekUploaded, videoYear);
-        
+
         // Base growth factor decays over time (Viral curve)
         // Week 0: 1.0, Week 1: 0.4, Week 4: 0.05
         let growthFactor = Math.max(0.01, 1 / ((age * 2) + 1));
-        
+
         // Quality bonus (hidden stat 0-100) -> 0.5 to 2.5 multiplier
-        const qualityBonus = 0.5 + ((video.qualityScore || 50) / 25); 
-        
+        const qualityBonus = 0.5 + ((video.qualityScore || 50) / 25);
+
         // Subscriber bonus (more subs = more initial push)
         // FIX: Ensure minimum push for 0 subs is roughly 500-1000 views for algorithm discovery
-        const subPush = Math.max(1000, channel.subscribers * 0.15); 
-        
+        const subPush = Math.max(1000, channel.subscribers * 0.15);
+
         // Calculate new views for this week
         // Random variance
         const variance = 0.8 + Math.random() * 0.4;
-        
+
         let newViews = Math.floor(subPush * growthFactor * qualityBonus * variance);
-        
+
         // CRITICAL: Prevent Infinity/NaN propagation
         if (!isFinite(newViews)) newViews = 0;
-        
+
         // Earnings (RPM approx $2.00)
         let earnings = 0;
         if (channel.isMonetized) {
             earnings = (newViews / 1000) * 2.0;
         }
         if (!isFinite(earnings)) earnings = 0;
-        
+
         // FIX: Force integer earnings to prevent decimal overflow in display
         earnings = Math.floor(earnings);
 
@@ -832,16 +909,16 @@ export const processYoutubeChannel = (player: Player): { channel: YoutubeChannel
         // Quality increases conversion
         let conversionRate = 150; // 1 sub per 150 views baseline
         if (video.qualityScore > 80) conversionRate = 80; // High quality converts better (1 per 80)
-        
+
         let subsGained = Math.floor(newViews / conversionRate);
-        
+
         // "Viral Hit" mechanic: Random chance to double subs if quality is high
         if (video.qualityScore > 75 && Math.random() < 0.1) {
             subsGained *= 2;
         }
 
         if (!isFinite(subsGained)) subsGained = 0;
-        
+
         newSubsTotal += subsGained;
 
         return {
@@ -856,11 +933,11 @@ export const processYoutubeChannel = (player: Player): { channel: YoutubeChannel
     channel.videos = updatedVideos;
     channel.subscribers += newSubsTotal;
     channel.lifetimeEarnings += weeklyRevenue;
-    
+
     // Safety checks for channel totals
     if (!isFinite(channel.subscribers)) channel.subscribers = 0;
     if (!isFinite(channel.lifetimeEarnings)) channel.lifetimeEarnings = 0;
-    
+
     // Recalculate total views
     const totalViews = channel.videos.reduce((sum, v) => sum + v.views, 0);
     channel.totalChannelViews = totalViews;

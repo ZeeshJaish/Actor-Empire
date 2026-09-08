@@ -126,7 +126,8 @@ player = {
 coverage = getStreamingOpeningCatalogueView(player);
 const india = coverage.countries.find(country => country.countryId === 'IN');
 assert(india?.missingRightsTitles.includes('Glass City'), 'A domestic external license must expose a rights gap in another selected country.');
-assert(!coverage.rightsReady, 'The catalogue desk must still report uncovered title-country rights for later content management.');
+assert(coverage.rightsReady, 'A US-only acquisition must not invalidate the existing eligible India catalogue.');
+assert(india!.rightsCoveredTitles < india!.totalTitles, 'Excluded countries must not gain playback rights or title counts.');
 assert(doesStreamingLicenseCoverCountry({ ...domesticLicense, territory: 'GLOBAL', countryIds: [] }, 'IN', ['US', 'IN']), 'A global license should cover future and existing countries.');
 
 console.log('Streaming opening catalogue, rights and localization Phase 6 audit passed.');

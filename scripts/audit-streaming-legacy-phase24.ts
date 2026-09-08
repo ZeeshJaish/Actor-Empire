@@ -75,6 +75,7 @@ const createFixture = (): Player => {
                 soundIdentKey: 'ASCENT',
                 brandPromiseId: 'BALANCED',
                 foundedAtAbsoluteWeek: absoluteWeek - 120,
+                publicManifesto: 'One screen for every kind of story.',
             },
             leadership: {
                 ...platform.leadership,

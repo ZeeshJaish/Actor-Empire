@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Player, Agent, Manager, SponsorshipActionType, TeamMember } from '../../types';
 import { getPlayerLanguage, t } from '../../services/i18n';
 import { ArrowLeft, Send, Camera, Clock, DollarSign, XCircle, AlertTriangle, Dumbbell, Sparkles, Megaphone, HeartPulse, CheckCircle, Stethoscope, ChevronRight } from 'lucide-react';
+import { getPublicistWeekSummary } from '../../services/industryWorld';
 
 interface TeamAppProps {
   player: Player;
@@ -26,7 +27,7 @@ export const TeamApp: React.FC<TeamAppProps> = ({ player, onBack, onHireAgent, o
   const [selectedManager, setSelectedManager] = useState<Manager | null>(null);
   const language = getPlayerLanguage(player);
   const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
-  
+
   // Generic Selection for Lifestyle Team
   const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
 
@@ -99,6 +100,7 @@ export const TeamApp: React.FC<TeamAppProps> = ({ player, onBack, onHireAgent, o
       || message.type === 'OFFER_MUSIC_VIDEO_FEATURE'
   )).length;
   const activeContractCount = player.activeSponsorships?.length || 0;
+  const publicistWeekSummary = getPublicistWeekSummary(player, player.age * 52 + player.currentWeek);
 
   const guardTeamChange = () => {
       if (player.flags.teamChangeLocked) {
@@ -142,7 +144,7 @@ export const TeamApp: React.FC<TeamAppProps> = ({ player, onBack, onHireAgent, o
   const handleHireMember = (member: TeamMember) => {
       if (!onUpdatePlayer) return;
       if (!guardTeamChange()) return;
-      
+
       // NEW CHECK: Can afford first week?
       if (player.money < member.weeklyCost) {
           safeShowToast(tr('team.needFirstWeek', { amount: member.weeklyCost.toLocaleString() }), "bg-rose-500");
@@ -172,17 +174,17 @@ export const TeamApp: React.FC<TeamAppProps> = ({ player, onBack, onHireAgent, o
       }
 
       const updatedFlags = { ...player.flags, teamChangeLocked: true };
-      
+
       // DEDUCT MONEY (First week payment upfront)
       const newMoney = player.money - member.weeklyCost;
-      
+
       const newLogs = [...player.logs, {
-          week: player.currentWeek, 
-          year: player.age, 
-          message: `Hired ${member.name}. Paid initial week: $${member.weeklyCost.toLocaleString()}`, 
+          week: player.currentWeek,
+          year: player.age,
+          message: `Hired ${member.name}. Paid initial week: $${member.weeklyCost.toLocaleString()}`,
           type: 'neutral' as const
       }];
-      
+
       onUpdatePlayer({ ...player, team: updatedTeam, flags: updatedFlags, money: newMoney, logs: newLogs });
       setSelectedMember(null);
       safeShowToast(tr('team.memberHired', { name: member.name }), "bg-emerald-500");
@@ -200,14 +202,14 @@ export const TeamApp: React.FC<TeamAppProps> = ({ player, onBack, onHireAgent, o
       else if (type === 'WELLNESS') updatedTeam.wellness = null;
 
       const updatedFlags = { ...player.flags, teamChangeLocked: true };
-      
+
       onUpdatePlayer({ ...player, team: updatedTeam, flags: updatedFlags });
       safeShowToast(tr('team.memberFired'), "bg-zinc-700");
   };
 
   const renderLifestyleTab = (
-      roleType: 'TRAINER' | 'STYLIST' | 'THERAPIST' | 'PUBLICIST' | 'WELLNESS', 
-      current: TeamMember | null, 
+      roleType: 'TRAINER' | 'STYLIST' | 'THERAPIST' | 'PUBLICIST' | 'WELLNESS',
+      current: TeamMember | null,
       pool: TeamMember[]
   ) => (
       <div>
@@ -230,7 +232,21 @@ export const TeamApp: React.FC<TeamAppProps> = ({ player, onBack, onHireAgent, o
                   </div>
               </div>
           )}
-          
+          {roleType === 'PUBLICIST' && current && (
+              <div className="mb-6 border-l-4 border-violet-500 bg-slate-950 p-4 text-white shadow-sm">
+                  <div className="flex items-center justify-between gap-3">
+                      <div className="text-[10px] font-black uppercase tracking-[0.2em] text-violet-300">This week's media desk</div>
+                      <div className="font-mono text-xs text-slate-400">{publicistWeekSummary.interventionsUsed}/{publicistWeekSummary.capacity}</div>
+                  </div>
+                  <p className="mt-2 text-xs leading-5 text-slate-300">{publicistWeekSummary.summary}</p>
+                  {publicistWeekSummary.interventions.slice(-2).map(intervention => (
+                      <div key={intervention.id} className="mt-3 border-t border-slate-800 pt-3 text-[11px] leading-4 text-slate-400">
+                          {intervention.summary}
+                      </div>
+                  ))}
+              </div>
+          )}
+
           <div className="flex items-end justify-between mb-3 px-2">
               <div>
                   <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">{tr('team.availablePros')}</h3>
@@ -283,9 +299,9 @@ export const TeamApp: React.FC<TeamAppProps> = ({ player, onBack, onHireAgent, o
                     { id: 'PUBLICIST', label: tr('team.publicist') },
                     { id: 'WELLNESS', label: tr('team.wellness') },
                 ].map(item => (
-                    <button 
+                    <button
                         key={item.id}
-                        onClick={() => setTab(item.id as Tab)} 
+                        onClick={() => setTab(item.id as Tab)}
                         className={`flex-none px-6 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap ${tab === item.id ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-400'}`}
                     >
                         {item.label}
@@ -295,7 +311,7 @@ export const TeamApp: React.FC<TeamAppProps> = ({ player, onBack, onHireAgent, o
         )}
 
         <div className="flex-1 overflow-y-auto p-4 custom-scrollbar pb-20">
-            
+
             {/* OVERVIEW TAB */}
             {tab === 'OVERVIEW' && !selectedAgent && !selectedManager && !selectedMember && (
                 <div className="space-y-6">
@@ -414,14 +430,14 @@ export const TeamApp: React.FC<TeamAppProps> = ({ player, onBack, onHireAgent, o
                                     const total = req.totalRequired || 1;
                                     const isDone = progress >= total;
                                     const pct = Math.min(100, (progress / total) * 100);
-                                    
+
                                     return (
                                         <div key={spon.id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 relative overflow-hidden">
                                             {/* Progress Bar Background */}
                                             <div className="absolute top-0 left-0 h-1 bg-slate-100 w-full">
                                                 <div className={`h-full ${isDone ? 'bg-emerald-500' : 'bg-blue-500'}`} style={{width: `${pct}%`}}></div>
                                             </div>
-                                            
+
                                             <div className="flex justify-between items-start mb-2 mt-2">
                                                 <div>
                                                     <div className="font-bold text-slate-900">{spon.brandName}</div>
@@ -437,13 +453,13 @@ export const TeamApp: React.FC<TeamAppProps> = ({ player, onBack, onHireAgent, o
                                                 <span>Task: {req.type === 'POST' ? 'Social Post' : 'Photoshoot'}</span>
                                                 <span className={isDone ? 'text-emerald-600 font-bold' : 'text-slate-600 font-bold'}>{progress}/{total} Completed</span>
                                             </div>
-                                            
-                                            <button 
-                                                onClick={() => onPerformSponsorship(spon.id, spon.requirements.type)} 
-                                                disabled={isDone || player.energy.current < spon.requirements.energyCost} 
+
+                                            <button
+                                                onClick={() => onPerformSponsorship(spon.id, spon.requirements.type)}
+                                                disabled={isDone || player.energy.current < spon.requirements.energyCost}
                                                 className={`w-full py-3 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-colors ${
                                                     isDone ? 'bg-emerald-100 text-emerald-700 cursor-default' :
-                                                    player.energy.current < spon.requirements.energyCost ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 
+                                                    player.energy.current < spon.requirements.energyCost ? 'bg-slate-200 text-slate-400 cursor-not-allowed' :
                                                     'bg-blue-600 hover:bg-blue-700 text-white shadow-md'
                                                 }`}
                                             >
@@ -485,7 +501,7 @@ export const TeamApp: React.FC<TeamAppProps> = ({ player, onBack, onHireAgent, o
             {/* HIRE MODALS */}
             {selectedAgent && <div className="space-y-4 animate-in slide-in-from-bottom"><div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 text-center"><h2 className="text-xl font-bold text-slate-900">{selectedAgent.name}</h2><p className="text-sm text-slate-500 mt-2">{getTeamDescription(selectedAgent)}</p><button onClick={handleHireAgentFromModal} className="w-full py-4 rounded-xl font-bold text-white shadow-lg bg-blue-600 hover:bg-blue-700 mt-4">Hire Agent</button></div></div>}
             {selectedManager && <div className="space-y-4 animate-in slide-in-from-bottom"><div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 text-center"><h2 className="text-xl font-bold text-slate-900">{selectedManager.name}</h2><p className="text-sm text-slate-500 mt-2">{getTeamDescription(selectedManager)}</p><button onClick={handleHireManagerFromModal} className="w-full py-4 rounded-xl font-bold text-white shadow-lg bg-purple-600 hover:bg-purple-700 mt-4">Hire Manager</button></div></div>}
-            
+
             {/* Generic Lifestyle Hire Modal */}
             {selectedMember && (
                 <div className="space-y-4 animate-in slide-in-from-bottom">
@@ -493,7 +509,7 @@ export const TeamApp: React.FC<TeamAppProps> = ({ player, onBack, onHireAgent, o
                         <div className="text-[10px] uppercase font-bold text-slate-400 mb-2">{selectedMember.type}</div>
                         <h2 className="text-2xl font-bold text-slate-900 mb-2">{selectedMember.name}</h2>
                         <p className="text-sm text-slate-600 mb-6">{getTeamDescription(selectedMember)}</p>
-                        
+
                         <div className="bg-slate-50 p-4 rounded-xl mb-6 text-left space-y-2 text-xs">
                             <div className="flex justify-between">
                                 <span className="text-slate-500">Weekly Cost</span>
@@ -505,8 +521,8 @@ export const TeamApp: React.FC<TeamAppProps> = ({ player, onBack, onHireAgent, o
                             </div>
                         </div>
 
-                        <button 
-                            onClick={() => handleHireMember(selectedMember)} 
+                        <button
+                            onClick={() => handleHireMember(selectedMember)}
                             disabled={player.flags.teamChangeLocked || player.money < selectedMember.weeklyCost}
                             className={`w-full py-4 rounded-xl font-bold text-white shadow-lg transition-colors ${
                                 player.flags.teamChangeLocked || player.money < selectedMember.weeklyCost

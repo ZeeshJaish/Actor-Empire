@@ -99,6 +99,9 @@ const canonicalDifferencePaths = (
     output: string[] = [],
 ): string[] => {
     if (output.length >= 12 || Object.is(left, right)) return output;
+    // JSON persistence intentionally canonicalizes signed zero. Treat -0 and
+    // 0 as the same numeric value when auditing runtime reload parity.
+    if (typeof left === 'number' && typeof right === 'number' && left === right) return output;
     if (!left || !right || typeof left !== 'object' || typeof right !== 'object') {
         output.push(path);
         return output;

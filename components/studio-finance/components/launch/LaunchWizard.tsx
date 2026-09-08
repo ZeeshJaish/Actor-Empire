@@ -15,7 +15,7 @@
 
 import React, { useMemo, useState } from 'react';
 import type { LaunchData, LaunchDraft, LaunchHandlers, LaunchStepId } from '../../finance/launch';
-import { STEPS, blockersFor, launchStageSummaries, plannedTotal, selectedCountries, shortfall, spendable } from '../../finance/launch';
+import { STEPS, blockersFor, launchStageSummaries, plannedTotal, resolveLaunchDraftAfterDetour, selectedCountries, shortfall, spendable } from '../../finance/launch';
 import { brandVars } from '../../finance/brand';
 import { money } from '../../finance/format';
 import { Row, Sheet, useCountUp } from '../ui';
@@ -33,19 +33,21 @@ import '../../styles/launch.css';
 export interface LaunchWizardProps extends LaunchHandlers {
   data: LaunchData;
   initialStep?: LaunchStepId;
+  initialDraft?: LaunchDraft | null;
+  onDraftChange?: (draft: LaunchDraft) => void;
 }
 
-export function LaunchWizard({ data, initialStep = 'markets', ...handlers }: LaunchWizardProps) {
+export function LaunchWizard({ data, initialStep = 'markets', initialDraft, onDraftChange, ...handlers }: LaunchWizardProps) {
   const [stepId, setStepId] = useState<LaunchStepId>(initialStep);
   const [openSheet, setOpenSheet] = useState<'money' | 'plan' | null>(null);
-  const [draft, setDraft] = useState<LaunchDraft>(() => ({
-    selectedCountryIds: [...data.selectedCountryIds],
-    soundId: data.ident.soundId,
-    packageId: data.ident.packageId,
-    customAudio: data.ident.customAudio,
-    storefrontId: data.offer.storefrontId,
-    pricing: data.pricing,
-  }));
+  const [draft, setDraft] = useState<LaunchDraft>(() => resolveLaunchDraftAfterDetour({
+      selectedCountryIds: data.selectedCountryIds,
+      soundId: data.ident.soundId,
+      packageId: data.ident.packageId,
+      customAudio: data.ident.customAudio,
+      storefrontId: data.offer.storefrontId,
+      pricing: data.pricing,
+    }, initialDraft));
 
   const brand = useMemo(() => brandVars(data.company.brandHex), [data.company.brandHex]);
   const index = Math.max(0, STEPS.findIndex((s) => s.id === stepId));
@@ -72,7 +74,11 @@ export function LaunchWizard({ data, initialStep = 'markets', ...handlers }: Lau
   const over = (Math.max(0, planned - free) / scale) * 100;
   const budgetMark = (free / scale) * 100;
 
-  const patch = (next: Partial<LaunchDraft>) => setDraft((prev) => ({ ...prev, ...next }));
+  const patch = (next: Partial<LaunchDraft>) => setDraft((prev) => {
+    const updated = { ...prev, ...next };
+    onDraftChange?.(resolveLaunchDraftAfterDetour(updated, null));
+    return updated;
+  });
   const selectStep = (next: LaunchStepId) => {
     setOpenSheet(null);
     setStepId(next);

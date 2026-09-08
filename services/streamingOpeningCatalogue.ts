@@ -15,6 +15,7 @@ import {
 } from './ownedStreamingPlatform';
 import { getStreamingCatalogLicenseStatus, resolveStreamingCatalogTitle } from './streamingCatalog';
 import { normalizeStreamingLanguageId, resolveStreamingLocalizationTiers } from './streamingLocalizationCapabilities';
+import { getStreamingContentAvailability, type ContentAvailability } from './streamingContentAvailability';
 
 export type StreamingLocalizationDelivery = 'OUTSOURCE' | 'IN_HOUSE';
 export type StreamingCatalogueMetadataStatus = 'READY' | 'IN_REVIEW' | 'PLANNED';
@@ -26,6 +27,10 @@ export interface StreamingOpeningTitleCoverage {
     genre: string;
     source: 'OWNED' | 'LICENSED' | 'ORIGINAL';
     rightsCovered: boolean;
+    available: boolean;
+    availability: ContentAvailability;
+    hours: number;
+    hoursEstimated: boolean;
     subtitleLanguagesReady: string[];
     dubLanguagesReady: string[];
 }
@@ -101,6 +106,7 @@ const activeLicenseFor = (player: Player, projectId: string): OwnedStreamingCata
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
     return platform.catalogLicenses.find(license => (
         license.sourceProjectId === projectId
+        && license.startsAtAbsoluteWeek <= absoluteWeek
         && getStreamingCatalogLicenseStatus(license, absoluteWeek) === 'ACTIVE'
     )) || null;
 };
@@ -166,6 +172,7 @@ export const getStreamingOpeningCatalogueView = (player: Player): StreamingOpeni
         ...(platform.starterCatalog?.ownedProjectIds || []),
         ...(platform.starterCatalog?.licensedProjectIds || []),
         ...platform.catalogProjectIds,
+        ...originalIds,
     ]));
     const baseTitles = titleIds.map(projectId => {
         const title = resolveStreamingCatalogTitle(player, projectId);
@@ -182,6 +189,7 @@ export const getStreamingOpeningCatalogueView = (player: Player): StreamingOpeni
             genre: title?.genre || license?.genre || 'Unknown',
             source,
             license,
+            access: getStreamingContentAvailability(player, projectId, openingCountryIds),
         };
     });
     const allLanguages = Array.from(new Set(operations.flatMap(operation => (
@@ -193,7 +201,11 @@ export const getStreamingOpeningCatalogueView = (player: Player): StreamingOpeni
         projectType: title.projectType,
         genre: title.genre,
         source: title.source,
-        rightsCovered: title.source !== 'LICENSED' || Boolean(title.license),
+        rightsCovered: title.access.available,
+        available: title.access.available,
+        availability: title.access.status,
+        hours: title.access.hours,
+        hoursEstimated: title.access.estimated,
         subtitleLanguagesReady: allLanguages.filter(language => (
             isOriginalLanguage(language) || Boolean(getAsset(platform.localizationOperations.titleLanguageAssets, title.projectId, language)?.subtitleReady)
         )),
@@ -204,16 +216,14 @@ export const getStreamingOpeningCatalogueView = (player: Player): StreamingOpeni
 
     const countries = operations.map((operation): StreamingOpeningCountryCoverage => {
         const profile = operation.countryProfile!;
-        const missingRightsTitles = baseTitles.filter(title => (
-            title.source === 'LICENSED'
-            && (!title.license || !doesStreamingLicenseCoverCountry(title.license, operation.countryId!, openingCountryIds))
-        )).map(title => title.title);
-        const totalChecks = Math.max(1, baseTitles.length * Math.max(1, profile.languageDistribution.length));
+        const availableTitles = baseTitles.filter(title => title.access.available && title.access.coveredCountryIds.includes(operation.countryId!));
+        const missingRightsTitles = baseTitles.filter(title => !availableTitles.includes(title)).map(title => title.title);
+        const totalChecks = Math.max(1, availableTitles.length * Math.max(1, profile.languageDistribution.length));
         let subtitles = 0;
         let dubs = 0;
         let qualityChecks = 0;
         let reachWeighted = 0;
-        baseTitles.forEach(title => profile.languageDistribution.forEach(language => {
+        availableTitles.forEach(title => profile.languageDistribution.forEach(language => {
             const asset = getAsset(platform.localizationOperations.titleLanguageAssets, title.projectId, language.language);
             if (isOriginalLanguage(language.language) || asset?.subtitleReady) subtitles += 1;
             if (isOriginalLanguage(language.language) || asset?.dubReady) dubs += 1;
@@ -235,17 +245,17 @@ export const getStreamingOpeningCatalogueView = (player: Player): StreamingOpeni
             missingRightsTitles,
             subtitleCoveragePercent: Math.round((subtitles / totalChecks) * 100),
             dubCoveragePercent: Math.round((dubs / totalChecks) * 100),
-            projectedAudienceReachPercent: titleCount
-                ? Math.max(0, Math.min(100, Math.round(reachWeighted / titleCount)))
+            projectedAudienceReachPercent: availableTitles.length
+                ? Math.max(0, Math.min(100, Math.round(reachWeighted / availableTitles.length)))
                 : 0,
-            launchGateReady: titleCount > 0 && missingRightsTitles.length === 0,
-            qualityReady: titleCount > 0 && qualityChecks === totalChecks,
+            launchGateReady: availableTitles.length > 0,
+            qualityReady: availableTitles.length > 0 && qualityChecks === totalChecks,
         };
     });
     const launchBlockers: string[] = [];
-    if (!platform.starterCatalog || !titles.length) launchBlockers.push('Assemble at least one real opening title.');
+    if (!platform.starterCatalog || !titles.some(title => title.available)) launchBlockers.push('Add at least one available opening title.');
     countries.filter(country => !country.launchGateReady).forEach(country => {
-        launchBlockers.push(`${country.country}: ${country.missingRightsTitles.length || titles.length} title rights gap${(country.missingRightsTitles.length || titles.length) === 1 ? '' : 's'}.`);
+        launchBlockers.push(`${country.country}: no available titles with current rights.`);
     });
     if (!countries.length) launchBlockers.push('Choose at least one Opening Market.');
     const qualityWarnings = countries.filter(country => !country.qualityReady).map(country => (

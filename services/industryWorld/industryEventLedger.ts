@@ -23,6 +23,7 @@ const EVENT_TYPES = new Set<IndustryEventType>([
 const IMPORTANCE = new Set<IndustryEventImportance>(['LOW', 'MEDIUM', 'HIGH']);
 const EVIDENCE_KINDS = new Set<IndustryEventEvidence['kind']>([
     'COMPANY', 'PROJECT', 'PRODUCTION', 'PLATFORM', 'RIGHTS_CONTRACT', 'TRANSACTION', 'AWARD',
+    'TALENT', 'UNIVERSE', 'COUNTRY',
 ]);
 
 const cleanText = (value: unknown): string => typeof value === 'string' ? value.trim() : '';

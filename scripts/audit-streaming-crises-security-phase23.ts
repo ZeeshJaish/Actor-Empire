@@ -85,6 +85,7 @@ const createFixture = (): Player => {
                 soundIdentKey: 'PULSE',
                 brandPromiseId: 'TECHNOLOGY_FIRST',
                 foundedAtAbsoluteWeek: absoluteWeek - 80,
+                publicManifesto: 'Technology that keeps every story within reach.',
             },
             launchCommit: {
                 id: 'phase23-launch',
@@ -128,6 +129,10 @@ const createFixture = (): Player => {
                     ceoName: 'Rhea Kane',
                     ceoPersonality: 'Patient consolidator',
                     strategy: 'SCALE_DOMINANCE',
+                    baseMonthlyPrice: 15.99,
+                    perceivedValue: 82,
+                    activeRegionIds: ['NORTH_AMERICA'],
+                    copiedTechnologyBranches: [],
                     cashReserveMillions: 80_000,
                     subscribersMillions: 220,
                     technology: 75,

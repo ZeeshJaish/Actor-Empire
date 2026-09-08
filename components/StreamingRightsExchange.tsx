@@ -177,11 +177,13 @@ export default function StreamingRightsExchange({
       return;
     }
     onUpdatePlayer(submitted.player);
-    setFeedback(submitted.negotiation?.status === 'READY_TO_SIGN'
-      ? 'The term sheet cleared. Legal is ready for signature.'
-      : submitted.negotiation?.status === 'LOST'
-        ? 'A rival closed the window before our bid could recover.'
-        : 'The counterparty returned a live counteroffer.');
+    setFeedback(submitted.negotiation?.responseStatus === 'AWAITING_RESPONSE'
+      ? `Private offer sent. The rights holder will reply after ${Math.max(2, (submitted.negotiation.responseDueAbsoluteWeek || absoluteWeek + 2) - absoluteWeek)} processed weeks.`
+      : submitted.negotiation?.status === 'READY_TO_SIGN'
+        ? 'The term sheet cleared. Legal is ready for signature.'
+        : submitted.negotiation?.status === 'LOST'
+          ? 'A rival closed the window before our bid could recover.'
+          : 'The counterparty returned a live counteroffer.');
   };
 
   const acceptCounter = () => {

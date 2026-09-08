@@ -18,8 +18,8 @@ legacy.id = 'c1_legacy_player';
 legacy.flags.saveMigrationVersion = 33;
 delete legacy.world.industryMedia;
 const migrated = migratePlayerSave(legacy);
-assert.equal(migrated.flags.saveMigrationVersion, 34);
-assert.equal(migrated.world.industryMedia?.schemaVersion, 1);
+assert.equal(migrated.flags.saveMigrationVersion, 40);
+assert.equal(migrated.world.industryMedia?.schemaVersion, 7);
 assert.deepEqual(migrated.world.industryMedia?.stories, []);
 
 const publishedEvent = createIndustryEventFact({
@@ -107,7 +107,7 @@ oversized.world.industryMedia = {
     ),
 };
 const compacted = compactPlayerForPersistence(oversized);
-assert.equal(compacted.world.industryMedia?.schemaVersion, 1);
+assert.equal(compacted.world.industryMedia?.schemaVersion, 7);
 assert.equal(compacted.world.industryMedia?.stories.length, INDUSTRY_MEDIA_STORY_LIMIT);
 assert.equal(compacted.world.industryMedia?.publishedBeatKeys.length, INDUSTRY_MEDIA_PUBLISHED_KEY_LIMIT);
 assert.equal(new Set(compacted.world.industryMedia?.stories.map(story => story.id)).size,

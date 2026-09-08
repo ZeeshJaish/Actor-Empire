@@ -34,10 +34,10 @@ export interface RightsWindow {
 export interface CatalogueTitle {
   id: string;
   title: string;
-  kind: 'ORIGINAL' | 'LICENSED';
+  kind: 'ORIGINAL' | 'LICENSED' | 'OWNED';
   format: string;                 // "Film" | "Series"
   genre: string;
-  status: 'LIVE' | 'STAGED' | 'IN PRODUCTION';
+  status: 'LIVE' | 'STAGED' | 'IN PRODUCTION' | 'READY TO SCHEDULE' | 'SCHEDULED' | 'AWAITING AVAILABILITY' | 'RIGHTS EXPIRED' | 'RIGHTS UNAVAILABLE';
   rating?: number;
   views?: number;
   completion?: number;
@@ -143,16 +143,19 @@ export const ContentDesk: React.FC<{
   initialTab?: Tab;
   onOpenTitle?: (t: CatalogueTitle) => void;
   entryRoutes?: ContentEntryRoute[];
+  onAddContent?: () => void;
+  onReviewCatalogue?: () => void;
+  onOpenSlate?: () => void;
   onRenew?: (t: CatalogueTitle) => void;
   onLapse?: (t: CatalogueTitle) => void;
   localization?: { providers: number; facilities: number; planned: number; inProgress: number; ready: number; assets: number };
   onOpenLocalization?: () => void;
-}> = ({ brand, state, onBack, initialTab, onOpenTitle, entryRoutes = [], onRenew, onLapse, localization, onOpenLocalization }) => {
+}> = ({ brand, state, onBack, initialTab, onOpenTitle, entryRoutes = [], onAddContent, onReviewCatalogue, onOpenSlate, onRenew, onLapse, localization, onOpenLocalization }) => {
   const c = brandColor(brand), c2 = brandDeep(brand);
   const tf = typeFace(brand);
   /* a console chip can open this page straight on the tab it names */
   const [tab, setTab] = useState<Tab>(initialTab ?? 'LIBRARY');
-  const [filter, setFilter] = useState<'ALL' | 'ORIGINAL' | 'LICENSED' | 'EXPIRING'>('ALL');
+  const [filter, setFilter] = useState<'ALL' | 'ORIGINAL' | 'LICENSED' | 'OWNED' | 'EXPIRING'>('ALL');
   const [showEntryRoutes, setShowEntryRoutes] = useState(false);
 
   const licensed = useMemo(() => state.titles.filter(t => t.rights), [state.titles]);
@@ -245,12 +248,12 @@ export const ContentDesk: React.FC<{
           <section className={s.cdsec}>
             <div className={s.cdhead}>
               <h2>Library</h2>
-              <button className={s.cdadd} onClick={() => setShowEntryRoutes(true)}>+ ADD CONTENT</button>
+              <button className={s.cdadd} onClick={() => onAddContent ? onAddContent() : setShowEntryRoutes(true)}>+ ADD CONTENT</button>
             </div>
             <div className={s.chips}>
-              {(['ALL', 'ORIGINAL', 'LICENSED', 'EXPIRING'] as const).map(f => (
+              {(['ALL', 'ORIGINAL', 'LICENSED', 'OWNED', 'EXPIRING'] as const).map(f => (
                 <button key={f} className={filter === f ? s.on : ''} onClick={() => setFilter(f)}>
-                  {f === 'ALL' ? 'All' : f === 'ORIGINAL' ? 'Originals' : f === 'LICENSED' ? 'Licensed' : 'Expiring'}
+                  {f === 'ALL' ? 'All' : f === 'ORIGINAL' ? 'Originals' : f === 'LICENSED' ? 'Licensed' : f === 'OWNED' ? 'My studio' : 'Expiring'}
                 </button>
               ))}
             </div>
@@ -260,7 +263,7 @@ export const ContentDesk: React.FC<{
                 <span className={s.emptyLibraryMark}><Film size={25} /></span>
                 <strong>Your shelves are empty.</strong>
                 <p>Choose how the first title enters the service.</p>
-                <button type="button" onClick={() => setShowEntryRoutes(true)}>ADD CONTENT <ChevronRight size={15} /></button>
+                <button type="button" onClick={() => onAddContent ? onAddContent() : setShowEntryRoutes(true)}>ADD CONTENT <ChevronRight size={15} /></button>
               </div>
             ) : shown.length === 0 ? <div className={s.empty}>Nothing matches that filter.</div> : null}
 
@@ -272,7 +275,7 @@ export const ContentDesk: React.FC<{
                 <div className={s.tinfo}>
                   <b>{t.title}</b>
                   <span className={s.tmeta}>
-                    {t.kind === 'ORIGINAL' ? 'Original' : 'Licensed'} · {t.format} · {t.genre}
+                    {t.kind === 'ORIGINAL' ? 'Original' : t.kind === 'OWNED' ? 'Studio import' : 'Licensed'} · {t.format} · {t.genre}
                   </span>
                   <div className={s.tpills}>
                     <i className={cx(s.pill, s[t.status.replace(/\s/g, '').toLowerCase()])}>{t.status}</i>
@@ -281,7 +284,7 @@ export const ContentDesk: React.FC<{
                         {t.rights.endsInWeeks}w LEFT
                       </i>
                     )}
-                    {!t.rights && <i className={cx(s.pill, s.own)}>OWNED</i>}
+                    {t.kind === 'OWNED' && <i className={cx(s.pill, s.own)}>STUDIO IMPORT</i>}
                   </div>
                 </div>
                 <div className={s.tnums}>
@@ -296,6 +299,7 @@ export const ContentDesk: React.FC<{
                 </div>
               </button>
             ))}
+            {onReviewCatalogue && <button className={s.localizationAction} onClick={onReviewCatalogue}>Review catalogue coverage →</button>}
           </section>
         )}
 
@@ -350,7 +354,7 @@ export const ContentDesk: React.FC<{
         {/* ── SLATE — a release calendar ── */}
         {tab === 'SLATE' && (
           <section className={s.cdsec}>
-            <div className={s.cdhead}><h2>Next twelve weeks</h2><span>tap a week to programme it</span></div>
+            <div className={s.cdhead}><h2>Release schedule</h2>{onOpenSlate && <button className={s.cdadd} onClick={onOpenSlate}>OPEN SLATE PLANNER</button>}</div>
 
             {warnings.length > 0 && (
               <div className={s.warnlist}>

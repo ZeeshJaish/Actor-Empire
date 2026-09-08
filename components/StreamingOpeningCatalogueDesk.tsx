@@ -26,6 +26,7 @@ import {
 } from '../services/streamingOpeningCatalogue';
 import AccessibleDialog from './AccessibleDialog';
 import '../styles/streaming-opening-catalogue.css';
+import { CONTENT_AVAILABILITY_LABELS } from '../services/streamingContentAvailability';
 
 type DeskTab = 'PROGRAM' | 'COVERAGE' | 'LANGUAGES';
 
@@ -110,20 +111,20 @@ export default function StreamingOpeningCatalogueDesk({
       </section>
 
       <section className="ocd-section">
-        <header><div><span>OPENING SHELF</span><h2>{view.titles.length} programmed title{view.titles.length === 1 ? '' : 's'}</h2></div><button type="button" onClick={onOpenRightsMarket}>+ LICENSE TITLE</button></header>
+        <header><div><span>OPENING SHELF</span><h2>{view.titles.filter(title => title.available).length} available · {view.titles.length} acquired</h2></div><button type="button" onClick={onOpenRightsMarket}>+ ADD CONTENT</button></header>
         <div className="ocd-poster-rail">
           {view.titles.map((title, index) => (
             <button type="button" key={title.projectId} className="ocd-poster-card" onClick={() => { setSelectedTitleId(title.projectId); setTab('LANGUAGES'); }} style={{ ['--ocd-hue' as string]: hueFor(title.projectId) }}>
               <span className="ocd-poster-art"><i>{title.title.slice(0, 2)}</i><em>{index + 1 < 10 ? `0${index + 1}` : index + 1}</em></span>
               <span className="ocd-poster-copy"><small>{title.source} · {title.projectType}</small><strong>{title.title}</strong><em>{title.genre}</em></span>
-              <span className={title.rightsCovered ? 'is-ready' : 'is-risk'}>{title.rightsCovered ? <ShieldCheck size={13} /> : <CircleAlert size={13} />}{title.rightsCovered ? 'RIGHTS HELD' : 'CHECK RIGHTS'}</span>
+              <span className={title.available ? 'is-ready' : 'is-risk'}>{title.available ? <ShieldCheck size={13} /> : <CircleAlert size={13} />}{CONTENT_AVAILABILITY_LABELS[title.availability]}</span>
             </button>
           ))}
         </div>
       </section>
 
       <section className="ocd-command-pair">
-        <button type="button" onClick={onOpenRightsMarket}><LockKeyhole size={21} /><span><small>BUSINESS AFFAIRS</small><b>License another title</b><em>Negotiate territory, window and guarantee</em></span><ChevronRight size={18} /></button>
+        <button type="button" onClick={onOpenRightsMarket}><LockKeyhole size={21} /><span><small>CONTENT MARKET</small><b>Add Content</b><em>Browse titles, collections, and studio imports</em></span><ChevronRight size={18} /></button>
         <button type="button" onClick={onOpenSlate}><Clapperboard size={21} /><span><small>PROGRAMMING</small><b>Arrange the launch slate</b><em>Place titles across the first twelve weeks</em></span><ChevronRight size={18} /></button>
       </section>
     </>
@@ -149,7 +150,7 @@ export default function StreamingOpeningCatalogueDesk({
               </div>
               <div className="ocd-reach"><span><i style={{ width: `${country.projectedAudienceReachPercent}%` }} /></span><b>{country.projectedAudienceReachPercent}% projected reach</b></div>
               <footer><Languages size={15} /><span>{country.languageDistribution.map(language => `${language.language} ${language.audiencePercent}%`).join(' · ')}</span></footer>
-              {country.missingRightsTitles.length ? <p>Missing: {country.missingRightsTitles.join(', ')}</p> : null}
+              {country.missingRightsTitles.length ? <p>Unavailable here: {country.missingRightsTitles.join(', ')}</p> : null}
             </article>
           ))}
         </div>
@@ -192,7 +193,7 @@ export default function StreamingOpeningCatalogueDesk({
     <AccessibleDialog className="ocd-shell" aria-labelledby="ocd-title" onEscape={onClose}>
       <header className="ocd-topbar">
         <button type="button" onClick={onClose} aria-label="Close opening catalogue"><ArrowLeft size={20} /></button>
-        <div><small>EMPIRE+ · CONTENT ROOM</small><strong id="ocd-title">Opening Catalogue</strong></div>
+        <div><small>{platform.identity?.name || 'Your platform'} · CONTENT DESK</small><strong id="ocd-title">Opening Catalogue</strong></div>
         <span>{money(platform.treasuryCash)}<small>TREASURY</small></span>
       </header>
       <main className="ocd-scroll">

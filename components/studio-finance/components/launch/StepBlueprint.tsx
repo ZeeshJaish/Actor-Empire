@@ -37,7 +37,6 @@ export function StepBlueprint({ data, draft, chosen, treasury, free, gap, handle
   const storefront = data.storefronts.find((s) => s.id === draft.storefrontId);
   const sound = data.identSounds.find((s) => s.id === draft.soundId);
   const pack = data.identPackages.find((p) => p.id === draft.packageId);
-  const depth = data.catalogue.hours / Math.max(1, data.catalogue.hoursNeeded);
 
   const checks = [
     { ok: chosen.length > 0, step: 'markets' as LaunchStepId },
@@ -45,7 +44,7 @@ export function StepBlueprint({ data, draft, chosen, treasury, free, gap, handle
     { ok: data.ident.commissioned, step: 'ident' as LaunchStepId },
     { ok: Boolean(storefront), step: 'storefront' as LaunchStepId },
     { ok: settings.streams.length > 0, step: 'pricing' as LaunchStepId },
-    { ok: depth >= 1, step: 'catalogue' as LaunchStepId },
+    { ok: data.catalogue.readyForLaunch ?? data.catalogue.titles > 0, step: 'catalogue' as LaunchStepId },
   ];
   const done = checks.filter((c) => c.ok).length;
   const blocking = data.blockers.filter((b) => b.severity === 'block').length;
@@ -135,7 +134,7 @@ export function StepBlueprint({ data, draft, chosen, treasury, free, gap, handle
           </div>
         </Tile>
 
-        <Tile label="Opening catalogue" state={depth >= 1} onJump={() => onJump('catalogue')}
+        <Tile label="Opening catalogue" state={data.catalogue.readyForLaunch ?? data.catalogue.titles > 0} onJump={() => onJump('catalogue')}
           value={`${compactCount(data.catalogue.titles)} titles · ${compactCount(data.catalogue.hours)} hours`}>
           <div className="bl-posters">
             {data.catalogue.anchors.slice(0, 4).map((t) => (

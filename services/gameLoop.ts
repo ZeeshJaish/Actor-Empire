@@ -2,19 +2,19 @@
 import { Player, Commitment, ActiveRelease, StreamingState, LogEntry, NegotiationData, ActorSkills, Application, AuditionOpportunity, ProjectDetails, ScheduledEvent, TransactionCategory, Transaction, YearlyFinance, Message, IndustryProject, TeamMember, Business, InstaPost, XPost, WriterStats, DirectorStats, PlatformId, LegalCase, LifeEvent, RoleType, FamilyObligation, FuturePotential, PlayerReturnStatus, SponsorshipCategory, SponsorshipOffer, NewsItem, PastProject, StreamingDistributionBreakdown, TheatricalDistributionBreakdown, Relationship, MusicCultureMomentRecord, GameLanguage } from '../types';
 import { PROPERTY_CATALOG, BUSINESS_CATALOG, CAR_CATALOG, MOTORCYCLE_CATALOG, BOAT_CATALOG, AIRCRAFT_CATALOG, CLOTHING_CATALOG } from './lifestyleLogic';
 import { calculateRealEstateValueUpdate, quoteRealEstateWeeklyRent } from './realEstateLogic';
-import { 
-    calculateGlobalTalent, 
+import {
+    calculateGlobalTalent,
     getActorTalent,
     getWriterTalent,
     getDirectorTalent,
-    getPhaseDuration, 
-    checkAuditionPass, 
-    calculateIMDbRating, 
-    getEstimatedBudget, 
-    calculateWeeklyBoxOffice, 
-    calculateRunOutcome, 
-    getConsequences, 
-    calculateFuturePotential, 
+    getPhaseDuration,
+    checkAuditionPass,
+    calculateIMDbRating,
+    getEstimatedBudget,
+    calculateWeeklyBoxOffice,
+    calculateRunOutcome,
+    getConsequences,
+    calculateFuturePotential,
     generateSequelOffer,
     generateRenewalOffer,
     generateAuditions,
@@ -33,19 +33,19 @@ import {
     evaluateCastingApplication,
     generateBreakthroughAuditionInvite
 } from './roleLogic';
-import { 
-    determineStreamingAcquisition, 
-    PLATFORMS, 
-    calculateStreamingViewership, 
-    checkStreamingExit 
+import {
+    determineStreamingAcquisition,
+    PLATFORMS,
+    calculateStreamingViewership,
+    checkStreamingExit
 } from './streamingLogic';
-import { 
-    generateWeeklyNews, 
-    generateSequelHypeNews, 
-    generateSequelConfirmedNews, 
-    generateSequelCancelledNews, 
-    generateFanBacklashNews, 
-    generateForbesNews, 
+import {
+    generateWeeklyNews,
+    generateSequelHypeNews,
+    generateSequelConfirmedNews,
+    generateSequelCancelledNews,
+    generateFanBacklashNews,
+    generateForbesNews,
     generateForbesIndustryNews,
     generateRenewalNews,
     generateCancellationNews,
@@ -73,7 +73,7 @@ import { processStreamingCataloguePackagesWeek } from './streamingCataloguePacka
 import { processStreamingCataloguePackageStrategyAutomation } from './streamingCataloguePackageAutomation';
 import { processStreamingRightsOfficeWeek } from './streamingRightsOffice';
 import { processWorldTurn } from './worldLogic';
-import { generateFamousMovieOpportunity, generateCameoOffer } from './famousMovieLogic'; 
+import { generateFamousMovieOpportunity, generateCameoOffer } from './famousMovieLogic';
 import { calculateYoutubeCreatorScore, generateMusicVideoFeatureOffer, generateYoutubeBrandDeal, generateYoutubeCollabOffer, getYoutubePublicImageLabel, processYoutubeChannel } from './youtubeLogic';
 import { getInstagramPostComments, pickInstagramMicroBrand } from './instagramLogic';
 import { checkForDirectorDecision, checkForProductionCrisis } from './productionService';
@@ -121,6 +121,7 @@ import { processAcquisitionDebtService } from './acquisitionDebt';
 import { processRegulatorPressure } from './regulatorPressure';
 import { processTalentInstability } from './talentInstability';
 import { processRivalRetaliation } from './rivalRetaliation';
+import { clonePlayerForWeekProcessing } from './gameLoopClone';
 import { processAcquisitionMarketPulse } from './acquisitionMarketPulse';
 import { processStudioSaleRoyalties } from './studioSale';
 import { getStudioGroup } from './studioGroup';
@@ -1519,7 +1520,7 @@ export const processGameWeek = async (
         commitments: player.commitments?.length || 0,
         releases: player.activeReleases?.length || 0,
     });
-    let nextPlayer = JSON.parse(JSON.stringify(player)) as Player;
+    let nextPlayer = clonePlayerForWeekProcessing(player);
     let triggerAd = false;
     const emitLoopStage = (stage: string, context: Record<string, unknown> = {}) => {
         const stageContext = {
@@ -1548,7 +1549,7 @@ export const processGameWeek = async (
         const translated = t(currentLanguage, commitment.nameKey);
         return translated === commitment.nameKey ? commitment.name : translated;
     };
-    
+
     // --- 0. INIT STOCKS, FINANCE, WORLD, STUDIO IF MISSING ---
     if (!nextPlayer.stocks || nextPlayer.stocks.length === 0) {
         nextPlayer.stocks = initializeStocks();
@@ -1569,10 +1570,10 @@ export const processGameWeek = async (
         nextPlayer.finance.credit = { successfulPayments: 0, missedPayments: 0, defaults: 0, totalBorrowed: 0, totalRepaid: 0 };
     }
     if (!nextPlayer.world) {
-        nextPlayer.world = { 
-            projects: [], 
-            trendingGenre: 'ACTION', 
-            universes: {} as any, 
+        nextPlayer.world = {
+            projects: [],
+            trendingGenre: 'ACTION',
+            universes: {} as any,
             famousMoviesReleased: [],
             awardHistory: [],
             upcomingRivals: []
@@ -1858,7 +1859,7 @@ export const processGameWeek = async (
     if (!nextPlayer.youtube.totalChannelViews) nextPlayer.youtube.totalChannelViews = nextPlayer.youtube.videos.reduce((a,b) => a + b.views, 0);
 
     // RESET TEAM CHANGE FLAGS
-    nextPlayer.flags.teamChangeLocked = false; 
+    nextPlayer.flags.teamChangeLocked = false;
     emitLoopStage('state_normalized');
 
     // --- DEBT CHECK ---
@@ -1927,7 +1928,7 @@ export const processGameWeek = async (
         nextPlayer.flags.lastFriendFavorAbsWeek = friendFavorAbsWeek;
         logsToAdd.push({ msg: `New friend favor request from ${friendFavorRequest.sender}.`, type: 'neutral' });
     }
-    
+
     // Transaction Helper
     const addTransaction = (amount: number, category: TransactionCategory, description: string) => {
         const safeAmount = Math.trunc(ensureFiniteNumber(amount));
@@ -2187,7 +2188,7 @@ export const processGameWeek = async (
     marketUpdate.notifications.forEach(notification => {
         logsToAdd.push({ msg: `📈 ${notification}`, type: 'neutral' });
     });
-    
+
     // Calculate Dividends
     const dividends = getDividendPayout(nextPlayer.portfolio, nextPlayer.stocks, nextPlayer.currentWeek, nextPlayer);
     if (dividends > 0) {
@@ -2229,7 +2230,7 @@ export const processGameWeek = async (
         nextPlayer.youtube.audienceTrust = Math.max(0, Math.min(100, ensureFiniteNumber(nextPlayer.youtube.audienceTrust, 55) + trustDrift + identityTuning.trustDrift));
         nextPlayer.youtube.fanMood = Math.max(0, Math.min(100, ensureFiniteNumber(nextPlayer.youtube.fanMood, 55) - 1 + (ytResult.newSubs > 0 ? 1 : 0) + identityTuning.moodDrift));
         nextPlayer.youtube.controversy = Math.max(0, Math.min(100, ensureFiniteNumber(nextPlayer.youtube.controversy, 0) - 2 + (recentVideo?.uploadPlan === 'VIRAL_BAIT' ? 1 : 0) + identityTuning.heatDrift));
-        
+
         if (ytResult.weeklyRevenue > 0) {
             addTransaction(Math.floor(ytResult.weeklyRevenue), 'BUSINESS', t(language, 'services.gameLoop.youtubeWeekly.finance.adRevenue'));
             if (ytResult.weeklyRevenue > 100) {
@@ -3126,7 +3127,7 @@ export const processGameWeek = async (
     // Talent Refresh (Every 3 Weeks)
     const lastTalentRefresh = nextPlayer.studio.lastTalentRefreshWeek || 0;
     const weeksSinceTalentRefresh = ((nextPlayer.age - 1) * 52 + nextPlayer.currentWeek) - lastTalentRefresh;
-    
+
     if (weeksSinceTalentRefresh >= 3) {
         const newUnknowns = generateNewUnknowns(5);
         nextPlayer.flags.extraNPCs = [...(nextPlayer.flags.extraNPCs || []), ...newUnknowns];
@@ -3241,7 +3242,7 @@ export const processGameWeek = async (
         nextPlayer.team.availablePublicists = getRandomPublicists(2, hiredTeamIds);
         nextPlayer.team.availableWellness = getRandomWellness(2, hiredTeamIds);
         nextPlayer.team = sanitizeTeamPools(nextPlayer);
-        
+
         logsToAdd.push({ msg: "The hiring pool for Agents & Managers has refreshed.", type: 'neutral' });
     }
 
@@ -3417,17 +3418,17 @@ export const processGameWeek = async (
                                 : 'neutral',
                     });
                 });
-                
+
                 // Color-code alerts based on content
                 res.alerts.forEach(a => {
                     let type: 'neutral' | 'positive' | 'negative' = 'neutral';
                     if (
-                        a.includes('REFUSE') || 
-                        a.includes('CRITICAL') || 
-                        a.includes('overwhelmed') || 
-                        a.includes('burning') || 
-                        a.includes('Complaints') || 
-                        a.includes('No one') || 
+                        a.includes('REFUSE') ||
+                        a.includes('CRITICAL') ||
+                        a.includes('overwhelmed') ||
+                        a.includes('burning') ||
+                        a.includes('Complaints') ||
+                        a.includes('No one') ||
                         a.includes('Bad reviews')
                     ) {
                         type = 'negative';
@@ -3442,7 +3443,7 @@ export const processGameWeek = async (
             }
         });
         nextPlayer.businesses = updatedBusinesses;
-    } 
+    }
     emitLoopStage('business_sim_done', {
         businesses: nextPlayer.businesses?.length || 0,
         rights_inbox: nextPlayer.inbox?.filter(message => message.type === 'RIGHTS_NEGOTIATION' || message.type === 'RIGHTS_REPORT').length || 0,
@@ -3516,11 +3517,11 @@ export const processGameWeek = async (
     const commitmentDrain = nextPlayer.commitments.reduce((sum, c) => {
         if (c.type === 'ACTING_GIG') return sum;
         return sum + c.energyCost;
-    }, 0); 
-    
+    }, 0);
+
     // Business Drain Removed
     const totalDrain = commitmentDrain;
-    
+
     resetWeeklyEnergy(nextPlayer);
     spendPlayerEnergy(nextPlayer, totalDrain, 'Weekly commitments');
 
@@ -3548,7 +3549,7 @@ export const processGameWeek = async (
         return 0;
     };
 
-    const BASE_DECAY = 1.0 * difficultyMult; 
+    const BASE_DECAY = 1.0 * difficultyMult;
     const HEALTH_DECAY = 0.5 * difficultyMult;
     const FAME_DECAY = 0.18; // Middle ground: fame still grows, but weekly momentum no longer snowballs too quickly.
     emitLoopStage('health_social_start');
@@ -3710,7 +3711,7 @@ export const processGameWeek = async (
         });
     }
     const healthAfterCrisisRecovery = nextPlayer.stats.health;
-    
+
     // --- ORGANIC FOLLOWER GROWTH ---
     if (nextPlayer.stats.fame > 10) {
         const organicGrowthIG = Math.floor(nextPlayer.stats.fame * 50 + (nextPlayer.stats.reputation * 10));
@@ -3730,7 +3731,7 @@ export const processGameWeek = async (
                 const viralBurst = Math.random() > 0.95 ? 3.0 : 1.0;
                 const growthRate = (0.02 + Math.random() * 0.03) * decay * viralBurst;
                 const addedLikes = Math.floor(p.likes * growthRate);
-                
+
                 if (addedLikes > 0) {
                     p.likes += addedLikes;
                     if (p.comments !== undefined) p.comments += Math.floor(addedLikes * 0.05);
@@ -3751,7 +3752,7 @@ export const processGameWeek = async (
     let newSkills = { ...nextPlayer.stats.skills };
     let newWriterStats = nextPlayer.writerStats ? { ...nextPlayer.writerStats } : { creativity: 0, dialogue: 0, structure: 0, pacing: 0 };
     let newDirectorStats = nextPlayer.directorStats ? { ...nextPlayer.directorStats } : { vision: 0, technical: 0, leadership: 0, style: 0 };
-    
+
     nextPlayer.commitments = nextPlayer.commitments.map(c => {
         if (c.type === 'COURSE') {
             if (c.skillGains) {
@@ -3856,12 +3857,12 @@ export const processGameWeek = async (
         if (weeksSince > 4) {
              newCloseness = Math.max(0, newCloseness - 2);
         }
-        
+
         if (nextPlayer.stats.fame > 40 && newCloseness < 20 && ['Parent', 'Partner'].includes(rel.relation)) {
             if (Math.random() < 0.03) {
                 const template = ESTRANGEMENT_TEMPLATES[Math.floor(Math.random() * ESTRANGEMENT_TEMPLATES.length)];
                 const headline = template.replace('{Name}', nextPlayer.name).replace('{Rel}', rel.relation.toLowerCase());
-                
+
                 nextPlayer.news.unshift({
                     id: `news_estrange_${Date.now()}`,
                     headline: headline,
@@ -3890,10 +3891,10 @@ export const processGameWeek = async (
             'SPONSORSHIP',
             `${spon.brandName}${isFinalPaidWeek ? ' Final' : ''} Payment`,
         );
-        const nextWeekSpon = { 
-            ...spon, 
+        const nextWeekSpon = {
+            ...spon,
             durationWeeks: Math.max(0, remainingBeforePayment - 1),
-            weeksCompleted: (spon.weeksCompleted || 0) + 1 
+            weeksCompleted: (spon.weeksCompleted || 0) + 1
         };
 
         if (isFinalPaidWeek && deliverablesComplete) {
@@ -3977,7 +3978,7 @@ export const processGameWeek = async (
                 const passedShortlist = Math.random() < evaluation.finalChance;
                 if (passedShortlist) {
                     const duration = getPhaseDuration('AUDITION');
-                    
+
                     newAuditionCommitments.push({
                         id: `aud_active_${Date.now()}_${Math.random()}`,
                         name: opp.projectName,
@@ -3989,7 +3990,7 @@ export const processGameWeek = async (
                         payoutType: 'LUMPSUM',
                         projectDetails: applyOpportunityIdentityToProject(opp, nextPlayer),
                         projectPhase: 'AUDITION',
-                        phaseWeeksLeft: duration, 
+                        phaseWeeksLeft: duration,
                         totalPhaseDuration: duration,
                         auditionPerformance: 0,
                         productionPerformance: 0,
@@ -4029,7 +4030,7 @@ export const processGameWeek = async (
     const nextCommitments: Commitment[] = [];
     const newReleases: ActiveRelease[] = [];
     nextPlayer = prepareSubsidiaryProjectsForGameLoop(nextPlayer);
-    
+
     nextPlayer.commitments.forEach(c => {
         let updatedC = { ...c };
         const isPersonalCareerRole = c.type === 'ACTING_GIG'
@@ -4108,7 +4109,7 @@ export const processGameWeek = async (
                     logsToAdd.push({ msg: `🎉 CAST! You booked the role in "${updatedC.name}"! Production starts now.`, type: 'positive' });
                     if (updatedC.projectDetails?.isFamous) {
                         nextPlayer.world.famousMoviesReleased.push(updatedC.name);
-                        nextPlayer.stats.reputation = Math.min(100, nextPlayer.stats.reputation + 10); 
+                        nextPlayer.stats.reputation = Math.min(100, nextPlayer.stats.reputation + 10);
                     }
                     nextCommitments.push({ ...updatedC, projectPhase: 'PRODUCTION', phaseWeeksLeft: duration, totalPhaseDuration: duration, productionPerformance: 0 });
                     nextPlayer.stats.experience = Math.min(100, nextPlayer.stats.experience + 1);
@@ -4224,7 +4225,7 @@ export const processGameWeek = async (
             } else { nextCommitments.push({ ...updatedC, phaseWeeksLeft: weeksLeft }); }
         } else if (updatedC.projectPhase === 'AWAITING_RELEASE') {
             const isStudioProject = updatedC.projectDetails?.studioId !== undefined;
-            
+
             if (updatedC.projectDetails?.releaseStrategy) {
                 if (weeksLeft <= 0) {
                     let imdb = calculateIMDbRating(updatedC);
@@ -4238,18 +4239,18 @@ export const processGameWeek = async (
 
                 if (updatedC.projectDetails) {
                     if (!updatedC.projectDetails.castList) updatedC.projectDetails.castList = generateCastList(nextPlayer, updatedC.projectDetails, updatedC.roleType || 'MINOR');
-                    
+
                     // Calculate Fame Multiplier for Acting Gig
                     const castIds = updatedC.projectDetails.castList.map(c => c.npcId).filter(Boolean) as string[];
-                    
+
                     let talentValue = 0;
                     if (updatedC.type === 'ACTING_GIG') talentValue = getActorTalent(nextPlayer.stats.skills);
                     else if (updatedC.type === 'DIRECTOR_GIG') talentValue = getDirectorTalent(nextPlayer.directorStats || { vision: 0, technical: 0, leadership: 0, style: 0 });
                     else if (updatedC.type === 'WRITER_GIG') talentValue = getWriterTalent(nextPlayer.writerStats || { creativity: 0, dialogue: 0, structure: 0, pacing: 0 });
 
                     updatedC.projectDetails.hiddenStats.fameMultiplier = calculateProjectFameMultiplier(
-                        castIds, 
-                        updatedC.projectDetails.directorName, 
+                        castIds,
+                        updatedC.projectDetails.directorName,
                         nextPlayer.stats.fame,
                         talentValue
                     );
@@ -4320,7 +4321,7 @@ export const processGameWeek = async (
                 } else {
                     logsToAdd.push({ msg: `🌍 RELEASE DAY: "${updatedC.name}" hits theaters! IMDb Page Created.`, type: 'positive' });
                 }
-                
+
                 if (updatedC.lumpSum && isPersonalCareerRole) {
                     let finalPay = updatedC.lumpSum;
                     if (updatedC.agentCommission) {
@@ -4331,7 +4332,7 @@ export const processGameWeek = async (
                     addTransaction(finalPay, 'SALARY', `Salary: ${updatedC.name}`);
                     logsToAdd.push({ msg: `💰 Payday! Received $${finalPay.toLocaleString()} for "${updatedC.name}".`, type: 'positive' });
                 }
-                
+
                 if (updatedC.projectDetails) {
                     if (isPersonalCareerRole) {
                         const releaseExperienceGain = calculateProjectExperienceGain(
@@ -4349,12 +4350,12 @@ export const processGameWeek = async (
 	                    }
 
                     let accumulatedBuzz = updatedC.promotionalBuzz || 0;
-                    
+
                     // Add Red Carpet Hype
                     if (updatedC.projectDetails.hiddenStats.redCarpetHype) {
                         accumulatedBuzz += updatedC.projectDetails.hiddenStats.redCarpetHype;
                     }
-                    
+
                     // Add Festival Hype
                     if (updatedC.projectDetails.hiddenStats.festivalPremiere) {
                         accumulatedBuzz += 25; // Significant boost for festival premiere
@@ -4475,8 +4476,8 @@ export const processGameWeek = async (
 		                    newReleases.push(newRelease);
 	                    nextPlayer = improveStudioGenreReputation(nextPlayer, updatedC.projectDetails.studioId, updatedC.projectDetails.genre, imdb);
 	                }
-            } else { 
-                nextCommitments.push({ ...updatedC, phaseWeeksLeft: weeksLeft }); 
+            } else {
+                nextCommitments.push({ ...updatedC, phaseWeeksLeft: weeksLeft });
             }
         } else {
             // Waiting for player to set strategy
@@ -4768,7 +4769,7 @@ export const processGameWeek = async (
     allRunning.forEach(initialRelease => {
         let rel = processPostReleaseReality(initialRelease);
         if (rel.imdbRating) {
-            const change = (Math.random() * 0.1) - 0.05; 
+            const change = (Math.random() * 0.1) - 0.05;
             rel.imdbRating = Math.max(1.1, Math.min(9.9, rel.imdbRating + change));
         }
         const roleAwareReview = generateRoleAwareCriticReview(nextPlayer, rel);
@@ -4805,7 +4806,7 @@ export const processGameWeek = async (
                 potential.isSequelGreenlit = rollContinuationGreenlight(potential.sequelChance, 94);
             }
             const isUniverseContracted = !!(player.activeUniverseContract && rel.projectDetails.universeId && player.activeUniverseContract.universeId === rel.projectDetails.universeId);
-            
+
             // Check if this project belongs to the player's production house
             const isPlayerProduction = nextPlayer.businesses?.some(b => b.id === rel.projectDetails.studioId && b.type === 'PRODUCTION_HOUSE');
             if (rel.type === 'SERIES' && rel.projectDetails.episodeRatings?.length) {
@@ -5295,7 +5296,7 @@ export const processGameWeek = async (
             if (theatricalFamePulse > 0) {
                 nextPlayer.stats.fame = Math.max(0, Math.min(100, nextPlayer.stats.fame + theatricalFamePulse));
             }
-            
+
             // Add revenue to player's studio if they own it
             const studioId = rel.projectDetails.studioId;
             const playerStudio = nextPlayer.businesses?.find(b => b.id === studioId);
@@ -5434,7 +5435,7 @@ export const processGameWeek = async (
                 if (playerStudio) {
                     // Trigger bidding war for player's studio
                     logsToAdd.push({ msg: `📉 "${rel.name}" left theaters. Awaiting streaming bids!`, type: 'neutral' });
-                    
+
                     // Generate bids
                     if (rel.streaming) {
                         // Already has a streaming deal (accepted while in theaters)
@@ -5447,7 +5448,7 @@ export const processGameWeek = async (
                         platforms.forEach(pId => {
                             const platformProfile = PLATFORMS[pId];
                             const platformState = nextPlayer.world.platforms?.[pId];
-                            
+
                             if (!platformState) return;
 
                             // Base interest on quality, genre match, and platform's desperation (recentHits)
@@ -5472,7 +5473,7 @@ export const processGameWeek = async (
 	                                + ((rel.promotionalBuzz ?? 0) * 0.15)
 	                                + (runStrength * 12)
 	                            ) * (0.82 + (campaignReach * 0.18));
-                            
+
                             if (interest > 60 || Math.random() > 0.7) {
                                 const bidProfile = getStreamingBidProfile(packageStrength, isSeries, runStrength);
                                 const qualityFactor = Math.max(0.85, 0.95 + ((packageStrength - 55) / 105));
@@ -5525,7 +5526,7 @@ export const processGameWeek = async (
 
                                 const upfront = Math.floor(Math.max(floorOffer, baseOffer * (0.96 + Math.random() * 0.28)));
                                 const royalty = Math.floor(Math.random() * (isSeries ? 6 : 8)) + (isSeries ? 6 : 5); // series get slightly safer backend terms
-                                
+
                                 if (upfront > 0) {
                                     bids.push({ platformId: pId, upfront, royalty, duration: 52 }); // 1 year contract
                                 }
@@ -5577,7 +5578,7 @@ export const processGameWeek = async (
                                 return false;
                             });
                         }
-                        
+
                         if (bids.length === 0) {
                             const hiddenStats = (rel.projectDetails.hiddenStats || {}) as Record<string, number>;
                             const packageStrength = ((hiddenStats.qualityScore || 50) * 0.45)
@@ -5620,7 +5621,7 @@ export const processGameWeek = async (
                     const platformId = determineStreamingAcquisition(rel.projectDetails);
                     const cost = Math.floor(rel.budget * 0.4 * PLATFORMS[platformId].payoutMult);
                     logsToAdd.push({ msg: `📉 "${rel.name}" left theaters. Acquired by ${PLATFORMS[platformId].name}.`, type: 'neutral' });
-                    
+
                     // Update platform state
                     if (nextPlayer.world.platforms && nextPlayer.world.platforms[platformId]) {
                         const platform = nextPlayer.world.platforms[platformId];
@@ -5663,7 +5664,7 @@ export const processGameWeek = async (
             } else {
                 processedReleases.push({ ...rel, ...theatricalDistributionState, weekNum: rel.weekNum + 1 });
             }
-        } 
+        }
         else if (rel.distributionPhase === 'STREAMING_BIDDING') {
             const biddingStudio = nextPlayer.businesses?.find(business => (
                 business.id === rel.projectDetails.studioId
@@ -5963,7 +5964,7 @@ export const processGameWeek = async (
                 applyStudioMarketOutcome(outcomeStudio, rel, rel.totalGross + newStreamingRevenue + newSoundtrackRevenue);
                 logsToAdd.push({ msg: `👋 "${rel.name}" left ${PLATFORMS[rel.streaming.platformId].name}.`, type: 'neutral' });
                 if (rel.royaltyPercentage && rel.royaltyPercentage > 0) {
-                    const studioCut = rel.budget * 2; 
+                    const studioCut = rel.budget * 2;
                     const netProfit = rel.totalGross - studioCut;
                     if (netProfit > 0) {
                         const royaltyAmount = Math.floor(netProfit * (rel.royaltyPercentage / 100));
@@ -6203,7 +6204,7 @@ export const processGameWeek = async (
                         }
                     ]
                 };
-                
+
                 const auditEvent: ScheduledEvent = {
                     id: lifeEvent.id,
                     week: nextPlayer.currentWeek,
@@ -6302,7 +6303,7 @@ export const processGameWeek = async (
         nextPlayer.currentWeek = 1;
         nextPlayer.age += 1;
         logsToAdd.push({ msg: `🎂 Happy Birthday! You are now ${nextPlayer.age}.`, type: 'positive' });
-        
+
         // Age up parents yearly. Children with tracked birth weeks are resolved separately.
         if (nextPlayer.relationships) {
             nextPlayer.relationships.forEach(rel => {
@@ -6312,7 +6313,7 @@ export const processGameWeek = async (
                     } else {
                         rel.age = (rel.age || 0) + 1;
                     }
-                    
+
                     // Parent death logic (simple chance based on age)
                     if (rel.relation === 'Parent' && rel.age > 75) {
                         if (Math.random() < 0.1) { // 10% chance per year after 75
@@ -6329,7 +6330,7 @@ export const processGameWeek = async (
         if (nextPlayer.age > 70) {
             const happiness = nextPlayer.stats.happiness ?? 50;
             const health = nextPlayer.stats.health ?? 50;
-            
+
             if (health < 30 && happiness < 30) {
                 nextPlayer.stats.health = Math.max(0, health - Math.floor(Math.random() * 15 + 5));
             } else if (health < 50) {
@@ -6610,18 +6611,18 @@ export const processGameWeek = async (
             console.error('Agent offer generation failed during week processing:', error);
         }
     }
-    
+
     const currentOfferAbsoluteWeek = getAbsoluteWeek(nextPlayer.age, nextPlayer.currentWeek);
 
     if (nextPlayer.team.manager) {
         const lastOfferWeek = Number(nextPlayer.flags.lastSponsorshipOfferAbsoluteWeek || 0);
         const managerTier = nextPlayer.team.manager.tier;
-        
+
         // Dynamic cooldown based on manager tier
         let minCooldown = 5;
         if (managerTier === 'STANDARD') minCooldown = 3;
         if (managerTier === 'ELITE') minCooldown = 2;
-        
+
         if (currentOfferAbsoluteWeek - lastOfferWeek >= minCooldown + Math.floor(Math.random() * 3)) {
             try {
                 const sponOffer = generateManagerOffer(nextPlayer);
@@ -6842,11 +6843,11 @@ export const processGameWeek = async (
             console.error('NPC venture offer generation failed during week processing:', error);
         }
     }
-    
+
     if (nextPlayer.currentWeek % 3 === 0) {
         // Updated: usedTitles now includes past projects to prevent repeating famous titles
         const usedTitles = [
-            ...nextPlayer.commitments.map(c => c.name), 
+            ...nextPlayer.commitments.map(c => c.name),
             ...nextPlayer.activeReleases.map(r => r.name),
             ...nextPlayer.pastProjects.map(p => p.name),
             ...nextPlayer.inbox

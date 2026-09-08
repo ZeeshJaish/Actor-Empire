@@ -381,6 +381,10 @@ export const processTalentInstability = (player: Player): Player => {
         event?.data?.talentInstabilityEventType,
         candidate => existingPendingEvents.some(pending => pending.id === candidate.id || pending.data?.talentInstabilityEventType),
     );
+    const shouldLog = state.controlledStudioCount > 0 && (
+        state.departureRisk >= 10
+        || state.acquiredStudioCount > 0
+    );
 
     return {
         ...player,
@@ -398,7 +402,7 @@ export const processTalentInstability = (player: Player): Player => {
                 feed: [xPost, ...(player.x?.feed || []).filter(post => post.id !== xPost.id)].slice(0, 80),
             }
             : player.x,
-        logs: [{
+        logs: [...(shouldLog ? [{
             week: player.currentWeek,
             year: player.age,
             message: t(language, 'services.talentInstability.log.weekly', {
@@ -406,6 +410,6 @@ export const processTalentInstability = (player: Player): Player => {
                 studios: state.controlledStudioCount,
             }),
             type: state.departureRisk >= 65 ? 'negative' as const : 'neutral' as const,
-        }, ...(player.logs || [])].slice(0, 50),
+        }] : []), ...(player.logs || [])].slice(0, 50),
     };
 };

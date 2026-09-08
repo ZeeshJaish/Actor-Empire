@@ -51,6 +51,8 @@ interface Props {
   onOpenOriginalProduction?: (target: { studioId: string; scriptId: string; commissionId: string }) => void;
   onOpenBank?: () => void;
   initialDestination?: 'HOME' | 'FINANCE';
+  initialContentMarketOfferId?: string;
+  onContentMarketOfferConsumed?: () => void;
 }
 
 const formatCompactMoney = (value: number): string => {
@@ -182,6 +184,8 @@ export default function StreamingLockedScreen({
   onOpenOriginalProduction,
   onOpenBank,
   initialDestination = 'HOME',
+  initialContentMarketOfferId,
+  onContentMarketOfferConsumed,
 }: Props) {
   const readinessRef = useRef<HTMLElement>(null);
   const [showLaunchMoment, setShowLaunchMoment] = useState(false);
@@ -279,6 +283,8 @@ export default function StreamingLockedScreen({
         onOpenOriginalProduction={onOpenOriginalProduction}
         onOpenBank={onOpenBank}
         initialDestination={headquartersDestination}
+        initialContentMarketOfferId={initialContentMarketOfferId}
+        onContentMarketOfferConsumed={onContentMarketOfferConsumed}
       />
     );
   }

@@ -347,7 +347,10 @@ export type IndustryEventEvidenceKind =
     | 'PLATFORM'
     | 'RIGHTS_CONTRACT'
     | 'TRANSACTION'
-    | 'AWARD';
+    | 'AWARD'
+    | 'TALENT'
+    | 'UNIVERSE'
+    | 'COUNTRY';
 
 export interface IndustryEventEvidence {
     kind: IndustryEventEvidenceKind;
@@ -405,6 +408,618 @@ export type IndustryMediaStoryCategory =
 
 export type IndustryMediaChannel = 'NEWS' | 'X' | 'INSTAGRAM' | 'YOUTUBE';
 
+export type IndustryMediaInstitutionKind =
+    | 'TRADE'
+    | 'BUSINESS'
+    | 'PRESTIGE'
+    | 'TABLOID'
+    | 'STREAMING'
+    | 'REGIONAL'
+    | 'FANDOM';
+
+export type IndustryMediaPersonalityRole =
+    | 'REPORTER'
+    | 'INVESTIGATOR'
+    | 'BUSINESS_ANALYST'
+    | 'CRITIC'
+    | 'COLUMNIST'
+    | 'COMMENTATOR'
+    | 'THEORY_CREATOR';
+
+export type IndustryMediaSignatureRole = 'ANTAGONIST' | 'SUPPORTER';
+
+export type IndustryMediaVoiceArchetype =
+    | 'MEASURED'
+    | 'INSIDER'
+    | 'NUMBERS_FIRST'
+    | 'AUTEUR'
+    | 'PROVOCATEUR'
+    | 'POPULIST'
+    | 'FAN_SCHOLAR';
+
+export type IndustryMediaClaimMode = 'FACT' | 'ANALYSIS' | 'OPINION' | 'SPECULATION';
+
+export interface IndustryMediaInstitution {
+    schemaVersion: 1;
+    id: string;
+    name: string;
+    shortName: string;
+    kind: IndustryMediaInstitutionKind;
+    handles: Partial<Record<IndustryMediaChannel, string>>;
+    channels: IndustryMediaChannel[];
+    homeRegionId: string;
+    coveredRegionIds: string[];
+    languageIds: string[];
+    focusCategories: IndustryMediaStoryCategory[];
+    primaryColor: string;
+    secondaryColor: string;
+    avatar: string;
+    credibility: number;
+    reach: number;
+    access: number;
+    sensationalism: number;
+    prestige: number;
+    isAnchor: boolean;
+    isActive: boolean;
+}
+
+export interface IndustryMediaPersonality {
+    schemaVersion: 1;
+    id: string;
+    name: string;
+    handle: string;
+    avatar: string;
+    gender: Gender;
+    institutionId?: string;
+    role: IndustryMediaPersonalityRole;
+    voiceArchetype: IndustryMediaVoiceArchetype;
+    channels: IndustryMediaChannel[];
+    homeRegionId: string;
+    languageIds: string[];
+    focusCategories: IndustryMediaStoryCategory[];
+    preferredGenreIds: string[];
+    credibility: number;
+    reach: number;
+    aggression: number;
+    optimism: number;
+    humour: number;
+    sensationalism: number;
+    independence: number;
+    baselinePlayerAffinity: number;
+    stanceFloor: number;
+    stanceCeiling: number;
+    signatureRole?: IndustryMediaSignatureRole;
+    isAnchor: boolean;
+    isActive: boolean;
+    verified: boolean;
+    lastAppearanceAbsoluteWeek: number;
+    recentStoryIds: string[];
+}
+
+export interface IndustryMediaSubjectStance {
+    id: string;
+    personalityId: string;
+    subjectKey: string;
+    affinity: number;
+    lastUpdatedAbsoluteWeek: number;
+    lastIndustryEventId?: string;
+}
+
+export interface IndustryMediaStoryAssignment {
+    id: string;
+    storyId: string;
+    industryEventId: string;
+    channel: IndustryMediaChannel;
+    institutionId: string;
+    personalityId?: string;
+    angle: IndustryMediaClaimMode;
+    assignedAbsoluteWeek: number;
+    lastUsedAbsoluteWeek: number;
+}
+
+export type IndustryMediaDiscussionStatus = 'OPEN' | 'RESPONDED' | 'RESOLVED' | 'CLOSED';
+export type IndustryMediaDiscussionTurnKind = 'SOURCE' | 'MEDIA' | 'PLAYER' | 'REACTION';
+export type IndustryMediaResponseTone =
+    | 'CLARIFY'
+    | 'ACKNOWLEDGE'
+    | 'DEFEND'
+    | 'CHALLENGE'
+    | 'HUMOUR'
+    | 'APPRECIATION';
+export type IndustryMediaResponseFormat = 'REPLY' | 'QUOTE' | 'STATEMENT';
+export type IndustryMediaResponseSpeaker = 'PERSONAL' | 'STUDIO';
+export type IndustryMediaResponseStatus = 'PENDING' | 'RESOLVED';
+export type IndustryMediaResponseOutcome = 'LANDED' | 'MIXED' | 'BACKFIRED' | 'IGNORED';
+
+export interface IndustryMediaDiscussionTurn {
+    schemaVersion: 1;
+    id: string;
+    discussionId: string;
+    kind: IndustryMediaDiscussionTurnKind;
+    industryEventId: string;
+    mediaStoryId: string;
+    absoluteWeek: number;
+    content: string;
+    claimMode: IndustryMediaClaimMode;
+    mediaInstitutionId?: string;
+    mediaPersonalityId?: string;
+    responseId?: string;
+    parentTurnId?: string;
+}
+
+export interface IndustryMediaDiscussion {
+    schemaVersion: 1;
+    id: string;
+    industryEventId: string;
+    mediaStoryId: string;
+    sourcePostId: string;
+    openedAbsoluteWeek: number;
+    lastActivityAbsoluteWeek: number;
+    responseClosesAbsoluteWeek: number;
+    status: IndustryMediaDiscussionStatus;
+    isPlayerRelated: boolean;
+    heat: number;
+    turns: IndustryMediaDiscussionTurn[];
+    playerResponseId?: string;
+    /** C6 rumour/leak/prediction discussed by this thread. */
+    mediaClaimId?: string;
+}
+
+export interface IndustryMediaResponseEffects {
+    reputation: number;
+    controversy: number;
+    followers: number;
+    mediaStance: number;
+    discussionHeat: number;
+}
+
+export interface IndustryMediaPlayerResponse {
+    schemaVersion: 1;
+    id: string;
+    discussionId: string;
+    industryEventId: string;
+    mediaStoryId: string;
+    sourcePostId: string;
+    publishedPostId: string;
+    tone: IndustryMediaResponseTone;
+    format: IndustryMediaResponseFormat;
+    speaker: IndustryMediaResponseSpeaker;
+    content: string;
+    submittedAbsoluteWeek: number;
+    resolvesAbsoluteWeek: number;
+    status: IndustryMediaResponseStatus;
+    outcome?: IndustryMediaResponseOutcome;
+    effects?: IndustryMediaResponseEffects;
+    resolvedAbsoluteWeek?: number;
+    /** C6 claim that prompted the optional response. */
+    mediaClaimId?: string;
+}
+
+export type IndustryMediaYoutubeFormat =
+    | 'THEORY'
+    | 'EXPLAINED'
+    | 'BUSINESS_BREAKDOWN'
+    | 'REVIEW_AFTERMATH'
+    | 'RESPONSE_ANALYSIS'
+    | 'CREATOR_REACTION';
+
+export type IndustryMediaYoutubeOutcome = 'BREAKOUT' | 'HIT' | 'NORMAL' | 'FLOP';
+
+export interface IndustryMediaYoutubeThumbnail {
+    primaryColor: string;
+    secondaryColor: string;
+    label: string;
+    motif: string;
+}
+
+export interface IndustryMediaCreatorChannel {
+    schemaVersion: 1;
+    id: string;
+    personalityId: string;
+    subscribers: number;
+    totalViews: number;
+    credibility: number;
+    momentum: number;
+    sponsorAppeal: number;
+    estimatedLifetimeRevenue: number;
+    uploadCount: number;
+    hitCount: number;
+    flopCount: number;
+    lastUploadAbsoluteWeek: number;
+    recentVideoIds: string[];
+}
+
+export interface IndustryMediaYoutubeVideo {
+    schemaVersion: 1;
+    id: string;
+    publicationKey: string;
+    industryEventId: string;
+    mediaStoryId: string;
+    evidenceEventIds: string[];
+    personalityId: string;
+    institutionId?: string;
+    format: IndustryMediaYoutubeFormat;
+    claimMode: IndustryMediaClaimMode;
+    title: string;
+    summary: string;
+    confirmedFacts: string;
+    interpretation?: string;
+    thumbnail: IndustryMediaYoutubeThumbnail;
+    subjectKey: string;
+    companyId?: string;
+    projectId?: string;
+    importance: IndustryEventImportance;
+    publishedAbsoluteWeek: number;
+    lastPerformanceAbsoluteWeek: number;
+    views: number;
+    likes: number;
+    comments: string[];
+    outcome: IndustryMediaYoutubeOutcome;
+    subscriberDelta: number;
+    estimatedRevenue: number;
+    responseId?: string;
+    responseOutcome?: IndustryMediaResponseOutcome;
+    /** C6 rumour/leak/prediction examined by this video. */
+    mediaClaimId?: string;
+}
+
+export type IndustryMediaFandomArchetype =
+    | 'DEVOTED'
+    | 'CREATIVE'
+    | 'EVENT'
+    | 'PROTECTIVE'
+    | 'ANALYTICAL'
+    | 'VOLATILE';
+
+export type IndustryMediaCampaignType =
+    | 'COUNTDOWN'
+    | 'WATCH_PARTY'
+    | 'FAN_EDIT'
+    | 'AWARD_DRIVE'
+    | 'SAVE_THE_PROJECT'
+    | 'CONTINUE_THE_UNIVERSE'
+    | 'DEFEND_SUBJECT'
+    | 'CELEBRATE'
+    | 'CASTING_WISH'
+    | 'HASHTAG_CLASH';
+
+export type IndustryMediaCampaignStage = 'SPARK' | 'RALLY' | 'PEAK' | 'AFTERMATH' | 'CLOSED';
+export type IndustryMediaCampaignOutcome = 'BREAKOUT' | 'STRONG' | 'MODEST' | 'FIZZLED' | 'MESSY';
+export type IndustryMediaCampaignParticipationMode = 'JOIN' | 'THANK';
+
+export interface IndustryMediaCampaignMoment {
+    schemaVersion: 1;
+    id: string;
+    campaignId: string;
+    absoluteWeek: number;
+    stage: IndustryMediaCampaignStage;
+    caption: string;
+    reach: number;
+    participation: number;
+    sentiment: number;
+    heat: number;
+    instagramPostId?: string;
+    xPostId?: string;
+}
+
+export interface IndustryMediaCampaignParticipation {
+    mode: IndustryMediaCampaignParticipationMode;
+    absoluteWeek: number;
+    playerPostId?: string;
+    followerDelta: number;
+    fanLoyaltyDelta: number;
+    controversyDelta: number;
+}
+
+export interface IndustryMediaFandom {
+    schemaVersion: 1;
+    id: string;
+    name: string;
+    handle: string;
+    bio: string;
+    primaryColor: string;
+    secondaryColor: string;
+    avatar: string;
+    motif: string;
+    subjectKey: string;
+    subjectName: string;
+    companyId?: string;
+    projectId?: string;
+    universeId?: string;
+    platformId?: string;
+    talentId?: string;
+    archetype: IndustryMediaFandomArchetype;
+    homeRegionId: string;
+    languageId: string;
+    size: number;
+    loyalty: number;
+    activity: number;
+    coordination: number;
+    optimism: number;
+    volatility: number;
+    formedAbsoluteWeek: number;
+    lastActiveAbsoluteWeek: number;
+    friendlySubjectKeys: string[];
+    rivalSubjectKeys: string[];
+    recentCampaignIds: string[];
+}
+
+export interface IndustryMediaCampaign {
+    schemaVersion: 1;
+    id: string;
+    campaignKey: string;
+    fandomId: string;
+    industryEventId: string;
+    mediaStoryId: string;
+    evidenceEventIds: string[];
+    youtubeVideoId?: string;
+    responseId?: string;
+    subjectKey: string;
+    type: IndustryMediaCampaignType;
+    hashtag: string;
+    headline: string;
+    purpose: string;
+    context: string;
+    stage: IndustryMediaCampaignStage;
+    startedAbsoluteWeek: number;
+    lastAdvancedAbsoluteWeek: number;
+    nextEligibleAbsoluteWeek: number;
+    terminalAbsoluteWeek?: number;
+    reach: number;
+    participation: number;
+    coordination: number;
+    sentiment: number;
+    heat: number;
+    performanceRoll: number;
+    outcome?: IndustryMediaCampaignOutcome;
+    playerRelated: boolean;
+    moments: IndustryMediaCampaignMoment[];
+    playerParticipation?: IndustryMediaCampaignParticipation;
+    /** C6 rumour/leak/prediction lineage when a campaign reacts to a claim. */
+    mediaClaimId?: string;
+}
+
+export type IndustryMediaClaimKind = 'RUMOUR' | 'LEAK' | 'PREDICTION';
+export type IndustryMediaClaimStatus =
+    | 'OPEN'
+    | 'CONFIRMED'
+    | 'PARTLY_CONFIRMED'
+    | 'REFUTED'
+    | 'EXPIRED_UNVERIFIED'
+    | 'SUPERSEDED';
+export type IndustryMediaClaimCategory =
+    | 'CASTING'
+    | 'PROJECT_STATUS'
+    | 'PLATFORM_DESTINATION'
+    | 'RELEASE_WINDOW'
+    | 'FRANCHISE_DIRECTION'
+    | 'AWARDS'
+    | 'COMPANY_MOVE'
+    | 'PROJECT_OUTCOME';
+export type IndustryMediaClaimConfidence = 'TENTATIVE' | 'CREDIBLE_CHATTER' | 'STRONG_SOURCING';
+
+export interface IndustryMediaClaimTarget {
+    expectedEventTypes: IndustryEventType[];
+    companyId?: string;
+    projectId?: string;
+    platformId?: string;
+    rightsContractId?: string;
+    universeId?: string;
+    talentId?: string;
+    awardEventId?: string;
+    expectedCountryIds?: string[];
+    expectedAbsoluteWeek?: number;
+    toleranceWeeks?: number;
+    expectedOutcome?: string;
+}
+
+export interface IndustryMediaLeakIntentSnapshot {
+    sourceSystem: 'PLATFORM_AI' | 'STUDIO_AI' | 'INDUSTRY_INTELLIGENCE';
+    intentionId: string;
+    intentionType: 'COMMISSION' | 'FRANCHISE' | 'RELEASE_WINDOW' | 'RIGHTS_TARGET' | 'CASTING_DIRECTION';
+    companyId: string;
+    subjectId: string;
+    targetId?: string;
+    targetAbsoluteWeek?: number;
+    capturedAbsoluteWeek: number;
+}
+
+export interface IndustryMediaClaimResolution {
+    status: Exclude<IndustryMediaClaimStatus, 'OPEN'>;
+    absoluteWeek: number;
+    eventIds: string[];
+    explanation: string;
+    sourceReliabilityDelta: number;
+    playerCredibilityApplied?: boolean;
+}
+
+export interface IndustryMediaClaim {
+    schemaVersion: 1;
+    id: string;
+    claimKey: string;
+    kind: IndustryMediaClaimKind;
+    status: IndustryMediaClaimStatus;
+    category: IndustryMediaClaimCategory;
+    confidence: IndustryMediaClaimConfidence;
+    subjectKey: string;
+    subjectName: string;
+    anchorIndustryEventId: string;
+    anchorStoryId: string;
+    evidenceEventIds: string[];
+    institutionId: string;
+    personalityId?: string;
+    publicationChannel: IndustryMediaChannel;
+    importance: IndustryEventImportance;
+    headline: string;
+    summary: string;
+    knownEvidence: string;
+    interpretation?: string;
+    target: IndustryMediaClaimTarget;
+    createdAbsoluteWeek: number;
+    earliestResolutionAbsoluteWeek: number;
+    expiryAbsoluteWeek: number;
+    lastEvaluatedAbsoluteWeek: number;
+    playerRelated: boolean;
+    leakIntentSnapshot?: IndustryMediaLeakIntentSnapshot;
+    resolution?: IndustryMediaClaimResolution;
+    discussionId?: string;
+    responseId?: string;
+    youtubeVideoId?: string;
+    fandomId?: string;
+    campaignId?: string;
+}
+
+export interface IndustryMediaSourceRecord {
+    schemaVersion: 1;
+    id: string;
+    sourceId: string;
+    institutionId: string;
+    personalityId?: string;
+    category: IndustryMediaClaimCategory;
+    calls: number;
+    confirmed: number;
+    partlyConfirmed: number;
+    refuted: number;
+    expired: number;
+    reliability: number;
+    currentStreak: number;
+    lastResolvedAbsoluteWeek: number;
+    recentClaimIds: string[];
+}
+
+export type IndustryMediaNarrativeTheme =
+    | 'AMBITIOUS_RISK_TAKER'
+    | 'RECKLESS_SPENDER'
+    | 'AWARDS_POWERHOUSE'
+    | 'FRANCHISE_ARCHITECT'
+    | 'OVERHYPED_STAR'
+    | 'RELIABLE_HITMAKER'
+    | 'COMEBACK'
+    | 'DECLINE'
+    | 'GLOBAL_EXPANSION'
+    | 'FADING_DOMINANCE'
+    | 'DIFFICULT_COLLABORATOR'
+    | 'UNDERDOG';
+export type IndustryMediaNarrativePolarity = 'POSITIVE' | 'NEGATIVE' | 'MIXED';
+export type IndustryMediaNarrativeStage = 'EMERGING' | 'ESTABLISHED' | 'DEFINING' | 'FADING' | 'RESOLVED';
+export type IndustryMediaNarrativeLandmarkKind =
+    | 'ORIGIN'
+    | 'SUPPORT'
+    | 'CONTRADICTION'
+    | 'PLAYER_CONFRONTATION'
+    | 'CLAIM_RESOLUTION'
+    | 'TURNING_POINT'
+    | 'LATEST';
+
+export interface IndustryMediaNarrativeLandmark {
+    id: string;
+    kind: IndustryMediaNarrativeLandmarkKind;
+    industryEventIds: string[];
+    absoluteWeek: number;
+    summary: string;
+    impact: number;
+    mediaClaimId?: string;
+    mediaResponseId?: string;
+}
+
+export interface IndustryMediaNarrative {
+    schemaVersion: 1;
+    id: string;
+    narrativeKey: string;
+    subjectKey: string;
+    subjectName: string;
+    theme: IndustryMediaNarrativeTheme;
+    polarity: IndustryMediaNarrativePolarity;
+    stage: IndustryMediaNarrativeStage;
+    strength: number;
+    confidence: number;
+    supportingEvidence: number;
+    contradictingEvidence: number;
+    primaryStoryId: string;
+    primaryIndustryEventId: string;
+    firstAbsoluteWeek: number;
+    lastAdvancedAbsoluteWeek: number;
+    nextEligiblePublicationAbsoluteWeek: number;
+    lastPublishedAbsoluteWeek?: number;
+    resolvedAbsoluteWeek?: number;
+    landmarks: IndustryMediaNarrativeLandmark[];
+    playerRelated: boolean;
+}
+
+export type IndustryMediaRelationshipDirection = 'IMPROVING' | 'WORSENING' | 'STABLE';
+export type IndustryMediaFeudState = 'NONE' | 'BUILDING' | 'ACTIVE' | 'COOLING' | 'RESOLVED';
+
+export interface IndustryMediaRelationship {
+    schemaVersion: 1;
+    id: string;
+    relationshipKey: string;
+    personalityId: string;
+    subjectKey: string;
+    subjectName: string;
+    counterpartPersonalityId?: string;
+    affinity: number;
+    respect: number;
+    trust: number;
+    tension: number;
+    familiarity: number;
+    direction: IndustryMediaRelationshipDirection;
+    feudState: IndustryMediaFeudState;
+    conflictEventIds: string[];
+    /** Distinct entered weeks carrying feud-qualifying evidence. */
+    conflictAbsoluteWeeks: number[];
+    landmarkInteractionIds: string[];
+    firstInteractionAbsoluteWeek: number;
+    lastMeaningfulInteractionAbsoluteWeek: number;
+    lastIndustryEventId?: string;
+    playerRelated: boolean;
+}
+
+export interface IndustryMediaPrEffectVector {
+    reputation: number;
+    controversy: number;
+    followers: number;
+    projectBuzz: number;
+    mediaStance: number;
+    discussionHeat: number;
+    relationshipTension: number;
+    narrativeMomentum: number;
+}
+
+export interface IndustryMediaPrIntervention {
+    schemaVersion: 1;
+    id: string;
+    interventionKey: string;
+    absoluteWeek: number;
+    tier: TeamMember['tier'];
+    importance: IndustryEventImportance;
+    rawEffects: IndustryMediaPrEffectVector;
+    appliedEffects: IndustryMediaPrEffectVector;
+    outcomeLabel?: string;
+    summary: string;
+    sourceId?: string;
+    projectId?: string;
+}
+
+export type ProjectPromotionChannel = 'X' | 'INSTAGRAM' | 'YOUTUBE' | 'PRESS' | 'RED_CARPET';
+export type ProjectPromotionType = 'PROJECT_PROMO' | 'ANNOUNCEMENT' | 'BTS' | 'REEL' | 'CELEBRATION' | 'INTERVIEW' | 'PREMIERE';
+
+export interface ProjectPromotionAttribution {
+    schemaVersion: 1;
+    id: string;
+    attributionKey: string;
+    publicationId: string;
+    projectId: string;
+    projectName: string;
+    channel: ProjectPromotionChannel;
+    promotionType: ProjectPromotionType;
+    absoluteWeek: number;
+    baseBuzzDelta: number;
+    fatigueMultiplier: number;
+    prMultiplier: number;
+    appliedBuzzDelta: number;
+    prInterventionId?: string;
+}
+
 export interface IndustryMediaStory {
     schemaVersion: 1;
     id: string;
@@ -434,11 +1049,33 @@ export interface IndustryMediaStory {
 }
 
 export interface IndustryMediaWorldState {
-    schemaVersion: 1;
+    schemaVersion: 7;
     lastProcessedAbsoluteWeek: number;
     stories: IndustryMediaStory[];
     eventStoryIndex: Record<string, string>;
     publishedBeatKeys: string[];
+    institutions: IndustryMediaInstitution[];
+    personalities: IndustryMediaPersonality[];
+    subjectStances: IndustryMediaSubjectStance[];
+    storyAssignments: IndustryMediaStoryAssignment[];
+    discussions: IndustryMediaDiscussion[];
+    playerResponses: IndustryMediaPlayerResponse[];
+    processedDiscussionKeys: string[];
+    processedResponseKeys: string[];
+    creatorChannels: IndustryMediaCreatorChannel[];
+    youtubeVideos: IndustryMediaYoutubeVideo[];
+    processedYoutubeKeys: string[];
+    fandoms: IndustryMediaFandom[];
+    campaigns: IndustryMediaCampaign[];
+    processedFandomKeys: string[];
+    claims: IndustryMediaClaim[];
+    sourceRecords: IndustryMediaSourceRecord[];
+    processedClaimKeys: string[];
+    narratives: IndustryMediaNarrative[];
+    mediaRelationships: IndustryMediaRelationship[];
+    prInterventions: IndustryMediaPrIntervention[];
+    promotionAttributions: ProjectPromotionAttribution[];
+    processedC7Keys: string[];
 }
 
 export interface StreamingPlatformEcosystemState {
@@ -4078,8 +4715,17 @@ export type StreamingRightsNegotiationStatus =
     | 'LOST'
     | 'WITHDRAWN'
     | 'EXPIRED';
+export type StreamingPrivateOfferResponseStatus =
+    | 'AWAITING_RESPONSE'
+    | 'SELLER_COUNTERED'
+    | 'SELLER_ACCEPTED'
+    | 'SELLER_DECLINED'
+    | 'RIGHTS_SOLD'
+    | 'WITHDRAWN'
+    | 'EXPIRED'
+    | 'SIGNED';
 export type StreamingRightsChangeOfControl = 'NONE' | 'NOTICE' | 'CONSENT_REQUIRED';
-export type StreamingRightsObligationType = 'MARKETING_SPEND' | 'VIEWERSHIP_THRESHOLD';
+export type StreamingRightsObligationType = 'MARKETING_SPEND' | 'VIEWERSHIP_THRESHOLD' | 'FUTURE_GREENLIGHT';
 export type StreamingRightsObligationStatus = 'PENDING' | 'ON_TRACK' | 'SATISFIED' | 'BREACHED';
 export const STREAMING_RIGHTS_CONTRACT_SCHEMA_VERSION = 2 as const;
 export type StreamingRightsContractPartyType =
@@ -4573,6 +5219,122 @@ export interface StreamingBiddingSession {
 
 export type StreamingBiddingSessionRegistry = Record<string, StreamingBiddingSession>;
 
+export type StreamingBuyerAuctionStatus = 'LIVE' | 'WON' | 'LOST' | 'NO_SALE' | 'WITHDRAWN' | 'INVALIDATED';
+export type StreamingBuyerAuctionBidStatus = 'ACTIVE' | 'OUTBID' | 'WITHDRAWN' | 'WON' | 'LOST';
+export type StreamingBuyerAuctionEventType = 'OPENED' | 'BID_PLACED' | 'BID_REVISED' | 'RIVAL_BID' | 'RIVAL_WITHDREW' | 'CLOSED' | 'SETTLED' | 'INVALIDATED';
+
+export interface StreamingBuyerAuctionAllowedTerms {
+    backendMinimum: number;
+    backendMaximum: number;
+    marketingMaximum: number;
+    futureGreenlightAllowed: boolean;
+    futureGreenlightReserve: number;
+}
+
+export interface StreamingBuyerAuctionSellerPriorities {
+    cash: number;
+    backend: number;
+    marketing: number;
+    futureGreenlight: number;
+}
+
+export interface StreamingBuyerAuctionLot {
+    id: string;
+    listingId: string;
+    listingSignature: string;
+    listingKind: 'TITLE' | 'CATALOGUE_PACKAGE';
+    sourceProjectId: string;
+    title: string;
+    projectType: 'MOVIE' | 'SERIES';
+    genre: string;
+    sellerId: string;
+    sellerName: string;
+    sourceLicenseId: string | null;
+    territory: StreamingLicenseTerritory;
+    countryIds: string[];
+    excludedCountryIds: string[];
+    windowType: StreamingRightsWindowType;
+    exclusivity: StreamingLicenseExclusivity;
+    durationWeeks: number;
+    startsAtAbsoluteWeek: number;
+    referenceValue: number;
+    minimumGuarantee: number;
+    minimumBidIncrement: number;
+    reserveSellerValue: number;
+    allowedTerms: StreamingBuyerAuctionAllowedTerms;
+    sellerPriorities: StreamingBuyerAuctionSellerPriorities;
+    notice: string | null;
+    cataloguePackageId: string | null;
+    /** Frozen component projects when the lot represents an all-or-nothing catalogue package. */
+    catalogueComponentIds?: string[];
+}
+
+export interface StreamingBuyerAuctionBid {
+    id: string;
+    sessionId: string;
+    bidderId: string;
+    bidderName: string;
+    platformId: PlatformId | null;
+    isPlayer: boolean;
+    revision: number;
+    status: StreamingBuyerAuctionBidStatus;
+    replacesBidId: string | null;
+    minimumGuarantee: number;
+    licensorRevenueShare: number;
+    marketingGuarantee: number;
+    futureGreenlight: boolean;
+    guaranteedExposure: number;
+    sellerValue: number;
+    createdAtActiveSecond: number;
+}
+
+export interface StreamingBuyerAuctionRival {
+    bidderId: string;
+    platformId: PlatformId;
+    platformName: string;
+    color: string;
+    cashAvailable: number;
+    sellerValueCeiling: number;
+    preferredBackend: number;
+    marketingLimit: number;
+    nextActionSecond: number;
+    revision: number;
+    status: 'WATCHING' | 'ACTIVE' | 'FINAL' | 'WITHDRAWN';
+    currentBidId: string | null;
+}
+
+export interface StreamingBuyerAuctionEvent {
+    id: string;
+    type: StreamingBuyerAuctionEventType;
+    activeSecond: number;
+    bidderId: string | null;
+    bidId: string | null;
+}
+
+export interface StreamingBuyerAuctionSession {
+    id: string;
+    idempotencyKey: string;
+    lot: StreamingBuyerAuctionLot;
+    status: StreamingBuyerAuctionStatus;
+    openedAtAbsoluteWeek: number;
+    roomSecondsRemaining: number;
+    activeSecondsElapsed: number;
+    hardClosesAtSecond: number;
+    materialEventCount: number;
+    lastRealtimeAtMs: number;
+    playerBidderId: string;
+    playerBidId: string | null;
+    rivals: StreamingBuyerAuctionRival[];
+    bids: StreamingBuyerAuctionBid[];
+    events: StreamingBuyerAuctionEvent[];
+    leaderBidId: string | null;
+    winnerBidId: string | null;
+    closedAtActiveSecond: number | null;
+    settledAtAbsoluteWeek: number | null;
+    resultReason: string | null;
+    outcomeMessageId: string | null;
+}
+
 export const STREAMING_CATALOGUE_PACKAGE_SCHEMA_VERSION = 1 as const;
 export type StreamingCataloguePackageLifecycle =
     | 'DRAFT'
@@ -4766,6 +5528,16 @@ export interface OwnedStreamingRightsNegotiation {
     createdAtAbsoluteWeek: number;
     updatedAtAbsoluteWeek: number;
     expiresAtAbsoluteWeek: number;
+    /** CM2 metadata exists only for offers submitted through the Content Market. */
+    proposalVersion?: number;
+    submittedAtAbsoluteWeek?: number | null;
+    responseDueAbsoluteWeek?: number | null;
+    responseStatus?: StreamingPrivateOfferResponseStatus | null;
+    responseReason?: string | null;
+    respondedAtAbsoluteWeek?: number | null;
+    processedProposalVersion?: number | null;
+    signingDeadlineAbsoluteWeek?: number | null;
+    responseMessageId?: string | null;
 }
 
 export interface OwnedStreamingSublicenseDeal {
@@ -4804,6 +5576,9 @@ export interface OwnedStreamingRightsObligation {
     breachPenalty: number;
     successPayment: number;
     resolvedAtAbsoluteWeek: number | null;
+    /** Optional producer/counterparty required by a future-greenlight promise. */
+    counterpartyId?: string | null;
+    createdAtAbsoluteWeek?: number | null;
 }
 
 export type StreamingOriginalGapId =
@@ -5414,6 +6189,8 @@ export interface OwnedStreamingPlatformState {
     campusProjects: OwnedStreamingCampusProject[];
     productLines: OwnedStreamingProductLine[];
     catalogSetupDraft: OwnedStreamingCatalogSetupDraft | null;
+    contentMarketDraft?: { tab: 'ALL' | 'MOVIE' | 'SERIES' | 'COLLECTIONS' | 'OWNED' | 'OFFERS' | 'AUCTIONS'; search: string; selectedId: string | null; ownedIds: string[] } | null;
+    buyerAuctionSessions: StreamingBuyerAuctionSession[];
     starterCatalog: OwnedStreamingStarterCatalog | null;
     catalogLicenses: OwnedStreamingCatalogLicense[];
     rightsNegotiations: OwnedStreamingRightsNegotiation[];
@@ -5630,6 +6407,7 @@ export const createInitialOwnedStreamingPlatformState = (playerId = ''): OwnedSt
     campusProjects: [],
     productLines: [],
     catalogSetupDraft: null,
+    buyerAuctionSessions: [],
     starterCatalog: null,
     catalogLicenses: [],
     rightsNegotiations: [],
@@ -5769,7 +6547,7 @@ export interface ActiveRelease {
 
 export interface Award {
     id: string;
-    name: string; 
+    name: string;
     category: string;
     year: number;
     outcome: 'WON' | 'NOMINATED';
@@ -5848,7 +6626,7 @@ export interface PastProject {
     description?: string;
     projectType: ProjectType;
     royaltyPercentage?: number;
-    awards?: Award[]; 
+    awards?: Award[];
     franchiseId?: string;
     universeId?: UniverseId;
     universeSagaName?: string;
@@ -5873,9 +6651,9 @@ export interface Commitment {
     type: 'ACTING_GIG' | 'JOB' | 'COURSE' | 'GYM' | 'DIRECTOR_GIG' | 'WRITER_GIG';
     roleType?: RoleType;
     energyCost: number;
-    income: number; 
-    lumpSum?: number; 
-    weeklyCost?: number; 
+    income: number;
+    lumpSum?: number;
+    weeklyCost?: number;
     upfrontCost?: number;
     payoutType: 'WEEKLY' | 'LUMPSUM';
     projectDetails?: ProjectDetails;
@@ -6157,7 +6935,7 @@ export interface ScheduledEvent {
     type: ScheduledEventType;
     title: string;
     description?: string;
-    data?: any; 
+    data?: any;
 }
 
 export interface PendingEvent extends ScheduledEvent {}
@@ -6183,6 +6961,10 @@ export interface YoutubeVideo {
     comments: string[];
     sourceArtistId?: string;
     sourceArtistName?: string;
+    /** C7 player-selected project promoted by this upload. */
+    promotedProjectId?: string;
+    /** C7 exact-once promotion attribution record. */
+    promotionAttributionId?: string;
     songTitle?: string;
     isMusicVideo?: boolean;
     assetContext?: {
@@ -6192,6 +6974,29 @@ export interface YoutubeVideo {
         label: string;
         qualityBonus: number;
         viewBoost: number;
+    };
+    /** C4 presentation-only metadata for a saved NPC industry creator video. */
+    industryContext?: {
+        videoId: string;
+        industryEventId: string;
+        mediaStoryId: string;
+        personalityId: string;
+        institutionId?: string;
+        format: IndustryMediaYoutubeFormat;
+        claimMode: IndustryMediaClaimMode;
+        summary: string;
+        confirmedFacts: string;
+        interpretation?: string;
+        creatorSubscribers: number;
+        creatorCredibility: number;
+        creatorAvatar: string;
+        primaryColor: string;
+        secondaryColor: string;
+        thumbnailLabel: string;
+        thumbnailMotif: string;
+        outcome: IndustryMediaYoutubeOutcome;
+        responseOutcome?: IndustryMediaResponseOutcome;
+        mediaClaimId?: string;
     };
 }
 
@@ -6242,6 +7047,20 @@ export interface NewsItem {
     industryEventId?: string;
     /** C1 shared media-story reference. */
     mediaStoryId?: string;
+    /** C2 recurring media-institution reference. */
+    mediaInstitutionId?: string;
+    /** C2 recurring journalist or commentator reference. */
+    mediaPersonalityId?: string;
+    /** C3 public-discussion lineage. */
+    mediaDiscussionId?: string;
+    /** C3 player-response lineage. */
+    mediaResponseId?: string;
+    /** C6 rumour/leak/prediction lineage. */
+    mediaClaimId?: string;
+    /** Saved player-facing publisher name; legacy items continue to infer a source. */
+    sourceName?: string;
+    /** Saved player-facing journalist or commentator byline. */
+    byline?: string;
     companyId?: string;
 }
 
@@ -6265,10 +7084,10 @@ export interface Business {
     name: string;
     type: BusinessType;
     subtype: BusinessSubtype;
-    logo: string; 
+    logo: string;
     color: string;
     foundedWeek: number;
-    balance: number; 
+    balance: number;
     isActive: boolean;
     config: BusinessConfig;
     stats: BusinessStats;
@@ -6336,13 +7155,31 @@ export interface InstaPost {
     hasLiked?: boolean;
     hasSaved?: boolean;
     isPlayer: boolean;
-    contentImage?: string; 
+    contentImage?: string;
     /** B7 shared public-world fact reference. */
     industryEventId?: string;
     /** C1 shared media-story reference. */
     mediaStoryId?: string;
+    /** C2 recurring media-institution reference. */
+    mediaInstitutionId?: string;
+    /** C2 recurring media-personality reference. */
+    mediaPersonalityId?: string;
+    /** C4 saved industry creator-video reference. */
+    industryYoutubeVideoId?: string;
+    /** C5 persistent fandom reference. */
+    fandomId?: string;
+    /** C5 public-campaign reference. */
+    campaignId?: string;
+    /** C5 saved campaign-moment reference. */
+    campaignMomentId?: string;
+    /** C6 rumour/leak/prediction lineage. */
+    mediaClaimId?: string;
     companyId?: string;
     projectId?: string;
+    /** C7 player-selected project promoted by this post. */
+    promotedProjectId?: string;
+    /** C7 exact-once promotion attribution record. */
+    promotionAttributionId?: string;
 }
 
 export interface XPost {
@@ -6370,8 +7207,34 @@ export interface XPost {
     industryEventId?: string;
     /** C1 shared media-story reference. */
     mediaStoryId?: string;
+    /** C2 recurring media-institution reference. */
+    mediaInstitutionId?: string;
+    /** C2 recurring media-personality reference. */
+    mediaPersonalityId?: string;
+    /** C4 saved industry creator-video reference. */
+    industryYoutubeVideoId?: string;
+    /** C5 persistent fandom reference. */
+    fandomId?: string;
+    /** C5 public-campaign reference. */
+    campaignId?: string;
+    /** C5 saved campaign-moment reference. */
+    campaignMomentId?: string;
+    /** C3 public-discussion lineage. */
+    mediaDiscussionId?: string;
+    /** C3 player-response lineage. */
+    mediaResponseId?: string;
+    /** C6 rumour/leak/prediction lineage. */
+    mediaClaimId?: string;
+    /** C3 direct-reply source post. */
+    replyToId?: string;
+    /** Canonical entered week used by C3; legacy timestamp remains presentation-compatible. */
+    publishedAbsoluteWeek?: number;
     companyId?: string;
     projectId?: string;
+    /** C7 player-selected project promoted by this post. */
+    promotedProjectId?: string;
+    /** C7 exact-once promotion attribution record. */
+    promotionAttributionId?: string;
 }
 
 export interface StudioContract {
@@ -6646,7 +7509,7 @@ export interface IndustryProject {
         campaign: number;
     };
     universeId?: UniverseId;
-    isFamous?: boolean; 
+    isFamous?: boolean;
     /** @deprecated Legacy single-platform projection. `streamingWindows` is canonical. */
     streamingPlatformId?: PlatformId;
     /** @deprecated Legacy single-platform projection. `streamingWindows` is canonical. */
@@ -8331,7 +9194,7 @@ export interface Vehicle {
     price: number;
     reputationBonus: number;
     energySave: number;
-    customizations?: string[]; 
+    customizations?: string[];
 }
 
 export interface ClothingItem {
@@ -8386,10 +9249,10 @@ export interface ImprovementOption {
     nameKey?: string;
     energyCost: number;
     moneyCost: number;
-    gains: Partial<Stats> & Partial<ActorSkills>; 
+    gains: Partial<Stats> & Partial<ActorSkills>;
     writerGains?: Partial<WriterStats>;
     directorGains?: Partial<DirectorStats>;
-    risk: number; 
+    risk: number;
     description: string;
     descriptionKey?: string;
 }
@@ -8812,7 +9675,7 @@ export const INITIAL_PLAYER: Player = {
         { id: 'rel_mom', name: 'Mom', relation: 'Parent', closeness: 85, image: 'https://api.dicebear.com/8.x/pixel-art/svg?seed=Sophie', lastInteractionWeek: 0, lastInteractionAbsolute: 0, age: 46, gender: 'FEMALE' },
         { id: 'rel_dad', name: 'Dad', relation: 'Parent', closeness: 80, image: 'https://api.dicebear.com/8.x/pixel-art/svg?seed=Arthur', lastInteractionWeek: 0, lastInteractionAbsolute: 0, age: 49, gender: 'MALE' }
     ],
-    team: { 
+    team: {
         agent: null, manager: null, lastAgentFeePaidWeek: 0, lastManagerFeePaidWeek: 0, availableAgents: [], availableManagers: [],
         personalTrainer: null, stylist: null, therapist: null, publicist: null, wellness: null,
         availableTrainers: [], availableStylists: [], availableTherapists: [], availablePublicists: [], availableWellness: []
@@ -8885,9 +9748,9 @@ export const INITIAL_PLAYER: Player = {
         studioMandates: {},
         updatedAtAbsoluteWeek: 0,
     },
-    world: { 
-        projects: [], 
-        trendingGenre: 'ACTION', 
+    world: {
+        projects: [],
+        trendingGenre: 'ACTION',
         universes: {
             MCU: {
                 id: 'MCU',
@@ -8935,8 +9798,8 @@ export const INITIAL_PLAYER: Player = {
                 weeksUntilNextPhase: 156
             }
         },
-        famousMoviesReleased: [], 
-        awardHistory: [], 
+        famousMoviesReleased: [],
+        awardHistory: [],
         upcomingRivals: [],
         talentBookings: [],
         industryProductions: {},

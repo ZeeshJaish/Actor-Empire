@@ -249,6 +249,13 @@ export const resolveStreamingCatalogTitle = (
             .filter((project): project is StreamingCatalogTitle => Boolean(project))
             .find(project => project.id === projectId)
         || (() => {
+        const commission = player.ownedStreamingPlatform?.originalCommissions?.find(item => item.canonicalProjectId === projectId);
+        if (commission) return {
+            id: projectId, title: commission.title, projectType: commission.projectType,
+            genre: commission.genre, rating: null, releaseYear: null, gross: null,
+            studioId: commission.producerStudioId, studioName: commission.producerStudioName,
+            source: 'OWNED_LIBRARY' as const,
+        };
         const license = normalizeOwnedStreamingPlatformState(
             player.ownedStreamingPlatform,
             player.id,

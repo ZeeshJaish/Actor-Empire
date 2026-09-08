@@ -132,7 +132,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
   const logContainerRef = useRef<HTMLDivElement>(null);
   const language = getPlayerLanguage(player);
   const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
-  
+
   // Cheat Menu State
   const [activeCheatMenu, setActiveCheatMenu] = useState<CheatMenuMode>('NONE');
   const [showPasswordPrompt, setShowPasswordPrompt] = useState(false);
@@ -147,7 +147,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
   const [isCompressing, setIsCompressing] = useState(false);
   const [avatarError, setAvatarError] = useState('');
   const [showEnergySpendSheet, setShowEnergySpendSheet] = useState(false);
-  
+
   const clickCountRef = useRef(0);
   const lastClickRef = useRef(0);
   const avatarClickTimeoutRef = useRef<number | null>(null);
@@ -343,7 +343,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       const newStats = { ...player.stats, [key]: value };
       onUpdatePlayer({ ...player, stats: newStats });
   };
-  
+
   const updateSkill = (key: keyof ActorSkills, value: number) => {
       if (!onUpdatePlayer) return;
       const newSkills = { ...player.stats.skills, [key]: value };
@@ -473,7 +473,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
          roleType: 'LEAD',
          energyCost: 0,
          income: 0,
-         lumpSum: 500000, 
+         lumpSum: 500000,
          payoutType: 'LUMPSUM',
          projectDetails: details,
          projectPhase: 'POST_PRODUCTION', // Magic State
@@ -504,7 +504,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
          roleType: 'LEAD',
          energyCost: 0,
          income: 0,
-         lumpSum: 1000000, 
+         lumpSum: 1000000,
          payoutType: 'LUMPSUM',
          projectDetails: details,
          projectPhase: 'POST_PRODUCTION',
@@ -541,9 +541,9 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
   });
   const triggerCheatLifeEvent = () => {
     if (!onUpdatePlayer) return;
-    
+
     let event = generateLifeEvent(player);
-    
+
     let tries = 0;
     while (!event && tries < 100) {
         event = generateLifeEvent(player);
@@ -3149,7 +3149,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
 
   return (
     <div className="space-y-6 pb-24 pt-4 relative">
-      
+
       {/* PASSWORD PROMPT OVERLAY */}
       {showPasswordPrompt && (
           <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-200">
@@ -3159,10 +3159,10 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                   </div>
                   <h3 className="text-white font-bold text-lg mb-1">Developer Tools</h3>
                   <p className="text-zinc-500 text-xs mb-6">This code only opens internal QA tools. It does not lock or protect save slots.</p>
-                  
+
                   <div className="w-full relative mb-4">
-                      <input 
-                        type="password" 
+                      <input
+                        type="password"
                         value={passwordInput}
                         onChange={(e) => setPasswordInput(e.target.value)}
                         placeholder="Required"
@@ -3206,7 +3206,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                           <X size={20} className="text-zinc-400" />
                       </button>
                   </div>
-                  
+
                   <div className="p-5 overflow-y-auto custom-scrollbar space-y-6">
 
                       {activeCheatMenu === 'EDITOR' && (
@@ -3406,7 +3406,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                               </button>
                           </div>
                       )}
-                      
+
                       {/* DEV ONLY: Scenario Triggers */}
                       {activeCheatMenu === 'DEV' && (
                           <div className="space-y-2">
@@ -3490,7 +3490,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                                       Production to Post
                                   </button>
                                   <button onClick={() => triggerStudioScenario('AWAITING_RELEASE')} className="bg-emerald-900/30 hover:bg-emerald-900/50 border border-emerald-500/30 text-xs font-bold py-3 rounded-lg text-emerald-400">
-                                      Release Next Week
+                                      Awaiting Release Wizard
                                   </button>
                                   <button onClick={() => triggerStudioScenario('FUNDED_PREMIERE')} className="bg-sky-900/30 hover:bg-sky-900/50 border border-sky-400/40 text-xs font-bold py-3 rounded-lg text-sky-300">
                                       Funded Season Premiere
@@ -3913,9 +3913,9 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                               </button>
                               <div>
                                   <label className="text-xs font-bold text-zinc-500 uppercase block mb-1">Bank Balance ($)</label>
-                                  <input 
-                                    type="number" 
-                                    value={player.money} 
+                                  <input
+                                    type="number"
+                                    value={player.money}
                                     onChange={updateMoney}
                                     className="w-full bg-zinc-950 border border-zinc-700 rounded-xl p-3 text-white font-mono font-bold focus:outline-none focus:border-amber-500"
                                   />
@@ -3925,9 +3925,9 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                                       <label className="text-xs font-bold text-zinc-500 uppercase">Energy</label>
                                       <span className="text-xs font-mono text-amber-400">{player.energy.current}</span>
                                   </div>
-                                  <input 
-                                    type="range" min="0" max="100" 
-                                    value={player.energy.current} 
+                                  <input
+                                    type="range" min="0" max="100"
+                                    value={player.energy.current}
                                     onChange={(e) => updateEnergy(parseInt(e.target.value))}
                                     className="w-full accent-amber-500 h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer"
                                   />
@@ -3972,9 +3972,9 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                                       <label className="text-xs font-bold text-zinc-400 capitalize">{stat === 'happiness' ? 'Mood' : stat === 'body' ? 'Physique' : stat}</label>
                                       <span className="text-xs font-mono text-zinc-300">{Math.round((player.stats as any)[stat] || 0)}</span>
                                   </div>
-                                  <input 
+                                  <input
                                     type="range" min="0" max="100"
-                                    value={(player.stats as any)[stat] || 0} 
+                                    value={(player.stats as any)[stat] || 0}
                                     onChange={(e) => updateStat(stat as any, parseInt(e.target.value))}
                                     className="w-full accent-emerald-500 h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer"
                                   />
@@ -3991,16 +3991,16 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                                       <label className="text-xs font-bold text-zinc-400 capitalize">{stat}</label>
                                       <span className="text-xs font-mono text-zinc-300">{Math.round((player.stats as any)[stat] || 0)}</span>
                                   </div>
-                                  <input 
+                                  <input
                                     type="range" min="0" max="100"
-                                    value={(player.stats as any)[stat] || 0} 
+                                    value={(player.stats as any)[stat] || 0}
                                     onChange={(e) => updateStat(stat as any, parseInt(e.target.value))}
                                     className="w-full accent-blue-500 h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer"
                                   />
                               </div>
                           ))}
                       </div>
-                      
+
                       {/* ALL TIERS: Skills */}
                       <div>
                           <div className="flex justify-between items-center mb-2 border-b border-zinc-800 pb-1">
@@ -4011,9 +4011,9 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                               {Object.keys(player.stats.skills).map((key) => (
                                   <div key={key}>
                                       <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">{key}</label>
-                                      <input 
+                                      <input
                                         type="number" min="0" max="100"
-                                        value={Math.round((player.stats.skills as any)[key] || 0)} 
+                                        value={Math.round((player.stats.skills as any)[key] || 0)}
                                         onChange={(e) => updateSkill(key as keyof ActorSkills, parseInt(e.target.value))}
                                         className="w-full bg-zinc-950 border border-zinc-800 rounded p-1 text-xs text-white text-center"
                                       />
@@ -4034,9 +4034,9 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                                           <label className="text-xs font-bold text-zinc-400">{formatGenreLabel(genre)}</label>
                                           <span className="text-xs font-mono text-zinc-300">{Math.round((player.stats.genreXP[genre] || 0))}</span>
                                       </div>
-                                      <input 
+                                      <input
                                         type="range" min="0" max="100"
-                                        value={player.stats.genreXP[genre] || 0} 
+                                        value={player.stats.genreXP[genre] || 0}
                                         onChange={(e) => updateGenreXP(genre, parseInt(e.target.value))}
                                         className="w-full accent-purple-500 h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer"
                                       />
@@ -4246,13 +4246,13 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
         <div className="absolute top-0 right-0 p-4 opacity-20 group-hover:opacity-40 transition-opacity">
             <Star size={120} className="text-amber-500 rotate-12" />
         </div>
-        
+
         <div className="relative z-10 flex items-center gap-4">
             <div className="relative cursor-pointer active:scale-95 transition-transform shrink-0" onClick={handleAvatarClick}>
                 <div className="w-20 h-20 rounded-full p-[2px] bg-gradient-to-tr from-amber-300 via-amber-500 to-amber-700 shadow-lg shadow-amber-900/20">
-                    <img 
-                        src={player.avatar} 
-                        alt="Avatar" 
+                    <img
+                        src={player.avatar}
+                        alt="Avatar"
                         className="w-full h-full rounded-full object-cover border-2 border-zinc-900"
                     />
                 </div>
@@ -4263,7 +4263,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                     Lvl {Math.floor((player.stats?.fame || 0) / 10) + 1}
                 </div>
             </div>
-            
+
             <div className="flex-1 min-w-0">
                 <h1 className="text-2xl font-bold leading-tight text-white tracking-tight break-words sm:text-3xl">{player.name}</h1>
                 <div className="mt-2 flex min-w-0 flex-col items-start gap-2">
@@ -4281,12 +4281,12 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                     {formatMoney(player.money)}
                 </div>
             </div>
-            
+
             <div className="flex flex-col items-center justify-center pl-4 border-l border-white/5 shrink-0">
                 <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-bold mb-1">{tr('home.week')}</div>
                 <div className="text-3xl font-light text-white">{player.currentWeek}</div>
                 <div className="text-[10px] text-zinc-600">{tr('common.of')} 52</div>
-                
+
                 {/* SETTINGS AND STORE BUTTONS */}
                 <div className="flex gap-1 mt-2">
                     {(player.bloodline && player.bloodline.length > 0) || player.relationships.some(rel => rel.relation === 'Child') ? (
@@ -4332,13 +4332,13 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
          </div>
          <div className="h-4 bg-zinc-900/50 rounded-full overflow-hidden border border-white/5 relative">
             {/* The Used/Committed Portion */}
-            <div 
-                className="absolute right-0 top-0 h-full bg-zinc-800 pattern-diagonal-lines border-l border-zinc-700" 
+            <div
+                className="absolute right-0 top-0 h-full bg-zinc-800 pattern-diagonal-lines border-l border-zinc-700"
                 style={{ width: `${weeklyDrain}%` }}
             />
             {/* The Current Active Energy */}
-            <div 
-                className="absolute left-0 top-0 h-full bg-gradient-to-r from-amber-600 to-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.5)] transition-all duration-700" 
+            <div
+                className="absolute left-0 top-0 h-full bg-gradient-to-r from-amber-600 to-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.5)] transition-all duration-700"
                 style={{ width: `${Math.max(0, player.energy.current)}%` }}
             />
          </div>
@@ -4431,7 +4431,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
 
       {/* Stats Section Redesign */}
       <div className="space-y-4">
-          
+
           {/* Personal Condition */}
           <div className="glass-card p-5 rounded-3xl space-y-3">
               <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 flex items-center gap-2">
@@ -4473,7 +4473,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
         <div ref={logContainerRef} className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar mask-image-gradient">
             {liveFeedLogs.map((log, idx) => (
                 <div key={idx} className={`text-sm leading-relaxed border-l-2 pl-3 ${
-                    log.type === 'positive' ? 'border-emerald-500/50 text-emerald-100' : 
+                    log.type === 'positive' ? 'border-emerald-500/50 text-emerald-100' :
                     log.type === 'negative' ? 'border-rose-500/50 text-rose-100' : 'border-zinc-700 text-zinc-400'
                 }`}>
                     <span className="text-zinc-600 text-[10px] font-mono mr-2 block uppercase">{tr('common.year')} {log.year} • {tr('common.week')} {log.week}</span>
@@ -4489,8 +4489,8 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
         disabled={isProcessing}
         data-tutorial-id="home-next-week"
         className={`w-full py-5 rounded-2xl font-bold text-lg shadow-xl shadow-amber-900/20 transform active:scale-[0.98] transition-all flex items-center justify-center gap-3 border border-white/10 ${
-            isProcessing 
-            ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed' 
+            isProcessing
+            ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
             : 'bg-gradient-to-br from-amber-500 to-amber-700 text-white hover:brightness-110 relative overflow-hidden group'
         }`}
       >

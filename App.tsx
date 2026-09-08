@@ -7,6 +7,7 @@ import { ProductionCrisisModal } from './components/ProductionCrisisModal';
 import { LifeEventModal } from './components/LifeEventModal';
 import { StockControlEventModal } from './components/StockControlEventModal';
 import { SaveRecoveryModal } from './components/SaveRecoveryModal';
+import { WeekProcessingRecoveryModal } from './components/WeekProcessingRecoveryModal';
 import { applyCrisisImpact } from './services/productionService';
 import { HomePage } from './views/HomePage';
 import { CareerPage } from './views/CareerPage';
@@ -58,7 +59,10 @@ import { createInstagramReferralOutcome } from './services/instagramOfferLogic';
 import { executeStockTrade } from './services/stockLogic';
 import { migratePlayerSave } from './services/saveMigration';
 import { prepareExternalPlayerUpdateForUi, prepareProcessedWeekForUi } from './services/playerUiState';
+import { applyIndustryMediaCampaignParticipation } from './services/industryWorld';
 import { yieldForWeekProcessingPaint } from './services/weekProcessingScheduler';
+import { describeWeekProcessingFailure } from './services/weekProcessingRecovery';
+import { checkpointNativeMemoryPressure } from './services/nativeMemoryCheckpoint';
 import { exportSignedSaveArchive, importSignedSaveArchiveFromFile } from './services/saveTransfer';
 import { grantMigrationCarePackageIfEligible, MIGRATION_CARE_PACKAGE_CASH, MIGRATION_CARE_PACKAGE_ENERGY } from './services/migrationCarePackage';
 import { externalizeCustomPostersInPlayer } from './services/customPosterMedia';
@@ -71,6 +75,7 @@ import { acceptOutsideProducerInvestmentOffer, counterOutsideProducerInvestmentO
 import { PHASE_ONE_ENERGY_COSTS } from './services/energyCosts';
 import { getPlayerLanguage, isSupportedGameLanguage, t } from './services/i18n';
 import { getHealthConditionLabel } from './services/healthConditions';
+import { applyProjectPromotionAttribution } from './services/projectPromotionAttribution';
 import {
   addBreadcrumb,
   markGameCheckpoint,
@@ -112,6 +117,13 @@ type PendingSaveRecovery = {
   storageKey: string;
   previous: Player;
   violations: string[];
+};
+
+type PendingWeekProcessingFailure = {
+  age: number;
+  week: number;
+  failedStage: string;
+  detail: string;
 };
 
 const getMedicalPromptCooldownWeeks = (severity?: string) => {
@@ -451,6 +463,7 @@ export const App: React.FC = () => {
   const [activePage, setActivePage] = useState<Page>(Page.HOME);
   const [lifestyleInitialView, setLifestyleInitialView] = useState<'MAIN' | 'ASSETS' | 'ACTIVITIES' | 'BUSINESS' | 'PRODUCTION_WIZARD' | 'PRODUCTION_GAME' | 'STREAMING_PLATFORM' | 'STREAMING_FINANCE' | null>(null);
   const [rightsMarketOpportunityId, setRightsMarketOpportunityId] = useState<string | null>(null);
+  const [streamingContentOfferId, setStreamingContentOfferId] = useState<string | null>(null);
   const [studioContinuationTarget, setStudioContinuationTarget] = useState<{ studioId: string; scriptId: string } | null>(null);
   const [platformCommissionTarget, setPlatformCommissionTarget] = useState<{ studioId: string; offerId: string } | null>(null);
   const [initialForbesStudioId, setInitialForbesStudioId] = useState<string | null>(null);
@@ -459,6 +472,7 @@ export const App: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const weekProcessingLockRef = useRef(false);
   const activeWeekRunIdRef = useRef<string | null>(null);
+  const activeWeekStageRef = useRef('idle');
   const lastWeekProcessSettledAtRef = useRef(0);
   const suppressNextAutosaveRef = useRef(false);
   const skipNextPlayingMigrationRef = useRef(false);
@@ -481,7 +495,7 @@ export const App: React.FC = () => {
   const [startupMinimumElapsed, setStartupMinimumElapsed] = useState(false);
   const [startupLoadingLineIndex, setStartupLoadingLineIndex] = useState(0);
   const [startupLoadingProgress, setStartupLoadingProgress] = useState(0);
-  
+
   // UI States
   const [toastMessage, setToastMessage] = useState<{title: string, subtext: string} | null>(null);
   const [activePressEvent, setActivePressEvent] = useState<{ project: Commitment, questions: PressInteraction[] } | null>(null);
@@ -493,6 +507,8 @@ export const App: React.FC = () => {
   const [pendingMedicalPrompt, setPendingMedicalPrompt] = useState<PendingMedicalPrompt | null>(null);
   const [pendingSaveRecovery, setPendingSaveRecovery] = useState<PendingSaveRecovery | null>(null);
   const [isRecoveringSave, setIsRecoveringSave] = useState(false);
+  const [pendingWeekProcessingFailure, setPendingWeekProcessingFailure] = useState<PendingWeekProcessingFailure | null>(null);
+  const [isExportingWeekBackup, setIsExportingWeekBackup] = useState(false);
   const [babyFirstNameInput, setBabyFirstNameInput] = useState('');
   const [babySurnameChoice, setBabySurnameChoice] = useState('');
   const [deathScreenPreviewPlayer, setDeathScreenPreviewPlayer] = useState<Player | null>(null);
@@ -503,11 +519,11 @@ export const App: React.FC = () => {
   const isStartupLoadingVisible = isInitializing || !startupMinimumElapsed;
   const [showWhatsNewModal, setShowWhatsNewModal] = useState(false);
   const [showPreviousWhatsNewNotes, setShowPreviousWhatsNewNotes] = useState(false);
-  
+
   // DEBT / AD STATES
   const [showDebtModal, setShowDebtModal] = useState(false);
   const [isShowingAd, setIsShowingAd] = useState(false);
-  const [adStep, setAdStep] = useState(0); 
+  const [adStep, setAdStep] = useState(0);
   const [adTotalSteps, setAdTotalSteps] = useState(1);
   const autosaveTimerRef = useRef<number | null>(null);
   const purchaseUpdateHandlerRef = useRef<(update: IOSPurchaseUpdate) => void>(() => {});
@@ -657,13 +673,14 @@ export const App: React.FC = () => {
       nextPlayer: Player,
       options: {
           rethrow?: boolean;
-          weekDiagnostic?: { runId: string; screen: string };
+          weekDiagnostic?: { runId: string; screen: string; onStage?: (stage: string) => void };
           reason?: SaveIntegrityReason;
           currentIsUnverified?: boolean;
           sourceByteEstimate?: number;
       } = {}
   ): Promise<Player> => {
       if (options.weekDiagnostic) {
+          options.weekDiagnostic.onStage?.('persist_prepare_start');
           markWeekProcessingStage('persist_prepare_start', nextPlayer, {
               run_id: options.weekDiagnostic.runId,
               screen: options.weekDiagnostic.screen,
@@ -692,11 +709,13 @@ export const App: React.FC = () => {
       }
       const playerToSave = prepared.player;
       if (options.weekDiagnostic) {
+          options.weekDiagnostic.onStage?.('persist_prepare_done');
           markWeekProcessingStage('persist_prepare_done', playerToSave, {
               run_id: options.weekDiagnostic.runId,
               screen: options.weekDiagnostic.screen,
               save_slot: slot,
           });
+          options.weekDiagnostic.onStage?.('indexeddb_write_start');
           markWeekProcessingStage('indexeddb_write_start', playerToSave, {
               run_id: options.weekDiagnostic.runId,
               screen: options.weekDiagnostic.screen,
@@ -730,6 +749,7 @@ export const App: React.FC = () => {
           });
       }
       if (options.weekDiagnostic) {
+          options.weekDiagnostic.onStage?.('indexeddb_write_done');
           markWeekProcessingStage('indexeddb_write_done', playerToSave, {
               run_id: options.weekDiagnostic.runId,
               screen: options.weekDiagnostic.screen,
@@ -778,7 +798,7 @@ export const App: React.FC = () => {
 
   const persistCurrentSlotSnapshot = async (
       nextPlayer: Player,
-      weekDiagnostic?: { runId: string; screen: string },
+      weekDiagnostic?: { runId: string; screen: string; onStage?: (stage: string) => void },
   ): Promise<Player> => {
       if (!currentSlot) return preparePlayerForPersistence(nextPlayer);
       const playerToSave = await persistSlotSave(currentSlot, nextPlayer, {
@@ -884,11 +904,11 @@ export const App: React.FC = () => {
   }, [activePage, gameStatus, currentSlot, player.age, player.currentWeek]);
 
   // --- LOGIC HOOK ---
-  const { 
+  const {
       handleGenericUpdate, handleRehearse, handleOwnedProductionFocus, handleImproveAction,
-      handlePartnerAction, handleSocialInteract, handleIntimacyChoice, 
+      handlePartnerAction, handleSocialInteract, handleIntimacyChoice,
       handlePromotionAction, handleNPCInteract
-  } = useGameActions({ 
+  } = useGameActions({
       player, setPlayer, setToastMessage, setActivePressEvent, setShowProtectionPrompt, setActiveSocialEvent, setPendingBabyNaming
   });
 
@@ -1054,7 +1074,7 @@ export const App: React.FC = () => {
     const init = async () => {
         try {
             const summaries: Record<number, SaveSlotSummary | null> = { 1: null, 2: null, 3: null };
-            
+
             // Startup must never hydrate or migrate a full career. Existing saves
             // receive a tiny deferred card and are opened only after player selection.
             const indexedDbKeys = new Set(await listGameDataKeys());
@@ -1064,7 +1084,7 @@ export const App: React.FC = () => {
                 const cachedSummary = getGameSaveSummary(saveKey);
                 summaries[i] = cachedSummary || createDeferredSaveSlotSummary(saveKey, 'indexeddb');
             }
-            
+
             // Legacy saves are also represented without parsing them on boot. They
             // migrate into the normal per-slot IndexedDB key only after selection.
             const hasAnySave = Object.values(summaries).some(s => s !== null);
@@ -1157,6 +1177,42 @@ export const App: React.FC = () => {
         last_screen: Page[activePage] || String(activePage),
         save_slot: currentSlot,
       });
+      void checkpointNativeMemoryPressure({
+        isPlaying: gameStatus === 'PLAYING',
+        currentSlot,
+        isWeekProcessing: weekProcessingLockRef.current,
+        getCommittedPlayer: () => playerRef.current,
+        cancelPendingAutosave: () => {
+          if (autosaveTimerRef.current) {
+            window.clearTimeout(autosaveTimerRef.current);
+            autosaveTimerRef.current = null;
+          }
+        },
+        persistCommittedPlayer: async (slot, committedPlayer) => {
+          const savedPlayer = await persistSlotSave(slot, committedPlayer, {
+            rethrow: true,
+            reason: 'AUTOSAVE',
+          });
+          setSaveSlots(prev => ({ ...prev, [slot]: savedPlayer }));
+        },
+      }).then(result => {
+        markTraceAction(
+          result.status === 'SAVED'
+            ? 'native_memory_checkpoint_saved'
+            : 'native_memory_checkpoint_skipped',
+          {
+            flow: 'app_lifecycle',
+            save_slot: currentSlot,
+            checkpoint_status: result.status,
+            checkpoint_reason: result.status === 'SKIPPED' ? result.reason : undefined,
+          },
+        );
+      }).catch(error => {
+        recordNonFatal(error, 'native_memory_checkpoint_failed', {
+          save_slot: currentSlot,
+          last_screen: Page[activePage] || String(activePage),
+        });
+      });
     };
     window.addEventListener('actor-empire-memory-warning', handleMemoryWarning);
     return () => {
@@ -1165,7 +1221,7 @@ export const App: React.FC = () => {
       window.removeEventListener('pageshow', handlePageShow);
       window.removeEventListener('actor-empire-memory-warning', handleMemoryWarning);
     };
-  }, [activePage, currentSlot]);
+  }, [activePage, currentSlot, gameStatus]);
 
   // Auto-save logic
   useEffect(() => {
@@ -1394,9 +1450,9 @@ export const App: React.FC = () => {
     setSaveSlotSummaries(prev => ({ ...prev, [slot]: null }));
   };
 
-  const handleExportGameData = async () => {
+  const handleExportGameData = async (options: { skipCurrentSnapshot?: boolean } = {}) => {
     try {
-      if (gameStatus === 'PLAYING' && currentSlot) {
+      if (!options.skipCurrentSnapshot && gameStatus === 'PLAYING' && currentSlot) {
         const playerToSave = await persistSlotSave(currentSlot, player, { rethrow: true, reason: 'MANUAL' });
         writeLocalStorageMirror(currentSlot, playerToSave);
         setSaveSlots(prev => ({ ...prev, [currentSlot]: playerToSave }));
@@ -1454,6 +1510,7 @@ export const App: React.FC = () => {
     setActivePressEvent(null);
     setShowProtectionPrompt(null);
     setActiveSocialEvent(null);
+    setPendingWeekProcessingFailure(null);
     setActivePage(Page.HOME);
     setSkipStartMenuIntro(true);
     setGameStatus('START_MENU');
@@ -1534,7 +1591,7 @@ export const App: React.FC = () => {
               safePlayer.team.publicist?.id,
               safePlayer.team.wellness?.id,
           ].filter((id): id is string => Boolean(id));
-          
+
           // Ensure Pools
           if (!safePlayer.team.availableAgents?.length) safePlayer.team.availableAgents = getRandomAgents(3, hiredTeamIds);
           if (!safePlayer.team.availableManagers?.length) safePlayer.team.availableManagers = getRandomManagers(2, hiredTeamIds);
@@ -1586,7 +1643,7 @@ export const App: React.FC = () => {
           if (!safePlayer.weeklyOpportunities || !Array.isArray(safePlayer.weeklyOpportunities.auditions) || !Array.isArray(safePlayer.weeklyOpportunities.jobs)) {
               safePlayer.weeklyOpportunities = { auditions: [], jobs: [] };
           }
-          
+
           if (typeof safePlayer.name !== 'string' || !safePlayer.name.trim()) {
               safePlayer.name = INITIAL_PLAYER.name;
           }
@@ -1650,7 +1707,7 @@ export const App: React.FC = () => {
           }
 
           if (!safePlayer.relationships || safePlayer.relationships.length === 0) safePlayer.relationships = [...INITIAL_PLAYER.relationships];
-          
+
           // FIX: Patch broken avatars
           if (safePlayer.relationships) {
               safePlayer.relationships = safePlayer.relationships.map((rel: any) => {
@@ -1691,7 +1748,7 @@ export const App: React.FC = () => {
           }
 
           if (safePlayer.instagram.feed.length === 0) safePlayer.instagram.feed = generateWeeklyFeed(safePlayer);
-          
+
           if (!Array.isArray(safePlayer.awards)) safePlayer.awards = [];
           safePlayer.awards = dedupeAwards(safePlayer.awards);
           if (!Array.isArray(safePlayer.scheduledEvents)) safePlayer.scheduledEvents = [];
@@ -1767,7 +1824,7 @@ export const App: React.FC = () => {
                   }
                   safePlayer.businesses.push(newBiz);
               }
-              delete safePlayer.business; 
+              delete safePlayer.business;
           }
           return safePlayer;
       });
@@ -1778,7 +1835,7 @@ export const App: React.FC = () => {
       if (toastMessage) { const t = setTimeout(() => setToastMessage(null), 2500); return () => clearTimeout(t); }
   }, [toastMessage]);
 
-  const handleUpdatePlayer = (updatedPlayer: Player) => { 
+  const handleUpdatePlayer = (updatedPlayer: Player) => {
       setPlayer(prepareExternalPlayerUpdateForUi(updatedPlayer));
   };
 
@@ -1855,68 +1912,75 @@ export const App: React.FC = () => {
       window.clearTimeout(autosaveTimerRef.current);
       autosaveTimerRef.current = null;
     }
-    weekProcessingLockRef.current = true;
-    setIsProcessing(true);
-    await yieldForWeekProcessingPaint();
     const traceName = 'process_game_week';
     const startedAt = performance.now();
     const activePageName = Page[activePage] || String(activePage);
     const weekRunId = `week_${player.age}_${player.currentWeek}_${Date.now().toString(36)}`;
-    activeWeekRunIdRef.current = weekRunId;
-    markTraceAction('process_week_started', {
-      last_screen: activePageName,
-      flow: 'process_week',
-      save_slot: currentSlot,
-    });
-    setCrashContext(player, {
-      flow: 'process_week',
-      screen: activePage,
-      game_status: gameStatus,
-      save_slot: currentSlot,
-    });
-    addBreadcrumb('process_week:start', {
-      age: player.age,
-      week: player.currentWeek,
-      pendingEvents: player.pendingEvents?.length || 0,
-      commitments: player.commitments?.length || 0,
-    });
-    markWeekProcessingStage('start', player, {
-      status: 'started',
-      run_id: weekRunId,
-      screen: activePageName,
-      save_slot: currentSlot,
-    });
-    markGameCheckpoint('process_week_start', player, {
-      screen: activePage,
-      pending_events: player.pendingEvents?.length || 0,
-      commitments: player.commitments?.length || 0,
-      active_releases: player.activeReleases?.length || 0,
-    });
-    startPerformanceTrace(traceName, {
-      age: player.age,
-      week: player.currentWeek,
-      screen: activePage,
-    });
     const previousHealthConditionIds = new Set(
       (Array.isArray(player.activeHealthConditions) ? player.activeHealthConditions : [])
         .map(condition => condition?.id)
         .filter(Boolean),
     );
+    weekProcessingLockRef.current = true;
+    activeWeekRunIdRef.current = weekRunId;
+    activeWeekStageRef.current = 'paint_wait';
+    setPendingWeekProcessingFailure(null);
+    setIsProcessing(true);
     try {
+        await yieldForWeekProcessingPaint();
+        markTraceAction('process_week_started', {
+          last_screen: activePageName,
+          flow: 'process_week',
+          save_slot: currentSlot,
+        });
+        setCrashContext(player, {
+          flow: 'process_week',
+          screen: activePage,
+          game_status: gameStatus,
+          save_slot: currentSlot,
+        });
+        addBreadcrumb('process_week:start', {
+          age: player.age,
+          week: player.currentWeek,
+          pendingEvents: player.pendingEvents?.length || 0,
+          commitments: player.commitments?.length || 0,
+        });
+        markWeekProcessingStage('start', player, {
+          status: 'started',
+          run_id: weekRunId,
+          screen: activePageName,
+          save_slot: currentSlot,
+        });
+        markGameCheckpoint('process_week_start', player, {
+          screen: activePage,
+          pending_events: player.pendingEvents?.length || 0,
+          commitments: player.commitments?.length || 0,
+          active_releases: player.activeReleases?.length || 0,
+        });
+        startPerformanceTrace(traceName, {
+          age: player.age,
+          week: player.currentWeek,
+          screen: activePage,
+        });
+        activeWeekStageRef.current = 'game_loop_start';
         markWeekProcessingStage('game_loop_start', player, {
             run_id: weekRunId,
             screen: activePageName,
             save_slot: currentSlot,
         });
         const { player: newPlayerState, triggerAd } = await processGameWeek(player, {
-            onStage: (stage, context) => markWeekProcessingStage(`loop_${stage}`, player, {
-                ...context,
-                run_id: weekRunId,
-                screen: activePageName,
-                save_slot: currentSlot,
-                elapsed_ms: Math.round(performance.now() - startedAt),
-            }),
+            onStage: (stage, context) => {
+                activeWeekStageRef.current = `loop_${stage}`;
+                markWeekProcessingStage(`loop_${stage}`, player, {
+                    ...context,
+                    run_id: weekRunId,
+                    screen: activePageName,
+                    save_slot: currentSlot,
+                    elapsed_ms: Math.round(performance.now() - startedAt),
+                });
+            },
         });
+        activeWeekStageRef.current = 'post_week_sync_start';
         markWeekProcessingStage('game_loop_done', newPlayerState, {
             run_id: weekRunId,
             screen: activePageName,
@@ -2016,11 +2080,14 @@ export const App: React.FC = () => {
             elapsed_ms: Math.round(performance.now() - startedAt),
         });
 
+        activeWeekStageRef.current = 'persist_prepare_start';
         const persistedPlayerState = await persistCurrentSlotSnapshot(syncedPlayerState, {
             runId: weekRunId,
             screen: activePageName,
+            onStage: stage => { activeWeekStageRef.current = stage; },
         });
         syncedPlayerState = persistedPlayerState;
+        activeWeekStageRef.current = 'commit_verified_week';
         suppressNextAutosaveRef.current = true;
         commitProcessedWeekPlayer(persistedPlayerState);
         addBreadcrumb('process_week:persisted', {
@@ -2102,6 +2169,12 @@ export const App: React.FC = () => {
         });
     } catch (error) {
         console.error('Week processing failed:', error);
+        const failurePresentation = describeWeekProcessingFailure(activeWeekStageRef.current, error);
+        setPendingWeekProcessingFailure({
+            age: player.age,
+            week: player.currentWeek,
+            ...failurePresentation,
+        });
         markWeekProcessingStage('failed', player, {
             status: 'failed',
             run_id: weekRunId,
@@ -2137,11 +2210,37 @@ export const App: React.FC = () => {
             subtext: tr('app.feedback.weekProcessingFailedSubtext')
         });
     } finally {
-      stopPerformanceTrace(traceName, { duration_ms: Math.round(performance.now() - startedAt) });
       lastWeekProcessSettledAtRef.current = Date.now();
       activeWeekRunIdRef.current = null;
+      activeWeekStageRef.current = 'idle';
       weekProcessingLockRef.current = false;
       setIsProcessing(false);
+      try {
+        stopPerformanceTrace(traceName, { duration_ms: Math.round(performance.now() - startedAt) });
+      } catch (error) {
+        recordNonFatal(error, 'process_week_trace_cleanup_failed', {
+          age: player.age,
+          week: player.currentWeek,
+        });
+      }
+    }
+  };
+
+  const handleRetryFailedWeek = () => {
+    setPendingWeekProcessingFailure(null);
+    const cooldownLeft = Math.max(0, 510 - (Date.now() - lastWeekProcessSettledAtRef.current));
+    window.setTimeout(() => void handleNextWeek(), cooldownLeft);
+  };
+
+  const handleExportFailedWeekBackup = async () => {
+    if (isExportingWeekBackup) return;
+    setIsExportingWeekBackup(true);
+    try {
+      await handleExportGameData({ skipCurrentSnapshot: true });
+    } catch {
+      // handleExportGameData already reports the actionable export error to the player.
+    } finally {
+      setIsExportingWeekBackup(false);
     }
   };
 
@@ -2153,13 +2252,28 @@ export const App: React.FC = () => {
           if (statsDelta.fame) newStats.fame = Math.max(0, newStats.fame + statsDelta.fame);
           if (statsDelta.reputation) newStats.reputation = Math.max(0, Math.min(100, newStats.reputation + statsDelta.reputation));
           if (statsDelta.followers) newStats.followers = Math.max(0, newStats.followers + statsDelta.followers);
-          const newBuzz = Math.max(-50, Math.min(50, (commitment.promotionalBuzz || 0) + buzzDelta));
-          const updatedC = { ...commitment, promotionalBuzz: newBuzz, lastPressWeek: prev.currentWeek, lastPressAbsolute: getAbsoluteWeek(prev.age, prev.currentWeek) };
-          return { 
-              ...prev, 
-              stats: newStats, 
-              commitments: prev.commitments.map(c => c.id === commitment.id ? updatedC : c),
+          const absoluteWeek = getAbsoluteWeek(prev.age, prev.currentWeek);
+          const publicationId = `press_${commitment.id}_${absoluteWeek}`;
+          const next: Player = {
+              ...prev,
+              stats: newStats,
               logs: [...prev.logs, { week: prev.currentWeek, year: prev.age, message: logMessage, type: 'positive' }]
+          };
+          const promotion = applyProjectPromotionAttribution(next, {
+              projectId: commitment.id,
+              publicationId,
+              channel: 'PRESS',
+              promotionType: 'INTERVIEW',
+              absoluteWeek,
+              baseBuzzDelta: buzzDelta,
+          });
+          return {
+              ...promotion.player,
+              commitments: promotion.player.commitments.map(c => c.id === commitment.id ? {
+                  ...c,
+                  lastPressWeek: prev.currentWeek,
+                  lastPressAbsolute: absoluteWeek,
+              } : c),
           };
       });
       setActivePressEvent(null);
@@ -2211,18 +2325,18 @@ export const App: React.FC = () => {
       setIsShowingAd(true);
 
       let successCount = 0;
-      
+
       try {
           for (let i = 1; i <= steps; i++) {
               setAdStep(i);
-              
+
               // BUFFER: If this is the 2nd (or later) ad, wait 1.5s to let the ad engine reset
               // This prevents "Ad Not Ready" errors or UI hangs
               if (i > 1) {
                   await new Promise(resolve => setTimeout(resolve, 1500));
               }
 
-              const result = await showAd(type); 
+              const result = await showAd(type);
               trackGameEvent('reward_ad_result', {
                   reward_type: type,
                   no_ads_owner: noAdsOwner,
@@ -2230,7 +2344,7 @@ export const App: React.FC = () => {
                   reason: result.reason || 'NONE',
                   step: i,
               });
-              
+
               if (result.success) {
                   successCount++;
                   pendingReceipt = recordPendingRewardAdStep(pendingReceipt, successCount);
@@ -2238,7 +2352,7 @@ export const App: React.FC = () => {
                   // If user cancels or ad fails, break loop
                   break;
               }
-              
+
               // Tiny buffer after closing ad before updating UI or next step
               await new Promise(resolve => setTimeout(resolve, 500));
           }
@@ -2248,7 +2362,7 @@ export const App: React.FC = () => {
           // CRITICAL FIX: This ensures the overlay ALWAYS closes, even if code crashes or hangs
           setIsShowingAd(false);
       }
-      
+
       if (successCount === steps) {
           pendingReceipt = markPendingRewardAdReady(pendingReceipt);
           handleAdComplete(type, data, pendingReceipt.id);
@@ -2280,7 +2394,7 @@ export const App: React.FC = () => {
           if (receiptId) {
               p.flags.grantedRewardAdIds = [...grantedRewardAdIds, receiptId].slice(-80);
           }
-          
+
           if (type === 'REWARDED_CASH') {
               p.money += 5000;
               toastSub = tr('app.rewards.cashSubtext');
@@ -2291,11 +2405,11 @@ export const App: React.FC = () => {
               const bailoutAmount = bailoutAdsUsedThisWeek === 0
                   ? Math.floor(currentDebt * 0.20) + 5000
                   : Math.floor(currentDebt * 0.10) + 2500;
-              
+
               p.money += bailoutAmount;
               p.flags.bailoutAdsUsedThisWeek = bailoutAdsUsedThisWeek + 1;
               toastSub = tr('app.rewards.bailoutSubtext', { amount: bailoutAmount.toLocaleString() });
-              
+
               // Close debt modal if we are back in green
               if (p.money >= 0) {
                   setShowDebtModal(false);
@@ -2321,7 +2435,7 @@ export const App: React.FC = () => {
               rewardGenreExperience(p, data, 10);
               toastSub = tr('app.rewards.genreSubtext', { amount: '10', genre: String(data) });
           }
-          
+
           setToastMessage({ title: toastTitle, subtext: toastSub });
           if (receiptId && currentSlot) {
               void persistSlotSave(currentSlot, p, { rethrow: true })
@@ -2539,16 +2653,16 @@ export const App: React.FC = () => {
   };
 
   // --- HANDLERS ---
-  const handleStartGame = (name: string, age: number, gender: any, avatar: string, handle: string, slotOverride?: number) => { 
+  const handleStartGame = (name: string, age: number, gender: any, avatar: string, handle: string, slotOverride?: number) => {
       const parentRelationships = INITIAL_PLAYER.relationships.map((rel, index) => ({
           ...rel,
           age: age + (index === 0 ? 28 : 31),
       }));
-      const newPlayer = { 
-          ...INITIAL_PLAYER, 
-          name, 
-          age, 
-          gender, 
+      const newPlayer = {
+          ...INITIAL_PLAYER,
+          name,
+          age,
+          gender,
           avatar,
 	          flags: {
 	              ...(INITIAL_PLAYER.flags || {}),
@@ -2567,9 +2681,9 @@ export const App: React.FC = () => {
       if (targetSlot) {
           setSaveSlots(prev => ({ ...prev, [targetSlot]: entitledNewPlayer }));
       }
-      setPlayer(entitledNewPlayer); 
+      setPlayer(entitledNewPlayer);
       setActivePage(Page.HOME);
-      setGameStatus('PLAYING'); 
+      setGameStatus('PLAYING');
   };
 
   const handleStartGameFromIntro = (data: NewCareerData, slot: number) => {
@@ -2609,7 +2723,7 @@ export const App: React.FC = () => {
           heirAge: playableChildAge,
           heirWeek: player.currentWeek,
       });
-      
+
       // Add the current player as a parent
       inheritedRelationships.push({
           id: legacyInheritance.parentActor.id,
@@ -2777,9 +2891,9 @@ export const App: React.FC = () => {
       setActivePage(Page.HOME);
   };
 
-  
-  const handleEventComplete = (updatedPlayer: Player) => { 
-      setPlayer({ ...updatedPlayer, pendingEvent: null }); 
+
+  const handleEventComplete = (updatedPlayer: Player) => {
+      setPlayer({ ...updatedPlayer, pendingEvent: null });
   };
 
   const resolveQueuedEventSafely = (
@@ -2870,7 +2984,7 @@ export const App: React.FC = () => {
           subtext: tr('app.stockControl.openingStocksSubtext', { companyName })
       });
   };
-  
+
   const handleRestartCareer = async () => {
     if (currentSlot) {
         await deleteVerifiedGameData(`actorEmpireSave_${currentSlot}`);
@@ -2919,10 +3033,10 @@ export const App: React.FC = () => {
 
   if (gameStatus === 'DEATH_SCREEN') {
       return (
-          <DeathScreen 
-              player={player} 
-              onContinueAsChild={handleContinueAsChild} 
-              onStartNewGame={handleRestartCareer} 
+          <DeathScreen
+              player={player}
+              onContinueAsChild={handleContinueAsChild}
+              onStartNewGame={handleRestartCareer}
           />
       );
   }
@@ -2955,7 +3069,20 @@ export const App: React.FC = () => {
               onCancel={handleCancelSaveRecovery}
           />
       )}
-      
+
+      {pendingWeekProcessingFailure && !pendingSaveRecovery ? (
+          <WeekProcessingRecoveryModal
+              age={pendingWeekProcessingFailure.age}
+              week={pendingWeekProcessingFailure.week}
+              failedStage={pendingWeekProcessingFailure.failedStage}
+              detail={pendingWeekProcessingFailure.detail}
+              isExporting={isExportingWeekBackup}
+              onRetry={handleRetryFailedWeek}
+              onExportBackup={() => void handleExportFailedWeekBackup()}
+              onReturnToMenu={handleRecoverToMenu}
+          />
+      ) : null}
+
       {/* SIMULATED AD OVERLAY */}
       {isShowingAd && (
           <div className="fixed inset-0 z-[300] bg-black flex flex-col items-center justify-center animate-in fade-in duration-300">
@@ -2979,13 +3106,13 @@ export const App: React.FC = () => {
       {showDebtModal && (
           <div className="fixed inset-0 z-[250] bg-red-950/80 backdrop-blur-md flex items-center justify-center p-6 animate-in zoom-in-95 duration-300">
               <div className="bg-zinc-900 border-2 border-red-500/50 rounded-3xl w-full max-w-sm p-6 shadow-2xl text-center relative overflow-hidden">
-                  
+
                   {/* Visuals */}
                   <div className="absolute top-0 left-0 w-full h-1 bg-red-500 animate-pulse"></div>
                   <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-500/30">
                       {(player.flags.weeksInDebt || 0) >= 8 ? <Skull size={40} className="text-red-500" /> : <AlertTriangle size={40} className="text-red-500" />}
                   </div>
-                  
+
                   {/* Status Check */}
                   {(player.flags.weeksInDebt || 0) >= 8 ? (
                       // GAME OVER STATE
@@ -2998,7 +3125,7 @@ export const App: React.FC = () => {
 	                              <div className="text-xs text-zinc-500 uppercase font-bold mb-1">{tr('app.debt.finalDebt')}</div>
 	                              <div className="text-2xl font-mono font-bold text-red-500">-${Math.abs(player.money).toLocaleString()}</div>
 	                          </div>
-                          <button 
+                          <button
                               onClick={handleRestartCareer}
                               className="w-full py-4 bg-white text-black font-bold rounded-xl hover:bg-zinc-200 transition-colors shadow-lg"
                           >
@@ -3012,7 +3139,7 @@ export const App: React.FC = () => {
 	                          <p className="text-zinc-400 text-sm mb-6 leading-relaxed">
 	                              {tr('app.debt.warningPrefix')} <span className="text-white font-bold">{tr('app.debt.weeksToRecover', { weeks: 8 - (player.flags.weeksInDebt || 0) })}</span> {tr('app.debt.warningSuffix')}
 	                          </p>
-                          
+
                           <div className="bg-black/40 rounded-xl p-4 mb-6 border border-zinc-800">
                               <div className="flex justify-between items-center text-xs text-zinc-500 uppercase font-bold mb-2">
 	                                  <span>{tr('app.debt.currentDebt')}</span>
@@ -3026,7 +3153,7 @@ export const App: React.FC = () => {
 
                           <div className="space-y-3">
                               {/* Bailout Option - Calculates ~20% of current debt + 5k */}
-                              <button 
+                              <button
                                   onClick={() => handleTriggerRewardAd('REWARDED_BAILOUT')}
                                   disabled={(player.flags.bailoutAdsUsedThisWeek || 0) >= 2}
                                   className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-800 disabled:text-zinc-500 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2 shadow-lg"
@@ -3036,9 +3163,9 @@ export const App: React.FC = () => {
 	                              <div className="text-[11px] text-zinc-500">
 	                                  {tr('app.debt.bailoutAdsUsed', { count: player.flags.bailoutAdsUsedThisWeek || 0 })}
 	                              </div>
-                              
+
                               {/* Continue Option */}
-                              <button 
+                              <button
                                   onClick={() => setShowDebtModal(false)}
                                   className="w-full py-3 bg-zinc-800 text-zinc-300 font-bold rounded-xl hover:bg-zinc-700 transition-colors flex items-center justify-center gap-2"
                               >
@@ -3130,15 +3257,15 @@ export const App: React.FC = () => {
 
 	      {player.pendingEvent && (player.pendingEvent.type === 'AWARD_CEREMONY' || player.pendingEvent.type === 'PREMIERE') && (<RedCarpetEvent player={player} event={player.pendingEvent} onComplete={handleEventComplete} />)}
       {player.pendingEvents && player.pendingEvents.length > 0 && (player.pendingEvents[0].type === 'PRODUCTION_CRISIS' || player.pendingEvents[0].type === 'DIRECTOR_DECISION') && (
-          <ProductionCrisisModal 
+          <ProductionCrisisModal
               key={player.pendingEvents[0].id}
-              player={player} 
-              event={player.pendingEvents[0]} 
+              player={player}
+              event={player.pendingEvents[0]}
               onChoice={(idx) => {
                   const currentEvent = player.pendingEvents![0];
                   const { updatedPlayer, log } = applyCrisisImpact(player, currentEvent, idx);
                   resolveQueuedEventSafely(player, updatedPlayer, currentEvent.id, log);
-              }} 
+              }}
           />
       )}
 
@@ -3152,12 +3279,12 @@ export const App: React.FC = () => {
           />
       )}
 
-      {player.pendingEvents && player.pendingEvents.length > 0 && 
-        (player.pendingEvents[0].type === 'LIFE_EVENT' || 
-         player.pendingEvents[0].type === 'LEGAL_HEARING' || 
-         player.pendingEvents[0].type === 'SCANDAL' || 
+      {player.pendingEvents && player.pendingEvents.length > 0 &&
+        (player.pendingEvents[0].type === 'LIFE_EVENT' ||
+         player.pendingEvents[0].type === 'LEGAL_HEARING' ||
+         player.pendingEvents[0].type === 'SCANDAL' ||
          player.pendingEvents[0].type === 'UNDERWORLD_OFFER') && (
-          <LifeEventModal 
+          <LifeEventModal
               key={player.pendingEvents[0].id}
               player={player}
               event={player.pendingEvents[0]}
@@ -3389,7 +3516,7 @@ export const App: React.FC = () => {
 
       <div className={`${isFullBleedMobileSurface ? 'w-screen max-w-none' : 'max-w-md mx-auto border-x border-white/5 pt-safe-top shadow-2xl'} h-screen relative z-10 bg-zinc-950/80 flex flex-col ${player?.settings?.smoothMode ? 'smooth-mode' : ''}`}>
         {gameStatus === 'START_MENU' && (
-            <StartMenu 
+            <StartMenu
                 saveSlots={saveSlotSummaries}
                 onSelectSlot={handleSelectSlot}
                 onDeleteSlot={handleDeleteSlot}
@@ -3406,10 +3533,10 @@ export const App: React.FC = () => {
                     {activePage === Page.CAREER && (<CareerPage player={player} onQuitJob={handleQuitJob} onRehearse={handleRehearse} onOwnedProductionFocus={handleOwnedProductionFocus} />)}
                     {activePage === Page.IMPROVE && (<ImprovePage player={player} onTrain={()=>{}} onEnroll={(c)=>handleGenericUpdate(p=>{ const previousCommitments = p.commitments; const next: Player = { ...p, money: p.money- (c.upfrontCost||0), commitments: [...p.commitments, {...c, id: `c_${Date.now()}`, weeksCompleted:0}] }; syncWeeklyEnergyForCommitments(next, previousCommitments); return next; })} onCancel={(id)=>handleGenericUpdate(p=>{ const previousCommitments = p.commitments; const next: Player = { ...p, commitments: p.commitments.filter(c=>c.id!==id)}; syncWeeklyEnergyForCommitments(next, previousCommitments); return next; })} onPerformAction={handleImproveAction} />)}
                     {activePage === Page.SOCIAL && (<SocialPage player={player} onInteract={handleSocialInteract} onContinueAsChild={handleContinueAsChild} />)}
-                    {activePage === Page.LIFESTYLE && (<LifestylePage player={player} onBuyItem={handleBuyLifestyleItem} onSellItem={handleSellLifestyleItem} onSetResidence={(id)=>handleGenericUpdate(p=>({ ...p, residenceId: id }))} onStartBusiness={()=>{}} onShutdownBusiness={()=>{}} onUpdatePlayer={handleUpdatePlayer} onPremiumPurchase={handlePremiumPurchase} onReturnHome={() => setActivePage(Page.HOME)} onNavVisibilityChange={setIsBottomNavVisible} initialView={lifestyleInitialView ?? undefined} onInitialViewConsumed={() => setLifestyleInitialView(null)} onOpenBank={() => { setInitialMobileAppMode('BANK'); setActivePage(Page.MOBILE); }} initialRightsMarketOpportunityId={rightsMarketOpportunityId ?? undefined} onRightsMarketTargetConsumed={() => setRightsMarketOpportunityId(null)} initialStudioContinuation={studioContinuationTarget ?? undefined} onStudioContinuationConsumed={() => setStudioContinuationTarget(null)} initialPlatformCommission={platformCommissionTarget ?? undefined} onPlatformCommissionConsumed={() => setPlatformCommissionTarget(null)} />)}
+                    {activePage === Page.LIFESTYLE && (<LifestylePage player={player} onBuyItem={handleBuyLifestyleItem} onSellItem={handleSellLifestyleItem} onSetResidence={(id)=>handleGenericUpdate(p=>({ ...p, residenceId: id }))} onStartBusiness={()=>{}} onShutdownBusiness={()=>{}} onUpdatePlayer={handleUpdatePlayer} onPremiumPurchase={handlePremiumPurchase} onReturnHome={() => setActivePage(Page.HOME)} onNavVisibilityChange={setIsBottomNavVisible} initialView={lifestyleInitialView ?? undefined} onInitialViewConsumed={() => setLifestyleInitialView(null)} onOpenBank={() => { setInitialMobileAppMode('BANK'); setActivePage(Page.MOBILE); }} initialRightsMarketOpportunityId={rightsMarketOpportunityId ?? undefined} onRightsMarketTargetConsumed={() => setRightsMarketOpportunityId(null)} initialStreamingContentOfferId={streamingContentOfferId ?? undefined} onStreamingContentOfferConsumed={() => setStreamingContentOfferId(null)} initialStudioContinuation={studioContinuationTarget ?? undefined} onStudioContinuationConsumed={() => setStudioContinuationTarget(null)} initialPlatformCommission={platformCommissionTarget ?? undefined} onPlatformCommissionConsumed={() => setPlatformCommissionTarget(null)} />)}
                     {activePage === Page.MOBILE && (
-                        <MobilePage 
-                            player={player} 
+                        <MobilePage
+                            player={player}
                             onUpdatePlayer={handleUpdatePlayer}
                             onNavVisibilityChange={setIsBottomNavVisible}
                             onFullBleedChange={setIsFullBleedMobileSurface}
@@ -3425,6 +3552,11 @@ export const App: React.FC = () => {
                                 setLifestyleInitialView('PRODUCTION_GAME');
                                 setActivePage(Page.LIFESTYLE);
                             }}
+                            onOpenStreamingContentOffer={(offerId) => {
+                                setStreamingContentOfferId(offerId);
+                                setLifestyleInitialView('STREAMING_PLATFORM');
+                                setActivePage(Page.LIFESTYLE);
+                            }}
                             onOpenStudioContinuation={(studioId, scriptId) => {
                                 if (!studioId || !scriptId) return;
                                 setStudioContinuationTarget({ studioId, scriptId });
@@ -3438,8 +3570,8 @@ export const App: React.FC = () => {
                             }}
                             onAudition={(opp)=>handleGenericUpdate(p=>{ const next: Player = { ...p, applications: [...p.applications, { id: `app_${Date.now()}`, type: 'AUDITION' as const, name: opp.projectName, weeksRemaining: 1, data: opp }] }; spendPlayerEnergy(next, 25, `Audition: ${opp.projectName}`); return next; })}
                             onTakeJob={(job)=>handleGenericUpdate(p=>{ const previousCommitments = p.commitments; const next: Player = { ...p, commitments: [...p.commitments, job] }; syncWeeklyEnergyForCommitments(next, previousCommitments); return next; })}
-                            onQuitJob={handleQuitJob} 
-                            onPost={(t,c,img)=>handleGenericUpdate(p=>{
+                            onQuitJob={handleQuitJob}
+                            onPost={(t,c,img,campaignParticipation,promotedProjectId)=>handleGenericUpdate(p=>{
                                 if (p.instagram.lastPostWeek !== p.currentWeek) {
                                     p.instagram.weeklyPostCount = 0;
                                     p.instagram.lastPostWeek = p.currentWeek;
@@ -3466,6 +3598,9 @@ export const App: React.FC = () => {
                                 const actualGain = outcome.followerGain;
                                 const avatarToSave = p.avatar.startsWith('data:') ? '' : p.avatar;
 
+                                const linkedCampaign = campaignParticipation
+                                    ? p.world.industryMedia?.campaigns?.find(item => item.id === campaignParticipation.campaignId)
+                                    : undefined;
                                 const newPost = {
                                     id: `p_${Date.now()}`,
                                     authorId: 'PLAYER',
@@ -3483,16 +3618,23 @@ export const App: React.FC = () => {
                                     commentList: outcome.commentList,
                                     engagementScore: outcome.engagementScore,
                                     isPlayer: true,
-                                    contentMediaId: img
+                                    contentMediaId: img,
+                                    ...(promotedProjectId ? { promotedProjectId } : {}),
+                                    ...(linkedCampaign ? {
+                                        campaignId: linkedCampaign.id,
+                                        fandomId: linkedCampaign.fandomId,
+                                        industryEventId: linkedCampaign.industryEventId,
+                                        mediaStoryId: linkedCampaign.mediaStoryId,
+                                    } : {}),
                                 };
-                                
+
                                 const toastMsg = outcome.likes > 10000
                                     ? tr('app.socialFeedback.viralFollowersSubtext', { followers: actualGain.toLocaleString() })
                                     : tr('app.socialFeedback.followersSubtext', { followers: actualGain.toLocaleString() });
                                 setToastMessage({ title: tr('app.socialFeedback.postedTitle'), subtext: toastMsg });
-                                
-                                const nextState: Player = { 
-                                    ...p, 
+
+                                const nextState: Player = {
+                                    ...p,
                                     stats: { ...p.stats, followers: p.stats.followers + actualGain },
                                     instagram: {
                                         ...p.instagram,
@@ -3504,10 +3646,38 @@ export const App: React.FC = () => {
                                         controversy: clampInstagramStat((p.instagram.controversy ?? 0) + outcome.statDeltas.controversy),
                                         fashionInfluence: clampInstagramStat((p.instagram.fashionInfluence ?? 10) + outcome.statDeltas.fashionInfluence),
                                         fanLoyalty: clampInstagramStat((p.instagram.fanLoyalty ?? 45) + outcome.statDeltas.fanLoyalty)
-                                    } 
+                                    }
                                 };
                                 spendPlayerEnergy(nextState, config.energy, `Instagram: ${config.label}`);
-                                return nextState;
+                                const campaignState = campaignParticipation
+                                    ? applyIndustryMediaCampaignParticipation(
+                                        nextState,
+                                        campaignParticipation.campaignId,
+                                        campaignParticipation.mode,
+                                        getAbsoluteWeek(nextState.age, nextState.currentWeek),
+                                    )
+                                    : nextState;
+                                if (!promotedProjectId) return campaignState;
+                                const promotion = applyProjectPromotionAttribution(campaignState, {
+                                    projectId: promotedProjectId,
+                                    publicationId: newPost.id,
+                                    channel: 'INSTAGRAM',
+                                    promotionType: t === 'BTS' ? 'BTS' : t === 'REEL' ? 'REEL' : t === 'CELEBRATION' ? 'CELEBRATION' : 'ANNOUNCEMENT',
+                                    absoluteWeek: getAbsoluteWeek(campaignState.age, campaignState.currentWeek),
+                                    reach: outcome.likes + outcome.comments * 3 + outcome.shares * 2,
+                                    engagement: outcome.likes + outcome.comments + outcome.shares + outcome.saves,
+                                });
+                                if (!promotion.attribution) return promotion.player;
+                                return {
+                                    ...promotion.player,
+                                    instagram: {
+                                        ...promotion.player.instagram,
+                                        posts: promotion.player.instagram.posts.map(post => post.id === newPost.id ? {
+                                            ...post,
+                                            promotionAttributionId: promotion.attribution!.id,
+                                        } : post),
+                                    },
+                                };
                             })}
                             onReactInstagramPost={(postId, action)=>handleGenericUpdate(p=>{
                                 const applyReaction = (post: any) => {
@@ -3679,10 +3849,10 @@ export const App: React.FC = () => {
                                         title: tr('app.team.agentHiredTitle'),
                                         subtext: tr('app.team.agentHiredSubtext', { name: agent.name })
                                     });
-                                    return { 
-                                        ...p, 
+                                    return {
+                                        ...p,
                                         money: p.money - agent.annualFee,
-                                        team: { 
+                                        team: {
                                             ...p.team,
                                             agent: agent,
                                             availableAgents: (p.team.availableAgents || []).filter(a => a.id !== agent.id)
@@ -3694,8 +3864,8 @@ export const App: React.FC = () => {
                             onFireAgent={() => {
                                 handleGenericUpdate(p => {
                                     const agentId = p.team.agent?.id;
-                                    return { 
-                                        ...p, 
+                                    return {
+                                        ...p,
                                         team: { ...p.team, agent: null },
                                         relationships: p.relationships.filter(r => r.npcId !== agentId)
                                     };
@@ -3726,8 +3896,8 @@ export const App: React.FC = () => {
                                         title: tr('app.team.managerHiredTitle'),
                                         subtext: tr('app.team.managerHiredSubtext', { name: manager.name })
                                     });
-                                    return { 
-                                        ...p, 
+                                    return {
+                                        ...p,
                                         money: p.money - manager.annualFee,
                                         team: {
                                             ...p.team,
@@ -3741,8 +3911,8 @@ export const App: React.FC = () => {
                             onFireManager={() => {
                                 handleGenericUpdate(p => {
                                     const managerId = p.team.manager?.id;
-                                    return { 
-                                        ...p, 
+                                    return {
+                                        ...p,
                                         team: { ...p.team, manager: null },
                                         relationships: p.relationships.filter(r => r.npcId !== managerId)
                                     };
@@ -3807,7 +3977,7 @@ export const App: React.FC = () => {
                                         : (result.reason || tr('app.producerInvestment.dealBlockedSubtext'))
                                 });
                                 return result.player;
-                            })} 
+                            })}
                             onPerformSponsorship={(id, type)=>handleGenericUpdate(p=>{
                                 const sponIndex = p.activeSponsorships.findIndex(x=>x.id===id);
                                 if (sponIndex < 0) return p;
@@ -3837,17 +4007,17 @@ export const App: React.FC = () => {
                                 spendPlayerEnergy(next, Number(req.energyCost || 0), `Sponsorship: ${s.brandName || type}`);
                                 return next;
                             })}
-                            onDeleteMessage={(id)=>handleGenericUpdate(p=>({ ...p, inbox: p.inbox.filter(m=>m.id!==id) }))} 
-                            onTradeStock={handleTradeStock} 
+                            onDeleteMessage={(id)=>handleGenericUpdate(p=>({ ...p, inbox: p.inbox.filter(m=>m.id!==id) }))}
+                            onTradeStock={handleTradeStock}
                         />
                     )}
                     {activePage === Page.SETTINGS && (
-                        <SettingsPage 
+                        <SettingsPage
                             player={player}
                             onUpdatePlayer={handleGenericUpdate}
                             onExportData={handleExportGameData}
                             onImportData={handleImportGameData}
-                            onBack={() => setActivePage(Page.HOME)} 
+                            onBack={() => setActivePage(Page.HOME)}
                             onMainMenu={() => {
                                 setSkipStartMenuIntro(true);
                                 setGameStatus('START_MENU');
@@ -3856,10 +4026,10 @@ export const App: React.FC = () => {
                         />
                     )}
                     {activePage === Page.STORE && (
-                        <StorePage 
-                            player={player} 
+                        <StorePage
+                            player={player}
                             onBack={() => setActivePage(Page.HOME)}
-                            onWatchAd={handleTriggerRewardAd} 
+                            onWatchAd={handleTriggerRewardAd}
                             onPremiumPurchase={handlePremiumPurchase}
                             onRestorePurchases={handleRestorePurchases}
                         />

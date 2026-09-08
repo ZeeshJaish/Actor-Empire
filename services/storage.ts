@@ -2,6 +2,7 @@
 import { addBreadcrumb, markTraceAction, recordNonFatal, startPerformanceTrace, stopPerformanceTrace } from './firebaseService';
 import type { Player } from '../types';
 import { verifySaveIntegrity, type SaveIntegrityManifest } from './saveIntegrity';
+import { waitForIndexedDbOpen, waitForIndexedDbTransaction } from './indexedDbResilience';
 import {
   loadVerifiedGameData as loadVerifiedGeneration,
   recoverPreviousGameData as recoverPreviousGeneration,
@@ -119,59 +120,53 @@ const getSaveStats = (data: any) => ({
 
 // Open (or create) the database
 const openDB = (): Promise<IDBDatabase> => {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-    request.onerror = () => {
-        console.error("IndexedDB Error:", request.error);
-        reject(request.error);
-    };
-
-    request.onsuccess = () => resolve(request.result);
-
-    request.onupgradeneeded = (event) => {
-      const db = (event.target as IDBOpenDBRequest).result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME);
-      }
-    };
-  });
+  const request = indexedDB.open(DB_NAME, DB_VERSION);
+  request.onupgradeneeded = (event) => {
+    const db = (event.target as IDBOpenDBRequest).result;
+    if (!db.objectStoreNames.contains(STORE_NAME)) {
+      db.createObjectStore(STORE_NAME);
+    }
+  };
+  return waitForIndexedDbOpen(request, { operation: 'open Actor Empire saves' });
 };
 
 const readGameRecord = async (key: string): Promise<unknown | null> => {
   const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const request = db.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME).get(key);
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => resolve(request.result ?? null);
-  });
+  try {
+    const transaction = db.transaction(STORE_NAME, 'readonly');
+    const request = transaction.objectStore(STORE_NAME).get(key);
+    await waitForIndexedDbTransaction(transaction, { operation: `read save record ${key}` });
+    return request.result ?? null;
+  } finally {
+    db.close();
+  }
 };
 
 const writeGameRecord = async (key: string, value: unknown): Promise<void> => {
   const db = await openDB();
-  return new Promise((resolve, reject) => {
+  try {
     const transaction = db.transaction(STORE_NAME, 'readwrite');
     transaction.objectStore(STORE_NAME).put(value, key);
-    transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error);
-    transaction.onabort = () => reject(transaction.error || new Error('IndexedDB write aborted.'));
-  });
+    await waitForIndexedDbTransaction(transaction, { operation: `write save record ${key}` });
+  } finally {
+    db.close();
+  }
 };
 
 const removeGameRecord = async (key: string): Promise<void> => {
   const db = await openDB();
-  return new Promise((resolve, reject) => {
+  try {
     const transaction = db.transaction(STORE_NAME, 'readwrite');
     transaction.objectStore(STORE_NAME).delete(key);
-    transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error);
-    transaction.onabort = () => reject(transaction.error || new Error('IndexedDB delete aborted.'));
-  });
+    await waitForIndexedDbTransaction(transaction, { operation: `delete save record ${key}` });
+  } finally {
+    db.close();
+  }
 };
 
 const promoteIndexedDbGeneration = async ({ keys, retainPrevious }: PromoteSaveGenerationInput): Promise<void> => {
   const db = await openDB();
-  return new Promise((resolve, reject) => {
+  try {
     const transaction = db.transaction(STORE_NAME, 'readwrite');
     const store = transaction.objectStore(STORE_NAME);
     let current: unknown = null;
@@ -209,15 +204,15 @@ const promoteIndexedDbGeneration = async ({ keys, retainPrevious }: PromoteSaveG
     integrityRequest.onsuccess = () => { currentManifest = (integrityRequest.result as unknown) ?? null; promoteAfterReads(); };
     const candidateRequest = store.get(keys.candidate);
     candidateRequest.onsuccess = () => { candidate = (candidateRequest.result as StoredSaveGeneration | undefined) ?? null; promoteAfterReads(); };
-    transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error);
-    transaction.onabort = () => reject(transaction.error || new Error('Verified save promotion aborted.'));
-  });
+    await waitForIndexedDbTransaction(transaction, { operation: `promote verified save ${keys.current}` });
+  } finally {
+    db.close();
+  }
 };
 
 const recoverIndexedDbGeneration = async ({ keys }: RecoverSaveGenerationInput): Promise<void> => {
   const db = await openDB();
-  return new Promise((resolve, reject) => {
+  try {
     const transaction = db.transaction(STORE_NAME, 'readwrite');
     const store = transaction.objectStore(STORE_NAME);
     let current: unknown = null;
@@ -241,15 +236,15 @@ const recoverIndexedDbGeneration = async ({ keys }: RecoverSaveGenerationInput):
     integrityRequest.onsuccess = () => { currentManifest = integrityRequest.result ?? null; recoverAfterReads(); };
     const previousRequest = store.get(keys.previous);
     previousRequest.onsuccess = () => { previous = previousRequest.result ?? null; recoverAfterReads(); };
-    transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error);
-    transaction.onabort = () => reject(transaction.error || new Error('Save recovery promotion aborted.'));
-  });
+    await waitForIndexedDbTransaction(transaction, { operation: `recover verified save ${keys.current}` });
+  } finally {
+    db.close();
+  }
 };
 
 const promoteIndexedDbGenerationBatch = async ({ keys }: PromoteSaveGenerationBatchInput): Promise<void> => {
   const db = await openDB();
-  return new Promise((resolve, reject) => {
+  try {
     const transaction = db.transaction(STORE_NAME, 'readwrite');
     const store = transaction.objectStore(STORE_NAME);
     const snapshots = keys.map(generationKeys => ({
@@ -293,12 +288,15 @@ const promoteIndexedDbGenerationBatch = async ({ keys }: PromoteSaveGenerationBa
       const integrityRequest = store.get(snapshot.keys.integrity);
       integrityRequest.onsuccess = () => { snapshot.integrity = integrityRequest.result ?? null; finishRead(); };
     });
-    transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error);
-    transaction.onabort = () => reject(transaction.error || new Error(
-      abortedForValidation ? 'Staged save batch failed integrity validation.' : 'Staged save batch promotion aborted.',
-    ));
-  });
+    await waitForIndexedDbTransaction(transaction, {
+      operation: 'promote staged save batch',
+      abortedError: new Error(
+        abortedForValidation ? 'Staged save batch failed integrity validation.' : 'Staged save batch promotion aborted.',
+      ),
+    });
+  } finally {
+    db.close();
+  }
 };
 
 const indexedDbGenerationStore: SaveGenerationStore = {
@@ -353,27 +351,20 @@ export const saveGameData = async (
   const startedAt = performance.now();
   try {
       const db = await openDB();
-      return await new Promise((resolve, reject) => {
+      try {
         const transaction = db.transaction(STORE_NAME, 'readwrite');
         const store = transaction.objectStore(STORE_NAME);
         // IndexedDB already performs a structured clone. Avoid an extra JSON
         // stringify/parse here because large long-running saves can stutter
         // mobile WebViews when autosave runs.
-        const request = store.put(data, key);
-        
-        request.onerror = () => {
-            console.error("Error saving game:", request.error);
-            markTraceAction('save_write_failed', { save_key: key, save_slot: data?.flags?.lastLoadedSlot || key });
-            recordNonFatal(request.error, 'indexeddb_save_request_failed', { key, ...getSaveStats(data) });
-            reject(request.error);
-        };
-        request.onsuccess = () => {
-            writeGameSaveSummary(key, data);
-            markTraceAction('save_write_completed', { save_key: key, save_slot: data?.flags?.lastLoadedSlot || key });
-            addBreadcrumb('save_game:success', { key, ...getSaveStats(data) });
-            resolve();
-        };
-      });
+        store.put(data, key);
+        await waitForIndexedDbTransaction(transaction, { operation: `save game data ${key}` });
+        writeGameSaveSummary(key, data);
+        markTraceAction('save_write_completed', { save_key: key, save_slot: data?.flags?.lastLoadedSlot || key });
+        addBreadcrumb('save_game:success', { key, ...getSaveStats(data) });
+      } finally {
+        db.close();
+      }
   } catch (err) {
       console.error("Failed to save game data", err);
       markTraceAction('save_write_failed', { save_key: key, save_slot: data?.flags?.lastLoadedSlot || key });
@@ -394,22 +385,17 @@ export const loadGameData = async (key: string): Promise<any> => {
   const startedAt = performance.now();
   try {
       const db = await openDB();
-      return await new Promise((resolve, reject) => {
+      try {
         const transaction = db.transaction(STORE_NAME, 'readonly');
         const store = transaction.objectStore(STORE_NAME);
         const request = store.get(key);
-        
-        request.onerror = () => {
-            markTraceAction('save_load_failed', { save_key: key, save_slot: key });
-            recordNonFatal(request.error, 'indexeddb_load_request_failed', { key });
-            reject(request.error);
-        };
-        request.onsuccess = () => {
-            markTraceAction('save_load_completed', { save_key: key, save_slot: request.result?.flags?.lastLoadedSlot || key });
-            addBreadcrumb('load_game:success', { key, found: !!request.result, ...getSaveStats(request.result) });
-            resolve(request.result);
-        };
-      });
+        await waitForIndexedDbTransaction(transaction, { operation: `load game data ${key}` });
+        markTraceAction('save_load_completed', { save_key: key, save_slot: request.result?.flags?.lastLoadedSlot || key });
+        addBreadcrumb('load_game:success', { key, found: !!request.result, ...getSaveStats(request.result) });
+        return request.result;
+      } finally {
+        db.close();
+      }
   } catch (err) {
       console.error("Failed to load game data", err);
       markTraceAction('save_load_failed', { save_key: key, save_slot: key });
@@ -423,25 +409,20 @@ export const loadGameData = async (key: string): Promise<any> => {
 export const deleteGameData = async (key: string): Promise<void> => {
   try {
       const db = await openDB();
-      return new Promise((resolve, reject) => {
+      try {
         const transaction = db.transaction(STORE_NAME, 'readwrite');
         const store = transaction.objectStore(STORE_NAME);
-        const request = store.delete(key);
-        
-        request.onerror = () => {
-            recordNonFatal(request.error, 'indexeddb_delete_request_failed', { key });
-            reject(request.error);
-        };
-        request.onsuccess = () => {
-            try {
-              localStorage.removeItem(`${SAVE_SUMMARY_PREFIX}${key}`);
-            } catch {
-              // IndexedDB deletion already succeeded.
-            }
-            addBreadcrumb('delete_game:success', { key });
-            resolve();
-        };
-      });
+        store.delete(key);
+        await waitForIndexedDbTransaction(transaction, { operation: `delete game data ${key}` });
+        try {
+          localStorage.removeItem(`${SAVE_SUMMARY_PREFIX}${key}`);
+        } catch {
+          // IndexedDB deletion already succeeded.
+        }
+        addBreadcrumb('delete_game:success', { key });
+      } finally {
+        db.close();
+      }
   } catch (err) {
       console.error("Failed to delete game data", err);
       recordNonFatal(err, 'delete_game_failed', { key });
@@ -451,12 +432,14 @@ export const deleteGameData = async (key: string): Promise<void> => {
 export const listGameDataKeys = async (): Promise<string[]> => {
   try {
     const db = await openDB();
-    return await new Promise((resolve, reject) => {
+    try {
       const transaction = db.transaction(STORE_NAME, 'readonly');
       const request = transaction.objectStore(STORE_NAME).getAllKeys();
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve(request.result.map(key => String(key)));
-    });
+      await waitForIndexedDbTransaction(transaction, { operation: 'list game save keys' });
+      return request.result.map(key => String(key));
+    } finally {
+      db.close();
+    }
   } catch (error) {
     recordNonFatal(error, 'indexeddb_list_keys_failed');
     return [];
@@ -465,31 +448,13 @@ export const listGameDataKeys = async (): Promise<string[]> => {
 
 export const exportPublicGameData = async (): Promise<Array<{ key: string; value: any }>> => {
   try {
-      const db = await openDB();
-      return await new Promise((resolve, reject) => {
-        const transaction = db.transaction(STORE_NAME, 'readonly');
-        const store = transaction.objectStore(STORE_NAME);
-        const request = store.getAllKeys();
-
-        request.onerror = () => {
-            recordNonFatal(request.error, 'indexeddb_export_keys_failed');
-            reject(request.error);
-        };
-        request.onsuccess = async () => {
-            try {
-                const keys = request.result
-                  .map(key => String(key))
-                  .filter(key => key === 'actorEmpireSave' || /^actorEmpireSave_[1-3]$/.test(key));
-                const entries = await Promise.all(keys.map(async key => ({
-                    key,
-                    value: await loadGameData(key),
-                })));
-                resolve(entries.filter(entry => entry.value !== undefined && entry.value !== null));
-            } catch (error) {
-                reject(error);
-            }
-        };
-      });
+      const keys = (await listGameDataKeys())
+        .filter(key => key === 'actorEmpireSave' || /^actorEmpireSave_[1-3]$/.test(key));
+      const entries = await Promise.all(keys.map(async key => ({
+          key,
+          value: await loadGameData(key),
+      })));
+      return entries.filter(entry => entry.value !== undefined && entry.value !== null);
   } catch (err) {
       console.error("Failed to export game data", err);
       recordNonFatal(err, 'export_game_data_failed');

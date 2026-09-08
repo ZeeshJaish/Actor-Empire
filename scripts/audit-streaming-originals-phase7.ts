@@ -77,6 +77,7 @@ const createFixture = (): Player => {
                 soundIdentKey: 'PULSE',
                 brandPromiseId: 'BALANCED',
                 foundedAtAbsoluteWeek: 2_100,
+                publicManifesto: 'One screen for every kind of story.',
             },
             foundingProfile: {
                 incorporationModel: 'FIXED_V7',

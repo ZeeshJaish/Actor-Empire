@@ -32,6 +32,7 @@ const createFixture = (): Player => {
             soundIdentKey: 'PULSE',
             brandPromiseId: 'BALANCED',
             foundedAtAbsoluteWeek: 2_100,
+            publicManifesto: 'One screen for every kind of story.',
         },
         foundingProfile: {
             incorporationModel: 'FIXED_V7',
@@ -61,6 +62,7 @@ const createFixture = (): Player => {
         },
         infrastructureSetup: {
             capacityPackageId: 'GROWTH',
+            networkPlacements: [],
             rolloutPace: 'STANDARD',
             storageCapacityHours: 40_000,
             reliabilityTarget: 99.8,

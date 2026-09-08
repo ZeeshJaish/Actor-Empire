@@ -8,6 +8,9 @@ import { AIRCRAFT_CATALOG, BOAT_CATALOG, CAR_CATALOG, CLOTHING_CATALOG, MOTORCYC
 import { getLifestyleAssetImageInfo } from '../../services/lifestyleAssetImages';
 import { getPlayerLanguage, t } from '../../services/i18n';
 import { ArrowLeft, Play, TrendingUp, DollarSign, Users, Plus, Lock, Home, Layout, Search, Bell, MonitorPlay, Sparkles, Handshake, ShieldCheck, Flame, MessageCircle, Trophy, ShoppingBag, Radio, ImagePlus, ThumbsUp, ThumbsDown, Share2, MoreHorizontal, ReceiptText, TrendingDown } from 'lucide-react';
+import { IndustryClaimContextPanel, getIndustryClaimPresentation } from './IndustryClaimContext';
+import { IndustryNarrativeContext } from './IndustryNarrativeContext';
+import { applyProjectPromotionAttribution, getEligiblePromotionProjects } from '../../services/projectPromotionAttribution';
 
 interface YoutubeAppProps {
   player: Player;
@@ -31,6 +34,7 @@ type ThumbnailFitMode = 'cover' | 'contain';
 type YoutubeVideoReaction = 'LIKE' | 'DISLIKE';
 type YoutubeContentAsset = Property | Vehicle | ClothingItem;
 type YoutubeAssetFilter = 'ALL' | 'PROPERTY' | 'VEHICLE' | 'CLOTHING';
+type YoutubeHomeFilter = 'ALL' | 'FILM_TV' | 'THEORIES' | 'INDUSTRY';
 
 const YoutubeAssetImageTile: React.FC<{ item: YoutubeContentAsset; selected?: boolean }> = ({ item, selected = false }) => {
     const imageInfo = getLifestyleAssetImageInfo(item);
@@ -137,8 +141,15 @@ const YoutubeThumbnail: React.FC<{ video: YoutubeVideo; className?: string; chil
         };
     }, [video.thumbnailMediaId]);
 
+    const industryStyle = video.industryContext && !src ? {
+        backgroundImage: `radial-gradient(circle at 78% 22%, ${video.industryContext.primaryColor}88 0, transparent 34%), linear-gradient(135deg, ${video.industryContext.secondaryColor}, #09090b 58%, ${video.industryContext.primaryColor}99)`,
+    } : undefined;
+
     return (
-        <div className={`relative overflow-hidden ${className} ${src ? 'bg-zinc-900' : video.thumbnailColor || 'bg-zinc-800'}`}>
+        <div
+            className={`relative overflow-hidden ${className} ${src || industryStyle ? 'bg-zinc-900' : video.thumbnailColor || 'bg-zinc-800'}`}
+            style={industryStyle}
+        >
             {src && <img src={src} alt={video.title} className="absolute inset-0 w-full h-full object-cover" />}
             <div className={src ? 'absolute inset-0 bg-black/15' : ''}></div>
             <div className="relative z-10 w-full h-full flex items-center justify-center">
@@ -147,6 +158,53 @@ const YoutubeThumbnail: React.FC<{ video: YoutubeVideo; className?: string; chil
         </div>
     );
 };
+
+export const IndustryYoutubeContextPanel: React.FC<{ video: YoutubeVideo }> = ({ video }) => {
+    const context = video.industryContext;
+    if (!context) return null;
+    const claimLabel = context.claimMode === 'SPECULATION' ? 'Speculation'
+        : context.claimMode === 'ANALYSIS' ? 'Analysis'
+            : context.claimMode === 'OPINION' ? 'Opinion' : 'Confirmed';
+    return (
+        <section className="mt-4 border-y border-zinc-800 bg-black/35 py-4" aria-label="Industry video context">
+            <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                    <span
+                        className="h-2 w-2 rotate-45"
+                        style={{ backgroundColor: context.primaryColor }}
+                        aria-hidden="true"
+                    />
+                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-300">
+                        {claimLabel}
+                    </span>
+                </div>
+                <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-500">
+                    Credibility {context.creatorCredibility}
+                </span>
+            </div>
+            <p className="mt-3 text-sm leading-5 text-zinc-300">{context.summary}</p>
+            <div className="mt-4 border-l-2 pl-3" style={{ borderColor: context.primaryColor }}>
+                <div className="text-[9px] font-black uppercase tracking-[0.18em] text-zinc-500">Confirmed record</div>
+                <p className="mt-1 text-sm leading-5 text-white">{context.confirmedFacts}</p>
+            </div>
+            {context.interpretation && (
+                <div className="mt-4 border-l border-dashed border-zinc-600 pl-3">
+                    <div className="text-[9px] font-black uppercase tracking-[0.18em] text-zinc-500">Creator interpretation</div>
+                    <p className="mt-1 text-sm italic leading-5 text-zinc-300">{context.interpretation}</p>
+                </div>
+            )}
+            {context.responseOutcome && (
+                <div className="mt-3 text-[10px] font-black uppercase tracking-[0.16em] text-zinc-500">
+                    Recorded response: <span className="text-zinc-200">{context.responseOutcome.toLowerCase()}</span>
+                </div>
+            )}
+        </section>
+    );
+};
+
+export const getYoutubeCommentAvatar = (video: YoutubeVideo, avatarSeed: string): string =>
+    video.industryContext?.creatorAvatar
+    || `https://api.dicebear.com/8.x/pixel-art/svg?seed=${encodeURIComponent(avatarSeed)}`;
 
 const UPLOAD_PLANS: Record<YoutubeUploadPlan, {
     labelKey: string;
@@ -437,14 +495,16 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
     });
     const getCommentBank = (keys: string[]) => keys.map(key => tr(key));
     const [activeTab, setActiveTab] = useState<'HOME' | 'STUDIO'>('HOME');
+    const [homeFilter, setHomeFilter] = useState<YoutubeHomeFilter>('ALL');
     const [studioSection, setStudioSection] = useState<'OVERVIEW' | 'IDENTITY' | 'MONETIZE' | 'DEALS' | 'CONTENT'>('OVERVIEW');
     const [view, setView] = useState<'MAIN' | 'UPLOAD' | 'WATCH'>('MAIN');
     const [selectedVideoId, setSelectedVideoId] = useState<string | null>(null);
-    
+
     // Upload State
     const [title, setTitle] = useState('');
     const [selectedType, setSelectedType] = useState<YoutubeVideoType>('VLOG');
     const [selectedPlan, setSelectedPlan] = useState<YoutubeUploadPlan>('SAFE');
+    const [promotedProjectId, setPromotedProjectId] = useState('');
     const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
     const [assetFilter, setAssetFilter] = useState<YoutubeAssetFilter>('ALL');
     const [thumbnailSourceUrl, setThumbnailSourceUrl] = useState<string | null>(null);
@@ -482,8 +542,21 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
         if (draftThumbnailSourceUrlRef.current) URL.revokeObjectURL(draftThumbnailSourceUrlRef.current);
     }, []);
 
-    // Generate feed once on mount
-    const homeFeed = useMemo(() => generateYoutubeFeed(player), []);
+    const homeFeed = useMemo(() => generateYoutubeFeed(player), [
+        player.id,
+        player.age,
+        player.currentWeek,
+        player.youtube.videos,
+        player.world?.industryMedia?.youtubeVideos,
+        player.world?.musicIndustry?.recentReleases,
+    ]);
+    const filteredHomeFeed = useMemo(() => homeFeed.filter(video => {
+        if (homeFilter === 'ALL') return true;
+        if (homeFilter === 'THEORIES') return video.industryContext?.format === 'THEORY';
+        if (homeFilter === 'INDUSTRY') return Boolean(video.industryContext)
+            && video.industryContext?.format !== 'THEORY';
+        return Boolean(video.industryContext) || video.type === 'TRAILER' || video.type === 'MUSIC_VIDEO';
+    }), [homeFeed, homeFilter]);
 
     const formatNumber = (num: number) => {
         if (!isFinite(num)) return '0';
@@ -497,6 +570,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
         ? player.flags.youtubeMilestonesUnlocked
         : [];
     const absoluteWeek = player.age * 52 + player.currentWeek;
+    const eligiblePromotionProjects = useMemo(() => getEligiblePromotionProjects(player), [player.commitments]);
     const canLivestream = absoluteWeek - (channel.lastLivestreamWeek || 0) >= 1;
     const canMerchDrop = absoluteWeek - (channel.lastMerchDropWeek || 0) >= YOUTUBE_MERCH_COOLDOWN_WEEKS;
     const lastMerchOutcome = channel.lastMerchOutcome;
@@ -528,6 +602,10 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
         return [...channel.videos, ...homeFeed.filter(video => !playerIds.has(video.id))];
     }, [channel.videos, homeFeed]);
     const selectedVideo = watchableVideos.find(video => video.id === selectedVideoId) || null;
+    const selectedClaimContext = getIndustryClaimPresentation(player, selectedVideo?.industryContext?.mediaClaimId);
+    const selectedNarrativeSubjectKey = selectedVideo?.industryContext?.mediaStoryId
+        ? player.world.industryMedia?.stories.find(story => story.id === selectedVideo.industryContext?.mediaStoryId)?.subjectKey
+        : undefined;
     const contentAssetCatalog = useMemo<YoutubeContentAsset[]>(() => {
         const marketAssets: YoutubeContentAsset[] = [
             ...PROPERTY_CATALOG,
@@ -630,7 +708,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                 text,
                 likes,
                 age: index < 2 ? tr('youtube.now') : tr('youtube.weeksAgo', { weeks: Math.max(1, ((seed + index) % 9) + 1) }),
-                avatar: `https://api.dicebear.com/8.x/pixel-art/svg?seed=${encodeURIComponent(avatarSeed)}`
+                avatar: getYoutubeCommentAvatar(video, avatarSeed)
             };
         });
     };
@@ -1017,7 +1095,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
     const handleUpload = async () => {
         if (isThumbnailProcessing) return;
         if (!title.trim()) return;
-        
+
         const typeConfig = getVideoTypeConfig(selectedType);
         if (!typeConfig) return;
 
@@ -1051,6 +1129,9 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
         }
 
         const newVideo = createYoutubeVideo(title, selectedType, 0, 0, selectedPlan, [], thumbnailMediaId, selectedAssetContext);
+        const linkedVideo: YoutubeVideo = selectedPlan === 'PROJECT_PROMO' && promotedProjectId
+            ? { ...newVideo, promotedProjectId }
+            : newVideo;
         const plan = getUploadPlanConfig(selectedPlan);
 
         const updatedChannel = {
@@ -1059,7 +1140,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
             audienceTrust: Math.max(0, Math.min(100, (channel.audienceTrust ?? 55) + plan.trust + currentIdentity.trust)),
             fanMood: Math.max(0, Math.min(100, (channel.fanMood ?? 55) + plan.mood + currentIdentity.mood)),
             controversy: Math.max(0, Math.min(100, (channel.controversy ?? 0) + plan.controversy + currentIdentity.heat)),
-            videos: [newVideo, ...channel.videos]
+            videos: [linkedVideo, ...channel.videos]
         };
 
         const nextPlayer = {
@@ -1069,11 +1150,31 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
             logs: [...player.logs, { week: player.currentWeek, year: player.age, message: selectedAssetContext ? tr('youtube.log.uploadedWithAsset', { plan: plan.label, title, asset: selectedAssetContext.assetName }) : tr('youtube.log.uploaded', { plan: plan.label, title }), type: selectedPlan === 'VIRAL_BAIT' || selectedPlan === 'SPONSOR_HEAVY' ? 'neutral' : 'positive' }]
         };
         spendPlayerEnergy(nextPlayer, typeConfig.energy, `YouTube upload: ${title.trim()}`);
-        onUpdatePlayer(nextPlayer);
+        const promotion = linkedVideo.promotedProjectId ? applyProjectPromotionAttribution(nextPlayer, {
+            projectId: linkedVideo.promotedProjectId,
+            publicationId: linkedVideo.id,
+            channel: 'YOUTUBE',
+            promotionType: 'PROJECT_PROMO',
+            absoluteWeek,
+            reach: linkedVideo.views,
+            engagement: linkedVideo.likes,
+        }) : undefined;
+        const attributedPlayer = promotion?.attribution ? {
+            ...promotion.player,
+            youtube: {
+                ...promotion.player.youtube,
+                videos: promotion.player.youtube.videos.map(video => video.id === linkedVideo.id ? {
+                    ...video,
+                    promotionAttributionId: promotion.attribution!.id,
+                } : video),
+            },
+        } : (promotion?.player || nextPlayer);
+        onUpdatePlayer(attributedPlayer);
 
         setView('MAIN');
         setTitle('');
         setSelectedPlan('SAFE');
+        setPromotedProjectId('');
         setSelectedAssetId(null);
         resetThumbnailEditor();
         setIsThumbnailProcessing(false);
@@ -1204,20 +1305,43 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
         <button type="button" onClick={() => openWatchPage(video)} className="mb-6 group cursor-pointer w-full text-left block">
             {/* Thumbnail */}
             <YoutubeThumbnail video={video} className="w-full aspect-video rounded-xl mb-3 shadow-sm">
-                {/* Center Format Text */}
-                <div className="relative z-10 text-center transform group-hover:scale-105 transition-transform duration-300">
-                    <span className="block text-white/90 font-black text-3xl uppercase tracking-tighter drop-shadow-lg scale-y-110">
-                        {getVideoTypeConfig(video.type).label}
-                    </span>
-                </div>
+                {video.industryContext ? (
+                    <>
+                        <div className="absolute inset-y-0 left-0 w-1.5" style={{ backgroundColor: video.industryContext.primaryColor }} />
+                        <div className="absolute -right-2 top-1/2 -translate-y-1/2 text-[5rem] font-black leading-none tracking-[-0.08em] text-white/[0.06]">
+                            {video.industryContext.thumbnailMotif.slice(0, 3)}
+                        </div>
+                        <div className="absolute left-4 top-4 flex items-center gap-2">
+                            <span className="bg-black/75 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.2em] text-white backdrop-blur-sm">
+                                {video.industryContext.thumbnailLabel}
+                            </span>
+                            <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-white/60">
+                                {video.industryContext.claimMode === 'SPECULATION' ? 'Theory, not a leak' : 'Industry record'}
+                            </span>
+                        </div>
+                        <div className="absolute inset-x-4 bottom-4 pr-12">
+                            <div className="line-clamp-2 text-[1.35rem] font-black leading-[0.96] tracking-[-0.04em] text-white drop-shadow-xl">
+                                {video.title}
+                            </div>
+                        </div>
+                    </>
+                ) : (
+                    <div className="relative z-10 text-center transform group-hover:scale-105 transition-transform duration-300">
+                        <span className="block text-white/90 font-black text-3xl uppercase tracking-tighter drop-shadow-lg scale-y-110">
+                            {getVideoTypeConfig(video.type).label}
+                        </span>
+                    </div>
+                )}
 
                 {/* Duration Badge */}
                 <div className="absolute bottom-2 right-2 bg-black/80 backdrop-blur-sm text-white text-[10px] font-bold px-1.5 py-0.5 rounded">12:34</div>
             </YoutubeThumbnail>
             {/* Meta */}
             <div className="flex gap-3 px-1">
-                <div className={`w-10 h-10 rounded-full ${video.isPlayer ? 'bg-indigo-500' : 'bg-zinc-700'} flex items-center justify-center font-bold text-white text-sm border-2 border-zinc-900`}>
-                    {video.authorName[0]}
+                <div className={`w-10 h-10 rounded-full ${video.isPlayer ? 'bg-indigo-500' : 'bg-zinc-700'} flex items-center justify-center font-bold text-white text-sm border-2 border-zinc-900 overflow-hidden`}>
+                    {video.industryContext ? (
+                        <img src={video.industryContext.creatorAvatar} alt="" className="h-full w-full object-cover" />
+                    ) : video.authorName[0]}
                 </div>
                 <div className="flex-1">
                     {(() => {
@@ -1231,6 +1355,13 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                     {video.assetContext && (
                         <div className="mt-1 text-[10px] font-black uppercase tracking-[0.14em] text-cyan-300 line-clamp-1">
                             {video.assetContext.label}: {video.assetContext.assetName}
+                        </div>
+                    )}
+                    {video.industryContext && (
+                        <div className="mt-1 flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.14em]">
+                            <span style={{ color: video.industryContext.primaryColor }}>{video.industryContext.format.replace(/_/g, ' ')}</span>
+                            <span className="text-zinc-700">◆</span>
+                            <span className="text-zinc-500">{formatNumber(video.industryContext.creatorSubscribers)} subscribers</span>
                         </div>
                     )}
                             </>
@@ -1261,7 +1392,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
 
     return (
         <div className="absolute inset-0 bg-zinc-950 flex flex-col z-40 text-white animate-in slide-in-from-right duration-300 font-sans">
-            
+
             {/* Header */}
             {view === 'MAIN' && (
                 <div className="p-4 pt-12 border-b border-zinc-900 bg-zinc-950 flex justify-between items-center z-10 sticky top-0">
@@ -1378,7 +1509,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                                 {VIDEO_TYPES.map(vtBase => {
                                     const vt = getVideoTypeConfig(vtBase.type);
                                     return (
-                                    <button 
+                                    <button
                                         key={vt.type}
                                         onClick={() => setSelectedType(vt.type)}
                                         className={`p-3 rounded-2xl border text-left transition-all relative overflow-hidden group active:scale-[0.99] ${selectedType === vt.type ? 'bg-white text-black border-white shadow-[0_0_28px_rgba(255,255,255,0.08)]' : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:bg-zinc-900'}`}
@@ -1423,6 +1554,21 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                                 })}
                             </div>
                         </div>
+
+                        {selectedPlan === 'PROJECT_PROMO' && eligiblePromotionProjects.length > 0 && (
+                            <div className="rounded-[1.5rem] border border-red-500/20 bg-red-950/10 p-3">
+                                <div className="text-[10px] font-black uppercase tracking-widest text-red-300">Project featured in this video</div>
+                                <select
+                                    value={promotedProjectId}
+                                    onChange={event => setPromotedProjectId(event.target.value)}
+                                    className="mt-2 w-full rounded-2xl border border-zinc-800 bg-black p-3 text-sm font-bold text-white focus:border-red-500 focus:outline-none"
+                                >
+                                    <option value="">Choose a project</option>
+                                    {eligiblePromotionProjects.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}
+                                </select>
+                                <div className="mt-2 text-[11px] text-zinc-500">The upload still costs only its listed money and energy. Its reach is attributed to this production once.</div>
+                            </div>
+                        )}
 
                         {eligibleContentAssets.length > 0 && (
                             <div className="space-y-3">
@@ -1527,7 +1673,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                     </div>
 
                     <div className="pointer-events-none absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black via-black to-transparent px-4 pt-10 pb-8">
-                        <button 
+                        <button
                             onClick={handleUpload}
                             disabled={!title.trim() || isThumbnailProcessing}
                             className="pointer-events-auto w-full py-4 bg-gradient-to-r from-red-600 to-orange-500 text-white font-black rounded-[1.4rem] disabled:opacity-50 disabled:from-zinc-800 disabled:to-zinc-800 disabled:text-zinc-500 transition-colors shadow-[0_18px_45px_rgba(220,38,38,0.28)] flex items-center justify-center gap-2 active:scale-[0.99]"
@@ -1566,7 +1712,9 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                                 <span>•</span>
                                 <span>{getVideoAgeLabel(selectedVideo)}</span>
                                 <span>•</span>
-                                <span>{getVideoTypeConfig(selectedVideo.type).label}</span>
+                                <span>{selectedVideo.industryContext
+                                    ? selectedVideo.industryContext.format.replace(/_/g, ' ')
+                                    : getVideoTypeConfig(selectedVideo.type).label}</span>
                             </div>
                             {selectedVideo.assetContext && (() => {
                                 const videoAsset = contentAssetsById.get(selectedVideo.assetContext.assetId);
@@ -1583,7 +1731,9 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
 
                             <div className="mt-4 flex items-center gap-3">
                                 <div className={`h-11 w-11 rounded-full ${selectedVideo.isPlayer ? 'bg-indigo-500' : 'bg-zinc-700'} flex items-center justify-center font-black text-white border border-zinc-800 overflow-hidden`}>
-                                    {selectedVideo.isPlayer && player.avatar ? (
+                                    {selectedVideo.industryContext ? (
+                                        <img src={selectedVideo.industryContext.creatorAvatar} alt="" className="h-full w-full object-cover" />
+                                    ) : selectedVideo.isPlayer && player.avatar ? (
                                         <img src={player.avatar} alt={player.name} className="h-full w-full object-cover"/>
                                     ) : (
                                         selectedVideo.authorName[0]
@@ -1592,7 +1742,11 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                                 <div className="min-w-0 flex-1">
                                     <div className="font-black text-white truncate">{selectedVideo.authorName}</div>
                                     <div className="text-xs text-zinc-500">
-                                        {selectedVideo.isPlayer ? tr('youtube.subscriberCount', { count: formatNumber(channel.subscribers) }) : tr('youtube.recommendedCreator')}
+                                        {selectedVideo.isPlayer
+                                            ? tr('youtube.subscriberCount', { count: formatNumber(channel.subscribers) })
+                                            : selectedVideo.industryContext
+                                                ? tr('youtube.subscriberCount', { count: formatNumber(selectedVideo.industryContext.creatorSubscribers) })
+                                                : tr('youtube.recommendedCreator')}
                                     </div>
                                 </div>
                                 {selectedVideo.isPlayer && (
@@ -1601,6 +1755,19 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                                     </div>
                                 )}
                             </div>
+
+                            <IndustryYoutubeContextPanel video={selectedVideo} />
+                            {selectedClaimContext && <div className="mt-4"><IndustryClaimContextPanel {...selectedClaimContext} compact /></div>}
+                            {selectedNarrativeSubjectKey && (
+                                <div className="mt-4">
+                                    <IndustryNarrativeContext
+                                        player={player}
+                                        subjectKey={selectedNarrativeSubjectKey}
+                                        personalityId={selectedVideo.industryContext?.personalityId}
+                                        compact
+                                    />
+                                </div>
+                            )}
 
                             <div className="mt-4 grid grid-cols-4 gap-2">
                                 <button
@@ -1687,21 +1854,43 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
             {/* MAIN CONTENT AREA */}
             {view === 'MAIN' && (
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-4 pb-20 bg-zinc-950">
-                    
+
                     {/* --- HOME TAB --- */}
                     {activeTab === 'HOME' && (
                         <div>
                             {/* Categories */}
                             <div className="flex gap-2 mb-4 overflow-x-auto no-scrollbar pb-2">
-                                <button className="bg-white text-black px-3 py-1.5 rounded-lg text-xs font-bold shrink-0">{tr('youtube.category.all')}</button>
-                                <button className="bg-zinc-900 border border-zinc-800 text-white px-3 py-1.5 rounded-lg text-xs font-bold shrink-0">{tr('youtube.category.acting')}</button>
-                                <button className="bg-zinc-900 border border-zinc-800 text-white px-3 py-1.5 rounded-lg text-xs font-bold shrink-0">{tr('youtube.category.vlogs')}</button>
-                                <button className="bg-zinc-900 border border-zinc-800 text-white px-3 py-1.5 rounded-lg text-xs font-bold shrink-0">{tr('youtube.category.gaming')}</button>
+                                {([
+                                    ['ALL', tr('youtube.category.all')],
+                                    ['FILM_TV', 'Film & TV'],
+                                    ['THEORIES', 'Theories'],
+                                    ['INDUSTRY', 'Industry'],
+                                ] as [YoutubeHomeFilter, string][]).map(([filter, label]) => (
+                                    <button
+                                        key={filter}
+                                        type="button"
+                                        onClick={() => setHomeFilter(filter)}
+                                        aria-pressed={homeFilter === filter}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold shrink-0 border transition-colors ${
+                                            homeFilter === filter
+                                                ? 'bg-white border-white text-black'
+                                                : 'bg-zinc-900 border-zinc-800 text-white hover:border-zinc-700'
+                                        }`}
+                                    >
+                                        {label}
+                                    </button>
+                                ))}
                             </div>
 
                             {/* Feed */}
                             <div className="space-y-2">
-                                {homeFeed.map(v => <VideoCard key={v.id} video={v} />)}
+                                {filteredHomeFeed.map(v => <VideoCard key={v.id} video={v} />)}
+                                {filteredHomeFeed.length === 0 && (
+                                    <div className="border-y border-zinc-800 py-10 text-center">
+                                        <div className="text-sm font-black text-zinc-300">No videos in this lane yet</div>
+                                        <div className="mt-1 text-xs text-zinc-600">New industry stories can appear after Process Week.</div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
@@ -2158,7 +2347,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                             {/* Create Button */}
                             {studioSection === 'CONTENT' && (
                             <>
-                            <button 
+                            <button
                                 onClick={() => setView('UPLOAD')}
                                 className="w-full py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl flex items-center justify-center gap-2 mb-8 shadow-lg shadow-red-900/20"
                             >
@@ -2211,14 +2400,14 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
             {/* --- BOTTOM NAVIGATION --- */}
             {view === 'MAIN' && (
                 <div className="flex bg-zinc-950 border-t border-zinc-900 pb-safe">
-                    <button 
+                    <button
                         onClick={() => setActiveTab('HOME')}
                         className={`flex-1 py-3 flex flex-col items-center gap-1 ${activeTab === 'HOME' ? 'text-white' : 'text-zinc-600 hover:text-zinc-400'}`}
                     >
                         {activeTab === 'HOME' ? <Home size={22} fill="white"/> : <Home size={22}/>}
                         <span className="text-[10px] font-bold">Home</span>
                     </button>
-                    <button 
+                    <button
                         onClick={() => setView('UPLOAD')}
                         className="flex-1 py-3 flex flex-col items-center gap-1 text-zinc-400 hover:text-white"
                     >
@@ -2226,7 +2415,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                             <Plus size={18}/>
                         </div>
                     </button>
-                    <button 
+                    <button
                         onClick={() => setActiveTab('STUDIO')}
                         className={`flex-1 py-3 flex flex-col items-center gap-1 ${activeTab === 'STUDIO' ? 'text-white' : 'text-zinc-600 hover:text-zinc-400'}`}
                     >

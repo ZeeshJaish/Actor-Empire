@@ -23,9 +23,9 @@ interface LifestylePageProps {
   onBuyItem: (item: Property | Vehicle | ClothingItem) => void;
   onSellItem: (itemId: string) => void;
   onSetResidence: (propertyId: string) => void;
-  onStartBusiness: (type: any) => void; 
-  onShutdownBusiness: () => void; 
-  onUpdatePlayer?: (player: Player) => void; 
+  onStartBusiness: (type: any) => void;
+  onShutdownBusiness: () => void;
+  onUpdatePlayer?: (player: Player) => void;
   onPremiumPurchase: (productId: PremiumProductId) => void;
   onReturnHome?: () => void;
   onNavVisibilityChange?: (visible: boolean) => void;
@@ -34,6 +34,8 @@ interface LifestylePageProps {
   onOpenBank?: () => void;
   initialRightsMarketOpportunityId?: string;
   onRightsMarketTargetConsumed?: () => void;
+  initialStreamingContentOfferId?: string;
+  onStreamingContentOfferConsumed?: () => void;
   initialStudioContinuation?: { studioId: string; scriptId: string };
   onStudioContinuationConsumed?: () => void;
   initialPlatformCommission?: { studioId: string; offerId: string };
@@ -59,7 +61,7 @@ const CustomizationHeroImage: React.FC<{ item: Property | Vehicle }> = ({ item }
   );
 };
 
-export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem, onSellItem, onSetResidence, onUpdatePlayer, onPremiumPurchase, onReturnHome, onNavVisibilityChange, initialView, onInitialViewConsumed, onOpenBank, initialRightsMarketOpportunityId, onRightsMarketTargetConsumed, initialStudioContinuation, onStudioContinuationConsumed, initialPlatformCommission, onPlatformCommissionConsumed }) => {
+export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem, onSellItem, onSetResidence, onUpdatePlayer, onPremiumPurchase, onReturnHome, onNavVisibilityChange, initialView, onInitialViewConsumed, onOpenBank, initialRightsMarketOpportunityId, onRightsMarketTargetConsumed, initialStreamingContentOfferId, onStreamingContentOfferConsumed, initialStudioContinuation, onStudioContinuationConsumed, initialPlatformCommission, onPlatformCommissionConsumed }) => {
   const [view, setView] = useState<'MAIN' | 'ASSETS' | 'ACTIVITIES' | 'BUSINESS' | 'PRODUCTION_WIZARD' | 'PRODUCTION_GAME' | 'STREAMING_PLATFORM' | 'CINEMA_CHAIN'>('MAIN');
   const [customizationItem, setCustomizationItem] = useState<Property | Vehicle | null>(null);
   const [selectedCustomizations, setSelectedCustomizations] = useState<CustomizationOption[]>([]);
@@ -201,7 +203,7 @@ export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem,
   };
 
   // --- RENDER ---
-  
+
 	  if (customizationItem) {
           const customOptions = customizationItem.type === 'Property' ? PROPERTY_CUSTOMIZATIONS : VEHICLE_CUSTOMIZATIONS;
           const heroMeta = customizationItem.type === 'Property'
@@ -298,7 +300,7 @@ export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem,
       );
 
   if (view === 'ACTIVITIES') return <LifestyleActivities player={player} onBack={() => setView('MAIN')} onUpdatePlayer={onUpdatePlayer} />;
-  
+
   if (view === 'BUSINESS') return <LifestyleBusiness player={player} onBack={() => setView('MAIN')} onUpdatePlayer={onUpdatePlayer!} />;
 
   if (view === 'PRODUCTION_WIZARD') return <ProductionWizard player={player} onCancel={() => setView('MAIN')} onUpdatePlayer={onUpdatePlayer!} onComplete={() => setView('PRODUCTION_GAME')} />;
@@ -313,6 +315,8 @@ export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem,
           onReturnToGame={onReturnHome || (() => setView('MAIN'))}
           onOpenBank={onOpenBank}
           initialDestination={streamingDestination}
+          initialContentMarketOfferId={initialStreamingContentOfferId}
+          onContentMarketOfferConsumed={onStreamingContentOfferConsumed}
           onOpenOriginalProduction={target => {
               setStreamingOriginalTarget(target);
               setView('PRODUCTION_GAME');
@@ -327,7 +331,7 @@ export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem,
   return (
     <div className="space-y-6 pb-24 pt-4">
         <div className="flex items-center gap-4 mb-6"><h2 className="text-3xl font-bold text-white">{tr('lifestyle.title')}</h2></div>
-        
+
         <div className="glass-card p-6 rounded-3xl relative overflow-hidden">
             <div className="absolute top-0 right-0 p-4 opacity-5"><CreditCard size={100} /></div>
             <div className="relative z-10">
@@ -341,15 +345,15 @@ export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem,
         </div>
 
         <div className="grid grid-cols-1 gap-4">
-            
+
             {/* PRODUCTION HOUSE - Special Highlighted Card */}
-            <button 
-                onClick={handleProductionClick} 
+            <button
+                onClick={handleProductionClick}
                 className={`glass-card p-6 rounded-3xl text-left transition-all group relative overflow-hidden ${productionStudio ? 'border-amber-500/50 hover:bg-amber-900/10' : 'hover:bg-white/5 opacity-80 hover:opacity-100'}`}
             >
                 {/* Gold Glow for Owners */}
                 {productionStudio && <div className="absolute inset-0 bg-gradient-to-r from-amber-500/5 to-transparent pointer-events-none"></div>}
-                
+
                 <div className="flex items-center gap-4 relative z-10">
                     <div className={`p-3 rounded-2xl ${productionStudio ? 'bg-amber-500 text-black' : 'bg-amber-500/10 text-amber-400'}`}>
                         <Clapperboard size={24}/>

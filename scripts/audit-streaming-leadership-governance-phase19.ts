@@ -54,6 +54,7 @@ const createFixture = (): Player => {
                 soundIdentKey: 'ASCENT',
                 brandPromiseId: 'EVENT_HOUSE',
                 foundedAtAbsoluteWeek: absoluteWeek - 24,
+                publicManifesto: 'Event stories built for a worldwide audience.',
             },
             foundingProfile: {
                 incorporationModel: 'FIXED_V7',

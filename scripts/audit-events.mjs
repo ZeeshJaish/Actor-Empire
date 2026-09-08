@@ -16,7 +16,7 @@ const source = `
 	import { generateRandomCrisis } from '${root}services/crisisGenerator.ts';
 	import { generateDirectorDecision } from '${root}services/directorGenerator.ts';
 	import { SOCIAL_EVENTS_DB } from '${root}services/socialEvents.ts';
-	import { calculateInstagramPostOutcome, getInstagramPostComments, getInstagramPresetCaption, INSTAGRAM_POST_CONFIGS, pickInstagramMicroBrand } from '${root}services/instagramLogic.ts';
+	import { calculateInstagramPostOutcome, getInstagramPostComments, getInstagramPresetCaption, getLocalizedInstagramPostConfig, INSTAGRAM_POST_CONFIGS, pickInstagramMicroBrand } from '${root}services/instagramLogic.ts';
 	import { generateWeeklyFeed } from '${root}services/npcLogic.ts';
 	import { generateTrendingTopics, generateXFeed } from '${root}services/xLogic.ts';
 	import { createYoutubeBacklashEvent, createYoutubeCopyrightEvent, createYoutubeCreatorInviteEvent, createYoutubeRivalryEvent, processGameWeek } from '${root}services/gameLoop.ts';
@@ -351,10 +351,10 @@ GENERAL_CRISIS_TEMPLATES.forEach((template, templateIndex) => {
 for (let i = 0; i < 100; i += 1) {
   record('production:random', \`roll_\${i}\`, () => {
     const crisis = generateRandomCrisis(makeProject(), makePlayer('famous'));
-    if (!crisis.title || !Array.isArray(crisis.options) || crisis.options.length === 0) throw new Error('Bad random crisis shape');
+    if (!(crisis.title || crisis.titleKey) || !Array.isArray(crisis.options) || crisis.options.length === 0) throw new Error('Bad random crisis shape');
     crisis.options.forEach((option, optionIndex) => {
       const result = option.impact(makePlayer('famous'), makeProject());
-      if (!result?.updatedPlayer || !result?.updatedProject || !result.log) throw new Error(\`Bad random crisis option \${optionIndex}\`);
+      if (!result?.updatedPlayer || !result?.updatedProject || !(result.log || result.logKey)) throw new Error(\`Bad random crisis option \${optionIndex}\`);
       checks += 1;
     });
   });
@@ -363,10 +363,10 @@ for (let i = 0; i < 100; i += 1) {
 for (let i = 0; i < 60; i += 1) {
   record('production:director', \`roll_\${i}\`, () => {
     const decision = generateDirectorDecision(makeProject(), makePlayer('famous'));
-    if (!decision.title || !Array.isArray(decision.options) || decision.options.length === 0) throw new Error('Bad director decision shape');
+    if (!(decision.title || decision.titleKey) || !Array.isArray(decision.options) || decision.options.length === 0) throw new Error('Bad director decision shape');
     decision.options.forEach((option, optionIndex) => {
       const result = option.impact(makePlayer('famous'), makeProject());
-      if (!result?.updatedPlayer || !result?.updatedProject || !result.log) throw new Error(\`Bad director option \${optionIndex}\`);
+      if (!result?.updatedPlayer || !result?.updatedProject || !(result.log || result.logKey)) throw new Error(\`Bad director option \${optionIndex}\`);
       checks += 1;
     });
   });
@@ -387,7 +387,7 @@ Object.entries(SOCIAL_EVENTS_DB).forEach(([category, events]) => {
 
 (Object.keys(INSTAGRAM_POST_CONFIGS) as InstaPostType[]).forEach((postType) => {
   record('instagram:post_config', postType, () => {
-    const config = INSTAGRAM_POST_CONFIGS[postType];
+    const config = getLocalizedInstagramPostConfig(postType, 'en');
     if (!config.label || !config.shortLabel || !config.description) throw new Error('Missing Instagram config copy');
     if (!Number.isFinite(config.energy) || config.energy < 0) throw new Error('Bad Instagram energy cost');
     const caption = getInstagramPresetCaption(postType);

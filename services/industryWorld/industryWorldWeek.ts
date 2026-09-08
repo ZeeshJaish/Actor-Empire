@@ -6,6 +6,14 @@ import { appendIndustryEventFacts } from './industryEventLedger';
 import { collectIndustryEventFacts } from './industryEventCollectors';
 import { projectIndustryEvents } from './industryPresentation';
 import { getCanonicalScheduledRivals } from './publicIndustryProjection';
+import { resolveIndustryMediaResponses } from './industryMediaResponses';
+import { processIndustryMediaYoutube } from './industryMediaYoutube';
+import { processIndustryMediaFandoms } from './industryMediaFandoms';
+import { createIndustryMediaClaim } from './industryMediaClaims';
+import { resolveIndustryMediaClaims } from './industryMediaClaimResolution';
+import { publishIndustryMediaClaimBeats } from './industryMediaClaimPublication';
+import { advanceIndustryMediaNarratives } from './industryMediaNarratives';
+import { advanceIndustryMediaRelationships } from './industryMediaRelationships';
 
 export type IndustryWorldExecutionStage =
     | 'PLATFORM_AI'
@@ -77,12 +85,26 @@ export const processIndustryWorldWeek = (
         },
         industryMedia: presentation.mediaWorld,
     };
-    const nextPlayer = { ...presentation.player, world: nextWorld };
+    const presentedPlayer = { ...presentation.player, world: nextWorld };
+    const claimResolution = resolveIndustryMediaClaims(presentedPlayer, absoluteWeek);
+    const responseResolution = resolveIndustryMediaResponses(claimResolution.player, absoluteWeek);
+    const youtube = processIndustryMediaYoutube(responseResolution.player, absoluteWeek);
+    const fandoms = processIndustryMediaFandoms(youtube.player, absoluteWeek);
+    const relationships = advanceIndustryMediaRelationships(fandoms.player, absoluteWeek);
+    const narratives = advanceIndustryMediaNarratives(relationships.player, absoluteWeek);
+    const claimCreation = createIndustryMediaClaim(narratives.player, absoluteWeek);
+    const claimPublication = publishIndustryMediaClaimBeats(
+        claimCreation.player,
+        absoluteWeek,
+        claimCreation.claim,
+        claimResolution.resolvedClaims,
+    );
+    const resolvedWorld = claimPublication.player.world;
     return {
-        player: nextPlayer,
-        world: nextWorld,
-        news: presentation.news,
-        socialPosts: presentation.xPosts,
+        player: claimPublication.player,
+        world: resolvedWorld,
+        news: [...presentation.news, ...responseResolution.news, ...narratives.retrospectiveNews, ...claimPublication.news],
+        socialPosts: [...presentation.xPosts, ...youtube.xPosts, ...fandoms.xPosts, ...narratives.retrospectiveXPosts, ...claimPublication.xPosts],
         logs: [...streaming.logs, ...studio.logs],
         absoluteWeek,
         processed: true,

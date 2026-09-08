@@ -2,6 +2,8 @@ import type { Player } from '../../types';
 import { getAbsoluteWeek } from '../../services/legacyLogic';
 import { normalizeOwnedStreamingPlatformState } from '../../services/ownedStreamingPlatform';
 import { resolveStreamingCatalogTitle } from '../../services/streamingCatalog';
+import { getStreamingContentAvailability, CONTENT_AVAILABILITY_LABELS } from '../../services/streamingContentAvailability';
+import { getOwnedPlatformPackageCountryIds } from '../../services/streamingContentAvailability';
 import { getStreamingPublicMarkets } from '../../services/streamingPublicMarkets';
 import { getStreamingAudienceMarket } from '../../services/streamingAudienceMarket';
 import { getProductionLocation } from '../../services/productionLocations';
@@ -20,21 +22,20 @@ export const createCanonicalContentDeskState = (player: Player): ContentDeskStat
   const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
   const latestPerformance = platform.weeklyHistory.at(-1)?.operations?.titlePerformance ?? [];
   const performanceByProject = new Map(latestPerformance.map(item => [item.projectId, item]));
-  const titles = platform.catalogProjectIds.flatMap(projectId => {
+  const projectIds = [...new Set([...platform.catalogProjectIds, ...platform.originalCommissions.flatMap(c => c.canonicalProjectId ? [c.canonicalProjectId] : [])])];
+  const countries = getOwnedPlatformPackageCountryIds(platform);
+  const titles = projectIds.flatMap(projectId => {
     const title = resolveStreamingCatalogTitle(player, projectId);
     if (!title) return [];
-    const license = platform.catalogLicenses.find(item => item.sourceProjectId === projectId && item.status === 'ACTIVE');
+    const license = platform.catalogLicenses.find(item => item.sourceProjectId === projectId && item.status === 'ACTIVE' && item.startsAtAbsoluteWeek <= absoluteWeek && item.expiresAtAbsoluteWeek > absoluteWeek);
     const original = platform.originalCommissions.find(item => item.canonicalProjectId === projectId);
     const performance = performanceByProject.get(projectId);
-    const status = original?.status === 'IN_PRODUCTION'
-      ? 'IN PRODUCTION' as const
-      : platform.lifecycle === 'ACTIVE'
-        ? 'LIVE' as const
-        : 'STAGED' as const;
+    const availability = getStreamingContentAvailability(player, projectId, countries);
+    const status = CONTENT_AVAILABILITY_LABELS[availability.status].toUpperCase() as ContentDeskState['titles'][number]['status'];
     return [{
       id: projectId,
       title: title.title,
-      kind: original ? 'ORIGINAL' as const : 'LICENSED' as const,
+      kind: availability.source,
       format: title.projectType === 'SERIES' ? 'Series' : 'Film',
       genre: title.genre,
       status,
@@ -350,9 +351,10 @@ export const createCanonicalViewerState = (player: Player): AppState => {
   const latest = platform.weeklyHistory.at(-1);
   const performance = latest?.operations?.titlePerformance ?? [];
   const ranked = [...performance].sort((a, b) => b.viewingAccounts - a.viewingAccounts);
+  const countries = getOwnedPlatformPackageCountryIds(platform);
   const titles = platform.catalogProjectIds.flatMap(projectId => {
     const title = resolveStreamingCatalogTitle(player, projectId);
-    if (!title) return [];
+    if (!title || !getStreamingContentAvailability(player, projectId, countries).available) return [];
     const result = performance.find(item => item.projectId === projectId);
     const rank = ranked.findIndex(item => item.projectId === projectId);
     const license = platform.catalogLicenses.find(item => item.sourceProjectId === projectId && item.status === 'ACTIVE');
@@ -361,7 +363,7 @@ export const createCanonicalViewerState = (player: Player): AppState => {
     return [{
       id: projectId,
       title: title.title,
-      kind: original ? 'ORIGINAL' as const : 'LICENSED' as const,
+      kind: original ? 'ORIGINAL' as const : title.source === 'OWNED_LIBRARY' ? 'OWNED' as const : 'LICENSED' as const,
       format: title.projectType === 'SERIES' ? 'Series' : 'Film',
       genre: title.genre,
       hue: hueOf(projectId),

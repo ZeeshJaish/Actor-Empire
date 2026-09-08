@@ -23,7 +23,7 @@ import { getStreamingStorefrontRuntimeMode } from '../../services/streamingStore
 export interface AppTitle {
   id: string;
   title: string;
-  kind: 'ORIGINAL' | 'LICENSED';
+  kind: 'ORIGINAL' | 'LICENSED' | 'OWNED';
   format: string;
   genre: string;
   hue: number;
