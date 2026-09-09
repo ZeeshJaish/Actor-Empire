@@ -2,8 +2,8 @@
 
 **Date:** 2026-09-09
 **Audience:** Actor Empire development and future implementation chats
-**Status:** WE1 delivered in shadow mode; focused validation and production build green
-**Current next phase:** WE2 — Population Cohorts and Household Budgets
+**Status:** WE1 and WE2 delivered in shadow mode; focused validation and production build green
+**Current next phase:** WE3 — Participation and Access Model
 
 ## Purpose
 
@@ -96,6 +96,8 @@ Create the authoritative country and regional population registry from which eve
 ---
 
 # Phase WE2 — Population Cohorts and Household Budgets
+
+**Delivery status:** Complete in shadow mode. Canonical country cohorts, non-participant households, finite entertainment budgets, save migration, weekly progression, and read-only Audience Market projections are implemented. Live subscriber and revenue allocation remains owned by the existing streaming economy until WE4.
 
 ## Purpose
 

@@ -186,7 +186,7 @@ const CountryMarketCard: React.FC<{ country: StreamingAudienceCountryView; color
     <MarketLine data={country.trend.map(point => point.value)} color={color} label={`${country.country} active viewer trend`} />
     <div className={css.countryLeader}><span>WATCH-TIME LEADER</span><b>{country.topPlatformName} · {plainPct(country.topPlatformSharePercent)}</b></div>
     <p>{country.audienceReason}</p>
-    <details><summary>Market behavior <span>＋</span></summary><div>{country.subscriptionsPerHousehold} paid services per home · {plainPct(country.switchingPercent)} switch in a typical active week.<br />Local pressure: {country.regionalServices.join(' · ')}.</div></details>
+    <details><summary>Market behavior <span>＋</span></summary><div>{country.subscriptionsPerHousehold} paid services per home · {plainPct(country.switchingPercent)} switch in a typical active week.<br />{money(country.averageMonthlyEntertainmentBudget)} monthly entertainment capacity · {count(country.nonParticipantHouseholds)} homes currently outside the commercial market.<br />Local pressure: {country.regionalServices.join(' · ')}.</div></details>
   </article>
 );
 
@@ -422,7 +422,10 @@ export const AudienceDesk: React.FC<{
                       <div><span>PAID SUBSCRIPTIONS</span><b>{count(market.paidSubscriptions)}</b></div>
                       <div><span>SUBS / HOME</span><b>{market.subscriptionsPerHousehold}</b></div>
                       <div><span>WATCH HOURS / WK</span><b>{count(market.weeklyWatchHours)}</b></div>
+                      <div><span>HOUSEHOLD BUDGET</span><b>{money(market.householdEconomy.averageMonthlyEntertainmentBudget)}/mo</b></div>
+                      <div><span>OUTSIDE MARKET</span><b>{count(market.householdEconomy.nonParticipantHouseholds)}</b></div>
                     </div>
+                    <p className={css.marketExplain}>This is spending capacity, not automatic streaming revenue. Every service still has to win a place in the household budget.</p>
                     <section className={css.adsec}>
                       <div className={css.adhead}><h2>Streaming adoption</h2><span>last 52 game weeks</span></div>
                       <MarketLine data={marketTrend} color={c} label="Global active streaming viewers over the last 52 game weeks" />
@@ -454,7 +457,7 @@ export const AudienceDesk: React.FC<{
                         <article key={persona.id} style={{ ['--epx-persona' as string]: persona.color }}>
                           <div className={css.personaTop}><i>0{index + 1}</i><div><span>{plainPct(persona.sharePercent)} · {count(persona.activeViewers)} viewers</span><b>{persona.name}</b></div><em>{persona.switchSensitivity} RISK</em></div>
                           <p>{persona.need}</p>
-                          <div className={css.personaFacts}><span>{persona.weeklyHours}h / week</span><span>{persona.subscriptionsPerHousehold} services</span><span>Best fit: {persona.bestFitPlatform}</span></div>
+                          <div className={css.personaFacts}><span>{persona.weeklyHours}h / week</span><span>{persona.subscriptionsPerHousehold} services</span><span>{money(persona.averageMonthlyEntertainmentBudget)} monthly capacity</span><span>Best fit: {persona.bestFitPlatform}</span></div>
                           <div className={css.personaLeave}><b>Leaves when</b><span>{persona.leavesWhen}</span></div>
                         </article>
                       ))}

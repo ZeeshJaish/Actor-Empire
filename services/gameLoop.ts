@@ -149,6 +149,7 @@ import {
     migrateStreamingRightsContractRegistry,
     registerProductionStreamingRightsContract,
 } from './streamingRightsCore';
+import { normalizeWorldAudienceEconomyState } from './worldEconomy/worldAudienceCohorts';
 import { advanceWorldPopulationToWeek, normalizeWorldPopulationState } from './worldEconomy/worldPopulation';
 
 // --- CONSTANTS ---
@@ -6390,6 +6391,17 @@ export const processGameWeek = async (
         absolute_week: enteredStreamingAbsoluteWeek,
         population: nextPlayer.world.worldPopulation.global.population,
         countries: nextPlayer.world.worldPopulation.global.countryCount,
+    });
+    emitLoopStage('world_audience_economy_start', { absolute_week: enteredStreamingAbsoluteWeek });
+    nextPlayer.world.worldAudienceEconomy = normalizeWorldAudienceEconomyState(
+        nextPlayer.world.worldAudienceEconomy,
+        nextPlayer.world.worldPopulation,
+        enteredStreamingAbsoluteWeek,
+    );
+    emitLoopStage('world_audience_economy_done', {
+        absolute_week: enteredStreamingAbsoluteWeek,
+        cohorts: nextPlayer.world.worldAudienceEconomy.global.cohortCount,
+        commercial_households: nextPlayer.world.worldAudienceEconomy.global.commercialHouseholds,
     });
     emitLoopStage('streaming_rights_calendar_start', { absolute_week: enteredStreamingAbsoluteWeek });
     const streamingRightsCalendarResult = processStreamingRightsCalendarWeek(

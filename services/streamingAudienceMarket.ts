@@ -1,4 +1,11 @@
-import type { OwnedStreamingRivalProfile, PlatformId, Player } from '../types';
+import type {
+    OwnedStreamingRivalProfile,
+    PlatformId,
+    Player,
+    WorldAudienceCountryState,
+    WorldAudienceEconomyState,
+    WorldAudiencePersonaId,
+} from '../types';
 import { getAbsoluteWeek } from './legacyLogic';
 import { normalizeOwnedStreamingPlatformState } from './ownedStreamingPlatform';
 import {
@@ -8,16 +15,11 @@ import {
     type StreamingDayOneRegionId,
 } from './streamingDayOneMarkets';
 import { resolveStreamingPlatformBrandById } from './streamingPlatformBrandRegistry';
+import { getWorldAudiencePersonaShares, normalizeWorldAudienceEconomyState } from './worldEconomy/worldAudienceCohorts';
 import { normalizeWorldPopulationState } from './worldEconomy/worldPopulation';
 
 export type StreamingAudiencePlatformId = PlatformId | 'AMAZON_PRIME' | 'REGIONAL' | 'PLAYER';
-export type StreamingAudiencePersonaId =
-    | 'FAMILY_HOUSEHOLDS'
-    | 'VALUE_SEEKERS'
-    | 'FANDOM_LOYALISTS'
-    | 'PRESTIGE_EXPLORERS'
-    | 'LOCAL_FIRST'
-    | 'HABIT_STREAMERS';
+export type StreamingAudiencePersonaId = WorldAudiencePersonaId;
 
 export interface StreamingAudienceTrendPoint {
     label: string;
@@ -46,6 +48,10 @@ export interface StreamingAudienceCountryView {
     streamingAdoptionPercent: number;
     activeViewers: number;
     payingHouseholds: number;
+    commercialHouseholds: number;
+    nonParticipantHouseholds: number;
+    averageMonthlyEntertainmentBudget: number;
+    budgetPressureIndex: number;
     paidSubscriptions: number;
     subscriptionsPerHousehold: number;
     annualGrowthPercent: number;
@@ -92,6 +98,7 @@ export interface StreamingAudiencePersonaView {
     need: string;
     leavesWhen: string;
     bestFitPlatform: string;
+    averageMonthlyEntertainmentBudget: number;
 }
 
 export interface StreamingAudienceSwitchingView {
@@ -114,6 +121,13 @@ export interface StreamingAudienceMarketView {
     payingHouseholds: number;
     paidSubscriptions: number;
     subscriptionsPerHousehold: number;
+    householdEconomy: {
+        commercialHouseholds: number;
+        nonParticipantHouseholds: number;
+        nonParticipantPercent: number;
+        averageMonthlyEntertainmentBudget: number;
+        totalMonthlyEntertainmentBudget: number;
+    };
     weeklyWatchHours: number;
     subscriberOverlap: {
         oneServicePercent: number;
@@ -254,6 +268,7 @@ const buildCountry = (
     weeksSinceFounding: number,
     playerPresentation: AudiencePlatformPresentation,
     canonicalPopulation?: number,
+    canonicalAudience?: WorldAudienceCountryState,
 ): StreamingAudienceCountryView => {
     const selectedForLaunch = selectedMarketIds.has(market.id);
     const adoption = clamp(
@@ -268,7 +283,10 @@ const buildCountry = (
         : round(market.streamingAudience / (adoption / 100));
     const activeViewers = round(estimatedPopulation * adoption / 100);
     const subscriptionsPerHousehold = round1(clamp(1.38 + adoption / 100 * 0.9 + (market.competition === 'FIERCE' ? 0.18 : 0), 1.3, 2.55));
-    const payingHouseholds = round(activeViewers / (1.88 + adoption / 100 * 0.35));
+    const payingHouseholds = Math.min(
+        canonicalAudience?.commercialHouseholds ?? Number.MAX_SAFE_INTEGER,
+        round(activeViewers / (1.88 + adoption / 100 * 0.35)),
+    );
     const watchShare = getCountryShares(market, selectedForLaunch, playerSubscribers, playerPresentation);
     const top = watchShare[0];
     const playerShare = watchShare.find(item => item.id === 'PLAYER')?.sharePercent || 0;
@@ -291,6 +309,10 @@ const buildCountry = (
         streamingAdoptionPercent: round1(adoption),
         activeViewers,
         payingHouseholds,
+        commercialHouseholds: canonicalAudience?.commercialHouseholds ?? payingHouseholds,
+        nonParticipantHouseholds: canonicalAudience?.nonParticipantHouseholds ?? 0,
+        averageMonthlyEntertainmentBudget: canonicalAudience?.averageMonthlyEntertainmentBudget ?? 0,
+        budgetPressureIndex: canonicalAudience?.budgetPressureIndex ?? 0,
         paidSubscriptions: round(payingHouseholds * subscriptionsPerHousehold),
         subscriptionsPerHousehold,
         annualGrowthPercent: market.annualGrowthPercent,
@@ -347,8 +369,11 @@ const buildGlobalTrend = (
     };
 });
 
-const buildPersonas = (activeViewers: number): StreamingAudiencePersonaView[] => {
-    const definitions: Array<Omit<StreamingAudiencePersonaView, 'activeViewers'>> = [
+const buildPersonas = (
+    activeViewers: number,
+    audienceEconomy: WorldAudienceEconomyState,
+): StreamingAudiencePersonaView[] => {
+    const definitions: Array<Omit<StreamingAudiencePersonaView, 'activeViewers' | 'averageMonthlyEntertainmentBudget'>> = [
         { id: 'FAMILY_HOUSEHOLDS', name: 'Family households', sharePercent: 23, weeklyHours: 14.8, subscriptionsPerHousehold: 2.3, switchSensitivity: 'MEDIUM', color: resolveStreamingPlatformBrandById('DISNEY_PLUS').primaryColor, need: 'Safe profiles, familiar brands and something for every age.', leavesWhen: 'The children outgrow the catalogue or price rises without new family hits.', bestFitPlatform: 'Disney+' },
         { id: 'VALUE_SEEKERS', name: 'Value seekers', sharePercent: 19, weeklyHours: 10.4, subscriptionsPerHousehold: 1.5, switchSensitivity: 'HIGH', color: resolveStreamingPlatformBrandById('AMAZON_PRIME').primaryColor, need: 'A clear price, bundle value and enough popular entertainment.', leavesWhen: 'A rival bundle is cheaper or the service goes quiet for a month.', bestFitPlatform: 'Prime Video' },
         { id: 'FANDOM_LOYALISTS', name: 'Fandom loyalists', sharePercent: 16, weeklyHours: 17.1, subscriptionsPerHousehold: 2.1, switchSensitivity: 'LOW', color: '#ff4d7d', need: 'Universes, weekly conversation and a reason to stay between chapters.', leavesWhen: 'A franchise stalls or loses the characters they follow.', bestFitPlatform: 'Disney+' },
@@ -356,7 +381,17 @@ const buildPersonas = (activeViewers: number): StreamingAudiencePersonaView[] =>
         { id: 'LOCAL_FIRST', name: 'Local-first viewers', sharePercent: 17, weeklyHours: 13.6, subscriptionsPerHousehold: 1.7, switchSensitivity: 'MEDIUM', color: '#ffb020', need: 'Their language, local stars, sport and culturally precise discovery.', leavesWhen: 'The home page feels imported or localization is careless.', bestFitPlatform: 'Local & regional' },
         { id: 'HABIT_STREAMERS', name: 'Habit streamers', sharePercent: 13, weeklyHours: 21.2, subscriptionsPerHousehold: 2.7, switchSensitivity: 'LOW', color: resolveStreamingPlatformBrandById('NETFLIX').primaryColor, need: 'A constant next watch and recommendations that reduce effort.', leavesWhen: 'Discovery becomes repetitive or playback trust breaks.', bestFitPlatform: 'Netflix' },
     ];
-    return definitions.map(item => ({ ...item, activeViewers: round(activeViewers * item.sharePercent / 100) }));
+    const canonicalShares = getWorldAudiencePersonaShares(audienceEconomy);
+    return definitions.map(item => {
+        const canonical = canonicalShares.find(entry => entry.id === item.id);
+        const sharePercent = canonical?.sharePercent ?? item.sharePercent;
+        return {
+            ...item,
+            sharePercent,
+            activeViewers: round(activeViewers * sharePercent / 100),
+            averageMonthlyEntertainmentBudget: canonical?.averageMonthlyEntertainmentBudget ?? 0,
+        };
+    });
 };
 
 const buildPlatformViews = (
@@ -428,6 +463,11 @@ export const getStreamingAudienceMarket = (player: Player): StreamingAudienceMar
         color: platform.identity?.primaryColor || PLATFORM_META.PLAYER.fallbackColor || '#8B5CF6',
     });
     const worldPopulation = normalizeWorldPopulationState(player.world?.worldPopulation, absoluteWeek);
+    const worldAudienceEconomy = normalizeWorldAudienceEconomyState(
+        player.world?.worldAudienceEconomy,
+        worldPopulation,
+        absoluteWeek,
+    );
     const countries = STREAMING_DAY_ONE_MARKETS.map(market => buildCountry(
         market,
         selectedMarketIds,
@@ -435,6 +475,7 @@ export const getStreamingAudienceMarket = (player: Player): StreamingAudienceMar
         weeksSinceFounding,
         playerPresentation,
         worldPopulation.countries[market.id]?.population,
+        worldAudienceEconomy.countries[market.id],
     ));
     const population = worldPopulation.global.population;
     const adoption = round1(clamp(48.6 + weeksSinceFounding / 52 * 1.65, 35, 78));
@@ -471,13 +512,24 @@ export const getStreamingAudienceMarket = (player: Player): StreamingAudienceMar
         payingHouseholds,
         paidSubscriptions,
         subscriptionsPerHousehold,
+        householdEconomy: {
+            commercialHouseholds: worldAudienceEconomy.global.commercialHouseholds,
+            nonParticipantHouseholds: worldAudienceEconomy.global.nonParticipantHouseholds,
+            nonParticipantPercent: round1(
+                worldAudienceEconomy.global.nonParticipantHouseholds
+                / Math.max(1, worldAudienceEconomy.global.households)
+                * 100,
+            ),
+            averageMonthlyEntertainmentBudget: worldAudienceEconomy.global.averageMonthlyEntertainmentBudget,
+            totalMonthlyEntertainmentBudget: worldAudienceEconomy.global.totalMonthlyEntertainmentBudget,
+        },
         weeklyWatchHours,
         subscriberOverlap: { oneServicePercent: one, twoServicesPercent: two, threePlusPercent: threePlus },
         globalTrend: buildGlobalTrend(absoluteWeek, weeksSinceFounding, population, adoption, subscriptionsPerHousehold),
         globalWatchShare,
         countries,
         platforms: buildPlatformViews(player, countries, globalWatchShare, payingHouseholds),
-        personas: buildPersonas(activeViewers),
+        personas: buildPersonas(activeViewers, worldAudienceEconomy),
         switching: {
             joinedThisWeek: joined,
             cancelledThisWeek: cancelled,

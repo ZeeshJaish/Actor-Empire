@@ -9196,6 +9196,88 @@ export interface WorldPopulationState {
     snapshots: WorldPopulationSnapshot[];
 }
 
+export type WorldAudiencePersonaId =
+    | 'FAMILY_HOUSEHOLDS'
+    | 'VALUE_SEEKERS'
+    | 'FANDOM_LOYALISTS'
+    | 'PRESTIGE_EXPLORERS'
+    | 'LOCAL_FIRST'
+    | 'HABIT_STREAMERS';
+
+export type WorldAudienceLifeStageId =
+    | 'YOUTH'
+    | 'YOUNG_ADULT'
+    | 'FAMILY'
+    | 'ADULT'
+    | 'MATURE';
+
+export type WorldAudiencePersonaAffinity = [number, number, number, number, number, number];
+
+export interface WorldAudienceCohortState {
+    id: string;
+    primaryPersonaId: WorldAudiencePersonaId;
+    incomeBandId: WorldPopulationIncomeBandId;
+    lifeStageId: WorldAudienceLifeStageId;
+    households: number;
+    people: number;
+    entertainmentAppetiteIndex: number;
+    priceSensitivityIndex: number;
+    accessReadinessIndex: number;
+    localLanguageAffinityIndex: number;
+    legalConsumptionIndex: number;
+    sharingTendencyIndex: number;
+    piracyTendencyIndex: number;
+    monthlyEntertainmentBudgetPerHousehold: number;
+    totalMonthlyEntertainmentBudget: number;
+    personaAffinity: WorldAudiencePersonaAffinity;
+}
+
+export interface WorldAudienceCountryState {
+    id: string;
+    population: number;
+    households: number;
+    commercialPopulation: number;
+    commercialHouseholds: number;
+    nonParticipantPopulation: number;
+    nonParticipantHouseholds: number;
+    averageMonthlyEntertainmentBudget: number;
+    totalMonthlyEntertainmentBudget: number;
+    budgetPressureIndex: number;
+    personaShares: Record<WorldAudiencePersonaId, number>;
+    cohorts: WorldAudienceCohortState[];
+    lastMacroPeriod: number;
+}
+
+export interface WorldAudienceGlobalSummary {
+    population: number;
+    households: number;
+    commercialPopulation: number;
+    commercialHouseholds: number;
+    nonParticipantPopulation: number;
+    nonParticipantHouseholds: number;
+    averageMonthlyEntertainmentBudget: number;
+    totalMonthlyEntertainmentBudget: number;
+    cohortCount: number;
+    countryCount: number;
+}
+
+export interface WorldAudienceEconomySnapshot {
+    absoluteWeek: number;
+    commercialHouseholds: number;
+    nonParticipantHouseholds: number;
+    averageMonthlyEntertainmentBudget: number;
+    totalMonthlyEntertainmentBudget: number;
+}
+
+export interface WorldAudienceEconomyState {
+    schemaVersion: 1;
+    initializedAtAbsoluteWeek: number;
+    lastProcessedAbsoluteWeek: number;
+    countries: Record<string, WorldAudienceCountryState>;
+    global: WorldAudienceGlobalSummary;
+    snapshots: WorldAudienceEconomySnapshot[];
+}
+
 export interface WorldState {
     projects: IndustryProject[];
     trendingGenre: Genre;
@@ -9225,6 +9307,7 @@ export interface WorldState {
     npcVentureLastProcessedAbsoluteWeek?: number;
     musicIndustry?: MusicIndustryState;
     worldPopulation?: WorldPopulationState;
+    worldAudienceEconomy?: WorldAudienceEconomyState;
 }
 
 export interface LogEntry {
