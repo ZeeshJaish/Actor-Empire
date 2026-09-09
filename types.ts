@@ -9278,6 +9278,98 @@ export interface WorldAudienceEconomyState {
     snapshots: WorldAudienceEconomySnapshot[];
 }
 
+export type WorldAudienceParticipationBarrierId =
+    | 'CONNECTIVITY'
+    | 'DEVICE_ACCESS'
+    | 'PAYMENT_ACCESS'
+    | 'AFFORDABILITY'
+    | 'CINEMA_ACCESS'
+    | 'TRAVEL_ACCESS'
+    | 'LANGUAGE_ACCESS'
+    | 'LEISURE_TIME'
+    | 'LOW_INTEREST'
+    | 'NONE';
+
+export interface WorldAudienceParticipationCohortState {
+    cohortId: string;
+    streamingEligibilityIndex: number;
+    streamingInterestIndex: number;
+    cinemaEligibilityIndex: number;
+    cinemaInterestIndex: number;
+    streamingOnlyHouseholds: number;
+    cinemaOnlyHouseholds: number;
+    dualParticipantHouseholds: number;
+    neitherHouseholds: number;
+    totalMonthlyStreamingBudget: number;
+    totalMonthlyCinemaBudget: number;
+    totalMonthlyOtherEntertainmentBudget: number;
+    totalMonthlyUncommittedBudget: number;
+    streamingBarrierId: WorldAudienceParticipationBarrierId;
+    streamingBarrierIndex: number;
+    cinemaBarrierId: WorldAudienceParticipationBarrierId;
+    cinemaBarrierIndex: number;
+}
+
+export interface WorldAudienceParticipationCountryState {
+    id: string;
+    population: number;
+    households: number;
+    commercialHouseholds: number;
+    nonParticipantHouseholds: number;
+    streamingOnlyHouseholds: number;
+    cinemaOnlyHouseholds: number;
+    dualParticipantHouseholds: number;
+    commercialNeitherHouseholds: number;
+    neitherHouseholds: number;
+    streamingReachableHouseholds: number;
+    cinemaReachableHouseholds: number;
+    totalMonthlyStreamingBudget: number;
+    totalMonthlyCinemaBudget: number;
+    totalMonthlyOtherEntertainmentBudget: number;
+    totalMonthlyUncommittedBudget: number;
+    topStreamingBarrierId: WorldAudienceParticipationBarrierId;
+    topCinemaBarrierId: WorldAudienceParticipationBarrierId;
+    cohorts: WorldAudienceParticipationCohortState[];
+    lastMacroPeriod: number;
+}
+
+export interface WorldAudienceParticipationGlobalSummary {
+    population: number;
+    households: number;
+    commercialHouseholds: number;
+    nonParticipantHouseholds: number;
+    streamingOnlyHouseholds: number;
+    cinemaOnlyHouseholds: number;
+    dualParticipantHouseholds: number;
+    commercialNeitherHouseholds: number;
+    neitherHouseholds: number;
+    streamingReachableHouseholds: number;
+    cinemaReachableHouseholds: number;
+    totalMonthlyStreamingBudget: number;
+    totalMonthlyCinemaBudget: number;
+    totalMonthlyOtherEntertainmentBudget: number;
+    totalMonthlyUncommittedBudget: number;
+    cohortCount: number;
+    countryCount: number;
+}
+
+export interface WorldAudienceParticipationSnapshot {
+    absoluteWeek: number;
+    streamingReachableHouseholds: number;
+    cinemaReachableHouseholds: number;
+    dualParticipantHouseholds: number;
+    neitherHouseholds: number;
+}
+
+export interface WorldAudienceParticipationState {
+    schemaVersion: 1;
+    initializedAtAbsoluteWeek: number;
+    lastProcessedAbsoluteWeek: number;
+    countries: Record<string, WorldAudienceParticipationCountryState>;
+    global: WorldAudienceParticipationGlobalSummary;
+    snapshots: WorldAudienceParticipationSnapshot[];
+}
+
 export interface WorldState {
     projects: IndustryProject[];
     trendingGenre: Genre;
@@ -9308,6 +9400,7 @@ export interface WorldState {
     musicIndustry?: MusicIndustryState;
     worldPopulation?: WorldPopulationState;
     worldAudienceEconomy?: WorldAudienceEconomyState;
+    worldAudienceParticipation?: WorldAudienceParticipationState;
 }
 
 export interface LogEntry {

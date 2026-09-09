@@ -52,9 +52,10 @@ import { normalizeStreamingRightsTransactionRegistry } from './streamingRightsTr
 import { normalizeStreamingRightsOfficeState } from './streamingRightsOffice';
 import { migrateLegacyDynastyCareerState } from './dynastyCareer';
 import { normalizeWorldAudienceEconomyState } from './worldEconomy/worldAudienceCohorts';
+import { normalizeWorldAudienceParticipationState } from './worldEconomy/worldAudienceParticipation';
 import { normalizeWorldPopulationState } from './worldEconomy/worldPopulation';
 
-const SAVE_MIGRATION_VERSION = 42;
+const SAVE_MIGRATION_VERSION = 43;
 const RUNAWAY_STOCK_CASH_CEILING = 10_000_000_000_000;
 const ACQUISITION_RIVAL_BID_MAX_ROUNDS = 3;
 
@@ -1091,6 +1092,11 @@ export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
         base.world?.worldPopulation,
         migratedAbsoluteWeek,
     );
+    const migratedWorldAudienceEconomy = normalizeWorldAudienceEconomyState(
+        base.world?.worldAudienceEconomy,
+        migratedWorldPopulation,
+        migratedAbsoluteWeek,
+    );
     const playerWithStocks: Player = {
         ...base,
         id: String(base.id || INITIAL_PLAYER.id),
@@ -1119,9 +1125,11 @@ export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
                 ? reconcileIndustryMediaWorldWithEvents(base.world.industryMedia, migratedIndustryEvents)
                 : normalizeIndustryMediaWorld(undefined),
             worldPopulation: migratedWorldPopulation,
-            worldAudienceEconomy: normalizeWorldAudienceEconomyState(
-                base.world?.worldAudienceEconomy,
+            worldAudienceEconomy: migratedWorldAudienceEconomy,
+            worldAudienceParticipation: normalizeWorldAudienceParticipationState(
+                base.world?.worldAudienceParticipation,
                 migratedWorldPopulation,
+                migratedWorldAudienceEconomy,
                 migratedAbsoluteWeek,
             ),
             platformAiPlayerCommissionOffers: normalizePlatformAiPlayerCommissionOffers(

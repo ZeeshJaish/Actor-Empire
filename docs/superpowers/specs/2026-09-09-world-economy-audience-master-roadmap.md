@@ -2,8 +2,8 @@
 
 **Date:** 2026-09-09
 **Audience:** Actor Empire development and future implementation chats
-**Status:** WE1 and WE2 delivered in shadow mode; focused validation and production build green
-**Current next phase:** WE3 — Participation and Access Model
+**Status:** WE1, WE2, and WE3 delivered in shadow mode; focused validation and production build green
+**Current next phase:** WE4 — Streaming Plan Choice and Market Competition
 
 ## Purpose
 
@@ -122,6 +122,8 @@ Divide each country's people and households into lightweight behavioural cohorts
 ---
 
 # Phase WE3 — Participation and Access Model
+
+**Delivery status:** Complete in shadow mode. Canonical streaming/cinema eligibility, interest, participation partitions, shared entertainment-budget envelopes, barriers, save migration, weekly progression, corruption recovery, and read-only Audience Market evidence are implemented. Current subscribers, revenue, platform allocation, rights, and box office remain owned by existing live systems until WE4 and later phases.
 
 ## Purpose
 

@@ -186,7 +186,7 @@ const CountryMarketCard: React.FC<{ country: StreamingAudienceCountryView; color
     <MarketLine data={country.trend.map(point => point.value)} color={color} label={`${country.country} active viewer trend`} />
     <div className={css.countryLeader}><span>WATCH-TIME LEADER</span><b>{country.topPlatformName} · {plainPct(country.topPlatformSharePercent)}</b></div>
     <p>{country.audienceReason}</p>
-    <details><summary>Market behavior <span>＋</span></summary><div>{country.subscriptionsPerHousehold} paid services per home · {plainPct(country.switchingPercent)} switch in a typical active week.<br />{money(country.averageMonthlyEntertainmentBudget)} monthly entertainment capacity · {count(country.nonParticipantHouseholds)} homes currently outside the commercial market.<br />Local pressure: {country.regionalServices.join(' · ')}.</div></details>
+    <details><summary>Market behavior <span>＋</span></summary><div>{country.subscriptionsPerHousehold} paid services per home · {plainPct(country.switchingPercent)} switch in a typical active week.<br />{money(country.averageMonthlyEntertainmentBudget)} monthly entertainment capacity · {count(country.nonParticipantHouseholds)} homes currently outside the commercial market.<br />Streaming reach: {count(country.streamingReachableHouseholds)} homes · cinema reach: {count(country.cinemaReachableHouseholds)} homes · both: {count(country.dualParticipantHouseholds)}.<br />Main barriers: {country.topStreamingBarrier} for streaming · {country.topCinemaBarrier} for cinema.<br />Local pressure: {country.regionalServices.join(' · ')}.</div></details>
   </article>
 );
 
@@ -426,6 +426,16 @@ export const AudienceDesk: React.FC<{
                       <div><span>OUTSIDE MARKET</span><b>{count(market.householdEconomy.nonParticipantHouseholds)}</b></div>
                     </div>
                     <p className={css.marketExplain}>This is spending capacity, not automatic streaming revenue. Every service still has to win a place in the household budget.</p>
+                    <section className={css.adsec}>
+                      <div className={css.adhead}><h2>Where households can participate</h2><span>industry access</span></div>
+                      <div className={css.marketKpis}>
+                        <div><span>STREAMING REACH</span><b>{count(market.industryParticipation.streamingReachableHouseholds)}</b></div>
+                        <div><span>CINEMA REACH</span><b>{count(market.industryParticipation.cinemaReachableHouseholds)}</b></div>
+                        <div><span>BOTH</span><b>{count(market.industryParticipation.dualParticipantHouseholds)}</b></div>
+                        <div><span>NEITHER</span><b>{count(market.industryParticipation.neitherHouseholds)}</b></div>
+                      </div>
+                      <p className={css.marketExplain}>This is market potential, not automatic customers or revenue. Streaming and cinema still have to win attention and a place in each household budget.</p>
+                    </section>
                     <section className={css.adsec}>
                       <div className={css.adhead}><h2>Streaming adoption</h2><span>last 52 game weeks</span></div>
                       <MarketLine data={marketTrend} color={c} label="Global active streaming viewers over the last 52 game weeks" />

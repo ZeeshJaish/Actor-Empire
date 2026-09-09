@@ -4,6 +4,8 @@ import type {
     Player,
     WorldAudienceCountryState,
     WorldAudienceEconomyState,
+    WorldAudienceParticipationBarrierId,
+    WorldAudienceParticipationCountryState,
     WorldAudiencePersonaId,
 } from '../types';
 import { getAbsoluteWeek } from './legacyLogic';
@@ -16,6 +18,7 @@ import {
 } from './streamingDayOneMarkets';
 import { resolveStreamingPlatformBrandById } from './streamingPlatformBrandRegistry';
 import { getWorldAudiencePersonaShares, normalizeWorldAudienceEconomyState } from './worldEconomy/worldAudienceCohorts';
+import { normalizeWorldAudienceParticipationState } from './worldEconomy/worldAudienceParticipation';
 import { normalizeWorldPopulationState } from './worldEconomy/worldPopulation';
 
 export type StreamingAudiencePlatformId = PlatformId | 'AMAZON_PRIME' | 'REGIONAL' | 'PLAYER';
@@ -52,6 +55,14 @@ export interface StreamingAudienceCountryView {
     nonParticipantHouseholds: number;
     averageMonthlyEntertainmentBudget: number;
     budgetPressureIndex: number;
+    streamingReachableHouseholds: number;
+    cinemaReachableHouseholds: number;
+    streamingOnlyHouseholds: number;
+    cinemaOnlyHouseholds: number;
+    dualParticipantHouseholds: number;
+    neitherHouseholds: number;
+    topStreamingBarrier: string;
+    topCinemaBarrier: string;
     paidSubscriptions: number;
     subscriptionsPerHousehold: number;
     annualGrowthPercent: number;
@@ -128,6 +139,16 @@ export interface StreamingAudienceMarketView {
         averageMonthlyEntertainmentBudget: number;
         totalMonthlyEntertainmentBudget: number;
     };
+    industryParticipation: {
+        streamingReachableHouseholds: number;
+        cinemaReachableHouseholds: number;
+        streamingOnlyHouseholds: number;
+        cinemaOnlyHouseholds: number;
+        dualParticipantHouseholds: number;
+        neitherHouseholds: number;
+        totalMonthlyStreamingBudget: number;
+        totalMonthlyCinemaBudget: number;
+    };
     weeklyWatchHours: number;
     subscriberOverlap: {
         oneServicePercent: number;
@@ -148,6 +169,19 @@ const clamp = (value: number, minimum: number, maximum: number): number => (
 const round = (value: number): number => Math.round(value);
 const round1 = (value: number): number => Math.round(value * 10) / 10;
 const sum = (values: number[]): number => values.reduce((total, value) => total + value, 0);
+
+const PARTICIPATION_BARRIER_LABELS: Record<WorldAudienceParticipationBarrierId, string> = {
+    CONNECTIVITY: 'reliable connectivity',
+    DEVICE_ACCESS: 'device access',
+    PAYMENT_ACCESS: 'payment access',
+    AFFORDABILITY: 'affordability',
+    CINEMA_ACCESS: 'theatre availability',
+    TRAVEL_ACCESS: 'travel access',
+    LANGUAGE_ACCESS: 'language access',
+    LEISURE_TIME: 'available leisure time',
+    LOW_INTEREST: 'low category interest',
+    NONE: 'no dominant barrier',
+};
 
 const PLATFORM_META: Record<StreamingAudiencePlatformId, {
     shortName: string;
@@ -269,6 +303,7 @@ const buildCountry = (
     playerPresentation: AudiencePlatformPresentation,
     canonicalPopulation?: number,
     canonicalAudience?: WorldAudienceCountryState,
+    canonicalParticipation?: WorldAudienceParticipationCountryState,
 ): StreamingAudienceCountryView => {
     const selectedForLaunch = selectedMarketIds.has(market.id);
     const adoption = clamp(
@@ -313,6 +348,14 @@ const buildCountry = (
         nonParticipantHouseholds: canonicalAudience?.nonParticipantHouseholds ?? 0,
         averageMonthlyEntertainmentBudget: canonicalAudience?.averageMonthlyEntertainmentBudget ?? 0,
         budgetPressureIndex: canonicalAudience?.budgetPressureIndex ?? 0,
+        streamingReachableHouseholds: canonicalParticipation?.streamingReachableHouseholds ?? 0,
+        cinemaReachableHouseholds: canonicalParticipation?.cinemaReachableHouseholds ?? 0,
+        streamingOnlyHouseholds: canonicalParticipation?.streamingOnlyHouseholds ?? 0,
+        cinemaOnlyHouseholds: canonicalParticipation?.cinemaOnlyHouseholds ?? 0,
+        dualParticipantHouseholds: canonicalParticipation?.dualParticipantHouseholds ?? 0,
+        neitherHouseholds: canonicalParticipation?.neitherHouseholds ?? 0,
+        topStreamingBarrier: PARTICIPATION_BARRIER_LABELS[canonicalParticipation?.topStreamingBarrierId ?? 'NONE'],
+        topCinemaBarrier: PARTICIPATION_BARRIER_LABELS[canonicalParticipation?.topCinemaBarrierId ?? 'NONE'],
         paidSubscriptions: round(payingHouseholds * subscriptionsPerHousehold),
         subscriptionsPerHousehold,
         annualGrowthPercent: market.annualGrowthPercent,
@@ -468,6 +511,12 @@ export const getStreamingAudienceMarket = (player: Player): StreamingAudienceMar
         worldPopulation,
         absoluteWeek,
     );
+    const worldAudienceParticipation = normalizeWorldAudienceParticipationState(
+        player.world?.worldAudienceParticipation,
+        worldPopulation,
+        worldAudienceEconomy,
+        absoluteWeek,
+    );
     const countries = STREAMING_DAY_ONE_MARKETS.map(market => buildCountry(
         market,
         selectedMarketIds,
@@ -476,6 +525,7 @@ export const getStreamingAudienceMarket = (player: Player): StreamingAudienceMar
         playerPresentation,
         worldPopulation.countries[market.id]?.population,
         worldAudienceEconomy.countries[market.id],
+        worldAudienceParticipation.countries[market.id],
     ));
     const population = worldPopulation.global.population;
     const adoption = round1(clamp(48.6 + weeksSinceFounding / 52 * 1.65, 35, 78));
@@ -522,6 +572,16 @@ export const getStreamingAudienceMarket = (player: Player): StreamingAudienceMar
             ),
             averageMonthlyEntertainmentBudget: worldAudienceEconomy.global.averageMonthlyEntertainmentBudget,
             totalMonthlyEntertainmentBudget: worldAudienceEconomy.global.totalMonthlyEntertainmentBudget,
+        },
+        industryParticipation: {
+            streamingReachableHouseholds: worldAudienceParticipation.global.streamingReachableHouseholds,
+            cinemaReachableHouseholds: worldAudienceParticipation.global.cinemaReachableHouseholds,
+            streamingOnlyHouseholds: worldAudienceParticipation.global.streamingOnlyHouseholds,
+            cinemaOnlyHouseholds: worldAudienceParticipation.global.cinemaOnlyHouseholds,
+            dualParticipantHouseholds: worldAudienceParticipation.global.dualParticipantHouseholds,
+            neitherHouseholds: worldAudienceParticipation.global.neitherHouseholds,
+            totalMonthlyStreamingBudget: worldAudienceParticipation.global.totalMonthlyStreamingBudget,
+            totalMonthlyCinemaBudget: worldAudienceParticipation.global.totalMonthlyCinemaBudget,
         },
         weeklyWatchHours,
         subscriberOverlap: { oneServicePercent: one, twoServicesPercent: two, threePlusPercent: threePlus },
