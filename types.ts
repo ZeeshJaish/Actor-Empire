@@ -9104,6 +9104,98 @@ export interface NpcVentureState {
     closureReason?: string;
 }
 
+export type WorldPopulationRegionId =
+    | 'NORTH_AMERICA'
+    | 'SOUTH_AMERICA'
+    | 'EUROPE'
+    | 'AFRICA'
+    | 'ASIA'
+    | 'OCEANIA';
+
+export type WorldPopulationAgeBandId =
+    | 'CHILD'
+    | 'TEEN'
+    | 'YOUNG_ADULT'
+    | 'ADULT'
+    | 'OLDER';
+
+export type WorldPopulationIncomeBandId =
+    | 'SUBSISTENCE'
+    | 'WORKING'
+    | 'MIDDLE'
+    | 'AFFLUENT'
+    | 'WEALTHY'
+    | 'ULTRA_WEALTHY';
+
+export type WorldCountryDevelopmentProfile = 'LOW' | 'EMERGING' | 'DEVELOPED' | 'ADVANCED';
+
+export interface WorldPopulationMacroState {
+    purchasingPowerIndex: number;
+    inflationPressure: number;
+    unemploymentPressure: number;
+    consumerConfidence: number;
+    inequalityIndex: number;
+    annualPopulationGrowthPercent: number;
+}
+
+export interface WorldPopulationCountryState {
+    id: string;
+    name: string;
+    regionId: WorldPopulationRegionId;
+    developmentProfile: WorldCountryDevelopmentProfile;
+    languages: string[];
+    population: number;
+    households: number;
+    averageHouseholdSize: number;
+    ageBands: Record<WorldPopulationAgeBandId, number>;
+    incomeBands: Record<WorldPopulationIncomeBandId, number>;
+    urbanPercent: number;
+    reliableInternetPercent: number;
+    smartphoneAccessPercent: number;
+    homeScreenAccessPercent: number;
+    digitalPaymentAccessPercent: number;
+    cinemaAccessPercent: number;
+    macro: WorldPopulationMacroState;
+    lastDemographicYear: number;
+    lastMacroPeriod: number;
+}
+
+export interface WorldPopulationRegionSummary {
+    id: WorldPopulationRegionId;
+    population: number;
+    households: number;
+    countryCount: number;
+}
+
+export interface WorldPopulationGlobalSummary {
+    population: number;
+    households: number;
+    countryCount: number;
+    weightedUrbanPercent: number;
+    weightedReliableInternetPercent: number;
+    weightedDigitalPaymentAccessPercent: number;
+    weightedCinemaAccessPercent: number;
+}
+
+export interface WorldPopulationSnapshot {
+    absoluteWeek: number;
+    population: number;
+    households: number;
+    weightedPurchasingPowerIndex: number;
+    weightedConsumerConfidence: number;
+}
+
+export interface WorldPopulationState {
+    schemaVersion: 1;
+    epochAbsoluteWeek: number;
+    initializedAtAbsoluteWeek: number;
+    lastProcessedAbsoluteWeek: number;
+    countries: Record<string, WorldPopulationCountryState>;
+    regions: Record<WorldPopulationRegionId, WorldPopulationRegionSummary>;
+    global: WorldPopulationGlobalSummary;
+    snapshots: WorldPopulationSnapshot[];
+}
+
 export interface WorldState {
     projects: IndustryProject[];
     trendingGenre: Genre;
@@ -9132,6 +9224,7 @@ export interface WorldState {
     npcVentures?: Record<string, NpcVentureState>;
     npcVentureLastProcessedAbsoluteWeek?: number;
     musicIndustry?: MusicIndustryState;
+    worldPopulation?: WorldPopulationState;
 }
 
 export interface LogEntry {

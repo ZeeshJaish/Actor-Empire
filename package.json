@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "audit:world-population-we1": "esbuild scripts/audit-world-population-we1.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-world-population-we1.mjs && node /tmp/audit-world-population-we1.mjs",
     "audit:content-market-cm1": "esbuild scripts/audit-content-market-cm1.ts --bundle --platform=node --format=cjs --loader:.csv=text --outfile=/tmp/audit-content-market-cm1.cjs && node /tmp/audit-content-market-cm1.cjs",
     "audit:content-market-cm2": "esbuild scripts/audit-content-market-cm2.ts --bundle --platform=node --format=cjs --loader:.csv=text --outfile=/tmp/audit-content-market-cm2.cjs && node /tmp/audit-content-market-cm2.cjs",
     "audit:content-market-cm3": "esbuild scripts/audit-content-market-cm3.ts --bundle --platform=node --format=cjs --loader:.csv=text --outfile=/tmp/audit-content-market-cm3.cjs && node /tmp/audit-content-market-cm3.cjs",

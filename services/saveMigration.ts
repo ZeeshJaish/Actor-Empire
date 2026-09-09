@@ -51,8 +51,9 @@ import { reconstructSignedStreamingCataloguePackages } from './streamingCatalogu
 import { normalizeStreamingRightsTransactionRegistry } from './streamingRightsTransactions';
 import { normalizeStreamingRightsOfficeState } from './streamingRightsOffice';
 import { migrateLegacyDynastyCareerState } from './dynastyCareer';
+import { normalizeWorldPopulationState } from './worldEconomy/worldPopulation';
 
-const SAVE_MIGRATION_VERSION = 40;
+const SAVE_MIGRATION_VERSION = 41;
 const RUNAWAY_STOCK_CASH_CEILING = 10_000_000_000_000;
 const ACQUISITION_RIVAL_BID_MAX_ROUNDS = 3;
 
@@ -1112,6 +1113,10 @@ export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
             industryMedia: base.world?.industryMedia
                 ? reconcileIndustryMediaWorldWithEvents(base.world.industryMedia, migratedIndustryEvents)
                 : normalizeIndustryMediaWorld(undefined),
+            worldPopulation: normalizeWorldPopulationState(
+                base.world?.worldPopulation,
+                migratedAbsoluteWeek,
+            ),
             platformAiPlayerCommissionOffers: normalizePlatformAiPlayerCommissionOffers(
                 base.world?.platformAiPlayerCommissionOffers,
                 getAbsoluteWeek(base.age, base.currentWeek),

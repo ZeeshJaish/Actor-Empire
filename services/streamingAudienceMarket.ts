@@ -8,6 +8,7 @@ import {
     type StreamingDayOneRegionId,
 } from './streamingDayOneMarkets';
 import { resolveStreamingPlatformBrandById } from './streamingPlatformBrandRegistry';
+import { normalizeWorldPopulationState } from './worldEconomy/worldPopulation';
 
 export type StreamingAudiencePlatformId = PlatformId | 'AMAZON_PRIME' | 'REGIONAL' | 'PLAYER';
 export type StreamingAudiencePersonaId =
@@ -252,6 +253,7 @@ const buildCountry = (
     playerSubscribers: number,
     weeksSinceFounding: number,
     playerPresentation: AudiencePlatformPresentation,
+    canonicalPopulation?: number,
 ): StreamingAudienceCountryView => {
     const selectedForLaunch = selectedMarketIds.has(market.id);
     const adoption = clamp(
@@ -261,9 +263,12 @@ const buildCountry = (
         22,
         88,
     );
-    const estimatedPopulation = round(market.streamingAudience / (adoption / 100));
+    const estimatedPopulation = canonicalPopulation && canonicalPopulation > 0
+        ? round(canonicalPopulation)
+        : round(market.streamingAudience / (adoption / 100));
+    const activeViewers = round(estimatedPopulation * adoption / 100);
     const subscriptionsPerHousehold = round1(clamp(1.38 + adoption / 100 * 0.9 + (market.competition === 'FIERCE' ? 0.18 : 0), 1.3, 2.55));
-    const payingHouseholds = round(market.streamingAudience / (1.88 + adoption / 100 * 0.35));
+    const payingHouseholds = round(activeViewers / (1.88 + adoption / 100 * 0.35));
     const watchShare = getCountryShares(market, selectedForLaunch, playerSubscribers, playerPresentation);
     const top = watchShare[0];
     const playerShare = watchShare.find(item => item.id === 'PLAYER')?.sharePercent || 0;
@@ -284,12 +289,12 @@ const buildCountry = (
         selectedForLaunch,
         estimatedPopulation,
         streamingAdoptionPercent: round1(adoption),
-        activeViewers: market.streamingAudience,
+        activeViewers,
         payingHouseholds,
         paidSubscriptions: round(payingHouseholds * subscriptionsPerHousehold),
         subscriptionsPerHousehold,
         annualGrowthPercent: market.annualGrowthPercent,
-        weeklyWatchHours: round(market.streamingAudience * (7.4 + adoption / 17)),
+        weeklyWatchHours: round(activeViewers * (7.4 + adoption / 17)),
         churnPercent: round1(baseChurn),
         switchingPercent: round1(baseChurn * (market.competition === 'FIERCE' ? 1.65 : 1.35)),
         topPlatformName: top.name,
@@ -422,14 +427,16 @@ export const getStreamingAudienceMarket = (player: Player): StreamingAudienceMar
         name: platform.identity?.name || PLATFORM_META.PLAYER.fallbackName || 'Your platform',
         color: platform.identity?.primaryColor || PLATFORM_META.PLAYER.fallbackColor || '#8B5CF6',
     });
+    const worldPopulation = normalizeWorldPopulationState(player.world?.worldPopulation, absoluteWeek);
     const countries = STREAMING_DAY_ONE_MARKETS.map(market => buildCountry(
         market,
         selectedMarketIds,
         platform.metrics.subscribers,
         weeksSinceFounding,
         playerPresentation,
+        worldPopulation.countries[market.id]?.population,
     ));
-    const population = round(8_120_000_000 * Math.pow(1.0085, weeksSinceFounding / 52));
+    const population = worldPopulation.global.population;
     const adoption = round1(clamp(48.6 + weeksSinceFounding / 52 * 1.65, 35, 78));
     const activeViewers = round(population * adoption / 100);
     const payingHouseholds = round(activeViewers / (2.42 - adoption / 235));
