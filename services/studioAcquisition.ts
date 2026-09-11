@@ -17,6 +17,7 @@ import {
     deriveAcquiredStudioFacilities,
 } from './studioAcquisitionAssets';
 import { materializeStudioOwnership } from './industryWorld/studioOwnershipMaterializer';
+import { getGenderedAvatar } from './npcLogic';
 
 export type AcquisitionCaseStatus = 'DRAFT' | 'OFFER_SUBMITTED' | 'COUNTERED' | 'RIVAL_BID' | 'ACCEPTED' | 'REJECTED' | 'CLOSED' | 'ACQUIRED';
 export type AcquisitionOfferType = 'CONSERVATIVE' | 'FAIR' | 'AGGRESSIVE' | 'MINORITY';
@@ -417,7 +418,7 @@ const addAcquisitionMediaPulse = (
         authorId: source.authorId,
         authorName: source.authorName,
         authorHandle: source.authorHandle,
-        authorAvatar: source.authorAvatar || `https://api.dicebear.com/8.x/pixel-art/svg?seed=${encodeURIComponent(source.authorHandle)}`,
+        authorAvatar: source.authorAvatar || getGenderedAvatar('NON_BINARY', source.authorHandle),
         content: copy.social,
         timestamp: Date.now(),
         likes: 420 + (stableHash(`${idBase}:likes`) % 48_000),

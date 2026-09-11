@@ -1,6 +1,6 @@
 import { Player, LifeEvent, LifeEventOption, LegalCase, ScheduledEvent, DatingMatch, NewsItem } from '../types';
 import { spendPlayerEnergy } from './premiumLogic';
-import { NPC_DATABASE } from './npcLogic';
+import { getGenderedAvatar, NPC_DATABASE } from './npcLogic';
 import { applyDivorceOutcome, applyPartnerBreakup } from './familyLogic';
 import { getPlayerLanguage, t } from './i18n';
 import { createStudioNameRightsHearing } from './studioNameRights';
@@ -40,7 +40,7 @@ const pushRomanceCoverage = (
         authorId: `x_relationship_author_${Math.random()}`,
         authorName: tone === 'BREAKUP' ? 'SplitWatch' : tone === 'SCANDAL' ? 'TabloidWire' : 'PopPulse',
         authorHandle: tone === 'BREAKUP' ? '@splitwatch' : tone === 'SCANDAL' ? '@tabloidwire' : '@poppulse',
-        authorAvatar: `https://api.dicebear.com/8.x/pixel-art/svg?seed=${tone}`,
+        authorAvatar: getGenderedAvatar('NON_BINARY', tone),
         content: t(language, `services.lifeEvent.relationship.coverage.x.${tone}`, { playerName: player.name }),
         timestamp: Date.now(),
         likes: tone === 'SCANDAL' ? 38000 : 14000,

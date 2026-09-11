@@ -71,6 +71,7 @@ import {
     type OwnedStreamingLedgerEventType,
     type OwnedStreamingPlatformLifecycle,
     type OwnedStreamingPlatformMetrics,
+    type WorldStreamingCustomerAccessPolicy,
     type OwnedStreamingPlatformState,
     type OwnedStreamingWeeklyDecision,
     type OwnedStreamingGrowthAction,
@@ -82,6 +83,7 @@ import {
     type OwnedStreamingStarterCatalog,
     type OwnedStreamingWeeklySnapshot,
     type StreamingBuyerAuctionSession,
+    type StreamingUpcomingRightsSale,
     type PlatformId,
     type StreamingInfrastructureStrategy,
     type StreamingCatalogLicenseStatus,
@@ -2675,6 +2677,7 @@ const normalizeCatalogLicense = (value: unknown): OwnedStreamingCatalogLicense |
         buyerPlatformId: isOneOf(source.buyerPlatformId, PLATFORM_IDS, null),
         platformContentPlanId: cleanText(source.platformContentPlanId, '', 180) || null,
         cataloguePackageId: cleanText(source.cataloguePackageId, '', 180) || null,
+        upcomingRightsSaleId: cleanText(source.upcomingRightsSaleId, '', 180) || null,
         contentSource: source.contentSource as OwnedStreamingCatalogLicense['contentSource'],
         sellerType: isOneOf(source.sellerType, RIGHTS_SELLER_TYPES, 'STUDIO'),
         sellerPlatformId: isOneOf(source.sellerPlatformId, PLATFORM_IDS, 'NETFLIX') === source.sellerPlatformId
@@ -2750,6 +2753,10 @@ const normalizeRightsNegotiation = (value: unknown): OwnedStreamingRightsNegotia
         processedProposalVersion: source.processedProposalVersion == null ? null : Math.max(1, Math.round(clamp(source.processedProposalVersion, 1, 1000, 1))),
         signingDeadlineAbsoluteWeek: source.signingDeadlineAbsoluteWeek == null ? null : Math.max(0, Math.round(clamp(source.signingDeadlineAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
         responseMessageId: cleanText(source.responseMessageId, '', 180) || null,
+        availabilityAtAbsoluteWeek: source.availabilityAtAbsoluteWeek == null
+            ? null
+            : Math.max(0, Math.round(clamp(source.availabilityAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
+        upcomingRightsSaleId: cleanText(source.upcomingRightsSaleId, '', 180) || null,
     };
 };
 
@@ -2861,6 +2868,7 @@ const normalizeBuyerAuctionSession = (value: unknown): StreamingBuyerAuctionSess
         },
         notice: cleanText(lotSource.notice, '', 280) || null,
         cataloguePackageId: cleanText(lotSource.cataloguePackageId, '', 180) || null,
+        upcomingRightsSaleId: cleanText(lotSource.upcomingRightsSaleId, '', 180) || null,
         catalogueComponentIds: uniqueStrings(lotSource.catalogueComponentIds, 40),
     } satisfies StreamingBuyerAuctionSession['lot'];
     if (!lot.countryIds.length || lot.allowedTerms.backendMaximum < lot.allowedTerms.backendMinimum) return null;
@@ -2875,7 +2883,7 @@ const normalizeBuyerAuctionSession = (value: unknown): StreamingBuyerAuctionSess
             sessionId: id,
             bidderId: cleanText(bidSource.bidderId, '', 180),
             bidderName: cleanText(bidSource.bidderName, 'Bidder', 140),
-            platformId: isOneOf(bidSource.platformId, PLATFORM_IDS, null),
+            platformId: cleanText(bidSource.platformId, '', 80).toUpperCase().replace(/[^A-Z0-9_]/g, '_') || null,
             isPlayer: Boolean(bidSource.isPlayer),
             revision: Math.max(1, Math.round(clamp(bidSource.revision, 1, 20, 1))),
             status: isOneOf(bidSource.status, ['ACTIVE', 'OUTBID', 'WITHDRAWN', 'WON', 'LOST'] as const, 'OUTBID'),
@@ -2888,10 +2896,10 @@ const normalizeBuyerAuctionSession = (value: unknown): StreamingBuyerAuctionSess
             sellerValue: Math.round(clamp(bidSource.sellerValue, 0, 10_000_000_000)),
             createdAtActiveSecond: Math.max(0, Math.round(clamp(bidSource.createdAtActiveSecond, 0, 45))),
         };
-    }).filter((item): item is NonNullable<typeof item> => Boolean(item)).slice(-80);
+    }).filter((item): item is NonNullable<typeof item> => Boolean(item));
     const rivals = asArray<unknown>(source.rivals).map(item => {
         const rival = asRecord(item);
-        const platformId = isOneOf(rival.platformId, PLATFORM_IDS, null);
+        const platformId = cleanText(rival.platformId, '', 80).toUpperCase().replace(/[^A-Z0-9_]/g, '_') || null;
         if (!platformId) return null;
         return {
             bidderId: cleanText(rival.bidderId, platformId, 180),
@@ -2907,7 +2915,7 @@ const normalizeBuyerAuctionSession = (value: unknown): StreamingBuyerAuctionSess
             status: isOneOf(rival.status, ['WATCHING', 'ACTIVE', 'FINAL', 'WITHDRAWN'] as const, 'WATCHING'),
             currentBidId: cleanText(rival.currentBidId, '', 180) || null,
         };
-    }).filter((item): item is NonNullable<typeof item> => Boolean(item)).slice(0, 8);
+    }).filter((item): item is NonNullable<typeof item> => Boolean(item));
     const events = asArray<unknown>(source.events).map(item => {
         const event = asRecord(item);
         const eventId = cleanText(event.id, '', 180);
@@ -2942,6 +2950,52 @@ const normalizeBuyerAuctionSession = (value: unknown): StreamingBuyerAuctionSess
         settledAtAbsoluteWeek: source.settledAtAbsoluteWeek == null ? null : Math.max(0, Math.round(clamp(source.settledAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
         resultReason: cleanText(source.resultReason, '', 300) || null,
         outcomeMessageId: cleanText(source.outcomeMessageId, '', 180) || null,
+    };
+};
+
+const normalizeUpcomingRightsSale = (value: unknown): StreamingUpcomingRightsSale | null => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const source = asRecord(value);
+    const id = cleanText(source.id, '', 180);
+    const sourceProductionId = cleanText(source.sourceProductionId, '', 180);
+    const sourceProjectId = cleanText(source.sourceProjectId, '', 180);
+    if (!id || !sourceProductionId || !sourceProjectId) return null;
+    const announcedAtAbsoluteWeek = Math.max(0, Math.round(clamp(source.announcedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER)));
+    const opensAtAbsoluteWeek = Math.max(announcedAtAbsoluteWeek + 1, Math.round(clamp(source.opensAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER)));
+    const plannedAvailabilityAbsoluteWeek = Math.max(opensAtAbsoluteWeek, Math.round(clamp(source.plannedAvailabilityAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER)));
+    return {
+        schemaVersion: 1,
+        id,
+        idempotencyKey: cleanText(source.idempotencyKey, `upcoming-rights:${sourceProductionId}`, 240),
+        sourceProductionId,
+        sourceProjectId,
+        title: cleanText(source.title, 'Untitled future release', 160),
+        projectType: source.projectType === 'SERIES' ? 'SERIES' : 'MOVIE',
+        genre: cleanText(source.genre, 'DRAMA', 80),
+        sellerId: cleanText(source.sellerId, 'rights-holder', 180),
+        sellerName: cleanText(source.sellerName, 'Rights holder', 160),
+        announcedAtAbsoluteWeek,
+        opensAtAbsoluteWeek,
+        originalAvailabilityAbsoluteWeek: Math.max(opensAtAbsoluteWeek, Math.round(clamp(source.originalAvailabilityAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER, plannedAvailabilityAbsoluteWeek))),
+        plannedAvailabilityAbsoluteWeek,
+        durationWeeks: Math.round(clamp(source.durationWeeks, 26, 520, 104)),
+        territory: isOneOf(source.territory, LICENSE_TERRITORIES, 'MULTI_REGION'),
+        countryIds: normalizeStreamingDayOneMarketIds(source.countryIds).sort(),
+        windowType: isOneOf(source.windowType, RIGHTS_WINDOW_TYPES, 'FIRST_WINDOW'),
+        exclusivity: isOneOf(source.exclusivity, LICENSE_EXCLUSIVITY, 'EXCLUSIVE'),
+        referenceValue: Math.round(clamp(source.referenceValue, 1, 5_000_000_000)),
+        minimumGuarantee: Math.round(clamp(source.minimumGuarantee, 1, 5_000_000_000)),
+        publicInterestScore: Math.round(clamp(source.publicInterestScore, 0, 100)),
+        publicInterest: isOneOf(source.publicInterest, ['EMERGING', 'ACTIVE', 'HIGH', 'EVENT'] as const, 'ACTIVE'),
+        publicInterestDrivers: uniqueStrings(source.publicInterestDrivers, 6),
+        status: isOneOf(source.status, ['ANNOUNCED', 'LIVE', 'ACQUIRED', 'LOST', 'CLOSED', 'WITHDRAWN'] as const, 'ANNOUNCED'),
+        followedAtAbsoluteWeek: source.followedAtAbsoluteWeek == null ? null : Math.max(0, Math.round(clamp(source.followedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
+        openedNotificationId: cleanText(source.openedNotificationId, '', 180) || null,
+        auctionSessionId: cleanText(source.auctionSessionId, '', 180) || null,
+        winningContractId: cleanText(source.winningContractId, '', 180) || null,
+        winnerName: cleanText(source.winnerName, '', 160) || null,
+        resolvedAtAbsoluteWeek: source.resolvedAtAbsoluteWeek == null ? null : Math.max(0, Math.round(clamp(source.resolvedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
+        lastProcessedAbsoluteWeek: Math.max(-1, Math.round(clamp(source.lastProcessedAbsoluteWeek, -1, Number.MAX_SAFE_INTEGER, -1))),
     };
 };
 
@@ -3122,6 +3176,16 @@ const normalizeMetrics = (value: unknown): OwnedStreamingPlatformMetrics => {
     };
 };
 
+const normalizeAudienceAccessPolicy = (value: unknown): WorldStreamingCustomerAccessPolicy => {
+    const source = asRecord(value);
+    return {
+        sharingPosture: isOneOf(source.sharingPosture, ['REACH_FIRST', 'BALANCED', 'HOUSEHOLD_ONLY'] as const, 'BALANCED'),
+        enforcementInvestment: isOneOf(source.enforcementInvestment, ['LIGHT', 'STANDARD', 'AGGRESSIVE'] as const, 'STANDARD'),
+        source: isOneOf(source.source, ['LEADERSHIP_DEFAULT', 'PLAYER_ACTION'] as const, 'LEADERSHIP_DEFAULT'),
+        updatedAtAbsoluteWeek: Math.max(0, Math.round(clamp(source.updatedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
+    };
+};
+
 const normalizeTitleWeekPerformance = (value: unknown): OwnedStreamingTitleWeekPerformance | null => {
     const source = asRecord(value);
     const projectId = cleanText(source.projectId, '', 120);
@@ -3140,17 +3204,34 @@ const normalizeTitleWeekPerformance = (value: unknown): OwnedStreamingTitleWeekP
         programWeek: Math.max(1, Math.round(clamp(source.programWeek, 1, 999, 1))),
         weeksAvailable: Math.max(1, Math.round(clamp(source.weeksAvailable, 1, 999, 1))),
         viewingAccounts: Math.round(clamp(source.viewingAccounts, 0, Number.MAX_SAFE_INTEGER)),
+        estimatedViewers: source.estimatedViewers === undefined ? undefined : Math.round(clamp(source.estimatedViewers, 0, Number.MAX_SAFE_INTEGER)),
+        starts: source.starts === undefined ? undefined : Math.round(clamp(source.starts, 0, Number.MAX_SAFE_INTEGER)),
         hoursViewed: Math.round(clamp(source.hoursViewed, 0, Number.MAX_SAFE_INTEGER)),
         completionRate: clamp(source.completionRate, 0, 1),
         repeatViewingRate: clamp(source.repeatViewingRate, 0, 1),
+        abandonmentRate: source.abandonmentRate === undefined ? undefined : clamp(source.abandonmentRate, 0, 1),
+        paidViewingAccounts: source.paidViewingAccounts === undefined ? undefined : Math.round(clamp(source.paidViewingAccounts, 0, Number.MAX_SAFE_INTEGER)),
+        sharedViewingAccounts: source.sharedViewingAccounts === undefined ? undefined : Math.round(clamp(source.sharedViewingAccounts, 0, Number.MAX_SAFE_INTEGER)),
+        piracyViewingAccounts: source.piracyViewingAccounts === undefined ? undefined : Math.round(clamp(source.piracyViewingAccounts, 0, Number.MAX_SAFE_INTEGER)),
+        topCountryId: cleanText(source.topCountryId, '', 20) || null,
+        acquisitionAttributedAccounts: source.acquisitionAttributedAccounts === undefined ? undefined : Math.round(clamp(source.acquisitionAttributedAccounts, 0, Number.MAX_SAFE_INTEGER)),
+        retentionAttributedAccounts: source.retentionAttributedAccounts === undefined ? undefined : Math.round(clamp(source.retentionAttributedAccounts, 0, Number.MAX_SAFE_INTEGER)),
         satisfactionScore: clamp(source.satisfactionScore, 0, 100),
         discoveryMix: {
             homepagePercent: clamp(discovery.homepagePercent, 0, 100),
             recommendationsPercent: clamp(discovery.recommendationsPercent, 0, 100),
             searchPercent: clamp(discovery.searchPercent, 0, 100),
             directPercent: clamp(discovery.directPercent, 0, 100),
+            marketingPercent: discovery.marketingPercent === undefined ? undefined : clamp(discovery.marketingPercent, 0, 100),
+            externalBuzzPercent: discovery.externalBuzzPercent === undefined ? undefined : clamp(discovery.externalBuzzPercent, 0, 100),
         },
         attributedSubscriptionRevenue: Math.round(clamp(source.attributedSubscriptionRevenue, 0, Number.MAX_SAFE_INTEGER)),
+        advertisingRevenue: source.advertisingRevenue === undefined ? undefined : Math.round(clamp(source.advertisingRevenue, 0, Number.MAX_SAFE_INTEGER)),
+        premiumRevenue: source.premiumRevenue === undefined ? undefined : Math.round(clamp(source.premiumRevenue, 0, Number.MAX_SAFE_INTEGER)),
+        rentalRevenue: source.rentalRevenue === undefined ? undefined : Math.round(clamp(source.rentalRevenue, 0, Number.MAX_SAFE_INTEGER)),
+        purchaseRevenue: source.purchaseRevenue === undefined ? undefined : Math.round(clamp(source.purchaseRevenue, 0, Number.MAX_SAFE_INTEGER)),
+        sponsorshipRevenue: source.sponsorshipRevenue === undefined ? undefined : Math.round(clamp(source.sponsorshipRevenue, 0, Number.MAX_SAFE_INTEGER)),
+        incrementalRevenue: source.incrementalRevenue === undefined ? undefined : Math.round(clamp(source.incrementalRevenue, 0, Number.MAX_SAFE_INTEGER)),
         allocatedCashCost: Math.round(clamp(source.allocatedCashCost, 0, Number.MAX_SAFE_INTEGER)),
         allocatedContentAmortization: Math.round(clamp(source.allocatedContentAmortization, 0, Number.MAX_SAFE_INTEGER)),
         cashContribution: Math.round(clamp(source.cashContribution, -Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER, 0)),
@@ -3170,6 +3251,91 @@ const normalizeWeeklyOperations = (value: unknown): OwnedStreamingWeeklyOperatio
         cancellations: Math.round(clamp(source.cancellations, 0, Number.MAX_SAFE_INTEGER)),
         reactivations: Math.round(clamp(source.reactivations, 0, Number.MAX_SAFE_INTEGER)),
         subscriptionRevenue: Math.round(clamp(source.subscriptionRevenue, 0, Number.MAX_SAFE_INTEGER)),
+        worldCompetitionTargetSubscribers: source.worldCompetitionTargetSubscribers === undefined
+            ? undefined
+            : Math.round(clamp(source.worldCompetitionTargetSubscribers, 0, Number.MAX_SAFE_INTEGER)),
+        worldCompetitionEffectiveMonthlyPrice: source.worldCompetitionEffectiveMonthlyPrice === undefined
+            ? undefined
+            : clamp(source.worldCompetitionEffectiveMonthlyPrice, 0, Number.MAX_SAFE_INTEGER),
+        worldCompetitionPlanAllocations: asArray<unknown>(source.worldCompetitionPlanAllocations).slice(0, 12).flatMap(item => {
+            const allocation = asRecord(item);
+            const planId = cleanText(allocation.planId, '', 80);
+            const planName = cleanText(allocation.planName, '', 80);
+            if (!planId || !planName) return [];
+            return [{
+                planId,
+                planName,
+                households: Math.round(clamp(allocation.households, 0, Number.MAX_SAFE_INTEGER)),
+                effectiveMonthlyPrice: clamp(allocation.effectiveMonthlyPrice, 0, Number.MAX_SAFE_INTEGER),
+                monthlySubscriptionRevenue: clamp(allocation.monthlySubscriptionRevenue, 0, Number.MAX_SAFE_INTEGER),
+            }];
+        }),
+        worldCustomerStartingPaidAccounts: source.worldCustomerStartingPaidAccounts === undefined
+            ? undefined
+            : Math.round(clamp(source.worldCustomerStartingPaidAccounts, 0, Number.MAX_SAFE_INTEGER)),
+        worldCustomerEndingPaidAccounts: source.worldCustomerEndingPaidAccounts === undefined
+            ? undefined
+            : Math.round(clamp(source.worldCustomerEndingPaidAccounts, 0, Number.MAX_SAFE_INTEGER)),
+        worldCustomerPayingHouseholds: source.worldCustomerPayingHouseholds === undefined
+            ? undefined
+            : Math.round(clamp(source.worldCustomerPayingHouseholds, 0, Number.MAX_SAFE_INTEGER)),
+        worldCustomerUpgrades: source.worldCustomerUpgrades === undefined
+            ? undefined
+            : Math.round(clamp(source.worldCustomerUpgrades, 0, Number.MAX_SAFE_INTEGER)),
+        worldCustomerDowngrades: source.worldCustomerDowngrades === undefined
+            ? undefined
+            : Math.round(clamp(source.worldCustomerDowngrades, 0, Number.MAX_SAFE_INTEGER)),
+        worldCustomerSwitchIns: source.worldCustomerSwitchIns === undefined
+            ? undefined
+            : Math.round(clamp(source.worldCustomerSwitchIns, 0, Number.MAX_SAFE_INTEGER)),
+        worldCustomerSwitchOuts: source.worldCustomerSwitchOuts === undefined
+            ? undefined
+            : Math.round(clamp(source.worldCustomerSwitchOuts, 0, Number.MAX_SAFE_INTEGER)),
+        worldCustomerExternalSharedHouseholds: source.worldCustomerExternalSharedHouseholds === undefined
+            ? undefined
+            : Math.round(clamp(source.worldCustomerExternalSharedHouseholds, 0, Number.MAX_SAFE_INTEGER)),
+        worldCustomerSharedActiveViewers: source.worldCustomerSharedActiveViewers === undefined
+            ? undefined
+            : Math.round(clamp(source.worldCustomerSharedActiveViewers, 0, Number.MAX_SAFE_INTEGER)),
+        worldCustomerPiracyReach: source.worldCustomerPiracyReach === undefined
+            ? undefined
+            : Math.round(clamp(source.worldCustomerPiracyReach, 0, Number.MAX_SAFE_INTEGER)),
+        worldCustomerAccessLoadAccounts: source.worldCustomerAccessLoadAccounts === undefined
+            ? undefined
+            : Math.round(clamp(source.worldCustomerAccessLoadAccounts, 0, Number.MAX_SAFE_INTEGER)),
+        worldCustomerMonthlySubscriptionRevenue: source.worldCustomerMonthlySubscriptionRevenue === undefined
+            ? undefined
+            : clamp(source.worldCustomerMonthlySubscriptionRevenue, 0, Number.MAX_SAFE_INTEGER),
+        worldCustomerPlanAllocations: asArray<unknown>(source.worldCustomerPlanAllocations).slice(0, 12).flatMap(item => {
+            const allocation = asRecord(item);
+            const planId = cleanText(allocation.planId, '', 80);
+            const planName = cleanText(allocation.planName, '', 80);
+            if (!planId || !planName) return [];
+            return [{
+                planId,
+                planName,
+                paidAccounts: Math.round(clamp(allocation.paidAccounts, 0, Number.MAX_SAFE_INTEGER)),
+                effectiveMonthlyPrice: clamp(allocation.effectiveMonthlyPrice, 0, Number.MAX_SAFE_INTEGER),
+                monthlySubscriptionRevenue: clamp(allocation.monthlySubscriptionRevenue, 0, Number.MAX_SAFE_INTEGER),
+            }];
+        }),
+        audienceEnforcementCost: source.audienceEnforcementCost === undefined
+            ? undefined
+            : Math.round(clamp(source.audienceEnforcementCost, 0, Number.MAX_SAFE_INTEGER)),
+        worldViewingAccounts: source.worldViewingAccounts === undefined
+            ? undefined : Math.round(clamp(source.worldViewingAccounts, 0, Number.MAX_SAFE_INTEGER)),
+        worldViewingHours: source.worldViewingHours === undefined
+            ? undefined : Math.round(clamp(source.worldViewingHours, 0, Number.MAX_SAFE_INTEGER)),
+        worldViewingUnmetDemandAccounts: source.worldViewingUnmetDemandAccounts === undefined
+            ? undefined : Math.round(clamp(source.worldViewingUnmetDemandAccounts, 0, Number.MAX_SAFE_INTEGER)),
+        worldViewingAdvertisingRevenue: source.worldViewingAdvertisingRevenue === undefined
+            ? undefined : Math.round(clamp(source.worldViewingAdvertisingRevenue, 0, Number.MAX_SAFE_INTEGER)),
+        worldViewingTransactionRevenue: source.worldViewingTransactionRevenue === undefined
+            ? undefined : Math.round(clamp(source.worldViewingTransactionRevenue, 0, Number.MAX_SAFE_INTEGER)),
+        worldViewingSponsorshipRevenue: source.worldViewingSponsorshipRevenue === undefined
+            ? undefined : Math.round(clamp(source.worldViewingSponsorshipRevenue, 0, Number.MAX_SAFE_INTEGER)),
+        worldViewingIncrementalRevenue: source.worldViewingIncrementalRevenue === undefined
+            ? undefined : Math.round(clamp(source.worldViewingIncrementalRevenue, 0, Number.MAX_SAFE_INTEGER)),
         partnerRevenueShareCost: Math.round(clamp(source.partnerRevenueShareCost, 0, Number.MAX_SAFE_INTEGER)),
         infrastructureCost: Math.round(clamp(source.infrastructureCost, 0, Number.MAX_SAFE_INTEGER)),
         leadershipCost: Math.round(clamp(source.leadershipCost, 0, Number.MAX_SAFE_INTEGER)),
@@ -3585,7 +3751,7 @@ export const normalizeOwnedStreamingPlatformState = (
         ).slice(-OWNED_STREAMING_PRODUCT_LINE_LIMIT),
         catalogSetupDraft: normalizeCatalogSetupDraft(source.catalogSetupDraft),
         contentMarketDraft: source.contentMarketDraft && typeof source.contentMarketDraft === 'object' ? {
-            tab: ['ALL', 'MOVIE', 'SERIES', 'COLLECTIONS', 'OWNED', 'OFFERS', 'AUCTIONS'].includes(source.contentMarketDraft.tab) ? source.contentMarketDraft.tab : 'ALL',
+            tab: ['ALL', 'MOVIE', 'SERIES', 'COLLECTIONS', 'OWNED', 'OFFERS', 'AUCTIONS', 'UPCOMING'].includes(source.contentMarketDraft.tab) ? source.contentMarketDraft.tab : 'ALL',
             search: String(source.contentMarketDraft.search || '').slice(0, 100),
             selectedId: typeof source.contentMarketDraft.selectedId === 'string' ? source.contentMarketDraft.selectedId.slice(0, 200) : null,
             ownedIds: Array.isArray(source.contentMarketDraft.ownedIds) ? Array.from(new Set<string>(source.contentMarketDraft.ownedIds.filter((id: unknown) => typeof id === 'string'))).slice(0, 500) : [],
@@ -3596,6 +3762,12 @@ export const normalizeOwnedStreamingPlatformState = (
                 .filter((session): session is StreamingBuyerAuctionSession => Boolean(session)),
             session => session.id,
         ).slice(-40),
+        upcomingRightsSales: dedupeByKey(
+            asArray<unknown>(source.upcomingRightsSales)
+                .map(normalizeUpcomingRightsSale)
+                .filter((sale): sale is StreamingUpcomingRightsSale => Boolean(sale)),
+            sale => sale.id,
+        ).slice(-80),
         starterCatalog: normalizeStarterCatalog(source.starterCatalog),
         catalogLicenses: dedupeByKey(
             asArray<unknown>(source.catalogLicenses)
@@ -3644,6 +3816,7 @@ export const normalizeOwnedStreamingPlatformState = (
             TECHNOLOGY_BRANCHES.map(branch => [branch, Math.round(clamp(technologySource[branch], 0, 100))]),
         ) as Record<StreamingTechnologyBranch, number>,
         metrics: normalizeMetrics(source.metrics),
+        audienceAccessPolicy: normalizeAudienceAccessPolicy(source.audienceAccessPolicy),
         catalogProjectIds: uniqueStrings(source.catalogProjectIds, OWNED_STREAMING_CATALOG_REFERENCE_LIMIT),
         simulationSeed: cleanText(source.simulationSeed, defaults.simulationSeed, 120) || defaults.simulationSeed,
         lastProcessedAbsoluteWeek: source.lastProcessedAbsoluteWeek === null || source.lastProcessedAbsoluteWeek === undefined

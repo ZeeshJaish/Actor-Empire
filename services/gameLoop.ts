@@ -53,7 +53,7 @@ import {
 } from './newsLogic';
 import { generateWeeklyEvent } from './geminiService';
 import { generateLifeEvent, generateLuxeLifeEvent, hasEligibleLuxeEventTarget } from './lifeEventLogic';
-import { generateWeeklyFeed, NPC_DATABASE, calculateProjectFameMultiplier, generateNewUnknowns, updateNPCLives, createNPCFromMusicArtist } from './npcLogic';
+import { generateWeeklyFeed, NPC_DATABASE, calculateProjectFameMultiplier, generateNewUnknowns, updateNPCLives, createNPCFromMusicArtist, getGenderedAvatar } from './npcLogic';
 import { generateAgentOffers, generateManagerOffer, generateDirectOffer, getRandomAgents, getRandomManagers, getRandomTrainers, getRandomStylists, getRandomTherapists, getRandomPublicists, getRandomWellness, sanitizeTeamPools } from './teamLogic';
 import { processStockMarket, calculatePortfolioValue, getDividendPayout, initializeStocks } from './stockLogic';
 import { AWARD_CALENDAR, checkAwardEligibility, AwardDefinition, createCanonicalAwardNominationId, resolveCanonicalAwardSeason, generateFullBallot, getAwardCeremonyYear, sanitizeAwardCeremonyEvent, sanitizeAwardHistoryEntries, sanitizeAwardRecords } from './awardLogic';
@@ -69,6 +69,9 @@ import { processIndustryWorldWeek } from './industryWorld';
 import { calculateStreamingAdvertisingRevenueFullCurrency, calculateStreamingSubscriptionRevenueFullCurrency } from './streamingEconomyCore';
 import { attributeStreamingTitleRevenue, settleStreamingContractRoyaltyForPlayer } from './streamingContractSettlement';
 import { processStreamingRightsCalendarWeek } from './streamingRightsCalendar';
+import { buildStreamingPlatformRunsForProject, summarizeStreamingPlatformRuns } from './streamingReleaseRuns';
+import { resolveStreamingPlatformBrandById } from './streamingPlatformBrandRegistry';
+import { getForbesStreamingCompanies } from './streamingPlatformEcosystem';
 import { processStreamingCataloguePackagesWeek } from './streamingCataloguePackages';
 import { processStreamingCataloguePackageStrategyAutomation } from './streamingCataloguePackageAutomation';
 import { processStreamingRightsOfficeWeek } from './streamingRightsOffice';
@@ -152,6 +155,10 @@ import {
 import { normalizeWorldAudienceEconomyState } from './worldEconomy/worldAudienceCohorts';
 import { normalizeWorldAudienceParticipationState } from './worldEconomy/worldAudienceParticipation';
 import { advanceWorldPopulationToWeek, normalizeWorldPopulationState } from './worldEconomy/worldPopulation';
+import { normalizeWorldStreamingCompetitionState } from './worldEconomy/worldStreamingCompetition';
+import { normalizeWorldStreamingCustomerState } from './worldEconomy/worldStreamingCustomers';
+import { normalizeWorldStreamingViewingState } from './worldEconomy/worldStreamingViewing';
+import { settleWorldStreamingPlatformEconomyWeek } from './worldEconomy/worldStreamingPlatformEconomy';
 
 // --- CONSTANTS ---
 const ANNUAL_TAX_FREE_ALLOWANCE = 25000;
@@ -352,7 +359,7 @@ const buildSoundtrackCultureOutcomes = (
             authorId: source,
             authorName: source === 'music_watch' ? 'Music Watch' : source === 'chart_fans' ? 'Chart Fans' : 'Soundtrack Pulse',
             authorHandle: source === 'music_watch' ? '@musicwatch' : source === 'chart_fans' ? '@chartfans' : '@soundtrackpulse',
-            authorAvatar: `https://api.dicebear.com/8.x/pixel-art/svg?seed=${encodeURIComponent(moment.headline)}`,
+            authorAvatar: getGenderedAvatar('NON_BINARY', moment.headline),
             content: moment.description,
             timestamp: Date.now(),
             likes: Math.max(120, Math.floor(revenue * 0.018)),
@@ -1385,6 +1392,9 @@ const createPastProjectArchiveSnapshot = (
         studioId: projectDetails.studioId,
         streamingPlatform: release.streaming?.platformId,
         streamingContractId: release.streamingContractId || release.streaming?.contractId,
+        streamingRuns: Array.isArray(release.streamingRuns)
+            ? release.streamingRuns.map(run => ({ ...run, weeklyViews: [...run.weeklyViews] }))
+            : undefined,
         totalViews: ensureFiniteNumber(options.totalViews ?? release.streaming?.totalViews),
         weeklyViews,
         streamingRevenue,
@@ -2110,7 +2120,7 @@ export const processGameWeek = async (
                     authorId: isScandal ? 'music_watch' : isRivalry ? 'chart_fans' : 'soundtrack_pulse',
                     authorName: isScandal ? 'Music Watch' : isRivalry ? 'Chart Fans' : 'Soundtrack Pulse',
                     authorHandle: isScandal ? '@musicwatch' : isRivalry ? '@chartfans' : '@soundtrackpulse',
-                    authorAvatar: `https://api.dicebear.com/8.x/pixel-art/svg?seed=${encodeURIComponent(item.headline)}`,
+                    authorAvatar: getGenderedAvatar('NON_BINARY', item.headline),
                     content: isScandal
                         ? `${latestScandal?.artistName || 'An artist'} is trending for the wrong reasons. Music Twitter is already dissecting the rollout.`
                         : isRivalry
@@ -2429,7 +2439,7 @@ export const processGameWeek = async (
                         authorId: 'small_creator_circle',
                         authorName: 'Small Creator Circle',
                         authorHandle: '@smallcreatorcircle',
-                        authorAvatar: 'https://api.dicebear.com/8.x/pixel-art/svg?seed=SmallCreatorCircle',
+                        authorAvatar: getGenderedAvatar('NON_BINARY', 'SmallCreatorCircle'),
                         content: t(language, 'services.gameLoop.youtubeEarly.social.tinyShare', { title, playerName: nextPlayer.name }),
                         timestamp: Date.now(),
                         likes: Math.max(1, Math.floor(bonusViews * 0.08)),
@@ -2566,7 +2576,7 @@ export const processGameWeek = async (
                     authorId: 'yt_trends',
                     authorName: 'Creator Watch',
                     authorHandle: '@creatorwatch',
-                    authorAvatar: 'https://api.dicebear.com/8.x/pixel-art/svg?seed=CreatorWatch',
+                    authorAvatar: getGenderedAvatar('NON_BINARY', 'CreatorWatch'),
                     content: t(language, 'services.gameLoop.youtubeAudience.social.viralClip', { playerName: nextPlayer.name, title }),
                     timestamp: Date.now(),
                     likes: Math.floor(bonusViews * 0.04),
@@ -2679,7 +2689,7 @@ export const processGameWeek = async (
                     authorId: 'social_spotter',
                     authorName: 'Social Spotter',
                     authorHandle: '@socialspotter',
-                    authorAvatar: 'https://api.dicebear.com/8.x/pixel-art/svg?seed=SocialSpotter',
+                    authorAvatar: getGenderedAvatar('NON_BINARY', 'SocialSpotter'),
                     type: 'INDUSTRY_NEWS',
                     caption: t(language, 'services.gameLoop.instagramMicro.social.celebrityLike', { celebrityName: celebrity.name, playerName: nextPlayer.name }),
                     week: nextPlayer.currentWeek,
@@ -3011,7 +3021,7 @@ export const processGameWeek = async (
                     authorId: 'casting_room_buzz',
                     authorName: 'Casting Room Buzz',
                     authorHandle: '@castingroombuzz',
-                    authorAvatar: 'https://api.dicebear.com/8.x/pixel-art/svg?seed=CastingRoomBuzz',
+                    authorAvatar: getGenderedAvatar('NON_BINARY', 'CastingRoomBuzz'),
                     type: 'INDUSTRY_NEWS',
                     caption: t(language, 'services.gameLoop.instagramDm.social.referralBuzz'),
                     week: nextPlayer.currentWeek,
@@ -4310,7 +4320,7 @@ export const processGameWeek = async (
                         const isAlreadySold = !!updatedC.projectDetails.hiddenStats.platformId;
                         const platformId = (updatedC.projectDetails.hiddenStats.platformId as PlatformId) || determineStreamingAcquisition(updatedC.projectDetails);
                         streamingState = { platformId, weekOnPlatform: 1, totalViews: 0, weeklyViews: [], isLeaving: false };
-                        logsToAdd.push({ msg: `📺 "${updatedC.name}" is now streaming on ${PLATFORMS[platformId].name}! IMDb Page Created.`, type: 'positive' });
+                        logsToAdd.push({ msg: `📺 "${updatedC.name}" is now streaming on ${resolveStreamingPlatformBrandById(platformId).displayName}! IMDb Page Created.`, type: 'positive' });
 
                         // Update platform state only if not already sold (otherwise it was paid during bidding)
                         if (!isAlreadySold && nextPlayer.world.platforms && nextPlayer.world.platforms[platformId]) {
@@ -4323,6 +4333,19 @@ export const processGameWeek = async (
                     }
                 } else {
                     logsToAdd.push({ msg: `🌍 RELEASE DAY: "${updatedC.name}" hits theaters! IMDb Page Created.`, type: 'positive' });
+                }
+                const releaseStreamingRuns = isStreamingOnly
+                    ? buildStreamingPlatformRunsForProject(nextPlayer, updatedC.id)
+                    : [];
+                if (streamingState && releaseStreamingRuns.length > 0) {
+                    const primaryRun = releaseStreamingRuns[0];
+                    streamingState = {
+                        ...streamingState,
+                        platformId: primaryRun.platformId as PlatformId,
+                        contractId: primaryRun.contractId,
+                        startWeekAbsolute: primaryRun.startWeekAbsolute,
+                        startWeek: ((primaryRun.startWeekAbsolute - 1) % 52) + 1,
+                    };
                 }
 
                 if (updatedC.lumpSum && isPersonalCareerRole) {
@@ -4429,6 +4452,8 @@ export const processGameWeek = async (
                         status: updatedC.projectDetails.hiddenStats.ownedStreamingOriginal ? 'FINISHED' : 'RUNNING', imdbRating: imdb, productionPerformance: updatedC.productionPerformance || 50,
                         distributionPhase: isStreamingOnly ? 'STREAMING' : 'THEATRICAL',
                         streaming: streamingState,
+                        streamingRuns: releaseStreamingRuns,
+                        streamingContractId: releaseStreamingRuns[0]?.contractId,
                         streamingRevenue: updatedC.projectDetails.streamingRevenue || 0,
                         soundtrackRevenue: 0,
                         weeklySoundtrackRevenue: [],
@@ -4671,7 +4696,7 @@ export const processGameWeek = async (
         };
     };
 
-    const phaseTwoAttributionByProject = new Map<string, ReturnType<typeof attributeStreamingTitleRevenue>[number]>();
+    const phaseTwoAttributionByContract = new Map<string, ReturnType<typeof attributeStreamingTitleRevenue>[number]>();
     const settlementAbsoluteWeek = getAbsoluteWeek(nextPlayer.age, nextPlayer.currentWeek);
     const phaseTwoContracts = Object.values(nextPlayer.world.streamingRightsContracts || {}).filter(contract => (
         contract.status === 'ACTIVE'
@@ -4693,7 +4718,8 @@ export const processGameWeek = async (
                 && candidate.buyer.platformId === platformId
             ));
             if (!contract || release.distributionPhase !== 'STREAMING' || !release.streaming) return [];
-            const priorViews = Math.max(0, Number(release.streaming.weeklyViews.at(-1) || 0));
+            const platformRun = release.streamingRuns?.find(run => run.contractId === contract.id);
+            const priorViews = Math.max(0, Number(platformRun?.weeklyViews.at(-1) ?? release.streaming.weeklyViews.at(-1) ?? 0));
             const quality = Math.max(0, Math.min(100, Number(release.projectDetails.hiddenStats.qualityScore || 50)));
             return [{
                 projectId: release.id,
@@ -4765,7 +4791,12 @@ export const processGameWeek = async (
             }),
             titles: signalsWithAdvertising,
         }).forEach(row => {
-            if (playerProjectIds.has(row.projectId)) phaseTwoAttributionByProject.set(row.projectId, row);
+            if (!playerProjectIds.has(row.projectId)) return;
+            const contract = phaseTwoContracts.find(candidate => (
+                candidate.sourceProjectId === row.projectId
+                && candidate.buyer.platformId === platformId
+            ));
+            if (contract) phaseTwoAttributionByContract.set(contract.id, row);
         });
     });
 
@@ -5691,13 +5722,18 @@ export const processGameWeek = async (
             }
         }
         else if (rel.distributionPhase === 'STREAMING' && rel.streaming) {
-            // Handle delayed streaming release, including year rollover.
-            const weeksUntilStreamingStart = getStreamingWeeksUntilStart(
-                rel.streaming,
-                nextPlayer.age,
-                nextPlayer.currentWeek
-            );
-            if (weeksUntilStreamingStart > 0) {
+            const contractRuns = buildStreamingPlatformRunsForProject(nextPlayer, rel.id, rel.streamingRuns || []);
+            const streamingRuns = contractRuns.length > 0 ? contractRuns : [{
+                platformId: rel.streaming.platformId,
+                contractId: rel.streamingContractId || rel.streaming.contractId || `legacy:${rel.id}`,
+                startWeekAbsolute: inferStreamingStartWeekAbsolute(rel.streaming, nextPlayer.age, nextPlayer.currentWeek)
+                    ?? settlementAbsoluteWeek + getStreamingWeeksUntilStart(rel.streaming, nextPlayer.age, nextPlayer.currentWeek),
+                weekOnPlatform: rel.streaming.weekOnPlatform,
+                totalViews: rel.streaming.totalViews,
+                weeklyViews: [...rel.streaming.weeklyViews],
+                isLeaving: rel.streaming.isLeaving,
+            }];
+            if (!streamingRuns.some(run => settlementAbsoluteWeek >= run.startWeekAbsolute)) {
                 processedReleases.push(rel);
                 return;
             }
@@ -5708,18 +5744,41 @@ export const processGameWeek = async (
                 imdbRating: rel.imdbRating,
                 productionPerformance: rel.productionPerformance
             });
-            const rawNewViews = calculateStreamingViewership(
-                rel.streaming.platformId,
-                rel.streaming.weekOnPlatform,
-                rel.projectDetails.hiddenStats.qualityScore,
-                rel.streaming.weeklyViews[rel.streaming.weeklyViews.length - 1] || 0,
-                rel.type,
-                streamingDemand
-            );
-            const newViews = Math.max(0, Math.floor(rawNewViews * streamingProductionRisk.streamingViewMultiplier));
-            const totalViews = rel.streaming.totalViews + newViews;
+            const nextStreamingRuns = streamingRuns.map(run => {
+                if (run.isLeaving || settlementAbsoluteWeek < run.startWeekAbsolute) return run;
+                const company = getForbesStreamingCompanies(nextPlayer).find(candidate => candidate.id === run.platformId);
+                const simulationPlatformId: PlatformId = Object.prototype.hasOwnProperty.call(PLATFORMS, run.platformId)
+                    ? run.platformId as PlatformId
+                    : (company?.subscribersMillions || 0) >= 150 ? 'NETFLIX'
+                        : (company?.subscribersMillions || 0) >= 75 ? 'DISNEY_PLUS'
+                            : (company?.subscribersMillions || 0) >= 25 ? 'HULU'
+                                : 'APPLE_TV';
+                const previousViews = run.weeklyViews[run.weeklyViews.length - 1] || 0;
+                const rawRunViews = calculateStreamingViewership(
+                    simulationPlatformId,
+                    run.weekOnPlatform,
+                    rel.projectDetails.hiddenStats.qualityScore,
+                    previousViews,
+                    rel.type,
+                    streamingDemand,
+                );
+                const runViews = Math.max(0, Math.floor(rawRunViews * streamingProductionRisk.streamingViewMultiplier));
+                return {
+                    ...run,
+                    weekOnPlatform: run.weekOnPlatform + 1,
+                    totalViews: run.totalViews + runViews,
+                    weeklyViews: [...run.weeklyViews, runViews],
+                    isLeaving: checkStreamingExit(simulationPlatformId, runViews, run.weekOnPlatform),
+                };
+            });
+            const runSummary = summarizeStreamingPlatformRuns(nextStreamingRuns);
+            const newViews = nextStreamingRuns.reduce((sum, run, index) => (
+                sum + Math.max(0, run.totalViews - streamingRuns[index].totalViews)
+            ), 0);
+            const totalViews = runSummary.totalViews;
             const newWeeklyViews = [...rel.streaming.weeklyViews, newViews];
-            const shouldExit = checkStreamingExit(rel.streaming.platformId, newViews, rel.streaming.weekOnPlatform);
+            const shouldExit = runSummary.allLeaving;
+            const primaryNextRun = nextStreamingRuns.find(run => run.platformId === rel.streaming!.platformId) || nextStreamingRuns[0];
             const roleVisibility = rel.roleType === 'LEAD' ? 1 : rel.roleType === 'SUPPORTING' ? 0.7 : 0.35;
             const streamingFamePulse = newViews >= 5_000_000
                 ? 0.35 * roleVisibility
@@ -5763,51 +5822,60 @@ export const processGameWeek = async (
             }
             let weeklyStreamingRevenue = 0;
             let investorStreamingPayout = 0;
-            const canonicalStreamingContract = rel.streamingContractId
-                ? nextPlayer.world.streamingRightsContracts?.[rel.streamingContractId]
-                : undefined;
-            const phaseTwoAttribution = canonicalStreamingContract?.biddingSessionId
-                ? phaseTwoAttributionByProject.get(rel.id)
-                : undefined;
-            let phaseTwoSettlementApplied = false;
-            if (canonicalStreamingContract && phaseTwoAttribution) {
-                const settlement = settleStreamingContractRoyaltyForPlayer(nextPlayer, {
-                    contractId: canonicalStreamingContract.id,
-                    attribution: phaseTwoAttribution,
-                    absoluteWeek: settlementAbsoluteWeek,
-                });
-                nextPlayer = settlement.player;
-                weeklyStreamingRevenue = settlement.royaltyPaid;
-                phaseTwoSettlementApplied = settlement.changed || Boolean(settlement.settlementId);
-                streamingStudio = nextPlayer.businesses?.find(b => b.id === rel.projectDetails.studioId && b.type === 'PRODUCTION_HOUSE');
-            } else if (rel.studioRoyaltyPercentage) {
-                // Legacy contracts retain the historical view proxy. Phase 2 contracts settle from attributable adjusted gross.
-                weeklyStreamingRevenue = Math.floor(newViews * 0.10 * (rel.studioRoyaltyPercentage / 100));
+            let uncreditedStreamingRevenue = 0;
+            const canonicalStreamingContracts = streamingRuns.flatMap(run => {
+                const contract = nextPlayer.world.streamingRightsContracts?.[run.contractId];
+                return contract ? [{ run, contract }] : [];
+            });
+            for (const { run, contract } of canonicalStreamingContracts) {
+                const attribution = contract.biddingSessionId
+                    ? phaseTwoAttributionByContract.get(contract.id)
+                    : undefined;
+                if (attribution) {
+                    const settlement = settleStreamingContractRoyaltyForPlayer(nextPlayer, {
+                        contractId: contract.id,
+                        attribution,
+                        absoluteWeek: settlementAbsoluteWeek,
+                    });
+                    nextPlayer = settlement.player;
+                    weeklyStreamingRevenue += settlement.royaltyPaid;
+                } else if (contract.licensorRevenueShare > 0) {
+                    const runViews = Math.max(0, nextStreamingRuns.find(candidate => candidate.contractId === run.contractId)?.weeklyViews.at(-1) || 0);
+                    const proxyRoyalty = Math.floor(runViews * 0.10 * (contract.licensorRevenueShare / 100));
+                    weeklyStreamingRevenue += proxyRoyalty;
+                    uncreditedStreamingRevenue += proxyRoyalty;
+                }
             }
-            if (rel.studioRoyaltyPercentage || canonicalStreamingContract?.licensorRevenueShare) {
+            if (canonicalStreamingContracts.length === 0 && rel.studioRoyaltyPercentage) {
+                const legacyRoyalty = Math.floor(newViews * 0.10 * (rel.studioRoyaltyPercentage / 100));
+                weeklyStreamingRevenue += legacyRoyalty;
+                uncreditedStreamingRevenue += legacyRoyalty;
+            }
+            const canonicalStreamingContract = canonicalStreamingContracts[0]?.contract;
+            if (canonicalStreamingContracts.some(({ contract }) => contract.licensorRevenueShare > 0) || rel.studioRoyaltyPercentage) {
                 const studioId = rel.projectDetails.studioId;
                 const playerStudio = nextPlayer.businesses?.find(b => b.id === studioId);
                 if (playerStudio && weeklyStreamingRevenue > 0) {
                     const activeInvestorPlan = rel.investorPlan || rel.projectDetails.investorPlan;
                     investorStreamingPayout = calculateInvestorPayout(activeInvestorPlan, weeklyStreamingRevenue);
-                    const netStreamingRevenue = Math.max(0, weeklyStreamingRevenue - investorStreamingPayout);
-                    if (!phaseTwoSettlementApplied) {
-                        playerStudio.balance += netStreamingRevenue;
-                        playerStudio.stats.weeklyRevenue += netStreamingRevenue;
-                        playerStudio.stats.weeklyProfit += netStreamingRevenue;
-                        playerStudio.stats.lifetimeRevenue += netStreamingRevenue;
+                    if (uncreditedStreamingRevenue > 0) {
+                        playerStudio.balance += uncreditedStreamingRevenue;
+                        playerStudio.stats.weeklyRevenue += uncreditedStreamingRevenue;
+                        playerStudio.stats.weeklyProfit += uncreditedStreamingRevenue;
+                        playerStudio.stats.lifetimeRevenue += uncreditedStreamingRevenue;
                         appendStudioLedgerEntry(playerStudio, {
                             id: `studio_ledger_streaming_${rel.id}_${nextPlayer.age}_${nextPlayer.currentWeek}`,
                             week: nextPlayer.currentWeek,
                             year: nextPlayer.age,
-                            amount: netStreamingRevenue,
+                            amount: uncreditedStreamingRevenue,
                             type: 'STREAMING_ROYALTY',
                             label: investorStreamingPayout > 0
                                 ? `${rel.name} streaming royalties after investor split`
                                 : `${rel.name} streaming royalties`,
                             projectId: rel.id
                         });
-                    } else if (investorStreamingPayout > 0) {
+                    }
+                    if (investorStreamingPayout > 0) {
                         playerStudio.balance = Math.max(0, playerStudio.balance - investorStreamingPayout);
                         playerStudio.stats.weeklyProfit -= investorStreamingPayout;
                     }
@@ -5946,7 +6014,8 @@ export const processGameWeek = async (
                         ...rel.streaming,
                         totalViews,
                         weeklyViews: newWeeklyViews
-                    }
+                    },
+                    streamingRuns: nextStreamingRuns,
                 },
                 rel.audienceReception || rel.projectDetails.audienceReception,
                 nextPlayer.currentWeek,
@@ -5965,7 +6034,7 @@ export const processGameWeek = async (
             if (shouldExit) {
                 const outcomeStudio = nextPlayer.businesses?.find(b => b.id === rel.projectDetails.studioId && b.type === 'PRODUCTION_HOUSE');
                 applyStudioMarketOutcome(outcomeStudio, rel, rel.totalGross + newStreamingRevenue + newSoundtrackRevenue);
-                logsToAdd.push({ msg: `👋 "${rel.name}" left ${PLATFORMS[rel.streaming.platformId].name}.`, type: 'neutral' });
+                logsToAdd.push({ msg: `👋 "${rel.name}" completed its streaming run across ${nextStreamingRuns.length} platform${nextStreamingRuns.length === 1 ? '' : 's'}.`, type: 'neutral' });
                 if (rel.royaltyPercentage && rel.royaltyPercentage > 0) {
                     const studioCut = rel.budget * 2;
                     const netProfit = rel.totalGross - studioCut;
@@ -5989,6 +6058,7 @@ export const processGameWeek = async (
                         investorPlan: activeInvestorPlan,
                         investorPayouts: streamingInvestorPayouts,
                         audienceReception: streamingAudienceReception,
+                        streamingRuns: nextStreamingRuns,
                         projectDetails: streamingProjectDetails
                     }, {
                         player: nextPlayer,
@@ -6039,9 +6109,10 @@ export const processGameWeek = async (
                         ...rel.streaming,
                         totalViews,
                         weeklyViews: newWeeklyViews,
-                        weekOnPlatform: rel.streaming.weekOnPlatform + 1,
-                        isLeaving: newWeeklyViews.length > 20 && newViews < 50000
-                    }
+                        weekOnPlatform: primaryNextRun?.weekOnPlatform ?? rel.streaming.weekOnPlatform + 1,
+                        isLeaving: shouldExit
+                    },
+                    streamingRuns: nextStreamingRuns,
                 });
             }
         }
@@ -6507,6 +6578,51 @@ export const processGameWeek = async (
     emitLoopStage('owned_streaming_start');
     nextPlayer = advanceStreamingMarketClearances(nextPlayer).player;
     nextPlayer = advanceStreamingTitleLocalization(nextPlayer).player;
+    emitLoopStage('world_streaming_competition_start', { absolute_week: enteredStreamingAbsoluteWeek });
+    nextPlayer.world.worldStreamingCompetition = normalizeWorldStreamingCompetitionState(
+        nextPlayer.world.worldStreamingCompetition,
+        nextPlayer,
+        enteredStreamingAbsoluteWeek,
+    );
+    emitLoopStage('world_streaming_competition_done', {
+        absolute_week: enteredStreamingAbsoluteWeek,
+        subscribing_households: nextPlayer.world.worldStreamingCompetition.global.subscribingHouseholds,
+        subscriptions: nextPlayer.world.worldStreamingCompetition.global.totalSubscriptions,
+        player_households: nextPlayer.world.worldStreamingCompetition.global.playerHouseholds,
+    });
+    emitLoopStage('world_streaming_customers_start', { absolute_week: enteredStreamingAbsoluteWeek });
+    nextPlayer.world.worldStreamingCustomers = normalizeWorldStreamingCustomerState(
+        nextPlayer.world.worldStreamingCustomers,
+        nextPlayer,
+        enteredStreamingAbsoluteWeek,
+    );
+    emitLoopStage('world_streaming_customers_done', {
+        absolute_week: enteredStreamingAbsoluteWeek,
+        paid_accounts: nextPlayer.world.worldStreamingCustomers.global.endingPaidAccounts,
+        player_paid_accounts: nextPlayer.world.worldStreamingCustomers.global.playerEndingPaidAccounts,
+        external_shared_households: nextPlayer.world.worldStreamingCustomers.global.externalSharedHouseholds,
+        piracy_reach: nextPlayer.world.worldStreamingCustomers.global.piracyReach,
+    });
+    emitLoopStage('world_streaming_viewing_start', { absolute_week: enteredStreamingAbsoluteWeek });
+    nextPlayer.world.worldStreamingViewing = normalizeWorldStreamingViewingState(
+        nextPlayer.world.worldStreamingViewing,
+        nextPlayer,
+        enteredStreamingAbsoluteWeek,
+    );
+    emitLoopStage('world_streaming_viewing_done', {
+        absolute_week: enteredStreamingAbsoluteWeek,
+        viewing_accounts: nextPlayer.world.worldStreamingViewing.global.totalViewingAccounts,
+        hours_viewed: nextPlayer.world.worldStreamingViewing.global.totalHoursViewed,
+        incremental_revenue: nextPlayer.world.worldStreamingViewing.global.revenue.totalIncrementalRevenue,
+    });
+    emitLoopStage('world_streaming_platform_economy_start', { absolute_week: enteredStreamingAbsoluteWeek });
+    nextPlayer = settleWorldStreamingPlatformEconomyWeek(nextPlayer, enteredStreamingAbsoluteWeek);
+    emitLoopStage('world_streaming_platform_economy_done', {
+        absolute_week: enteredStreamingAbsoluteWeek,
+        platforms: nextPlayer.world.worldStreamingPlatformEconomy?.global.platformCount || 0,
+        paid_accounts: nextPlayer.world.worldStreamingPlatformEconomy?.global.endingPaidAccounts || 0,
+        weekly_revenue: nextPlayer.world.worldStreamingPlatformEconomy?.global.weeklyRevenue || 0,
+    });
     const ownedStreamingResult = processOwnedStreamingPlatformWeek(nextPlayer);
     nextPlayer = ownedStreamingResult.player;
     if (ownedStreamingResult.snapshot?.operations) {

@@ -16,9 +16,11 @@ import {
   Grid3X3,
   Layers3,
   LineChart,
+  Play,
   RadioTower,
   Search,
   ShieldCheck,
+  Sparkles,
   Target,
   TrendingDown,
   TrendingUp,
@@ -126,6 +128,38 @@ export default function StreamingAnalyticsCenter({
         </div>
       </section>
 
+      {analytics.customerAccess ? (
+        <section className="sac-data-panel is-wide">
+          <div className="sac-panel-head">
+            <div><span>PAID VS ACCESS</span><h2>Who pays and who reaches the service</h2></div>
+            <strong>{formatStreamingAnalyticsCompact(analytics.customerAccess.accessLoadAccounts)} access load</strong>
+          </div>
+          <div className="sac-metric-row is-analyst">
+            <MetricCard icon={UsersRound} label="Paid accounts" value={formatStreamingAnalyticsCompact(analytics.customerAccess.paidAccounts)} detail={`${formatStreamingAnalyticsCompact(analytics.customerAccess.payingHouseholds)} paying households`} tone="positive" />
+            <MetricCard icon={Activity} label="Shared access" value={formatStreamingAnalyticsCompact(analytics.customerAccess.externalSharedHouseholds)} detail={`${formatStreamingAnalyticsCompact(analytics.customerAccess.sharedActiveViewers)} active shared viewers`} />
+            <MetricCard icon={ShieldCheck} label="Piracy reach" value={formatStreamingAnalyticsCompact(analytics.customerAccess.piracyReach)} detail="Outside paid subscription revenue" tone="watch" />
+            <MetricCard icon={TrendingUp} label="Plan movement" value={`${formatStreamingAnalyticsCompact(analytics.planMovement.upgrades)} up`} detail={`${formatStreamingAnalyticsCompact(analytics.planMovement.downgrades)} down · ${formatStreamingAnalyticsCompact(analytics.planMovement.switchIns)} switched in`} />
+          </div>
+          <p className="sac-model-note">Subscription revenue is derived from paid plan accounts only. Shared access still contributes to delivery load.</p>
+        </section>
+      ) : null}
+
+      {analytics.viewing ? (
+        <section className="sac-data-panel is-wide">
+          <div className="sac-panel-head">
+            <div><span>TITLE-LEVEL VIEWING</span><h2>Attention after access</h2></div>
+            <strong>{formatStreamingAnalyticsCompact(analytics.viewing.hoursViewed)} watch hours</strong>
+          </div>
+          <div className="sac-metric-row is-analyst">
+            <MetricCard icon={Play} label="Watching accounts" value={formatStreamingAnalyticsCompact(analytics.viewing.viewingAccounts)} detail={`${formatStreamingAnalyticsCompact(analytics.viewing.estimatedViewers)} estimated viewers`} tone="positive" />
+            <MetricCard icon={Clock3} label="Watch hours" value={formatStreamingAnalyticsCompact(analytics.viewing.hoursViewed)} detail={`${formatStreamingAnalyticsCompact(analytics.viewing.starts)} title starts`} />
+            <MetricCard icon={Search} label="Unmet demand" value={formatStreamingAnalyticsCompact(analytics.viewing.unmetDemandAccounts)} detail="Accessible accounts that found no eligible watch" tone="watch" />
+            <MetricCard icon={UsersRound} label="Shared viewing" value={formatStreamingAnalyticsCompact(analytics.viewing.sharedViewingAccounts)} detail={`${formatStreamingAnalyticsCompact(analytics.viewing.paidViewingAccounts)} paid-path viewing accounts`} />
+            <MetricCard icon={ShieldCheck} label="Pirated viewing" value={formatStreamingAnalyticsCompact(analytics.viewing.piracyViewingAccounts)} detail="Separate from legitimate access and cash" tone="watch" />
+          </div>
+        </section>
+      ) : null}
+
       <section className="sac-data-panel">
         <div className="sac-panel-head"><div><span>WORLD POSITION</span><h2>Modeled market share</h2></div></div>
         <StreamingMarketRing entries={analytics.marketShare} playerShare={analytics.playerMarketSharePercent} />
@@ -165,13 +199,25 @@ export default function StreamingAnalyticsCenter({
   const renderFinance = () => (
     <div className="sac-analyst-layout">
       <div className="sac-metric-row is-analyst">
-        <MetricCard icon={WalletCards} label="Subscription revenue" value={formatMoney(analytics.totals.revenue)} detail={`${analytics.availableWeeks}-week selected window`} tone="positive" />
+        <MetricCard icon={WalletCards} label="Subscription cash" value={formatMoney(analytics.totals.revenue)} detail={`${analytics.availableWeeks}-week selected window`} tone="positive" />
+        <MetricCard icon={CircleDollarSign} label="Incremental revenue" value={formatMoney(analytics.totals.incrementalRevenue)} detail="Ads, transactions and sponsorship" tone="positive" />
         <MetricCard icon={TrendingDown} label="Cash costs" value={formatMoney(analytics.totals.cashCost)} detail="Infrastructure, leadership, partners and plans" tone="watch" />
         <MetricCard icon={CircleDollarSign} label="Cash contribution" value={formatMoney(analytics.totals.cashContribution)} detail="Revenue less real cash costs" tone={analytics.totals.cashContribution >= 0 ? 'positive' : 'critical'} />
         <MetricCard icon={Database} label="Accounting contribution" value={formatMoney(analytics.totals.accountingContribution)} detail={`After ${formatMoney(analytics.totals.contentAmortization)} amortization`} tone={analytics.totals.accountingContribution >= 0 ? 'positive' : 'critical'} />
       </div>
+      {analytics.viewing ? (
+        <section className="sac-data-panel is-wide">
+          <div className="sac-panel-head"><div><span>COMMERCIAL VIEWING</span><h2>Revenue earned beyond subscriptions</h2></div><strong>{formatMoney(analytics.viewing.incrementalRevenue)}</strong></div>
+          <div className="sac-metric-row is-analyst">
+            <MetricCard icon={RadioTower} label="Advertising" value={formatMoney(analytics.viewing.advertisingRevenue)} detail="Delivered ad-supported viewing" tone="positive" />
+            <MetricCard icon={WalletCards} label="Transactions" value={formatMoney(analytics.viewing.transactionRevenue)} detail="Premium access, rentals and purchases" tone="positive" />
+            <MetricCard icon={Sparkles} label="Sponsorship" value={formatMoney(analytics.viewing.sponsorshipRevenue)} detail="Contracted title exposure" tone="positive" />
+          </div>
+          <p className="sac-model-note">Existing subscription revenue is counted once in WE5. WE6 attributes it to titles and adds only genuinely incremental commercial revenue.</p>
+        </section>
+      ) : null}
       <section className="sac-data-panel is-wide">
-        <div className="sac-panel-head"><div><span>REVENUE TIMELINE</span><h2>Subscription cash entering the company</h2></div></div>
+        <div className="sac-panel-head"><div><span>REVENUE TIMELINE</span><h2>Weekly subscription revenue</h2></div></div>
         <StreamingLineGraph points={analytics.revenueTimeline} label="Weekly subscription revenue" valueFormatter={formatMoney} primaryLabel="Revenue" tone="GREEN" />
       </section>
       <section className="sac-data-panel is-wide">

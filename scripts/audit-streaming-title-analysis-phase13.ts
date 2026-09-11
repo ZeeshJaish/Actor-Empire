@@ -26,6 +26,23 @@ const createFixture = (): Player => {
         name: 'Dossier Founder',
         age: 43,
         currentWeek: 8,
+        businesses: [{
+            id: 'producer-studio', name: 'Northstar Studios', type: 'PRODUCTION_HOUSE', subtype: 'MAJOR_STUDIO',
+            logo: 'NS', color: '#68ddff', foundedWeek: 1, balance: 100_000_000, isActive: true,
+            config: {} as any, stats: {} as any, staff: [], products: [], hiringPool: [], lastHiringRefreshWeek: 0, history: [],
+        }],
+        pastProjects: [
+            { id: 'glass-city', name: 'Glass City', studioId: 'producer-studio', projectType: 'MOVIE', genre: 'THRILLER', rating: 7.4, imdbRating: 7.4, gross: 80_000_000, year: 42, releaseYear: 42 } as any,
+            { id: 'after-hours', name: 'After Hours', studioId: 'producer-studio', projectType: 'MOVIE', genre: 'COMEDY', rating: 6.9, imdbRating: 6.9, gross: 45_000_000, year: 42, releaseYear: 42 } as any,
+        ],
+        world: {
+            ...base.world,
+            projects: [
+                { id: 'original-project', title: 'Midnight Frequency', genre: 'MYSTERY', mediaType: 'SERIES', quality: 84, rating: 8.1 },
+                { id: 'glass-city', title: 'Glass City', genre: 'THRILLER', mediaType: 'MOVIE', quality: 78, rating: 7.4 },
+                { id: 'after-hours', title: 'After Hours', genre: 'COMEDY', mediaType: 'MOVIE', quality: 72, rating: 6.9 },
+            ] as any,
+        },
         ownedStreamingPlatform: {
             ...initial,
             lifecycle: 'ACTIVE',
@@ -174,7 +191,7 @@ const createFixture = (): Player => {
     };
 };
 
-assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 23, 'The canonical foundation should retain Phase 13 title telemetry in schema v23.');
+assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 25, 'The canonical foundation should retain Phase 13 title telemetry in schema v25.');
 
 const preTelemetry = getStreamingTitleAnalytics(createFixture(), 'original-project');
 assert(preTelemetry.selected?.measuredWeeks === 0, 'A live title without committed title telemetry should remain unmeasured.');
@@ -184,7 +201,7 @@ assert(Object.values(preTelemetry.selected!.reports).every(report => report.stat
 const firstWeekInput: Player = { ...createFixture(), currentWeek: 9 };
 const deterministicA = processOwnedStreamingPlatformWeek(structuredClone(firstWeekInput) as Player);
 const deterministicB = processOwnedStreamingPlatformWeek(structuredClone(firstWeekInput) as Player);
-assert(deterministicA.processed && deterministicA.snapshot?.operations?.titlePerformance?.length === 2, 'The first operating week should commit title facts only for titles already available.');
+assert(deterministicA.processed && deterministicA.snapshot?.operations?.titlePerformance?.length === 2, `The first operating week should commit title facts only for titles already available (received ${deterministicA.snapshot?.operations?.titlePerformance?.map(title => title.title).join(', ') || 'none'}; WE6 ${firstWeekInput.world.worldStreamingViewing ? 'present' : 'absent'}).`);
 assert(JSON.stringify(deterministicA.snapshot?.operations?.titlePerformance) === JSON.stringify(deterministicB.snapshot?.operations?.titlePerformance), 'Identical title inputs must produce identical seeded title telemetry.');
 
 let livePlayer = deterministicA.player;

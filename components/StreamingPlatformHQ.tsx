@@ -20,7 +20,6 @@ import {
 } from '../services/streamingHq';
 import { markOwnedStreamingCinematicStatus } from '../services/ownedStreamingPlatform';
 import StreamingCatalogSetup from './StreamingCatalogSetup';
-import StreamingOpeningCatalogueDesk from './StreamingOpeningCatalogueDesk';
 import StreamingOriginalCommissioning from './StreamingOriginalCommissioning';
 import StreamingSlatePlanner from './StreamingSlatePlanner';
 import StreamingViewerMode from './StreamingViewerMode';
@@ -112,10 +111,15 @@ import {
   resolveStreamingCatalogTitle,
 } from '../services/streamingCatalog';
 import { getAbsoluteWeek } from '../services/legacyLogic';
+import { updateWorldStreamingCustomerAccessPolicy } from '../services/worldEconomy/worldStreamingCustomers';
 import { getStreamingOriginalLiveStatus } from '../services/streamingOriginals';
 import { getStreamingTechnologyCampus } from '../services/streamingTechnologyCampus';
 import { getStreamingProductSuite } from '../services/streamingProductSuite';
 import { getStreamingOpeningCatalogueView } from '../services/streamingOpeningCatalogue';
+import {
+  activateStreamingLanguagePackage,
+  getStreamingGlobalLocalizationView,
+} from '../services/streamingGlobalLocalization';
 import { contributeStreamingFounderCapital } from '../services/streamingCompany';
 import {
   acceptStreamingCelebrityInvestment,
@@ -310,8 +314,6 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
   const [showContentMarket, setShowContentMarket] = useState(Boolean(initialContentMarketOfferId));
   const [catalogueReturnToLaunch, setCatalogueReturnToLaunch] = useState(false);
   const [catalogSetupInitialStep, setCatalogSetupInitialStep] = useState<0 | 2 | undefined>(undefined);
-  const [catalogDeskInitialTab, setCatalogDeskInitialTab] = useState<'PROGRAM' | 'COVERAGE' | 'LANGUAGES'>('PROGRAM');
-  const [catalogSurface, setCatalogSurface] = useState<'SETUP' | 'DESK'>('SETUP');
   const [showOriginalCommissioning, setShowOriginalCommissioning] = useState(false);
   const [showOriginalsStudio, setShowOriginalsStudio] = useState(false);
   const [showRightsExchange, setShowRightsExchange] = useState(false);
@@ -749,6 +751,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
     };
   }, [incidentCommand.activeCrisis, latestWeeklySnapshot, leadershipSuite.appointments, launchProgram, platform, player, snapshot]);
   const cinematicContentState = useMemo(() => createCanonicalContentDeskState(player), [player]);
+  const globalLocalization = useMemo(() => getStreamingGlobalLocalizationView(player), [player]);
   const cinematicNetworkState = useMemo(() => createCanonicalNetworkState(player), [player]);
   const cinematicAudienceState = useMemo(() => createCanonicalAudienceState(player), [player]);
   const cinematicBoardroomState = useMemo(() => createCanonicalBoardroomState(player), [player]);
@@ -1259,14 +1262,6 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
     setShowContentMarket(true);
   };
 
-  const openCatalogueSurface = (tab: 'PROGRAM' | 'COVERAGE' | 'LANGUAGES' = 'PROGRAM') => {
-    if (!platform.starterCatalog) { setShowContentMarket(true); return; }
-    setCatalogDeskInitialTab(tab);
-    setCatalogSetupInitialStep(undefined);
-    setCatalogSurface(platform.starterCatalog ? 'DESK' : 'SETUP');
-    setShowCatalogSetup(true);
-  };
-
   const finishOriginalReveal = (status: 'VIEWED' | 'DISMISSED') => {
     setShowOriginalReveal(false);
     if (!pendingOriginalReveal) return;
@@ -1535,7 +1530,8 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
   const openCommandDivision = (division: StreamingCommandDivisionId, chip?: string) => {
     if (division === 'CONTENT') {
       if (chip === 'CATALOGUE') {
-        return openCatalogueSurface('PROGRAM');
+        setContentInitialTab('LIBRARY');
+        return selectSection('CONTENT');
       }
       if (chip === 'MARKETPLACE') return setShowContentMarket(true);
       if (chip === 'ORIGINALS') {
@@ -1543,11 +1539,18 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
           ? setShowOriginalsStudio(true)
           : setShowOriginalCommissioning(true);
       }
-      if (chip === 'RIGHTS') return platform.launchCommit
-        ? setShowRightsExchange(true)
-        : openCatalogueSurface('COVERAGE');
-      if (chip === 'LOCALIZATION') return openCatalogueSurface('LANGUAGES');
-      if (chip === 'SLATE') return setShowSlatePlanner(true);
+      if (chip === 'RIGHTS') {
+        setContentInitialTab('RIGHTS');
+        return selectSection('CONTENT');
+      }
+      if (chip === 'LOCALIZATION') {
+        setContentInitialTab('LOCALIZATION');
+        return selectSection('CONTENT');
+      }
+      if (chip === 'SLATE') {
+        setContentInitialTab('SLATE');
+        return selectSection('CONTENT');
+      }
       if (chip === 'ANALYTICS' && platform.launchCommit) {
         setAnalyticsInitialTab('CONTENT');
         return setShowAnalyticsCenter(true);
@@ -1604,7 +1607,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
       brand={commandDeckBrand}
       state={commandDeckState}
       onBack={onBack}
-      onCommission={() => platform.starterCatalog ? setShowOriginalCommissioning(true) : setShowCatalogSetup(true)}
+      onCommission={() => platform.starterCatalog ? setShowOriginalCommissioning(true) : setShowContentMarket(true)}
       onOpenDivision={openCommandDivision}
       onEvent={openCommandEvent}
       onOpenViewer={() => setShowViewerMode(true)}
@@ -1640,7 +1643,6 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
         state={cinematicContentState}
         initialTab={contentInitialTab}
         onAddContent={() => setShowContentMarket(true)}
-        onReviewCatalogue={() => openCatalogueSurface('COVERAGE')}
         onOpenSlate={() => setShowSlatePlanner(true)}
         onBack={() => {
           if (catalogueReturnToLaunch) {
@@ -1690,15 +1692,13 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
         ]}
         onRenew={() => setShowRightsExchange(true)}
         onLapse={() => setShowRightsExchange(true)}
-        localization={{
-          providers: platform.localizationOperations.providers.filter(item => item.status === 'CONTRACTED').length,
-          facilities: platform.localizationOperations.facilities.filter(item => item.status === 'ACTIVE').length,
-          planned: platform.localizationOperations.jobs.filter(item => item.status === 'PLANNED').length,
-          inProgress: platform.localizationOperations.jobs.filter(item => item.status === 'IN_PROGRESS').length,
-          ready: platform.localizationOperations.jobs.filter(item => item.status === 'READY').length,
-          assets: platform.localizationOperations.titleLanguageAssets.length,
+        localization={globalLocalization}
+        onOpenLocalization={() => setShowTechnologyCampus(true)}
+        onActivateLanguagePackage={packageId => {
+          const result = activateStreamingLanguagePackage(player, packageId);
+          if (result.changed) persist(result.player);
+          else setCompanyFeedback(result.detail);
         }}
-        onOpenLocalization={() => openCatalogueSurface('LANGUAGES')}
       />
     );
     if (activeSection === 'TECH') return (
@@ -1737,6 +1737,12 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
           setDefineLaunchInitialStep('MARKETS');
           setShowDefineLaunch(true);
         }}
+        accessPolicy={platform.audienceAccessPolicy}
+        onAccessPolicyChange={policy => persist(updateWorldStreamingCustomerAccessPolicy(
+          player,
+          policy,
+          getAbsoluteWeek(player.age, player.currentWeek),
+        ))}
       />
     );
     if (activeSection === 'COMPANY') return (
@@ -1771,8 +1777,8 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
         onOpenCatalogue={() => {
           setShowDefineLaunch(false);
           setCatalogueReturnToLaunch(true);
-          if (platform.starterCatalog) openCatalogueSurface('PROGRAM');
-          else setShowContentMarket(true);
+          setContentInitialTab('LIBRARY');
+          selectSection('CONTENT');
         }}
         onOpenContentDesk={() => {
           setShowDefineLaunch(false);
@@ -2158,26 +2164,19 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
           }}
           onOpenFinance={() => openFinanceRoom('CAPITAL', 'INJECT')}
           onCommission={() => setShowOriginalCommissioning(true)}
-          onResumeLegacy={() => { setCatalogSurface('SETUP'); setCatalogSetupInitialStep(undefined); setShowCatalogSetup(true); }}
+          onResumeLegacy={() => { setCatalogSetupInitialStep(undefined); setShowCatalogSetup(true); }}
           onExistingNegotiations={() => setShowRightsExchange(true)}
           onReview={() => {
-            if (platform.starterCatalog) { setShowContentMarket(false); openCatalogueSurface('PROGRAM'); }
+            if (platform.starterCatalog) {
+              setShowContentMarket(false);
+              setContentInitialTab('LIBRARY');
+              selectSection('CONTENT');
+            }
             else setCompanyFeedback('Add a title to establish your opening catalogue.');
           }}
         />
       ) : null}
-      {showCatalogSetup ? catalogSurface === 'DESK' && platform.starterCatalog ? (
-        <StreamingOpeningCatalogueDesk
-          player={player}
-          onUpdatePlayer={onUpdatePlayer!}
-          onClose={closeCatalogSetup}
-          initialTab={catalogDeskInitialTab}
-          onOpenRightsMarket={() => { setShowCatalogSetup(false); setShowContentMarket(true); }}
-          onOpenSlate={() => { setShowCatalogSetup(false); setShowSlatePlanner(true); }}
-          onOpenFinance={() => { openFinanceRoom('CAPITAL', 'INJECT'); }}
-          onOpenTechnology={() => { setShowCatalogSetup(false); setShowTechnologyCampus(true); }}
-        />
-      ) : (
+      {showCatalogSetup ? (
         <StreamingCatalogSetup
           player={player}
           onUpdatePlayer={onUpdatePlayer!}

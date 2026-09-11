@@ -107,11 +107,8 @@ export function StepCatalogue({ data, handlers }: StepProps) {
       <p className="lw-rule">Buying content does not schedule it. Premiere night still needs a locked slate of at least three titles, including a delivered Original.</p>
 
       <div className="lw-actions">
-        <button type="button" className="sf-btn sf-btn--ghost" onClick={() => handlers.onOpenContentDesk?.()}>
+        <button type="button" className="sf-btn sf-btn--primary" onClick={() => handlers.onOpenContentDesk?.()}>
           Open Content Desk
-        </button>
-        <button type="button" className="sf-btn sf-btn--primary" onClick={() => handlers.onAssembleCatalogue?.()}>
-          {c.established ? 'Review opening catalogue' : c.hasDraft ? 'Continue opening catalogue' : 'Build opening catalogue'}
         </button>
       </div>
     </>

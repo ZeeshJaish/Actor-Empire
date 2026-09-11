@@ -39,7 +39,7 @@ const strongerImportance = (
 ): IndustryEventImportance => importanceRank[right] > importanceRank[left] ? right : left;
 
 export const getIndustryMediaSubjectKey = (event: IndustryEventFact): string => {
-    if (event.type === 'RIGHTS_DEAL' || event.type === 'RIGHTS_TRANSFER') {
+    if (event.type === 'RIGHTS_DEAL' || event.type === 'RIGHTS_TRANSFER' || event.type === 'RIGHTS_SALE_ANNOUNCED') {
         if (event.rightsContractId) return `rights:${event.rightsContractId}`;
         if (event.projectId) return `project:${event.projectId}`;
     }
@@ -58,7 +58,7 @@ export const getIndustryMediaSubjectKey = (event: IndustryEventFact): string => 
 
 export const getIndustryMediaCategory = (event: IndustryEventFact): IndustryMediaStoryCategory => {
     if (COMPANY_EVENT_TYPES.has(event.type)) return 'COMPANY';
-    if (event.type === 'RIGHTS_DEAL' || event.type === 'RIGHTS_TRANSFER') return 'RIGHTS';
+    if (event.type === 'RIGHTS_DEAL' || event.type === 'RIGHTS_TRANSFER' || event.type === 'RIGHTS_SALE_ANNOUNCED') return 'RIGHTS';
     if (event.type === 'FRANCHISE_DECISION') return 'FRANCHISE';
     if (event.type === 'AWARD_NOMINATED' || event.type === 'AWARD_WON') return 'AWARDS';
     if (event.type === 'PARTNERSHIP_REPEATED') return 'PARTNERSHIP';
@@ -81,7 +81,7 @@ const channelEligibilityFor = (event: IndustryEventFact): IndustryMediaChannel[]
         'COMPANY_LAUNCHED', 'COMPANY_EXPANDED', 'COMPANY_DISTRESS', 'COMPANY_FUNDED',
         'COMPANY_RESTRUCTURED', 'COMPANY_ACQUIRED', 'COMPANY_CLOSED',
         'PROJECT_DELAYED', 'PROJECT_OVERRUN', 'PROJECT_HELD', 'PROJECT_CANCELLED',
-        'PROJECT_RELEASED', 'RIGHTS_DEAL', 'RIGHTS_TRANSFER', 'AWARD_WON',
+        'PROJECT_RELEASED', 'RIGHTS_DEAL', 'RIGHTS_TRANSFER', 'RIGHTS_SALE_ANNOUNCED', 'AWARD_WON',
     ].includes(event.type)) channels.push('NEWS');
     if (event.importance !== 'LOW') channels.push('X');
     if (event.importance === 'HIGH' && [
@@ -90,7 +90,7 @@ const channelEligibilityFor = (event: IndustryEventFact): IndustryMediaChannel[]
     if ([
         'PROJECT_GREENLIT', 'PROJECT_CAST', 'FRANCHISE_DECISION', 'PROJECT_RELEASED', 'PROJECT_HIT', 'PROJECT_FLOP',
         'PROJECT_SLEEPER', 'AWARD_NOMINATED', 'AWARD_WON', 'RIGHTS_DEAL',
-        'RIGHTS_TRANSFER', 'COMPANY_FUNDED', 'COMPANY_ACQUIRED', 'COMPANY_CLOSED',
+        'RIGHTS_TRANSFER', 'RIGHTS_SALE_ANNOUNCED', 'COMPANY_FUNDED', 'COMPANY_ACQUIRED', 'COMPANY_CLOSED',
         'PARTNERSHIP_REPEATED',
     ].includes(event.type)) channels.push('YOUTUBE');
     return [...new Set(channels)];

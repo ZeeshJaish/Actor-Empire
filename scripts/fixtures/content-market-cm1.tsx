@@ -8,6 +8,8 @@ import { MobilePage } from '../../views/mobile/MobilePage';
 import { getContentMarketListings } from '../../services/streamingContentMarket';
 import { openStreamingPrivateOffer, processStreamingPrivateOffersWeek } from '../../services/streamingRightsMarketplace';
 import { advanceStreamingBuyerAuction, getStreamingBuyerAuctionLots, openStreamingBuyerAuction, placeStreamingBuyerAuctionBid } from '../../services/streamingBuyerAuctions';
+import { getAbsoluteWeek } from '../../services/legacyLogic';
+import { processStreamingUpcomingRightsWeek } from '../../services/streamingUpcomingRights';
 
 function Fixture() {
   const messageMode = new URLSearchParams(location.search).has('message');
@@ -20,6 +22,26 @@ function Fixture() {
     if (new URLSearchParams(location.search).has('noStudio')) { p.businesses = []; p.pastProjects = []; }
     if (new URLSearchParams(location.search).has('gold')) p.ownedStreamingPlatform.identity!.primaryColor = '#f1bd24';
     p.ownedStreamingPlatform = normalizeOwnedStreamingPlatformState(p.ownedStreamingPlatform, p.id);
+    if (new URLSearchParams(location.search).has('upcoming') || new URLSearchParams(location.search).has('upcomingOpen')) {
+      const absoluteWeek = getAbsoluteWeek(p.age, p.currentWeek);
+      p.world.studios = { ...(p.world.studios || {}), 'cm4-studio': { id: 'cm4-studio', name: 'Northstar Pictures' } as any };
+      p.world.industryProductions = { ...(p.world.industryProductions || {}), 'cm4-production': {
+        id: 'cm4-production', canonicalProjectId: 'cm4-project', title: 'The Celestial War', projectType: 'MOVIE', genre: 'SCI_FI',
+        producerStudioId: 'cm4-studio', source: 'STUDIO_INDEPENDENT', status: 'PRODUCTION', productionCalendar: {}, budgetMillions: 180,
+        paidMillions: 94, talentBookingIds: [], writerSource: 'IN_HOUSE_TEAM', writerId: null, writerName: 'Northstar Story Group', writerSkill: 8,
+        studioAiExecution: { plannedReleaseAbsoluteWeek: absoluteWeek + 12, talentSelected: true,
+          talent: { leadActorId: 'star-1', leadActorName: 'Avery Stone', directorId: 'director-1', directorName: 'Mara Vale', packageScore: 86, estimatedCostMillions: 44 },
+          finalQuality: { creativeQuality: 84, executionQuality: 79, commercialPotential: 92, prestigePotential: 70, downsideRisk: 23 }, problems: [] },
+        createdAtAbsoluteWeek: absoluteWeek - 5, updatedAtAbsoluteWeek: absoluteWeek,
+      } as any };
+      const discovered = processStreamingUpcomingRightsWeek(p, absoluteWeek);
+      if (new URLSearchParams(location.search).has('upcomingOpen')) {
+        const opensAt = discovered.player.ownedStreamingPlatform.upcomingRightsSales[0].opensAtAbsoluteWeek;
+        const atOpening = { ...discovered.player, age: Math.floor(opensAt / 52) + 1, currentWeek: (opensAt % 52) + 1 };
+        return processStreamingUpcomingRightsWeek(atOpening, opensAt).player;
+      }
+      return discovered.player;
+    }
     if (messageMode) {
       const listing = getContentMarketListings(p)[0];
       const opened = openStreamingPrivateOffer(p, listing.id, {

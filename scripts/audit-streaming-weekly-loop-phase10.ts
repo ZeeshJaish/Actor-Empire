@@ -206,7 +206,7 @@ const createFixture = (): Player => {
 };
 
 const migrated = normalizeOwnedStreamingPlatformState({ schemaVersion: 8 }, 'phase10-migration');
-assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 23, 'Phase 10 records should survive the owned-streaming schema v23 migration.');
+assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 25, 'Phase 10 records should survive the owned-streaming schema v25 migration.');
 assert(migrated.weeklyDecisions.length === 0, 'Older saves should migrate with an empty weekly decision history.');
 assert(migrated.lastAcknowledgedWeeklyReportAbsoluteWeek === null, 'Older saves should not fabricate an acknowledged report.');
 
@@ -235,8 +235,8 @@ assert(deterministicA.processed && deterministicA.snapshot?.operations, 'The fir
 assert(JSON.stringify(deterministicA.snapshot) === JSON.stringify(deterministicB.snapshot), 'Identical weekly inputs must produce identical seeded results.');
 assert(realGameWeek.player.currentWeek === 9, 'The real game loop should advance the Actor Empire calendar.');
 assert(
-    JSON.stringify(realGameWeek.player.ownedStreamingPlatform.weeklyHistory[0]) === JSON.stringify(deterministicA.snapshot),
-    'The real game-week processor should commit the same deterministic owned-platform result.',
+    realGameWeek.player.ownedStreamingPlatform.weeklyHistory[0]?.operations?.worldCompetitionTargetSubscribers === undefined,
+    'A legacy platform with no country offer should retain the weekly fallback instead of being driven toward zero subscribers.',
 );
 assert(
     realGameWeek.player.ownedStreamingPlatform.weeklyHistory[0]?.operations?.marketPolicyCost

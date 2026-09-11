@@ -109,9 +109,9 @@ const createFixture = (): Player => {
     };
 };
 
-assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 23, 'The canonical foundation should advance the owned-streaming schema to v23.');
+assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 25, 'The canonical foundation should advance the owned-streaming schema to v24.');
 const migrated = normalizeOwnedStreamingPlatformState({ schemaVersion: 18 }, 'phase21-migration');
-assert(migrated.schemaVersion === 23, 'Schema v18 saves should migrate to the current schema.');
+assert(migrated.schemaVersion === 25, 'Schema v18 saves should migrate to the current schema.');
 assert(migrated.corporateDevelopment.acquisitionCases.length === 0, 'Legacy saves must receive a safe empty corporate-development state.');
 assert(STREAMING_ACQUISITION_COMMITMENTS.length === 4, 'The acquisition system should expose four durable seller, board and regulator commitments.');
 assert(STREAMING_INTEGRATION_MODES.length === 8, 'All eight locked integration strategies should be playable.');

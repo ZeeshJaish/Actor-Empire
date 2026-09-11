@@ -313,7 +313,7 @@ export const calculatePlatformAiPartnerRevenueShares = (
             contract.origin === 'PLATFORM_TRADE'
             && contract.sellerType === 'PLATFORM'
             && contract.sellerPlatformId
-            && PLATFORM_AI_PROFILES[contract.sellerPlatformId]
+            && PLATFORM_AI_PROFILES[contract.sellerPlatformId as PlatformId]
             && exactAmounts[index] > 0
                 ? [{
                     contractId: contract.id,

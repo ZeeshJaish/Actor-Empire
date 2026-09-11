@@ -7,11 +7,13 @@ import type {
     StreamingBiddingRightsLot,
     StreamingBiddingSession,
     StreamingBiddingSessionRegistry,
+    StreamingLicenseExclusivity,
     StreamingOfferVersion,
     StreamingRightsDealStructure,
     StreamingRightsLocalizationTerms,
 } from '../types';
 import { createDeterministicId, createDeterministicRng } from './deterministicRandom';
+import { resolveStreamingOfferRevision } from './streamingOfferRevisionIntelligence';
 import { allocateStreamingCatalogueGuarantee } from './streamingCataloguePackages';
 import { resolveStreamingPlatformBrandById } from './streamingPlatformBrandRegistry';
 import { normalizeStreamingDayOneMarketIds, STREAMING_DAY_ONE_MARKETS } from './streamingDayOneMarkets';
@@ -62,7 +64,7 @@ const createEvent = (
     sessionId: string,
     type: StreamingBiddingEvent['type'],
     activeSecond: number,
-    platformId: PlatformId | null,
+    platformId: string | null,
     offerId: string | null,
     ordinal: number,
 ): StreamingBiddingEvent => ({
@@ -100,20 +102,26 @@ interface OfferBuildInput {
     isClearingOffer: boolean;
     variant: 'OPENING' | 'UP' | 'DOWN' | 'RESTRUCTURE';
     rightsLot: StreamingBiddingRightsLot;
+    requiredExclusivity?: StreamingLicenseExclusivity;
+    requiredPremiereAbsoluteWeek?: number;
 }
 
 const buildOffer = (input: OfferBuildInput): StreamingOfferVersion => {
     const rng = createDeterministicRng(`${input.sessionId}:${input.platform.id}:offer:${input.revision}:${input.variant}`);
     const structureRoll = rng();
     const isSeriesFunding = input.projectType === 'SERIES' && structureRoll > 0.66;
-    const hasBackend = structureRoll > 0.2;
+    const hasBackend = structureRoll < clamp(input.platform.backendPreference ?? 0.5, 0.1, 0.8);
     const backendPoints = hasBackend ? Math.round(1 + rng() * 11) : 0;
     const guaranteeRecoupment = hasBackend && rng() > 0.52 ? 'RECOUPABLE' as const : 'NON_RECOUPABLE' as const;
     const supportedDurations = [52, 104, 156].filter(duration => duration <= input.rightsLot.maximumDurationWeeks);
     const durationWeeks = supportedDurations.length
         ? supportedDurations[Math.min(supportedDurations.length - 1, Math.floor(rng() * supportedDurations.length))]
         : input.rightsLot.maximumDurationWeeks;
-    const exclusivity = rng() > 0.22 ? 'EXCLUSIVE' as const : 'NON_EXCLUSIVE' as const;
+    const exclusivity = input.requiredExclusivity || (
+        rng() < clamp(input.platform.sharedRightsPreference ?? 0.22, 0.05, 0.75)
+            ? 'NON_EXCLUSIVE' as const
+            : 'EXCLUSIVE' as const
+    );
     const generatedLocalization: StreamingRightsLocalizationTerms = rng() > 0.72
         ? 'DUBS_AND_SUBTITLES'
         : rng() > 0.35 ? 'SUBTITLES' : 'NONE';
@@ -181,6 +189,10 @@ const buildOffer = (input: OfferBuildInput): StreamingOfferVersion => {
         expectedTotalCost: fixedExposure + expectedRoyaltyCost,
         expectedPlatformValue: roundMoney(Math.max(0, input.platformState.expectedTitleGross - expectedRoyaltyCost - fixedExposure)),
         createdAtActiveSecond: input.activeSecond,
+        proposedPremiereAbsoluteWeek: input.requiredPremiereAbsoluteWeek
+            ?? input.platform.availablePremiereAbsoluteWeek
+            ?? input.platform.availablePremiereAbsoluteWeeks?.[0]
+            ?? input.rightsLot.startsAtAbsoluteWeek,
     };
 };
 
@@ -197,7 +209,7 @@ const applyCatalogueTermsToOffer = (
     const allocation = allocateStreamingCatalogueGuarantee({
         totalGuarantee: minimumGuarantee,
         components: session.catalogueComponents,
-        platformId: state.platformId,
+        platformId: state.platformId as PlatformId,
         bidderValues: state.catalogueComponentValues || Object.fromEntries(
             session.catalogueComponents.map(component => [component.sourceProjectId, component.referenceValue]),
         ),
@@ -300,6 +312,12 @@ const buildPlatformState = (
             ...requirement,
             countryIds: [...requirement.countryIds].sort(),
         })) || [],
+        backendPreference: clamp(platform.backendPreference ?? 0.5, 0.1, 0.8),
+        sharedRightsPreference: clamp(platform.sharedRightsPreference ?? 0.22, 0.05, 0.75),
+        availablePremiereAbsoluteWeeks: [...(platform.availablePremiereAbsoluteWeeks || [])],
+        availablePremiereAbsoluteWeek: platform.availablePremiereAbsoluteWeek
+            ?? platform.availablePremiereAbsoluteWeeks?.[0]
+            ?? rightsLot.startsAtAbsoluteWeek,
     };
 };
 
@@ -404,6 +422,7 @@ export const createStreamingBiddingSession = (input: CreateStreamingBiddingSessi
         events: [openedEvent],
         acceptedOfferId: null,
         closedAtActiveSecond: null,
+        lockedPremiereAbsoluteWeek: null,
     };
 };
 
@@ -515,6 +534,12 @@ const actForPlatform = (
     session: StreamingBiddingSession,
     state: StreamingBiddingPlatformState,
 ): StreamingBiddingSession => {
+    const requiredExclusivity = session.offers.some(offer => (
+        offer.status === 'ACCEPTED' && offer.exclusivity === 'NON_EXCLUSIVE'
+    )) ? 'NON_EXCLUSIVE' as const : undefined;
+    const requiredPremiereAbsoluteWeek = requiredExclusivity
+        ? session.lockedPremiereAbsoluteWeek ?? undefined
+        : undefined;
     const currentOffer = state.currentOfferId
         ? session.offers.find(offer => offer.id === state.currentOfferId)
         : null;
@@ -535,6 +560,10 @@ const actForPlatform = (
         relationshipMultiplier: state.relationshipMultiplier,
         localizationLevelCap: state.localizationLevelCap,
         localizationRequirements: state.localizationRequirements,
+        backendPreference: state.backendPreference,
+        sharedRightsPreference: state.sharedRightsPreference,
+        availablePremiereAbsoluteWeeks: [...(state.availablePremiereAbsoluteWeeks || [])],
+        availablePremiereAbsoluteWeek: state.availablePremiereAbsoluteWeek,
     };
 
     if (!currentOffer) {
@@ -555,6 +584,8 @@ const actForPlatform = (
             isClearingOffer: false,
         variant: 'OPENING',
         rightsLot: session.rightsLot,
+        requiredExclusivity,
+        requiredPremiereAbsoluteWeek,
         }));
         const extension = extendRoomForMaterialAction(session);
         return {
@@ -585,24 +616,17 @@ const actForPlatform = (
         };
     }
 
-    let variant: OfferBuildInput['variant'];
-    let guaranteeTarget: number;
-    if (competitorValue > currentValue * 1.12 && state.fixedExposureCeiling > currentOffer.fixedExposure * 1.08) {
-        variant = 'UP';
-        guaranteeTarget = Math.min(
-            state.fixedExposureCeiling,
-            Math.max(currentOffer.minimumGuarantee * 1.14, competitorValue * (0.82 + rng() * 0.12)),
-        );
-    } else if (currentValue > Math.max(1_000_000, competitorValue) * 1.34) {
-        variant = 'DOWN';
-        guaranteeTarget = Math.max(1_000_000, currentOffer.minimumGuarantee * (0.68 + rng() * 0.12));
-    } else {
-        variant = 'RESTRUCTURE';
-        guaranteeTarget = Math.min(
-            state.fixedExposureCeiling,
-            Math.max(1_000_000, currentOffer.minimumGuarantee * (rng() > 0.5 ? 1.08 : 0.91)),
-        );
-    }
+    const revisionDecision = resolveStreamingOfferRevision({
+        currentValue,
+        currentAmount: currentOffer.minimumGuarantee,
+        currentExposure: currentOffer.fixedExposure,
+        competitorValue,
+        capacityCeiling: state.fixedExposureCeiling,
+        minimumAmount: 1_000_000,
+        randomFactor: rng(),
+    });
+    const variant: OfferBuildInput['variant'] = revisionDecision.variant;
+    const guaranteeTarget = revisionDecision.targetAmount;
     const revision = state.revision + 1;
     const revised = applyCatalogueTermsToOffer(session, state, buildOffer({
         sessionId: session.id,
@@ -616,6 +640,8 @@ const actForPlatform = (
         isClearingOffer: state.isClearingBidder,
         variant,
         rightsLot: session.rightsLot,
+        requiredExclusivity,
+        requiredPremiereAbsoluteWeek,
     }));
     const extension = extendRoomForMaterialAction(session);
     return {
@@ -700,22 +726,71 @@ export const acceptStreamingBiddingOffer = (
     if (session.status === 'LEFT') return session;
     const selectable = getStreamingBiddingClosingOffers(session).find(offer => offer.id === offerId);
     if (!selectable) return session;
+    const acceptedSharedCount = session.offers.filter(offer => (
+        offer.status === 'ACCEPTED' && offer.exclusivity === 'NON_EXCLUSIVE'
+    )).length;
+    const continuesSharedLicensing = selectable.exclusivity === 'NON_EXCLUSIVE' && acceptedSharedCount < 2;
+    const lockedPremiereAbsoluteWeek = selectable.exclusivity === 'NON_EXCLUSIVE'
+        ? session.lockedPremiereAbsoluteWeek ?? selectable.proposedPremiereAbsoluteWeek ?? null
+        : null;
+    const nextOffers = session.offers.map(offer => {
+        if (offer.id === selectable.id) return { ...offer, status: 'ACCEPTED' as const };
+        if (offer.status !== 'ACTIVE' && offer.status !== 'FINAL') return offer;
+        if (
+            continuesSharedLicensing
+            && offer.exclusivity === 'NON_EXCLUSIVE'
+            && offer.proposedPremiereAbsoluteWeek === lockedPremiereAbsoluteWeek
+        ) return offer;
+        return { ...offer, status: 'WITHDRAWN' as const };
+    });
+    const availableOfferIds = new Set(nextOffers
+        .filter(offer => offer.status === 'ACTIVE' || offer.status === 'FINAL')
+        .map(offer => offer.id));
+    return {
+        ...session,
+        status: continuesSharedLicensing ? session.status : 'ACCEPTED',
+        acceptedOfferId: selectable.id,
+        lockedPremiereAbsoluteWeek,
+        closedAtActiveSecond: continuesSharedLicensing
+            ? session.closedAtActiveSecond
+            : session.closedAtActiveSecond ?? session.activeSecondsElapsed,
+        offers: nextOffers,
+        platformStates: session.platformStates.map(state => {
+            const hasCompatibleOffer = Boolean(state.currentOfferId && availableOfferIds.has(state.currentOfferId));
+            const canStillPitchShared = continuesSharedLicensing
+                && !state.currentOfferId
+                && lockedPremiereAbsoluteWeek !== null
+                && (state.availablePremiereAbsoluteWeeks || []).includes(lockedPremiereAbsoluteWeek);
+            return {
+                ...state,
+                status: hasCompatibleOffer || canStillPitchShared ? state.status : 'WITHDRAWN' as const,
+                secondsUntilAction: hasCompatibleOffer || canStillPitchShared ? state.secondsUntilAction : 0,
+            };
+        }),
+        events: [...session.events, createEvent(session.id, 'ACCEPTED', session.activeSecondsElapsed, selectable.platformId, selectable.id, session.events.length)],
+    };
+};
+
+export const finishStreamingBiddingSession = (session: StreamingBiddingSession): StreamingBiddingSession => {
+    if (session.status === 'ACCEPTED' || session.status === 'LEFT') return session;
+    const acceptedOffers = session.offers.filter(offer => offer.status === 'ACCEPTED');
+    if (acceptedOffers.length === 0) return session;
     return {
         ...session,
         status: 'ACCEPTED',
-        acceptedOfferId: selectable.id,
+        acceptedOfferId: session.acceptedOfferId || acceptedOffers[0].id,
         closedAtActiveSecond: session.closedAtActiveSecond ?? session.activeSecondsElapsed,
-        offers: session.offers.map(offer => {
-            if (offer.id === selectable.id) return { ...offer, status: 'ACCEPTED' as const };
-            if (offer.status === 'ACTIVE' || offer.status === 'FINAL') return { ...offer, status: 'WITHDRAWN' as const };
-            return offer;
-        }),
+        offers: session.offers.map(offer => (
+            offer.status === 'ACTIVE' || offer.status === 'FINAL'
+                ? { ...offer, status: 'WITHDRAWN' as const }
+                : offer
+        )),
         platformStates: session.platformStates.map(state => ({
             ...state,
-            status: state.currentOfferId === selectable.id ? 'FINAL' as const : 'WITHDRAWN' as const,
+            status: 'WITHDRAWN' as const,
             secondsUntilAction: 0,
         })),
-        events: [...session.events, createEvent(session.id, 'ACCEPTED', session.activeSecondsElapsed, selectable.platformId, selectable.id, session.events.length)],
+        events: [...session.events, createEvent(session.id, 'CLOSED', session.activeSecondsElapsed, null, null, session.events.length)],
     };
 };
 
@@ -823,6 +898,41 @@ export const normalizeStreamingBiddingSessionRegistry = (value: unknown): Stream
     for (const rawSession of Object.values(value)) {
         if (!isValidSession(rawSession) || registry[rawSession.id]) continue;
         const rightsLot = normalizeSessionRightsLot(rawSession)!;
+        const platformStates = rawSession.platformStates.map(state => {
+            const hasStoredPremiereWeeks = Array.isArray(state.availablePremiereAbsoluteWeeks);
+            const availablePremiereAbsoluteWeeks = hasStoredPremiereWeeks
+                ? state.availablePremiereAbsoluteWeeks
+                    .map(week => Number(week))
+                    .filter(week => Number.isFinite(week) && week >= rightsLot.startsAtAbsoluteWeek)
+                : [];
+            const availablePremiereAbsoluteWeek = Number.isFinite(Number(state.availablePremiereAbsoluteWeek))
+                ? Number(state.availablePremiereAbsoluteWeek)
+                : availablePremiereAbsoluteWeeks[0] ?? rightsLot.startsAtAbsoluteWeek;
+            return {
+                ...state,
+                color: resolveStreamingPlatformBrandById(state.platformId, state.platformName).primaryColor,
+                rightsLotValueMultiplier: Number.isFinite(Number(state.rightsLotValueMultiplier))
+                    ? Number(state.rightsLotValueMultiplier)
+                    : 1,
+                availablePremiereAbsoluteWeeks: hasStoredPremiereWeeks
+                    ? availablePremiereAbsoluteWeeks
+                    : [availablePremiereAbsoluteWeek],
+                availablePremiereAbsoluteWeek,
+            };
+        });
+        const premiereByPlatform = new Map(platformStates.map(state => [state.platformId, state.availablePremiereAbsoluteWeek]));
+        const offers = rawSession.offers.map(offer => ({
+            ...offer,
+            territory: rightsLot.territory,
+            countryIds: [...rightsLot.countryIds],
+            windowType: rightsLot.windowType,
+            proposedPremiereAbsoluteWeek: Number.isFinite(Number(offer.proposedPremiereAbsoluteWeek))
+                ? Number(offer.proposedPremiereAbsoluteWeek)
+                : premiereByPlatform.get(offer.platformId) ?? rightsLot.startsAtAbsoluteWeek,
+        }));
+        const acceptedSharedPremiere = offers.find(offer => (
+            offer.status === 'ACCEPTED' && offer.exclusivity === 'NON_EXCLUSIVE'
+        ))?.proposedPremiereAbsoluteWeek;
         registry[rawSession.id] = {
             ...rawSession,
             subjectKind: rawSession.subjectKind === 'CATALOGUE_PACKAGE' ? 'CATALOGUE_PACKAGE' : 'TITLE',
@@ -833,19 +943,13 @@ export const normalizeStreamingBiddingSessionRegistry = (value: unknown): Stream
                 ? rawSession.componentLots.map(componentLot => ({ ...componentLot }))
                 : [],
             rightsLot,
-            offers: rawSession.offers.map(offer => ({
-                ...offer,
-                territory: rightsLot.territory,
-                countryIds: [...rightsLot.countryIds],
-                windowType: rightsLot.windowType,
-            })),
-            platformStates: rawSession.platformStates.map(state => ({
-                ...state,
-                color: resolveStreamingPlatformBrandById(state.platformId, state.platformName).primaryColor,
-                rightsLotValueMultiplier: Number.isFinite(Number(state.rightsLotValueMultiplier))
-                    ? Number(state.rightsLotValueMultiplier)
-                    : 1,
-            })),
+            lockedPremiereAbsoluteWeek: rawSession.lockedPremiereAbsoluteWeek !== null
+                && rawSession.lockedPremiereAbsoluteWeek !== undefined
+                && Number.isFinite(Number(rawSession.lockedPremiereAbsoluteWeek))
+                ? Number(rawSession.lockedPremiereAbsoluteWeek)
+                : acceptedSharedPremiere ?? null,
+            offers,
+            platformStates,
         };
     }
     return registry;

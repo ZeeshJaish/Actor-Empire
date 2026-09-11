@@ -10,7 +10,7 @@
    charged until the player confirms a paid step.
    ========================================================================== */
 
-import type { CustomPoster } from '../../../types';
+import type { CustomPoster, StreamingPricingPlanColorId } from '../../../types';
 
 export type LaunchStepId =
   | 'markets' | 'clearance' | 'ident'
@@ -85,6 +85,8 @@ export interface Country {
   /** Reachable streaming households, derived from this country's viewer base.
       Pricing uses this rather than treating every viewer as a separate bill. */
   addressableHouseholds: number;
+  /** Compact WE2/WE3 demand evidence used by the launch pricing preview. */
+  pricingCohorts?: PricingCohortSignal[];
   growth: number;
   opportunity: string;
   languages: Share[];
@@ -94,6 +96,14 @@ export interface Country {
   /** Compliance and regulatory setup, charged at Market Clearance. */
   complianceCost: number;
   dossier: CountryDossier;
+}
+
+export interface PricingCohortSignal {
+  households: number;
+  monthlyStreamingBudgetPerHousehold: number;
+  priceSensitivityIndex: number;
+  entertainmentAppetiteIndex: number;
+  piracyTendencyIndex: number;
 }
 
 /* --- 3 · clearance -------------------------------------------------------------- */
@@ -225,7 +235,13 @@ export interface Plan {
   monthly: number;
   featureIds: string[];
   ads: boolean;
+  colorId?: CustomPlanColorId;
 }
+
+export const CUSTOM_PLAN_COLORS = [
+  'emerald', 'ocean', 'teal', 'rose', 'magenta', 'graphite',
+] as const satisfies readonly StreamingPricingPlanColorId[];
+export type CustomPlanColorId = StreamingPricingPlanColorId;
 
 /* --- how the service makes money -------------------------------------------
    Subscriptions are one option, not the premise. A service can run on
@@ -757,6 +773,7 @@ export function forecastPricing(
   settings: PricingSettings,
   addressable: number,
   market: { rivalAveragePrice: number; reachRate: number },
+  cohortSignals: PricingCohortSignal[] = [],
 ): PricingForecast {
   const on = (id: StreamId) => settings.streams.includes(id);
   const plans = on('subs') ? settings.plans : [];
@@ -766,7 +783,38 @@ export function forecastPricing(
   const subReach = plans.length > 0
     ? market.reachRate * Math.min(1.6, Math.max(0.35, (market.rivalAveragePrice / Math.max(1, entryPrice)) ** 0.55))
     : 0;
-  const subscribers = Math.min(addressable, addressable * subReach);
+  const cohortPlanSubscribers = new Map<string, number>();
+  const signalHouseholds = cohortSignals.reduce((total, cohort) => total + Math.max(0, cohort.households), 0);
+  const signalScale = Math.min(1, addressable / Math.max(1, signalHouseholds));
+  const cohortSubscribers = plans.length && cohortSignals.length
+    ? cohortSignals.reduce((total, cohort) => {
+      const budget = Math.max(.5, cohort.monthlyStreamingBudgetPerHousehold);
+      const eligible = plans.filter(plan => plan.monthly <= budget * 1.15);
+      const candidates = eligible.length ? eligible : plans.filter(plan => plan.monthly === entryPrice);
+      const planScores = candidates.map(plan => {
+        const priceFit = Math.max(.08, 1 - plan.monthly / Math.max(1, budget) * (.42 + cohort.priceSensitivityIndex / 260));
+        return { plan, score: Math.max(.01, planAppeal(plan) * priceFit) };
+      });
+      const bestAppeal = Math.max(0, ...candidates.map(planAppeal));
+      const demandRate = Math.min(.95, Math.max(.002,
+        market.reachRate * (
+          .42
+          + bestAppeal / 34
+          + cohort.entertainmentAppetiteIndex / 180
+          - cohort.piracyTendencyIndex / 310
+          + Math.min(.3, budget / Math.max(1, market.rivalAveragePrice) * .08)
+        ),
+      ));
+      const won = Math.max(0, cohort.households * signalScale * demandRate);
+      const scoreTotal = planScores.reduce((sum, row) => sum + row.score, 0) || 1;
+      planScores.forEach(row => cohortPlanSubscribers.set(
+        row.plan.id,
+        (cohortPlanSubscribers.get(row.plan.id) || 0) + won * row.score / scoreTotal,
+      ));
+      return total + won;
+    }, 0)
+    : addressable * subReach;
+  const subscribers = Math.min(addressable, cohortSubscribers);
 
   /* A service with advertising also reaches households that never pay. */
   const freeHouseholds = on('ads')
@@ -785,9 +833,14 @@ export function forecastPricing(
   const totalPull = pull.reduce((sum, p) => sum + p.weight, 0) || 1;
   const planRows: PlanForecast[] = pull.map(({ plan, weight }) => {
     const share = (weight / totalPull) * 100;
-    const subs = subscribers * (share / 100);
+    const rawCohortSubscribers = cohortPlanSubscribers.get(plan.id);
+    const cohortTotal = Array.from(cohortPlanSubscribers.values()).reduce((sum, value) => sum + value, 0);
+    const subs = rawCohortSubscribers === undefined || cohortTotal <= 0
+      ? subscribers * (share / 100)
+      : subscribers * rawCohortSubscribers / cohortTotal;
+    const resolvedShare = subscribers > 0 ? subs / subscribers * 100 : 0;
     const perSub = plan.monthly * discountDrag;
-    return { plan, share, subscribers: subs, revenuePerSubscriber: perSub, monthly: subs * perSub };
+    return { plan, share: resolvedShare, subscribers: subs, revenuePerSubscriber: perSub, monthly: subs * perSub };
   });
 
   const streams: StreamForecast[] = [];

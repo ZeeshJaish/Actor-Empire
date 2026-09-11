@@ -23,12 +23,27 @@ export interface StreamingTitleDossierSummary {
     firstMeasuredAbsoluteWeek: number | null;
     latestMeasuredAbsoluteWeek: number | null;
     totalViewingAccounts: number | null;
+    totalEstimatedViewers: number | null;
+    totalStarts: number | null;
     totalHoursViewed: number | null;
     averageCompletionRate: number | null;
     averageRepeatViewingRate: number | null;
+    averageAbandonmentRate: number | null;
     averageSatisfactionScore: number | null;
     averagePlaybackSuccessRate: number | null;
+    paidViewingAccounts: number | null;
+    sharedViewingAccounts: number | null;
+    piracyViewingAccounts: number | null;
+    topCountryId: string | null;
+    acquisitionAttributedAccounts: number | null;
+    retentionAttributedAccounts: number | null;
     attributedSubscriptionRevenue: number | null;
+    advertisingRevenue: number | null;
+    premiumRevenue: number | null;
+    rentalRevenue: number | null;
+    purchaseRevenue: number | null;
+    sponsorshipRevenue: number | null;
+    incrementalRevenue: number | null;
     allocatedCashCost: number | null;
     allocatedContentAmortization: number | null;
     cashContribution: number | null;
@@ -148,6 +163,8 @@ export const getStreamingTitleAnalytics = (
         recommendationsPercent: weightedAverage(titleRecords, record => record.discoveryMix.recommendationsPercent) || 0,
         searchPercent: weightedAverage(titleRecords, record => record.discoveryMix.searchPercent) || 0,
         directPercent: weightedAverage(titleRecords, record => record.discoveryMix.directPercent) || 0,
+        marketingPercent: weightedAverage(titleRecords, record => record.discoveryMix.marketingPercent || 0) || 0,
+        externalBuzzPercent: weightedAverage(titleRecords, record => record.discoveryMix.externalBuzzPercent || 0) || 0,
     } : null;
     const latest = titleRecords.at(-1) || null;
     const previous = titleRecords.at(-2) || null;
@@ -174,6 +191,16 @@ export const getStreamingTitleAnalytics = (
         : selectedEntry.source === 'ORIGINAL'
             ? 'Should the platform preserve this world for a later renewal or franchise decision?'
             : 'Does this window still justify its catalog cost when renewal becomes available?';
+    const countryViewing = new Map<string, number>();
+    titleRecords.forEach(record => {
+        if (!record.topCountryId) return;
+        countryViewing.set(
+            record.topCountryId,
+            (countryViewing.get(record.topCountryId) || 0) + record.viewingAccounts,
+        );
+    });
+    const topCountryId = [...countryViewing.entries()]
+        .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))[0]?.[0] || null;
 
     return {
         titles,
@@ -183,12 +210,27 @@ export const getStreamingTitleAnalytics = (
             firstMeasuredAbsoluteWeek: titleRecords[0]?.absoluteWeek ?? null,
             latestMeasuredAbsoluteWeek: latest?.absoluteWeek ?? null,
             totalViewingAccounts: measuredWeeks ? sum(titleRecords.map(record => record.viewingAccounts)) : null,
+            totalEstimatedViewers: measuredWeeks ? sum(titleRecords.map(record => record.estimatedViewers || 0)) : null,
+            totalStarts: measuredWeeks ? sum(titleRecords.map(record => record.starts || 0)) : null,
             totalHoursViewed: measuredWeeks ? sum(titleRecords.map(record => record.hoursViewed)) : null,
             averageCompletionRate: completion,
             averageRepeatViewingRate: weightedAverage(titleRecords, record => record.repeatViewingRate),
+            averageAbandonmentRate: weightedAverage(titleRecords, record => record.abandonmentRate ?? (1 - record.completionRate)),
             averageSatisfactionScore: satisfaction,
             averagePlaybackSuccessRate: weightedAverage(titleRecords, record => record.playbackSuccessRate),
+            paidViewingAccounts: measuredWeeks ? sum(titleRecords.map(record => record.paidViewingAccounts || 0)) : null,
+            sharedViewingAccounts: measuredWeeks ? sum(titleRecords.map(record => record.sharedViewingAccounts || 0)) : null,
+            piracyViewingAccounts: measuredWeeks ? sum(titleRecords.map(record => record.piracyViewingAccounts || 0)) : null,
+            topCountryId,
+            acquisitionAttributedAccounts: measuredWeeks ? sum(titleRecords.map(record => record.acquisitionAttributedAccounts || 0)) : null,
+            retentionAttributedAccounts: measuredWeeks ? sum(titleRecords.map(record => record.retentionAttributedAccounts || 0)) : null,
             attributedSubscriptionRevenue: measuredWeeks ? sum(titleRecords.map(record => record.attributedSubscriptionRevenue)) : null,
+            advertisingRevenue: measuredWeeks ? sum(titleRecords.map(record => record.advertisingRevenue || 0)) : null,
+            premiumRevenue: measuredWeeks ? sum(titleRecords.map(record => record.premiumRevenue || 0)) : null,
+            rentalRevenue: measuredWeeks ? sum(titleRecords.map(record => record.rentalRevenue || 0)) : null,
+            purchaseRevenue: measuredWeeks ? sum(titleRecords.map(record => record.purchaseRevenue || 0)) : null,
+            sponsorshipRevenue: measuredWeeks ? sum(titleRecords.map(record => record.sponsorshipRevenue || 0)) : null,
+            incrementalRevenue: measuredWeeks ? sum(titleRecords.map(record => record.incrementalRevenue || 0)) : null,
             allocatedCashCost: measuredWeeks ? sum(titleRecords.map(record => record.allocatedCashCost)) : null,
             allocatedContentAmortization: measuredWeeks ? sum(titleRecords.map(record => record.allocatedContentAmortization)) : null,
             cashContribution: measuredWeeks ? sum(titleRecords.map(record => record.cashContribution)) : null,

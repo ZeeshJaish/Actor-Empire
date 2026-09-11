@@ -879,6 +879,14 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                 phase: 'RELEASED'
             };
         }
+
+        const commitment = player.commitments?.find(candidate => candidate.id === selectedProjectDashboard.id);
+        if (commitment) {
+            return {
+                ...commitment,
+                phase: commitment.projectDetails?.releaseStrategy ? 'PLANNED RELEASE' : 'AWAITING RELEASE',
+            };
+        }
         
         return selectedProjectDashboard;
     }, [selectedProjectDashboard, player]);

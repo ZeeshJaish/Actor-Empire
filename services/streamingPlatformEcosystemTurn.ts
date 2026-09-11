@@ -228,9 +228,19 @@ const progressOperator = (
     if (operator.kind === 'CORE_GLOBAL' || operator.lifecycle === 'CLOSED' || operator.lifecycle === 'ACQUIRED') return;
     if ((operator.lastProcessedAbsoluteWeek ?? -1) >= absoluteWeek) return;
     const rng = createDeterministicRng(`${player.id}:streaming-ecosystem-turn:${absoluteWeek}:${operator.id}`);
-    const weeklyRevenue = operator.subscriberMillions * (0.42 + operator.brandPower / 400);
-    const weeklyCost = 0.8 + operator.activeCountryIds.length * 0.42 + operator.cataloguePower / 38 + operator.technology / 90;
-    const cashDelta = roundTwo(weeklyRevenue - weeklyCost + (rng() - 0.48) * Math.max(0.4, operator.risk / 65));
+    const canonicalEconomy = player.world.worldStreamingPlatformEconomy;
+    const canonicalOutcome = canonicalEconomy && canonicalEconomy.lastProcessedAbsoluteWeek <= absoluteWeek
+        ? canonicalEconomy.platforms[operator.id]
+        : null;
+    const weeklyRevenue = canonicalOutcome
+        ? canonicalOutcome.weeklyRevenue / 1_000_000
+        : operator.subscriberMillions * (0.42 + operator.brandPower / 400);
+    const weeklyCost = canonicalOutcome
+        ? canonicalOutcome.appliedWeeklyOperatingCost / 1_000_000
+        : 0.8 + operator.activeCountryIds.length * 0.42 + operator.cataloguePower / 38 + operator.technology / 90;
+    const cashDelta = roundTwo(canonicalOutcome
+        ? canonicalOutcome.weeklyOperatingResult / 1_000_000
+        : weeklyRevenue - weeklyCost + (rng() - 0.48) * Math.max(0.4, operator.risk / 65));
     operator.cashMillions = roundTwo(operator.cashMillions + cashDelta);
     const operatingSignal = clamp((cashDelta / Math.max(4, weeklyCost)) + (operator.efficiency - 55) / 180 + (rng() - 0.5) * 0.18, -0.35, 0.35);
     operator.subscriberMillions = roundTwo(Math.max(0, operator.subscriberMillions * (1 + operatingSignal * 0.006)));

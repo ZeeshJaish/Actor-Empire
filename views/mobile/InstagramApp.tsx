@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Player, InstaPost, InstaPostType, NPCActor, NPCState, InteractionType, IndustryMediaCampaign, IndustryMediaCampaignParticipationMode, IndustryMediaFandom } from '../../types';
-import { NPC_DATABASE } from '../../services/npcLogic';
+import { getGenderedAvatar, NPC_DATABASE } from '../../services/npcLogic';
 import { getEnabledGlobalCreatorSocialProfiles } from '../../services/youtubeLogic';
 import { getIndustryMediaCampaignParticipationDraft, getIndustryMediaSocialProfiles } from '../../services/industryWorld';
 import { getInstagramPostComments, getInstagramPresetCaption, getLocalizedInstagramPostConfig, INSTAGRAM_POST_CONFIGS } from '../../services/instagramLogic';
@@ -497,7 +497,7 @@ export const InstagramApp: React.FC<InstagramAppProps> = ({ player, onBack, onPo
       if (post.isPlayer) return player.avatar;
       const npc = npcPool.find(entry => entry.id === post.authorId || entry.handle === post.authorHandle);
       if (post.mediaPersonalityId || post.mediaInstitutionId) return post.authorAvatar || npc?.avatar || '';
-      return post.authorAvatar || npc?.avatar || `https://api.dicebear.com/8.x/pixel-art/svg?seed=${encodeURIComponent(post.authorHandle || post.authorName || 'IG')}`;
+      return post.authorAvatar || npc?.avatar || getGenderedAvatar('NON_BINARY', post.authorHandle || post.authorName || 'IG');
   };
 
   const getCommentAuthor = (type: InstaPostType, idx: number) => {

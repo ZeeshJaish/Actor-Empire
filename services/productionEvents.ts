@@ -1,5 +1,6 @@
 import { Player, Commitment, NPCActor, ProductionCrisis, Genre } from '../types';
 import { getPlayerLanguage, t } from './i18n';
+import { getGenderedAvatar } from './npcLogic';
 
 const tuneProject = (project: Commitment, performanceDelta = 0, hypeDelta = 0): Commitment => {
     const updatedProject = {
@@ -63,7 +64,7 @@ export const GENERAL_CRISIS_TEMPLATES: ((project: Commitment) => ProductionCrisi
                         authorId: 'npc_rnd_1',
                         authorName: 'MovieNerd99',
                         authorHandle: '@movienerd99',
-                        authorAvatar: 'https://api.dicebear.com/7.x/pixel-art/svg?seed=Nerd',
+                        authorAvatar: getGenderedAvatar('NON_BINARY', 'Nerd'),
                         content: t(getPlayerLanguage(p), 'production.event.camera.leave.socialPost', { project: project.name }),
                         likes: 45000,
                         retweets: 12000,

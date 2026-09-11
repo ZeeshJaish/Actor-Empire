@@ -76,9 +76,9 @@ const createFixture = (): Player => {
     };
 };
 
-assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 23, 'Phase 1 canonical foundation should move owned streaming saves to schema v23.');
+assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 25, 'Phase 1 canonical foundation should move owned streaming saves to schema v25.');
 const migrated = normalizeOwnedStreamingPlatformState({ schemaVersion: 16 }, 'phase19-migration');
-assert(migrated.schemaVersion === 23, 'Schema v16 streaming saves should migrate to the current schema.');
+assert(migrated.schemaVersion === 25, 'Schema v16 streaming saves should migrate to the current schema.');
 assert(migrated.leadership.developmentPrograms.length === 0, 'Legacy saves should receive an empty executive-development portfolio.');
 assert(migrated.leadership.delegation.maximumRightsBid > 0, 'Legacy saves should receive a safe default delegation mandate.');
 assert(migrated.governance.directors.length === 0 && migrated.governance.boardConfidence > 0, 'Legacy saves should receive safe governance defaults.');

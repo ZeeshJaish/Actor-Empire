@@ -59,7 +59,7 @@ assert(
     getRecommendedStreamingCoreCityIds(['IN', 'ZA'], 2).join(',') === 'BOM,CPT',
     'The later Build should receive an editable cross-region city recommendation from the selected markets.',
 );
-assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 23, 'The fixed founding model should survive the current schema migration.');
+assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 25, 'The fixed founding model should survive the current schema migration.');
 assert(STREAMING_FOUNDING_STEP_COUNT === 3, 'Phase 3 should contain identity, promise, and fixed incorporation review.');
 assert(
     !validateStreamingFoundingDraft(defaultDraft, 500_000_000).valid,

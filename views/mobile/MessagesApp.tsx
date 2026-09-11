@@ -61,6 +61,9 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
   const selectedBuyerAuctionId = selectedMessage?.type === 'RIGHTS_NEGOTIATION'
       ? String(selectedMessage.data?.streamingBuyerAuctionId || '')
       : '';
+  const selectedUpcomingRightsSaleId = selectedMessage?.type === 'RIGHTS_NEGOTIATION'
+      ? String(selectedMessage.data?.streamingUpcomingRightsSaleId || '')
+      : '';
   const selectedRightsAccepted = selectedRightsStatus === 'ACCEPTED' || selectedRightsStatus === 'READY_TO_SIGN';
   const selectedStudioAcquisitionMessage = selectedMessage?.type === 'STUDIO_ACQUISITION'
       ? selectedMessage
@@ -722,7 +725,9 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                 <div className="mt-6 flex items-center gap-3 border-t border-black/15 pt-5">
                                     <ShieldCheck size={20} className="shrink-0 text-amber-700" />
                                     <p className="text-xs font-bold leading-relaxed text-slate-600">{selectedBuyerAuctionId
-                                        ? 'The complete auction record, winning terms, rights scope, and settlement remain available in Content Market.'
+                                        ? selectedUpcomingRightsSaleId
+                                            ? 'The watched future-rights sale is live in Content Market. Winning still depends on the bid, and playback still depends on delivery.'
+                                            : 'The complete auction record, winning terms, rights scope, and settlement remain available in Content Market.'
                                         : 'Continue in Development Lab → Market → Properties. Money moves only after you sign.'}</p>
                                 </div>
                                 <button
@@ -733,7 +738,7 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                         : onOpenRightsMarket?.(selectedMessage.data?.negotiation?.opportunityId)}
                                     className={`mt-5 flex min-h-12 w-full items-center justify-center gap-2 px-4 text-xs font-black uppercase tracking-[0.14em] text-white ${selectedRightsAccepted ? 'bg-emerald-700' : 'bg-slate-900'}`}
                                 >
-                                    {selectedBuyerAuctionId ? 'Open Auction Result' : selectedMessage.data?.streamingPrivateOfferId ? 'Open Your Offer' : 'Open Property Deal'} <ChevronRight size={17} />
+                                    {selectedBuyerAuctionId ? selectedUpcomingRightsSaleId ? 'Open Live Auction' : 'Open Auction Result' : selectedMessage.data?.streamingPrivateOfferId ? 'Open Your Offer' : 'Open Property Deal'} <ChevronRight size={17} />
                                 </button>
                             </div>
                         </div>

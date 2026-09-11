@@ -35,9 +35,14 @@ import type {
     StreamingOriginalLocalizationPackage,
     StreamingServiceConfigurationSource,
     StreamingRevenueStreamId,
+    StreamingPricingPlanColorId,
     StreamingSoundIdentKey,
     StreamingTechnologyBranch,
 } from '../types';
+
+const STREAMING_PLAN_COLOR_IDS: StreamingPricingPlanColorId[] = [
+    'emerald', 'ocean', 'teal', 'rose', 'magenta', 'graphite',
+];
 import {
     getStreamingDayOneMarket,
     getStreamingCountryMarketProfile,
@@ -428,12 +433,16 @@ const normalizePricingConfiguration = (root: UnknownRecord, source: UnknownRecor
     ];
     const plans = asArray(pricing.plans).map((value, index) => {
         const plan = asRecord(value);
+        const colorId = STREAMING_PLAN_COLOR_IDS.includes(plan.colorId as StreamingPricingPlanColorId)
+            ? plan.colorId as StreamingPricingPlanColorId
+            : undefined;
         return {
             id: text(plan.id, fallbackPlans[index]?.id || `PLAN_${index + 1}`, 50),
             name: text(plan.name, fallbackPlans[index]?.name || `Plan ${index + 1}`, 40),
             monthly: decimal(plan.monthly, fallbackPlans[index]?.monthly || 12, 100),
             featureIds: stringList(plan.featureIds, 20),
             ads: plan.ads === true,
+            colorId,
         };
     }).slice(0, 6);
     const ads = asRecord(pricing.ads);

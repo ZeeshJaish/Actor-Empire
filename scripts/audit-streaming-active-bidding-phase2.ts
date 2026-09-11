@@ -5,6 +5,7 @@ import {
     acceptStreamingBiddingOffer,
     advanceStreamingBiddingSession,
     createStreamingBiddingSession,
+    finishStreamingBiddingSession,
     getRestorableStreamingBiddingSession,
     getStreamingOfferFundingAllocation,
     getStreamingBiddingClosingOffers,
@@ -147,7 +148,73 @@ assert.equal(acceptedSession.status, 'ACCEPTED');
 assert.equal(acceptedSession.acceptedOfferId, selectedOffer.id);
 assert.equal(acceptedSession.offers.find(offer => offer.id === selectedOffer.id)?.status, 'ACCEPTED');
 
+const sharedFixtureOffers = platforms.map((platform, index) => ({
+    ...selectedOffer,
+    id: `shared-fixture-offer-${index + 1}`,
+    sessionId: 'shared-fixture-room',
+    platformId: platform.id,
+    platformName: platform.name,
+    status: 'FINAL' as const,
+    exclusivity: index === platforms.length - 1 ? 'EXCLUSIVE' as const : 'NON_EXCLUSIVE' as const,
+}));
+const sharedFixtureRoom = {
+    ...live,
+    id: 'shared-fixture-room',
+    idempotencyKey: 'shared-fixture-room',
+    status: 'CLOSING' as const,
+    acceptedOfferId: null,
+    offers: sharedFixtureOffers,
+    platformStates: opening.platformStates.map((state, index) => ({
+        ...state,
+        status: 'FINAL' as const,
+        currentOfferId: sharedFixtureOffers[index].id,
+        secondsUntilAction: 0,
+    })),
+};
+const firstSharedOffer = sharedFixtureOffers[0];
+const afterFirstSharedAcceptance = acceptStreamingBiddingOffer(sharedFixtureRoom, firstSharedOffer.id);
+assert.equal(afterFirstSharedAcceptance.status, 'CLOSING', 'one shared signing must keep the room available for compatible licences');
+assert.equal(afterFirstSharedAcceptance.offers.find(offer => offer.id === firstSharedOffer.id)?.status, 'ACCEPTED');
+assert.deepEqual(
+    getStreamingBiddingClosingOffers(afterFirstSharedAcceptance).map(offer => offer.id),
+    sharedFixtureOffers.slice(1, 3).map(offer => offer.id),
+    'shared acceptance must retain shared offers and withdraw incompatible exclusive terms',
+);
+const afterSecondSharedAcceptance = acceptStreamingBiddingOffer(afterFirstSharedAcceptance, sharedFixtureOffers[1].id);
+assert.equal(afterSecondSharedAcceptance.status, 'CLOSING');
+const afterThirdSharedAcceptance = acceptStreamingBiddingOffer(afterSecondSharedAcceptance, sharedFixtureOffers[2].id);
+assert.equal(afterThirdSharedAcceptance.status, 'ACCEPTED', 'the third shared signing must close the licensing room at the canonical slot limit');
+assert.equal(getStreamingBiddingClosingOffers(afterThirdSharedAcceptance).length, 0);
+const finishedSharedSession = finishStreamingBiddingSession(afterFirstSharedAcceptance);
+assert.equal(finishedSharedSession.status, 'ACCEPTED', 'finishing a partially signed shared room must close it without erasing accepted terms');
+assert.equal(finishedSharedSession.offers.find(offer => offer.id === firstSharedOffer.id)?.status, 'ACCEPTED');
+assert.equal(getStreamingBiddingClosingOffers(finishedSharedSession).length, 0);
+for (let index = 0; index < 12; index += 1) {
+    const waitingPlatform = opening.platformStates[opening.platformStates.length - 1];
+    const constrainedRoom = {
+        ...afterFirstSharedAcceptance,
+        id: `shared-followup-room-${index}`,
+        status: 'LIVE' as const,
+        activeSecondsElapsed: 4,
+        roomSecondsRemaining: 10,
+        platformStates: afterFirstSharedAcceptance.platformStates.map(state => state.platformId === waitingPlatform.platformId
+            ? { ...state, status: 'WAITING' as const, currentOfferId: null, secondsUntilAction: 0 }
+            : state),
+    };
+    const advanced = advanceStreamingBiddingSession(constrainedRoom, 1);
+    const followup = advanced.offers.find(offer => offer.platformId === waitingPlatform.platformId && offer.status === 'ACTIVE');
+    assert.equal(followup?.exclusivity, 'NON_EXCLUSIVE', 'new terms after a shared signing must remain compatible with that signed licence');
+}
+
 const signingPlayer = structuredClone(INITIAL_PLAYER);
+const sharedSigning = registerProductionStreamingRightsContractFromOffer(signingPlayer, {
+    session: afterFirstSharedAcceptance,
+    offer: afterFirstSharedAcceptance.offers.find(offer => offer.id === firstSharedOffer.id)!,
+    signedAtAbsoluteWeek: 500,
+    startsAtAbsoluteWeek: 501,
+});
+assert.ok(sharedSigning.contract, 'an accepted shared offer must register before the remaining shared room closes');
+assert.equal(sharedSigning.contract?.exclusivity, 'NON_EXCLUSIVE');
 const acceptedSigning = registerProductionStreamingRightsContractFromOffer(signingPlayer, {
     session: acceptedSession,
     offer: selectedOffer,

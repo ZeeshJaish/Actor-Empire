@@ -37,6 +37,7 @@ export function StepBlueprint({ data, draft, chosen, treasury, free, gap, handle
   const storefront = data.storefronts.find((s) => s.id === draft.storefrontId);
   const sound = data.identSounds.find((s) => s.id === draft.soundId);
   const pack = data.identPackages.find((p) => p.id === draft.packageId);
+  const catalogueDepth = data.catalogue.hours / Math.max(1, data.catalogue.hoursNeeded);
 
   const checks = [
     { ok: chosen.length > 0, step: 'markets' as LaunchStepId },
@@ -140,7 +141,7 @@ export function StepBlueprint({ data, draft, chosen, treasury, free, gap, handle
             {data.catalogue.anchors.slice(0, 4).map((t) => (
               <span key={t.id}><Poster seed={t.posterSeed ?? t.id} size={26} /></span>
             ))}
-            <em>{depth.toFixed(1)}×</em>
+            <em>{catalogueDepth.toFixed(1)}×</em>
           </div>
         </Tile>
       </div>

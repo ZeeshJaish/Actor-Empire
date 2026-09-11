@@ -1,42 +1,29 @@
 import fs from 'node:fs';
 
-const source = fs.readFileSync('views/lifestyle/business/ReleaseWizard.tsx', 'utf8');
+const source = fs.readFileSync('views/lifestyle/business/release-strategy-transplant/CampaignStep.tsx', 'utf8');
 
 const mustInclude = (token) => {
   if (!source.includes(token)) throw new Error(`Missing ${token}`);
 };
 
 [
-  'forecastGaugeScore',
-  'forecastGaugeLabel',
-  'forecastGaugeTone',
-  'forecastGaugeAccent',
-  'forecastGaugeWord',
-  'forecastGaugeRingOffset',
-  'forecast-speedometer',
-  'forecast-gauge-shell',
-  'forecast-gauge-track',
-  'forecast-gauge-fill',
+  'className={css.dial}',
+  '<svg viewBox="0 0 80 48">',
+  'forecast.score',
+  'forecast.label.toUpperCase()',
   'strokeDasharray',
-  'strokeDashoffset',
   'pathLength="100"',
-  'STRONG',
-  'EARLY',
-  'VOLATILE',
-  'Strong Read',
-  'Early Read',
-  'Volatile',
-  'Studio Forecast'
+  'STUDIO FORECAST'
 ].forEach(mustInclude);
 
-const forecastPanelStart = source.indexOf('Studio Forecast');
-const forecastPanelEnd = source.indexOf('Marketing Channel Mix');
+const forecastPanelStart = source.indexOf('STUDIO FORECAST');
+const forecastPanelEnd = source.indexOf('SOUNDTRACK IMPACT');
 if (forecastPanelStart === -1 || forecastPanelEnd === -1 || forecastPanelEnd <= forecastPanelStart) {
   throw new Error('Could not isolate Studio Forecast panel.');
 }
 
 const forecastPanel = source.slice(forecastPanelStart, forecastPanelEnd);
-if (!forecastPanel.includes('forecast-speedometer')) {
+if (!forecastPanel.includes('className={css.dial}')) {
   throw new Error('Speedometer must live inside Studio Forecast, not campaign position or channel mix.');
 }
 
@@ -44,19 +31,19 @@ if (forecastPanel.includes('forecast-gauge-needle') || forecastPanel.includes('f
   throw new Error('Forecast gauge should be a clean semi-ring badge, not a needle/tick speedometer.');
 }
 
-const campaignMeaningStart = source.indexOf('Campaign Meaning');
-const campaignMeaningEnd = source.indexOf('Studio Forecast');
+const campaignMeaningStart = source.indexOf('THE PROMISE');
+const campaignMeaningEnd = source.indexOf('STUDIO FORECAST');
 if (campaignMeaningStart !== -1 && campaignMeaningEnd > campaignMeaningStart) {
   const campaignMeaning = source.slice(campaignMeaningStart, campaignMeaningEnd);
-  if (campaignMeaning.includes('forecast-speedometer')) {
+  if (campaignMeaning.includes('className={css.dial}')) {
     throw new Error('Campaign meaning should stay text-only.');
   }
 }
 
-const channelMixStart = source.indexOf('Marketing Channel Mix');
+const channelMixStart = source.indexOf('CHANNEL MIX');
 if (channelMixStart !== -1) {
   const channelMix = source.slice(channelMixStart);
-  if (channelMix.includes('forecast-speedometer')) {
+  if (channelMix.includes('className={css.dial}')) {
     throw new Error('Channel mix should not contain the forecast gauge.');
   }
 }
@@ -65,4 +52,4 @@ if (source.includes('Guaranteed Forecast') || source.includes('guaranteed revenu
   throw new Error('Forecast gauge must not imply guaranteed results.');
 }
 
-console.log('Release forecast gauge audit passed.');
+console.log('Release transplanted forecast gauge audit passed.');

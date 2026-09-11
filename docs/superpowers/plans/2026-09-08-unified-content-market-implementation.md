@@ -117,12 +117,12 @@
 - `components/StreamingContentMarket.tsx`: Upcoming and followed listings.
 
 **Deliverable tasks:**
-- [ ] Create scheduled sale announcements only for real projects with eligible rights. Use a saved opening week and planned availability date; watchlisting produces a notification when bidding opens.
-- [ ] Derive public interest from existing franchise history, talent, marketing, production progress, market demand, and release results. Preserve uncertainty and avoid implying guaranteed success.
-- [ ] Pre-release acquisition records future availability and delivery dependency. A delay updates the agreement's availability view and schedule; it never turns an unfinished project into a playable title.
-- [ ] Give private submissions, public auction results, rumours, and confirmed events appropriate visibility. Publish through existing bounded news/social machinery; do not expose private bids as public facts without a supported event.
-- [ ] Run a full playthrough: empty service, studio import, direct purchase, delayed counter, auction win/loss, future-title delay and delivery, localization, programming, opening, and renewal.
-- [ ] Check old-save continuation, suspended-session recovery, bounded active listing/notification queues, and representative busy-save weekly cost. Fix failures within the affected phase boundaries.
+- [x] Create scheduled sale announcements only for real projects with eligible rights. Use a saved opening week and planned availability date; watchlisting produces a notification when bidding opens.
+- [x] Derive public interest from existing franchise history, talent, marketing, production progress, market demand, and release results. Preserve uncertainty and avoid implying guaranteed success.
+- [x] Pre-release acquisition records future availability and delivery dependency. A delay updates the agreement's availability view and schedule; it never turns an unfinished project into a playable title.
+- [x] Give private submissions, public auction results, rumours, and confirmed events appropriate visibility. Publish through existing bounded news/social machinery; do not expose private bids as public facts without a supported event.
+- [x] Run a full playthrough: empty service, studio import, direct purchase, delayed counter, auction win/loss, future-title delay and delivery, localization, programming, opening, and renewal.
+- [x] Check old-save continuation, suspended-session recovery, bounded active listing/notification queues, and representative busy-save weekly cost. Fix failures within the affected phase boundaries.
 
 **Acceptance cases:** Watchlisted sale opens in the correct week; unavailable rights are excluded; rumours remain attributed; title delays cannot produce premature watch hours; news references actual saved events; repeated processing creates no duplicate stories or transactions; permanent contract history remains available after active listings close.
 
@@ -132,4 +132,4 @@
 
 - Each phase ends with implemented behavior, focused regression results, mobile interaction verification, and a concise player-facing report.
 - CM1, CM2, and CM3 are complete. Direct purchases, delayed private offers, and live buyer auctions now settle through the shared rights and catalogue boundaries.
-- CM4 remains proposed until its implementation is authorized. Review the exact touched code and test fixtures when beginning it, because this repository contains ongoing work.
+- CM4 is implemented. Future-title announcements, watchlisting, live buyer auctions, future-dated canonical contracts, delay reconciliation, delivery gates, and bounded public reactions now share the existing Content Market and industry-world systems.

@@ -29,12 +29,14 @@ import { buildCanonStoryQaFixture } from '../services/canonStoryQa';
 import { ProfilePictureBuilder } from './avatar/ProfilePictureBuilder';
 import { getActorCareerArc } from '../services/actorCareerArc';
 import { RolePerformanceReport } from '../components/RolePerformanceReport';
+import ActorEmpireHome from '../components/ui-overhaul/HomeScreen';
 import {
   ProfileBuilderGender,
   ProfileBuilderSelection,
   createSeededProfileSelection,
 } from '../services/profileBuilder';
 import { exportProfilePortrait } from './avatar/profilePortraitRenderer';
+import { getCanonicalProfileAvatar } from '../services/profileAvatar';
 import { createHomeSocialQaActions } from './home/homeSocialQaActions';
 import { createHomeProductionQaActions } from './home/homeProductionQaActions';
 import { createHomeBoxOfficeQaActions } from './home/homeBoxOfficeQaActions';
@@ -3148,7 +3150,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
 
 
   return (
-    <div className="space-y-6 pb-24 pt-4 relative">
+    <div className="relative h-full">
 
       {/* PASSWORD PROMPT OVERLAY */}
       {showPasswordPrompt && (
@@ -4241,7 +4243,8 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
           </div>
       )}
 
-      {/* Premium Profile Header */}
+      {false && <>
+      {/* Legacy home surface retained temporarily while the supplied UI is transplanted. */}
       <div className="relative glass-card p-6 rounded-3xl overflow-hidden group" data-tutorial-id="home-profile">
         <div className="absolute top-0 right-0 p-4 opacity-20 group-hover:opacity-40 transition-opacity">
             <Star size={120} className="text-amber-500 rotate-12" />
@@ -4503,6 +4506,54 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
             </>
         )}
       </button>
+      </>}
+
+      <ActorEmpireHome
+        name={player.name}
+        avatarUrl={getCanonicalProfileAvatar(player.avatar, player.gender, player.name)}
+        tags={[tr('home.actor.role').toUpperCase(), tr(actorCareerArc.labelKey).toUpperCase()]}
+        money={formatMoney(player.money)}
+        year={player.age}
+        week={player.currentWeek}
+        weeksPerYear={52}
+        energy={player.energy.current}
+        energyMax={energyLimit}
+        energyReserved={weeklyDrain}
+        condition={{
+          health: player.stats.health,
+          physique: player.stats.body,
+          mood: player.stats.happiness,
+          looks: player.stats.looks,
+        }}
+        skills={{
+          talent: player.stats.talent,
+          experience: player.stats.experience,
+        }}
+        status={{
+          reputation: player.stats.reputation,
+          fame: player.stats.fame,
+        }}
+        feed={[...liveFeedLogs].sort((a, b) => b.year - a.year || b.week - a.week).map((log, index) => ({
+          id: `${log.year}:${log.week}:${index}`,
+          year: log.year,
+          week: log.week,
+          text: log.message,
+          isNew: index === 0,
+        }))}
+        energyLedger={weeklyEnergySpendLog.map(entry => ({
+          id: entry.id,
+          label: entry.label,
+          week: entry.week,
+          amount: -Math.abs(entry.amount),
+        }))}
+        showNavigation={false}
+        isProcessing={isProcessing}
+        onAgeUp={onNextWeek}
+        onOpenStore={() => setPage?.(Page.STORE)}
+        onOpenSettings={() => setPage?.(Page.SETTINGS)}
+        onChangeAvatar={handleAvatarClick}
+        onOpenCareerArc={() => setShowActorArcSheet(true)}
+      />
     </div>
   );
 };

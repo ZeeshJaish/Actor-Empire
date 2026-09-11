@@ -160,6 +160,17 @@ export const STREAMING_REGULATORY_STRATEGIES: StreamingRegulatoryStrategyDefinit
     { id: 'CONTEST_REVIEW', label: 'Contest review', detail: 'Defend the full deal with minimal concessions. Cheaper, slower and genuinely blockable.', remedyPercent: 0.003, scrutinyRelief: 4, subscriberRetentionPercent: 100, catalogRetentionPercent: 100, technologyRetentionPercent: 100 },
 ];
 
+export const getCanonicalStreamingAcquisitionSubscriberCount = (
+    player: Player,
+    targetPlatformId: PlatformId,
+    fallbackSubscriberMillions: number,
+): number => {
+    const canonical = player.world.worldStreamingPlatformEconomy?.platforms?.[targetPlatformId];
+    return canonical
+        ? Math.max(0, Math.round(canonical.endingPaidAccounts))
+        : Math.max(0, Math.round(fallbackSubscriberMillions * 1_000_000));
+};
+
 const TARGET_THESES: Record<PlatformId, string> = {
     NETFLIX: 'Instant global scale, deep originals operations and the strongest direct subscriber engine.',
     APPLE_TV: 'Elite playback technology, premium brand trust and a prestige-first catalog signal.',
@@ -835,7 +846,10 @@ export const signStreamingPlatformAcquisition = (
     }
     const regulatoryRetention = acquisitionCase.regulatoryReview.subscriberRetentionPercent / 100;
     const modeRetention = mode.subscriberRetentionPercent / 100;
-    const acquiredSubscriberCount = Math.round(target.subscribersMillions * 1_000_000 * regulatoryRetention * modeRetention);
+    const acquiredSubscriberCount = Math.round(
+        getCanonicalStreamingAcquisitionSubscriberCount(player, acquisitionCase.targetPlatformId, target.subscribersMillions)
+        * regulatoryRetention * modeRetention,
+    );
     const catalogAssetCount = Math.round(
         target.catalogPower * 18
         * acquisitionCase.regulatoryReview.catalogRetentionPercent / 100

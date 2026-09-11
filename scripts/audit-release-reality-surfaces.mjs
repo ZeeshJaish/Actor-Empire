@@ -3,6 +3,7 @@ import fs from 'node:fs';
 const gameLoop = fs.readFileSync('services/gameLoop.ts', 'utf8');
 const imdb = fs.readFileSync('views/mobile/ImdbApp.tsx', 'utf8');
 const types = fs.readFileSync('types.ts', 'utf8');
+const english = fs.readFileSync('services/localization/locales/en.ts', 'utf8');
 
 const mustInclude = (haystack, token, label = token) => {
   if (!haystack.includes(token)) throw new Error(`Missing ${label}`);
@@ -29,13 +30,20 @@ const mustInclude = (haystack, token, label = token) => {
 ].forEach(token => mustInclude(types, token));
 
 [
-  'Campaign Reality',
+  "tr('imdb.project.campaignReality')",
   'campaignRealitySnapshot',
-  'Promise',
-  'Audience Read',
-  'Forecast Shift',
+  "tr('imdb.project.promise')",
+  "tr('imdb.project.audienceRead')",
+  "tr('imdb.project.forecastShift')",
   'reality-tone'
 ].forEach(token => mustInclude(imdb, token));
+
+[
+  "'imdb.project.campaignReality': 'Campaign Reality'",
+  "'imdb.project.promise': 'Promise'",
+  "'imdb.project.audienceRead': 'Audience Read'",
+  "'imdb.project.forecastShift': 'Forecast Shift'"
+].forEach(token => mustInclude(english, token));
 
 const realityBlockStart = gameLoop.indexOf('processPostReleaseReality');
 const realityBlockEnd = gameLoop.indexOf('nextPlayer.activeReleases = processedReleases');

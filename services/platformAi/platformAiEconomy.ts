@@ -362,20 +362,29 @@ export const calculatePlatformAiWeeklyEconomy = (
     const profile = PLATFORM_AI_PROFILES[platform.id];
     const ai = platform.ai!;
     const markets = activeMarkets(platform);
-    const subscriptionRevenueMillions = fullCurrencyToMillions(
-        calculateStreamingSubscriptionRevenueFullCurrency({
-            subscribers: safe(platform.subscribers) * 1_000_000,
-            monthlyArpu: profile.monthlyArpu,
-            paidSubscriberShare: profile.paidSubscriberShare,
-        }),
-    );
-    const advertisingRevenueMillions = fullCurrencyToMillions(
-        calculateStreamingAdvertisingRevenueFullCurrency({
-            subscribers: safe(platform.subscribers) * 1_000_000,
-            adSupportedShare: profile.adSupportedShare,
-            weeklyAdRevenuePerSubscriber: profile.weeklyAdRevenuePerSubscriber,
-        }),
-    );
+    const canonicalWorldEconomy = input.player.world.worldStreamingPlatformEconomy;
+    const canonicalPlatformEconomy = canonicalWorldEconomy
+        && canonicalWorldEconomy.lastProcessedAbsoluteWeek <= input.absoluteWeek
+        ? canonicalWorldEconomy.platforms[platform.id]
+        : null;
+    const subscriptionRevenueMillions = canonicalPlatformEconomy
+        ? fullCurrencyToMillions(Math.round(canonicalPlatformEconomy.weeklySubscriptionRevenue))
+        : fullCurrencyToMillions(
+            calculateStreamingSubscriptionRevenueFullCurrency({
+                subscribers: safe(platform.subscribers) * 1_000_000,
+                monthlyArpu: profile.monthlyArpu,
+                paidSubscriberShare: profile.paidSubscriberShare,
+            }),
+        );
+    const advertisingRevenueMillions = canonicalPlatformEconomy
+        ? fullCurrencyToMillions(Math.round(canonicalPlatformEconomy.weeklyIncrementalRevenue))
+        : fullCurrencyToMillions(
+            calculateStreamingAdvertisingRevenueFullCurrency({
+                subscribers: safe(platform.subscribers) * 1_000_000,
+                adSupportedShare: profile.adSupportedShare,
+                weeklyAdRevenuePerSubscriber: profile.weeklyAdRevenuePerSubscriber,
+            }),
+        );
     const verifiedContractIncomeMillions = roundMillions(input.verifiedContractIncomeMillions || 0);
     const rescueIncomeMillions = roundMillions(input.rescueIncomeMillions || 0);
     const revenueMillions = roundMillions(

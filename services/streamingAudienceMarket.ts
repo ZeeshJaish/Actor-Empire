@@ -6,6 +6,10 @@ import type {
     WorldAudienceEconomyState,
     WorldAudienceParticipationBarrierId,
     WorldAudienceParticipationCountryState,
+    WorldStreamingCompetitionCountryState,
+    WorldStreamingCustomerCountryState,
+    WorldStreamingCustomerReasonId,
+    WorldStreamingPlanAllocation,
     WorldAudiencePersonaId,
 } from '../types';
 import { getAbsoluteWeek } from './legacyLogic';
@@ -20,6 +24,7 @@ import { resolveStreamingPlatformBrandById } from './streamingPlatformBrandRegis
 import { getWorldAudiencePersonaShares, normalizeWorldAudienceEconomyState } from './worldEconomy/worldAudienceCohorts';
 import { normalizeWorldAudienceParticipationState } from './worldEconomy/worldAudienceParticipation';
 import { normalizeWorldPopulationState } from './worldEconomy/worldPopulation';
+import { normalizeWorldStreamingCompetitionState } from './worldEconomy/worldStreamingCompetition';
 
 export type StreamingAudiencePlatformId = PlatformId | 'AMAZON_PRIME' | 'REGIONAL' | 'PLAYER';
 export type StreamingAudiencePersonaId = WorldAudiencePersonaId;
@@ -117,6 +122,8 @@ export interface StreamingAudienceSwitchingView {
     cancelledThisWeek: number;
     reactivatedThisWeek: number;
     switchedPlatformThisWeek: number;
+    upgradedThisWeek: number;
+    downgradedThisWeek: number;
     globalSwitchPool: number;
     playerChurnPercent: number;
     reasons: Array<{ id: string; label: string; sharePercent: number; detail: string }>;
@@ -148,6 +155,40 @@ export interface StreamingAudienceMarketView {
         neitherHouseholds: number;
         totalMonthlyStreamingBudget: number;
         totalMonthlyCinemaBudget: number;
+    };
+    streamingCompetition: {
+        subscribingHouseholds: number;
+        unclaimedHouseholds: number;
+        totalSubscriptions: number;
+        totalMonthlySubscriptionSpend: number;
+        playerHouseholds: number;
+        playerPrimaryHouseholds: number;
+        playerMonthlySubscriptionRevenue: number;
+        playerEffectiveMonthlyPrice: number;
+        playerPlanAllocations: WorldStreamingPlanAllocation[];
+        playerOfferPresent: boolean;
+        offerCount: number;
+    };
+    customerAccess: {
+        available: boolean;
+        paidAccounts: number;
+        payingHouseholds: number;
+        externalSharedHouseholds: number;
+        sharedActiveViewers: number;
+        piracyReach: number;
+        accessLoadAccounts: number;
+        monthlySubscriptionRevenue: number;
+        upgrades: number;
+        downgrades: number;
+        switchIns: number;
+        switchOuts: number;
+        planAllocations: Array<{
+            planId: string;
+            planName: string;
+            paidAccounts: number;
+            effectiveMonthlyPrice: number;
+            monthlySubscriptionRevenue: number;
+        }>;
     };
     weeklyWatchHours: number;
     subscriberOverlap: {
@@ -304,6 +345,8 @@ const buildCountry = (
     canonicalPopulation?: number,
     canonicalAudience?: WorldAudienceCountryState,
     canonicalParticipation?: WorldAudienceParticipationCountryState,
+    canonicalCompetition?: WorldStreamingCompetitionCountryState,
+    canonicalCustomers?: WorldStreamingCustomerCountryState,
 ): StreamingAudienceCountryView => {
     const selectedForLaunch = selectedMarketIds.has(market.id);
     const adoption = clamp(
@@ -317,11 +360,18 @@ const buildCountry = (
         ? round(canonicalPopulation)
         : round(market.streamingAudience / (adoption / 100));
     const activeViewers = round(estimatedPopulation * adoption / 100);
-    const subscriptionsPerHousehold = round1(clamp(1.38 + adoption / 100 * 0.9 + (market.competition === 'FIERCE' ? 0.18 : 0), 1.3, 2.55));
-    const payingHouseholds = Math.min(
+    const estimatedSubscriptionsPerHousehold = round1(clamp(1.38 + adoption / 100 * 0.9 + (market.competition === 'FIERCE' ? 0.18 : 0), 1.3, 2.55));
+    const estimatedPayingHouseholds = Math.min(
         canonicalAudience?.commercialHouseholds ?? Number.MAX_SAFE_INTEGER,
         round(activeViewers / (1.88 + adoption / 100 * 0.35)),
     );
+    const payingHouseholds = canonicalCustomers?.payingHouseholds
+        ?? canonicalCompetition?.subscribingHouseholds
+        ?? estimatedPayingHouseholds;
+    const paidSubscriptions = canonicalCustomers?.endingPaidAccounts
+        ?? canonicalCompetition?.totalSubscriptions
+        ?? round(payingHouseholds * estimatedSubscriptionsPerHousehold);
+    const subscriptionsPerHousehold = round1(paidSubscriptions / Math.max(1, payingHouseholds));
     const watchShare = getCountryShares(market, selectedForLaunch, playerSubscribers, playerPresentation);
     const top = watchShare[0];
     const playerShare = watchShare.find(item => item.id === 'PLAYER')?.sharePercent || 0;
@@ -356,7 +406,7 @@ const buildCountry = (
         neitherHouseholds: canonicalParticipation?.neitherHouseholds ?? 0,
         topStreamingBarrier: PARTICIPATION_BARRIER_LABELS[canonicalParticipation?.topStreamingBarrierId ?? 'NONE'],
         topCinemaBarrier: PARTICIPATION_BARRIER_LABELS[canonicalParticipation?.topCinemaBarrierId ?? 'NONE'],
-        paidSubscriptions: round(payingHouseholds * subscriptionsPerHousehold),
+        paidSubscriptions,
         subscriptionsPerHousehold,
         annualGrowthPercent: market.annualGrowthPercent,
         weeklyWatchHours: round(activeViewers * (7.4 + adoption / 17)),
@@ -517,6 +567,22 @@ export const getStreamingAudienceMarket = (player: Player): StreamingAudienceMar
         worldAudienceEconomy,
         absoluteWeek,
     );
+    const worldStreamingCompetition = normalizeWorldStreamingCompetitionState(
+        player.world?.worldStreamingCompetition,
+        {
+            ...player,
+            world: {
+                ...player.world,
+                worldPopulation,
+                worldAudienceEconomy,
+                worldAudienceParticipation,
+            },
+        },
+        absoluteWeek,
+    );
+    const worldStreamingCustomers = player.world?.worldStreamingCustomers?.lastProcessedAbsoluteWeek === absoluteWeek
+        ? player.world.worldStreamingCustomers
+        : null;
     const countries = STREAMING_DAY_ONE_MARKETS.map(market => buildCountry(
         market,
         selectedMarketIds,
@@ -526,13 +592,21 @@ export const getStreamingAudienceMarket = (player: Player): StreamingAudienceMar
         worldPopulation.countries[market.id]?.population,
         worldAudienceEconomy.countries[market.id],
         worldAudienceParticipation.countries[market.id],
+        worldStreamingCompetition.countries[market.id],
+        worldStreamingCustomers?.countries[market.id],
     ));
     const population = worldPopulation.global.population;
     const adoption = round1(clamp(48.6 + weeksSinceFounding / 52 * 1.65, 35, 78));
-    const activeViewers = round(population * adoption / 100);
-    const payingHouseholds = round(activeViewers / (2.42 - adoption / 235));
-    const subscriptionsPerHousehold = round1(clamp(1.72 + adoption / 100 * .64 + weeksSinceFounding / 520, 1.6, 2.55));
-    const paidSubscriptions = round(payingHouseholds * subscriptionsPerHousehold);
+    const activeViewers = worldStreamingCustomers
+        ? worldStreamingCustomers.global.activeViewers
+            + worldStreamingCustomers.global.sharedActiveViewers
+            + worldStreamingCustomers.global.piracyReach
+        : round(population * adoption / 100);
+    const payingHouseholds = worldStreamingCustomers?.global.payingHouseholds
+        ?? worldStreamingCompetition.global.subscribingHouseholds;
+    const paidSubscriptions = worldStreamingCustomers?.global.endingPaidAccounts
+        ?? worldStreamingCompetition.global.totalSubscriptions;
+    const subscriptionsPerHousehold = round1(paidSubscriptions / Math.max(1, payingHouseholds));
     const weeklyWatchHours = round(activeViewers * (10.2 + adoption / 15));
     const threePlus = round1(clamp((subscriptionsPerHousehold - 1.55) * 29, 7, 30));
     const two = round1(clamp(35 + (subscriptionsPerHousehold - 1.8) * 18, 30, 48));
@@ -544,8 +618,45 @@ export const getStreamingAudienceMarket = (player: Player): StreamingAudienceMar
     const cancelled = operations?.cancellations ?? round(platform.metrics.subscribers * (platform.metrics.churnRate || .02));
     const joined = operations?.joinedSubscribers ?? Math.max(0, platform.metrics.netSubscriberMovement + cancelled);
     const reactivated = operations?.reactivations ?? round(cancelled * .12);
-    const switched = round((joined + cancelled) * .46);
-    const switchingReasons = [
+    const switched = operations?.worldCustomerSwitchIns ?? round((joined + cancelled) * .46);
+    const reasonLabels: Record<WorldStreamingCustomerReasonId, { label: string; detail: string }> = {
+        PRICE: { label: 'Price & affordability', detail: 'The plan no longer fits the household budget or a rival offers clearer value.' },
+        PLAN_VALUE: { label: 'Plan value', detail: 'Features, screens and the chosen tier changed the value of staying.' },
+        CATALOGUE: { label: 'Catalogue depth', detail: 'The household could not see enough reasons to keep this service.' },
+        RELEASE: { label: 'New release', detail: 'A new premiere brought lapsed or new households into the service.' },
+        LOCALIZATION: { label: 'Local fit', detail: 'Language and cultural access changed which service felt useful.' },
+        RELIABILITY: { label: 'Playback trust', detail: 'Reliability and access quality changed the household decision.' },
+        MARKETING: { label: 'Discovery', detail: 'Promotion made the service or its next watch more visible.' },
+        COMPETITOR: { label: 'Platform switch', detail: 'A competing service won the household slot this week.' },
+        PROMO_EXPIRY: { label: 'Offer expired', detail: 'The introductory value ended and the household reconsidered the bill.' },
+        ROTATION: { label: 'Subscription rotation', detail: 'The household rotated a secondary service after finishing its current watch.' },
+        ECONOMY: { label: 'Household economy', detail: 'Changes in disposable entertainment budget reduced paid access.' },
+        SHARING_POLICY: { label: 'Sharing policy', detail: 'Account-access rules changed the balance between reach and retention.' },
+        PIRACY_ACCESS: { label: 'Piracy access', detail: 'Affordability or access gaps pushed viewing outside paid services.' },
+        OTHER: { label: 'Other pressure', detail: 'Several smaller factors combined to change the household decision.' },
+    };
+    const playerMovementReasons = worldStreamingCustomers
+        ? worldStreamingCustomers.recentMovements.filter(movement => (
+            movement.absoluteWeek === absoluteWeek
+            && (movement.sourcePlatformId === 'PLAYER' || movement.destinationPlatformId === 'PLAYER')
+        ))
+        : [];
+    const reasonTotals = new Map<WorldStreamingCustomerReasonId, number>();
+    playerMovementReasons.forEach(movement => reasonTotals.set(
+        movement.reasonId,
+        (reasonTotals.get(movement.reasonId) || 0) + movement.households,
+    ));
+    const reasonTotal = Math.max(1, [...reasonTotals.values()].reduce((total, value) => total + value, 0));
+    const canonicalReasons = [...reasonTotals.entries()]
+        .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+        .slice(0, 5)
+        .map(([id, households]) => ({
+            id,
+            label: reasonLabels[id].label,
+            sharePercent: round1(households / reasonTotal * 100),
+            detail: reasonLabels[id].detail,
+        }));
+    const switchingReasons = canonicalReasons.length ? canonicalReasons : [
         { id: 'PRICE', label: 'Price & bundles', sharePercent: 31, detail: 'Homes rotate toward a cheaper plan or a bundle they already pay for.' },
         { id: 'NEXT_WATCH', label: 'Nothing next', sharePercent: 27, detail: 'A viewer finishes the title they joined for and cannot see the next reason to stay.' },
         { id: 'RIVAL_HIT', label: 'Rival premiere', sharePercent: 19, detail: 'A major release shifts watch time first, then the household subscription.' },
@@ -583,6 +694,37 @@ export const getStreamingAudienceMarket = (player: Player): StreamingAudienceMar
             totalMonthlyStreamingBudget: worldAudienceParticipation.global.totalMonthlyStreamingBudget,
             totalMonthlyCinemaBudget: worldAudienceParticipation.global.totalMonthlyCinemaBudget,
         },
+        streamingCompetition: {
+            subscribingHouseholds: worldStreamingCompetition.global.subscribingHouseholds,
+            unclaimedHouseholds: worldStreamingCompetition.global.unclaimedHouseholds,
+            totalSubscriptions: worldStreamingCompetition.global.totalSubscriptions,
+            totalMonthlySubscriptionSpend: worldStreamingCompetition.global.totalMonthlySubscriptionSpend,
+            playerHouseholds: worldStreamingCompetition.global.playerHouseholds,
+            playerPrimaryHouseholds: worldStreamingCompetition.global.playerPrimaryHouseholds,
+            playerMonthlySubscriptionRevenue: worldStreamingCompetition.global.playerMonthlySubscriptionRevenue,
+            playerEffectiveMonthlyPrice: round1(
+                worldStreamingCompetition.global.playerMonthlySubscriptionRevenue
+                / Math.max(1, worldStreamingCompetition.global.playerHouseholds),
+            ),
+            playerPlanAllocations: worldStreamingCompetition.global.playerPlanAllocations.map(row => ({ ...row })),
+            playerOfferPresent: worldStreamingCompetition.global.playerOfferPresent,
+            offerCount: worldStreamingCompetition.global.offerCount,
+        },
+        customerAccess: {
+            available: Boolean(worldStreamingCustomers),
+            paidAccounts: worldStreamingCustomers?.global.playerEndingPaidAccounts ?? platform.metrics.subscribers,
+            payingHouseholds: worldStreamingCustomers?.global.playerPayingHouseholds ?? platform.metrics.subscribers,
+            externalSharedHouseholds: worldStreamingCustomers?.global.playerExternalSharedHouseholds ?? 0,
+            sharedActiveViewers: worldStreamingCustomers?.global.playerSharedActiveViewers ?? 0,
+            piracyReach: worldStreamingCustomers?.global.playerPiracyReach ?? 0,
+            accessLoadAccounts: worldStreamingCustomers?.global.playerAccessLoadAccounts ?? platform.metrics.subscribers,
+            monthlySubscriptionRevenue: worldStreamingCustomers?.global.playerMonthlySubscriptionRevenue ?? 0,
+            upgrades: worldStreamingCustomers?.global.playerUpgrades ?? 0,
+            downgrades: worldStreamingCustomers?.global.playerDowngrades ?? 0,
+            switchIns: worldStreamingCustomers?.global.playerSwitchIns ?? 0,
+            switchOuts: worldStreamingCustomers?.global.playerSwitchOuts ?? 0,
+            planAllocations: worldStreamingCustomers?.global.playerPlanAllocations.map(row => ({ ...row })) ?? [],
+        },
         weeklyWatchHours,
         subscriberOverlap: { oneServicePercent: one, twoServicesPercent: two, threePlusPercent: threePlus },
         globalTrend: buildGlobalTrend(absoluteWeek, weeksSinceFounding, population, adoption, subscriptionsPerHousehold),
@@ -595,6 +737,8 @@ export const getStreamingAudienceMarket = (player: Player): StreamingAudienceMar
             cancelledThisWeek: cancelled,
             reactivatedThisWeek: reactivated,
             switchedPlatformThisWeek: switched,
+            upgradedThisWeek: operations?.worldCustomerUpgrades ?? 0,
+            downgradedThisWeek: operations?.worldCustomerDowngrades ?? 0,
             globalSwitchPool: round(payingHouseholds * .021),
             playerChurnPercent,
             reasons: switchingReasons,

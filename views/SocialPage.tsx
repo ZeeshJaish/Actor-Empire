@@ -5,9 +5,10 @@ import { calculateLegacyScore, getAbsoluteWeek, getGenerationNumber, getInteract
 import { getDivorceLawyerCost, isChildAbandoned } from '../services/familyLogic';
 import { hasOwnedPremiumAssetInCollection } from '../services/premiumLogic';
 import { getPlayerLanguage, t } from '../services/i18n';
-import { ProfileBuilderGender, createSeededProfileSelection } from '../services/profileBuilder';
-import { exportProfilePortrait } from './avatar/profilePortraitRenderer';
+import { getCanonicalProfileAvatar } from '../services/profileAvatar';
 import { getDynastyMemberAge, normalizeDynastyCareerState } from '../services/dynastyCareer';
+import SocialScreen from '../components/ui-overhaul/SocialScreen';
+import { buildSocialUiModel } from '../services/socialUiAdapter';
 
 interface SocialPageProps {
   player: Player;
@@ -19,8 +20,6 @@ type SocialTab = 'connections' | 'legacy';
 type GiftInteractionType = 'GIFT_THOUGHTFUL' | 'GIFT_LUXURY' | 'GIFT_APOLOGY' | 'GIFT_FAMILY_SUPPORT' | 'GIFT_INDUSTRY_FAVOR';
 type SocialInteractionType = 'CALL' | 'CHECK_IN' | 'DEEP_TALK' | 'FAMILY_DINNER' | 'INDUSTRY_LUNCH' | 'HANGOUT' | 'GIFT' | GiftInteractionType | 'NETWORK' | 'DATE' | 'PROPOSE' | 'INTIMACY' | 'CLUBBING' | 'TRIP' | 'ESTATE_DATE' | 'YACHT_DATE' | 'JET_ESCAPE' | 'LUXURY_GIFT' | 'ABANDON_CHILD' | 'RECONNECT_CHILD' | 'BREAK_UP' | 'DIVORCE_SETTLE' | 'DIVORCE_FIGHT_BUDGET' | 'DIVORCE_FIGHT_ESTABLISHED' | 'DIVORCE_FIGHT_ELITE' | 'PET_FEED' | 'PET_PLAY' | 'PET_GROOM' | 'PET_VET';
 
-const familyProfileAvatarCache = new Map<string, string>();
-
 const formatWealth = (amount: number) => {
   if (amount >= 1000000000) return `$${(amount / 1000000000).toFixed(1)}B`;
   if (amount >= 1000000) return `$${(amount / 1000000).toFixed(1)}M`;
@@ -28,7 +27,7 @@ const formatWealth = (amount: number) => {
   return `$${amount.toLocaleString()}`;
 };
 
-const getParentProfileGender = (rel: Relationship): ProfileBuilderGender | null => {
+const getParentProfileGender = (rel: Relationship): Relationship['gender'] | null => {
   const familyName = `${rel.id}:${rel.name}`.toLowerCase();
   if (rel.id === 'rel_mom' || /(^|:)mom\b|mother/.test(familyName)) return 'FEMALE';
   if (rel.id === 'rel_dad' || /(^|:)dad\b|father/.test(familyName)) return 'MALE';
@@ -40,22 +39,11 @@ const getParentProfileGender = (rel: Relationship): ProfileBuilderGender | null 
 };
 
 const getFamilyProfileAvatar = (rel: Relationship, fallbackImage: string): string => {
-  const profileGender = getParentProfileGender(rel);
-  if (!profileGender || typeof document === 'undefined') return fallbackImage;
-
-  const cacheKey = `${profileGender}:${rel.id}:${rel.name}`;
-  const cached = familyProfileAvatarCache.get(cacheKey);
-  if (cached) return cached;
-
-  try {
-    const selection = createSeededProfileSelection(profileGender, `family-profile:${rel.id}:${rel.name}`);
-    const avatar = exportProfilePortrait(selection, 1);
-    familyProfileAvatarCache.set(cacheKey, avatar);
-    return avatar;
-  } catch (error) {
-    console.warn('Family profile avatar generation failed, falling back to saved relationship image.', error);
-    return fallbackImage;
-  }
+  return getCanonicalProfileAvatar(
+    fallbackImage,
+    getParentProfileGender(rel) || rel.gender,
+    `family-profile:${rel.id}:${rel.name}`,
+  );
 };
 
 const DYNASTY_STATUS_LABELS: Record<string, string> = {
@@ -119,7 +107,7 @@ export const DynastyCareerLegacyPanel: React.FC<{ player: Player }> = ({ player 
   );
 };
 
-export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onContinueAsChild }) => {
+const LegacySocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onContinueAsChild }) => {
   const [selectedContact, setSelectedContact] = useState<Relationship | null>(null);
   const [activeTab, setActiveTab] = useState<SocialTab>('connections');
   const [legacyCandidate, setLegacyCandidate] = useState<Relationship | null>(null);
@@ -1248,3 +1236,11 @@ export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCo
     </div>
   );
 };
+
+export const SocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onContinueAsChild }) => (
+  <SocialScreen
+    {...buildSocialUiModel(player)}
+    onMove={(person, action) => onInteract(person.id, action)}
+    onContinueAsChild={onContinueAsChild}
+  />
+);

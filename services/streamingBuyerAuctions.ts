@@ -11,6 +11,7 @@ import type {
 } from '../types';
 import { createDeterministicId, createDeterministicRng } from './deterministicRandom';
 import { getAbsoluteWeek } from './legacyLogic';
+import { getStreamingMarketCycle } from './streamingMarketSupply';
 import { compactOwnedStreamingPlatformForPersistence, normalizeOwnedStreamingPlatformState } from './ownedStreamingPlatform';
 import {
     establishContentMarketCatalogue,
@@ -27,14 +28,15 @@ import {
     signStreamingRightsDeal,
 } from './streamingRightsMarketplace';
 import { registerProductionStreamingRightsContract } from './streamingRightsCore';
-import { resolveStreamingPlatformBrandById } from './streamingPlatformBrandRegistry';
-import { PLATFORMS } from './streamingLogic';
+import { resolveStreamingOperatorBrand } from './streamingPlatformBrandRegistry';
+import { normalizeStreamingPlatformEcosystem } from './streamingPlatformEcosystem';
+import { resolveStreamingOfferRevision } from './streamingOfferRevisionIntelligence';
+import { getStreamingUpcomingRightsAuctionLots, resolveStreamingUpcomingRightsAuctionOutcome, settleStreamingUpcomingRightsForPlayer } from './streamingUpcomingRights';
 
 const ROOM_OPEN_SECONDS = 15;
 const ROOM_HARD_CAP_SECONDS = 45;
 const ROOM_EVENT_FLOOR_SECONDS = 12;
 const RIVAL_COOLDOWN_SECONDS = 6;
-const PLATFORM_IDS = Object.keys(PLATFORMS) as PlatformId[];
 
 export interface StreamingBuyerAuctionBidTerms {
     minimumGuarantee: number;
@@ -47,7 +49,7 @@ export interface StreamingBuyerAuctionActionResult {
     player: Player;
     changed: boolean;
     session?: StreamingBuyerAuctionSession;
-    reason?: 'NOT_FOUND' | 'NOT_LIVE' | 'INVALID_TERMS' | 'INSUFFICIENT_TREASURY' | 'BID_TOO_WEAK' | 'RIGHTS_UNAVAILABLE';
+    reason?: 'NOT_FOUND' | 'NOT_LIVE' | 'INVALID_TERMS' | 'INSUFFICIENT_TREASURY' | 'RIGHTS_UNAVAILABLE';
     detail?: string;
 }
 
@@ -55,6 +57,7 @@ const clamp = (value: number, minimum: number, maximum: number): number => (
     Math.min(maximum, Math.max(minimum, Number.isFinite(Number(value)) ? Number(value) : minimum))
 );
 const money = (value: number): number => Math.max(0, Math.round(value / 100_000) * 100_000);
+const technicalOfferFloor = (referenceValue: number): number => money(Math.max(100_000, referenceValue * 0.02));
 
 const auctionEvent = (
     sessionId: string,
@@ -130,7 +133,7 @@ export const getStreamingBuyerAuctionLots = (player: Player): StreamingBuyerAuct
         const referenceValue = Math.max(1_000_000, Number(listing.rivalBidAmount || listing.terms.minimumGuarantee));
         const countryIds = listing.countryIds.length ? [...listing.countryIds].sort() : [...exactPlatformMarkets].sort();
         const excludedCountryIds = exactPlatformMarkets.filter(id => !countryIds.includes(id));
-        const id = createDeterministicId('streaming_buyer_auction_lot', listing.id, absoluteWeek);
+        const id = createDeterministicId('streaming_buyer_auction_lot', listing.id, getStreamingMarketCycle(absoluteWeek));
         const allowedTerms = {
             backendMinimum: 1,
             backendMaximum: 10,
@@ -139,8 +142,8 @@ export const getStreamingBuyerAuctionLots = (player: Player): StreamingBuyerAuct
             futureGreenlightReserve: money(referenceValue * 0.25),
         };
         const priorities = sellerPriorities(id);
-        const minimumGuarantee = money(Math.max(1_000_000, referenceValue * 0.5));
-        const minimumBidIncrement = money(Math.max(500_000, referenceValue * 0.025));
+        const minimumGuarantee = technicalOfferFloor(referenceValue);
+        const minimumBidIncrement = money(Math.max(100_000, referenceValue * 0.01));
         return {
             id,
             listingId: listing.id,
@@ -175,7 +178,7 @@ export const getStreamingBuyerAuctionLots = (player: Player): StreamingBuyerAuct
     });
     const packageLots = getContentMarketAuctionCollections(player).map(collection => {
         const referenceValue = Math.max(3_000_000, collection.totalGuarantee);
-        const id = createDeterministicId('streaming_buyer_auction_lot', collection.id, absoluteWeek);
+        const id = createDeterministicId('streaming_buyer_auction_lot', collection.id, getStreamingMarketCycle(absoluteWeek));
         const componentIds = collection.rows.map(row => row.componentProjectId).sort();
         return {
             id,
@@ -197,8 +200,8 @@ export const getStreamingBuyerAuctionLots = (player: Player): StreamingBuyerAuct
             durationWeeks: collection.package.maximumDurationWeeks,
             startsAtAbsoluteWeek: collection.package.startsAtAbsoluteWeek,
             referenceValue,
-            minimumGuarantee: money(referenceValue * 0.5),
-            minimumBidIncrement: money(Math.max(500_000, referenceValue * 0.025)),
+            minimumGuarantee: technicalOfferFloor(referenceValue),
+            minimumBidIncrement: money(Math.max(100_000, referenceValue * 0.01)),
             reserveSellerValue: money(referenceValue * 0.84),
             allowedTerms: {
                 backendMinimum: 1,
@@ -213,41 +216,61 @@ export const getStreamingBuyerAuctionLots = (player: Player): StreamingBuyerAuct
             catalogueComponentIds: componentIds,
         };
     });
-    return [...titleLots, ...packageLots];
+    return [...titleLots, ...packageLots, ...getStreamingUpcomingRightsAuctionLots(player)];
 };
 
 const buildRivals = (player: Player, lot: StreamingBuyerAuctionLot, sessionId: string): StreamingBuyerAuctionRival[] => {
     const acquired = new Set(normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id).corporateDevelopment.acquiredPlatformIds);
-    return PLATFORM_IDS
-        .filter(platformId => !acquired.has(platformId))
-        .map((platformId, index) => {
-            const profile = PLATFORMS[platformId];
-            const worldPlatform = player.world.platforms?.[platformId];
-            const cashAvailable = Math.max(
-                lot.minimumGuarantee * 1.25,
-                Number(worldPlatform?.cashReserve || profile.valuation * 2) * 1_000_000,
+    const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+    const ecosystem = normalizeStreamingPlatformEcosystem(player.world.streamingPlatformEcosystem, absoluteWeek);
+    const lotCountries = new Set(lot.countryIds);
+    return Object.values(ecosystem.operators)
+        .filter(operator => !acquired.has(operator.id as PlatformId)
+            && (operator.lifecycle === 'ACTIVE' || operator.lifecycle === 'DISTRESSED')
+            && operator.cashMillions * 1_000_000 >= lot.minimumGuarantee
+            && operator.activeCountryIds.some(countryId => lotCountries.has(countryId)))
+        .map(operator => {
+            const rng = createDeterministicRng(`${sessionId}:${operator.id}:buyer-ceiling`);
+            const overlapCount = operator.activeCountryIds.filter(countryId => lotCountries.has(countryId)).length;
+            const territoryFit = overlapCount / Math.max(1, lot.countryIds.length);
+            const genreFit = lot.genre === 'CATALOGUE' || operator.preferredGenres.includes(lot.genre as any) ? 1 : 0;
+            const capability = (operator.cataloguePower + operator.localization + operator.technology) / 300;
+            const strategicFit = clamp(
+                territoryFit * 0.42 + genreFit * 0.25 + capability * 0.2 + operator.prestige / 100 * 0.08 + rng() * 0.05,
+                0,
+                1.1,
             );
-            const rng = createDeterministicRng(`${sessionId}:${platformId}:buyer-ceiling`);
-            const genreFit = profile.genreBias.some(genre => genre.toUpperCase().replace(/[^A-Z0-9]+/g, '_') === lot.genre) ? 1.12 : 0.96;
-            const sellerValueCeiling = money(Math.min(cashAvailable * 0.3, lot.referenceValue * (0.92 + rng() * 0.78) * genreFit));
+            const cashAvailable = Math.max(0, operator.cashMillions * 1_000_000);
+            const distressMultiplier = operator.lifecycle === 'DISTRESSED' ? 0.72 : 1;
+            const sellerValueCeiling = money(Math.min(
+                cashAvailable * clamp(0.06 + operator.risk / 100 * 0.09, 0.05, 0.18),
+                lot.referenceValue * (0.35 + strategicFit * 0.85 + rng() * 0.25) * distressMultiplier,
+            ));
+            const brand = resolveStreamingOperatorBrand(operator.id, operator.name, operator.brand);
             return {
-                bidderId: `ai-platform:${platformId}`,
-                platformId,
-                platformName: worldPlatform?.name || profile.name,
-                color: resolveStreamingPlatformBrandById(platformId, worldPlatform?.name || profile.name).primaryColor,
+                bidderId: `ai-platform:${operator.id}`,
+                platformId: operator.id,
+                platformName: operator.name,
+                color: brand.primaryColor,
                 cashAvailable,
                 sellerValueCeiling,
                 preferredBackend: Math.round(clamp(2 + rng() * 7, lot.allowedTerms.backendMinimum, lot.allowedTerms.backendMaximum)),
                 marketingLimit: money(Math.min(lot.allowedTerms.marketingMaximum, lot.referenceValue * (0.03 + rng() * 0.12))),
-                nextActionSecond: 4 + index * 2,
+                nextActionSecond: 0,
                 revision: 0,
                 status: 'WATCHING' as const,
                 currentBidId: null,
+                _entryScore: strategicFit * 100 + Math.log10(Math.max(10, cashAvailable)) * 2 + rng(),
             };
         })
         .filter(rival => rival.sellerValueCeiling >= lot.minimumGuarantee)
-        .sort((left, right) => right.sellerValueCeiling - left.sellerValueCeiling || left.platformId.localeCompare(right.platformId))
-        .slice(0, 4);
+        .sort((left, right) => right._entryScore - left._entryScore || right.sellerValueCeiling - left.sellerValueCeiling || left.platformId.localeCompare(right.platformId))
+        .map(({ _entryScore: _ignored, ...rival }, index) => ({
+            ...rival,
+            // Every eligible operator gets an opening window before the base room can close.
+            // Large fields share action seconds instead of silently losing participants.
+            nextActionSecond: 3 + (index % RIVAL_COOLDOWN_SECONDS),
+        }));
 };
 
 const buildRivalBid = (
@@ -306,7 +329,7 @@ export const openStreamingBuyerAuction = (
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     const lot = getStreamingBuyerAuctionLots(player).find(candidate => candidate.id === lotId);
     if (!lot) return { player, changed: false, reason: 'NOT_FOUND', detail: 'This auction lot is no longer available.' };
-    const existing = platform.buyerAuctionSessions.find(session => session.lot.id === lot.id && session.openedAtAbsoluteWeek === getAbsoluteWeek(player.age, player.currentWeek));
+    const existing = platform.buyerAuctionSessions.find(session => session.lot.id === lot.id);
     if (existing) return { player, changed: false, session: existing, reason: existing.status === 'LIVE' ? undefined : 'NOT_LIVE' };
     const sessionId = createDeterministicId('streaming_buyer_auction', platform.simulationSeed, lot.id);
     const rivals = buildRivals(player, lot, sessionId);
@@ -335,7 +358,11 @@ export const openStreamingBuyerAuction = (
         outcomeMessageId: null,
     };
     const openingRival = rivals[rivals.length - 1];
-    const openingBid = buildRivalBid(session, openingRival, Math.min(openingRival.sellerValueCeiling, lot.reserveSellerValue * 0.72));
+    const openingRng = createDeterministicRng(`${session.id}:${openingRival.platformId}:opening-posture`);
+    const openingBid = buildRivalBid(session, openingRival, Math.min(
+        openingRival.sellerValueCeiling,
+        lot.reserveSellerValue * (0.28 + openingRng() * 0.38),
+    ));
     session = withLeader({
         ...session,
         bids: [openingBid],
@@ -422,12 +449,6 @@ export const placeStreamingBuyerAuctionBid = (
         return { player, changed: false, session, reason: 'INSUFFICIENT_TREASURY', detail: 'Available funds cannot support this complete offer.' };
     }
     const sellerValue = calculateStreamingBuyerAuctionSellerValue(session.lot, terms, 1);
-    const competingLeader = session.bids
-        .filter(bid => bid.status === 'ACTIVE' && !bid.isPlayer)
-        .sort((left, right) => right.sellerValue - left.sellerValue)[0] || null;
-    if (competingLeader && sellerValue < competingLeader.sellerValue + session.lot.minimumBidIncrement) {
-        return { player, changed: false, session, reason: 'BID_TOO_WEAK', detail: 'This contract mix does not move ahead of the leading offer.' };
-    }
     const previous = activeBidFor(session, session.playerBidderId);
     const revision = (previous?.revision || 0) + 1;
     const bid: StreamingBuyerAuctionBid = {
@@ -468,29 +489,44 @@ const placeRivalBid = (
     session: StreamingBuyerAuctionSession,
     rival: StreamingBuyerAuctionRival,
 ): StreamingBuyerAuctionSession => {
-    const leader = getStreamingBuyerAuctionLeader(session);
-    const required = (leader?.sellerValue || session.lot.minimumGuarantee) + session.lot.minimumBidIncrement;
-    if (rival.revision >= 3 || rival.sellerValueCeiling < required) {
-        const withdraw = rival.revision === 0 || rival.sellerValueCeiling < (leader?.sellerValue || 0) * 0.88;
+    const rivalCurrent = activeBidFor(session, rival.bidderId);
+    if (rival.revision >= 3) {
         return {
             ...session,
             rivals: session.rivals.map(item => item.bidderId === rival.bidderId
-                ? { ...item, status: withdraw ? 'WITHDRAWN' as const : 'FINAL' as const }
+                ? { ...item, status: rivalCurrent ? 'FINAL' as const : 'WITHDRAWN' as const }
                 : item),
-            events: withdraw
-                ? [...session.events, auctionEvent(session.id, 'RIVAL_WITHDREW', session.activeSecondsElapsed, rival.bidderId, rival.currentBidId, session.events.length)]
-                : session.events,
+            events: rivalCurrent
+                ? session.events
+                : [...session.events, auctionEvent(session.id, 'RIVAL_WITHDREW', session.activeSecondsElapsed, rival.bidderId, rival.currentBidId, session.events.length)],
         };
     }
     const rng = createDeterministicRng(`${session.id}:${rival.platformId}:buyer-action:${rival.revision + 1}`);
-    const target = Math.min(rival.sellerValueCeiling, required + session.lot.minimumBidIncrement * (0.5 + rng() * 1.5));
+    const activeCompetitors = session.bids.filter(bid => bid.status === 'ACTIVE' && bid.bidderId !== rival.bidderId);
+    const marketLeaderValue = activeCompetitors.reduce(
+        (highest, bid) => Math.max(highest, bid.sellerValue),
+        session.lot.minimumGuarantee,
+    );
+    const marketPressure = clamp(marketLeaderValue / Math.max(1, rival.sellerValueCeiling), 0, 1.5);
+    const withdraw = !rivalCurrent && marketPressure > 1.12 && rng() < 0.6;
+    if (withdraw) return {
+        ...session,
+        rivals: session.rivals.map(item => item.bidderId === rival.bidderId ? { ...item, status: 'WITHDRAWN' as const } : item),
+        events: [...session.events, auctionEvent(session.id, 'RIVAL_WITHDREW', session.activeSecondsElapsed, rival.bidderId, rival.currentBidId, session.events.length)],
+    };
+    const target = rivalCurrent
+        ? resolveStreamingOfferRevision({
+            currentValue: rivalCurrent.sellerValue,
+            currentAmount: rivalCurrent.sellerValue,
+            competitorValue: marketLeaderValue,
+            capacityCeiling: rival.sellerValueCeiling,
+            minimumAmount: session.lot.minimumGuarantee,
+            randomFactor: rng(),
+        }).targetAmount
+        : rival.sellerValueCeiling > marketLeaderValue && rng() > 0.28
+            ? Math.min(rival.sellerValueCeiling, marketLeaderValue + session.lot.minimumBidIncrement * (0.5 + rng() * 1.5))
+            : Math.min(rival.sellerValueCeiling, session.lot.reserveSellerValue * (0.3 + rng() * 0.5));
     const bid = buildRivalBid(session, rival, target);
-    if (bid.sellerValue < required) {
-        return {
-            ...session,
-            rivals: session.rivals.map(item => item.bidderId === rival.bidderId ? { ...item, status: 'FINAL' as const } : item),
-        };
-    }
     const extended = extendRoom(session);
     return withLeader({
         ...session,
@@ -543,7 +579,7 @@ const finishPlayerWin = (
     const releasedCommitments = terminalCommitments(player, session, 'CANCELLED');
     let staged = upsertSession(player, session, { costCommitments: releasedCommitments });
     if (session.lot.listingKind === 'CATALOGUE_PACKAGE') {
-        const collection = getContentMarketCollections(staged).find(item => item.id === session.lot.listingId);
+        const collection = getContentMarketCollections(staged, session.lot.listingId).find(item => item.id === session.lot.listingId);
         if (!collection || collection.signature !== session.lot.listingSignature) {
             const invalid = { ...session, status: 'INVALIDATED' as const, resultReason: 'The collection changed before settlement. Your commitment was released.' };
             return { player: upsertSession(staged, invalid), changed: true, session: invalid, reason: 'RIGHTS_UNAVAILABLE' };
@@ -582,35 +618,50 @@ const finishPlayerWin = (
         };
         return { player: result, changed: true, session: won };
     }
-    const listing = getContentMarketListings(staged).find(item => item.id === session.lot.listingId);
-    if (!listing || listing.signature !== session.lot.listingSignature) {
-        const invalid = { ...session, status: 'INVALIDATED' as const, resultReason: 'The rights changed before settlement. Your commitment was released.' };
-        return { player: upsertSession(staged, invalid), changed: true, session: invalid, reason: 'RIGHTS_UNAVAILABLE' };
-    }
-    const opened = openStreamingRightsNegotiation(staged, session.lot.listingId, {
-        ...listing.terms,
-        countryIds: session.lot.countryIds,
-        minimumGuarantee: winner.minimumGuarantee,
-        platformRevenueShare: 100 - winner.licensorRevenueShare,
-        marketingGuarantee: winner.marketingGuarantee,
-    });
-    if (!opened.changed || !opened.negotiation) {
-        const invalid = { ...session, status: 'INVALIDATED' as const, resultReason: opened.detail || 'The rights became unavailable before settlement.' };
-        return { player: upsertSession(staged, invalid), changed: true, session: invalid, reason: 'RIGHTS_UNAVAILABLE' };
-    }
-    staged = {
-        ...opened.player,
-        ownedStreamingPlatform: {
-            ...opened.player.ownedStreamingPlatform,
-            rightsNegotiations: opened.player.ownedStreamingPlatform.rightsNegotiations.map(item => item.id === opened.negotiation!.id
-                ? { ...item, status: 'READY_TO_SIGN' as const }
-                : item),
-        },
-    };
-    const signed = signStreamingRightsDeal(staged, opened.negotiation.id);
-    if (!signed.changed) {
-        const invalid = { ...session, status: 'INVALIDATED' as const, resultReason: signed.detail || 'The winning contract could not settle. Your commitment was released.' };
-        return { player: upsertSession(player, invalid, { costCommitments: releasedCommitments }), changed: true, session: invalid, reason: 'RIGHTS_UNAVAILABLE' };
+    let signedPlayer: Player;
+    if (session.lot.upcomingRightsSaleId) {
+        const settled = settleStreamingUpcomingRightsForPlayer(staged, session.lot.upcomingRightsSaleId, session.id, {
+            minimumGuarantee: winner.minimumGuarantee,
+            licensorRevenueShare: winner.licensorRevenueShare,
+            marketingGuarantee: winner.marketingGuarantee,
+        });
+        if (!settled.changed) {
+            const invalid = { ...session, status: 'INVALIDATED' as const, resultReason: settled.detail || 'The future-rights contract could not settle. Your commitment was released.' };
+            return { player: upsertSession(player, invalid, { costCommitments: releasedCommitments }), changed: true, session: invalid, reason: 'RIGHTS_UNAVAILABLE' };
+        }
+        signedPlayer = settled.player;
+    } else {
+        const listing = getContentMarketListings(staged).find(item => item.id === session.lot.listingId);
+        if (!listing || listing.signature !== session.lot.listingSignature) {
+            const invalid = { ...session, status: 'INVALIDATED' as const, resultReason: 'The rights changed before settlement. Your commitment was released.' };
+            return { player: upsertSession(staged, invalid), changed: true, session: invalid, reason: 'RIGHTS_UNAVAILABLE' };
+        }
+        const opened = openStreamingRightsNegotiation(staged, session.lot.listingId, {
+            ...listing.terms,
+            countryIds: session.lot.countryIds,
+            minimumGuarantee: winner.minimumGuarantee,
+            platformRevenueShare: 100 - winner.licensorRevenueShare,
+            marketingGuarantee: winner.marketingGuarantee,
+        });
+        if (!opened.changed || !opened.negotiation) {
+            const invalid = { ...session, status: 'INVALIDATED' as const, resultReason: opened.detail || 'The rights became unavailable before settlement.' };
+            return { player: upsertSession(staged, invalid), changed: true, session: invalid, reason: 'RIGHTS_UNAVAILABLE' };
+        }
+        staged = {
+            ...opened.player,
+            ownedStreamingPlatform: {
+                ...opened.player.ownedStreamingPlatform,
+                rightsNegotiations: opened.player.ownedStreamingPlatform.rightsNegotiations.map(item => item.id === opened.negotiation!.id
+                    ? { ...item, status: 'READY_TO_SIGN' as const }
+                    : item),
+            },
+        };
+        const signed = signStreamingRightsDeal(staged, opened.negotiation.id);
+        if (!signed.changed) {
+            const invalid = { ...session, status: 'INVALIDATED' as const, resultReason: signed.detail || 'The winning contract could not settle. Your commitment was released.' };
+            return { player: upsertSession(player, invalid, { costCommitments: releasedCommitments }), changed: true, session: invalid, reason: 'RIGHTS_UNAVAILABLE' };
+        }
+        signedPlayer = signed.player;
     }
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
     const won: StreamingBuyerAuctionSession = {
@@ -623,7 +674,7 @@ const finishPlayerWin = (
         bids: session.bids.map(bid => ({ ...bid, status: bid.id === winner.id ? 'WON' as const : 'LOST' as const })),
         events: [...session.events, auctionEvent(session.id, 'SETTLED', session.activeSecondsElapsed, winner.bidderId, winner.id, session.events.length)],
     };
-    let result = establishContentMarketCatalogue(signed.player);
+    let result = establishContentMarketCatalogue(signedPlayer);
     const resultPlatform = normalizeOwnedStreamingPlatformState(result.ownedStreamingPlatform, result.id);
     const license = [...resultPlatform.catalogLicenses].reverse().find(item => item.sourceProjectId === session.lot.sourceProjectId);
     const futureObligation: OwnedStreamingRightsObligation | null = winner.futureGreenlight && license ? {
@@ -661,6 +712,38 @@ const finishPlayerWin = (
     return { player: result, changed: true, session: won };
 };
 
+const chargeAiAuctionWinner = (player: Player, winner: StreamingBuyerAuctionBid): Player => {
+    if (!winner.platformId) return player;
+    const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+    const ecosystem = normalizeStreamingPlatformEcosystem(player.world.streamingPlatformEcosystem, absoluteWeek);
+    const operator = ecosystem.operators[winner.platformId];
+    const legacyPlatform = player.world.platforms?.[winner.platformId as PlatformId];
+    const chargeMillions = winner.guaranteedExposure / 1_000_000;
+    return {
+        ...player,
+        world: {
+            ...player.world,
+            platforms: legacyPlatform ? {
+                ...player.world.platforms,
+                [winner.platformId]: {
+                    ...legacyPlatform,
+                    cashReserve: Math.max(0, legacyPlatform.cashReserve - chargeMillions),
+                },
+            } : player.world.platforms,
+            streamingPlatformEcosystem: operator ? {
+                ...ecosystem,
+                operators: {
+                    ...ecosystem.operators,
+                    [winner.platformId]: {
+                        ...operator,
+                        cashMillions: Math.max(0, operator.cashMillions - chargeMillions),
+                    },
+                },
+            } : ecosystem,
+        },
+    };
+};
+
 const finishAiWin = (
     player: Player,
     session: StreamingBuyerAuctionSession,
@@ -693,6 +776,7 @@ const finishAiWin = (
                 sellerStudioName: session.lot.sellerName,
                 sellerPartyType: 'NPC_STUDIO',
                 buyerPlatformId: winner.platformId!,
+                buyerPlatformName: winner.bidderName,
                 cataloguePackageId: collection.id,
                 minimumGuarantee: guarantee,
                 platformRevenueShare: 100 - winner.licensorRevenueShare,
@@ -720,15 +804,11 @@ const finishAiWin = (
             bids: session.bids.map(bid => ({ ...bid, status: bid.id === winner.id ? 'WON' as const : 'LOST' as const })),
             events: [...session.events, auctionEvent(session.id, 'SETTLED', session.activeSecondsElapsed, winner.bidderId, winner.id, session.events.length)],
         };
-        const worldPlatform = registeredPlayer.world.platforms?.[winner.platformId];
+        const chargedPlayer = chargeAiAuctionWinner(registeredPlayer, winner);
         const result = {
-            ...registeredPlayer,
-            world: { ...registeredPlayer.world, platforms: worldPlatform ? {
-                ...registeredPlayer.world.platforms,
-                [winner.platformId]: { ...worldPlatform, cashReserve: Math.max(0, worldPlatform.cashReserve - winner.minimumGuarantee / 1_000_000) },
-            } : registeredPlayer.world.platforms },
-            inbox: registeredPlayer.inbox.some(message => message.data?.streamingBuyerAuctionId === session.id)
-                ? registeredPlayer.inbox : [outcomeMessage(wonByRival, absoluteWeek), ...registeredPlayer.inbox],
+            ...chargedPlayer,
+            inbox: chargedPlayer.inbox.some(message => message.data?.streamingBuyerAuctionId === session.id)
+                ? chargedPlayer.inbox : [outcomeMessage(wonByRival, absoluteWeek), ...chargedPlayer.inbox],
         };
         return { player: upsertSession(result, wonByRival, { costCommitments: terminalCommitments(result, session, 'CANCELLED') }), changed: true, session: wonByRival };
     }
@@ -741,6 +821,7 @@ const finishAiWin = (
         sellerStudioName: session.lot.sellerName,
         sellerPartyType: 'NPC_STUDIO',
         buyerPlatformId: winner.platformId,
+        buyerPlatformName: winner.bidderName,
         minimumGuarantee: winner.minimumGuarantee,
         platformRevenueShare: 100 - winner.licensorRevenueShare,
         marketingGuarantee: winner.marketingGuarantee,
@@ -766,18 +847,23 @@ const finishAiWin = (
         bids: session.bids.map(bid => ({ ...bid, status: bid.id === winner.id ? 'WON' as const : 'LOST' as const })),
         events: [...session.events, auctionEvent(session.id, 'SETTLED', session.activeSecondsElapsed, winner.bidderId, winner.id, session.events.length)],
     };
-    const worldPlatform = registered.player.world.platforms?.[winner.platformId];
-    const nextWorldPlatforms = worldPlatform ? {
-        ...registered.player.world.platforms,
-        [winner.platformId]: { ...worldPlatform, cashReserve: Math.max(0, worldPlatform.cashReserve - winner.minimumGuarantee / 1_000_000) },
-    } : registered.player.world.platforms;
-    let result = {
-        ...registered.player,
-        world: { ...registered.player.world, platforms: nextWorldPlatforms },
-        inbox: registered.player.inbox.some(message => message.data?.streamingBuyerAuctionId === session.id)
-            ? registered.player.inbox
-            : [outcomeMessage(wonByRival, absoluteWeek), ...registered.player.inbox],
+    const chargedPlayer = chargeAiAuctionWinner(registered.player, winner);
+    let result: Player = {
+        ...chargedPlayer,
+        inbox: chargedPlayer.inbox.some(message => message.data?.streamingBuyerAuctionId === session.id)
+            ? chargedPlayer.inbox
+            : [outcomeMessage(wonByRival, absoluteWeek), ...chargedPlayer.inbox],
     };
+    if (session.lot.upcomingRightsSaleId) result = resolveStreamingUpcomingRightsAuctionOutcome(
+        result,
+        session.lot.upcomingRightsSaleId,
+        {
+            status: 'LOST',
+            auctionSessionId: session.id,
+            winnerName: winner.bidderName,
+            winningContractId: registered.contract.id,
+        },
+    );
     result = upsertSession(result, wonByRival, { costCommitments: terminalCommitments(result, session, 'CANCELLED') });
     return { player: result, changed: true, session: wonByRival };
 };
@@ -804,7 +890,12 @@ const closeStreamingBuyerAuction = (
             outcomeMessageId: createDeterministicId('streaming_buyer_auction_message', source.id),
             bids: closed.bids.map(bid => ({ ...bid, status: 'LOST' as const })),
         };
-        const result = upsertSession(player, noSale, { costCommitments: terminalCommitments(player, source, 'CANCELLED') });
+        let result = upsertSession(player, noSale, { costCommitments: terminalCommitments(player, source, 'CANCELLED') });
+        if (source.lot.upcomingRightsSaleId) result = resolveStreamingUpcomingRightsAuctionOutcome(
+            result,
+            source.lot.upcomingRightsSaleId,
+            { status: 'CLOSED', auctionSessionId: source.id },
+        );
         return { player: { ...result, inbox: result.inbox.some(message => message.data?.streamingBuyerAuctionId === source.id)
             ? result.inbox : [outcomeMessage(noSale, getAbsoluteWeek(player.age, player.currentWeek)), ...result.inbox] }, changed: true, session: noSale };
     }

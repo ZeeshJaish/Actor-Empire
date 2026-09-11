@@ -112,7 +112,7 @@ const createFixture = (): Player => {
 
 const migrated = normalizeOwnedStreamingPlatformState({ schemaVersion: 21 }, 'phase8-old-save');
 assert(Array.isArray(migrated.campusProjects) && migrated.campusProjects.length === 0, 'Old saves should migrate with an empty campus project portfolio.');
-assert(migrated.schemaVersion === 23, 'Phase 8 should preserve the canonical schema v23 migration target.');
+assert(migrated.schemaVersion === 25, 'Phase 8 should preserve the canonical schema v25 migration target.');
 assert(STREAMING_CAMPUS_FLOW_LABELS.length === 10, 'The player-facing campus flow should expose all ten gates.');
 assert(STREAMING_CAMPUS_STAGE_ORDER.length === 7, 'Land and opening should frame seven accountable post-land construction stages.');
 const ownedContract = STREAMING_FACILITY_CONTRACTS.find(item => item.type === 'OWNED_DATA_CENTRE')!;

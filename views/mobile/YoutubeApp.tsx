@@ -11,6 +11,7 @@ import { ArrowLeft, Play, TrendingUp, DollarSign, Users, Plus, Lock, Home, Layou
 import { IndustryClaimContextPanel, getIndustryClaimPresentation } from './IndustryClaimContext';
 import { IndustryNarrativeContext } from './IndustryNarrativeContext';
 import { applyProjectPromotionAttribution, getEligiblePromotionProjects } from '../../services/projectPromotionAttribution';
+import { getGenderedAvatar } from '../../services/npcLogic';
 
 interface YoutubeAppProps {
   player: Player;
@@ -204,7 +205,7 @@ export const IndustryYoutubeContextPanel: React.FC<{ video: YoutubeVideo }> = ({
 
 export const getYoutubeCommentAvatar = (video: YoutubeVideo, avatarSeed: string): string =>
     video.industryContext?.creatorAvatar
-    || `https://api.dicebear.com/8.x/pixel-art/svg?seed=${encodeURIComponent(avatarSeed)}`;
+    || getGenderedAvatar('NON_BINARY', avatarSeed);
 
 const UPLOAD_PLANS: Record<YoutubeUploadPlan, {
     labelKey: string;
@@ -873,7 +874,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
         authorId: 'creator_pulse',
         authorName: 'Creator Pulse',
         authorHandle: '@creatorpulse',
-        authorAvatar: 'https://api.dicebear.com/8.x/pixel-art/svg?seed=CreatorPulse',
+        authorAvatar: getGenderedAvatar('NON_BINARY', 'CreatorPulse'),
         content,
         timestamp: Date.now(),
         likes: Math.max(20, Math.floor(reach * 0.04)),

@@ -340,6 +340,56 @@
   color: #93c8ff;
 }
 
+.weekly-customer-evidence {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 18px;
+  padding-top: 15px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.weekly-customer-evidence > span,
+.weekly-customer-evidence > p {
+  grid-column: 1 / -1;
+}
+
+.weekly-customer-evidence > span {
+  color: #687680;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+}
+
+.weekly-customer-evidence > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 10px;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.weekly-customer-evidence small {
+  color: #7e8b95;
+  font-size: 7px;
+  font-weight: 850;
+  letter-spacing: 0.09em;
+}
+
+.weekly-customer-evidence strong {
+  color: #e9f2f6;
+  font-size: 11px;
+}
+
+.weekly-customer-evidence > p {
+  margin: 0;
+  color: #6f7c87;
+  font-size: 8.5px;
+  line-height: 1.45;
+}
+
 .weekly-economics dl {
   display: grid;
   gap: 9px;

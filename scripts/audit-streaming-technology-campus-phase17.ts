@@ -85,9 +85,9 @@ const createFixture = (): Player => {
     };
 };
 
-assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 23, 'The canonical foundation should preserve Technology Campus in schema v23.');
+assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 25, 'The canonical foundation should preserve Technology Campus in schema v25.');
 const migrated = normalizeOwnedStreamingPlatformState({ schemaVersion: 14 }, 'phase17-migration');
-assert(migrated.schemaVersion === 23 && migrated.technologyProjects.length === 0, 'Schema v14 saves should migrate with an empty technology-project history.');
+assert(migrated.schemaVersion === 25 && migrated.technologyProjects.length === 0, 'Schema v14 saves should migrate with an empty technology-project history.');
 
 let fixture = createFixture();
 let campus = getStreamingTechnologyCampus(fixture);

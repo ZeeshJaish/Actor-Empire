@@ -117,7 +117,7 @@ const driveToSignature = (player: Player, negotiationId: string): Player => {
     return current;
 };
 
-assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 23, 'The canonical foundation should preserve the Phase 16 rights market in schema v23.');
+assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 25, 'The canonical foundation should preserve the Phase 16 rights market in schema v25.');
 const migrated = normalizeOwnedStreamingPlatformState({ schemaVersion: 13 }, 'phase16-migration');
 assert(migrated.rightsNegotiations.length === 0, 'Older saves should migrate without fabricated negotiations.');
 assert(migrated.sublicenseDeals.length === 0, 'Older saves should migrate without fabricated sublicenses.');

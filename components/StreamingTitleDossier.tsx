@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import {
   Activity,
   ArrowLeft,
+  BadgeCheck,
   BadgeDollarSign,
   BarChart3,
   BookOpenCheck,
@@ -174,10 +175,21 @@ export default function StreamingTitleDossier({ player, onClose, onOpenPromotion
       </section>
       <div className="std-metric-rack is-wide">
         <DossierMetric icon={UsersRound} label="Viewing accounts" value={formatStreamingAnalyticsCompact(title.totalViewingAccounts!)} detail={`Across ${title.measuredWeeks} measured week${title.measuredWeeks === 1 ? '' : 's'}`} tone="positive" />
+        <DossierMetric icon={Eye} label="Estimated viewers" value={formatStreamingAnalyticsCompact(title.totalEstimatedViewers!)} detail={`${formatStreamingAnalyticsCompact(title.totalStarts || 0)} starts`} />
         <DossierMetric icon={Play} label="Hours viewed" value={formatStreamingAnalyticsCompact(title.totalHoursViewed!)} detail="Canonical measured consumption" />
         <DossierMetric icon={BookOpenCheck} label="Completion" value={formatPercent(title.averageCompletionRate!)} detail="Viewing-account weighted average" />
         <DossierMetric icon={Sparkles} label="Satisfaction" value={formatScore(title.averageSatisfactionScore!)} detail="Modeled viewer response" tone={(title.averageSatisfactionScore || 0) >= 72 ? 'positive' : 'warning'} />
+        <DossierMetric icon={Target} label="Top country" value={title.topCountryId || 'PENDING'} detail="Largest measured country audience" />
       </div>
+      <section className="std-story-panel is-wide">
+        <div className="std-panel-heading"><div><span>ACCESS PATHS</span><h2>Who watched and how they reached it</h2></div><UsersRound size={22} /></div>
+        <div className="std-metric-rack is-wide">
+          <DossierMetric icon={BadgeCheck} label="Paid viewing" value={formatStreamingAnalyticsCompact(title.paidViewingAccounts || 0)} detail="Watching through a paid platform account" tone="positive" />
+          <DossierMetric icon={UsersRound} label="Shared viewing" value={formatStreamingAnalyticsCompact(title.sharedViewingAccounts || 0)} detail="Legitimate access beyond the paying household" />
+          <DossierMetric icon={ShieldCheck} label="Pirated viewing" value={formatStreamingAnalyticsCompact(title.piracyViewingAccounts || 0)} detail="Audience outside platform revenue" tone="warning" />
+          <DossierMetric icon={TrendingUp} label="Acquisition value" value={formatStreamingAnalyticsCompact(title.acquisitionAttributedAccounts || 0)} detail={`${formatStreamingAnalyticsCompact(title.retentionAttributedAccounts || 0)} retention-attributed accounts`} />
+        </div>
+      </section>
       <section className="std-trust-card is-wide">
         <ShieldCheck size={22} />
         <div><span>MEASUREMENT RECEIPT</span><strong>Weeks {title.firstMeasuredAbsoluteWeek}–{title.latestMeasuredAbsoluteWeek}</strong><p>This dossier uses committed weekly title records. Reopening it cannot reroll a result.</p></div>
@@ -230,6 +242,8 @@ export default function StreamingTitleDossier({ player, onClose, onOpenPromotion
       { label: 'Recommendations', value: discovery.recommendationsPercent, icon: Sparkles, copy: 'Personalized viewer suggestions' },
       { label: 'Search', value: discovery.searchPercent, icon: Search, copy: 'Intent-led title and genre discovery' },
       { label: 'Direct', value: discovery.directPercent, icon: Target, copy: 'Watchlists, links and known demand' },
+      { label: 'Marketing', value: discovery.marketingPercent || 0, icon: TrendingUp, copy: 'Paid and owned campaign attention' },
+      { label: 'External buzz', value: discovery.externalBuzzPercent || 0, icon: Activity, copy: 'Conversation beyond platform surfaces' },
     ];
     return (
       <div className="std-report-grid">
@@ -265,7 +279,9 @@ export default function StreamingTitleDossier({ player, onClose, onOpenPromotion
   const renderFinancials = (title: StreamingTitleDossierSummary) => (
     <div className="std-report-grid">
       <div className="std-metric-rack is-wide">
-        <DossierMetric icon={BadgeDollarSign} label="Attributed revenue" value={formatMoney(title.attributedSubscriptionRevenue!)} detail="Allocated by measured title attention" tone="positive" />
+        <DossierMetric icon={BadgeDollarSign} label="Subscription attribution" value={formatMoney(title.attributedSubscriptionRevenue!)} detail="Existing subscription cash allocated by attention" tone="positive" />
+        <DossierMetric icon={CircleDollarSign} label="Incremental revenue" value={formatMoney(title.incrementalRevenue || 0)} detail={`${formatMoney(title.advertisingRevenue || 0)} ads · ${formatMoney((title.premiumRevenue || 0) + (title.rentalRevenue || 0) + (title.purchaseRevenue || 0))} transactions`} tone="positive" />
+        <DossierMetric icon={Sparkles} label="Sponsorship" value={formatMoney(title.sponsorshipRevenue || 0)} detail="Exposure earned against active sponsor inventory" />
         <DossierMetric icon={CircleDollarSign} label="Allocated cash cost" value={formatMoney(title.allocatedCashCost!)} detail="Share of this period’s real cash spend" />
         <DossierMetric icon={BookOpenCheck} label="Content amortization" value={formatMoney(title.allocatedContentAmortization!)} detail="Accounting recognition, not a second cash payment" />
       </div>

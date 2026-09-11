@@ -51,11 +51,16 @@ import { reconstructSignedStreamingCataloguePackages } from './streamingCatalogu
 import { normalizeStreamingRightsTransactionRegistry } from './streamingRightsTransactions';
 import { normalizeStreamingRightsOfficeState } from './streamingRightsOffice';
 import { migrateLegacyDynastyCareerState } from './dynastyCareer';
+import { normalizePlayerProfileAvatars } from './profileAvatar';
 import { normalizeWorldAudienceEconomyState } from './worldEconomy/worldAudienceCohorts';
 import { normalizeWorldAudienceParticipationState } from './worldEconomy/worldAudienceParticipation';
 import { normalizeWorldPopulationState } from './worldEconomy/worldPopulation';
+import { normalizeWorldStreamingCompetitionState } from './worldEconomy/worldStreamingCompetition';
+import { normalizeWorldStreamingCustomerState } from './worldEconomy/worldStreamingCustomers';
+import { normalizeWorldStreamingViewingState } from './worldEconomy/worldStreamingViewing';
+import { normalizeWorldStreamingPlatformEconomyState } from './worldEconomy/worldStreamingPlatformEconomy';
 
-const SAVE_MIGRATION_VERSION = 43;
+const SAVE_MIGRATION_VERSION = 46;
 const RUNAWAY_STOCK_CASH_CEILING = 10_000_000_000_000;
 const ACQUISITION_RIVAL_BID_MAX_ROUNDS = 3;
 
@@ -1282,15 +1287,59 @@ export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
             ),
         },
     };
-    const migratedPlayer = {
+    const playerWithWorldStreamingCompetition: Player = {
         ...playerWithStreamingRightsCalendar,
-        flags: migrateFlags(base.flags, playerWithStreamingRightsCalendar),
+        world: {
+            ...playerWithStreamingRightsCalendar.world,
+            worldStreamingCompetition: normalizeWorldStreamingCompetitionState(
+                base.world?.worldStreamingCompetition,
+                playerWithStreamingRightsCalendar,
+                migratedAbsoluteWeek,
+            ),
+        },
     };
-    const repairedPlayer = migrateLegacyCharacterIdentity(reverseLegacyImportedAcquisitionDebtCharge(
+    const playerWithWorldStreamingCustomers: Player = {
+        ...playerWithWorldStreamingCompetition,
+        world: {
+            ...playerWithWorldStreamingCompetition.world,
+            worldStreamingCustomers: normalizeWorldStreamingCustomerState(
+                base.world?.worldStreamingCustomers,
+                playerWithWorldStreamingCompetition,
+                migratedAbsoluteWeek,
+            ),
+        },
+    };
+    const playerWithWorldStreamingViewing: Player = {
+        ...playerWithWorldStreamingCustomers,
+        world: {
+            ...playerWithWorldStreamingCustomers.world,
+            worldStreamingViewing: normalizeWorldStreamingViewingState(
+                base.world?.worldStreamingViewing,
+                playerWithWorldStreamingCustomers,
+                migratedAbsoluteWeek,
+            ),
+        },
+    };
+    const playerWithWorldStreamingPlatformEconomy: Player = {
+        ...playerWithWorldStreamingViewing,
+        world: {
+            ...playerWithWorldStreamingViewing.world,
+            worldStreamingPlatformEconomy: normalizeWorldStreamingPlatformEconomyState(
+                base.world?.worldStreamingPlatformEconomy,
+                playerWithWorldStreamingViewing,
+                migratedAbsoluteWeek,
+            ),
+        },
+    };
+    const migratedPlayer = {
+        ...playerWithWorldStreamingPlatformEconomy,
+        flags: migrateFlags(base.flags, playerWithWorldStreamingPlatformEconomy),
+    };
+    const repairedPlayer = normalizePlayerProfileAvatars(migrateLegacyCharacterIdentity(reverseLegacyImportedAcquisitionDebtCharge(
         repairAcquiredStudioAssetPortfolios(
             repairInDevelopmentContinuationScripts(repairAcquiredStudioFinance(migratedPlayer)),
         ),
-    ));
+    )));
     const productionHouses = repairedPlayer.businesses.filter(business => business.type === 'PRODUCTION_HOUSE');
     const parentStudio = productionHouses.find(business => (
         business.studioState?.acquisitionOrigin !== 'STUDIO_ACQUISITION'

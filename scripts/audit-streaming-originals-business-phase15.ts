@@ -244,7 +244,7 @@ const createFixture = (): Player => {
     };
 };
 
-assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 23, 'The canonical foundation should preserve the complete Originals pipeline in schema v23.');
+assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 25, 'The canonical foundation should preserve the complete Originals pipeline in schema v25.');
 const migrated = normalizeOwnedStreamingPlatformState({
     schemaVersion: 12,
     originalCommissions: [{

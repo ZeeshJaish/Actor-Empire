@@ -2664,6 +2664,24 @@ export const normalizePlatformAiState = (
                 retainedSubscribersMillions: 0,
                 churnedSubscribersMillions: 0,
             },
+        worldEconomyFeedback: isRecord(existing?.worldEconomyFeedback) && hasOnlyFiniteNumbers(existing.worldEconomyFeedback)
+            ? {
+                asOfAbsoluteWeek: normalizeNonNegativeInteger(existing.worldEconomyFeedback.asOfAbsoluteWeek, absoluteWeek),
+                endingPaidAccounts: finiteNonNegative(existing.worldEconomyFeedback.endingPaidAccounts),
+                viewingAccounts: finiteNonNegative(existing.worldEconomyFeedback.viewingAccounts),
+                hoursViewed: finiteNonNegative(existing.worldEconomyFeedback.hoursViewed),
+                weeklyRevenue: finiteNonNegative(existing.worldEconomyFeedback.weeklyRevenue),
+                weeklyOperatingResult: Number.isFinite(Number(existing.worldEconomyFeedback.weeklyOperatingResult))
+                    ? Number(existing.worldEconomyFeedback.weeklyOperatingResult) : 0,
+                audienceMomentum: Number.isFinite(Number(existing.worldEconomyFeedback.audienceMomentum))
+                    ? Number(existing.worldEconomyFeedback.audienceMomentum) : 0,
+                churnPressure: finiteNonNegative(existing.worldEconomyFeedback.churnPressure),
+                viewingDepth: finiteNonNegative(existing.worldEconomyFeedback.viewingDepth),
+                unmetDemandPressure: finiteNonNegative(existing.worldEconomyFeedback.unmetDemandPressure),
+                strongestCountryId: typeof existing.worldEconomyFeedback.strongestCountryId === 'string'
+                    ? existing.worldEconomyFeedback.strongestCountryId : null,
+            }
+            : undefined,
         debtMillions,
         lastRescueAbsoluteWeek: normalizeNullableWeek(existing?.lastRescueAbsoluteWeek),
         rescueCount: normalizeNonNegativeInteger(existing?.rescueCount, 0),

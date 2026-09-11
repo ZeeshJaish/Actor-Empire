@@ -6,7 +6,11 @@ const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const read = (relativePath) => fs.readFileSync(path.join(rootDir, relativePath), 'utf8');
 
 const files = {
-    career: read('views/CareerPage.tsx'),
+    career: [
+        read('views/CareerPage.tsx'),
+        read('components/ui-overhaul/CareerScreen.tsx'),
+        read('services/careerUiAdapter.ts'),
+    ].join('\n'),
     home: read('views/HomePage.tsx'),
     messages: read('views/mobile/MessagesApp.tsx'),
     mobile: read('views/mobile/MobilePage.tsx'),
@@ -17,7 +21,10 @@ const files = {
     npc: read('services/npcLogic.ts'),
     role: read('services/roleLogic.ts'),
     world: read('services/worldLogic.ts'),
-    greenlight: read('views/lifestyle/business/GreenlightWizard.tsx'),
+    greenlight: [
+        read('views/lifestyle/business/GreenlightWizard.tsx'),
+        read('views/lifestyle/business/greenlightProjectBuilder.ts'),
+    ].join('\n'),
     acquisitionDesk: read('views/mobile/components/StudioAcquisitionDesk.tsx'),
     localeEn: read('services/localization/locales/en.ts'),
     premium: read('services/premiumLogic.ts'),
@@ -26,14 +33,14 @@ const files = {
 
 const checks = [
     [files.career, 'data-owned-production-card="compact"', 'compact owned production card marker'],
-    [files.career, 'Owned Work', 'compact owned work badge'],
-    [files.career, 'Polish +{item.qualityLift}/15', 'inline polish lift summary'],
-    [files.career, 'Phase {item.weeksLeft}/{item.phaseDurationWeeks}w', 'owned production phase window summary'],
-    [files.career, 'track.actions.map', 'compact track action rendering'],
-    [files.career, 'flex flex-wrap gap-1.5', 'wrapped compact action chips'],
-    [files.career, 'Need ${action.energyCost}E', 'owned action shortfall state'],
-    [files.career, 'className="space-y-2"', 'minimal track stack'],
-    [files.career, 'action.shortLabel', 'owned production readable short action label'],
+    [files.career, 'OWNED WORK', 'compact owned work badge'],
+    [files.career, 'production.polish}/{production.polishMax', 'inline polish lift summary'],
+    [files.career, 'production.phaseWeek}/{production.phaseWeeks', 'owned production phase window summary'],
+    [files.career, 'track.tasks.map', 'compact track action rendering'],
+    [files.career, 'grid-template-columns:repeat(2,minmax(0,1fr))', 'fixed compact action grid'],
+    [files.career, 'NEED ${task.energy}E', 'owned action shortfall state'],
+    [files.career, 'className="cr-track"', 'minimal track stack'],
+    [files.career, 'label: action.shortLabel', 'owned production readable short action label'],
     [files.ownedCareer, 'OWNED_PRODUCTION_FOCUS_ENERGY_PER_WEEK = 25', 'owned production focus-week calculation baseline'],
     [files.ownedCareer, 'getOwnedProductionFocusLoadWeeks', 'owned production workload helper'],
     [files.ownedCareer, 'phaseDurationWeeks', 'owned production phase duration mirrors project timeline'],

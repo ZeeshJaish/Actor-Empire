@@ -15,9 +15,11 @@ import {
 
 const rendererSource = readFileSync(new URL('../views/avatar/profilePortraitRenderer.ts', import.meta.url), 'utf8');
 const creationMenuSource = readFileSync(new URL('../views/CreationMenu.tsx', import.meta.url), 'utf8');
-const npcLogicSource = readFileSync(new URL('../services/npcLogic.ts', import.meta.url), 'utf8');
+const npcAvatarSource = readFileSync(new URL('../services/npcAvatar.ts', import.meta.url), 'utf8');
 const forbesSource = readFileSync(new URL('../views/mobile/ForbesApp.tsx', import.meta.url), 'utf8');
 const socialPageSource = readFileSync(new URL('../views/SocialPage.tsx', import.meta.url), 'utf8');
+const socialAdapterSource = readFileSync(new URL('../services/socialUiAdapter.ts', import.meta.url), 'utf8');
+const profileAvatarSource = readFileSync(new URL('../services/profileAvatar.ts', import.meta.url), 'utf8');
 
 assert.deepEqual(PROFILE_ART_GRID, { width: 112, height: 128, sourceSize: 1024 }, 'Portrait renderer should use the CharacterCreator-compatible fixed art grid.');
 assert.deepEqual(PROFILE_AVATAR_EXPORT, { shape: 'square', size: 128, contentWidth: 112, contentHeight: 128, padX: 8, padY: 0 }, 'Saved avatars should export square-safe so circular game slots do not trim the top.');
@@ -34,20 +36,22 @@ assert(!creationMenuSource.includes('MALE_AVATAR_SEEDS'), 'Creation page should 
 assert(!creationMenuSource.includes('FEMALE_AVATAR_SEEDS'), 'Creation page should not use the old female DiceBear preset seeds.');
 assert(!creationMenuSource.includes('api.dicebear.com'), 'Creation page presets should come from the modular pixel portrait builder, not DiceBear URLs.');
 assert(creationMenuSource.includes('createSeededProfileSelection'), 'Creation page should build random presets from the modular profile system.');
-assert(!npcLogicSource.includes('api.dicebear.com/7.x/pixel-art/svg'), 'New NPC avatars should not fall back to DiceBear; old saved DiceBear URLs can remain in existing saves.');
-assert(npcLogicSource.includes('createFallbackProfileAvatar'), 'NPC avatar generation should have a local non-DiceBear fallback for non-DOM contexts.');
-assert(npcLogicSource.includes('data:image/svg+xml;charset=UTF-8'), 'NPC fallback avatars should be generated as local SVG data URIs.');
+assert(!npcAvatarSource.includes('api.dicebear.com/7.x/pixel-art/svg'), 'New NPC avatars should not fall back to DiceBear.');
+assert(npcAvatarSource.includes('createFallbackPortrait'), 'NPC avatar generation should have a local non-DiceBear fallback for non-DOM contexts.');
+assert(npcAvatarSource.includes('data:image/svg+xml;charset=UTF-8'), 'NPC fallback avatars should be generated as local SVG data URIs.');
 assert(forbesSource.includes('isForbesCelebRankingEntry'), 'Forbes Celebs should filter ranking source rows before rendering.');
 assert(forbesSource.includes('isForbesBrandCategory'), 'Forbes Celebs should explicitly exclude brand/company categories.');
 assert(forbesSource.includes('getForbesCelebAvatar'), 'Forbes Celebs should normalize generated NPC avatars through the profile system.');
 assert(!forbesSource.includes('avatar: npc.avatar'), 'Forbes Celebs should not render raw NPC avatar strings that may be old seed-system URLs.');
 assert(forbesSource.includes('grayscale opacity-70'), 'Forbes Celebs should keep non-player portraits visually muted while the player card stays colored.');
 assert(socialPageSource.includes('getFamilyProfileAvatar'), 'Connections should normalize Mom/Dad through the profile avatar system.');
-assert(socialPageSource.includes('createSeededProfileSelection(profileGender'), 'Mom/Dad profile avatars should be deterministic seeded profile-builder portraits.');
 assert(socialPageSource.includes("family-profile:${rel.id}:${rel.name}"), 'Family profile seeds should be stable per relationship.');
 assert(socialPageSource.includes("rel.id === 'rel_mom'"), 'Mom should be explicitly mapped to the female profile system.');
 assert(socialPageSource.includes("rel.id === 'rel_dad'"), 'Dad should be explicitly mapped to the male profile system.');
 assert(socialPageSource.includes('[image-rendering:pixelated]'), 'Family profile avatars should preserve crisp profile-builder pixel rendering.');
+assert(profileAvatarSource.includes('isLegacyPixelAvatar'), 'The profile system should recognize retired pixel avatar URLs.');
+assert(profileAvatarSource.includes('normalizePlayerProfileAvatars'), 'Existing saves should normalize retired player and family portraits.');
+assert(socialAdapterSource.includes('getCanonicalProfileAvatar(relationship.image'), 'The transplanted Connections UI should not bypass profile normalization.');
 
 const expectedCategories = ['skinTone', 'faceShape', 'hair', 'hairColor', 'eyebrows', 'eyes', 'eyeColor', 'nose', 'mouth', 'facialHair', 'outfit', 'frame'];
 assert.deepEqual(PROFILE_BUILDER_CATEGORIES.map(category => category.id), expectedCategories, 'Builder categories should follow the canonical face-to-frame order.');

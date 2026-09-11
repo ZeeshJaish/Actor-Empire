@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 
 const releaseSource = fs.readFileSync('views/lifestyle/business/ReleaseWizard.tsx', 'utf8');
+const campaignSource = fs.readFileSync('views/lifestyle/business/release-strategy-transplant/CampaignStep.tsx', 'utf8');
 const typesSource = fs.readFileSync('types.ts', 'utf8');
 
 const mustInclude = (source, token) => {
@@ -11,15 +12,26 @@ const mustInclude = (source, token) => {
   'MARKETING_CHANNEL_OPTIONS',
   'normalizeMarketingChannelAllocations',
   'channelAllocations',
-  'Marketing Channel Mix',
-  'Pool Used',
-  'Pool Remaining',
+  'campaignChannels',
+  'channels={campaignChannels}',
+  'spent={totalCampaignCost}',
+  'budget={legacyCampaignBudgetCap}',
+  'onChangeChannel={(id, delta)',
   'returnedMarketingBudget',
   'marketingChannelAllocations',
   'marketingBudgetRemaining: 0',
   'hasReservedMarketingPool',
   'unusedCampaignReserve'
 ].forEach(token => mustInclude(releaseSource, token));
+
+[
+  'CHANNEL MIX',
+  'SPENT',
+  'AVAILABLE',
+  'campaign-remaining',
+  'channels.map',
+  'OF POOL'
+].forEach(token => mustInclude(campaignSource, token));
 
 [
   'MarketingChannelId',
@@ -40,4 +52,4 @@ if (/grid-cols-1 md:grid-cols-5/.test(releaseSource)) {
   throw new Error('Campaign positioning controls are still using the large mobile card stack.');
 }
 
-console.log('Release channel mix UI audit passed.');
+console.log('Release transplanted channel mix UI audit passed.');

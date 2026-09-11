@@ -14,7 +14,11 @@ import {
     normalizeOwnedStreamingPlatformState,
 } from './ownedStreamingPlatform';
 import { getStreamingCatalogLicenseStatus, resolveStreamingCatalogTitle } from './streamingCatalog';
-import { normalizeStreamingLanguageId, resolveStreamingLocalizationTiers } from './streamingLocalizationCapabilities';
+import {
+    normalizeStreamingLanguageId,
+    resolveStreamingGlobalLocalizationCapability,
+    resolveStreamingLocalizationTiers,
+} from './streamingLocalizationCapabilities';
 import { getStreamingContentAvailability, type ContentAvailability } from './streamingContentAvailability';
 
 export type StreamingLocalizationDelivery = 'OUTSOURCE' | 'IN_HOUSE';
@@ -144,26 +148,39 @@ const qualitySatisfied = (
     preference: OwnedStreamingCountryMarketProfile['localizationPreference'],
     language: string,
     asset: OwnedStreamingTitleLanguageAsset | null,
+    subtitleLevel: 0 | 1 | 2 | 3 = 0,
+    dubbingLevel: 0 | 1 | 2 | 3 = 0,
 ): boolean => {
     if (isOriginalLanguage(language)) return true;
-    if (preference === 'DUB_FIRST') return Boolean(asset?.dubReady);
-    if (preference === 'SUBTITLE_FIRST') return Boolean(asset?.subtitleReady);
-    return Boolean(asset?.subtitleReady || asset?.dubReady);
+    const subtitlesReady = Boolean(asset?.subtitleReady) || subtitleLevel > 0;
+    const dubbingReady = Boolean(asset?.dubReady) || dubbingLevel > 0;
+    if (preference === 'DUB_FIRST') return dubbingReady;
+    if (preference === 'SUBTITLE_FIRST') return subtitlesReady;
+    return subtitlesReady || dubbingReady;
 };
 
 const reachForLanguage = (
     preference: OwnedStreamingCountryMarketProfile['localizationPreference'],
     language: string,
     asset: OwnedStreamingTitleLanguageAsset | null,
+    subtitleLevel: 0 | 1 | 2 | 3 = 0,
+    dubbingLevel: 0 | 1 | 2 | 3 = 0,
 ): number => {
     if (isOriginalLanguage(language)) return 1;
     if (asset?.dubReady) return 1;
     if (asset?.subtitleReady) return preference === 'DUB_FIRST' ? 0.68 : 0.94;
+    if (dubbingLevel > 0) return ([0, 0.84, 0.94, 1] as const)[dubbingLevel];
+    if (subtitleLevel > 0) {
+        const subtitleReach = ([0, 0.78, 0.88, 0.96] as const)[subtitleLevel];
+        return preference === 'DUB_FIRST' ? subtitleReach * 0.72 : subtitleReach;
+    }
     return preference === 'ORIGINAL_AUDIO' ? 0.72 : 0.24;
 };
 
 export const getStreamingOpeningCatalogueView = (player: Player): StreamingOpeningCatalogueView => {
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+    const globalLocalization = resolveStreamingGlobalLocalizationCapability(platform);
+    const activeLanguages = new Set(globalLocalization.activeLanguageIds);
     const operations = openingOperations(player);
     const openingCountryIds = operations.map(operation => operation.countryId!);
     const ownedIds = new Set(platform.starterCatalog?.ownedProjectIds || []);
@@ -206,12 +223,18 @@ export const getStreamingOpeningCatalogueView = (player: Player): StreamingOpeni
         availability: title.access.status,
         hours: title.access.hours,
         hoursEstimated: title.access.estimated,
-        subtitleLanguagesReady: allLanguages.filter(language => (
-            isOriginalLanguage(language) || Boolean(getAsset(platform.localizationOperations.titleLanguageAssets, title.projectId, language)?.subtitleReady)
-        )),
-        dubLanguagesReady: allLanguages.filter(language => (
-            isOriginalLanguage(language) || Boolean(getAsset(platform.localizationOperations.titleLanguageAssets, title.projectId, language)?.dubReady)
-        )),
+        subtitleLanguagesReady: allLanguages.filter(language => {
+            const normalized = normalizeStreamingLanguageId(language);
+            return isOriginalLanguage(language)
+                || Boolean(getAsset(platform.localizationOperations.titleLanguageAssets, title.projectId, language)?.subtitleReady)
+                || (globalLocalization.subtitleLevel > 0 && activeLanguages.has(normalized));
+        }),
+        dubLanguagesReady: allLanguages.filter(language => {
+            const normalized = normalizeStreamingLanguageId(language);
+            return isOriginalLanguage(language)
+                || Boolean(getAsset(platform.localizationOperations.titleLanguageAssets, title.projectId, language)?.dubReady)
+                || (globalLocalization.dubbingLevel > 0 && activeLanguages.has(normalized));
+        }),
     }));
 
     const countries = operations.map((operation): StreamingOpeningCountryCoverage => {
@@ -225,10 +248,13 @@ export const getStreamingOpeningCatalogueView = (player: Player): StreamingOpeni
         let reachWeighted = 0;
         availableTitles.forEach(title => profile.languageDistribution.forEach(language => {
             const asset = getAsset(platform.localizationOperations.titleLanguageAssets, title.projectId, language.language);
-            if (isOriginalLanguage(language.language) || asset?.subtitleReady) subtitles += 1;
-            if (isOriginalLanguage(language.language) || asset?.dubReady) dubs += 1;
-            if (qualitySatisfied(profile.localizationPreference, language.language, asset)) qualityChecks += 1;
-            reachWeighted += language.audiencePercent * reachForLanguage(profile.localizationPreference, language.language, asset);
+            const languageActive = activeLanguages.has(normalizeStreamingLanguageId(language.language));
+            const subtitleLevel = languageActive ? globalLocalization.subtitleLevel : 0;
+            const dubbingLevel = languageActive ? globalLocalization.dubbingLevel : 0;
+            if (isOriginalLanguage(language.language) || asset?.subtitleReady || subtitleLevel > 0) subtitles += 1;
+            if (isOriginalLanguage(language.language) || asset?.dubReady || dubbingLevel > 0) dubs += 1;
+            if (qualitySatisfied(profile.localizationPreference, language.language, asset, subtitleLevel, dubbingLevel)) qualityChecks += 1;
+            reachWeighted += language.audiencePercent * reachForLanguage(profile.localizationPreference, language.language, asset, subtitleLevel, dubbingLevel);
         }));
         const titleCount = baseTitles.length;
         return {

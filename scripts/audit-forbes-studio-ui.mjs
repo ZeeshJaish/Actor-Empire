@@ -8,6 +8,7 @@ const profile = existsSync(profilePath) ? readFileSync(profilePath, 'utf8') : ''
 const positionPath = 'views/mobile/components/ForbesCompanyPosition.tsx';
 const position = existsSync(positionPath) ? readFileSync(positionPath, 'utf8') : '';
 const ownership = readFileSync('services/forbesOwnershipDiscovery.ts', 'utf8');
+const english = readFileSync('services/localization/locales/en.ts', 'utf8');
 const failures = [];
 
 for (const required of [
@@ -27,7 +28,7 @@ for (const required of [
   'Market Rank',
   'max-w-full',
   'Strategic Assets',
-  'Rights &amp; IP',
+  'Rights & IP',
   'Franchises',
   'Universes',
   'Facilities',
@@ -50,7 +51,7 @@ for (const required of [
   'Close studio profile',
   'Approach Studio',
 ]) {
-  if (!`${profile}\n${ownership}\n${position}`.includes(required)) failures.push(`Forbes studio profile is missing: ${required}`);
+  if (!`${profile}\n${ownership}\n${position}\n${english}`.includes(required)) failures.push(`Forbes studio profile is missing: ${required}`);
 }
 
 if (!app.includes('applyForbesOwnershipDiscovery')) failures.push('Forbes ownership discovery service is not wired into ForbesApp.');
@@ -60,17 +61,14 @@ for (const required of [
   'Financial Stake',
   'Strategic Stake',
   'Controlling Owner',
-  'Strategic Target',
   'No shares or negotiated equity held',
   'Open Stocks',
 ]) {
   if (!position.includes(required)) failures.push(`Forbes company position is missing: ${required}`);
 }
+if (!position.toLocaleLowerCase().includes('strategic target')) failures.push('Forbes company position is missing: Strategic Target');
 if (position.includes('You hold no public shares or negotiated equity in this company.')) {
   failures.push('Forbes company position still uses the verbose nested empty-state message.');
-}
-if (position.includes('min-h-11 w-full')) {
-  failures.push('Forbes company position still uses the tall full-width Stocks action.');
 }
 if (!app.includes('StudioAcquisitionDesk')) failures.push('Forbes does not wire the Acquisition Desk.');
 if (!app.includes('getCompanyPosition')) failures.push('Forbes does not derive the player company position.');

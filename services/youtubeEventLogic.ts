@@ -7,6 +7,7 @@ import {
     XPost
 } from '../types';
 import { getPlayerLanguage, t } from './i18n';
+import { getGenderedAvatar } from './npcLogic';
 
 export type YoutubeEventResolution =
     | {
@@ -231,7 +232,7 @@ const createCreatorRivalPost = (
     authorId: `rival_${rivalName.toLowerCase().replace(/\s+/g, '_')}`,
     authorName: rivalName === CREATOR_WATCH_AUTHOR_ID ? t(language, 'services.youtubeEvent.social.creatorWatch.name') : rivalName,
     authorHandle: `@${rivalName.toLowerCase().replace(/\s+/g, '')}`,
-    authorAvatar: `https://api.dicebear.com/8.x/pixel-art/svg?seed=${encodeURIComponent(rivalName)}`,
+    authorAvatar: getGenderedAvatar('NON_BINARY', rivalName),
     content,
     timestamp: Date.now(),
     likes: Math.max(80, Math.floor(reach * 0.05)),

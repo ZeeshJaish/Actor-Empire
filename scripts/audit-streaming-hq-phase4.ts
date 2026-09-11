@@ -54,7 +54,7 @@ const createIncorporatedPlayer = (): Player => {
     return result.player;
 };
 
-assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 23, 'The current schema should retain the Phase 4 lightweight onboarding record.');
+assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 25, 'The current schema should retain the Phase 4 lightweight onboarding record.');
 assert(STREAMING_HQ_SECTIONS.map(section => section.id).join(',') === 'HOME,CONTENT,TECH,MARKET,COMPANY', 'HQ should expose the five locked sections in order.');
 assert(STREAMING_HQ_TOUR_STEPS.length === 5, 'The guided HQ orientation should have one contextual step per section.');
 

@@ -249,9 +249,9 @@ const createFixture = (): Player => {
     };
 };
 
-assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 23, 'The canonical foundation should preserve public markets in schema v23.');
+assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 25, 'The canonical foundation should preserve public markets in schema v25.');
 const migrated = normalizeOwnedStreamingPlatformState({ schemaVersion: 19 }, 'phase22-migration');
-assert(migrated.schemaVersion === 23 && migrated.publicCompany.lifecycle === 'PRIVATE', 'Schema v19 saves should migrate to a safe private-company state.');
+assert(migrated.schemaVersion === 25 && migrated.publicCompany.lifecycle === 'PRIVATE', 'Schema v19 saves should migrate to a safe private-company state.');
 
 let player = createFixture();
 const privateView = getStreamingPublicMarkets(player);

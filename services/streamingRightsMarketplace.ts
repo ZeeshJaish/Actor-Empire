@@ -24,10 +24,16 @@ import {
     normalizeOwnedStreamingPlatformState,
 } from './ownedStreamingPlatform';
 import {
+    getStreamingLicenseCandidatePool,
     getStreamingLicenseOpportunities,
     getStreamingLicenseQuote,
     type StreamingCatalogTitle,
 } from './streamingCatalog';
+import {
+    getStreamingMarketCycle,
+    getStreamingMarketSupplyProfile,
+    selectStreamingMarketTitles,
+} from './streamingMarketSupply';
 import { PLATFORMS } from './streamingLogic';
 import { normalizeStreamingDayOneMarketIds } from './streamingDayOneMarkets';
 import {
@@ -66,7 +72,7 @@ export interface StreamingRightsOpportunity {
     sellerType: 'STUDIO' | 'PLATFORM';
     sellerId: string;
     sellerName: string;
-    sellerPlatformId: PlatformId | null;
+    sellerPlatformId: string | null;
     sourceLicenseId: string | null;
     recommendedTerritory: StreamingLicenseTerritory;
     recommendedWindow: StreamingRightsWindowType;
@@ -298,15 +304,13 @@ const PLATFORM_IDS = Object.keys(PLATFORMS) as PlatformId[];
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 const roundMoney = (value: number): number => Math.max(0, Math.round(value / 250_000) * 250_000);
 
-const marketCycle = (absoluteWeek: number): number => Math.max(0, Math.floor(absoluteWeek / 4));
-
 const chooseRival = (
     seed: string,
     opportunityId: string,
     absoluteWeek: number,
     excludedPlatformId: PlatformId | null,
 ): { id: PlatformId; name: string; pressure: number } => {
-    const rng = createDeterministicRng(`${seed}:rights-rival:${opportunityId}:${marketCycle(absoluteWeek)}`);
+    const rng = createDeterministicRng(`${seed}:rights-rival:${opportunityId}:${getStreamingMarketCycle(absoluteWeek)}`);
     const candidates = PLATFORM_IDS.filter(id => id !== excludedPlatformId);
     const id = candidates[Math.floor(rng() * candidates.length)] || 'NETFLIX';
     return { id, name: PLATFORMS[id].name, pressure: 0.88 + rng() * 0.34 };
@@ -319,7 +323,7 @@ const buildOpportunity = (
     sellerType: 'STUDIO' | 'PLATFORM',
     sellerId: string,
     sellerName: string,
-    sellerPlatformId: PlatformId | null,
+    sellerPlatformId: string | null,
     kind: StreamingRightsOpportunityKind,
     sourceLicenseId: string | null = null,
     sourceContract: StreamingRightsContract | null = null,
@@ -332,7 +336,10 @@ const buildOpportunity = (
         ? Math.max(1, sourceContract.expiresAtAbsoluteWeek - absoluteWeek)
         : kind === 'SUBLICENSE_OUT' ? 52 : 104;
     const quote = getStreamingLicenseQuote(title, recommendedTerritory, Math.min(520, remainingWeeks), sourceContract?.exclusivity || 'NON_EXCLUSIVE');
-    const rival = chooseRival(platform.simulationSeed, `${kind}:${title.id}`, absoluteWeek, sellerPlatformId);
+    const excludedLegacyPlatform = sellerPlatformId && PLATFORM_IDS.includes(sellerPlatformId as PlatformId)
+        ? sellerPlatformId as PlatformId
+        : null;
+    const rival = chooseRival(platform.simulationSeed, `${kind}:${title.id}`, absoluteWeek, excludedLegacyPlatform);
     const heatScore = rival.pressure * ((title.rating || 6.5) / 7);
     const marketHeat = heatScore >= 1.16 ? 'HOT' : heatScore >= 0.96 ? 'ACTIVE' : 'COOL';
     return {
@@ -514,8 +521,14 @@ export const getStreamingRightsOpportunities = (player: Player): StreamingRights
         ));
     return [...inbound, ...canonicalPlatformTrades, ...licensedOutbound, ...originalOutbound]
         .filter(opportunity => !platform.rightsNegotiations.some(negotiation => (
-            negotiation.idempotencyKey === `${opportunity.id}:${marketCycle(absoluteWeek)}`
-            && ACTIVE_NEGOTIATION_STATUSES.has(negotiation.status)
+            ACTIVE_NEGOTIATION_STATUSES.has(negotiation.status)
+            && negotiation.sourceProjectId === opportunity.title.id
+            && negotiation.sourceLicenseId === opportunity.sourceLicenseId
+            && (
+                (['STUDIO_ACQUISITION', 'PLATFORM_TRADE'].includes(opportunity.kind) && negotiation.kind === 'ACQUIRE')
+                || (opportunity.kind === 'SUBLICENSE_OUT' && negotiation.kind === 'SUBLICENSE_OUT')
+                || (opportunity.kind === 'TRANSFER_OUT' && negotiation.kind === 'TRANSFER_OUT')
+            )
         )))
         .slice(0, 18);
 };
@@ -549,22 +562,41 @@ export { getOwnedPlatformPackageCountryIds } from './streamingContentAvailabilit
 
 export const getStreamingCataloguePackageOpportunities = (
     player: Player,
+    options: { includeReservedOpportunityId?: string } = {},
 ): StreamingCataloguePackageOpportunity[] => {
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     if (!['FOUNDING', 'ACTIVE'].includes(platform.lifecycle)) return [];
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+    const supplyProfile = getStreamingMarketSupplyProfile(player);
     const countryIds = getOwnedPlatformPackageCountryIds(platform);
     const sourceProjectById = new Map((player.world.projects || []).map(project => [project.id, project]));
+    const settlementSession = options.includeReservedOpportunityId
+        ? platform.buyerAuctionSessions.find(session => (
+            session.lot.listingKind === 'CATALOGUE_PACKAGE'
+            && session.lot.listingId === options.includeReservedOpportunityId
+        ))
+        : null;
+    const settlementProjectIds = new Set(settlementSession?.lot.catalogueComponentIds || []);
+    const reservedProjectIds = new Set([
+        ...platform.rightsNegotiations
+            .filter(negotiation => ACTIVE_NEGOTIATION_STATUSES.has(negotiation.status))
+            .map(negotiation => negotiation.sourceProjectId),
+        ...platform.buyerAuctionSessions
+            .filter(session => session.status === 'LIVE')
+            .flatMap(session => session.lot.catalogueComponentIds?.length
+                ? session.lot.catalogueComponentIds
+                : [session.lot.sourceProjectId]),
+    ]);
     const groups = new Map<string, StreamingCatalogTitle[]>();
-    getStreamingLicenseOpportunities(player)
-        .filter(title => title.source === 'EXTERNAL_MARKET')
+    getStreamingLicenseCandidatePool(player)
+        .filter(title => (
+            title.source === 'EXTERNAL_MARKET'
+            && (!reservedProjectIds.has(title.id) || settlementProjectIds.has(title.id))
+        ))
         .forEach(title => groups.set(title.studioId, [...(groups.get(title.studioId) || []), title]));
     return [...groups.entries()].flatMap(([studioId, titles]) => {
-        const selected = titles
-            .slice()
-            .sort((left, right) => (right.rating || 0) - (left.rating || 0) || left.id.localeCompare(right.id))
-            .slice(0, 5);
-        if (selected.length < 3) return [];
+        const selected = selectStreamingMarketTitles(player, titles, supplyProfile.collectionMaximumSize);
+        const compatibleTitles: StreamingCatalogTitle[] = [];
         const components = selected.flatMap(title => {
             const sourceProject = sourceProjectById.get(title.id);
             const lotBuild = buildStreamingBiddingRightsLot({
@@ -577,6 +609,7 @@ export const getStreamingCataloguePackageOpportunities = (
                 desiredCountryIds: countryIds,
             });
             if (!lotBuild.lot) return [];
+            compatibleTitles.push(title);
             const component: StreamingCataloguePackageComponent = {
                 sourceProjectId: title.id,
                 title: title.title,
@@ -596,7 +629,7 @@ export const getStreamingCataloguePackageOpportunities = (
             };
             return [component];
         }).sort((left, right) => left.sourceProjectId.localeCompare(right.sourceProjectId));
-        if (components.length !== selected.length) return [];
+        if (components.length < 3) return [];
         const referenceValues = components.map(component => calculateStreamingCatalogueReferenceValue(component));
         const referenceTotal = referenceValues.reduce((sum, value) => sum + value, 0);
         const valuedComponents = components.map((component, index) => ({
@@ -605,14 +638,14 @@ export const getStreamingCataloguePackageOpportunities = (
             referenceWeight: referenceTotal > 0 ? referenceValues[index] / referenceTotal : 1 / components.length,
         }));
         const totalGuarantee = roundMoney(Math.max(
-            selected.length * 1_000_000,
-            selected.reduce((sum, title) => sum + getStreamingLicenseQuote(title, 'MULTI_REGION', 104, 'NON_EXCLUSIVE').suggestedGuarantee, 0) * .78,
+            compatibleTitles.length * 1_000_000,
+            compatibleTitles.reduce((sum, title) => sum + getStreamingLicenseQuote(title, 'MULTI_REGION', 104, 'NON_EXCLUSIVE').suggestedGuarantee, 0) * .78,
         ));
         const allocation = allocateStreamingCatalogueGuarantee({
             totalGuarantee,
             components: valuedComponents,
             platformId: 'NETFLIX',
-            bidderValues: Object.fromEntries(selected.map(title => [
+            bidderValues: Object.fromEntries(compatibleTitles.map(title => [
                 title.id,
                 Math.max(1, Number(title.gross || 0) * .19 + (title.rating || 6) ** 2 * 900_000),
             ])),
@@ -622,7 +655,7 @@ export const getStreamingCataloguePackageOpportunities = (
             localizationRequirements: [],
         });
         if (!allocation.valid) return [];
-        const packageId = createDeterministicId('owned_streaming_catalogue_package', platform.simulationSeed, marketCycle(absoluteWeek), studioId, ...valuedComponents.map(component => component.sourceProjectId));
+        const packageId = createDeterministicId('owned_streaming_catalogue_package', platform.simulationSeed, getStreamingMarketCycle(absoluteWeek), studioId, ...valuedComponents.map(component => component.sourceProjectId));
         const acceptedOfferId = createDeterministicId('owned_streaming_catalogue_package_offer', packageId);
         const cataloguePackage: StreamingCataloguePackage = {
             schemaVersion: STREAMING_CATALOGUE_PACKAGE_SCHEMA_VERSION,
@@ -653,7 +686,7 @@ export const getStreamingCataloguePackageOpportunities = (
             componentContractIds: [],
             digestId: null,
         };
-        const averageRating = selected.reduce((sum, title) => sum + (title.rating || 6), 0) / selected.length;
+        const averageRating = compatibleTitles.reduce((sum, title) => sum + (title.rating || 6), 0) / compatibleTitles.length;
         return [{
             id: packageId,
             package: cataloguePackage,
@@ -662,7 +695,8 @@ export const getStreamingCataloguePackageOpportunities = (
             sellerName: selected[0].studioName,
             marketHeat: averageRating >= 7.8 ? 'HOT' as const : 'ACTIVE' as const,
         }];
-    }).sort((left, right) => right.totalGuarantee - left.totalGuarantee || left.id.localeCompare(right.id)).slice(0, 4);
+    }).sort((left, right) => right.totalGuarantee - left.totalGuarantee || left.id.localeCompare(right.id))
+        .slice(0, supplyProfile.collectionLimit);
 };
 
 export const signOwnedStreamingCataloguePackage = (
@@ -678,7 +712,9 @@ export const signOwnedStreamingCataloguePackage = (
     }
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     if (!['FOUNDING', 'ACTIVE'].includes(platform.lifecycle)) return { player, changed: false, contracts: [], package: null, reason: 'NOT_ACTIVE' };
-    const opportunity = getStreamingCataloguePackageOpportunities(player).find(candidate => candidate.id === opportunityId);
+    const opportunity = getStreamingCataloguePackageOpportunities(player, {
+        includeReservedOpportunityId: opportunityId,
+    }).find(candidate => candidate.id === opportunityId);
     if (!opportunity) return { player, changed: false, contracts: [], package: null, reason: 'NOT_FOUND' };
     const totalGuarantee = Math.max(0, Math.round(options.totalGuarantee ?? opportunity.totalGuarantee));
     const licensorRevenueShare = options.licensorRevenueShare == null
@@ -893,7 +929,7 @@ export const openStreamingRightsNegotiation = (
         };
     }
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
-    const idempotencyKey = `${opportunity.id}:${marketCycle(absoluteWeek)}`;
+    const idempotencyKey = `${opportunity.id}:${getStreamingMarketCycle(absoluteWeek)}`;
     const existing = platform.rightsNegotiations.find(item => item.idempotencyKey === idempotencyKey);
     if (existing) return { player, changed: false, reason: 'ALREADY_OPEN', negotiation: existing };
     const terms = normalizeTerms(inputTerms || createDefaultStreamingRightsTerms(opportunity));
@@ -1449,7 +1485,9 @@ export const signStreamingRightsDeal = (
             : getNegotiationCountrySnapshot(platform, negotiation.territory, sourceLicense);
     const startsAtAbsoluteWeek = negotiation.kind === 'RENEW' && sourceLicense
         ? Math.max(absoluteWeek, sourceLicense.expiresAtAbsoluteWeek + 1)
-        : absoluteWeek;
+        : negotiation.availabilityAtAbsoluteWeek == null
+            ? absoluteWeek
+            : Math.max(absoluteWeek, negotiation.availabilityAtAbsoluteWeek);
     const expiresAtAbsoluteWeek = negotiation.windowType === 'PERMANENT'
         ? Number.MAX_SAFE_INTEGER
         : startsAtAbsoluteWeek + negotiation.durationWeeks;
@@ -1575,6 +1613,7 @@ export const signStreamingRightsDeal = (
             buyerPlatformId: null,
             platformContentPlanId: null,
             cataloguePackageId: null,
+            upcomingRightsSaleId: negotiation.upcomingRightsSaleId || null,
             licensorName: negotiation.sellerName,
             territory: negotiation.territory,
             countryIds,
@@ -1700,7 +1739,14 @@ export const openStreamingRightsRenewal = (
     const idempotencyKey = `RENEW:${license.id}:${renewalCase.id}`;
     const existing = platform.rightsNegotiations.find(item => item.idempotencyKey === idempotencyKey);
     if (existing) return { player: prepared, changed: false, reason: 'ALREADY_OPEN', negotiation: existing };
-    const rival = chooseRival(platform.simulationSeed, idempotencyKey, absoluteWeek, license.sellerPlatformId || null);
+    const rival = chooseRival(
+        platform.simulationSeed,
+        idempotencyKey,
+        absoluteWeek,
+        license.sellerPlatformId && PLATFORM_IDS.includes(license.sellerPlatformId as PlatformId)
+            ? license.sellerPlatformId as PlatformId
+            : null,
+    );
     const economics = renewalCase.proposedEconomics;
     const negotiation: OwnedStreamingRightsNegotiation = {
         id: createDeterministicId('streaming_rights_negotiation', platform.simulationSeed, idempotencyKey),

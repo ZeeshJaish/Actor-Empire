@@ -163,7 +163,7 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
                 authorId: `x_lifestyle_${Math.random()}`,
                 authorName: 'Style Signal',
                 authorHandle: '@stylesignal',
-                authorAvatar: 'https://api.dicebear.com/8.x/pixel-art/svg?seed=StyleSignal',
+                authorAvatar: getGenderedAvatar('NON_BINARY', 'StyleSignal'),
                 content: headline,
                 timestamp: Date.now(),
                 likes: 14000,
@@ -215,6 +215,8 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
                 const newLog: LogEntry = { week: prev.currentWeek, year: prev.age, message: msg, type: 'neutral' };
                 const newState = {
                     ...prev,
+                    energy: { ...prev.energy },
+                    flags: { ...prev.flags },
                     stats: { ...prev.stats, experience: prev.stats.experience + 1 },
                     commitments: newCommitments,
                     logs: [...prev.logs, newLog].slice(-50)
@@ -233,7 +235,13 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
 
                const newCommitments = [...prev.commitments]; newCommitments[cIndex] = updatedC;
                const newLog: LogEntry = { week: prev.currentWeek, year: prev.age, message: msg, type: 'neutral' };
-               const newState = { ...prev, commitments: newCommitments, logs: [...prev.logs, newLog].slice(-50)};
+               const newState = {
+                   ...prev,
+                   energy: { ...prev.energy },
+                   flags: { ...prev.flags },
+                   commitments: newCommitments,
+                   logs: [...prev.logs, newLog].slice(-50),
+               };
                spendPlayerEnergy(newState, 20, `Audition rehearsal: ${c.name}`);
                return newState;
 
@@ -248,7 +256,13 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
 
                const newCommitments = [...prev.commitments]; newCommitments[cIndex] = updatedC;
                const newLog: LogEntry = { week: prev.currentWeek, year: prev.age, message: msg, type: 'neutral' };
-               const newState = { ...prev, commitments: newCommitments, logs: [...prev.logs, newLog].slice(-50)};
+               const newState = {
+                   ...prev,
+                   energy: { ...prev.energy },
+                   flags: { ...prev.flags },
+                   commitments: newCommitments,
+                   logs: [...prev.logs, newLog].slice(-50),
+               };
                spendPlayerEnergy(newState, 20, `Scene rehearsal: ${c.name}`);
                return newState;
             }
@@ -505,6 +519,8 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
 
             const newState = {
                 ...prev,
+                energy: { ...prev.energy },
+                flags: { ...prev.flags },
                 money: prev.money - option.moneyCost,
                 stats: newStats,
                 writerStats: newWriterStats,
@@ -694,6 +710,8 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
 
           const nextState = {
               ...prev,
+              energy: { ...prev.energy },
+              flags: { ...prev.flags },
               money: prev.money - moneyCost,
               stats: newPlayerStats,
               activePregnancy: scheduledActivePregnancy || prev.activePregnancy,
@@ -769,6 +787,8 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
                 };
                 const nextState = {
                     ...prev,
+                    energy: { ...prev.energy },
+                    flags: { ...prev.flags },
                     money: Math.max(0, prev.money - config.cost),
                     stats: {
                         ...prev.stats,

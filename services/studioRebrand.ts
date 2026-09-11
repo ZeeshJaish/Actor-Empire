@@ -2,6 +2,7 @@ import type { Business, NewsItem, Player, Transaction, XPost } from '../types';
 import { getAcquisitionCase } from './studioAcquisition';
 import { createStudioNameRightsCase } from './studioNameRights';
 import { getAbsoluteWeek } from './legacyLogic';
+import { getGenderedAvatar } from './npcLogic';
 
 export const STUDIO_NAME_MAX_LENGTH = 48;
 export const STUDIO_RENAME_COOLDOWN_WEEKS = 4;
@@ -138,7 +139,7 @@ const makeIndustryPost = (
     authorId: 'backlot_wire',
     authorName: 'Backlot Wire',
     authorHandle: '@backlotwire',
-    authorAvatar: 'https://api.dicebear.com/8.x/pixel-art/svg?seed=backlot-wire',
+    authorAvatar: getGenderedAvatar('NON_BINARY', 'backlot-wire'),
     content: brokePromise
         ? `${oldName} is now ${newName}—and the former owners have filed a naming-rights lawsuit over the promise made at closing. First hearing: next week.`
         : `${oldName} is now ${newName}. The new owner is putting a fresh identity on the acquired studio—and Hollywood is watching what changes next.`,

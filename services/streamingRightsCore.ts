@@ -57,7 +57,6 @@ const LEGACY_SOURCES = new Set([
     'OWNED_PLATFORM_LICENSE', 'PLATFORM_AI_LICENSE', 'PRODUCTION_RELEASE',
 ]);
 const GUARANTEE_RECOUPMENT_TERMS = new Set<StreamingGuaranteeRecoupment>(['NON_RECOUPABLE', 'RECOUPABLE']);
-const PLATFORM_IDS = new Set<PlatformId>(['NETFLIX', 'APPLE_TV', 'DISNEY_PLUS', 'HULU', 'YOUTUBE']);
 const canonicalStreamingRightsRegistries = new WeakSet<object>();
 
 const asRecord = (value: unknown): Record<string, any> => (
@@ -111,9 +110,7 @@ const normalizeParty = (
     const type = enumValue(source.type, CONTRACT_PARTY_TYPES, fallback.type);
     const platformId = source.platformId === null
         ? null
-        : PLATFORM_IDS.has(source.platformId as PlatformId)
-            ? source.platformId as PlatformId
-            : fallback.platformId;
+        : cleanText(source.platformId, fallback.platformId || '', 80).toUpperCase().replace(/[^A-Z0-9_]/g, '_') || fallback.platformId;
     return {
         type,
         id: cleanText(source.id, fallback.id, 180),
@@ -169,16 +166,13 @@ const normalizeStreamingRightsContract = (value: unknown): StreamingRightsContra
         expiresAtAbsoluteWeek: permanentPurchase ? Number.MAX_SAFE_INTEGER : startsAtAbsoluteWeek + durationWeeks,
         status: enumValue(source.status, LICENSE_STATUSES, 'ACTIVE'),
         origin: enumValue(source.origin, ORIGINS, 'STUDIO_MARKET'),
-        buyerPlatformId: PLATFORM_IDS.has(source.buyerPlatformId as PlatformId)
-            ? source.buyerPlatformId as PlatformId
-            : buyer.platformId,
+        buyerPlatformId: cleanText(source.buyerPlatformId, buyer.platformId || '', 80).toUpperCase().replace(/[^A-Z0-9_]/g, '_') || buyer.platformId,
         platformContentPlanId: cleanText(source.platformContentPlanId, '', 180) || null,
         cataloguePackageId: cleanText(source.cataloguePackageId, '', 180) || null,
+        upcomingRightsSaleId: cleanText(source.upcomingRightsSaleId, '', 180) || null,
         contentSource: source.contentSource,
         sellerType: enumValue(source.sellerType, SELLER_TYPES, seller.type.endsWith('PLATFORM') ? 'PLATFORM' : 'STUDIO'),
-        sellerPlatformId: PLATFORM_IDS.has(source.sellerPlatformId as PlatformId)
-            ? source.sellerPlatformId as PlatformId
-            : seller.platformId,
+        sellerPlatformId: cleanText(source.sellerPlatformId, seller.platformId || '', 80).toUpperCase().replace(/[^A-Z0-9_]/g, '_') || seller.platformId,
         windowType: enumValue(source.windowType, WINDOW_TYPES, permanentPurchase ? 'PERMANENT' : 'FIRST_WINDOW'),
         permanentPurchase,
         marketingGuarantee: finiteMoney(source.marketingGuarantee),
@@ -502,9 +496,10 @@ export const millionsToFullCurrency = (millions: number): number => (
 export interface StreamingLicenseContractInput {
     id: string;
     sourceProject: { id: string; title: string; mediaType?: 'MOVIE' | 'SERIES'; genre?: string };
-    buyerPlatformId: PlatformId | null;
+    buyerPlatformId: string | null;
     platformContentPlanId: string | null;
     cataloguePackageId: string | null;
+    upcomingRightsSaleId?: string | null;
     contentSource?: PlatformAiContentSource;
     licensorName: string;
     territory: StreamingLicenseTerritory;
@@ -518,7 +513,7 @@ export interface StreamingLicenseContractInput {
     status?: StreamingCatalogLicenseStatus;
     origin: NonNullable<OwnedStreamingCatalogLicense['origin']>;
     sellerType: StreamingRightsSellerType;
-    sellerPlatformId: PlatformId | null;
+    sellerPlatformId: string | null;
     windowType: StreamingRightsWindowType;
     permanentPurchase?: boolean;
     marketingGuarantee?: number;
@@ -560,6 +555,7 @@ export const createStreamingLicenseContract = (
         buyerPlatformId: input.buyerPlatformId,
         platformContentPlanId: input.platformContentPlanId,
         cataloguePackageId: input.cataloguePackageId,
+        upcomingRightsSaleId: input.upcomingRightsSaleId || null,
         contentSource: input.contentSource,
         sellerType: input.sellerType,
         sellerPlatformId: input.sellerPlatformId,
@@ -585,7 +581,8 @@ export interface ProductionStreamingRightsContractInput {
     sellerStudioId: string;
     sellerStudioName: string;
     sellerPartyType?: 'PLAYER_STUDIO' | 'NPC_STUDIO';
-    buyerPlatformId: PlatformId;
+    buyerPlatformId: string;
+    buyerPlatformName?: string;
     cataloguePackageId?: string | null;
     minimumGuarantee: number;
     platformRevenueShare: number;
@@ -623,7 +620,7 @@ export const registerProductionStreamingRightsContract = (
         input.buyerPlatformId,
         startsAtAbsoluteWeek,
     );
-    const platform = player.world.platforms?.[input.buyerPlatformId];
+    const platform = player.world.platforms?.[input.buyerPlatformId as PlatformId];
     const playerOwnsSeller = (player.businesses || []).some(business => business.id === input.sellerStudioId);
     const seller: StreamingRightsContractParty = {
         type: input.sellerPartyType || (playerOwnsSeller ? 'PLAYER_STUDIO' : 'NPC_STUDIO'),
@@ -634,7 +631,7 @@ export const registerProductionStreamingRightsContract = (
     const buyer: StreamingRightsContractParty = {
         type: 'AI_PLATFORM',
         id: input.buyerPlatformId,
-        name: platform?.name || input.buyerPlatformId,
+        name: input.buyerPlatformName || platform?.name || input.buyerPlatformId,
         platformId: input.buyerPlatformId,
     };
     const license = createStreamingLicenseContract({
@@ -722,9 +719,12 @@ export const registerProductionStreamingRightsContractFromOffer = (
     player: Player,
     input: ProductionStreamingRightsContractFromOfferInput,
 ): { player: Player; contract: StreamingRightsContract | null; changed: boolean } => {
+    const acceptedInSession = input.session.offers.some(offer => (
+        offer.id === input.offer.id && offer.status === 'ACCEPTED'
+    ));
     if (
-        input.session.status !== 'ACCEPTED'
-        || input.session.acceptedOfferId !== input.offer.id
+        input.session.status === 'LEFT'
+        || !acceptedInSession
         || input.offer.sessionId !== input.session.id
         || input.offer.status !== 'ACTIVE' && input.offer.status !== 'FINAL' && input.offer.status !== 'ACCEPTED'
     ) return { player, contract: null, changed: false };
@@ -764,6 +764,7 @@ export const registerProductionStreamingRightsContractFromOffer = (
         sellerStudioName: input.session.sellerStudioName,
         sellerPartyType: 'PLAYER_STUDIO',
         buyerPlatformId: input.offer.platformId,
+        buyerPlatformName: input.offer.platformName,
         minimumGuarantee: input.offer.minimumGuarantee,
         platformRevenueShare: input.offer.platformRevenueShare,
         productionFunding: input.offer.productionFunding,

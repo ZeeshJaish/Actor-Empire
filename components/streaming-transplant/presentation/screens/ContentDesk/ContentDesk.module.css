@@ -22,14 +22,15 @@
 .cd .cdstats b{display:block;margin-top:3px;font-size:16px;font-weight:800}
 .cd .cdstats b.bad{color:#ff5a5f}
 
-.cd .cdtabs{display:flex;gap:5px;padding:11px 14px 0}
-.cd .cdtabs button{position:relative;flex:1;padding:9px 6px;border-radius:10px;background:rgba(255,255,255,.04);
-  border:1px solid rgba(255,255,255,.08);font-size:9.5px;font-weight:900;letter-spacing:.14em;
-  color:#8b93a5;text-align:center}
+.cd .cdtabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;padding:11px 14px 0}
+.cd .cdtabs button{position:relative;width:100%;min-width:0;padding:9px 2px;border-radius:10px;background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.08);font-size:clamp(7px,2.2vw,9px);font-weight:900;letter-spacing:.1em;
+  white-space:nowrap;color:#8b93a5;text-align:center}
 .cd .cdtabs button.on{background:color-mix(in srgb,var(--epx-cd-c) 15%,transparent);
   border-color:color-mix(in srgb,var(--epx-cd-c) 50%,transparent);color:var(--epx-cd-c)}
 .cd .tdot{position:absolute;top:6px;right:7px;width:6px;height:6px;border-radius:50%;background:#ff5a5f;
   box-shadow:0 0 7px rgba(255,90,95,.9)}
+@media (max-width:340px){.cd .cdtabs{padding-inline:10px}}
 
 .cd .cdscroll{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:0 14px}
 .cd .cdfoot{height:30px}
@@ -168,4 +169,15 @@
 .cd .chips{display:flex;gap:5px;flex-wrap:wrap;justify-content:center;margin-top:11px}
 .cd .localizationHero{padding:20px 17px;border-radius:16px;background:radial-gradient(circle at 85% 10%,color-mix(in srgb,var(--epx-cd-c) 25%,transparent),transparent 42%),#0e1016;border:1px solid color-mix(in srgb,var(--epx-cd-c) 34%,rgba(255,255,255,.08))}
 .cd .localizationHero>span{display:block;font-size:7px;font-weight:900;letter-spacing:.18em;color:var(--epx-cd-c)}.cd .localizationHero strong{display:inline-block;margin-top:8px;font-size:40px;line-height:1}.cd .localizationHero h3{display:inline;margin-left:7px;font-size:14px}.cd .localizationHero p{margin-top:10px;font-size:10px;line-height:1.5;color:#8790a0}
-.cd .localizationGrid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:9px}.cd .localizationGrid div{padding:12px;border-radius:12px;background:rgba(255,255,255,.028);border:1px solid rgba(255,255,255,.075)}.cd .localizationGrid span{display:block;font-size:7px;font-weight:900;letter-spacing:.12em;color:#6e7788}.cd .localizationGrid b{display:block;margin-top:4px;font-size:18px}.cd .localizationNotice{margin-top:9px;padding:11px 12px;border-radius:11px;background:rgba(255,176,32,.08);border:1px solid rgba(255,176,32,.22);font-size:9px;color:#e8bd72}.cd .localizationAction{width:100%;margin-top:12px;padding:13px;border-radius:12px;background:color-mix(in srgb,var(--epx-cd-c) 18%,#101219);border:1px solid color-mix(in srgb,var(--epx-cd-c) 40%,transparent);color:var(--epx-cd-c);font-size:8px;font-weight:950;letter-spacing:.13em;text-align:center}
+.cd .localizationTracks{margin-top:10px;border-top:1px solid rgba(255,255,255,.09)}
+.cd .localizationTracks>div{display:grid;grid-template-columns:1fr auto 74px;align-items:center;gap:11px;padding:13px 2px;border-bottom:1px solid rgba(255,255,255,.09)}
+.cd .localizationTracks span{font-size:10px;color:#929aaa}.cd .localizationTracks b{font-size:10px;color:#d7dbe4}
+.cd .localizationTracks i{display:flex;gap:4px}.cd .localizationTracks u{flex:1;height:4px;border-radius:99px;background:rgba(255,255,255,.1);text-decoration:none}.cd .localizationTracks u.isOn{background:var(--epx-cd-c);box-shadow:0 0 8px color-mix(in srgb,var(--epx-cd-c) 55%,transparent)}
+.cd .localizationSignal{display:flex;justify-content:space-between;gap:12px;padding:13px 2px 16px;font-size:8px;font-weight:850;letter-spacing:.06em;color:#6f7889}.cd .localizationSignal b{font-size:12px;color:#eef0f5}.cd .localizationSignal .isReady{color:#4ade80}
+.cd .localizationPackages{border-top:1px solid rgba(255,255,255,.1)}
+.cd .localizationPackages article{display:flex;align-items:center;gap:12px;padding:14px 2px;border-bottom:1px solid rgba(255,255,255,.09)}
+.cd .localizationPackages article>div{flex:1}.cd .localizationPackages article span{display:block;font-size:6.5px;font-weight:950;letter-spacing:.16em;color:var(--epx-cd-c)}.cd .localizationPackages article b{display:block;margin-top:4px;font-size:12px}.cd .localizationPackages article em{display:block;margin-top:3px;color:#747d8e;font-size:8.5px;font-style:normal;line-height:1.4}
+.cd .localizationPackages article>strong{flex:0 0 auto;font-size:8px;letter-spacing:.12em;color:#7f8899}.cd .localizationPackages article.isActive>strong{color:#4ade80}.cd .localizationPackages article.isActive span{color:#4ade80}.cd .localizationPackages article.isLocked{opacity:.56}
+.cd .localizationPackages article>button{flex:0 0 auto;padding:8px 10px;border-radius:9px;text-align:center;background:color-mix(in srgb,var(--epx-cd-c) 16%,#11141b);border:1px solid color-mix(in srgb,var(--epx-cd-c) 42%,transparent);color:var(--epx-cd-c);font-size:6.5px;font-weight:950;letter-spacing:.1em}.cd .localizationPackages article>button strong{font-size:9px;line-height:1.5}
+.cd .localizationRule{margin-top:14px;padding-left:11px;border-left:2px solid color-mix(in srgb,var(--epx-cd-c) 72%,transparent);color:#7f8898;font-size:9px;line-height:1.55}
+.cd .localizationAction{width:100%;margin-top:12px;padding:13px;border-radius:12px;background:color-mix(in srgb,var(--epx-cd-c) 18%,#101219);border:1px solid color-mix(in srgb,var(--epx-cd-c) 40%,transparent);color:var(--epx-cd-c);font-size:8px;font-weight:950;letter-spacing:.13em;text-align:center}

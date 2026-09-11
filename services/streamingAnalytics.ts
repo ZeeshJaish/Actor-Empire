@@ -98,6 +98,36 @@ export interface StreamingPlatformAnalytics {
     capacityTimeline: StreamingAnalyticsPoint[];
     capacityForecast: StreamingAnalyticsPoint[];
     waterfall: StreamingSubscriberWaterfall | null;
+    customerAccess: {
+        paidAccounts: number;
+        payingHouseholds: number;
+        externalSharedHouseholds: number;
+        sharedActiveViewers: number;
+        piracyReach: number;
+        accessLoadAccounts: number;
+        monthlySubscriptionRevenue: number;
+        planAllocations: NonNullable<OwnedStreamingWeeklySnapshot['operations']>['worldCustomerPlanAllocations'];
+    } | null;
+    planMovement: {
+        upgrades: number;
+        downgrades: number;
+        switchIns: number;
+        switchOuts: number;
+    };
+    viewing: {
+        viewingAccounts: number;
+        hoursViewed: number;
+        unmetDemandAccounts: number;
+        paidViewingAccounts: number;
+        sharedViewingAccounts: number;
+        piracyViewingAccounts: number;
+        estimatedViewers: number;
+        starts: number;
+        advertisingRevenue: number;
+        transactionRevenue: number;
+        sponsorshipRevenue: number;
+        incrementalRevenue: number;
+    } | null;
     cohorts: StreamingRetentionCohort[];
     incidents: StreamingAnalyticsIncident[];
     marketShare: StreamingMarketShareEntry[];
@@ -105,6 +135,9 @@ export interface StreamingPlatformAnalytics {
     contentGaps: StreamingContentGapCell[];
     totals: {
         revenue: number;
+        productRevenue: number;
+        incrementalRevenue: number;
+        totalOperatingRevenue: number;
         cashCost: number;
         cashContribution: number;
         contentAmortization: number;
@@ -454,13 +487,54 @@ export const getStreamingPlatformAnalytics = (
         endingSubscribers,
         reconciled: startingSubscribers + joinedSubscribers + reactivations - cancellations === endingSubscribers,
     } : null;
+    const latestCustomerOperations = [...operations].reverse().find(item => (
+        item.worldCustomerEndingPaidAccounts !== undefined
+    ));
+    const customerAccess = latestCustomerOperations ? {
+        paidAccounts: latestCustomerOperations.worldCustomerEndingPaidAccounts || 0,
+        payingHouseholds: latestCustomerOperations.worldCustomerPayingHouseholds || 0,
+        externalSharedHouseholds: latestCustomerOperations.worldCustomerExternalSharedHouseholds || 0,
+        sharedActiveViewers: latestCustomerOperations.worldCustomerSharedActiveViewers || 0,
+        piracyReach: latestCustomerOperations.worldCustomerPiracyReach || 0,
+        accessLoadAccounts: latestCustomerOperations.worldCustomerAccessLoadAccounts || 0,
+        monthlySubscriptionRevenue: latestCustomerOperations.worldCustomerMonthlySubscriptionRevenue || 0,
+        planAllocations: latestCustomerOperations.worldCustomerPlanAllocations?.map(row => ({ ...row })) || [],
+    } : null;
+    const planMovement = {
+        upgrades: sum(operations.map(item => item.worldCustomerUpgrades || 0)),
+        downgrades: sum(operations.map(item => item.worldCustomerDowngrades || 0)),
+        switchIns: sum(operations.map(item => item.worldCustomerSwitchIns || 0)),
+        switchOuts: sum(operations.map(item => item.worldCustomerSwitchOuts || 0)),
+    };
+    const viewingOperations = operations.filter(item => item.worldViewingAccounts !== undefined);
+    const viewingTitleRecords = viewingOperations.flatMap(item => item.titlePerformance || []);
+    const viewing = viewingOperations.length ? {
+        viewingAccounts: sum(viewingOperations.map(item => item.worldViewingAccounts || 0)),
+        hoursViewed: sum(viewingOperations.map(item => item.worldViewingHours || 0)),
+        unmetDemandAccounts: sum(viewingOperations.map(item => item.worldViewingUnmetDemandAccounts || 0)),
+        paidViewingAccounts: sum(viewingTitleRecords.map(item => item.paidViewingAccounts || 0)),
+        sharedViewingAccounts: sum(viewingTitleRecords.map(item => item.sharedViewingAccounts || 0)),
+        piracyViewingAccounts: sum(viewingTitleRecords.map(item => item.piracyViewingAccounts || 0)),
+        estimatedViewers: sum(viewingTitleRecords.map(item => item.estimatedViewers || 0)),
+        starts: sum(viewingTitleRecords.map(item => item.starts || 0)),
+        advertisingRevenue: sum(viewingOperations.map(item => item.worldViewingAdvertisingRevenue || 0)),
+        transactionRevenue: sum(viewingOperations.map(item => item.worldViewingTransactionRevenue || 0)),
+        sponsorshipRevenue: sum(viewingOperations.map(item => item.worldViewingSponsorshipRevenue || 0)),
+        incrementalRevenue: sum(viewingOperations.map(item => item.worldViewingIncrementalRevenue || 0)),
+    } : null;
     const revenue = sum(operations.map(item => item.subscriptionRevenue));
+    const productRevenue = sum(operations.map(item => item.productRevenue || 0));
+    const incrementalRevenue = viewing?.incrementalRevenue || 0;
+    const totalOperatingRevenue = revenue + productRevenue + incrementalRevenue;
     const cashCost = sum(operations.map(item => item.totalCashCost));
     const cashContribution = sum(operations.map(item => item.netCashContribution));
     const contentAmortization = sum(operations.map(item => item.contentAmortization));
     const accountingContribution = sum(operations.map(item => item.accountingContribution));
     const totals: StreamingPlatformAnalytics['totals'] = {
         revenue,
+        productRevenue,
+        incrementalRevenue,
+        totalOperatingRevenue,
         cashCost,
         cashContribution,
         contentAmortization,
@@ -485,12 +559,12 @@ export const getStreamingPlatformAnalytics = (
     const snapshotLedgerCoverage = snapshots.every(snapshot => metricsLedgerWeeks.has(snapshot.absoluteWeek));
     const reconciliation: StreamingAnalyticsReconciliation = {
         subscriberWaterfall: waterfall?.reconciled ?? true,
-        cashContribution: revenue - cashCost === cashContribution,
+        cashContribution: totalOperatingRevenue - cashCost === cashContribution,
         accountingContribution: cashContribution - contentAmortization === accountingContribution,
         snapshotLedgerCoverage,
         status: (
             (waterfall?.reconciled ?? true)
-            && revenue - cashCost === cashContribution
+            && totalOperatingRevenue - cashCost === cashContribution
             && cashContribution - contentAmortization === accountingContribution
             && snapshotLedgerCoverage
         ) ? 'RECONCILED' : 'PARTIAL',
@@ -523,6 +597,9 @@ export const getStreamingPlatformAnalytics = (
         ),
         capacityForecast: buildCapacityForecast(platform, snapshots, contentGaps),
         waterfall,
+        customerAccess,
+        planMovement,
+        viewing,
         cohorts: reduceCohorts(platform, platform.weeklyHistory, absoluteWeek),
         incidents,
         marketShare,
@@ -535,14 +612,13 @@ export const getStreamingPlatformAnalytics = (
                 label: 'Tier and regional churn',
                 reason: 'Member-level tier and territory cohorts are not yet canonical. Aggregate churn remains available.',
             },
-            {
+            ...(!viewing ? [{
                 label: 'Cost per viewing hour',
-                reason: 'Viewing-hour telemetry begins with the detailed title and engagement systems.',
-            },
-            {
+                reason: 'Advance a live WE6 platform week to begin canonical watch-hour measurement.',
+            }, {
                 label: 'Recommendation share',
-                reason: 'Recommendation attribution starts when Phase 14 introduces auditable discovery modifiers.',
-            },
+                reason: 'Advance a live WE6 platform week before title-level recommendation discovery is treated as measured.',
+            }] : []),
         ],
     };
 };

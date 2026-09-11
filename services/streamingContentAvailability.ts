@@ -38,6 +38,8 @@ export const getStreamingContentAvailability = (player: Player, projectId: strin
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     const week = getAbsoluteWeek(player.age, player.currentWeek);
     const commission = platform.originalCommissions.find(c => c.canonicalProjectId === projectId);
+    const industryProduction = Object.values(player.world.industryProductions || {})
+        .find(production => production.canonicalProjectId === projectId);
     const title = resolveStreamingCatalogTitle(player, projectId);
     const source = commission ? 'ORIGINAL' as const : title?.source === 'OWNED_LIBRARY' ? 'OWNED' as const : 'LICENSED' as const;
     const licenses = platform.catalogLicenses.filter(l => l.sourceProjectId === projectId);
@@ -46,10 +48,15 @@ export const getStreamingContentAvailability = (player: Player, projectId: strin
     const coveredCountryIds = owned ? getOwnedTitleCountryAccess(player, projectId, countries) : countries.filter(country => active.some(l =>
         l.territory === 'GLOBAL' || (l.countryIds?.length ? l.countryIds.includes(country)
             : l.territory === 'MULTI_REGION' || country === countries[0])));
-    const readyProduction = !commission || ['DELIVERED', 'RELEASED'].includes(commission.status);
+    const commissionReady = !commission || ['DELIVERED', 'RELEASED'].includes(commission.status);
+    const industryProductionReady = !industryProduction
+        || ['DELIVERED', 'AWAITING_RELEASE', 'RELEASED'].includes(industryProduction.status);
+    const readyProduction = commissionReady && industryProductionReady;
     const available = readyProduction && (owned || active.length > 0) && (!countries.length || coveredCountryIds.length > 0);
     const slate = platform.launchSlate?.entries.find(e => e.projectId === projectId);
-    const programWeek = platform.weeklyHistory.at(-1)?.operations?.programWeek || 0;
+    const programWeek = platform.launchCommit
+        ? Math.max(1, week - platform.launchCommit.committedAtAbsoluteWeek + 1)
+        : platform.weeklyHistory.at(-1)?.operations?.programWeek || 0;
     const released = commission?.status === 'RELEASED' || Boolean(slate && platform.lifecycle === 'ACTIVE' && slate.launchWeek <= programWeek);
     const status: ContentAvailability = !readyProduction ? 'IN_PRODUCTION'
         : !owned && !active.length ? licenses.some(l => l.status === 'ACTIVE' && l.startsAtAbsoluteWeek > week)

@@ -1,7 +1,7 @@
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Player, Property, Vehicle, ClothingItem } from '../types';
-import { ArrowLeft, CalendarDays, Check, CreditCard, Store, Briefcase, ChevronRight, Clapperboard, Sparkles, Tv, Star, WalletCards, Ticket } from 'lucide-react';
+import { ArrowLeft, Check, Sparkles, WalletCards } from 'lucide-react';
 import { LifestyleAssets } from './lifestyle/LifestyleAssets';
 import { LifestyleBusiness } from './lifestyle/LifestyleBusiness';
 import { LifestyleActivities } from './lifestyle/LifestyleActivities';
@@ -15,8 +15,8 @@ import { getLifestyleAssetImageInfo } from '../services/lifestyleAssetImages';
 import { AssetShareModal, type ShareableAsset } from './lifestyle/components/AssetShareModal';
 import StreamingLockedScreen from '../components/StreamingLockedScreen';
 import CinemaLockedScreen from '../components/CinemaLockedScreen';
-import { getPlayerBusinessEquityValue } from '../services/studioGroupValuation';
-import { evaluateStreamingEligibility } from '../services/streamingEligibility';
+import LifestyleHubScreen from '../components/ui-overhaul/LifestyleHubScreen';
+import { buildLifestyleUiModel, type LifestyleUiDestinationId } from '../services/lifestyleUiAdapter';
 
 interface LifestylePageProps {
   player: Player;
@@ -106,13 +106,6 @@ export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem,
 
   // Check if player owns a Production House
   const productionStudio = player.businesses.find(b => b.type === 'PRODUCTION_HOUSE');
-  const streamingEligibility = useMemo(() => evaluateStreamingEligibility(player), [player]);
-  const streamingAccessBadge = player.ownedStreamingPlatform.lifecycle !== 'LOCKED'
-      ? 'Studio Ready'
-      : streamingEligibility.eligible
-          ? 'Launch Ready'
-          : `${Math.round(streamingEligibility.readiness * 100)}%`;
-
   const handleProductionClick = () => {
       if (productionStudio) {
           setView('PRODUCTION_GAME');
@@ -328,90 +321,14 @@ export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem,
       <CinemaLockedScreen onBack={() => setView('MAIN')} />
   );
 
-  return (
-    <div className="space-y-6 pb-24 pt-4">
-        <div className="flex items-center gap-4 mb-6"><h2 className="text-3xl font-bold text-white">{tr('lifestyle.title')}</h2></div>
+  const openLifestyleDestination = (destination: LifestyleUiDestinationId) => {
+      if (destination === 'studio') handleProductionClick();
+      if (destination === 'business') setView('BUSINESS');
+      if (destination === 'streaming') openStreamingPlatform();
+      if (destination === 'cinema') setView('CINEMA_CHAIN');
+      if (destination === 'assets') setView('ASSETS');
+      if (destination === 'activities') setView('ACTIVITIES');
+  };
 
-        <div className="glass-card p-6 rounded-3xl relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-4 opacity-5"><CreditCard size={100} /></div>
-            <div className="relative z-10">
-                <div className="text-zinc-500 text-xs font-bold uppercase tracking-widest mb-1">{tr('lifestyle.liquidCash')}</div>
-                <div className="text-3xl font-bold text-white tracking-tight mb-4">${Math.round(player.money).toLocaleString()}</div>
-                <div className="flex gap-4">
-                    <div><div className="text-[10px] text-zinc-600 uppercase font-bold">{tr('lifestyle.assets')}</div><div className="text-sm font-mono text-zinc-300">~{formatCompactMoney(player.assets.length * 50000)}</div></div>
-                    <div><div className="text-[10px] text-zinc-600 uppercase font-bold">{tr('lifestyle.equity')}</div><div className="text-sm font-mono text-emerald-400">{formatCompactMoney(getPlayerBusinessEquityValue(player))}</div></div>
-                </div>
-            </div>
-        </div>
-
-        <div className="grid grid-cols-1 gap-4">
-
-            {/* PRODUCTION HOUSE - Special Highlighted Card */}
-            <button
-                onClick={handleProductionClick}
-                className={`glass-card p-6 rounded-3xl text-left transition-all group relative overflow-hidden ${productionStudio ? 'border-amber-500/50 hover:bg-amber-900/10' : 'hover:bg-white/5 opacity-80 hover:opacity-100'}`}
-            >
-                {/* Gold Glow for Owners */}
-                {productionStudio && <div className="absolute inset-0 bg-gradient-to-r from-amber-500/5 to-transparent pointer-events-none"></div>}
-
-                <div className="flex items-center gap-4 relative z-10">
-                    <div className={`p-3 rounded-2xl ${productionStudio ? 'bg-amber-500 text-black' : 'bg-amber-500/10 text-amber-400'}`}>
-                        <Clapperboard size={24}/>
-                    </div>
-                    <div className="min-w-0 flex-1 pr-2">
-                        <div className="font-bold text-xl text-white flex items-center gap-2">
-                            {productionStudio ? productionStudio.name : tr('lifestyle.productionHouse')}
-                            {productionStudio && <Star size={12} className="text-amber-500 fill-amber-500"/>}
-                        </div>
-                        <div className="text-sm text-zinc-400">
-                            {productionStudio ? tr('lifestyle.manageStudioSlate') : tr('lifestyle.createBlockbusters')}
-                        </div>
-                    </div>
-                    <ChevronRight className="shrink-0 text-zinc-700 group-hover:text-zinc-400 transition-colors"/>
-                </div>
-            </button>
-
-            {/* Standard Assets */}
-            <button onClick={() => setView('ASSETS')} className="glass-card p-6 rounded-3xl text-left hover:bg-white/5 transition-all group relative">
-                <div className="flex items-center gap-4"><div className="p-3 rounded-2xl bg-blue-500/10 text-blue-400"><Store size={24}/></div><div className="min-w-0 flex-1 pr-2"><div className="font-bold text-xl text-white">{tr('lifestyle.assetsTitle')}</div><div className="text-sm text-zinc-400">{tr('lifestyle.assetsSub')}</div></div><ChevronRight className="shrink-0 text-zinc-700 group-hover:text-zinc-400 transition-colors"/></div>
-            </button>
-
-            {/* Activities */}
-            <button onClick={() => setView('ACTIVITIES')} className="glass-card p-6 rounded-3xl text-left hover:bg-white/5 transition-all group relative">
-                <div className="flex items-center gap-4"><div className="p-3 rounded-2xl bg-sky-500/10 text-sky-300"><CalendarDays size={24}/></div><div className="min-w-0 flex-1 pr-2"><div className="font-bold text-xl text-white">{tr('lifestyle.activitiesTitle')}</div><div className="text-sm text-zinc-400">{tr('lifestyle.activitiesSub')}</div></div><ChevronRight className="shrink-0 text-zinc-700 group-hover:text-zinc-400 transition-colors"/></div>
-            </button>
-
-            {/* Business Empire (Excluding Production House) */}
-            <button onClick={() => setView('BUSINESS')} className="glass-card p-6 rounded-3xl text-left hover:bg-white/5 transition-all group relative">
-                <div className="flex items-center gap-4"><div className="p-3 rounded-2xl bg-emerald-500/10 text-emerald-400"><Briefcase size={24}/></div><div className="min-w-0 flex-1 pr-2"><div className="font-bold text-xl text-white">{tr('lifestyle.businessEmpire')}</div><div className="text-sm text-zinc-400">{tr('lifestyle.businessSub')}</div></div><ChevronRight className="shrink-0 text-zinc-700 group-hover:text-zinc-400 transition-colors"/></div>
-            </button>
-
-            {/* Streaming Platform */}
-            <button onClick={() => openStreamingPlatform()} className="glass-card p-6 rounded-3xl text-left hover:bg-purple-500/10 transition-all group relative">
-                <div className="flex items-center gap-4">
-                    <div className="p-3 rounded-2xl bg-purple-500/10 text-purple-400"><Tv size={24}/></div>
-                    <div className="min-w-0 flex-1 pr-2">
-                        <div className="font-bold text-xl text-white">{tr('lifestyle.streamingPlatform')}</div>
-                        <div className="text-sm text-zinc-400">{tr('lifestyle.streamingSub')}</div>
-                    </div>
-                    <div className="shrink-0 rounded-full border border-purple-400/30 bg-purple-500/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-purple-200">{streamingAccessBadge}</div>
-                    <ChevronRight className="shrink-0 text-zinc-700 group-hover:text-purple-300 transition-colors"/>
-                </div>
-            </button>
-
-            {/* Cinema Chain */}
-            <button onClick={() => setView('CINEMA_CHAIN')} className="glass-card p-6 rounded-3xl text-left hover:bg-amber-500/10 transition-all group relative">
-                <div className="flex items-center gap-4">
-                    <div className="p-3 rounded-2xl bg-amber-500/10 text-amber-300"><Ticket size={24}/></div>
-                    <div className="min-w-0 flex-1 pr-2">
-                        <div className="font-bold text-xl text-white">{trFallback('lifestyle.cinemaChain', 'Cinema Chain')}</div>
-                        <div className="text-sm text-zinc-400">{trFallback('lifestyle.cinemaChainSub', 'Build theaters, sell tickets, and own the box office.')}</div>
-                    </div>
-                    <div className="shrink-0 rounded-full border border-amber-300/30 bg-amber-500/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-amber-100">Preview</div>
-                    <ChevronRight className="shrink-0 text-zinc-700 group-hover:text-amber-200 transition-colors"/>
-                </div>
-            </button>
-        </div>
-    </div>
-  );
+  return <LifestyleHubScreen {...buildLifestyleUiModel(player)} onOpen={openLifestyleDestination} />;
 };

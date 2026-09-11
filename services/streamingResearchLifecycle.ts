@@ -28,7 +28,9 @@ import {
     previewStreamingResearchProgram,
 } from './streamingResearchCore';
 import {
+    STREAMING_LANGUAGE_PACKAGES,
     STREAMING_LOCALIZATION_CAPABILITY_DEFINITIONS,
+    getStreamingLanguagePackageCapabilityId,
     type StreamingLocalizationCapabilityId,
 } from './streamingLocalizationCapabilities';
 
@@ -512,4 +514,10 @@ export const getStreamingResearchWeeklyCost = (platform: OwnedStreamingPlatformS
     platform.researchPrograms
         .filter(program => program.stage === 'OPERATING')
         .reduce((sum, program) => sum + program.weeklyOperatingCost + (program.ipStrategy === 'LICENSE' ? program.licenseWeeklyCost : 0), 0)
+    + STREAMING_LANGUAGE_PACKAGES
+        .filter(item => platform.capabilities.installed.some(capability => (
+            capability.capabilityId === getStreamingLanguagePackageCapabilityId(item.id)
+            && (capability.status === 'OPERATING' || capability.status === 'LEGACY_GRANT')
+        )))
+        .reduce((sum, item) => sum + item.weeklyOperatingCost, 0)
 );

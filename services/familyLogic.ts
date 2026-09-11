@@ -168,7 +168,7 @@ const pushFamilyReactionPosts = (player: Player, topic: 'BREAKUP' | 'DIVORCE', p
         authorId: `npc_family_x_${Math.random()}`,
         authorName: topic === 'DIVORCE' ? 'CourtWatchLive' : 'PopDramaNow',
         authorHandle: topic === 'DIVORCE' ? '@courtwatchlive' : '@popdramanow',
-        authorAvatar: `https://api.dicebear.com/7.x/pixel-art/svg?seed=${topic === 'DIVORCE' ? 'Court' : 'Drama'}`,
+        authorAvatar: getGenderedAvatar('NON_BINARY', topic === 'DIVORCE' ? 'Court' : 'Drama'),
         content: xContent,
         timestamp: Date.now(),
         likes: topic === 'DIVORCE' ? 54000 : 18000,
@@ -186,7 +186,7 @@ const pushFamilyReactionPosts = (player: Player, topic: 'BREAKUP' | 'DIVORCE', p
         authorId: `npc_family_ig_${Math.random()}`,
         authorName: topic === 'DIVORCE' ? 'CelebScope' : 'StarPulse',
         authorHandle: topic === 'DIVORCE' ? '@celebscope' : '@starpulse',
-        authorAvatar: `https://api.dicebear.com/7.x/pixel-art/svg?seed=${topic === 'DIVORCE' ? 'CelebScope' : 'StarPulse'}`,
+        authorAvatar: getGenderedAvatar('NON_BINARY', topic === 'DIVORCE' ? 'CelebScope' : 'StarPulse'),
         type: 'INDUSTRY_NEWS',
         caption: topic === 'DIVORCE'
             ? `${player.name}'s divorce battle with ${partnerName} is dominating entertainment media right now.`

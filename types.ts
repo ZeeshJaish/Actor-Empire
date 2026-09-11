@@ -335,6 +335,7 @@ export type IndustryEventType =
     | 'PROJECT_SLEEPER'
     | 'RIGHTS_DEAL'
     | 'RIGHTS_TRANSFER'
+    | 'RIGHTS_SALE_ANNOUNCED'
     | 'FRANCHISE_DECISION'
     | 'AWARD_NOMINATED'
     | 'AWARD_WON'
@@ -2139,6 +2140,8 @@ export interface ProjectHiddenStats {
     linkedUniverseCastCount?: number;
     releaseWeek?: number;
     platformId?: string | null;
+    streamingPlatformIds?: string[];
+    streamingContractIds?: string[];
     festivalPremiere?: string | null;
     redCarpetHype?: number;
     campaignFitScore?: number;
@@ -2779,8 +2782,14 @@ export interface ReleasePlanningDraft {
     campaignTimeline: CampaignTimeline;
     channelAllocations: MarketingChannelAllocations;
     selectedPlatform: string | null;
+    selectedStreamingPlatformIds?: string[];
+    selectedStreamingContractIds?: string[];
     festivalPremiere: string | null;
     releaseWeek: number;
+    /** Signing is the real-world commitment boundary for platform rights. */
+    commitmentState?: 'DRAFT' | 'SIGNED';
+    /** Platform-selected premiere shared by every accepted non-exclusive licence. */
+    lockedPremiereAbsoluteWeek?: number | null;
     updatedAt: number;
 }
 
@@ -2831,6 +2840,17 @@ export interface StreamingState {
     isLeaving: boolean;
     startWeek?: number;
     startWeekAbsolute?: number;
+}
+
+/** One independently simulated and settled buyer in a shared streaming release. */
+export interface StreamingPlatformRun {
+    platformId: string;
+    contractId: string;
+    startWeekAbsolute: number;
+    weekOnPlatform: number;
+    totalViews: number;
+    weeklyViews: number[];
+    isLeaving: boolean;
 }
 
 /**
@@ -3163,12 +3183,16 @@ export type StreamingIdentPackageId = 'STANDARD' | 'FULL' | 'CINEMATIC' | 'GENRE
 export type StreamingRevenueStreamId =
     | 'subs' | 'ads' | 'rentals' | 'premium' | 'daypass' | 'sponsor' | 'metered' | 'patron';
 
+export type StreamingPricingPlanColorId =
+    | 'emerald' | 'ocean' | 'teal' | 'rose' | 'magenta' | 'graphite';
+
 export interface OwnedStreamingPricingPlan {
     id: string;
     name: string;
     monthly: number;
     featureIds: string[];
     ads: boolean;
+    colorId?: StreamingPricingPlanColorId;
 }
 
 export interface OwnedStreamingPricingConfiguration {
@@ -4751,7 +4775,8 @@ export interface StreamingRightsContractParty {
     type: StreamingRightsContractPartyType;
     id: string;
     name: string;
-    platformId: PlatformId | null;
+    /** Canonical ecosystem operator id. Includes seeded and generated platforms. */
+    platformId: string | null;
 }
 
 export interface StreamingRightsContractSettlement {
@@ -4807,12 +4832,14 @@ export interface OwnedStreamingCatalogLicense {
     expiresAtAbsoluteWeek: number;
     status: StreamingCatalogLicenseStatus;
     origin?: 'STARTER' | 'STUDIO_MARKET' | 'PLATFORM_TRADE' | 'RENEWAL' | 'OWNED_STUDIO_TRANSFER' | 'CATALOGUE_ACQUISITION';
-    buyerPlatformId?: PlatformId | null;
+    buyerPlatformId?: string | null;
     platformContentPlanId?: string | null;
     cataloguePackageId?: string | null;
+    /** Future-release market sale that originated this contract. */
+    upcomingRightsSaleId?: string | null;
     contentSource?: PlatformAiContentSource;
     sellerType?: StreamingRightsSellerType;
-    sellerPlatformId?: PlatformId | null;
+    sellerPlatformId?: string | null;
     windowType?: StreamingRightsWindowType;
     permanentPurchase?: boolean;
     marketingGuarantee?: number;
@@ -5107,7 +5134,7 @@ export interface StreamingBiddingRightsLot {
 }
 
 export interface StreamingBiddingPlatformInput {
-    id: PlatformId;
+    id: string;
     name: string;
     color: string;
     /** Full currency available for new fixed commitments. */
@@ -5127,12 +5154,20 @@ export interface StreamingBiddingPlatformInput {
     /** Optional deterministic strategy inputs; 1 is neutral. */
     catalogueGapMultiplier?: number;
     subscriberOpportunityMultiplier?: number;
+    /** Company-specific chance (0-1) of attaching adjusted-gross participation. */
+    backendPreference?: number;
+    /** Company-specific chance (0-1) of requesting a shared rather than exclusive licence. */
+    sharedRightsPreference?: number;
+    /** Platform calendar slots this bidder can contractually promise for the title. */
+    availablePremiereAbsoluteWeeks?: number[];
+    /** Earliest currently available slot, retained for compact UI adapters. */
+    availablePremiereAbsoluteWeek?: number;
 }
 
 export interface StreamingOfferVersion {
     id: string;
     sessionId: string;
-    platformId: PlatformId;
+    platformId: string;
     platformName: string;
     revision: number;
     status: StreamingOfferStatus;
@@ -5160,12 +5195,14 @@ export interface StreamingOfferVersion {
     expectedTotalCost: number;
     expectedPlatformValue: number;
     createdAtActiveSecond: number;
+    /** Premiere date promised by this specific contract offer. */
+    proposedPremiereAbsoluteWeek?: number;
     cataloguePackageId?: string | null;
     componentTerms?: StreamingCataloguePackageOfferRow[];
 }
 
 export interface StreamingBiddingPlatformState {
-    platformId: PlatformId;
+    platformId: string;
     platformName: string;
     color: string;
     status: StreamingBiddingPlatformStatus;
@@ -5181,13 +5218,17 @@ export interface StreamingBiddingPlatformState {
     localizationLevelCap?: StreamingRightsLocalizationTerms;
     localizationRequirements?: StreamingLocalizationPromise[];
     catalogueComponentValues?: Record<string, number>;
+    backendPreference?: number;
+    sharedRightsPreference?: number;
+    availablePremiereAbsoluteWeeks?: number[];
+    availablePremiereAbsoluteWeek?: number;
 }
 
 export interface StreamingBiddingEvent {
     id: string;
     type: StreamingBiddingEventType;
     activeSecond: number;
-    platformId: PlatformId | null;
+    platformId: string | null;
     offerId: string | null;
 }
 
@@ -5211,6 +5252,8 @@ export interface StreamingBiddingSession {
     events: StreamingBiddingEvent[];
     acceptedOfferId: string | null;
     closedAtActiveSecond: number | null;
+    /** Shared licences in one room must all use this date after the first signature. */
+    lockedPremiereAbsoluteWeek?: number | null;
     subjectKind?: 'TITLE' | 'CATALOGUE_PACKAGE';
     cataloguePackageId?: string | null;
     componentLots?: StreamingBiddingRightsLot[];
@@ -5265,6 +5308,8 @@ export interface StreamingBuyerAuctionLot {
     sellerPriorities: StreamingBuyerAuctionSellerPriorities;
     notice: string | null;
     cataloguePackageId: string | null;
+    /** CM4 future-release sale represented by this lot, when applicable. */
+    upcomingRightsSaleId?: string | null;
     /** Frozen component projects when the lot represents an all-or-nothing catalogue package. */
     catalogueComponentIds?: string[];
 }
@@ -5274,7 +5319,7 @@ export interface StreamingBuyerAuctionBid {
     sessionId: string;
     bidderId: string;
     bidderName: string;
-    platformId: PlatformId | null;
+    platformId: string | null;
     isPlayer: boolean;
     revision: number;
     status: StreamingBuyerAuctionBidStatus;
@@ -5290,7 +5335,7 @@ export interface StreamingBuyerAuctionBid {
 
 export interface StreamingBuyerAuctionRival {
     bidderId: string;
-    platformId: PlatformId;
+    platformId: string;
     platformName: string;
     color: string;
     cashAvailable: number;
@@ -5333,6 +5378,45 @@ export interface StreamingBuyerAuctionSession {
     settledAtAbsoluteWeek: number | null;
     resultReason: string | null;
     outcomeMessageId: string | null;
+}
+
+export type StreamingUpcomingRightsSaleStatus = 'ANNOUNCED' | 'LIVE' | 'ACQUIRED' | 'LOST' | 'CLOSED' | 'WITHDRAWN';
+export type StreamingUpcomingRightsInterest = 'EMERGING' | 'ACTIVE' | 'HIGH' | 'EVENT';
+
+/** A saved public sale window for a real canonical production that has not released yet. */
+export interface StreamingUpcomingRightsSale {
+    schemaVersion: 1;
+    id: string;
+    idempotencyKey: string;
+    sourceProductionId: string;
+    sourceProjectId: string;
+    title: string;
+    projectType: 'MOVIE' | 'SERIES';
+    genre: string;
+    sellerId: string;
+    sellerName: string;
+    announcedAtAbsoluteWeek: number;
+    opensAtAbsoluteWeek: number;
+    originalAvailabilityAbsoluteWeek: number;
+    plannedAvailabilityAbsoluteWeek: number;
+    durationWeeks: number;
+    territory: StreamingLicenseTerritory;
+    countryIds: string[];
+    windowType: StreamingRightsWindowType;
+    exclusivity: StreamingLicenseExclusivity;
+    referenceValue: number;
+    minimumGuarantee: number;
+    publicInterestScore: number;
+    publicInterest: StreamingUpcomingRightsInterest;
+    publicInterestDrivers: string[];
+    status: StreamingUpcomingRightsSaleStatus;
+    followedAtAbsoluteWeek: number | null;
+    openedNotificationId: string | null;
+    auctionSessionId: string | null;
+    winningContractId: string | null;
+    winnerName: string | null;
+    resolvedAtAbsoluteWeek: number | null;
+    lastProcessedAbsoluteWeek: number;
 }
 
 export const STREAMING_CATALOGUE_PACKAGE_SCHEMA_VERSION = 1 as const;
@@ -5475,7 +5559,7 @@ export interface StreamingRoyaltySettlement {
     idempotencyKey: string;
     contractId: string;
     projectId: string;
-    buyerPlatformId: PlatformId | null;
+    buyerPlatformId: string | null;
     sellerStudioId: string;
     absoluteWeek: number;
     adjustedGrossReceipts: number;
@@ -5538,6 +5622,10 @@ export interface OwnedStreamingRightsNegotiation {
     processedProposalVersion?: number | null;
     signingDeadlineAbsoluteWeek?: number | null;
     responseMessageId?: string | null;
+    /** Earliest canonical availability for a pre-release acquisition. */
+    availabilityAtAbsoluteWeek?: number | null;
+    /** Future-release sale that opened this term sheet. */
+    upcomingRightsSaleId?: string | null;
 }
 
 export interface OwnedStreamingSublicenseDeal {
@@ -5802,6 +5890,30 @@ export interface OwnedStreamingWeeklyOperations {
     cancellations: number;
     reactivations: number;
     subscriptionRevenue: number;
+    worldCompetitionTargetSubscribers?: number;
+    worldCompetitionEffectiveMonthlyPrice?: number;
+    worldCompetitionPlanAllocations?: WorldStreamingPlanAllocation[];
+    worldCustomerStartingPaidAccounts?: number;
+    worldCustomerEndingPaidAccounts?: number;
+    worldCustomerPayingHouseholds?: number;
+    worldCustomerUpgrades?: number;
+    worldCustomerDowngrades?: number;
+    worldCustomerSwitchIns?: number;
+    worldCustomerSwitchOuts?: number;
+    worldCustomerExternalSharedHouseholds?: number;
+    worldCustomerSharedActiveViewers?: number;
+    worldCustomerPiracyReach?: number;
+    worldCustomerAccessLoadAccounts?: number;
+    worldCustomerMonthlySubscriptionRevenue?: number;
+    worldCustomerPlanAllocations?: WorldStreamingCustomerPlanSummary[];
+    audienceEnforcementCost?: number;
+    worldViewingAccounts?: number;
+    worldViewingHours?: number;
+    worldViewingUnmetDemandAccounts?: number;
+    worldViewingAdvertisingRevenue?: number;
+    worldViewingTransactionRevenue?: number;
+    worldViewingSponsorshipRevenue?: number;
+    worldViewingIncrementalRevenue?: number;
     partnerRevenueShareCost: number;
     infrastructureCost: number;
     leadershipCost: number;
@@ -5840,6 +5952,8 @@ export interface OwnedStreamingTitleDiscoveryMix {
     recommendationsPercent: number;
     searchPercent: number;
     directPercent: number;
+    marketingPercent?: number;
+    externalBuzzPercent?: number;
 }
 
 export interface OwnedStreamingTitleWeekPerformance {
@@ -5853,12 +5967,27 @@ export interface OwnedStreamingTitleWeekPerformance {
     programWeek: number;
     weeksAvailable: number;
     viewingAccounts: number;
+    estimatedViewers?: number;
+    starts?: number;
     hoursViewed: number;
     completionRate: number;
     repeatViewingRate: number;
+    abandonmentRate?: number;
+    paidViewingAccounts?: number;
+    sharedViewingAccounts?: number;
+    piracyViewingAccounts?: number;
+    topCountryId?: string | null;
+    acquisitionAttributedAccounts?: number;
+    retentionAttributedAccounts?: number;
     satisfactionScore: number;
     discoveryMix: OwnedStreamingTitleDiscoveryMix;
     attributedSubscriptionRevenue: number;
+    advertisingRevenue?: number;
+    premiumRevenue?: number;
+    rentalRevenue?: number;
+    purchaseRevenue?: number;
+    sponsorshipRevenue?: number;
+    incrementalRevenue?: number;
     allocatedCashCost: number;
     allocatedContentAmortization: number;
     cashContribution: number;
@@ -6189,8 +6318,9 @@ export interface OwnedStreamingPlatformState {
     campusProjects: OwnedStreamingCampusProject[];
     productLines: OwnedStreamingProductLine[];
     catalogSetupDraft: OwnedStreamingCatalogSetupDraft | null;
-    contentMarketDraft?: { tab: 'ALL' | 'MOVIE' | 'SERIES' | 'COLLECTIONS' | 'OWNED' | 'OFFERS' | 'AUCTIONS'; search: string; selectedId: string | null; ownedIds: string[] } | null;
+    contentMarketDraft?: { tab: 'ALL' | 'MOVIE' | 'SERIES' | 'COLLECTIONS' | 'OWNED' | 'OFFERS' | 'AUCTIONS' | 'UPCOMING'; search: string; selectedId: string | null; ownedIds: string[] } | null;
     buyerAuctionSessions: StreamingBuyerAuctionSession[];
+    upcomingRightsSales: StreamingUpcomingRightsSale[];
     starterCatalog: OwnedStreamingStarterCatalog | null;
     catalogLicenses: OwnedStreamingCatalogLicense[];
     rightsNegotiations: OwnedStreamingRightsNegotiation[];
@@ -6212,6 +6342,7 @@ export interface OwnedStreamingPlatformState {
     };
     technologyLevels: Record<StreamingTechnologyBranch, number>;
     metrics: OwnedStreamingPlatformMetrics;
+    audienceAccessPolicy: WorldStreamingCustomerAccessPolicy;
     catalogProjectIds: string[];
     simulationSeed: string;
     lastProcessedAbsoluteWeek: number | null;
@@ -6226,7 +6357,7 @@ export interface OwnedStreamingPlatformState {
     milestoneKeys: string[];
 }
 
-export const OWNED_STREAMING_PLATFORM_SCHEMA_VERSION = 23;
+export const OWNED_STREAMING_PLATFORM_SCHEMA_VERSION = 25;
 
 export const createInitialOwnedStreamingPlatformState = (playerId = ''): OwnedStreamingPlatformState => ({
     schemaVersion: OWNED_STREAMING_PLATFORM_SCHEMA_VERSION,
@@ -6408,6 +6539,7 @@ export const createInitialOwnedStreamingPlatformState = (playerId = ''): OwnedSt
     productLines: [],
     catalogSetupDraft: null,
     buyerAuctionSessions: [],
+    upcomingRightsSales: [],
     starterCatalog: null,
     catalogLicenses: [],
     rightsNegotiations: [],
@@ -6449,6 +6581,12 @@ export const createInitialOwnedStreamingPlatformState = (playerId = ''): OwnedSt
         averageRevenuePerUser: 0,
         cashRunwayWeeks: 0,
         technologyHealth: 0,
+    },
+    audienceAccessPolicy: {
+        sharingPosture: 'BALANCED',
+        enforcementInvestment: 'STANDARD',
+        source: 'LEADERSHIP_DEFAULT',
+        updatedAtAbsoluteWeek: 0,
     },
     catalogProjectIds: [],
     simulationSeed: playerId ? `owned-streaming:${playerId}` : '',
@@ -6513,6 +6651,8 @@ export interface ActiveRelease {
     theatricalExtensionHistory?: TheatricalExtensionDecision[];
     weeksInTheaters?: number;
     streaming?: StreamingState;
+    /** Canonical per-contract runs. `streaming` remains the aggregate legacy projection. */
+    streamingRuns?: StreamingPlatformRun[];
     /** Canonical rights record shared with the buyer platform. */
     streamingContractId?: string;
     streamingRevenue?: number;
@@ -6576,6 +6716,8 @@ export interface PastProject {
     studioId: StudioId;
     streamingPlatform?: PlatformId;
     streamingContractId?: string;
+    /** Final per-contract platform runs for shared or exclusive streaming releases. */
+    streamingRuns?: StreamingPlatformRun[];
     totalViews?: number;
     weeklyViews?: number[];
     streamingRevenue?: number;
@@ -8184,7 +8326,7 @@ export interface PlatformAiRegionalStreamingPerformance {
 
 export interface PlatformAiProjectStreamingWindow {
     id: string;
-    platformId: PlatformId;
+    platformId: string;
     platformContentPlanId: string;
     rightsContractId: string | null;
     contentSource: PlatformAiContentSource;
@@ -8406,6 +8548,20 @@ export interface PlatformAiAudienceHealth {
     acquiredSubscribersMillions: number;
     retainedSubscribersMillions: number;
     churnedSubscribersMillions: number;
+}
+
+export interface PlatformAiWorldEconomyFeedback {
+    asOfAbsoluteWeek: number;
+    endingPaidAccounts: number;
+    viewingAccounts: number;
+    hoursViewed: number;
+    weeklyRevenue: number;
+    weeklyOperatingResult: number;
+    audienceMomentum: number;
+    churnPressure: number;
+    viewingDepth: number;
+    unmetDemandPressure: number;
+    strongestCountryId: string | null;
 }
 
 export type PlatformAiLocalizationJobStatus = 'WAITING_FOR_FUNDS' | 'IN_PROGRESS' | 'READY' | 'CANCELLED';
@@ -8656,7 +8812,7 @@ export interface PlatformAiFinanceSnapshot {
 
 export interface PlatformAiTradeRoyaltyAllocation {
     contractId: string;
-    sellerPlatformId: PlatformId;
+    sellerPlatformId: string;
     amountMillions: number;
 }
 
@@ -8871,6 +9027,7 @@ export interface PlatformAiRuntimeState {
     rightsRenewals: PlatformAiRightsRenewalRecord[];
     pendingAudienceSettlements: PlatformAiAudienceSettlement[];
     audienceHealth: PlatformAiAudienceHealth;
+    worldEconomyFeedback?: PlatformAiWorldEconomyFeedback;
     debtMillions: number;
     lastRescueAbsoluteWeek: number | null;
     rescueCount: number;
@@ -9370,6 +9527,556 @@ export interface WorldAudienceParticipationState {
     snapshots: WorldAudienceParticipationSnapshot[];
 }
 
+export interface WorldStreamingPlanOffer {
+    id: string;
+    name: string;
+    monthlyPrice: number;
+    effectiveMonthlyPrice: number;
+    featureIds: string[];
+    ads: boolean;
+    appealIndex: number;
+}
+
+export interface WorldStreamingPlatformOffer {
+    platformId: string;
+    name: string;
+    isPlayer: boolean;
+    activeCountryIds: string[];
+    plans: WorldStreamingPlanOffer[];
+    annualDiscountPercent: number;
+    introOfferPercent: number;
+    catalogueStrengthIndex: number;
+    localizationStrengthIndex: number;
+    reputationIndex: number;
+    reliabilityIndex: number;
+    marketingIndex: number;
+    loyaltyIndex: number;
+    countryMomentum: Record<string, number>;
+    preferredGenres: Genre[];
+    sourceFingerprint: string;
+}
+
+export interface WorldStreamingOfferRegistry {
+    schemaVersion: 1;
+    absoluteWeek: number;
+    offers: WorldStreamingPlatformOffer[];
+    byCountry: Record<string, string[]>;
+    fingerprint: string;
+}
+
+export interface WorldStreamingPlanAllocation {
+    planId: string;
+    planName: string;
+    households: number;
+    effectiveMonthlyPrice: number;
+    monthlySubscriptionRevenue: number;
+}
+
+export interface WorldStreamingPlatformAllocation {
+    platformId: string;
+    platformName: string;
+    households: number;
+    primaryHouseholds: number;
+    monthlySubscriptionRevenue: number;
+    planAllocations: WorldStreamingPlanAllocation[];
+    strongestDriver: string;
+}
+
+export interface WorldStreamingCompetitionCountryState {
+    countryId: string;
+    streamingReachableHouseholds: number;
+    subscribingHouseholds: number;
+    unclaimedHouseholds: number;
+    totalSubscriptions: number;
+    totalMonthlyStreamingBudget: number;
+    totalMonthlySubscriptionSpend: number;
+    evaluatedCohortCount: number;
+    eligiblePlatformCount: number;
+    platformAllocations: WorldStreamingPlatformAllocation[];
+}
+
+export interface WorldStreamingCompetitionGlobalSummary {
+    streamingReachableHouseholds: number;
+    subscribingHouseholds: number;
+    unclaimedHouseholds: number;
+    totalSubscriptions: number;
+    totalMonthlyStreamingBudget: number;
+    totalMonthlySubscriptionSpend: number;
+    playerHouseholds: number;
+    playerPrimaryHouseholds: number;
+    playerMonthlySubscriptionRevenue: number;
+    playerPlanAllocations: WorldStreamingPlanAllocation[];
+    playerOfferPresent: boolean;
+    countryCount: number;
+    offerCount: number;
+}
+
+export interface WorldStreamingCompetitionSnapshot {
+    absoluteWeek: number;
+    subscribingHouseholds: number;
+    totalSubscriptions: number;
+    playerHouseholds: number;
+    playerMonthlySubscriptionRevenue: number;
+}
+
+export interface WorldStreamingCompetitionState {
+    schemaVersion: 1;
+    initializedAtAbsoluteWeek: number;
+    lastProcessedAbsoluteWeek: number;
+    sourceFingerprint: string;
+    countries: Record<string, WorldStreamingCompetitionCountryState>;
+    global: WorldStreamingCompetitionGlobalSummary;
+    snapshots: WorldStreamingCompetitionSnapshot[];
+}
+
+export type WorldStreamingCustomerMovementKind =
+    | 'JOIN'
+    | 'CANCEL'
+    | 'REACTIVATE'
+    | 'UPGRADE'
+    | 'DOWNGRADE'
+    | 'SWITCH'
+    | 'ADD_SECONDARY'
+    | 'DROP_SECONDARY';
+
+export type WorldStreamingCustomerReasonId =
+    | 'PRICE'
+    | 'PLAN_VALUE'
+    | 'CATALOGUE'
+    | 'RELEASE'
+    | 'LOCALIZATION'
+    | 'RELIABILITY'
+    | 'MARKETING'
+    | 'COMPETITOR'
+    | 'PROMO_EXPIRY'
+    | 'ROTATION'
+    | 'ECONOMY'
+    | 'SHARING_POLICY'
+    | 'PIRACY_ACCESS'
+    | 'OTHER';
+
+export type StreamingSharingPosture = 'REACH_FIRST' | 'BALANCED' | 'HOUSEHOLD_ONLY';
+export type StreamingEnforcementInvestment = 'LIGHT' | 'STANDARD' | 'AGGRESSIVE';
+
+export interface WorldStreamingCustomerAccessPolicy {
+    sharingPosture: StreamingSharingPosture;
+    enforcementInvestment: StreamingEnforcementInvestment;
+    source: 'LEADERSHIP_DEFAULT' | 'PLAYER_ACTION';
+    updatedAtAbsoluteWeek: number;
+}
+
+export interface WorldStreamingCustomerPlanCell {
+    platformId: string;
+    platformName: string;
+    planId: string;
+    planName: string;
+    paidAccounts: number;
+    primaryHouseholds: number;
+    effectiveMonthlyPrice: number;
+    monthlySubscriptionRevenue: number;
+    tenureNewAccounts: number;
+    tenureEstablishedAccounts: number;
+    tenureLoyalAccounts: number;
+    externalSharedHouseholds: number;
+    sharedActiveViewers: number;
+    piracyReach: number;
+    accessLoadAccounts: number;
+}
+
+export interface WorldStreamingCustomerLapsedCell {
+    platformId: string;
+    planId: string;
+    households: number;
+    lastActiveAbsoluteWeek: number;
+}
+
+export interface WorldStreamingCustomerCohortState {
+    cohortId: string;
+    reachableHouseholds: number;
+    payingHouseholds: number;
+    profiles: number;
+    activeViewers: number;
+    externalSharedHouseholds: number;
+    sharedActiveViewers: number;
+    piracyReach: number;
+    accessLoadAccounts: number;
+    planCells: WorldStreamingCustomerPlanCell[];
+    lapsedCells: WorldStreamingCustomerLapsedCell[];
+}
+
+export interface WorldStreamingCustomerMovement {
+    id: string;
+    absoluteWeek: number;
+    countryId: string;
+    cohortId: string;
+    kind: WorldStreamingCustomerMovementKind;
+    households: number;
+    sourcePlatformId: string | null;
+    destinationPlatformId: string | null;
+    fromPlanId: string | null;
+    toPlanId: string | null;
+    reasonId: WorldStreamingCustomerReasonId;
+}
+
+export interface WorldStreamingCustomerPlanSummary {
+    planId: string;
+    planName: string;
+    paidAccounts: number;
+    effectiveMonthlyPrice: number;
+    monthlySubscriptionRevenue: number;
+}
+
+export interface WorldStreamingCustomerPlatformSummary {
+    platformId: string;
+    platformName: string;
+    startingPaidAccounts: number;
+    endingPaidAccounts: number;
+    payingHouseholds: number;
+    joins: number;
+    cancellations: number;
+    reactivations: number;
+    upgrades: number;
+    downgrades: number;
+    switchIns: number;
+    switchOuts: number;
+    externalSharedHouseholds: number;
+    sharedActiveViewers: number;
+    piracyReach: number;
+    accessLoadAccounts: number;
+    monthlySubscriptionRevenue: number;
+    planAllocations: WorldStreamingCustomerPlanSummary[];
+    strongestReasonId: WorldStreamingCustomerReasonId;
+}
+
+export interface WorldStreamingCustomerCountryState {
+    countryId: string;
+    reachableHouseholds: number;
+    startingPaidAccounts: number;
+    endingPaidAccounts: number;
+    payingHouseholds: number;
+    profiles: number;
+    activeViewers: number;
+    joins: number;
+    cancellations: number;
+    reactivations: number;
+    upgrades: number;
+    downgrades: number;
+    switchIns: number;
+    switchOuts: number;
+    externalSharedHouseholds: number;
+    sharedActiveViewers: number;
+    piracyReach: number;
+    accessLoadAccounts: number;
+    monthlySubscriptionRevenue: number;
+    cohorts: WorldStreamingCustomerCohortState[];
+    platformSummaries: WorldStreamingCustomerPlatformSummary[];
+}
+
+export interface WorldStreamingCustomerGlobalSummary {
+    reachableHouseholds: number;
+    startingPaidAccounts: number;
+    endingPaidAccounts: number;
+    payingHouseholds: number;
+    profiles: number;
+    activeViewers: number;
+    joins: number;
+    cancellations: number;
+    reactivations: number;
+    upgrades: number;
+    downgrades: number;
+    switchIns: number;
+    switchOuts: number;
+    externalSharedHouseholds: number;
+    sharedActiveViewers: number;
+    piracyReach: number;
+    accessLoadAccounts: number;
+    monthlySubscriptionRevenue: number;
+    playerStartingPaidAccounts: number;
+    playerEndingPaidAccounts: number;
+    playerPayingHouseholds: number;
+    playerJoins: number;
+    playerCancellations: number;
+    playerReactivations: number;
+    playerUpgrades: number;
+    playerDowngrades: number;
+    playerSwitchIns: number;
+    playerSwitchOuts: number;
+    playerExternalSharedHouseholds: number;
+    playerSharedActiveViewers: number;
+    playerPiracyReach: number;
+    playerAccessLoadAccounts: number;
+    playerMonthlySubscriptionRevenue: number;
+    playerPlanAllocations: WorldStreamingCustomerPlanSummary[];
+    playerOfferPresent: boolean;
+    countryCount: number;
+    platformCount: number;
+}
+
+export interface WorldStreamingCustomerSnapshot {
+    absoluteWeek: number;
+    endingPaidAccounts: number;
+    payingHouseholds: number;
+    externalSharedHouseholds: number;
+    piracyReach: number;
+    playerEndingPaidAccounts: number;
+    playerMonthlySubscriptionRevenue: number;
+}
+
+export interface WorldStreamingCustomerState {
+    schemaVersion: 1;
+    initializedAtAbsoluteWeek: number;
+    lastProcessedAbsoluteWeek: number;
+    sourceFingerprint: string;
+    playerAccessPolicy: WorldStreamingCustomerAccessPolicy;
+    countries: Record<string, WorldStreamingCustomerCountryState>;
+    global: WorldStreamingCustomerGlobalSummary;
+    recentMovements: WorldStreamingCustomerMovement[];
+    snapshots: WorldStreamingCustomerSnapshot[];
+}
+
+export interface WorldStreamingViewingDiscoveryMix {
+    homepagePercent: number;
+    recommendationsPercent: number;
+    searchPercent: number;
+    directPercent: number;
+    marketingPercent: number;
+    externalBuzzPercent: number;
+}
+
+export interface WorldStreamingViewingAccessMix {
+    paidViewingAccounts: number;
+    sharedViewingAccounts: number;
+    piracyViewingAccounts: number;
+}
+
+export interface WorldStreamingViewingRevenue {
+    attributedSubscriptionRevenue: number;
+    advertisingImpressions: number;
+    advertisingRevenue: number;
+    premiumTransactions: number;
+    premiumRevenue: number;
+    rentalTransactions: number;
+    rentalRevenue: number;
+    purchaseTransactions: number;
+    purchaseRevenue: number;
+    sponsorshipImpressions: number;
+    sponsorshipRevenue: number;
+    totalIncrementalRevenue: number;
+}
+
+export interface WorldStreamingViewingCountryTitleState {
+    projectId: string;
+    title: string;
+    countryId: string;
+    viewingAccounts: number;
+    estimatedViewers: number;
+    starts: number;
+    hoursViewed: number;
+    completionRate: number;
+    repeatViewingRate: number;
+    abandonmentRate: number;
+    accessMix: WorldStreamingViewingAccessMix;
+    revenue: WorldStreamingViewingRevenue;
+}
+
+export interface WorldStreamingViewingTitleState {
+    projectId: string;
+    title: string;
+    source: StreamingSlateEntrySource;
+    projectType: ProjectType;
+    genre: string;
+    weeksAvailable: number;
+    viewingAccounts: number;
+    estimatedViewers: number;
+    starts: number;
+    hoursViewed: number;
+    completionRate: number;
+    repeatViewingRate: number;
+    abandonmentRate: number;
+    satisfactionScore: number;
+    acquisitionAttributedAccounts: number;
+    retentionAttributedAccounts: number;
+    accessMix: WorldStreamingViewingAccessMix;
+    discoveryMix: WorldStreamingViewingDiscoveryMix;
+    revenue: WorldStreamingViewingRevenue;
+    topCountryId: string | null;
+    countryPerformance: WorldStreamingViewingCountryTitleState[];
+}
+
+export interface WorldStreamingViewingPlatformSummary {
+    platformId: string;
+    platformName: string;
+    totalViewingAccounts: number;
+    estimatedViewers: number;
+    totalStarts: number;
+    totalHoursViewed: number;
+    averageCompletionRate: number;
+    averageRepeatViewingRate: number;
+    unmetDemandAccounts: number;
+    accessMix: WorldStreamingViewingAccessMix;
+    revenue: WorldStreamingViewingRevenue;
+    streamLoadAccounts: number;
+    titlePerformance: WorldStreamingViewingTitleState[];
+}
+
+export interface WorldStreamingViewingCountryPlatformSummary {
+    platformId: string;
+    platformName: string;
+    totalViewingAccounts: number;
+    estimatedViewers: number;
+    totalStarts: number;
+    totalHoursViewed: number;
+    unmetDemandAccounts: number;
+    accessMix: WorldStreamingViewingAccessMix;
+    revenue: WorldStreamingViewingRevenue;
+}
+
+export interface WorldStreamingViewingCountryState {
+    countryId: string;
+    accessibleAccounts: number;
+    totalViewingAccounts: number;
+    estimatedViewers: number;
+    totalStarts: number;
+    totalHoursViewed: number;
+    unmetDemandAccounts: number;
+    accessMix: WorldStreamingViewingAccessMix;
+    revenue: WorldStreamingViewingRevenue;
+    titlePerformance: WorldStreamingViewingCountryTitleState[];
+    platformPerformance?: Record<string, WorldStreamingViewingCountryPlatformSummary>;
+}
+
+export interface WorldStreamingViewingGlobalSummary {
+    totalViewingAccounts: number;
+    estimatedViewers: number;
+    totalStarts: number;
+    totalHoursViewed: number;
+    unmetDemandAccounts: number;
+    accessMix: WorldStreamingViewingAccessMix;
+    revenue: WorldStreamingViewingRevenue;
+    platformCount: number;
+    countryCount: number;
+    titleCount: number;
+}
+
+export interface WorldStreamingViewingSnapshot {
+    absoluteWeek: number;
+    totalViewingAccounts: number;
+    totalHoursViewed: number;
+    unmetDemandAccounts: number;
+    incrementalRevenue: number;
+}
+
+export interface WorldStreamingViewingState {
+    schemaVersion: 1;
+    initializedAtAbsoluteWeek: number;
+    lastProcessedAbsoluteWeek: number;
+    sourceFingerprint: string;
+    countries: Record<string, WorldStreamingViewingCountryState>;
+    platforms: Record<string, WorldStreamingViewingPlatformSummary>;
+    global: WorldStreamingViewingGlobalSummary;
+    snapshots: WorldStreamingViewingSnapshot[];
+}
+
+export interface WorldStreamingPlatformOperatingCostPolicy {
+    controller: 'AI' | 'PLAYER';
+    policyVersion: 1;
+    standardCostMultiplier: 1;
+    appliedCostMultiplier: number;
+    aiAssistanceActive: boolean;
+}
+
+export interface WorldStreamingPlatformCountryEconomy {
+    countryId: string;
+    endingPaidAccounts: number;
+    payingHouseholds: number;
+    monthlySubscriptionRevenue: number;
+    viewingAccounts: number;
+    hoursViewed: number;
+    joinAccounts: number;
+    cancellationAccounts: number;
+}
+
+export interface WorldStreamingPlatformStrategySignals {
+    audienceMomentum: number;
+    churnPressure: number;
+    viewingDepth: number;
+    unmetDemandPressure: number;
+    revenuePerPaidAccount: number;
+    strongestCountryId: string | null;
+}
+
+export interface WorldStreamingPlatformEconomySummary {
+    platformId: string;
+    platformName: string;
+    controller: 'AI' | 'PLAYER';
+    endingPaidAccounts: number;
+    payingHouseholds: number;
+    joins: number;
+    cancellations: number;
+    reactivations: number;
+    sharedActiveViewers: number;
+    piracyReach: number;
+    viewingAccounts: number;
+    estimatedViewers: number;
+    hoursViewed: number;
+    unmetDemandAccounts: number;
+    monthlySubscriptionRevenue: number;
+    weeklySubscriptionRevenue: number;
+    weeklyIncrementalRevenue: number;
+    weeklyRevenue: number;
+    standardWeeklyOperatingCost: number;
+    appliedWeeklyOperatingCost: number;
+    weeklyOperatingResult: number;
+    operatingCostPolicy: WorldStreamingPlatformOperatingCostPolicy;
+    countryEconomy: WorldStreamingPlatformCountryEconomy[];
+    strategySignals: WorldStreamingPlatformStrategySignals;
+}
+
+export interface WorldStreamingPlatformEconomyGlobalSummary {
+    platformCount: number;
+    endingPaidAccounts: number;
+    payingHouseholds: number;
+    viewingAccounts: number;
+    hoursViewed: number;
+    monthlySubscriptionRevenue: number;
+    weeklySubscriptionRevenue: number;
+    weeklyIncrementalRevenue: number;
+    weeklyRevenue: number;
+    standardWeeklyOperatingCost: number;
+    appliedWeeklyOperatingCost: number;
+    weeklyOperatingResult: number;
+}
+
+export interface WorldStreamingPlatformEconomySnapshot {
+    absoluteWeek: number;
+    platformCount: number;
+    endingPaidAccounts: number;
+    viewingAccounts: number;
+    weeklyRevenue: number;
+    weeklyOperatingResult: number;
+}
+
+export interface WorldStreamingPlatformEconomyHistoryEntry {
+    absoluteWeek: number;
+    controller: 'AI' | 'PLAYER';
+    endingPaidAccounts: number;
+    viewingAccounts: number;
+    hoursViewed: number;
+    weeklyRevenue: number;
+    weeklyOperatingResult: number;
+}
+
+export interface WorldStreamingPlatformEconomyState {
+    schemaVersion: 1;
+    initializedAtAbsoluteWeek: number;
+    lastProcessedAbsoluteWeek: number;
+    sourceFingerprint: string;
+    platforms: Record<string, WorldStreamingPlatformEconomySummary>;
+    global: WorldStreamingPlatformEconomyGlobalSummary;
+    snapshots: WorldStreamingPlatformEconomySnapshot[];
+    historyByPlatform: Record<string, WorldStreamingPlatformEconomyHistoryEntry[]>;
+}
+
 export interface WorldState {
     projects: IndustryProject[];
     trendingGenre: Genre;
@@ -9401,6 +10108,10 @@ export interface WorldState {
     worldPopulation?: WorldPopulationState;
     worldAudienceEconomy?: WorldAudienceEconomyState;
     worldAudienceParticipation?: WorldAudienceParticipationState;
+    worldStreamingCompetition?: WorldStreamingCompetitionState;
+    worldStreamingCustomers?: WorldStreamingCustomerState;
+    worldStreamingViewing?: WorldStreamingViewingState;
+    worldStreamingPlatformEconomy?: WorldStreamingPlatformEconomyState;
 }
 
 export interface LogEntry {
@@ -9916,7 +10627,7 @@ export const INITIAL_PLAYER: Player = {
     age: 15,
     totalPlayTimeMs: 0,
     gender: 'MALE',
-    avatar: 'https://api.dicebear.com/8.x/pixel-art/svg?seed=Felix',
+    avatar: '',
     settings: { language: 'en', smoothMode: false },
     money: 2000,
     energy: { current: 100, max: 100 },
@@ -9941,8 +10652,8 @@ export const INITIAL_PLAYER: Player = {
     outsideProductions: [],
     applications: [],
     relationships: [
-        { id: 'rel_mom', name: 'Mom', relation: 'Parent', closeness: 85, image: 'https://api.dicebear.com/8.x/pixel-art/svg?seed=Sophie', lastInteractionWeek: 0, lastInteractionAbsolute: 0, age: 46, gender: 'FEMALE' },
-        { id: 'rel_dad', name: 'Dad', relation: 'Parent', closeness: 80, image: 'https://api.dicebear.com/8.x/pixel-art/svg?seed=Arthur', lastInteractionWeek: 0, lastInteractionAbsolute: 0, age: 49, gender: 'MALE' }
+        { id: 'rel_mom', name: 'Mom', relation: 'Parent', closeness: 85, image: '', lastInteractionWeek: 0, lastInteractionAbsolute: 0, age: 46, gender: 'FEMALE' },
+        { id: 'rel_dad', name: 'Dad', relation: 'Parent', closeness: 80, image: '', lastInteractionWeek: 0, lastInteractionAbsolute: 0, age: 49, gender: 'MALE' }
     ],
     team: {
         agent: null, manager: null, lastAgentFeePaidWeek: 0, lastManagerFeePaidWeek: 0, availableAgents: [], availableManagers: [],

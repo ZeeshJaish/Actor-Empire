@@ -33,6 +33,7 @@ import {
   setStreamingDefineLaunchStep,
 } from '../services/streamingLaunchProgram';
 import { getStreamingOpeningCatalogueView } from '../services/streamingOpeningCatalogue';
+import { rankStreamingLaunchAnchors } from '../services/streamingCatalogueAnchors';
 import { getEligibleOwnedStreamingTitles, getStreamingLicenseOpportunities } from '../services/streamingCatalog';
 import {
   STREAMING_STOREFRONT_LAYOUTS,
@@ -53,6 +54,9 @@ import type {
   PricingSettings,
 } from './studio-finance/finance/launch';
 import StreamingMarketExpansionWizard from './StreamingMarketExpansionWizard';
+import { normalizeWorldAudienceEconomyState } from '../services/worldEconomy/worldAudienceCohorts';
+import { normalizeWorldAudienceParticipationState } from '../services/worldEconomy/worldAudienceParticipation';
+import { normalizeWorldPopulationState } from '../services/worldEconomy/worldPopulation';
 
 interface Props {
   player: Player;
@@ -210,6 +214,7 @@ const buildCatalogue = (player: Player): CatalogueState => {
   const view = getStreamingOpeningCatalogueView(player);
   const platform = player.ownedStreamingPlatform;
   const available = view.titles.filter(title => title.available);
+  const anchors = rankStreamingLaunchAnchors(player, available, 4);
   const titles = available.length;
   const hours = available.reduce((total, title) => total + title.hours, 0);
   const depthGuide = platform.starterCatalog?.packageId === 'BROAD_APPEAL' ? 80 : platform.starterCatalog?.packageId === 'PRESTIGE_VAULT' ? 30 : 40;
@@ -235,7 +240,7 @@ const buildCatalogue = (player: Player): CatalogueState => {
     genreCoverage,
     gaps: expectedGenres.filter(genre => !genreCounts.has(genre)),
     readiness: Math.min(1, hours / depthGuide),
-    anchors: available.slice(0, 4).map(title => ({
+    anchors: anchors.map(title => ({
       id: title.projectId,
       name: title.title,
       format: title.projectType === 'SERIES' ? 'Series' : 'Film',
@@ -285,7 +290,39 @@ const buildLaunchData = (player: Player): LaunchData => {
   const budget = getStreamingLaunchBudgetView(player);
   const launchView = getStreamingLaunchProgramView(player);
   const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
-  const countries = STREAMING_DAY_ONE_MARKETS.map(buildCountry);
+  const worldPopulation = normalizeWorldPopulationState(player.world.worldPopulation, absoluteWeek);
+  const worldAudienceEconomy = normalizeWorldAudienceEconomyState(
+    player.world.worldAudienceEconomy,
+    worldPopulation,
+    absoluteWeek,
+  );
+  const worldAudienceParticipation = normalizeWorldAudienceParticipationState(
+    player.world.worldAudienceParticipation,
+    worldPopulation,
+    worldAudienceEconomy,
+    absoluteWeek,
+  );
+  const countries = STREAMING_DAY_ONE_MARKETS.map(market => {
+    const country = buildCountry(market);
+    const audience = worldAudienceEconomy.countries[market.id];
+    const participation = worldAudienceParticipation.countries[market.id];
+    return {
+      ...country,
+      pricingCohorts: audience && participation ? audience.cohorts.flatMap(cohort => {
+        const overlay = participation.cohorts.find(item => item.cohortId === cohort.id);
+        if (!overlay) return [];
+        const households = overlay.streamingOnlyHouseholds + overlay.dualParticipantHouseholds;
+        if (!households) return [];
+        return [{
+          households,
+          monthlyStreamingBudgetPerHousehold: overlay.totalMonthlyStreamingBudget / households,
+          priceSensitivityIndex: cohort.priceSensitivityIndex,
+          entertainmentAppetiteIndex: cohort.entertainmentAppetiteIndex,
+          piracyTendencyIndex: cohort.piracyTendencyIndex,
+        }];
+      }) : [],
+    };
+  });
   const opening = platform.marketOperations.filter(operation => operation.entryKind === 'OPENING' && operation.countryId && operation.status !== 'EXITED');
   const clearance = opening.map(operation => {
     const view = getStreamingMarketClearanceView(operation, absoluteWeek);

@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, CheckCircle2, Clock3, Gavel, Megaphone, ShieldCheck, TrendingUp, XCircle } from 'lucide-react';
 import type { Player, StreamingBuyerAuctionSession } from '../types';
 import {
     advanceStreamingBuyerAuction,
@@ -11,7 +10,9 @@ import {
 } from '../services/streamingBuyerAuctions';
 import { getContentMarketFunds } from '../services/streamingContentMarket';
 import { getStreamingDayOneMarket } from '../services/streamingDayOneMarkets';
-import '../styles/streaming-buyer-auction-room.css';
+import css from '../content-market-exact/ContentMarket.module.css';
+import { cx } from '../content-market-exact/cx';
+import { PlatformMark, Poster } from '../content-market-exact/Poster';
 
 const money = (value: number) => value >= 1e9
     ? `$${(value / 1e9).toFixed(1)}B`
@@ -39,6 +40,8 @@ export default function StreamingBuyerAuctionRoom({ player, session, onUpdatePla
     const [marketing, setMarketing] = useState(session.lot.allowedTerms.marketingMaximum);
     const [futureGreenlight, setFutureGreenlight] = useState(session.lot.allowedTerms.futureGreenlightAllowed);
     const [feedback, setFeedback] = useState('');
+    const [termsOpen, setTermsOpen] = useState(false);
+    const [expandedBidId, setExpandedBidId] = useState<string | null>(null);
 
     useEffect(() => {
         const restored = reconcileStreamingBuyerAuction(playerRef.current, session.id, Date.now());
@@ -73,54 +76,129 @@ export default function StreamingBuyerAuctionRoom({ player, session, onUpdatePla
         setFeedback(result.detail || 'Your offer was withdrawn. The other buyers remain live.');
     };
 
+    const titleHue = [...session.lot.sourceProjectId].reduce((sum, char) => sum + char.charCodeAt(0), 0) % 360;
+    const playerTint = player.ownedStreamingPlatform.identity?.primaryColor || 'var(--epx-mkwrap-c)';
+    const seconds = Math.max(0, session.roomSecondsRemaining);
+    const heat = seconds <= 5 ? 'x3' : seconds <= 10 ? 'x2' : 'x1';
+    const drain = Math.max(0, Math.min(100, (seconds / 15) * 100));
+    const sellerReads = Object.entries(session.lot.sellerPriorities)
+        .sort((left, right) => right[1] - left[1])[0]?.[0] || 'cash';
+    const appetite = sellerReads === 'backend' ? 'their share of revenue'
+        : sellerReads === 'marketing' ? 'the marketing behind it'
+            : sellerReads === 'futureGreenlight' ? 'the next relationship' : 'the guarantee';
+    const bestValue = leader?.sellerValue || 0;
+
     if (session.status !== 'LIVE') {
         const won = session.status === 'WON';
-        return <section className="cm-auction-room cm-auction-result" role="dialog" aria-label="Live rights auction">
-            <div className={`cm-auction-verdict ${won ? 'is-won' : 'is-closed'}`}>
-                {won ? <CheckCircle2 size={36} /> : <XCircle size={36} />}
-                <span>AUCTION CLOSED</span>
-                <h1>{won ? 'Rights secured.' : session.status === 'NO_SALE' ? 'No sale.' : 'Another platform won.'}</h1>
-                <p>{session.resultReason}</p>
-                <dl><div><dt>Lot</dt><dd>{session.lot.title}</dd></div><div><dt>Scope</dt><dd>{countries}</dd></div><div><dt>Outcome</dt><dd>{session.status.replaceAll('_', ' ')}</dd></div></dl>
-                <button type="button" onClick={onExit}>Return to live auctions</button>
-            </div>
-        </section>;
+        const winner = session.winnerBidId ? session.bids.find(bid => bid.id === session.winnerBidId) : null;
+        return <div className={css.mkwrap} data-content-market-design="zip-exact">
+            <section className={cx(css.mk, css.mkroom)} data-content-market-scene="room" role="dialog" aria-label="Live rights auction">
+                <div className={cx(css.mkverdict, css['mk-' + (won ? 'won' : 'lost')])} style={{ ['--epx-mkwrap-oh' as string]: String(titleHue) }}>
+                    <div className={css.mkgavel} />
+                    {winner && <span className={css.mkvmark}><PlatformMark name={winner.bidderName} tint={winner.isPlayer ? playerTint : session.rivals.find(rival => rival.bidderId === winner.bidderId)?.color || '#777'} /></span>}
+                    <b className={css.mkvsold}>{session.status === 'NO_SALE' ? 'NO SALE' : 'SOLD'}</b>
+                    <span className={css.mkvwho}>{won ? 'TO YOU' : winner ? `TO ${winner.bidderName.toUpperCase()}` : 'ROOM CLOSED'}</span>
+                    <div className={css.mkvprice}>{winner ? money(winner.minimumGuarantee) : '—'}</div>
+                    <p className={css.mkvnote}>{session.resultReason || (won ? 'The contract is registered in your catalogue.' : 'Nothing was charged.')}</p>
+                    <button className={css.mkmark} type="button" onClick={onExit}>RETURN TO THE MARKET</button>
+                </div>
+            </section>
+        </div>;
     }
 
-    return <section className="cm-auction-room" role="dialog" aria-label="Live rights auction">
-        <div className="cm-auction-venue">
-            <div className="cm-auction-head">
-                <button type="button" aria-label="Leave auction room" onClick={onExit}><ArrowLeft size={18} /></button>
-                <div><span>LIVE RIGHTS AUCTION</span><strong>{session.lot.title}</strong><small>{session.lot.listingKind === 'CATALOGUE_PACKAGE' ? `${session.lot.catalogueComponentIds?.length || 0} title collection` : `${session.lot.projectType === 'SERIES' ? 'Series' : 'Film'} · ${session.lot.genre.replaceAll('_', ' ')}`}</small></div>
-                <div className={`cm-auction-clock ${session.roomSecondsRemaining <= 5 ? 'is-closing' : ''}`}><Clock3 size={14} /><b>{session.roomSecondsRemaining}</b><small>SEC</small></div>
-            </div>
-            <div className="cm-auction-scope"><span>{countries}</span><b>{session.lot.durationWeeks} weeks · {session.lot.exclusivity === 'EXCLUSIVE' ? 'Exclusive' : 'Shared'}</b></div>
-            {session.lot.notice && <p className="cm-auction-notice"><ShieldCheck size={14} />{session.lot.notice}</p>}
-            <div className="cm-auction-leader">
-                <span>SELLER'S LEADING CONTRACT</span>
-                <strong>{leader?.bidderName || 'No qualified offer'}</strong>
-                <b>{leader ? money(leader.minimumGuarantee) : '—'} <small>{leader ? `+ ${leader.licensorRevenueShare}% backend` : ''}</small></b>
-            </div>
-            <div className="cm-auction-tape" aria-label="Auction offers">
-                {activeBids.map((bid, index) => <article key={bid.id} className={`${bid.isPlayer ? 'is-player' : ''} ${index === 0 ? 'is-leading' : ''}`}>
-                    <i style={!bid.isPlayer ? { background: session.rivals.find(rival => rival.bidderId === bid.bidderId)?.color } : undefined} />
-                    <div><strong>{bid.bidderName}</strong><small>{bid.isPlayer ? `Your offer · revision ${bid.revision}` : `Round ${bid.revision}`}</small></div>
-                    <span><b>{money(bid.minimumGuarantee)}</b><small>{bid.licensorRevenueShare}% backend{bid.marketingGuarantee ? ` · ${money(bid.marketingGuarantee)} marketing` : ''}</small></span>
-                </article>)}
-                {!activeBids.length && <p className="cm-auction-wait"><Gavel size={22} />Waiting for the opening contract…</p>}
-            </div>
-        </div>
+    return <div className={css.mkwrap} data-content-market-design="zip-exact">
+        <section className={cx(css.mk, css.mkroom, css['mkh-' + heat])} data-content-market-scene="room" role="dialog" aria-label="Live rights auction" style={{ ['--epx-mkwrap-dh' as string]: String(titleHue) }}>
+            <div className={css.mkspot} />
+            <header className={css.mkroomtop}>
+                <button className={css.mkback} type="button" aria-label="Leave auction room" onClick={onExit}>←</button>
+                <div className={css.mkroomlot}>
+                    <span className={css.mkposterchip}><Poster id={session.lot.sourceProjectId} title={session.lot.title} genre={session.lot.genre} hue={titleHue} size="xs" /></span>
+                    <div><b>{session.lot.title}</b><span>{session.lot.sellerName}</span></div>
+                </div>
+                <div className={cx(css.mkclock, seconds <= 8 ? css.urgent : '')}>0:{String(seconds).padStart(2, '0')}</div>
+            </header>
+            <div className={css.mkdrain}><u style={{ width: `${drain}%` }} className={seconds <= 8 ? css.urgent : ''} /></div>
 
-        <section className="cm-auction-console" aria-label="Auction offer console">
-            <div className="cm-console-summary"><span><small>AVAILABLE</small><b>{money(funds)}</b></span><span><small>CURRENT COMMITMENT</small><b>{playerBid ? money(playerBid.guaranteedExposure) : 'None'}</b></span><span><small>CONTRACT STRENGTH</small><b className={previewValue > (leader?.sellerValue || 0) ? 'is-ahead' : ''}>{previewValue > (leader?.sellerValue || 0) ? 'Leading' : 'Behind'}</b></span></div>
-            <div className="cm-console-controls">
-                <label className="cm-bid-money"><span>Upfront</span><input aria-label="Auction upfront" type="number" step={session.lot.minimumBidIncrement} min={session.lot.minimumGuarantee} value={upfront} onChange={event => setUpfront(Number(event.target.value))} /><b>{money(upfront)}</b></label>
-                <label><span>Seller backend</span><input aria-label="Seller backend" type="range" min={session.lot.allowedTerms.backendMinimum} max={session.lot.allowedTerms.backendMaximum} value={backend} onChange={event => setBackend(Number(event.target.value))} /><b>{backend}%</b></label>
-                {session.lot.allowedTerms.marketingMaximum > 0 && <label><span><Megaphone size={12} /> Marketing</span><input aria-label="Marketing guarantee" type="range" min={0} max={session.lot.allowedTerms.marketingMaximum} step={100_000} value={marketing} onChange={event => setMarketing(Number(event.target.value))} /><b>{money(marketing)}</b></label>}
-                {session.lot.allowedTerms.futureGreenlightAllowed && <label className="cm-greenlight"><input type="checkbox" checked={futureGreenlight} onChange={event => setFutureGreenlight(event.target.checked)} /><span><TrendingUp size={12} /> Future original with {session.lot.sellerName}</span><b>{futureGreenlight ? 'Included' : 'Off'}</b></label>}
+            <div className={css.mkscroll}>
+                <div className={cx(css.mkboard, leader?.isPlayer ? css.mine : '', css['mkb-' + heat])}>
+                    <span>LEADING CONTRACT</span>
+                    <b>{leader ? money(leader.minimumGuarantee) : money(session.lot.minimumGuarantee)}</b>
+                    <div className={css.mkboardsub}>
+                        {leader && <PlatformMark name={leader.bidderName} tint={leader.isPlayer ? playerTint : session.rivals.find(rival => rival.bidderId === leader.bidderId)?.color || '#777'} small />}
+                        <em>{leader ? `${leader.licensorRevenueShare}% backend` : 'reserve'}</em>
+                        {leader && leader.marketingGuarantee > 0 && <em>{money(leader.marketingGuarantee)} mktg</em>}
+                    </div>
+                    <p className={leader?.isPlayer ? css.mkleads : ''}>{leader?.isPlayer ? 'You are leading.' : leader ? `${leader.bidderName} is leading.` : 'No contract on the table.'}</p>
+                </div>
+
+                <button className={css.mkbrief} type="button">
+                    <PlatformMark name={session.lot.sellerName} tint={`hsl(${titleHue} 58% 44%)`} small />
+                    <span className={css.mkbrieftext}>{session.lot.sellerName} is reading <b>{appetite}</b></span>
+                    <i>•</i>
+                </button>
+                {session.lot.notice && <p className={css.mkbriefopen}>{session.lot.notice}</p>}
+                {playerBid && <div className={cx(css.mkstand, leader?.isPlayer ? css.mine : '')}>
+                    <b>{leader?.isPlayer ? '1st' : `${activeBids.findIndex(bid => bid.id === playerBid.id) + 1}`}</b>
+                    <p>{leader?.isPlayer ? 'You hold the room.' : previewValue > bestValue ? 'Your revised contract would take the lead.' : 'Improve the complete contract to move ahead.'}</p>
+                </div>}
+
+                <div className={css.mkcontracts} aria-label="Auction offers">
+                    {activeBids.map((bid, index) => {
+                        const tint = bid.isPlayer ? playerTint : session.rivals.find(rival => rival.bidderId === bid.bidderId)?.color || '#777';
+                        const open = expandedBidId === bid.id;
+                        const valueWidth = bestValue > 0 ? Math.max(8, Math.round((bid.sellerValue / bestValue) * 100)) : 0;
+                        return <div key={bid.id} className={cx(css.mkoffer2, bid.isPlayer ? css.mine : '', index === 0 ? css.top : '')} style={{ ['--epx-mkwrap-oh' as string]: String(titleHue) }}>
+                            <button className={css.mkofferhead} type="button" onClick={() => setExpandedBidId(open ? null : bid.id)}>
+                                <i className={css.mkrank}>{index + 1}</i>
+                                <PlatformMark name={bid.bidderName} tint={tint} small />
+                                <b className={css.mkoffwho}>{bid.bidderName}</b>
+                                <em className={css.mkoffterse}>{bid.licensorRevenueShare}% backend{bid.marketingGuarantee ? ` · ${money(bid.marketingGuarantee)}` : ''}</em>
+                                <b className={css.mkoffmg}>{money(bid.minimumGuarantee)}</b>
+                            </button>
+                            <i className={css.mkvalue} style={{ width: `${valueWidth}%` }} />
+                            {open && <div className={css.mkoffterms}>
+                                {[
+                                    ['GUARANTEE', money(bid.minimumGuarantee)],
+                                    ['BACKEND', `${bid.licensorRevenueShare}%`],
+                                    ['MARKETING', bid.marketingGuarantee ? money(bid.marketingGuarantee) : 'None'],
+                                    ['FUTURE ORIGINAL', bid.futureGreenlight ? 'Committed' : 'Not offered'],
+                                ].map(([key, value]) => <div className={css.mkctcell} key={key}><span>{key}</span><b>{value}</b></div>)}
+                            </div>}
+                        </div>;
+                    })}
+                    {!activeBids.length && <p className={css.mkempty}>Nothing has been tabled yet.</p>}
+                </div>
+                {feedback && <p className={css.mkbriefopen} role="status">{feedback}</p>}
             </div>
-            {feedback && <p className="cm-console-feedback" role="status">{feedback}</p>}
-            <div className="cm-console-action"><button type="button" className="cm-withdraw" disabled={!playerBid} onClick={withdraw}>Withdraw</button><button type="button" className="cm-place-bid" disabled={!canBid} onClick={placeBid}><Gavel size={17} />{playerBid ? 'Revise bid' : 'Place bid'} · {money(guaranteedExposure)}</button></div>
+
+            <section className={css.mkmaker} aria-label="Auction offer console">
+                <button className={css.mkmyterms} type="button" onClick={() => setTermsOpen(true)}>
+                    <span>{backend}% backend</span>
+                    <span>{marketing ? `${money(marketing)} mktg` : 'no mktg'}</span>
+                    {futureGreenlight && <span>future original</span>}
+                    <i>edit</i>
+                </button>
+                <div className={css.mkmakerrow}>
+                    <button className={css.mkstep} type="button" onClick={() => setUpfront(Math.max(session.lot.minimumGuarantee, upfront - session.lot.minimumBidIncrement))}>−</button>
+                    <b className={guaranteedExposure > funds ? css.mkover : ''}>{money(upfront)}</b>
+                    <button className={css.mkstep} type="button" onClick={() => setUpfront(upfront + session.lot.minimumBidIncrement)}>+</button>
+                </div>
+                <button className={cx(css.mkbid, !canBid ? css.dead : '')} type="button" disabled={!canBid} onClick={placeBid}>
+                    {guaranteedExposure > funds ? `SHORT BY ${money(guaranteedExposure - funds)}` : `${playerBid ? 'REVISE' : 'TABLE'} ${money(guaranteedExposure)}`}
+                </button>
+            </section>
+
+            {termsOpen && <div className={css.mksheetwrap} onClick={() => setTermsOpen(false)}>
+                <div className={css.mkfilters} onClick={event => event.stopPropagation()}>
+                    <div className={css.mkfhead}><b>YOUR TERMS</b><button type="button" onClick={() => setTermsOpen(false)}>Done</button></div>
+                    <div className={css.mkdials}>
+                        <div className={css.mkdial}><span>THEY KEEP</span><b>{backend}%</b><div><button type="button" onClick={() => setBackend(Math.max(session.lot.allowedTerms.backendMinimum, backend - 1))}>−</button><button type="button" onClick={() => setBackend(Math.min(session.lot.allowedTerms.backendMaximum, backend + 1))}>+</button></div></div>
+                        {session.lot.allowedTerms.marketingMaximum > 0 && <div className={css.mkdial}><span>MARKETING</span><b>{marketing ? money(marketing) : '—'}</b><div><button type="button" onClick={() => setMarketing(Math.max(0, marketing - 100_000))}>−</button><button type="button" onClick={() => setMarketing(Math.min(session.lot.allowedTerms.marketingMaximum, marketing + 100_000))}>+</button></div></div>}
+                    </div>
+                    {session.lot.allowedTerms.futureGreenlightAllowed && <><span className={css.mkflabel}>SWEETENER</span><div className={css.mkfrow}><button type="button" className={futureGreenlight ? css.on : ''} onClick={() => setFutureGreenlight(!futureGreenlight)}>{futureGreenlight ? '✓ ' : ''}Future original</button></div></>}
+                    {playerBid && <button className={css.mkfclear} type="button" onClick={withdraw}>Withdraw your standing contract</button>}
+                </div>
+            </div>}
         </section>
-    </section>;
+    </div>;
 }

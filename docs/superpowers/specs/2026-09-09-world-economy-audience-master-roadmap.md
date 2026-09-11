@@ -2,8 +2,8 @@
 
 **Date:** 2026-09-09
 **Audience:** Actor Empire development and future implementation chats
-**Status:** WE1, WE2, and WE3 delivered in shadow mode; focused validation and production build green
-**Current next phase:** WE4 — Streaming Plan Choice and Market Competition
+**Status:** WE1 through WE7 delivered; focused validation, 400-year annual-checkpoint validation, and production build green
+**Current next phase:** WE8 — Economy, History, Performance, and Save Safety
 
 ## Purpose
 
@@ -168,6 +168,8 @@ Make every player, real, fictional, and future streaming platform compete for th
 - the cheapest and most expensive services can both succeed for explainable reasons;
 - country, cohort, plan, and global totals reconcile.
 
+**Delivery status:** Complete. WE4 now owns finite country/cohort subscription allocation, all-operator competition, exact player plan choice, effective subscription pricing, and the target used by owned-platform weekly subscription revenue. Save migration, bounded snapshots, 400-year direct projection, pricing-preview cohort signals, and Audience Market evidence are connected. Persistent customer transitions, password sharing, and piracy remain reserved for WE5.
+
 ---
 
 # Phase WE5 — Acquisition, Churn, Sharing, and Piracy
@@ -190,6 +192,8 @@ Turn cohort preferences into persistent weekly customer behaviour.
 - sharing and piracy never count as direct subscription revenue by mistake;
 - churn, acquisition, and reactivation agree across dashboards and finance;
 - save/reload does not reroll outcomes.
+
+**Delivery status:** Complete. WE5 now owns persistent aggregate customer membership and the exact weekly player waterfall across joins, cancellations, reactivations, plan upgrades/downgrades, linked platform switches, and multi-service rotation. Paying accounts, paying households, shared access, piracy reach, access load, plan revenue, and bounded lapsed memory remain distinct and reconcile. The owned-platform weekly economy, Audience Market, Analytics Center, CEO report, save migration, and global access-policy controls consume the same canonical facts. A 400-year horizon with annual persistence checkpoints remains deterministic and bounded. Title-level viewing, advertising, transactions, and title piracy remain reserved for WE6.
 
 ---
 
@@ -214,6 +218,8 @@ Translate audience access into title-level attention, engagement, and commercial
 - niche, local, prestige, fandom, and mass-market successes emerge from audience fit;
 - all revenue streams use canonical activity and configured terms.
 
+**Delivery status:** Complete. WE6 now converts finite WE5 access into rights-safe country/title viewing, estimated viewers, starts, hours, completion, repeats, abandonment, acquisition/retention attribution, six-way discovery, unmet demand, and distinct paid/shared/pirated paths. WE5 remains the sole owner of subscription cash; WE6 attributes that existing amount to titles and adds only advertising, premium access, rentals, purchases, and sponsorship as incremental revenue. The owned weekly settlement, Title Dossier, Analytics Center, CEO report, save migration, malformed-state recovery, and bounded 52-week snapshots consume the same committed facts. A 400-year / 20,800-week annual-checkpoint audit remains deterministic, finite, and compact. WE7 now supplies the completed AI/generated-platform parity layer.
+
 ---
 
 # Phase WE7 — Shared Player and AI Platform Economy
@@ -236,6 +242,8 @@ Make the cohort world authoritative for both the player's service and all AI-con
 - ownership transfer preserves history and removes AI-only benefits;
 - newly generated platforms enter the world through the same interfaces;
 - existing Platform AI, rights, content-market, research, localization, and finance flows remain compatible.
+
+**Delivery status:** Complete. WE7 now derives player, core AI, regional, and generated-platform subscribers, households, joins, cancellations, sharing, piracy exposure, viewing, revenue, operating costs, and strategy signals from the same WE5/WE6 facts. The canonical result synchronizes into Platform AI, ecosystem/Forbes standings, acquisitions, market shares, and the shared intelligence adapter without creating rival player-style workflows. AI operating assistance remains explicit and applies only while AI-controlled; acquisition preserves the platform's audience/history and immediately restores standard player costs. Current and 52-week per-platform histories are bounded, save-migrated, deterministic after reload, and verified across a 400-year annual-checkpoint horizon. WE8 retains ownership of full performance budgets, broad shock/balance matrices, legacy-history policy, and final save-safety hardening.
 
 ---
 

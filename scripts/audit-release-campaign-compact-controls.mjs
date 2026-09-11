@@ -1,21 +1,22 @@
 import fs from 'node:fs';
 
-const source = fs.readFileSync('views/lifestyle/business/ReleaseWizard.tsx', 'utf8');
+const source = fs.readFileSync('views/lifestyle/business/release-strategy-transplant/CampaignStep.tsx', 'utf8');
 
 const mustInclude = token => {
   if (!source.includes(token)) throw new Error(`Missing ${token}`);
 };
 
 [
-  'Campaign Meaning',
-  'selectedCampaignPosition.label',
-  'selectedCampaignPosition.description',
-  'selectedCampaignPosition.promise',
-  'setChannelAllocationAmount',
-  'type="number"',
-  'inputMode="decimal"',
-  'channel-mini-meter',
-  'aria-label={`${channel.label} custom spend in millions`'
+  'THE PROMISE',
+  'position?.label.toUpperCase()',
+  'position?.description',
+  'position?.promise',
+  'positions.map',
+  'onSelectPosition(item.id)',
+  'onSelectTimeline(item.id)',
+  'onChangeChannel(channel.id, -allocationStep)',
+  'onChangeChannel(channel.id, allocationStep)',
+  'data-testid={`channel-${channel.id}-value`'
 ].forEach(mustInclude);
 
 [
@@ -27,7 +28,7 @@ const mustInclude = token => {
   if (source.includes(token)) throw new Error(`Visible campaign guidance should not include ${token}`);
 });
 
-if (source.includes('type="range"') || source.includes('spend slider')) {
+if (source.includes('type="range"') || source.includes('spend slider') || source.includes('type="number"')) {
   throw new Error('Campaign controls should use the minimal meter, not big sliders.');
 }
 
@@ -53,4 +54,4 @@ if (/font-serif text-lg text-white\/90 truncate/.test(source)) {
   throw new Error('Marketing channel titles are still forced to truncate.');
 }
 
-console.log('Release campaign compact controls audit passed.');
+console.log('Release campaign transplant compact controls audit passed.');

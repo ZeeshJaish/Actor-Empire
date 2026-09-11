@@ -1,0 +1,835 @@
+.mkwrap{position:absolute;inset:0;overflow:hidden}
+.mkwrap .mk{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;
+  background:#07080b;color:#eceef3;padding:0 14px 40px}
+.mkwrap .mk *{box-sizing:border-box}
+.mkwrap .mkglow{position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:radial-gradient(110% 46% at 50% -6%,rgba(255,190,110,.13),transparent 62%)}
+
+.mkwrap .mktop{position:relative;z-index:1;display:flex;align-items:center;gap:12px;padding:16px 0 12px}
+.mkwrap .mkback{width:34px;height:34px;flex-shrink:0;border-radius:11px;font-size:15px;color:#eceef3;
+  background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.11)}
+.mkwrap .mkmast b{display:block;font-size:13px;font-weight:900;letter-spacing:.2em}
+.mkwrap .mkmast span{display:block;margin-top:3px;font-size:8px;font-weight:800;letter-spacing:.18em;color:#8b93a6}
+.mkwrap .mklead{position:relative;z-index:1;margin:2px 0 14px;font-size:12.5px;line-height:1.55;color:#98a0b2}
+.mkwrap .mkempty{padding:26px 0;text-align:center;font-size:11.5px;color:#6d7486}
+
+/* ── buying power, as a meter ── */
+/* ══ BUYING POWER ═══════════════════════════════════════════════════════════
+   A credit line, drawn as one. The old block was a label, a number, a bar, two
+   mono figures and two sentences — five text treatments in a box, and the most
+   useful part of it was set as a footnote. It was also the loudest thing on a
+   page about films, which is the wrong order. */
+.mkwrap .mkpower{position:relative;z-index:1;padding:13px 15px 12px;border-radius:15px;
+  background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.018));
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.075)}
+.mkwrap .mkpwhead{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.mkwrap .mkpwhead>span{font-size:7px;font-weight:900;letter-spacing:.22em;color:#7b8395}
+.mkwrap .mkpwhead>em{font-style:normal;font-size:10px;color:#7b8395}
+.mkwrap .mkpwhead>em b{color:#cdd3e0;font-weight:800}
+/* the figure that matters, and only that one */
+.mkwrap .mkpwbig{display:block;margin-top:3px;font-size:30px;font-weight:900;letter-spacing:-.045em;
+  line-height:1.05;font-family:ui-monospace,Menlo,monospace;
+  background:linear-gradient(180deg,#fff,#c3cad8);-webkit-background-clip:text;
+  background-clip:text;color:transparent}
+/* one track, split into what is left and what is already spoken for */
+.mkwrap .mkpwtrack{position:relative;height:6px;margin-top:11px;border-radius:99px;overflow:hidden;
+  background:repeating-linear-gradient(-45deg,rgba(255,255,255,.11) 0 4px,rgba(255,255,255,.05) 4px 8px)}
+.mkwrap .mkpwtrack u{display:block;height:100%;border-radius:99px;
+  background:linear-gradient(90deg,#4fd39c,#8ae8bd);
+  box-shadow:0 0 14px -2px rgba(79,211,156,.65);
+  transition:width .55s cubic-bezier(.2,.8,.2,1)}
+.mkwrap .mkpwlegend{display:flex;align-items:center;gap:13px;margin-top:9px;flex-wrap:wrap}
+.mkwrap .mkpwlegend em{display:flex;align-items:center;gap:5px;font-style:normal;font-size:9.5px;
+  font-weight:700;color:#7b8395;font-family:ui-monospace,Menlo,monospace}
+.mkwrap .mkpwlegend em::before{content:'';width:6px;height:6px;border-radius:2px;flex-shrink:0}
+.mkwrap .mkpwfree{color:#9fe8c6 !important}
+.mkwrap .mkpwfree::before{background:#4fd39c}
+.mkwrap .mkpwheld::before{background:repeating-linear-gradient(-45deg,rgba(255,255,255,.4) 0 2px,transparent 2px 4px)}
+.mkwrap .mkpwsum{margin-left:auto;color:#5f6675 !important}
+.mkwrap .mkpwsum::before{display:none}
+/* only present when something is actually beyond you */
+.mkwrap .mkpwshort{display:flex;align-items:center;gap:8px;margin-top:11px;padding-top:10px;
+  border-top:1px solid rgba(255,255,255,.07)}
+.mkwrap .mkpwshort i{width:5px;height:5px;border-radius:50%;background:#e0736c;flex-shrink:0;
+  box-shadow:0 0 9px rgba(224,115,108,.85)}
+.mkwrap .mkpwshort span{font-size:10.5px;color:#8b93a6}
+.mkwrap .mkpwshort b{color:#e6e9f0;font-weight:700}
+
+/* ── THE GATE ── */
+.mkwrap .mkdoor{display:flex;align-items:center;gap:14px;width:100%;margin-top:11px;padding:14px;
+  text-align:left;border-radius:16px;position:relative;z-index:1;overflow:hidden;
+  background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.022));
+  border:1px solid rgba(255,255,255,.09);transition:transform .12s}
+.mkwrap .mkdoor:active{transform:scale(.985)}
+.mkwrap .mkdoorart{width:82px;flex-shrink:0;position:relative;height:96px}
+.mkwrap .mkfan{position:absolute;top:0;width:56px;transform:rotate(calc((var(--epx-mkwrap-i) - 1) * 7deg)) translateX(calc((var(--epx-mkwrap-i) - 1) * 11px));
+  left:12px;filter:drop-shadow(0 5px 12px rgba(0,0,0,.55))}
+.mkwrap .mkwall{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;height:96px;align-content:center}
+.mkwrap .mkframe{display:flex;align-items:center;justify-content:center;width:56px;height:84px;margin:6px auto 0;
+  border:1.5px dashed rgba(255,255,255,.26);border-radius:5px}
+.mkwrap .mkframe i{display:block;width:16px;height:16px;border-radius:50%;border:1.5px dashed rgba(255,255,255,.34)}
+.mkwrap .mkdoortext{flex:1;min-width:0}
+.mkwrap .mkdoortext b{display:block;font-size:13px;font-weight:900;letter-spacing:.1em}
+.mkwrap .mkdoortext span{display:block;margin-top:5px;font-size:11.5px;line-height:1.45;color:#8b93a6}
+.mkwrap .mkdoortext em{display:inline-block;margin-top:8px;font-style:normal;font-size:7.5px;font-weight:900;
+  letter-spacing:.16em;padding:4px 8px;border-radius:99px;background:rgba(255,255,255,.08);color:#a8b0c2}
+.mkwrap .mkd-studio .mkdoortext em{color:#0b0c10;background:#54d69a}
+.mkwrap .mkd-orig .mkdoortext em{color:#0b0c10;background:var(--epx-mkwrap-c)}
+.mkwrap .mkd-market .mkdoortext em{color:#0b0c10;background:#ffbe4d}
+
+/* ── THE MARKET ── */
+.mkwrap .mkshelves{position:relative;z-index:1;display:flex;gap:6px;margin-top:13px}
+.mkwrap .mkshelves button{flex:1;display:flex;align-items:center;justify-content:center;gap:5px;padding:10px 6px;
+  border-radius:11px;font-size:11px;font-weight:800;color:#98a0b2;
+  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09)}
+.mkwrap .mkshelves button.on{color:#0b0c10;background:#fff;border-color:transparent}
+.mkwrap .mkdot{font-style:normal;font-size:8px;font-weight:900;color:#fff;background:#e0233a;
+  padding:2px 5px;border-radius:99px}
+.mkwrap .mkshelves button.on .mkdot{color:#fff}
+.mkwrap .mksearch{position:relative;z-index:1;margin-top:8px}
+.mkwrap .mksearch input{width:100%;padding:10px 13px;border-radius:11px;font-size:12.5px;color:#eceef3;
+  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);outline:none}
+.mkwrap .mksearch input::placeholder{color:#6d7486}
+.mkwrap .mkwallgrid{position:relative;z-index:1;display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-top:14px}
+.mkwrap .mkcard{position:relative;padding:0;background:none;border:none;text-align:left;transition:transform .12s}
+.mkwrap .mkcard:active{transform:scale(.975)}
+.mkwrap .mkcardfoot{display:flex;align-items:baseline;justify-content:space-between;gap:6px;margin-top:7px}
+.mkwrap .mkcardfoot b{font-size:14px;font-weight:900;font-family:ui-monospace,Menlo,monospace}
+.mkwrap .mkcardfoot span{font-size:7.5px;font-weight:900;letter-spacing:.1em;color:#7b8395}
+.mkwrap .mkfree{color:#54d69a}
+.mkwrap .mktag{position:absolute;top:7px;left:7px;font-size:7px;font-weight:900;letter-spacing:.14em;
+  color:#0b0c10;background:#ffd08a;padding:3px 6px;border-radius:99px}
+
+/* ── live rooms ── */
+.mkwrap .mkrooms{position:relative;z-index:1;display:flex;flex-direction:column;gap:11px;margin-top:14px}
+.mkwrap .mkroomcard{display:flex;gap:13px;width:100%;padding:12px;text-align:left;border-radius:15px;
+  background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.022));
+  border:1px solid rgba(255,255,255,.09)}
+.mkwrap .mkroomcard.live{border-color:rgba(255,190,77,.4);
+  box-shadow:0 0 0 1px rgba(255,190,77,.1),0 10px 30px -12px rgba(255,190,77,.34)}
+.mkwrap .mkroomcard>div:first-child,.mkwrap .mkroomcard>.po{width:74px;flex-shrink:0}
+.mkwrap .mkroominfo{flex:1;min-width:0}
+.mkwrap .mkroominfo b{display:block;margin-top:6px;font-size:14px;font-weight:800}
+/* the seller line only. An element selector here is (0,2,1) and was beating
+   .mklive at (0,2,0), forcing the ROOM OPEN badge to display:block and
+   stretching it the full width of the card. */
+.mkwrap .mkroominfo>span:not([class]){display:block;margin-top:2px;font-size:10.5px;color:#8b93a6}
+.mkwrap .mklive{display:inline-flex;align-items:center;gap:5px;font-size:7.5px;font-weight:900;letter-spacing:.16em;
+  color:#0b0c10;background:#ffbe4d;padding:4px 8px;border-radius:99px}
+.mkwrap .mklive i{width:5px;height:5px;border-radius:50%;background:#0b0c10;animation:epx-mkpulse 1.1s infinite}
+@keyframes epx-mkpulse{0%,100%{opacity:1}50%{opacity:.2}}
+.mkwrap .mksoon{display:inline-block;font-size:7.5px;font-weight:900;letter-spacing:.16em;color:#a8b0c2;
+  background:rgba(255,255,255,.08);padding:4px 8px;border-radius:99px}
+.mkwrap .mkrivals{display:flex;align-items:center;gap:4px;margin-top:9px}
+.mkwrap .mkrivals em{font-style:normal;font-size:9.5px;color:#7b8395;margin-left:3px}
+
+/* ── THE TITLE ── */
+/* ══ THE TITLE PAGE ═════════════════════════════════════════════════════════
+   This is a seven-million-dollar decision and it was reading as a product
+   listing: a cropped header image, then a vertical stack of identical grey
+   boxes. The poster is now PRESENTED — framed, lit, sitting in a pool of its
+   own colour — and the page is tinted by the title's hue so that no two titles
+   feel like the same screen. */
+.mkwrap .mkdetail{padding:0 0 108px}
+.mkwrap .mkbloom{position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(78% 42% at 50% 6%,hsl(var(--epx-mkwrap-dh) 76% 46% / .42),transparent 70%),
+    radial-gradient(46% 26% at 78% 24%,hsl(calc(var(--epx-mkwrap-dh) + 42) 82% 52% / .22),transparent 72%),
+    linear-gradient(180deg,rgba(7,8,11,.28) 0%,#07080b 62%);
+  animation:epx-mkbloom 1s ease both}
+@keyframes epx-mkbloom{from{opacity:0}to{opacity:1}}
+.mkwrap .mkhero{position:relative;z-index:1;display:flex;align-items:center;justify-content:center;
+  padding:52px 20px 26px}
+/* NOT .mkframe — the Gate already owns that for its dashed empty-frame icon,
+   and this poster inherited its height:84px and dashed border. */
+.mkwrap .mkoneframe{width:62%;max-width:250px;border-radius:10px;overflow:hidden;
+  animation:epx-mkrise .72s cubic-bezier(.16,.84,.3,1) both;
+  box-shadow:0 2px 0 rgba(255,255,255,.14) inset,
+    0 42px 70px -26px rgba(0,0,0,.92),
+    0 24px 90px -34px hsl(var(--epx-mkwrap-dh) 80% 52% / .75)}
+@keyframes epx-mkrise{from{opacity:0;transform:translateY(24px) scale(.94)}to{opacity:1;transform:none}}
+.mkwrap .mkfloat{position:absolute;top:16px;left:14px;z-index:3;
+  background:rgba(12,14,20,.55);backdrop-filter:blur(10px)}
+.mkwrap .mkbody{position:relative;z-index:2;padding:0 18px;
+  animation:epx-mkbodyup .7s .1s cubic-bezier(.16,.84,.3,1) both}
+@keyframes epx-mkbodyup{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.mkwrap .mkbody h1{font-size:31px;font-weight:900;letter-spacing:-.032em;line-height:1.04}
+.mkwrap .mkline{margin-top:6px;font-size:10.5px;font-weight:700;letter-spacing:.06em;color:#8b93a6}
+.mkwrap .mktiles{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:15px}
+.mkwrap .mktile{padding:10px 8px;border-radius:12px;text-align:center;
+  background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.08)}
+.mkwrap .mktile span{display:block;font-size:6.5px;font-weight:900;letter-spacing:.16em;color:#7b8395}
+.mkwrap .mktile b{display:block;margin-top:5px;font-size:15px;font-weight:900;
+  font-family:ui-monospace,Menlo,monospace;letter-spacing:-.02em}
+.mkwrap .mktile i{font-style:normal;font-size:9px;color:#7b8395}
+.mkwrap .mkfaces{display:flex;gap:6px;margin-top:16px}
+.mkwrap .mkfaces button{flex:1;padding:9px;border-radius:10px;font-size:11px;font-weight:800;color:#98a0b2;
+  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09)}
+.mkwrap .mkfaces button.on{color:#0b0c10;background:#fff;border-color:transparent}
+/* ── the avails map. Sized by what each market is worth, so a greyed-out
+      India reads as a loss rather than as one chip of sixteen. ── */
+.mkwrap .mkreach{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;margin-top:15px;
+  padding:13px 15px;border-radius:14px;
+  background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.02));
+  border:1px solid rgba(255,255,255,.09)}
+.mkwrap .mkreach>span{font-size:7px;font-weight:900;letter-spacing:.18em;color:#8b93a6;
+  flex-basis:100%}
+.mkwrap .mkreach>b{font-size:34px;font-weight:900;letter-spacing:-.04em;
+  font-family:ui-monospace,Menlo,monospace;color:#7ee0b0}
+.mkwrap .mkreach>b i{font-style:normal;font-size:16px;opacity:.6;margin-left:1px}
+.mkwrap .mkreach>em{font-style:normal;font-size:11.5px;color:#8b93a6;flex:1;min-width:120px}
+.mkwrap .mkgrid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-top:13px;
+  grid-auto-flow:row dense}
+/* ── THE AVAILS MAP ────────────────────────────────────────────────────────
+   Sixteen flags at full saturation read like a language picker: no hierarchy,
+   no material, everything shouting at one volume. So the flags sit UNDER GLASS
+   on a dark card, and how much colour a market is allowed is decided by what
+   it is worth — the United States carries real colour, Ireland is almost
+   monochrome. The map gets its hierarchy from the same number the deal does. */
+.mkwrap .mkcell{position:relative;display:flex;flex-direction:column;align-items:flex-start;
+  justify-content:flex-end;gap:3px;min-height:58px;padding:9px 10px;border-radius:13px;
+  overflow:hidden;isolation:isolate;background:#0f1116;border:none;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.07),0 2px 10px rgba(0,0,0,.4)}
+.mkwrap .mkfield{position:absolute;inset:0;z-index:0;opacity:.5;
+  filter:saturate(.8);transition:opacity .3s ease,filter .3s ease}
+/* value decides presence */
+.mkwrap .mkw-xl .mkfield{opacity:.74}
+.mkwrap .mkw-lg .mkfield{opacity:.62}
+/* glass: a soft sheen off the top left, and shade where the label sits */
+.mkwrap .mkscrim{position:absolute;inset:0;z-index:1;
+  background:linear-gradient(158deg,rgba(255,255,255,.09) 0%,rgba(255,255,255,0) 38%),
+    linear-gradient(180deg,rgba(10,12,16,.1) 0%,rgba(10,12,16,.36) 62%,rgba(10,12,16,.7) 100%)}
+.mkwrap .mkcell b{position:relative;z-index:2;font-size:11px;font-weight:800;letter-spacing:.1em;
+  color:rgba(255,255,255,.94);text-shadow:0 1px 8px rgba(0,0,0,.75)}
+/* the share of value: a hairline chip, not a sticker */
+.mkwrap .mkcell i{position:relative;z-index:2;font-style:normal;font-size:9px;font-weight:700;
+  letter-spacing:.02em;color:rgba(255,255,255,.72);font-family:ui-monospace,Menlo,monospace;
+  padding:2px 6px;border-radius:99px;background:rgba(255,255,255,.09);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.11)}
+.mkwrap .mkw-xl{grid-column:span 3;grid-row:span 2;min-height:126px;padding:13px 15px;gap:6px;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.11),0 6px 22px rgba(0,0,0,.5)}
+.mkwrap .mkw-xl b{font-size:19px;letter-spacing:.06em}
+.mkwrap .mkw-xl i{font-size:12px;padding:3px 9px;color:#fff}
+.mkwrap .mkw-lg{grid-column:span 3;min-height:66px}
+.mkwrap .mkw-lg b{font-size:13px}
+.mkwrap .mkw-md{grid-column:span 2}
+/* a market you cannot buy loses its colour entirely and takes a fine rule */
+.mkwrap .mkxout{position:absolute;inset:0;z-index:2;display:block;
+  background:repeating-linear-gradient(-48deg,transparent 0 6px,rgba(255,255,255,.05) 6px 12px)}
+.mkwrap .mkt-held{box-shadow:inset 0 0 0 1px rgba(224,84,72,.4),0 2px 10px rgba(0,0,0,.4)}
+.mkwrap .mkt-held .mkfield{filter:grayscale(1) brightness(.5);opacity:.2}
+.mkwrap .mkt-held b{color:rgba(255,150,142,.9)}
+.mkwrap .mkt-held i{color:rgba(255,150,142,.85);background:rgba(224,84,72,.16);
+  box-shadow:inset 0 0 0 1px rgba(224,84,72,.3)}
+.mkwrap .mkt-held .mkxout{background:repeating-linear-gradient(-48deg,transparent 0 6px,rgba(224,84,72,.16) 6px 12px)}
+.mkwrap .mkt-blocked .mkfield{filter:grayscale(1) brightness(.4);opacity:.12}
+.mkwrap .mkt-blocked b{color:rgba(255,255,255,.42)}
+.mkwrap .mkt-blocked i{color:rgba(255,255,255,.4)}
+.mkwrap .mkavailline{margin-top:12px;font-size:12.5px;line-height:1.55;color:#b6bccb}
+.mkwrap .mkavailline b{color:#fff}
+.mkwrap .mknote{margin-top:10px;font-size:11.5px;line-height:1.55;font-style:italic;color:#8b93a6}
+.mkwrap .mkchain{margin-top:12px;padding-left:0;list-style:none}
+.mkwrap .mkchain li{padding:9px 0;border-bottom:1px solid rgba(255,255,255,.07);font-size:12.5px}
+.mkwrap .mkchain em{display:block;font-style:normal;font-size:6.5px;font-weight:900;letter-spacing:.18em;
+  color:#7b8395;margin-bottom:3px}
+.mkwrap .mkmemo{margin-top:12px}
+.mkwrap .mkmemo>div{display:flex;align-items:baseline;gap:8px;padding:10px 0;
+  border-bottom:1px solid rgba(255,255,255,.07)}
+.mkwrap .mkmemo dt{font-size:12.5px;color:#b6bccb}
+.mkwrap .mkmemo dd{margin-left:auto;font-family:ui-monospace,Menlo,monospace;font-size:12px;font-weight:800}
+.mkwrap .mkschedule{width:100%;margin-top:14px;border-collapse:collapse;font-size:12px}
+.mkwrap .mkschedule td{padding:8px 4px;border-bottom:1px solid rgba(255,255,255,.06);vertical-align:baseline}
+.mkwrap .mkschedule i{display:block;font-style:normal;font-size:8px;letter-spacing:.1em;color:#6d7486;margin-top:1px}
+.mkwrap .mkno{width:20px;font-family:ui-monospace,Menlo,monospace;font-size:9px;color:#6d7486}
+.mkwrap .mkalloc{text-align:right;font-family:ui-monospace,Menlo,monospace;font-size:11.5px;white-space:nowrap}
+.mkwrap .mkschedule tfoot td{border-bottom:none;border-top:1.5px solid rgba(255,255,255,.24);padding-top:10px;
+  font-size:8px;font-weight:900;letter-spacing:.16em}
+.mkwrap .mkschedule tfoot .mkalloc{font-size:13px;font-weight:900;letter-spacing:0}
+.mkwrap .mkheat{display:flex;align-items:center;gap:11px;margin-top:14px}
+.mkwrap .mkheat i{flex:1;display:block;height:7px;border-radius:99px;background:rgba(255,255,255,.09)}
+.mkwrap .mkheat u{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--epx-mkwrap-c),#ffbe4d)}
+.mkwrap .mkheat b{font-family:ui-monospace,Menlo,monospace;font-size:17px;font-weight:900}
+.mkwrap .mkwhy{margin-top:11px;padding-left:16px}
+.mkwrap .mkwhy li{font-size:12.5px;line-height:1.6;color:#b6bccb}
+
+/* ── the action bar, pinned ── */
+.mkwrap .mkbar2{position:fixed;left:0;right:0;bottom:0;z-index:6;display:flex;gap:8px;
+  padding:12px 14px calc(14px + env(safe-area-inset-bottom));
+  background:linear-gradient(180deg,rgba(7,8,11,0),rgba(7,8,11,.94) 32%)}
+.mkwrap .mksign{display:flex;align-items:center;justify-content:center;text-align:center;flex:1;padding:16px;border-radius:13px;font-size:11.5px;font-weight:900;letter-spacing:.14em;
+  color:#0b0c10;background:#fff;border:none}
+.mkwrap .mksign.dead{opacity:.35}
+.mkwrap .mklivebtn{background:linear-gradient(180deg,#ffd98f,#ffbe4d 55%,#e09a12);color:#1a1206}
+.mkwrap .mkmark{display:flex;align-items:center;justify-content:center;text-align:center;padding:16px 20px;border-radius:13px;font-size:11px;font-weight:900;letter-spacing:.14em;
+  color:#eceef3;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14)}
+.mkwrap .mkfoot{position:relative;z-index:1;margin-top:12px;text-align:center;font-size:11px;
+  line-height:1.5;font-style:italic;color:#6d7486}
+
+/* ── THE OFFER ── */
+.mkwrap .mkoffer{padding-bottom:110px}
+.mkwrap .mkreads{position:relative;z-index:1;margin-top:13px;padding:14px;border-radius:15px;
+  border-left:3px solid #8b93a6;background:rgba(255,255,255,.05)}
+.mkwrap .mkseller{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.mkwrap .mkseller em{font-style:normal;font-size:7.5px;font-weight:900;letter-spacing:.16em;color:#8b93a6}
+.mkwrap .mkreads p{font-size:13px;line-height:1.5}
+.mkwrap .mk-good{border-left-color:#54d69a;background:rgba(84,214,154,.09)}
+.mkwrap .mk-warn{border-left-color:#ffbe4d;background:rgba(255,190,77,.09)}
+.mkwrap .mk-bad{border-left-color:#e0736c;background:rgba(224,115,108,.09)}
+.mkwrap .mkbig{position:relative;z-index:1;margin-top:12px;padding:18px;border-radius:16px;text-align:center;
+  background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.025));
+  border:1px solid rgba(255,255,255,.1)}
+.mkwrap .mkbig>span{font-size:7.5px;font-weight:900;letter-spacing:.2em;color:#8b93a6}
+.mkwrap .mkbig>b{display:block;margin-top:7px;font-size:33px;font-weight:900;letter-spacing:-.04em;
+  font-family:ui-monospace,Menlo,monospace}
+.mkwrap .mkbig>i{display:block;margin-top:4px;font-style:normal;font-size:10.5px;color:#7b8395}
+.mkwrap .mkbig>i.up{color:#54d69a} .mkwrap .mkbig>i.down{color:#e0736c}
+.mkwrap .mkbigrow{display:flex;gap:8px;margin-top:13px}
+.mkwrap .mkbigrow button{flex:1;height:42px;border-radius:12px;font-size:19px;font-weight:800;color:#eceef3;
+  background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12)}
+.mkwrap .mkover{color:#e0736c}
+.mkwrap .mkdials{position:relative;z-index:1;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px}
+.mkwrap .mkdial{padding:11px 9px;border-radius:13px;text-align:center;
+  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09)}
+.mkwrap .mkdial>span{display:block;font-size:6.5px;font-weight:900;letter-spacing:.14em;color:#8b93a6}
+.mkwrap .mkdial>b{display:block;margin-top:6px;font-size:14px;font-weight:900;
+  font-family:ui-monospace,Menlo,monospace}
+.mkwrap .mkdial>div{display:flex;gap:5px;margin-top:9px}
+.mkwrap .mkdial>div button{flex:1;height:28px;border-radius:8px;font-size:15px;font-weight:800;color:#eceef3;
+  background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1)}
+.mkwrap .mkclauses{position:relative;z-index:1;display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.mkwrap .mkclauses button{padding:10px 13px;border-radius:99px;font-size:11px;font-weight:800;color:#98a0b2;
+  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1)}
+.mkwrap .mkclauses button.on{color:#0b0c10;background:var(--epx-mkwrap-c);border-color:transparent}
+
+/* ── THE ROOM ── */
+.mkwrap .mkroom{background:#050506;padding-bottom:40px}
+.mkwrap .mkspot{position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:radial-gradient(60% 32% at 50% 2%,hsl(var(--epx-mkwrap-dh) 80% 52% / .22),transparent 70%)}
+.mkwrap .mkroomtop{position:relative;z-index:1;display:flex;align-items:center;gap:11px;padding:14px 0 10px}
+.mkwrap .mkroomlot{display:flex;align-items:center;gap:9px;min-width:0;flex:1}
+.mkwrap .mkposterchip{width:30px;flex-shrink:0;display:block}
+.mkwrap .mkroomlot b{display:block;font-size:12.5px;font-weight:800;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis}
+.mkwrap .mkroomlot span{display:block;font-size:8.5px;color:#8b93a6}
+.mkwrap .mkclock{font-family:ui-monospace,Menlo,monospace;font-size:23px;font-weight:900;letter-spacing:-.02em}
+.mkwrap .mkclock.urgent{color:#ff5b52;animation:epx-mkbeat .7s infinite}
+@keyframes epx-mkbeat{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}
+.mkwrap .mkdrain{position:relative;z-index:1;height:3px;border-radius:99px;background:rgba(255,255,255,.08);
+  overflow:hidden}
+.mkwrap .mkdrain u{display:block;height:100%;background:#ffbe4d;transition:width 1s linear}
+.mkwrap .mkdrain u.urgent{background:#ff5b52}
+.mkwrap .mkboard{position:relative;z-index:1;margin-top:14px;padding:22px 18px;text-align:center;border-radius:18px;
+  background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.02));
+  border:1px solid rgba(255,255,255,.11);animation:epx-mkslam .34s cubic-bezier(.2,.9,.3,1) both}
+@keyframes epx-mkslam{from{transform:scale(.94);opacity:.4}to{transform:none;opacity:1}}
+.mkwrap .mkboard.mine{border-color:rgba(84,214,154,.5);
+  box-shadow:0 0 0 1px rgba(84,214,154,.14),0 18px 46px -18px rgba(84,214,154,.5)}
+.mkwrap .mkboard>span{font-size:7.5px;font-weight:900;letter-spacing:.22em;color:#9aa0ae}
+.mkwrap .mkboard>b{display:block;margin-top:9px;font-size:42px;font-weight:900;letter-spacing:-.045em;
+  font-family:ui-monospace,Menlo,monospace;color:#ffc266}
+.mkwrap .mkboard.mine>b{color:#7ee0b0}
+.mkwrap .mkboardsub{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:6px;margin-top:11px}
+.mkwrap .mkboardsub em{font-style:normal;font-size:8px;font-weight:900;letter-spacing:.1em;color:#9aa0ae;
+  padding:4px 8px;border-radius:99px;background:rgba(255,255,255,.07)}
+.mkwrap .mkboard p{margin-top:11px;font-size:12.5px;color:#a8aebd}
+.mkwrap .mkleads{color:#7ee0b0;font-weight:700}
+.mkwrap .mkfloorline{position:relative;z-index:1;display:flex;align-items:center;gap:9px;margin-top:13px}
+.mkwrap .mkfloorline p{font-size:12px;line-height:1.5;color:#a8aebd}
+.mkwrap .mkfloorline b{color:#fff;font-weight:800}
+.mkwrap .mkscope{position:relative;z-index:1;margin-top:10px;padding:10px 12px;border-radius:11px;
+  font-size:11.5px;line-height:1.5;color:#ffd08a;background:rgba(255,190,77,.09);
+  border:1px solid rgba(255,190,77,.2)}
+.mkwrap .mktape{position:relative;z-index:1;margin-top:14px;display:flex;flex-direction:column;gap:5px}
+.mkwrap .mktaperow{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:11px;
+  background:rgba(255,255,255,.045);animation:epx-mkin .3s both}
+@keyframes epx-mkin{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:none}}
+.mkwrap .mktaperow.you{background:rgba(255,190,77,.12);border:1px solid rgba(255,190,77,.24)}
+.mkwrap .mktaperow b{font-family:ui-monospace,Menlo,monospace;font-size:13px;font-weight:900}
+.mkwrap .mktaperow em{margin-left:auto;font-style:normal;font-size:9.5px;color:#8b93a6}
+.mkwrap .mkbid{position:relative;z-index:1;width:100%;margin-top:12px;padding:18px;border-radius:14px;
+  font-size:12px;font-weight:900;letter-spacing:.16em;color:#1a1206;border:none;
+  background:linear-gradient(180deg,#ffd98f,#ffbe4d 55%,#e09a12);
+  box-shadow:0 12px 34px -12px rgba(255,190,77,.7)}
+.mkwrap .mkbid.dead{opacity:.35;box-shadow:none}
+.mkwrap .mkoutbid{position:fixed;inset:0;z-index:14;display:flex;align-items:center;justify-content:center;
+  pointer-events:none;font-size:34px;font-weight:900;letter-spacing:.2em;color:#ff5b52;
+  animation:epx-mkbang .9s both}
+@keyframes epx-mkbang{0%{opacity:0;transform:scale(1.5)}18%{opacity:1;transform:scale(1)}
+  70%{opacity:1}100%{opacity:0}}
+/* ══ THE HAMMER ════════════════════════════════════════════════════════════
+   Two lines of static text was a poor ending for forty-five seconds of
+   pressure. The room closes in the winner's colour, the mark lands, and the
+   word arrives before the price does. */
+.mkwrap .mkverdict{position:fixed;inset:0;z-index:20;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:0;padding:0 30px;text-align:center;
+  background:radial-gradient(70% 44% at 50% 42%,hsl(var(--epx-mkwrap-oh) 62% 22% / .95),rgba(3,3,5,.97) 72%),
+    rgba(3,3,5,.97);
+  animation:epx-mkfade .3s both}
+/* the flash of the hammer coming down */
+.mkwrap .mkgavel{position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(50% 30% at 50% 44%,hsl(var(--epx-mkwrap-oh) 90% 70% / .5),transparent 70%);
+  animation:epx-mkhammer .5s cubic-bezier(.2,.9,.3,1) both}
+@keyframes epx-mkhammer{0%{opacity:0;transform:scale(2.2)}22%{opacity:1;transform:scale(1)}
+  100%{opacity:0;transform:scale(1.15)}}
+.mkwrap .mkvmark{display:block;animation:epx-mkdrop .5s .1s cubic-bezier(.2,1.5,.4,1) both}
+@keyframes epx-mkdrop{from{opacity:0;transform:translateY(-26px) scale(.5)}to{opacity:1;transform:none}}
+.mkwrap .mkvsold{display:block;margin-top:14px;font-size:40px;font-weight:900;letter-spacing:.3em;
+  text-indent:.3em;line-height:1;color:#fff;
+  animation:epx-mkslam2 .46s .16s cubic-bezier(.2,.9,.3,1) both}
+@keyframes epx-mkslam2{from{opacity:0;letter-spacing:.9em;transform:scale(1.18)}
+  to{opacity:1;letter-spacing:.3em;transform:none}}
+.mkwrap .mkvwho{display:block;margin-top:9px;font-size:11px;font-weight:900;letter-spacing:.24em;
+  color:hsl(var(--epx-mkwrap-oh) 90% 74%);animation:epx-mkbodyup .44s .34s both}
+.mkwrap .mkvprice{margin-top:20px;padding:11px 20px;border-radius:99px;font-size:24px;font-weight:900;
+  letter-spacing:-.03em;font-family:ui-monospace,Menlo,monospace;color:#fff;
+  background:hsl(var(--epx-mkwrap-oh) 60% 26% / .8);
+  box-shadow:inset 0 0 0 1px hsl(var(--epx-mkwrap-oh) 85% 68% / .5);
+  animation:epx-mkbodyup .5s .46s cubic-bezier(.16,.84,.3,1) both}
+.mkwrap .mkvnote{margin-top:16px;font-size:12.5px;line-height:1.5;color:#9aa2b4;
+  animation:epx-mkbodyup .5s .6s both}
+.mkwrap .mk-won .mkvsold{color:#7ee0b0}
+
+/* ── signature ── */
+/* ══ ACQUIRED ═══════════════════════════════════════════════════════════════
+   Losing an auction got a full hammer; buying a title outright got three lines
+   of text over a dimmed page. The purchase is the point of the whole screen,
+   so it gets the object you just bought, lit in its own colour. */
+.mkwrap .mksigned{position:fixed;inset:0;z-index:30;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;padding:0 30px;text-align:center;
+  background:radial-gradient(66% 40% at 50% 40%,hsl(var(--epx-mkwrap-dh) 60% 20% / .95),rgba(4,5,7,.98) 74%),
+    rgba(4,5,7,.98);animation:epx-mkfade .3s both}
+.mkwrap .mksignglow{position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(44% 26% at 50% 40%,hsl(var(--epx-mkwrap-dh) 92% 68% / .4),transparent 70%);
+  animation:epx-mkhammer .6s cubic-bezier(.2,.9,.3,1) both}
+.mkwrap .mksignart{width:132px;animation:epx-mksignin .62s cubic-bezier(.16,1.3,.4,1) both}
+@keyframes epx-mksignin{from{opacity:0;transform:translateY(26px) scale(.82) rotate(-4deg)}
+  to{opacity:1;transform:none}}
+.mkwrap .mksignword{display:block;margin-top:20px;font-size:11px;font-weight:900;letter-spacing:.34em;
+  text-indent:.34em;color:#7ee0b0;animation:epx-mkbodyup .44s .24s both}
+.mkwrap .mks-sent .mksignword{color:#ffc266}
+.mkwrap .mksigntitle{display:block;margin-top:9px;font-size:25px;font-weight:900;line-height:1.14;
+  letter-spacing:-.028em;color:#fff;animation:epx-mkbodyup .5s .32s cubic-bezier(.16,.84,.3,1) both}
+.mkwrap .mksignfacts{display:flex;gap:20px;margin-top:20px;padding-top:15px;
+  border-top:1px solid rgba(255,255,255,.13);animation:epx-mkbodyup .5s .44s both}
+.mkwrap .mksignfacts em{font-style:normal;font-size:9px;color:#8b93a6;line-height:1.3}
+.mkwrap .mksignfacts i{display:block;font-style:normal;font-size:17px;font-weight:900;
+  letter-spacing:-.02em;color:#eceef3;font-family:ui-monospace,Menlo,monospace;margin-bottom:3px}
+.mkwrap .mksignnote{margin-top:16px;font-size:12px;line-height:1.5;color:#8b93a6;
+  animation:epx-mkbodyup .5s .56s both}
+
+/* ══ THE TABLE ══════════════════════════════════════════════════════════════
+   Its own register. Every other screen in here is cold glass on near-black;
+   this one is a warm room with a light over a table, a person opposite, and
+   a sheet of paper between you. Nothing else in the Market looks like it. */
+.mkwrap .mkoffer{background:#0d0a08}
+.mkwrap .mkoffer .mkglow{background:
+  radial-gradient(74% 34% at 50% 0%,rgba(255,196,128,.2),transparent 66%),
+  radial-gradient(120% 60% at 50% 100%,rgba(0,0,0,.66),transparent)}
+.mkwrap .mkrep{position:relative;z-index:1;display:flex;align-items:center;gap:13px;margin-top:14px;
+  transition:transform .45s cubic-bezier(.2,.8,.2,1),opacity .45s}
+.mkwrap .mkface{width:56px;height:56px;flex-shrink:0;display:block;border-radius:15px;overflow:hidden;
+  background:linear-gradient(180deg,hsl(var(--epx-mkwrap-fh) 42% 34%),hsl(var(--epx-mkwrap-fh) 46% 15%));
+  box-shadow:0 8px 22px rgba(0,0,0,.55),inset 0 0 0 1px rgba(255,255,255,.14)}
+.mkwrap .mkface svg{width:100%;height:100%;display:block;fill:rgba(9,7,5,.62)}
+.mkwrap .mkrepwho b{display:block;font-size:16px;font-weight:800;letter-spacing:-.01em;color:#f4efe6}
+.mkwrap .mkrepwho span{display:block;margin-top:2px;font-size:11px;color:#a89c8a}
+.mkwrap .mkrepwho em{display:block;margin-top:4px;font-style:normal;font-size:7.5px;font-weight:900;
+  letter-spacing:.16em;color:#8a7e6d}
+/* posture. Leaning in, level, or sat back with the folder closed. */
+.mkwrap .mkp-in{transform:translateY(-3px) scale(1.035)}
+.mkwrap .mkp-level{transform:none}
+.mkwrap .mkp-back{transform:translateY(4px) scale(.955);opacity:.72}
+.mkwrap .mksays{position:relative;z-index:1;margin-top:13px;padding:15px 16px;border-radius:15px;
+  border-left:3px solid #8a7e6d;background:rgba(255,240,214,.055)}
+.mkwrap .mksays p{font-family:Georgia,'Times New Roman',serif;font-size:16px;line-height:1.42;
+  font-style:italic;color:#f4efe6}
+.mkwrap .mksays p::before{content:'\201C'} .mkwrap .mksays p::after{content:'\201D'}
+.mkwrap .mksays em{display:block;margin-top:9px;font-style:normal;font-size:11.5px;line-height:1.5;
+  color:#a89c8a}
+.mkwrap .mksays.mk-good{border-left-color:#7ee0b0;background:rgba(126,224,176,.08)}
+.mkwrap .mksays.mk-warn{border-left-color:#ffbe4d;background:rgba(255,190,77,.08)}
+.mkwrap .mksays.mk-bad{border-left-color:#e0736c;background:rgba(224,115,108,.08)}
+/* the paper. Square corners, because paper does not have rounded ones. */
+.mkwrap .mksheet{position:relative;z-index:1;margin-top:14px;padding:16px 17px 14px;
+  background:#f2eee3;color:#191712;box-shadow:0 16px 40px rgba(0,0,0,.6)}
+.mkwrap .mksheethead{display:flex;align-items:baseline;justify-content:space-between;
+  padding-bottom:9px;border-bottom:1.5px solid #191712}
+.mkwrap .mksheethead b{font-size:9px;font-weight:900;letter-spacing:.2em}
+.mkwrap .mksheethead span{font-size:7px;font-weight:900;letter-spacing:.18em;opacity:.5}
+.mkwrap .mkrow{display:flex;align-items:baseline;gap:10px;padding:9px 0;
+  border-bottom:1px dotted rgba(25,23,18,.3)}
+.mkwrap .mkrow span{font-size:12.5px}
+.mkwrap .mkrow b{margin-left:auto;font-family:ui-monospace,Menlo,monospace;font-size:12px;font-weight:800}
+.mkwrap .mkdelta{border-bottom:none;border-top:1.5px solid #191712;margin-top:2px;padding-top:10px}
+.mkwrap .mkdelta span{font-size:8px;font-weight:900;letter-spacing:.16em;opacity:.6}
+.mkwrap .up{color:#1f7a4d} .mkwrap .down{color:#a8271d}
+.mkwrap .mkoffer .mkbigrow{position:relative;z-index:1;display:flex;gap:8px;margin-top:11px}
+.mkwrap .mkoffer .mkbigrow button{flex:1;height:46px;border-radius:12px;font-size:12px;font-weight:900;
+  letter-spacing:.1em;color:#f4efe6;background:rgba(255,255,255,.08);
+  border:1px solid rgba(255,255,255,.14)}
+
+/* ══ CONTRACTS AS WRITTEN ═══════════════════════════════════════════════════
+   Taken from the studio-side deal sheet: a headline guarantee, then the terms
+   that actually decide what it is worth — basis, cap, recoupability, term. */
+.mkwrap .mkcontract{margin-top:14px;background:#e9e6dd;color:#16150f;
+  box-shadow:0 12px 32px rgba(0,0,0,.5)}
+.mkwrap .mkcthead{display:flex;align-items:center;gap:8px;padding:12px 14px 10px}
+.mkwrap .mkcthead b{font-size:10px;font-weight:900;letter-spacing:.13em}
+.mkwrap .mkcthead span{margin-left:auto;font-size:7.5px;font-weight:900;letter-spacing:.16em;
+  color:#6d6a5e}
+.mkwrap .mkctmg{padding:0 14px 12px}
+.mkwrap .mkctmg>span{display:block;font-size:7px;font-weight:900;letter-spacing:.18em;color:#6d6a5e}
+.mkwrap .mkctmg>b{display:block;margin-top:2px;font-size:34px;font-weight:900;letter-spacing:-.045em;
+  font-family:ui-monospace,Menlo,monospace}
+.mkwrap .mkctmg>em{display:inline-block;margin-top:6px;font-style:normal;font-size:9px;font-weight:800;
+  letter-spacing:.06em;color:#4a4840;background:rgba(22,21,15,.09);padding:5px 9px}
+.mkwrap .mkctgrid{display:grid;grid-template-columns:1fr 1fr;border-top:1px solid rgba(22,21,15,.2)}
+.mkwrap .mkctcell{padding:9px 14px;border-bottom:1px solid rgba(22,21,15,.13);
+  border-right:1px solid rgba(22,21,15,.13)}
+.mkwrap .mkctcell:nth-child(2n){border-right:none}
+.mkwrap .mkctcell span{display:block;font-size:7px;font-weight:900;letter-spacing:.14em;color:#6d6a5e}
+.mkwrap .mkctcell b{display:block;margin-top:3px;font-size:12.5px;font-weight:700;
+  font-family:ui-monospace,Menlo,monospace}
+.mkwrap .mkwarn{margin-top:11px;padding:11px 13px;border-radius:11px;font-size:11.5px;line-height:1.55;
+  color:#ffd08a;background:rgba(255,190,77,.09);border:1px solid rgba(255,190,77,.22)}
+.mkwrap .mkwarn b{color:#fff}
+
+/* ══ TENSION ═══════════════════════════════════════════════════════════════
+   A red wash over the entire screen made everything urgent, which is the same
+   as nothing being urgent — and it dirtied every colour underneath it. The
+   pressure belongs on the ONE thing the clock is actually about: the money. */
+.mkwrap .mkb-x1{box-shadow:inset 0 0 0 1px rgba(255,190,77,.3),0 8px 30px -14px rgba(255,150,60,.4)}
+.mkwrap .mkb-x2{box-shadow:inset 0 0 0 1px rgba(255,140,70,.5),0 10px 40px -14px rgba(255,120,60,.55)}
+.mkwrap .mkb-x2>b{transform:scale(1.03);color:#ff9d6b}
+.mkwrap .mkb-x3{box-shadow:inset 0 0 0 1.5px rgba(255,80,66,.75),0 14px 52px -14px rgba(255,60,50,.7);
+  animation:epx-mkpanic .62s ease-in-out infinite alternate}
+.mkwrap .mkb-x3>b{transform:scale(1.06);color:#ff6a58}
+@keyframes epx-mkpanic{from{box-shadow:inset 0 0 0 1.5px rgba(255,80,66,.55),0 10px 40px -16px rgba(255,60,50,.45)}
+  to{box-shadow:inset 0 0 0 1.5px rgba(255,80,66,.95),0 18px 60px -12px rgba(255,60,50,.85)}}
+.mkwrap .mkboard>b{transition:transform .4s cubic-bezier(.2,.8,.2,1),color .4s}
+
+/* ══ BUYING POWER ═══════════════════════════════════════════════════════════
+   A number alone never said whether it was a lot of money. */
+.mkwrap .mkbar{position:relative}
+.mkwrap .mkbar i{position:absolute;top:-3px;width:2px;height:11px;border-radius:2px;
+  background:#fff;transform:translateX(-1px);box-shadow:0 0 8px rgba(255,255,255,.7)}
+.mkwrap .mkpowbuys{display:flex;flex-direction:column;gap:2px;margin-top:7px;padding-top:7px;
+  border-top:1px solid rgba(255,255,255,.08)}
+.mkwrap .mkpowbuys span{font-size:10.5px;color:#8b93a6}
+.mkwrap .mkpowbuys b{color:#eceef3;font-weight:800}
+.mkwrap .mkpowshort b{color:#e0736c}
+
+/* ══ AVAILABILITY ═══════════════════════════════════════════════════════════
+   Urgency is information, so it gets a colour and a place of its own. */
+.mkwrap .mkav{display:inline-flex;align-items:center;gap:5px;font-size:7px;font-weight:900;
+  letter-spacing:.15em;padding:4px 8px;border-radius:99px;white-space:nowrap}
+.mkwrap .mkav i{width:5px;height:5px;border-radius:50%;background:currentColor;
+  animation:epx-mkpulse 1.1s infinite}
+.mkwrap .mkav-live{color:#1a1206;background:#ffbe4d}
+.mkwrap .mkav-closing{color:#fff;background:#c8402f}
+.mkwrap .mkav-open{color:#0b0c10;background:#7ee0b0}
+.mkwrap .mkav-soon{color:#cdd3e0;background:rgba(255,255,255,.12)}
+.mkwrap .mkav-watch{color:#8b93a6;background:rgba(255,255,255,.07)}
+.mkwrap .mkcardav{position:absolute;top:7px;left:7px;z-index:2}
+.mkwrap .mkrate{position:absolute;top:7px;right:7px;z-index:2;font-size:10px;font-weight:900;
+  font-family:ui-monospace,Menlo,monospace;color:#0b0c10;background:#e8c545;
+  padding:3px 6px;border-radius:5px}
+.mkwrap .mkavrow{display:flex;align-items:center;gap:9px;margin-bottom:9px}
+.mkwrap .mkavrow em{font-style:normal;font-size:10.5px;color:#8b93a6}
+
+/* ══ RAILS ══════════════════════════════════════════════════════════════════
+   A flat grid is fine for twelve titles and a spreadsheet at forty. Rails
+   answer a question each — what is closing, what is proven, what is cheap. */
+.mkwrap .mklenses{position:relative;z-index:1;display:flex;gap:6px;margin-top:8px;
+  overflow-x:auto;padding-bottom:3px;scrollbar-width:none}
+.mkwrap .mklenses::-webkit-scrollbar{display:none}
+.mkwrap .mklenses button{flex-shrink:0;display:flex;align-items:center;gap:6px;padding:7px 12px;
+  border-radius:99px;font-size:11px;font-weight:800;color:#98a0b2;
+  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09)}
+.mkwrap .mklenses button i{font-style:normal;font-size:9px;font-weight:900;opacity:.65}
+.mkwrap .mklenses button.on{color:#0b0c10;background:#fff;border-color:transparent}
+.mkwrap .mklenslive{color:#ffbe4d;border-color:rgba(255,190,77,.3)}
+.mkwrap .mklensclose{color:#ff8a7a;border-color:rgba(200,64,47,.35)}
+.mkwrap .mkresult{position:relative;z-index:1;margin-top:12px;font-size:11px;color:#7b8395}
+.mkwrap .mkrail{position:relative;z-index:1;margin-top:18px}
+.mkwrap .mkrailhead{display:flex;flex-direction:column;gap:2px}
+.mkwrap .mkrailhead b{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:800;
+  letter-spacing:-.012em}
+/* the count belonged beside the title; floating it right put a bare number on
+   its own line above the posters, attached to nothing */
+.mkwrap .mkrailhead em{font-style:normal;font-size:9px;font-weight:900;color:#8b93a6;
+  padding:2px 7px;border-radius:99px;background:rgba(255,255,255,.08)}
+.mkwrap .mkrailhead span{font-size:11px;color:#7b8395}
+.mkwrap .mkrailrun{display:flex;gap:10px;margin-top:11px;overflow-x:auto;padding-bottom:4px;
+  scroll-snap-type:x mandatory;scrollbar-width:none}
+.mkwrap .mkrailrun::-webkit-scrollbar{display:none}
+.mkwrap .mkcard{position:relative}
+.mkwrap .mkcard.wide{flex:0 0 132px;scroll-snap-align:start}
+
+/* ══ WHAT IT IS, AND HOW IT DID ════════════════════════════════════════════ */
+.mkwrap .mklogline{margin-top:13px;font-family:Georgia,'Times New Roman',serif;font-size:16px;
+  line-height:1.4;font-style:italic;color:#e6e9f0}
+.mkwrap .mksynopsis{margin-top:9px;font-size:13px;line-height:1.6;color:#9aa2b4}
+.mkwrap .mkpath{margin-top:16px;padding:14px 15px;border-radius:14px;
+  background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.08)}
+.mkwrap .mkpathrow{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.mkwrap .mkpathrow span{font-size:7px;font-weight:900;letter-spacing:.18em;color:#7b8395}
+.mkwrap .mkpathrow b{font-size:13px;font-weight:800}
+.mkwrap .mkpath>p{margin-top:6px;font-size:11.5px;line-height:1.55;color:#8b93a6}
+.mkwrap .mkprior{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.mkwrap .mkscore{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:9px 13px;border-radius:11px;background:#e8c545;color:#1a1206;min-width:74px}
+.mkwrap .mkscore b{font-size:22px;font-weight:900;letter-spacing:-.03em;
+  font-family:ui-monospace,Menlo,monospace}
+.mkwrap .mkscore span{font-size:7px;font-weight:900;letter-spacing:.1em;opacity:.72}
+.mkwrap .mkbox{flex:1;min-width:104px;padding:9px 11px;border-radius:11px;
+  background:rgba(255,255,255,.06)}
+.mkwrap .mkbox b{display:block;font-size:15px;font-weight:900;letter-spacing:-.02em;
+  font-family:ui-monospace,Menlo,monospace}
+.mkwrap .mkbox span{display:block;margin-top:2px;font-size:9px;color:#7b8395;line-height:1.3}
+.mkwrap .mkunproven{margin-top:11px;font-size:11.5px;line-height:1.55;color:#8b93a6}
+.mkwrap .mkunproven b{color:#eceef3}
+
+
+/* ══ THE ASK ════════════════════════════════════════════════════════════════
+   Four identical tiles said ASK, REACH, TERM, INTEREST at one volume. The
+   price is the decision; the rest is context, and it should read like it. */
+.mkwrap .mkask{margin-top:20px;padding:17px 18px 15px;border-radius:17px;
+  background:linear-gradient(180deg,rgba(255,255,255,.075),rgba(255,255,255,.022));
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.1)}
+.mkwrap .mkask>span{font-size:7.5px;font-weight:900;letter-spacing:.22em;color:#8b93a6}
+.mkwrap .mkask>b{display:block;margin-top:5px;font-size:44px;font-weight:900;letter-spacing:-.05em;
+  line-height:1;font-family:ui-monospace,Menlo,monospace;
+  background:linear-gradient(180deg,#fff,#b9c0cf);-webkit-background-clip:text;
+  background-clip:text;color:transparent}
+.mkwrap .mkfacts{display:flex;gap:16px;margin-top:15px;padding-top:13px;
+  border-top:1px solid rgba(255,255,255,.09)}
+.mkwrap .mkfacts em{flex:1;font-style:normal;font-size:9.5px;line-height:1.35;color:#7b8395}
+.mkwrap .mkfacts i{display:block;font-style:normal;font-size:17px;font-weight:900;letter-spacing:-.02em;
+  color:#eceef3;font-family:ui-monospace,Menlo,monospace;margin-bottom:2px}
+
+/* ══ WORKING A LONG CATALOGUE ═══════════════════════════════════════════════
+   Rails and one chip row do not survive a hundred lots: the Open rail becomes
+   a sixty-item sideways scroll and the grid becomes an endless column. What a
+   long catalogue actually needs is a cap with a way through it, a sort, real
+   filters, a dense mode, and a page size. */
+.mkwrap .mktools{position:relative;z-index:1;display:flex;gap:7px;margin-top:8px}
+.mkwrap .mktool{display:flex;align-items:center;gap:6px;padding:8px 13px;border-radius:11px;
+  font-size:11.5px;font-weight:800;color:#cdd3e0;background:rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.1)}
+.mkwrap .mktool i{font-style:normal;font-size:9px;font-weight:900;color:#0b0c10;background:#fff;
+  padding:2px 6px;border-radius:99px}
+.mkwrap .mksort{flex:1;padding:8px 12px;border-radius:11px;font-size:11.5px;font-weight:800;
+  color:#cdd3e0;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);
+  -webkit-appearance:none;appearance:none;outline:none}
+.mkwrap .mkdense{width:42px;justify-content:center;font-size:15px}
+.mkwrap .mkdense.on{color:#0b0c10;background:#fff;border-color:transparent}
+.mkwrap .mkresulthead{position:relative;z-index:1;display:flex;align-items:baseline;
+  justify-content:space-between;margin-top:16px}
+.mkwrap .mkresulthead b{font-size:13px;font-weight:800}
+.mkwrap .mkresulthead button{font-size:11px;font-weight:800;color:#8b93a6;background:none;
+  border:none;padding:4px}
+/* a page at a time, so the DOM never carries a hundred posters it is not showing */
+.mkwrap .mkmore{display:flex;align-items:center;justify-content:center;text-align:center;position:relative;z-index:1;display:flex;align-items:center;justify-content:center;
+  gap:9px;width:100%;margin-top:14px;padding:15px;border-radius:13px;font-size:12px;font-weight:800;
+  color:#cdd3e0;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1)}
+.mkwrap .mkmore i{font-style:normal;font-size:10px;color:#7b8395}
+/* the way out of a capped rail */
+.mkwrap .mkseeall{flex:0 0 132px;scroll-snap-align:start;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:4px;aspect-ratio:2/3;border-radius:13px;
+  background:rgba(255,255,255,.045);border:1px dashed rgba(255,255,255,.2)}
+.mkwrap .mkseeall b{font-size:12px;font-weight:800;color:#cdd3e0}
+.mkwrap .mkseeall i{font-style:normal;font-size:22px;font-weight:900;letter-spacing:-.03em;
+  color:#fff;font-family:ui-monospace,Menlo,monospace}
+.mkwrap .mkseeall em{font-style:normal;font-size:14px;color:#8b93a6}
+
+/* ── dense mode: how anyone actually works through sixty titles ── */
+.mkwrap .mklist{position:relative;z-index:1;display:flex;flex-direction:column;gap:5px;margin-top:12px}
+.mkwrap .mkrow2{display:flex;align-items:center;gap:11px;width:100%;padding:8px 11px 8px 8px;
+  border-radius:12px;text-align:left;background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.07)}
+.mkwrap .mkthumb{width:30px;flex-shrink:0;display:block}
+.mkwrap .mkrowmain{flex:1;min-width:0}
+.mkwrap .mkrowmain b{display:block;font-size:13px;font-weight:700;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.mkwrap .mkrowmain em{display:block;margin-top:2px;font-style:normal;font-size:10px;color:#7b8395;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mkwrap .mkrowend{flex-shrink:0;text-align:right}
+.mkwrap .mkrowend b{display:block;font-size:13px;font-weight:900;
+  font-family:ui-monospace,Menlo,monospace}
+.mkwrap .mkrowend em{display:block;margin-top:1px;font-style:normal;font-size:9px;color:#7b8395;
+  font-family:ui-monospace,Menlo,monospace}
+
+/* ── the filter sheet ── */
+.mkwrap .mksheetwrap{position:fixed;inset:0;z-index:40;display:flex;align-items:flex-end;
+  background:rgba(4,5,8,.72);backdrop-filter:blur(6px);animation:epx-mkfade .25s both}
+.mkwrap .mkfilters{width:100%;max-height:78%;overflow-y:auto;padding:18px 16px
+  calc(20px + env(safe-area-inset-bottom));border-radius:22px 22px 0 0;
+  background:#141720;box-shadow:0 -20px 60px rgba(0,0,0,.7);
+  animation:epx-mksheetup .32s cubic-bezier(.2,.85,.25,1) both}
+@keyframes epx-mksheetup{from{transform:translateY(100%)}to{transform:none}}
+.mkwrap .mkfhead{display:flex;align-items:center;justify-content:space-between}
+.mkwrap .mkfhead b{font-size:9px;font-weight:900;letter-spacing:.2em;color:#8b93a6}
+.mkwrap .mkfhead button{font-size:12px;font-weight:800;color:#fff;background:none;border:none;padding:4px}
+.mkwrap .mkflabel{display:block;margin-top:18px;font-size:7px;font-weight:900;letter-spacing:.18em;
+  color:#7b8395}
+.mkwrap .mkfrow{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
+.mkwrap .mkfrow button{padding:9px 12px;border-radius:99px;font-size:11px;font-weight:800;
+  color:#98a0b2;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1)}
+.mkwrap .mkfrow button.on{color:#0b0c10;background:#fff;border-color:transparent}
+.mkwrap .mkfclear{display:flex;align-items:center;justify-content:center;text-align:center;width:100%;margin-top:20px;padding:14px;border-radius:12px;font-size:11.5px;
+  font-weight:800;color:#e0736c;background:rgba(224,115,108,.1);
+  border:1px solid rgba(224,115,108,.24)}
+
+
+.mkwrap .mkoffterms{display:grid;grid-template-columns:1fr 1fr;
+  border-top:1px solid rgba(255,255,255,.08)}
+.mkwrap .mkoffterms .mkctcell{padding:9px 13px;border-bottom:1px solid rgba(255,255,255,.06);
+  border-right:1px solid rgba(255,255,255,.06)}
+.mkwrap .mkoffterms .mkctcell:nth-child(2n){border-right:none}
+.mkwrap .mkoffterms .mkctcell span{color:#7b8395}
+.mkwrap .mkoffterms .mkctcell b{color:#e6e9f0;font-size:12px}
+
+
+/* ══ THE ROOM, RESTRUCTURED ═════════════════════════════════════════════════
+   It was a single column of prose boxes with the controls at the bottom, so
+   the thing you need every four seconds scrolled off exactly when the clock
+   mattered. Now: fixed head, one scrolling middle, and a pinned offer maker. */
+.mkwrap .mkroom{display:flex;flex-direction:column;padding:0 14px;overflow:hidden}
+.mkwrap .mkscroll{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding-bottom:14px;scrollbar-width:none}
+.mkwrap .mkscroll::-webkit-scrollbar{display:none}
+
+/* two prose boxes, folded into one line you can open if you want it */
+.mkwrap .mkbrief{display:flex;align-items:center;gap:9px;width:100%;margin-top:11px;padding:10px 12px;
+  border-radius:12px;text-align:left;background:rgba(255,255,255,.045);
+  border:1px solid rgba(255,255,255,.08)}
+/* the platform mark is also a span in here; flex:1 was stretching it into a bar */
+.mkwrap .mkbrieftext{flex:1;font-size:11.5px;line-height:1.35;color:#a8aebd}
+.mkwrap .mkbrief b{color:#fff;font-weight:700}
+.mkwrap .mkbrief i{font-style:normal;font-size:15px;font-weight:800;color:#7b8395}
+.mkwrap .mkbriefopen{margin-top:8px;padding:0 3px;font-size:11.5px;line-height:1.55;color:#8b93a6}
+
+/* where you stand: one line, not a paragraph in a box */
+.mkwrap .mkstand{display:flex;align-items:center;gap:12px;margin-top:11px;padding:11px 13px;
+  border-radius:13px;background:rgba(255,190,77,.09);border:1px solid rgba(255,190,77,.26)}
+.mkwrap .mkstand.mine{background:rgba(126,224,176,.1);border-color:rgba(126,224,176,.3)}
+.mkwrap .mkstand>b{flex-shrink:0;font-size:17px;font-weight:900;letter-spacing:-.03em;
+  font-family:ui-monospace,Menlo,monospace;color:#ffc266}
+.mkwrap .mkstand.mine>b{color:#7ee0b0}
+.mkwrap .mkstand p{font-size:12px;line-height:1.4;color:#dfe4ee}
+
+.mkwrap .mkcontracts{margin-top:12px;display:flex;flex-direction:column;gap:6px}
+/* ONE LINE per contract, in the platform's own colour. A neutral card with a
+   coloured hairline made three rivals look like three rows of a table; a
+   Vantage card should be Vantage red the way a Netflix tile is Netflix red. */
+.mkwrap .mkoffer2{position:relative;border-radius:13px;overflow:hidden;animation:epx-mkslam .34s both;
+  background:linear-gradient(118deg,hsl(var(--epx-mkwrap-oh) 58% 24%) 0%,
+    hsl(var(--epx-mkwrap-oh) 52% 13%) 62%,hsl(var(--epx-mkwrap-oh) 46% 9%) 100%);
+  box-shadow:inset 0 0 0 1px hsl(var(--epx-mkwrap-oh) 62% 56% / .3)}
+.mkwrap .mkoffer2.top{
+  background:linear-gradient(118deg,hsl(var(--epx-mkwrap-oh) 70% 34%) 0%,
+    hsl(var(--epx-mkwrap-oh) 62% 18%) 66%,hsl(var(--epx-mkwrap-oh) 55% 12%) 100%);
+  box-shadow:inset 0 0 0 1.5px hsl(var(--epx-mkwrap-oh) 85% 66% / .65),
+    0 12px 34px -14px hsl(var(--epx-mkwrap-oh) 80% 50% / .6)}
+.mkwrap .mkoffer2.mine{box-shadow:inset 0 0 0 1.5px hsl(var(--epx-mkwrap-oh) 90% 70% / .8),
+  0 12px 34px -14px hsl(var(--epx-mkwrap-oh) 85% 55% / .6)}
+.mkwrap .mkofferhead{display:flex;align-items:center;gap:9px;width:100%;padding:11px 12px;
+  background:none;border:none;text-align:left}
+.mkwrap .mkrank{font-style:normal;font-size:10px;font-weight:900;color:rgba(255,255,255,.45);min-width:9px;
+  font-family:ui-monospace,Menlo,monospace}
+.mkwrap .mkoffer2.top .mkrank{color:#ffc266}
+.mkwrap .mkoffwho{font-size:12.5px;font-weight:800;white-space:nowrap}
+.mkwrap .mkoffterse{flex:1;min-width:0;font-style:normal;font-size:9.5px;color:rgba(255,255,255,.6);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mkwrap .mkoffmg{font-size:15px;font-weight:900;letter-spacing:-.03em;
+  font-family:ui-monospace,Menlo,monospace;white-space:nowrap}
+/* the seller's reading, as a rule along the bottom edge */
+.mkwrap .mkvalue{position:absolute;left:0;bottom:0;height:2.5px;background:rgba(255,255,255,.85);
+  transition:width .45s cubic-bezier(.2,.8,.2,1)}
+
+/* ── the pinned offer maker ── */
+.mkwrap .mkmaker{flex-shrink:0;padding:10px 0 calc(10px + env(safe-area-inset-bottom));
+  border-top:1px solid rgba(255,255,255,.09);background:rgba(6,6,8,.86);
+  backdrop-filter:blur(16px)}
+.mkwrap .mkmyterms{display:flex;align-items:center;gap:5px;width:100%;padding:2px 0 9px;
+  background:none;border:none;overflow-x:auto;scrollbar-width:none}
+.mkwrap .mkmyterms::-webkit-scrollbar{display:none}
+.mkwrap .mkmyterms span{flex-shrink:0;font-size:9.5px;font-weight:700;color:#a8b0c2;
+  padding:4px 9px;border-radius:99px;background:rgba(255,255,255,.08)}
+.mkwrap .mkmyterms i{flex-shrink:0;margin-left:auto;font-style:normal;font-size:9px;font-weight:900;
+  letter-spacing:.14em;color:#ffc266;padding:4px 9px}
+/* a grid, so the two steppers are identical and the number is truly centred */
+.mkwrap .mkmakerrow{display:grid;grid-template-columns:58px 1fr 58px;align-items:center;gap:10px;
+  margin-bottom:10px}
+.mkwrap .mkmakerrow b{flex:1;text-align:center;font-size:23px;font-weight:900;letter-spacing:-.04em;
+  font-family:ui-monospace,Menlo,monospace}
+/* The shell resets buttons with `:where(button){text-align:inherit}`. Zero
+   specificity, but it still wins wherever nothing else sets alignment — so
+   every glyph sat hard against the left edge and the pair read as lopsided.
+   Centre them explicitly rather than trusting the button default. */
+.mkwrap .mkstep{display:flex;align-items:center;justify-content:center;
+  width:100%;height:46px;border-radius:12px;font-size:20px;font-weight:800;line-height:1;
+  color:#eceef3;background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.12)}
+/* centred, and in the player's own wizard colour rather than a hardcoded gold */
+.mkwrap .mkbid{display:flex;align-items:center;justify-content:center;text-align:center;
+  width:100%;margin:0;padding:17px;border-radius:13px;font-size:12px;font-weight:900;
+  letter-spacing:.16em;border:none;color:hsl(var(--epx-mkwrap-me,42) 70% 10%);
+  background:linear-gradient(180deg,
+    hsl(var(--epx-mkwrap-me,42) 92% 74%),
+    hsl(var(--epx-mkwrap-me,42) 88% 60%) 55%,
+    hsl(var(--epx-mkwrap-me,42) 80% 44%));
+  box-shadow:0 10px 28px -12px hsl(var(--epx-mkwrap-me,42) 88% 58% / .7)}
+.mkwrap .mkbid.dead{opacity:.35;box-shadow:none}
+.mkwrap .mkroom .mkdials{grid-template-columns:1fr 1fr 1fr;margin-top:4px}
+
+/* ══ THE BOX SET ════════════════════════════════════════════════════════════
+   A fan of three sheets spilled past the card edge and got clipped, leaving
+   slivers either side of one dark poster — scattered cards, not a set. A
+   collection cover is a MOSAIC: four titles, all legible, the count doing the
+   rest of the work. */
+.mkwrap .mkbox{position:relative;display:grid;grid-template-columns:1fr 1fr;
+  grid-template-rows:1fr 1fr;gap:2px;width:100%;aspect-ratio:2/3;border-radius:6px;
+  overflow:hidden;background:#0a0b0f;
+  box-shadow:0 8px 24px rgba(0,0,0,.6),inset 0 0 0 1px rgba(255,255,255,.09)}
+.mkwrap .mkboxcell{position:relative;overflow:hidden;display:block}
+.mkwrap .mkboxcell>div{height:100%;border-radius:0;box-shadow:none}
+.mkwrap .mkboxmore{position:absolute;right:6px;bottom:6px;z-index:3;font-size:9px;font-weight:900;
+  color:#0b0c10;background:#fff;padding:3px 7px;border-radius:99px;
+  font-family:ui-monospace,Menlo,monospace;
+  box-shadow:0 3px 10px rgba(0,0,0,.5)}
+.mkwrap .mkbox.lg{width:66%;max-width:250px;border-radius:10px;
+  box-shadow:0 42px 70px -26px rgba(0,0,0,.92),
+    0 24px 90px -34px hsl(var(--epx-mkwrap-dh) 80% 52% / .7),
+    inset 0 0 0 1px rgba(255,255,255,.1);
+  animation:epx-mkrise .72s cubic-bezier(.16,.84,.3,1) both}
+.mkwrap .mkbox.lg .mkboxmore{right:9px;bottom:9px;font-size:12px;padding:5px 11px}
+
+/* ══ WHAT IS IN IT ══════════════════════════════════════════════════════════
+   The old schedule was a three-column table of names and numbers. These are
+   films; the shelf shows them as films, with the allocation drawn so you can
+   see which one the package is really about. */
+.mkwrap .mkshelf{display:flex;flex-direction:column;gap:6px;margin-top:14px}
+.mkwrap .mkmember{position:relative;display:flex;align-items:center;gap:11px;padding:9px 12px 10px 9px;
+  border-radius:12px;background:rgba(255,255,255,.045);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.07);overflow:hidden}
+.mkwrap .mkmemart{width:30px;flex-shrink:0;display:block}
+.mkwrap .mkmemmain{flex:1;min-width:0}
+.mkwrap .mkmemmain b{display:block;font-size:12.5px;font-weight:700;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.mkwrap .mkmemmain em{display:block;margin-top:2px;font-style:normal;font-size:9.5px;color:#7b8395}
+.mkwrap .mkmemend{flex-shrink:0;text-align:right}
+.mkwrap .mkmemend b{display:block;font-size:13px;font-weight:900;
+  font-family:ui-monospace,Menlo,monospace}
+.mkwrap .mkmemend em{display:block;margin-top:1px;font-style:normal;font-size:8.5px;color:#7b8395}
+/* the allocation, drawn — the first title is usually most of the package */
+.mkwrap .mkmemshare{position:absolute;left:0;bottom:0;height:2px;
+  background:linear-gradient(90deg,rgba(255,255,255,.5),rgba(255,255,255,.14))}
+.mkwrap .mkshelftotal{display:flex;align-items:baseline;justify-content:space-between;
+  margin-top:12px;padding-top:12px;border-top:1.5px solid rgba(255,255,255,.16)}
+.mkwrap .mkshelftotal span{font-size:8px;font-weight:900;letter-spacing:.18em;color:#7b8395}
+.mkwrap .mkshelftotal b{font-size:19px;font-weight:900;letter-spacing:-.03em;
+  font-family:ui-monospace,Menlo,monospace}
+
+/* the mosaic already fills a poster's footprint, so the card needs no frame */
+.mkwrap .mkcardbox{display:block;width:100%}

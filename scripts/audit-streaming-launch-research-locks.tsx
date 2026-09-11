@@ -117,8 +117,7 @@ assert.match(
 );
 
 const pricingMarkup = renderToStaticMarkup(<StepPricing {...props} />);
-assert.equal(lockCount(pricingMarkup), 2, 'Locked pricing models and plan features should share the same visible research-lock treatment.');
+assert.equal(lockCount(pricingMarkup), 1, 'Collapsed pricing keeps revenue-model research requirements visible without rendering every plan editor.');
 assert.match(visibleText(pricingMarkup), /Research locked.*Commerce level 20 or EMPIRE\+ Free/);
-assert.match(visibleText(pricingMarkup), /Research locked.*Playback Quality level 20/);
 
 console.log('Streaming launch research-lock UX audit passed.');

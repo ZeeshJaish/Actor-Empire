@@ -1,21 +1,25 @@
 import fs from 'node:fs';
 
-const source = fs.readFileSync('views/lifestyle/business/ReleaseWizard.tsx', 'utf8');
+const source = fs.readFileSync('views/lifestyle/business/release-strategy-transplant/CampaignStep.tsx', 'utf8');
+const styles = fs.readFileSync('views/lifestyle/business/release-strategy-transplant/ReleaseStrategy.module.css', 'utf8');
 
 const mustInclude = token => {
   if (!source.includes(token)) throw new Error(`Missing ${token}`);
 };
 
 [
-  'channel-grid-row',
-  'channel-control-cluster',
-  'channel-control-dock',
-  'channel-mini-meter',
-  'channel-amount-input',
-  'grid-cols-[44px_minmax(0,1fr)]',
-  'md:grid-cols-[44px_minmax(0,1fr)_236px]',
-  'tabular-nums'
+  'className={join(css.chan, channel.amount > 0 && css.on)}',
+  'className={css.chanicon}',
+  'className={css.chantext}',
+  'className={css.chanset}',
+  'className={css.chanfoot}',
+  'className={css.chanfill}',
+  'data-testid={`channel-${channel.id}-value`'
 ].forEach(mustInclude);
+
+['.chan{', 'grid-template-areas:', "'icon text set'", "'foot foot foot'", '.chanset{'].forEach(token => {
+  if (!styles.includes(token)) throw new Error(`Missing ${token}`);
+});
 
 if (source.includes('channel-spend-slider') || source.includes('type="range"')) {
   throw new Error('Channel rows still render the old large slider control.');
@@ -33,4 +37,4 @@ if (/grid-cols-\[44px_104px_44px\]/.test(source)) {
   throw new Error('Channel controls still use the oversized mobile cluster.');
 }
 
-console.log('Release channel row symmetry audit passed.');
+console.log('Release transplanted channel row symmetry audit passed.');

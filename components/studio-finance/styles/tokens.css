@@ -14,17 +14,17 @@
 
 .sf {
   /* --- surface: five rungs of near-black, real luminance steps apart ------ */
-  --sf-void:     #030406;
-  --sf-canvas:   #07080c;
-  --sf-surface:  #0d0f15;
-  --sf-raised:   #13161e;
-  --sf-overlay:  #1a1e28;
-  --sf-scrim:    rgba(3, 4, 6, 0.72);
+  --sf-void:     #07090e;
+  --sf-canvas:   #0b0e15;
+  --sf-surface:  #111621;
+  --sf-raised:   #171d29;
+  --sf-overlay:  #202736;
+  --sf-scrim:    rgba(5, 7, 11, 0.76);
 
   /* --- line: three weights, no more --------------------------------------- */
-  --sf-line-hair:   rgba(255, 255, 255, 0.055);
-  --sf-line:        rgba(255, 255, 255, 0.10);
-  --sf-line-strong: rgba(255, 255, 255, 0.18);
+  --sf-line-hair:   rgba(206, 218, 235, 0.07);
+  --sf-line:        rgba(206, 218, 235, 0.12);
+  --sf-line-strong: rgba(220, 230, 244, 0.20);
 
   /* --- foreground: warm whites, cool greys --------------------------------- */
   --sf-fg-max: #f7f5f1;   /* the number that matters most on the screen */
@@ -68,6 +68,28 @@
   --sf-brand-wash: rgba(var(--sf-brand-on-rgb), 0.14);
   --sf-brand-line: rgba(var(--sf-brand-on-rgb), 0.42);
 
+  /* --- subscription tiers: solid comparison surfaces ---------------------- */
+  --sf-plan-essential:      #10242d;
+  --sf-plan-essential-open: #15303b;
+  --sf-plan-standard:       #19162d;
+  --sf-plan-standard-open:  #211d3a;
+  --sf-plan-premiere:       #261c0f;
+  --sf-plan-premiere-open:  #302415;
+  --sf-plan-custom:         #141923;
+  --sf-plan-custom-open:    #1a202c;
+  --sf-plan-emerald:        #11271f;
+  --sf-plan-emerald-open:   #173329;
+  --sf-plan-ocean:          #101f32;
+  --sf-plan-ocean-open:     #152a42;
+  --sf-plan-teal:           #102725;
+  --sf-plan-teal-open:      #15332f;
+  --sf-plan-rose:           #2b131c;
+  --sf-plan-rose-open:      #371923;
+  --sf-plan-magenta:        #26152d;
+  --sf-plan-magenta-open:   #311b39;
+  --sf-plan-graphite:       #171b23;
+  --sf-plan-graphite-open:  #1f2530;
+
   /* --- gold: ownership, investors, the public markets. Nothing else -------- */
   --sf-gold:      #c9a227;
   --sf-gold-tint: #e6cf8a;
@@ -93,8 +115,8 @@
 
   /* --- space, shape, depth, motion ------------------------------------------ */
   --sf-1: 4px; --sf-2: 8px; --sf-3: 12px; --sf-4: 16px; --sf-5: 20px; --sf-6: 28px;
-  --sf-r-chip: 5px; --sf-r-card: 12px; --sf-r-sheet: 18px;
-  --sf-shadow: 0 12px 34px rgba(0, 0, 0, 0.55);
+  --sf-r-chip: 12px; --sf-r-card: 18px; --sf-r-sheet: 24px;
+  --sf-shadow: 0 14px 30px rgba(0, 0, 0, 0.38);
   --sf-fast: 160ms; --sf-med: 240ms; --sf-slow: 320ms;
   --sf-ease: cubic-bezier(0.22, 0.8, 0.3, 1);
 }

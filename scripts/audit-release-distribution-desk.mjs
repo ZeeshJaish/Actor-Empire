@@ -5,6 +5,7 @@ const assert = (condition, message) => {
 };
 
 const releaseWizard = fs.readFileSync('views/lifestyle/business/ReleaseWizard.tsx', 'utf8');
+const desk = fs.readFileSync('views/lifestyle/business/release-strategy-transplant/TheatricalDeskStep.tsx', 'utf8');
 const typesSource = fs.readFileSync('types.ts', 'utf8');
 
 [
@@ -16,34 +17,39 @@ const typesSource = fs.readFileSync('types.ts', 'utf8');
   'distributionDealSummary',
   'getCinemaChainsForRegion',
   'getCinemaChainTerms',
-  'Auto Build Footprint',
-  'Distribution Desk',
-  'Selected region partners',
-  'All partners',
-  'Max screens',
-  'chainIds',
-  'Deal summary',
-  'Audience pull',
-  'Partner cut',
-  'Studio share',
-  'Booking cost',
-  'Gross opening estimate',
-  'Studio receipts',
-  'If the run sells $100',
-  'box-office variance'
+  '<TheatricalDeskStep',
+  'regions={deskRegions}',
+  'totalScreens={distributionDealSummary.totalScreens}',
+  'bookingCost={distributionDealSummary.bookingCost}',
+  'studioShare={distributionDealSummary.studioShare}',
+  'onToggleRegion={regionId => toggleSelectedRegion',
+  'onToggleChain={(regionId, chainId) => toggleDistributionChain',
+  'onAutoBuild={() => applyRecommendedDistributionDesk'
 ].forEach(token => {
   assert(releaseWizard.includes(token), `Release distribution desk should include ${token}.`);
 });
+
+[
+  'AUTO-BUILD FOOTPRINT',
+  'WHERE IT OPENS',
+  'CINEMA PARTNERS',
+  'regions.map',
+  'region.chains.map',
+  'onToggleRegion(region.id)',
+  'onToggleChain(region.id, chain.id)',
+  'totalScreens.toLocaleString()',
+  'bookingCost',
+  'studioShare',
+  'expectedFootfall',
+  'openingRange'
+].forEach(token => assert(desk.includes(token), `Transplanted distribution desk should include ${token}.`));
 
 assert(
   releaseWizard.includes('releaseChainSelections: releaseType === \'THEATRICAL\'') &&
     releaseWizard.includes('? normalizedDistributionChainSelections'),
   'Release lock should persist selected cinema chains per region.'
 );
-assert(
-  /disabled=\{normalizedSelectedRegionIds\.length === 0\}/.test(releaseWizard),
-  'Continue should require at least one selected release region, not a separate scale card.'
-);
+assert(/disabled=\{totalScreens <= 0\}/.test(desk), 'Continue should require a live theatrical footprint.');
 assert(
   /releaseChainSelections\?:\s*Partial<Record<BoxOfficeRegionId,\s*CinemaChainId\[\]>>/.test(typesSource),
   'ProjectDetails should support saved multi-partner cinema-chain selections by region.'
@@ -61,4 +67,4 @@ assert(
   'Distribution desk should not show duplicate scale cards, market-weight jargon, or bulky forecast model copy.'
 );
 
-console.log('Release distribution desk audit passed.');
+console.log('Release transplanted distribution desk audit passed.');

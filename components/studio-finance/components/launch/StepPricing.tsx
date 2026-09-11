@@ -13,8 +13,8 @@
 
 import { useMemo, useState, type ReactNode } from 'react';
 import {
-  PLAN_FEATURES, REVENUE_STREAMS, forecastPricing,
-  type Plan, type PricingSettings, type StreamId,
+  CUSTOM_PLAN_COLORS, PLAN_FEATURES, REVENUE_STREAMS, forecastPricing,
+  type CustomPlanColorId, type Plan, type PricingSettings, type StreamId,
 } from '../../finance/launch';
 import type { StepProps } from './LaunchWizard';
 import { compactCount, money, moneyPrecise, pct } from '../../finance/format';
@@ -26,12 +26,42 @@ const GROUPS = [
   { id: 'extras' as const, label: 'Extras' },
 ];
 
+const planTone = (plan: Plan) => {
+  if (plan.id === 'BASIC' || plan.name.trim().toLowerCase() === 'essential') return 'essential';
+  if (plan.id === 'PREMIUM' || plan.name.trim().toLowerCase() === 'standard') return 'standard';
+  if (plan.id === 'FAMILY' || plan.name.trim().toLowerCase() === 'premiere') return 'premiere';
+  return 'custom';
+};
+
+const PLAN_COLOR_LABELS: Record<CustomPlanColorId, string> = {
+  emerald: 'Emerald',
+  ocean: 'Ocean',
+  teal: 'Teal',
+  rose: 'Rose',
+  magenta: 'Magenta',
+  graphite: 'Graphite',
+};
+
+const stablePlanColor = (plan: Plan): CustomPlanColorId => {
+  if (plan.colorId && CUSTOM_PLAN_COLORS.includes(plan.colorId)) return plan.colorId;
+  const hash = [...plan.id].reduce((sum, character) => sum + character.charCodeAt(0), 0);
+  return CUSTOM_PLAN_COLORS[hash % CUSTOM_PLAN_COLORS.length];
+};
+
+const assignPlanColor = (plans: Plan[]): CustomPlanColorId => {
+  const used = new Set(plans.filter((plan) => planTone(plan) === 'custom').map(stablePlanColor));
+  const available = CUSTOM_PLAN_COLORS.filter((color) => !used.has(color));
+  const pool = available.length ? available : CUSTOM_PLAN_COLORS;
+  return pool[Math.floor(Math.random() * pool.length)];
+};
+
 export function StepPricing({ data, draft, patch, chosen, handlers }: StepProps) {
   const settings: PricingSettings = draft.pricing ?? data.pricing;
   const addressable = useMemo(() => chosen.reduce((sum, c) => sum + c.addressableHouseholds, 0), [chosen]);
+  const pricingCohorts = useMemo(() => chosen.flatMap(country => country.pricingCohorts || []), [chosen]);
   const forecast = useMemo(
-    () => forecastPricing(settings, addressable, data.market),
-    [settings, addressable, data.market],
+    () => forecastPricing(settings, addressable, data.market, pricingCohorts),
+    [settings, addressable, data.market, pricingCohorts],
   );
 
   const write = (next: Partial<PricingSettings>) => patch({ pricing: { ...settings, ...next } });
@@ -45,6 +75,25 @@ export function StepPricing({ data, draft, patch, chosen, handlers }: StepProps)
 
   const top = [...forecast.streams].sort((a, b) => b.monthly - a.monthly)[0];
   const [openDetail, setOpenDetail] = useState(false);
+  const [openPlanId, setOpenPlanId] = useState<string | null>(null);
+  const openPlanIndex = settings.plans.findIndex((plan) => plan.id === openPlanId);
+  const openPlan = openPlanIndex >= 0 ? settings.plans[openPlanIndex] : null;
+  const openPlanRow = openPlan ? forecast.plans.find((row) => row.plan.id === openPlan.id) : null;
+
+  const addPlan = () => {
+    const id = `plan-${Date.now()}`;
+    write({
+      plans: [...settings.plans, {
+        id,
+        name: `Plan ${settings.plans.length + 1}`,
+        monthly: 12,
+        featureIds: ['noads', 'catalogue'],
+        ads: false,
+        colorId: assignPlanColor(settings.plans),
+      }],
+    });
+    setOpenPlanId(id);
+  };
 
   return (
     <>
@@ -132,107 +181,161 @@ export function StepPricing({ data, draft, patch, chosen, handlers }: StepProps)
             <button
               type="button"
               className="sf-link"
-              onClick={() => write({
-                plans: [...settings.plans, {
-                  id: `plan-${Date.now()}`,
-                  name: `Plan ${settings.plans.length + 1}`,
-                  monthly: 12,
-                  featureIds: ['noads', 'catalogue'],
-                  ads: false,
-                }],
-              })}
+              onClick={addPlan}
             >
               Add a plan
             </button>
           </div>
 
-          <ul className="pr-plans">
+          <ul className="pr-plan-tabs" aria-label="Compare subscription plans">
             {settings.plans.map((plan) => {
               const row = forecast.plans.find((r) => r.plan.id === plan.id);
+              const tone = planTone(plan);
+              const colorId = tone === 'custom' ? stablePlanColor(plan) : undefined;
+              const featureNames = PLAN_FEATURES
+                .filter((feature) => plan.featureIds.includes(feature.id))
+                .map((feature) => feature.name);
+              if (plan.ads) featureNames.push('Ad-supported');
+              const visibleFeatures = featureNames.slice(0, 2);
+              const extraFeatures = Math.max(0, featureNames.length - visibleFeatures.length);
+              const isOpen = openPlanId === plan.id;
               return (
-                <li key={plan.id} className="pr-plan">
-                  <header className="pr-plan-head">
-                    <input
-                      className="pr-plan-name"
-                      value={plan.name}
-                      onChange={(e) => writePlan(plan.id, { name: e.target.value })}
-                      aria-label="Plan name"
-                    />
-                    {settings.plans.length > 1 && (
-                      <button
-                        type="button"
-                        className="pr-remove"
-                        onClick={() => write({ plans: settings.plans.filter((p) => p.id !== plan.id) })}
-                        aria-label={`Remove ${plan.name}`}
-                      >
-                        ×
-                      </button>
-                    )}
-                  </header>
-
-                  <div className="pr-price">
-                    <button type="button" className="st-step" onClick={() => writePlan(plan.id, { monthly: Math.max(0, plan.monthly - 1) })} aria-label="Lower price">−</button>
-                    <span className="pr-price-figure">{money(plan.monthly)}<i>/mo</i></span>
-                    <button type="button" className="st-step" onClick={() => writePlan(plan.id, { monthly: plan.monthly + 1 })} aria-label="Raise price">+</button>
-                  </div>
-
-                  <div className="pr-feats">
-                    {GROUPS.map((group) => (
-                      <div key={group.id} className="pr-featgroup">
-                        <em>{group.label}</em>
-                        <div className="pr-chips">
-                          {PLAN_FEATURES.filter((f) => f.group === group.id).map((feature) => {
-                            const has = plan.featureIds.includes(feature.id);
-                            const lock = data.capabilityLocks[`feature:${feature.id}`];
-                            return (
-                              <button
-                                key={feature.id}
-                                type="button"
-                                disabled={Boolean(lock)}
-                                title={lock || undefined}
-                                aria-label={lock ? `${feature.name} locked: ${lock}` : feature.name}
-                                className={`${has ? 'pr-chip is-on' : 'pr-chip'}${lock ? ' is-locked' : ''}`}
-                                onClick={() => writePlan(plan.id, {
-                                  featureIds: has
-                                    ? plan.featureIds.filter((f) => f !== feature.id)
-                                    : [...plan.featureIds, feature.id],
-                                })}
-                              >
-                                <span className="pr-chip-name">{feature.name}</span>
-                                {lock && <ResearchLockMark reason={lock} compact />}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ))}
-                    {settings.streams.includes('ads') && (
-                      <div className="pr-featgroup">
-                        <em>Adverts</em>
-                        <div className="pr-chips">
-                          <button
-                            type="button"
-                            className={plan.ads ? 'pr-chip is-ads is-on' : 'pr-chip'}
-                            onClick={() => writePlan(plan.id, { ads: !plan.ads })}
-                          >
-                            {plan.ads ? 'This plan carries adverts' : 'No adverts on this plan'}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {row && (
-                    <footer className="pr-plan-foot">
-                      <span><b>{compactCount(row.subscribers)}</b> households</span>
-                      <span><b>{pct(row.share, 0)}</b> of subscribers</span>
-                      <span><b>{money(row.monthly)}</b> a month</span>
-                    </footer>
-                  )}
+                <li key={plan.id}>
+                  <button
+                    type="button"
+                    className={isOpen ? 'pr-plan-tab is-open' : 'pr-plan-tab'}
+                    data-plan-tone={tone}
+                    data-plan-color={colorId}
+                    aria-expanded={isOpen}
+                    aria-label={`Edit ${plan.name} plan`}
+                    onClick={() => setOpenPlanId(isOpen ? null : plan.id)}
+                  >
+                    <span className="pr-plan-tab-name">{plan.name}</span>
+                    <strong>{money(plan.monthly)}<i>/mo</i></strong>
+                    <span className="pr-plan-tab-features" title={featureNames.join(', ')}>
+                      {visibleFeatures.length ? visibleFeatures.join(' · ') : 'Base access'}
+                      {extraFeatures > 0 && ` +${extraFeatures}`}
+                    </span>
+                    <span className="pr-plan-tab-foot">
+                      <b>{row ? pct(row.share, 0) : '—'}</b>
+                      <i>{isOpen ? 'Close' : 'Edit'} {isOpen ? '⌃' : '⌄'}</i>
+                    </span>
+                  </button>
                 </li>
               );
             })}
           </ul>
+
+          {openPlan && (
+            <div
+              className="pr-plan pr-plan-editor"
+              data-plan-tone={planTone(openPlan)}
+              data-plan-color={planTone(openPlan) === 'custom' ? stablePlanColor(openPlan) : undefined}
+            >
+              <header className="pr-plan-head">
+                <input
+                  className="pr-plan-name"
+                  value={openPlan.name}
+                  onChange={(e) => writePlan(openPlan.id, { name: e.target.value })}
+                  aria-label="Plan name"
+                />
+                {settings.plans.length > 1 && (
+                  <button
+                    type="button"
+                    className="pr-remove"
+                    onClick={() => {
+                      write({ plans: settings.plans.filter((plan) => plan.id !== openPlan.id) });
+                      setOpenPlanId(null);
+                    }}
+                    aria-label={`Remove ${openPlan.name}`}
+                  >
+                    ×
+                  </button>
+                )}
+              </header>
+
+              <div className="pr-price">
+                <button type="button" className="st-step" onClick={() => writePlan(openPlan.id, { monthly: Math.max(0, openPlan.monthly - 1) })} aria-label="Lower price">−</button>
+                <span className="pr-price-figure">{money(openPlan.monthly)}<i>/mo</i></span>
+                <button type="button" className="st-step" onClick={() => writePlan(openPlan.id, { monthly: openPlan.monthly + 1 })} aria-label="Raise price">+</button>
+              </div>
+
+              {planTone(openPlan) === 'custom' && (
+                <div className="pr-plan-colour-picker">
+                  <em>Plan colour</em>
+                  <div className="pr-plan-colours" role="group" aria-label="Plan colour">
+                    {CUSTOM_PLAN_COLORS.map((colorId) => (
+                      <button
+                        key={colorId}
+                        type="button"
+                        className="pr-plan-colour"
+                        data-plan-color={colorId}
+                        aria-label={`${PLAN_COLOR_LABELS[colorId]} plan colour`}
+                        aria-pressed={stablePlanColor(openPlan) === colorId}
+                        onClick={() => writePlan(openPlan.id, { colorId })}
+                      >
+                        <span aria-hidden="true" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="pr-feats">
+                {GROUPS.map((group) => (
+                  <div key={group.id} className="pr-featgroup">
+                    <em>{group.label}</em>
+                    <div className="pr-chips">
+                      {PLAN_FEATURES.filter((feature) => feature.group === group.id).map((feature) => {
+                        const has = openPlan.featureIds.includes(feature.id);
+                        const lock = data.capabilityLocks[`feature:${feature.id}`];
+                        return (
+                          <button
+                            key={feature.id}
+                            type="button"
+                            disabled={Boolean(lock)}
+                            title={lock || undefined}
+                            aria-label={lock ? `${feature.name} locked: ${lock}` : feature.name}
+                            className={`${has ? 'pr-chip is-on' : 'pr-chip'}${lock ? ' is-locked' : ''}`}
+                            onClick={() => writePlan(openPlan.id, {
+                              featureIds: has
+                                ? openPlan.featureIds.filter((id) => id !== feature.id)
+                                : [...openPlan.featureIds, feature.id],
+                            })}
+                          >
+                            <span className="pr-chip-name">{feature.name}</span>
+                            {lock && <ResearchLockMark reason={lock} compact />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+                {settings.streams.includes('ads') && (
+                  <div className="pr-featgroup">
+                    <em>Adverts</em>
+                    <div className="pr-chips">
+                      <button
+                        type="button"
+                        className={openPlan.ads ? 'pr-chip is-ads is-on' : 'pr-chip'}
+                        onClick={() => writePlan(openPlan.id, { ads: !openPlan.ads })}
+                      >
+                        {openPlan.ads ? 'This plan carries adverts' : 'No adverts on this plan'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {openPlanRow && (
+                <footer className="pr-plan-foot">
+                  <span><b>{compactCount(openPlanRow.subscribers)}</b> households</span>
+                  <span><b>{pct(openPlanRow.share, 0)}</b> of subscribers</span>
+                  <span><b>{money(openPlanRow.monthly)}</b> a month</span>
+                </footer>
+              )}
+            </div>
+          )}
 
           <div className="pr-dials">
             <Dial label="Pay yearly" value={settings.annualDiscount} max={40} step={5} suffix="%"

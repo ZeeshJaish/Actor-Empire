@@ -22,11 +22,11 @@ const source = fs.readFileSync('views/mobile/BoxOfficeApp.tsx', 'utf8');
 });
 
 assert(
-  source.includes('Live') &&
-    source.includes('Weekly') &&
-    source.includes('All-Time') &&
-    source.includes('Partners') &&
-    source.includes('Records'),
+  source.includes("labelKey: 'box.section.live'") &&
+    source.includes("labelKey: 'box.section.weekly'") &&
+    source.includes("labelKey: 'box.section.allTime'") &&
+    source.includes("labelKey: 'box.section.partners'") &&
+    source.includes("labelKey: 'box.section.records'"),
   'Bottom dock should expose the five planned Box Office sections.'
 );
 

@@ -19,6 +19,7 @@ import {
     createStreamingRightsContractFromLicense,
     registerStreamingRightsContract,
 } from './streamingRightsCore';
+import { selectStreamingMarketTitles } from './streamingMarketSupply';
 
 export interface StreamingCatalogTitle {
     id: string;
@@ -200,7 +201,7 @@ const toCareerLicenseTitle = (
     };
 };
 
-export const getStreamingLicenseOpportunities = (player: Player): StreamingCatalogTitle[] => {
+export const getStreamingLicenseCandidatePool = (player: Player): StreamingCatalogTitle[] => {
     const ownedStudioNames = getOwnedStudioNames(player);
     const worldStudioNames = new Map(
         Object.values(player.world?.studios || {}).map(studio => [String(studio.id), studio.name]),
@@ -211,23 +212,32 @@ export const getStreamingLicenseOpportunities = (player: Player): StreamingCatal
     const ownedTitleIds = new Set(getEligibleOwnedStreamingTitles(player).map(project => project.id));
     const candidates = [
         ...(player.world?.projects || [])
-            .filter(project => !ownedStudioNames.has(String(project.studioId)))
+            .filter(project => (
+                Boolean(String(project.id || '').trim())
+                && Boolean(String(project.title || '').trim())
+                && Boolean(String(project.studioId || '').trim())
+                && !ownedStudioNames.has(String(project.studioId))
+            ))
             .map(project => toWorldLicenseTitle(project, worldStudioNames)),
         ...(player.pastProjects || [])
             .map(project => toCareerLicenseTitle(project, ownedStudioNames))
-            .filter((project): project is StreamingCatalogTitle => Boolean(project)),
+            .filter((project): project is StreamingCatalogTitle => Boolean(
+                project?.id && project.title && project.studioId,
+            )),
     ];
     const byId = new Map<string, StreamingCatalogTitle>();
     candidates.forEach(project => {
         if (!existingCatalogIds.has(project.id) && !ownedTitleIds.has(project.id)) byId.set(project.id, project);
     });
-    return Array.from(byId.values())
-        .sort((a, b) => (
+    return Array.from(byId.values()).sort((a, b) => (
             (b.rating || 0) - (a.rating || 0)
             || (b.gross || 0) - (a.gross || 0)
             || a.title.localeCompare(b.title)
-        ))
-        .slice(0, 12);
+        ));
+};
+
+export const getStreamingLicenseOpportunities = (player: Player): StreamingCatalogTitle[] => {
+    return selectStreamingMarketTitles(player, getStreamingLicenseCandidatePool(player));
 };
 
 export const resolveStreamingCatalogTitle = (
@@ -263,8 +273,8 @@ export const resolveStreamingCatalogTitle = (
         return license ? {
             id: license.sourceProjectId,
             title: license.titleAtSigning,
-            projectType: 'MOVIE' as const,
-            genre: 'Licensed',
+            projectType: license.projectType || 'MOVIE',
+            genre: license.genre || 'Licensed',
             rating: null,
             releaseYear: null,
             gross: null,

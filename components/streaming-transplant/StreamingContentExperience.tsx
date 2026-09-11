@@ -144,13 +144,27 @@ export const ContentDesk: React.FC<{
   onOpenTitle?: (t: CatalogueTitle) => void;
   entryRoutes?: ContentEntryRoute[];
   onAddContent?: () => void;
-  onReviewCatalogue?: () => void;
   onOpenSlate?: () => void;
   onRenew?: (t: CatalogueTitle) => void;
   onLapse?: (t: CatalogueTitle) => void;
-  localization?: { providers: number; facilities: number; planned: number; inProgress: number; ready: number; assets: number };
+  localization?: {
+    subtitleLevel: number;
+    dubbingLevel: number;
+    simultaneousLocalization: boolean;
+    coveredTitleCount: number;
+    activeLanguageCount: number;
+    packages: Array<{
+      id: string;
+      name: string;
+      languages: string[];
+      active: boolean;
+      locked: boolean;
+      activationCost: number;
+    }>;
+  };
   onOpenLocalization?: () => void;
-}> = ({ brand, state, onBack, initialTab, onOpenTitle, entryRoutes = [], onAddContent, onReviewCatalogue, onOpenSlate, onRenew, onLapse, localization, onOpenLocalization }) => {
+  onActivateLanguagePackage?: (packageId: string) => void;
+}> = ({ brand, state, onBack, initialTab, onOpenTitle, entryRoutes = [], onAddContent, onOpenSlate, onRenew, onLapse, localization, onOpenLocalization, onActivateLanguagePackage }) => {
   const c = brandColor(brand), c2 = brandDeep(brand);
   const tf = typeFace(brand);
   /* a console chip can open this page straight on the tab it names */
@@ -299,7 +313,6 @@ export const ContentDesk: React.FC<{
                 </div>
               </button>
             ))}
-            {onReviewCatalogue && <button className={s.localizationAction} onClick={onReviewCatalogue}>Review catalogue coverage →</button>}
           </section>
         )}
 
@@ -393,16 +406,36 @@ export const ContentDesk: React.FC<{
 
         {tab === 'LOCALIZATION' && (
           <section className={s.cdsec}>
-            <div className={s.cdhead}><h2>Language operations</h2><span>title by title</span></div>
+            <div className={s.cdhead}><h2>Localization network</h2><span>platform-wide</span></div>
             <div className={s.localizationHero}>
-              <span>CONTENT CAPABILITY</span><strong>{localization?.assets || 0}</strong><h3>language assets ready</h3>
-              <p>Subtitles and dubbing belong to individual titles. Build in-house facilities or contract providers as the company grows.</p>
+              <span>ONE SYSTEM · EVERY TITLE</span>
+              <strong>{localization?.coveredTitleCount || state.titles.length}</strong><h3>catalogue titles covered</h3>
+              <p>Research upgrades the platform once. Every current and future title inherits subtitle and dubbing quality in active language networks.</p>
             </div>
-            <div className={s.localizationGrid}>
-              <div><span>PROVIDERS</span><b>{localization?.providers || 0}</b></div><div><span>IN-HOUSE ROOMS</span><b>{localization?.facilities || 0}</b></div><div><span>IN PROGRESS</span><b>{localization?.inProgress || 0}</b></div><div><span>READY JOBS</span><b>{localization?.ready || 0}</b></div>
+            <div className={s.localizationTracks}>
+              <div><span>Subtitle quality</span><b>Level {localization?.subtitleLevel || 0}</b><i>{[1, 2, 3].map(level => <u key={level} className={(localization?.subtitleLevel || 0) >= level ? s.isOn : ''} />)}</i></div>
+              <div><span>Dubbing quality</span><b>Level {localization?.dubbingLevel || 0}</b><i>{[1, 2, 3].map(level => <u key={level} className={(localization?.dubbingLevel || 0) >= level ? s.isOn : ''} />)}</i></div>
             </div>
-            {(localization?.planned || 0) > 0 && <div className={s.localizationNotice}>{localization?.planned} planned language jobs still need a provider or facility.</div>}
-            <button type="button" className={s.localizationAction} onClick={onOpenLocalization}>OPEN LANGUAGE CAPABILITIES →</button>
+            <div className={s.localizationSignal}>
+              <span><b>{localization?.activeLanguageCount || 0}</b> active languages</span>
+              <span className={localization?.simultaneousLocalization ? s.isReady : ''}>{localization?.simultaneousLocalization ? 'Simultaneous releases ready' : 'Simultaneous releases locked'}</span>
+            </div>
+            <div className={s.localizationPackages}>
+              {(localization?.packages || []).map(item => (
+                <article key={item.id} className={item.active ? s.isActive : item.locked ? s.isLocked : ''}>
+                  <div><span>{item.active ? 'OPERATING' : item.locked ? 'RESEARCH REQUIRED' : 'LANGUAGE NETWORK'}</span><b>{item.name}</b><em>{item.languages.join(' · ')}</em></div>
+                  {item.active || item.locked ? (
+                    <strong>{item.active ? 'ACTIVE' : 'LOCKED'}</strong>
+                  ) : (
+                    <button type="button" onClick={() => onActivateLanguagePackage?.(item.id)}>
+                      ACTIVATE<br /><strong>{money(item.activationCost)}</strong>
+                    </button>
+                  )}
+                </article>
+              ))}
+            </div>
+            <p className={s.localizationRule}>No per-title orders. New catalogue additions receive the same active language capability automatically.</p>
+            <button type="button" className={s.localizationAction} onClick={onOpenLocalization}>OPEN RESEARCH CAMPUS →</button>
           </section>
         )}
 

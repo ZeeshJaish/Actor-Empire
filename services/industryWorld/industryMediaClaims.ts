@@ -128,6 +128,11 @@ const candidatesForEvent = (
             expectedEventTypes: ['RIGHTS_DEAL', 'RIGHTS_TRANSFER'], projectId, platformId: destination.id,
         }, displayName(destination.id), absoluteWeek));
     }
+    if (event.type === 'RIGHTS_SALE_ANNOUNCED' && projectId) {
+        items.push(candidate(event, story, 'PLATFORM_DESTINATION', 'RUMOUR', {
+            expectedEventTypes: ['RIGHTS_DEAL', 'RIGHTS_TRANSFER'], projectId,
+        }, 'a major streaming buyer', absoluteWeek));
+    }
     if (['PROJECT_RELEASE_PLANNED', 'PROJECT_RELEASED'].includes(event.type) && projectId) {
         const expected = deterministicOutcome(event);
         items.push(candidate(event, story, 'PROJECT_OUTCOME', 'PREDICTION', {

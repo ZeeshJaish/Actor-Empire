@@ -99,9 +99,9 @@ const createFixture = (weeksLive = 8): Player => {
     };
 };
 
-assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 23, 'The canonical foundation should advance owned streaming saves to schema v23.');
+assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 25, 'The canonical foundation should advance owned streaming saves to schema v25.');
 const migrated = normalizeOwnedStreamingPlatformState({ schemaVersion: 17 }, 'phase20-migration');
-assert(migrated.schemaVersion === 23, 'Schema v17 streaming saves should migrate to the current schema.');
+assert(migrated.schemaVersion === 25, 'Schema v17 streaming saves should migrate to the current schema.');
 assert(migrated.competitiveWorld.rivals.length === 0 && migrated.competitiveWorld.awardSeasons.length === 0, 'Legacy saves should receive safe empty competitive collections.');
 assert(Object.keys(STREAMING_RIVAL_TEMPLATES).length === 5, 'The competitive world should contain five named rival CEO templates.');
 assert(STREAMING_REGION_DEFINITIONS.length === 7, 'The global map should contain the home market plus six expansion regions.');

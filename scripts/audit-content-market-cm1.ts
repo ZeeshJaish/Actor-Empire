@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { contentMarketFixture } from './helpers/contentMarketFixture';
 import { getContentMarketListings, getContentMarketCollections, purchaseContentMarketListing, purchaseContentMarketCollection,
-    getContentMarketOwnedTitles, linkContentMarketOwnedTitles } from '../services/streamingContentMarket';
+    getContentMarketOwnedTitles, linkContentMarketOwnedTitles, getContentMarketAuctionCollections } from '../services/streamingContentMarket';
 import { getStreamingContentAvailability } from '../services/streamingContentAvailability';
 import { getAbsoluteWeek } from '../services/legacyLogic';
 import { normalizeOwnedStreamingPlatformState } from '../services/ownedStreamingPlatform';
@@ -40,7 +40,20 @@ const poorOffer = getContentMarketListings(poor)[0];
 assert.equal(purchaseContentMarketListing(poor, poorOffer.id, poorOffer.signature).changed, false);
 assert.equal(poor.ownedStreamingPlatform.catalogLicenses.length, 0);
 let collectionPlayer = contentMarketFixture();
-const collection = getContentMarketCollections(collectionPlayer)[0];
+collectionPlayer.world.projects.push(...['seller-cm1-b', 'seller-cm1-c'].flatMap((studioId, sellerIndex) => (
+    Array.from({ length: 6 }, (_, index) => ({
+        id: `${studioId}-film-${index}`,
+        title: `Archive ${sellerIndex + 1}.${index + 1}`,
+        studioId,
+        mediaType: 'MOVIE',
+        genre: index % 2 ? 'THRILLER' : 'DRAMA',
+        rating: 6.8 + index / 10,
+        year: 18 + index,
+        boxOffice: 20_000_000 + index * 2_000_000,
+    } as any))
+)));
+const auctionCollectionIds = new Set(getContentMarketAuctionCollections(collectionPlayer).map(item => item.id));
+const collection = getContentMarketCollections(collectionPlayer).find(item => !auctionCollectionIds.has(item.id));
 assert.ok(collection, 'Collections available before opening');
 assert.equal(collection.rows.reduce((sum, row) => sum + row.minimumGuarantee, 0), collection.totalGuarantee);
 const boughtCollection = purchaseContentMarketCollection(collectionPlayer, collection.id, collection.signature);

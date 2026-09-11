@@ -306,7 +306,7 @@ assert(Array.isArray(corruptImport.youtube.videos) && Array.isArray(corruptImpor
 assert(corruptImport.youtube.subscribers === 300, 'Imported YouTube progress should be preserved while filling missing fields.');
 assert(Array.isArray(corruptImport.finance.history) && Array.isArray(corruptImport.finance.yearly) && Array.isArray(corruptImport.finance.loans), 'Imported finance state should always have required arrays.');
 assert(corruptImport.finance.credit && typeof corruptImport.finance.credit.successfulPayments === 'number', 'Imported finance state should always have credit history.');
-assert(corruptImport.relationships[0].image === INITIAL_PLAYER.relationships[0].image, 'Broken parent image should be repaired during migration.');
+assert(corruptImport.relationships[0].image.startsWith('data:image/'), 'Broken parent image should be repaired through the canonical local profile system during migration.');
 assert(corruptImport.relationships[1].relation === INITIAL_PLAYER.relationships[1].relation, 'Invalid relationship roles should be repaired during migration.');
 assert(corruptImport.relationships[1].closeness === 100, 'Relationship closeness should be clamped.');
 assert(Array.isArray(corruptImport.weeklyOpportunities.auditions) && Array.isArray(corruptImport.weeklyOpportunities.jobs), 'Weekly opportunities should be safe arrays after import.');

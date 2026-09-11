@@ -37,7 +37,7 @@ assert(
 );
 
 assert(
-  releaseWizardSource.includes('cashReserve = Math.max(0, platformState.cashReserve - totalCost)'),
+  releaseWizardSource.includes('cashReserve = Math.max(0, platformState.cashReserve - (totalCost / 1_000_000))'),
   'Accepting a streaming deal should not drive platform cash reserve below zero.'
 );
 

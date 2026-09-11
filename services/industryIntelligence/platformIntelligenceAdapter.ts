@@ -41,6 +41,7 @@ export const adaptPlatformIntelligenceContext = (
         : ai.competence.technology;
     const localization = (ai.capabilities.subtitleCoveragePercent + ai.capabilities.dubCoveragePercent) / 2;
     const catalogueStrength = clampIndustryScore(ai.audienceHealth.catalogueStrengthIndex);
+    const worldFeedback = ai.worldEconomyFeedback;
     const activeCommitmentIds = [
         ...activePlans.map(plan => plan.id),
         ...activeResearch.map(item => item.id),
@@ -81,12 +82,15 @@ export const adaptPlatformIntelligenceContext = (
             debtMillions: Math.max(0, finiteIndustryNumber(ai.debtMillions)),
             runwayWeeks,
             capacityPressure,
-            momentum: clampIndustryScore(intelligence.momentum),
+            momentum: clampIndustryScore(intelligence.momentum + (worldFeedback?.audienceMomentum || 0) * 120),
             recentResultStrength: clampIndustryScore(42 + platform.recentHits * 8 + ai.audienceHealth.engagementIndex * 0.18),
             audienceTrust: clampIndustryScore((platform.reputation + ai.audienceHealth.engagementIndex) / 2),
-            catalogueNeed: clampIndustryScore(100 - catalogueStrength),
-            marketOpportunity: clampIndustryScore(45 + (1 - activeMarkets / totalMarkets) * 45),
-            financialPressure,
+            catalogueNeed: clampIndustryScore(100 - catalogueStrength + (worldFeedback?.unmetDemandPressure || 0) * 22),
+            marketOpportunity: clampIndustryScore(45 + (1 - activeMarkets / totalMarkets) * 45
+                + (worldFeedback?.unmetDemandPressure || 0) * 14),
+            financialPressure: clampIndustryScore(financialPressure
+                + (worldFeedback && worldFeedback.weeklyOperatingResult < 0 ? 12 : 0)
+                + (worldFeedback?.churnPressure || 0) * 90),
             competitivePressure: clampIndustryScore(48 + Math.max(0, 80 - platform.reputation) * 0.3),
             repetitionFatigue: clampIndustryScore(intelligence.learning.repetitionFatigue),
             franchiseFatigue: clampIndustryScore(intelligence.learning.franchiseFatigue),

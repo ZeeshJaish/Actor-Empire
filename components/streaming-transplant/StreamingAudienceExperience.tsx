@@ -19,7 +19,12 @@ import { cx } from './presentation/cx';
 import { brandVars } from './presentation/brand';
 import React, { useMemo, useRef, useState } from 'react';
 import { Brand, Mark, brandColor } from './StreamingBrandVisuals';
-import type { OwnedStreamingMarketOperation } from '../../types';
+import type {
+  OwnedStreamingMarketOperation,
+  StreamingEnforcementInvestment,
+  StreamingSharingPosture,
+  WorldStreamingCustomerAccessPolicy,
+} from '../../types';
 import type {
   StreamingAudienceCountryView,
   StreamingAudienceMarketView,
@@ -198,19 +203,26 @@ export const AudienceDesk: React.FC<{
   state: AudienceState;
   onBack: () => void;
   initialTab?: Tab;
+  initialAnalyticsScope?: AnalyticsScope;
+  initialMarketView?: MarketView;
   onNewCampaign?: () => void;
   onObjective?: (o: RecObjective) => void;
   onOpenRegion?: (r: RegionRow) => void;
   marketOperations?: OwnedStreamingMarketOperation[];
   onManageMarkets?: () => void;
-}> = ({ brand, state, onBack, initialTab, onNewCampaign, onObjective, onOpenRegion, marketOperations = [], onManageMarkets }) => {
+  accessPolicy?: WorldStreamingCustomerAccessPolicy;
+  onAccessPolicyChange?: (policy: {
+    sharingPosture: StreamingSharingPosture;
+    enforcementInvestment: StreamingEnforcementInvestment;
+  }) => void;
+}> = ({ brand, state, onBack, initialTab, initialAnalyticsScope, initialMarketView, onNewCampaign, onObjective, onOpenRegion, marketOperations = [], onManageMarkets, accessPolicy, onAccessPolicyChange }) => {
   const c = brandColor(brand);
   /* a console chip can open this page straight on the tab it names */
   const [tab, setTab] = useState<Tab>(initialTab ?? 'ANALYTICS');
   const [range, setRange] = useState<Range>('28D');
   const [hover, setHover] = useState<number | null>(null);
-  const [analyticsScope, setAnalyticsScope] = useState<AnalyticsScope>(state.live ? 'PLATFORM' : 'MARKET');
-  const [marketView, setMarketView] = useState<MarketView>('OVERVIEW');
+  const [analyticsScope, setAnalyticsScope] = useState<AnalyticsScope>(initialAnalyticsScope ?? (state.live ? 'PLATFORM' : 'MARKET'));
+  const [marketView, setMarketView] = useState<MarketView>(initialMarketView ?? 'OVERVIEW');
   const [countryRegion, setCountryRegion] = useState<string>('ALL');
   const svgRef = useRef<SVGSVGElement>(null);
   const countryMarketOperations = useMemo(() => marketOperations.filter(operation => operation.scope === 'COUNTRY' && operation.status !== 'EXITED'), [marketOperations]);
@@ -427,6 +439,64 @@ export const AudienceDesk: React.FC<{
                     </div>
                     <p className={css.marketExplain}>This is spending capacity, not automatic streaming revenue. Every service still has to win a place in the household budget.</p>
                     <section className={css.adsec}>
+                      <div className={css.adhead}><h2>Subscription competition</h2><span>{market.streamingCompetition.offerCount} active offers</span></div>
+                      <div className={css.marketKpis}>
+                        <div><span>HOMES WON</span><b>{count(market.streamingCompetition.playerHouseholds)}</b></div>
+                        <div><span>UNCLAIMED HOMES</span><b>{count(market.streamingCompetition.unclaimedHouseholds)}</b></div>
+                        <div><span>EFFECTIVE PRICE</span><b>{money(market.streamingCompetition.playerEffectiveMonthlyPrice)}/mo</b></div>
+                        <div><span>YOUR PLAN MIX</span><b>{market.streamingCompetition.playerPlanAllocations.length || '—'}</b></div>
+                      </div>
+                      {market.streamingCompetition.playerPlanAllocations.length > 0 && (
+                        <div className={css.overlapGrid}>
+                          {market.streamingCompetition.playerPlanAllocations.map(plan => (
+                            <div key={plan.planId}><strong>{count(plan.households)}</strong><span>{plan.planName} · {money(plan.effectiveMonthlyPrice)}</span></div>
+                          ))}
+                        </div>
+                      )}
+                      <p className={css.marketExplain}>Every active service competes for the same finite country households. Price, plan fit, catalogue, localization and trust decide who wins; homes may still choose nobody.</p>
+                    </section>
+                    <section className={css.adsec}>
+                      <div className={css.adhead}><h2>Paid audience and access</h2><span>{market.customerAccess.available ? 'canonical customers' : 'forecast'}</span></div>
+                      <div className={css.marketKpis}>
+                        <div><span>PAID ACCOUNTS</span><b>{count(market.customerAccess.paidAccounts)}</b></div>
+                        <div><span>PAYING HOMES</span><b>{count(market.customerAccess.payingHouseholds)}</b></div>
+                        <div><span>SHARED ACCESS</span><b>{count(market.customerAccess.externalSharedHouseholds)}</b></div>
+                        <div><span>PIRACY REACH</span><b>{count(market.customerAccess.piracyReach)}</b></div>
+                        <div><span>ACCESS LOAD</span><b>{count(market.customerAccess.accessLoadAccounts)}</b></div>
+                        <div><span>MONTHLY SUBS</span><b>{money(market.customerAccess.monthlySubscriptionRevenue)}</b></div>
+                      </div>
+                      <p className={css.marketExplain}>Only paid accounts create subscription revenue. Shared viewers still use delivery capacity; piracy is reach outside the paid service.</p>
+                      {accessPolicy && onAccessPolicyChange ? (
+                        <div className={css.accessPolicy}>
+                          <div>
+                            <span>SHARING POSTURE</span>
+                            <div className={css.marketTabs}>
+                              {([
+                                ['REACH_FIRST', 'Reach first'],
+                                ['BALANCED', 'Balanced'],
+                                ['HOUSEHOLD_ONLY', 'Household only'],
+                              ] as [StreamingSharingPosture, string][]).map(([id, label]) => (
+                                <button key={id} type="button" className={accessPolicy.sharingPosture === id ? css.on : ''} onClick={() => onAccessPolicyChange({ sharingPosture: id, enforcementInvestment: accessPolicy.enforcementInvestment })}>{label}</button>
+                              ))}
+                            </div>
+                          </div>
+                          <div>
+                            <span>ENFORCEMENT</span>
+                            <div className={css.marketTabs}>
+                              {([
+                                ['LIGHT', 'Light'],
+                                ['STANDARD', 'Standard'],
+                                ['AGGRESSIVE', 'Aggressive'],
+                              ] as [StreamingEnforcementInvestment, string][]).map(([id, label]) => (
+                                <button key={id} type="button" className={accessPolicy.enforcementInvestment === id ? css.on : ''} onClick={() => onAccessPolicyChange({ sharingPosture: accessPolicy.sharingPosture, enforcementInvestment: id })}>{label}</button>
+                              ))}
+                            </div>
+                          </div>
+                          <small>{accessPolicy.source === 'LEADERSHIP_DEFAULT' ? 'Leadership default. Choosing a control makes this a direct player policy.' : 'Direct player policy.'}</small>
+                        </div>
+                      ) : null}
+                    </section>
+                    <section className={css.adsec}>
                       <div className={css.adhead}><h2>Where households can participate</h2><span>industry access</span></div>
                       <div className={css.marketKpis}>
                         <div><span>STREAMING REACH</span><b>{count(market.industryParticipation.streamingReachableHouseholds)}</b></div>
@@ -485,6 +555,15 @@ export const AudienceDesk: React.FC<{
                       <div className={css.negative}><span>CANCELLED</span><b>{state.live ? `−${count(market.switching.cancelledThisWeek)}` : 'PRE-LAUNCH'}</b></div>
                       <div><span>RETURNED</span><b>{state.live ? count(market.switching.reactivatedThisWeek) : 'PRE-LAUNCH'}</b></div>
                     </div>
+                    <section className={css.adsec}>
+                      <div className={css.adhead}><h2>Plan movement</h2><span>paid accounts</span></div>
+                      <div className={css.marketKpis}>
+                        <div><span>UPGRADES</span><b>{count(market.switching.upgradedThisWeek)}</b></div>
+                        <div><span>DOWNGRADES</span><b>{count(market.switching.downgradedThisWeek)}</b></div>
+                        <div><span>SWITCHED IN</span><b>{count(market.customerAccess.switchIns)}</b></div>
+                        <div><span>SWITCHED OUT</span><b>{count(market.customerAccess.switchOuts)}</b></div>
+                      </div>
+                    </section>
                     <section className={css.adsec}>
                       <div className={css.adhead}><h2>Why homes move</h2><span>{state.live ? `${plainPct(market.switching.playerChurnPercent)} player churn` : 'market pressure'}</span></div>
                       {market.switching.reasons.map(reason => (

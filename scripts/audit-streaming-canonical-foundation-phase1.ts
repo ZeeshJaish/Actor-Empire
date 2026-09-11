@@ -65,8 +65,8 @@ const treasuryBefore = legacy.treasuryCash;
 const normalized = normalizeOwnedStreamingPlatformState(legacy, 'canonical-phase1');
 const normalizedAgain = normalizeOwnedStreamingPlatformState(normalized, 'canonical-phase1');
 
-assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 23, 'Phase 1 must advance the canonical streaming save schema to v23.');
-assert(normalized.schemaVersion === 23, 'Legacy saves must normalize to the current canonical schema.');
+assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 25, 'Phase 1 must advance the canonical streaming save schema to v24.');
+assert(normalized.schemaVersion === 25, 'Legacy saves must normalize to the current canonical schema.');
 assert(normalized.treasuryCash === treasuryBefore, 'Migration must never charge treasury cash.');
 assert(JSON.stringify(normalizedAgain) === JSON.stringify(normalized), 'Canonical normalization must be idempotent.');
 assert(normalized.marketOperations.filter(operation => operation.scope === 'COUNTRY').length === 3, 'Every legacy Day-One country must become one canonical country operation.');

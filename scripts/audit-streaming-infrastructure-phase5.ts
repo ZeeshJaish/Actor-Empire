@@ -58,7 +58,7 @@ const createIncorporatedPlayer = (): Player => {
     return funded.player;
 };
 
-assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 23, 'The current schema should retain Phase 5 infrastructure fields.');
+assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 25, 'The current schema should retain Phase 5 infrastructure fields.');
 assert(STREAMING_INFRASTRUCTURE_STRATEGIES.length === 3, 'Cloud, owned and hybrid strategies should all remain available.');
 assert(
     STREAMING_CAPACITY_PACKAGES.map(item => item.id).join(',') === 'STARTER,ESSENTIAL,GROWTH,PREMIERE',

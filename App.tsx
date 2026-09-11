@@ -517,6 +517,16 @@ export const App: React.FC = () => {
   const latestChangelogEntry = getLatestChangelogEntry();
   const previousChangelogEntries = CHANGELOG_ENTRIES.filter(entry => entry.version !== latestChangelogEntry.version);
   const isStartupLoadingVisible = isInitializing || !startupMinimumElapsed;
+  const isUiOverhaulSurface = gameStatus === 'PLAYING'
+    && (
+      activePage === Page.HOME
+      || activePage === Page.CAREER
+      || activePage === Page.IMPROVE
+      || activePage === Page.SOCIAL
+      || (activePage === Page.LIFESTYLE && isBottomNavVisible)
+      || (activePage === Page.MOBILE && isBottomNavVisible)
+      || activePage === Page.STORE
+    );
   const [showWhatsNewModal, setShowWhatsNewModal] = useState(false);
   const [showPreviousWhatsNewNotes, setShowPreviousWhatsNewNotes] = useState(false);
 
@@ -1715,10 +1725,10 @@ export const App: React.FC = () => {
                   const imageUrl = typeof patchedRel.image === 'string' ? patchedRel.image : '';
 
                   if (patchedRel.id === 'rel_mom' && (imageUrl.includes('seed=Mom') || imageUrl === '')) {
-                      patchedRel = { ...patchedRel, image: 'https://api.dicebear.com/8.x/pixel-art/svg?seed=Sophie' };
+                      patchedRel = { ...patchedRel, image: getGenderedAvatar('FEMALE', 'Sophie') };
                   }
                   if (patchedRel.id === 'rel_dad' && (imageUrl.includes('seed=Dad') || imageUrl === '')) {
-                      patchedRel = { ...patchedRel, image: 'https://api.dicebear.com/8.x/pixel-art/svg?seed=Arthur' };
+                      patchedRel = { ...patchedRel, image: getGenderedAvatar('MALE', 'Arthur') };
                   }
 
                   if ((patchedRel.relation === 'Parent' || patchedRel.relation === 'Deceased Parent') && typeof patchedRel.age !== 'number') {
@@ -2540,7 +2550,7 @@ export const App: React.FC = () => {
                   authorId: 'x_home_buy',
                   authorName: 'RealEstateWire',
                   authorHandle: '@realestatewire',
-                  authorAvatar: 'https://api.dicebear.com/8.x/pixel-art/svg?seed=RealEstateWire',
+                  authorAvatar: getGenderedAvatar('NON_BINARY', 'RealEstateWire'),
                   content: tr('app.generated.lifestyle.homeSocial', { name: nextPlayer.name, itemName: item.name }),
                   timestamp: Date.now(),
                   likes: 12000,
@@ -2558,7 +2568,7 @@ export const App: React.FC = () => {
                   authorId: 'x_vehicle_buy',
                   authorName: 'GarageWatch',
                   authorHandle: '@garagewatch',
-                  authorAvatar: 'https://api.dicebear.com/8.x/pixel-art/svg?seed=GarageWatch',
+                  authorAvatar: getGenderedAvatar('NON_BINARY', 'GarageWatch'),
                   content: tr('app.generated.lifestyle.vehicleSocial', { name: nextPlayer.name, itemName: item.name }),
                   timestamp: Date.now(),
                   likes: 15000,
@@ -2587,7 +2597,7 @@ export const App: React.FC = () => {
                   authorId: 'x_lifestyle_buy',
                   authorName: 'Style Radar',
                   authorHandle: '@styleradar',
-                  authorAvatar: 'https://api.dicebear.com/8.x/pixel-art/svg?seed=StyleRadar',
+                  authorAvatar: getGenderedAvatar('NON_BINARY', 'StyleRadar'),
                   content: tr('app.generated.lifestyle.ultimateSocial', { name: nextPlayer.name, itemName: item.name }),
                   timestamp: Date.now(),
                   likes: 18000,
@@ -3514,7 +3524,7 @@ export const App: React.FC = () => {
           </div>
       )}
 
-      <div className={`${isFullBleedMobileSurface ? 'w-screen max-w-none' : 'max-w-md mx-auto border-x border-white/5 pt-safe-top shadow-2xl'} h-screen relative z-10 bg-zinc-950/80 flex flex-col ${player?.settings?.smoothMode ? 'smooth-mode' : ''}`}>
+      <div className={`${isFullBleedMobileSurface ? 'w-screen max-w-none' : isUiOverhaulSurface ? 'w-full max-w-md mx-auto' : 'max-w-md mx-auto border-x border-white/5 pt-safe-top shadow-2xl'} h-screen relative z-10 ${isUiOverhaulSurface ? 'bg-[#070605]' : 'bg-zinc-950/80'} flex flex-col ${player?.settings?.smoothMode ? 'smooth-mode' : ''}`}>
         {gameStatus === 'START_MENU' && (
             <StartMenu
                 saveSlots={saveSlotSummaries}
@@ -3528,10 +3538,10 @@ export const App: React.FC = () => {
         {gameStatus === 'CREATION' && <CreationMenu onStartGame={handleStartGame} />}
         {gameStatus === 'PLAYING' && (
             <>
-                <div className={`${isFullBleedMobileSurface ? 'flex-1 overflow-hidden p-0' : `flex-1 px-5 pt-5 pb-nav-safe overflow-y-auto custom-scrollbar ${player.money < 0 ? 'pt-8' : ''}`}`}>
+                <div className={`${isFullBleedMobileSurface ? 'flex-1 overflow-hidden p-0' : isUiOverhaulSurface ? 'min-h-0 flex-1 overflow-hidden pb-nav-safe' : `flex-1 px-5 pt-5 pb-nav-safe overflow-y-auto custom-scrollbar ${player.money < 0 ? 'pt-8' : ''}`}`}>
                     {activePage === Page.HOME && (<HomePage player={player} onNextWeek={handleNextWeek} isProcessing={isProcessing} onUpdatePlayer={handleUpdatePlayer} setPage={setActivePage} onOpenProductionHouseCheat={() => { setLifestyleInitialView('PRODUCTION_GAME'); setActivePage(Page.LIFESTYLE); }} onOpenPlatformCommissionCheat={() => { setInitialMobileAppMode('MESSAGES'); setActivePage(Page.MOBILE); }} onOpenStudioAcquisitionCheat={(studioId) => { setInitialForbesStudioId(studioId); setActivePage(Page.MOBILE); }} onOpenBoxOfficeCheat={() => { setInitialMobileAppMode('BOXOFFICE'); setActivePage(Page.MOBILE); }} onQueueBabyNamingCheat={handleQueueBabyNamingCheat} onOpenDeathSummaryPreview={handleOpenDeathSummaryPreview} onShowWhatsNewCheat={handleShowWhatsNewCheat} />)}
                     {activePage === Page.CAREER && (<CareerPage player={player} onQuitJob={handleQuitJob} onRehearse={handleRehearse} onOwnedProductionFocus={handleOwnedProductionFocus} />)}
-                    {activePage === Page.IMPROVE && (<ImprovePage player={player} onTrain={()=>{}} onEnroll={(c)=>handleGenericUpdate(p=>{ const previousCommitments = p.commitments; const next: Player = { ...p, money: p.money- (c.upfrontCost||0), commitments: [...p.commitments, {...c, id: `c_${Date.now()}`, weeksCompleted:0}] }; syncWeeklyEnergyForCommitments(next, previousCommitments); return next; })} onCancel={(id)=>handleGenericUpdate(p=>{ const previousCommitments = p.commitments; const next: Player = { ...p, commitments: p.commitments.filter(c=>c.id!==id)}; syncWeeklyEnergyForCommitments(next, previousCommitments); return next; })} onPerformAction={handleImproveAction} />)}
+                    {activePage === Page.IMPROVE && (<ImprovePage player={player} onTrain={()=>{}} onEnroll={(c)=>handleGenericUpdate(p=>{ const previousCommitments = p.commitments; const next: Player = { ...p, energy: { ...p.energy }, flags: { ...p.flags }, money: p.money- (c.upfrontCost||0), commitments: [...p.commitments, {...c, id: `c_${Date.now()}`, weeksCompleted:0}] }; syncWeeklyEnergyForCommitments(next, previousCommitments); return next; })} onCancel={(id)=>handleGenericUpdate(p=>{ const previousCommitments = p.commitments; const next: Player = { ...p, energy: { ...p.energy }, flags: { ...p.flags }, commitments: p.commitments.filter(c=>c.id!==id)}; syncWeeklyEnergyForCommitments(next, previousCommitments); return next; })} onPerformAction={handleImproveAction} />)}
                     {activePage === Page.SOCIAL && (<SocialPage player={player} onInteract={handleSocialInteract} onContinueAsChild={handleContinueAsChild} />)}
                     {activePage === Page.LIFESTYLE && (<LifestylePage player={player} onBuyItem={handleBuyLifestyleItem} onSellItem={handleSellLifestyleItem} onSetResidence={(id)=>handleGenericUpdate(p=>({ ...p, residenceId: id }))} onStartBusiness={()=>{}} onShutdownBusiness={()=>{}} onUpdatePlayer={handleUpdatePlayer} onPremiumPurchase={handlePremiumPurchase} onReturnHome={() => setActivePage(Page.HOME)} onNavVisibilityChange={setIsBottomNavVisible} initialView={lifestyleInitialView ?? undefined} onInitialViewConsumed={() => setLifestyleInitialView(null)} onOpenBank={() => { setInitialMobileAppMode('BANK'); setActivePage(Page.MOBILE); }} initialRightsMarketOpportunityId={rightsMarketOpportunityId ?? undefined} onRightsMarketTargetConsumed={() => setRightsMarketOpportunityId(null)} initialStreamingContentOfferId={streamingContentOfferId ?? undefined} onStreamingContentOfferConsumed={() => setStreamingContentOfferId(null)} initialStudioContinuation={studioContinuationTarget ?? undefined} onStudioContinuationConsumed={() => setStudioContinuationTarget(null)} initialPlatformCommission={platformCommissionTarget ?? undefined} onPlatformCommissionConsumed={() => setPlatformCommissionTarget(null)} />)}
                     {activePage === Page.MOBILE && (

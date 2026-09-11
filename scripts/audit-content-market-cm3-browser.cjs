@@ -11,15 +11,15 @@ const assert = require('node:assert/strict');
     await page.waitForLoadState('networkidle');
     await page.getByRole('button', { name: 'Explore on my own', exact: true }).click();
     await page.getByRole('button', { name: 'CONTENT MARKET', exact: true }).click();
-    await page.getByRole('button', { name: /Live auctions/ }).click();
-    await page.locator('.cm-auction-row').first().click();
-    await page.getByRole('button', { name: 'Enter live auction', exact: true }).click();
+    await page.getByRole('button', { name: /THE MARKET/ }).click();
+    await page.getByRole('button', { name: /The Harbour 2/i }).first().click();
+    await page.getByRole('button', { name: 'ENTER THE ROOM', exact: true }).click();
     await page.getByRole('dialog', { name: 'Live rights auction' }).waitFor();
     await page.getByRole('region', { name: 'Auction offer console' }).waitFor();
-    await page.getByRole('button', { name: /Place bid/ }).click();
-    await page.getByText(/Current commitment/i).waitFor();
+    await page.getByRole('button', { name: /TABLE/ }).click();
+    await page.getByText(/complete contract leads|seller is weighing/i).waitFor();
     await page.setViewportSize({ width: 320, height: 740 });
-    assert.equal(await page.locator('.cm-auction-room').evaluate(el => el.scrollWidth <= el.clientWidth), true,
+    assert.equal(await page.locator('[data-content-market-scene="room"]').evaluate(el => el.scrollWidth <= el.clientWidth), true,
       'The live buyer auction fits a 320px mobile screen without horizontal overflow');
     await page.screenshot({ path: '/tmp/cm3-live-auction-mobile.png' });
     const messagePage = await browser.newPage({ viewport: { width: 390, height: 844 } });
@@ -28,9 +28,9 @@ const assert = require('node:assert/strict');
     await messagePage.getByText(/won The Harbour/i).first().click();
     await messagePage.getByRole('button', { name: 'Open Auction Result', exact: true }).click();
     await messagePage.getByRole('dialog', { name: 'Live rights auction' }).waitFor();
-    await messagePage.getByText('Rights secured.', { exact: true }).waitFor();
-    assert.ok((await messagePage.locator('.cm-auction-verdict').innerText()).includes('The Harbour 2'),
-      'The auction outcome Message opens the exact persisted room');
+    await messagePage.getByText('SOLD', { exact: true }).waitFor();
+    assert.equal(await messagePage.locator('[data-content-market-scene="room"]').count(), 1,
+      'The auction outcome Message opens the exact persisted ZIP room');
     assert.equal(await page.locator('vite-error-overlay').count(), 0);
     assert.deepEqual(errors, []);
     console.log('CM3 live buyer auction mobile browser passed.');

@@ -1,4 +1,5 @@
 import { STREAMING_DAY_ONE_MARKETS } from './streamingDayOneMarkets';
+import type { OwnedStreamingPlatformState } from '../types';
 
 export type StreamingLocalizationCapabilityId =
     | 'LOCALIZATION_FOUNDATION'
@@ -54,6 +55,42 @@ export const STREAMING_LANGUAGE_PACKAGES: StreamingLanguagePackage[] = [
     { id: 'SOUTHEAST_ASIA_CORE', name: 'Southeast Asia Core Languages', languageIds: ['indonesian', 'thai', 'filipino'], prerequisiteCapabilityIds: ['LOCALIZATION_FOUNDATION'], activationCost: 7_000_000, weeklyOperatingCost: 105_000 },
     { id: 'MIDDLE_EAST_AFRICA_CORE', name: 'Middle East and Africa Core Languages', languageIds: ['arabic', 'swahili', 'hausa', 'yoruba', 'igbo'], prerequisiteCapabilityIds: ['LOCALIZATION_FOUNDATION'], activationCost: 8_500_000, weeklyOperatingCost: 125_000 },
 ];
+
+export const STREAMING_LANGUAGE_PACKAGE_CAPABILITY_PREFIX = 'LANGUAGE_PACKAGE:';
+
+export const getStreamingLanguagePackageCapabilityId = (packageId: string): string => (
+    `${STREAMING_LANGUAGE_PACKAGE_CAPABILITY_PREFIX}${packageId}`
+);
+
+export interface StreamingGlobalLocalizationCapability {
+    subtitleLevel: 0 | 1 | 2 | 3;
+    dubbingLevel: 0 | 1 | 2 | 3;
+    simultaneousLocalization: boolean;
+    activePackageIds: string[];
+    activeLanguageIds: string[];
+}
+
+/**
+ * Localization is a platform capability, not a title queue. Once a language
+ * package and subtitle/dubbing tier are operating, every current and future
+ * catalogue title inherits that capability without adding per-title save data.
+ */
+export const resolveStreamingGlobalLocalizationCapability = (
+    platform: Pick<OwnedStreamingPlatformState, 'capabilities'>,
+): StreamingGlobalLocalizationCapability => {
+    const installedIds = new Set(platform.capabilities.installed
+        .filter(item => item.status === 'OPERATING' || item.status === 'LEGACY_GRANT')
+        .map(item => item.capabilityId));
+    const tiers = resolveStreamingLocalizationTiers(Array.from(installedIds));
+    const activePackages = STREAMING_LANGUAGE_PACKAGES.filter(item => (
+        installedIds.has(getStreamingLanguagePackageCapabilityId(item.id))
+    ));
+    return {
+        ...tiers,
+        activePackageIds: activePackages.map(item => item.id),
+        activeLanguageIds: Array.from(new Set(activePackages.flatMap(item => item.languageIds))).sort(),
+    };
+};
 
 const CAPABILITY_BY_ID = new Map(STREAMING_LOCALIZATION_CAPABILITY_DEFINITIONS.map(item => [item.id, item]));
 const KNOWN_LANGUAGE_IDS = new Set([

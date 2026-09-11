@@ -31,6 +31,7 @@ import { PHASE_ONE_ENERGY_COSTS } from '../../services/energyCosts';
 import { resolveShareholderVote } from '../../services/shareholderVoting';
 import { addBreadcrumb, markTraceAction, setCrashContext, setCurrentGameScreen } from '../../services/firebaseService';
 import { acceptPlatformAiPlayerCommission, declinePlatformAiPlayerCommission } from '../../services/platformAi';
+import { getGenderedAvatar } from '../../services/npcLogic';
 
 type MobileAppMode = 'HOME' | 'CASTLINK' | 'IMDB' | 'BOXOFFICE' | 'INSTAGRAM' | 'X' | 'YOUTUBE' | 'NEWS' | 'TEAM' | 'MESSAGES' | 'FORBES' | 'STOCKS' | 'DATING_FOLDER' | 'SOCIAL_FOLDER' | 'TINDER' | 'LUXE' | 'BANK' | 'GUIDE';
 
@@ -573,7 +574,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                   authorId: 'music_video_watch',
                   authorName: 'Music Video Watch',
                   authorHandle: '@musicvideowatch',
-                  authorAvatar: `https://api.dicebear.com/8.x/pixel-art/svg?seed=${encodeURIComponent(offer.artistName)}`,
+                  authorAvatar: getGenderedAvatar('NON_BINARY', offer.artistName),
                   content: messy
                       ? `${updatedPlayer.name}'s cameo in ${offer.artistName}'s "${offer.songTitle}" video is getting mixed reactions. Big reach, debatable fit.`
                       : `${updatedPlayer.name} shows up in ${offer.artistName}'s "${offer.songTitle}" video and the crossover is landing with fans.`,

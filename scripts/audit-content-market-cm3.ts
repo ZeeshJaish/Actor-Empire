@@ -18,7 +18,43 @@ import {
     submitContentMarketPrivateOffer,
 } from '../services/streamingContentMarket';
 import { normalizeOwnedStreamingPlatformState } from '../services/ownedStreamingPlatform';
+import { normalizeStreamingPlatformEcosystem } from '../services/streamingPlatformEcosystem';
 import { evaluateStreamingRightsCompliance } from '../services/streamingRightsMarketplace';
+import { resolveStreamingOfferRevision } from '../services/streamingOfferRevisionIntelligence';
+
+const underMarketRevision = resolveStreamingOfferRevision({
+    currentValue: 50_000_000,
+    currentAmount: 50_000_000,
+    competitorValue: 310_000_000,
+    capacityCeiling: 400_000_000,
+    minimumAmount: 100_000,
+    randomFactor: 0.5,
+});
+assert.equal(underMarketRevision.variant, 'UP', 'A bidder far below a stronger field intelligently raises its offer');
+assert.ok(underMarketRevision.targetAmount > 50_000_000 && underMarketRevision.targetAmount <= 400_000_000,
+    'An upward revision remains inside the bidder’s fixed room ceiling');
+
+const overMarketRevision = resolveStreamingOfferRevision({
+    currentValue: 500_000_000,
+    currentAmount: 500_000_000,
+    competitorValue: 200_000_000,
+    capacityCeiling: 700_000_000,
+    minimumAmount: 100_000,
+    randomFactor: 0.5,
+});
+assert.equal(overMarketRevision.variant, 'DOWN', 'A bidder materially above the field corrects an inflated offer downward');
+assert.ok(overMarketRevision.targetAmount < 500_000_000,
+    'A downward revision reduces exposure instead of blindly escalating');
+
+const closeMarketRevision = resolveStreamingOfferRevision({
+    currentValue: 210_000_000,
+    currentAmount: 180_000_000,
+    competitorValue: 200_000_000,
+    capacityCeiling: 350_000_000,
+    minimumAmount: 100_000,
+    randomFactor: 0.75,
+});
+assert.equal(closeMarketRevision.variant, 'RESTRUCTURE', 'A close field produces a term restructure rather than a forced cash race');
 
 const base = contentMarketFixture();
 const lots = getStreamingBuyerAuctionLots(base);
@@ -37,6 +73,181 @@ assert.equal(openedSession.hardClosesAtSecond, 45, 'The room has a 45-second har
 assert.deepEqual(openedSession.lot.countryIds, lot.countryIds, 'Opening cannot mutate the lot scope');
 assert.ok(openedSession.rivals.length >= 2, 'At least two funded AI rivals enter a live room');
 assert.ok(openedSession.rivals.every(rival => rival.sellerValueCeiling > 0), 'Rival valuation ceilings are fixed when the room opens');
+const legacyBuyerIds = new Set(['NETFLIX', 'APPLE_TV', 'DISNEY_PLUS', 'HULU', 'YOUTUBE']);
+const ecosystem = normalizeStreamingPlatformEcosystem(opened.player.world.streamingPlatformEcosystem, 1);
+assert.ok(Object.keys(ecosystem.operators).length >= 33, 'The world exposes the full streaming operator ecosystem');
+assert.ok(openedSession.rivals.every(rival => ecosystem.operators[rival.platformId]), 'Every auction rival comes from the canonical ecosystem');
+assert.ok(openedSession.rivals.some(rival => !legacyBuyerIds.has(rival.platformId)),
+    'Relevant regional and global operators outside the old five-platform list can enter');
+assert.ok(openedSession.bids[0].minimumGuarantee < lot.referenceValue * 0.5,
+    'An AI buyer can open with a strategic low offer instead of a forced valuation-level bid');
+
+const runFieldRevision = (currentSellerValue: number, competitorSellerValue: number) => {
+    const targetRival = openedSession.rivals[0];
+    const competitorRival = openedSession.rivals[1];
+    const targetBid = {
+        ...openedSession.bids[0],
+        id: `${openedSession.id}:field-target:${currentSellerValue}`,
+        bidderId: targetRival.bidderId,
+        bidderName: targetRival.platformName,
+        platformId: targetRival.platformId,
+        revision: 1,
+        status: 'ACTIVE' as const,
+        replacesBidId: null,
+        minimumGuarantee: currentSellerValue,
+        marketingGuarantee: 0,
+        guaranteedExposure: currentSellerValue,
+        sellerValue: currentSellerValue,
+    };
+    const competitorBid = {
+        ...targetBid,
+        id: `${openedSession.id}:field-competitor:${competitorSellerValue}`,
+        bidderId: competitorRival.bidderId,
+        bidderName: competitorRival.platformName,
+        platformId: competitorRival.platformId,
+        minimumGuarantee: competitorSellerValue,
+        guaranteedExposure: competitorSellerValue,
+        sellerValue: competitorSellerValue,
+    };
+    const scenarioSession = {
+        ...openedSession,
+        id: `${openedSession.id}:field-revision:${currentSellerValue}:${competitorSellerValue}`,
+        activeSecondsElapsed: 5,
+        roomSecondsRemaining: 15,
+        lastRealtimeAtMs: 1_000_000,
+        materialEventCount: 0,
+        bids: [targetBid, competitorBid],
+        leaderBidId: currentSellerValue >= competitorSellerValue ? targetBid.id : competitorBid.id,
+        rivals: openedSession.rivals.map(rival => rival.bidderId === targetRival.bidderId ? {
+            ...rival,
+            status: 'ACTIVE' as const,
+            revision: 1,
+            currentBidId: targetBid.id,
+            sellerValueCeiling: lot.referenceValue * 3,
+            cashAvailable: lot.referenceValue * 4,
+            nextActionSecond: 6,
+        } : rival.bidderId === competitorRival.bidderId ? {
+            ...rival,
+            status: 'FINAL' as const,
+            revision: 3,
+            currentBidId: competitorBid.id,
+            nextActionSecond: 45,
+        } : { ...rival, status: 'WITHDRAWN' as const }),
+    };
+    const scenarioPlayer = {
+        ...opened.player,
+        ownedStreamingPlatform: {
+            ...opened.player.ownedStreamingPlatform,
+            buyerAuctionSessions: [scenarioSession],
+        },
+    };
+    const result = advanceStreamingBuyerAuction(scenarioPlayer, scenarioSession.id, 1, 1_001_000);
+    assert.ok(result.changed && result.session, 'A due rival performs its saved field-aware revision');
+    return result.session!.bids.find(bid => bid.bidderId === targetRival.bidderId && bid.status === 'ACTIVE')!;
+};
+
+const correctedOverbid = runFieldRevision(lot.referenceValue * 1.8, lot.referenceValue * 0.7);
+assert.ok(correctedOverbid.sellerValue < lot.referenceValue * 1.8,
+    'An AI buyer that discovers it overbid the field can replace its own offer downward');
+const correctedUnderbid = runFieldRevision(lot.referenceValue * 0.2, lot.referenceValue * 1.2);
+assert.ok(correctedUnderbid.sellerValue > lot.referenceValue * 0.2,
+    'An AI buyer that trails a stronger field can replace its own offer upward');
+
+const generatedBuyerFixture = contentMarketFixture();
+const generatedBuyerEcosystem = normalizeStreamingPlatformEcosystem(generatedBuyerFixture.world.streamingPlatformEcosystem, 1);
+const generatedTemplate = generatedBuyerEcosystem.operators.PRIME_VIDEO;
+generatedBuyerEcosystem.operators = Object.fromEntries(Object.entries(generatedBuyerEcosystem.operators).map(([id, operator]) => [
+    id,
+    { ...operator, lifecycle: id === 'PRIME_VIDEO' ? 'ACTIVE' : 'CLOSED' },
+]));
+generatedBuyerEcosystem.operators.EMBER_STREAM = {
+    ...generatedTemplate,
+    id: 'EMBER_STREAM',
+    name: 'Ember Stream',
+    kind: 'DYNAMIC_FICTIONAL',
+    lifecycle: 'ACTIVE',
+    cashMillions: 15_000,
+    activeCountryIds: [...new Set(getStreamingBuyerAuctionLots(generatedBuyerFixture)[0].countryIds)],
+    brand: { source: 'GENERATED', identity: undefined } as any,
+};
+generatedBuyerFixture.world.streamingPlatformEcosystem = generatedBuyerEcosystem;
+const generatedBuyerLot = getStreamingBuyerAuctionLots(generatedBuyerFixture)[0];
+const generatedBuyerRoom = openStreamingBuyerAuction(generatedBuyerFixture, generatedBuyerLot.id, 1_000_100);
+assert.ok(generatedBuyerRoom.changed && generatedBuyerRoom.session?.rivals.some(rival => rival.platformId === 'EMBER_STREAM'),
+    'A future generated streaming platform can qualify for the same auction system');
+const generatedBuyerReload = normalizeOwnedStreamingPlatformState(generatedBuyerRoom.player.ownedStreamingPlatform, generatedBuyerRoom.player.id);
+assert.ok(generatedBuyerReload.buyerAuctionSessions[0].rivals.some(rival => rival.platformId === 'EMBER_STREAM'),
+    'Generated bidder identity survives save normalization');
+const generatedSession = generatedBuyerRoom.session!;
+const generatedOpeningBid = generatedSession.bids.find(bid => bid.platformId === 'EMBER_STREAM') || null;
+const forcedGeneratedSession = {
+    ...generatedSession,
+    lot: { ...generatedSession.lot, reserveSellerValue: generatedSession.lot.minimumGuarantee },
+    rivals: generatedSession.rivals.map(rival => rival.platformId === 'EMBER_STREAM' ? {
+        ...rival,
+        status: generatedOpeningBid ? 'ACTIVE' as const : 'WATCHING' as const,
+        sellerValueCeiling: generatedSession.lot.referenceValue * 1.2,
+        currentBidId: generatedOpeningBid?.id || null,
+        revision: generatedOpeningBid?.revision || 0,
+        nextActionSecond: 1,
+    } : { ...rival, status: 'WITHDRAWN' as const }),
+    bids: generatedOpeningBid ? [generatedOpeningBid] : [],
+    leaderBidId: generatedOpeningBid?.id || null,
+};
+const generatedSettlementPlayer = {
+    ...generatedBuyerRoom.player,
+    ownedStreamingPlatform: {
+        ...generatedBuyerRoom.player.ownedStreamingPlatform,
+        buyerAuctionSessions: [forcedGeneratedSession],
+    },
+};
+const generatedCashBefore = generatedSettlementPlayer.world.streamingPlatformEcosystem!.operators.EMBER_STREAM.cashMillions;
+const generatedSettlement = advanceStreamingBuyerAuction(generatedSettlementPlayer, forcedGeneratedSession.id, 45, 1_000_200);
+const generatedContract = Object.values(generatedSettlement.player.world.streamingRightsContracts || {}).find(contract => (
+    contract.buyerPlatformId === 'EMBER_STREAM'
+));
+assert.ok(generatedContract && generatedContract.buyer.name === 'Ember Stream',
+    'A generated winner is registered as the canonical rights buyer under its real brand name');
+assert.ok(generatedSettlement.player.world.streamingPlatformEcosystem!.operators.EMBER_STREAM.cashMillions < generatedCashBefore,
+    'A generated winner pays its guarantee from the shared ecosystem balance');
+
+const uncappedRoomFixture = contentMarketFixture();
+const uncappedLotCountryIds = getStreamingBuyerAuctionLots(uncappedRoomFixture)[0].countryIds;
+const uncappedEcosystem = normalizeStreamingPlatformEcosystem(uncappedRoomFixture.world.streamingPlatformEcosystem, 1);
+const uncappedTemplate = uncappedEcosystem.operators.PRIME_VIDEO;
+uncappedEcosystem.operators = Object.fromEntries(Object.entries(uncappedEcosystem.operators).map(([id, operator]) => [
+    id,
+    { ...operator, lifecycle: id === 'PRIME_VIDEO' ? 'ACTIVE' : 'CLOSED' },
+]));
+const expectedUncappedPlatformIds = ['PRIME_VIDEO'];
+for (let index = 1; index <= 12; index += 1) {
+    const platformId = `OPEN_FIELD_${String(index).padStart(2, '0')}`;
+    expectedUncappedPlatformIds.push(platformId);
+    uncappedEcosystem.operators[platformId] = {
+        ...uncappedTemplate,
+        id: platformId,
+        name: `Open Field ${index}`,
+        kind: 'DYNAMIC_FICTIONAL',
+        lifecycle: 'ACTIVE',
+        cashMillions: 15_000,
+        activeCountryIds: [...uncappedLotCountryIds],
+        brand: { source: 'GENERATED', identity: undefined } as any,
+    };
+}
+uncappedRoomFixture.world.streamingPlatformEcosystem = uncappedEcosystem;
+const uncappedLot = getStreamingBuyerAuctionLots(uncappedRoomFixture)[0];
+const uncappedRoom = openStreamingBuyerAuction(uncappedRoomFixture, uncappedLot.id, 1_000_300);
+assert.ok(uncappedRoom.changed && uncappedRoom.session, 'A funded open field can enter the live auction');
+assert.equal(uncappedRoom.session!.rivals.length, expectedUncappedPlatformIds.length,
+    'A live room does not discard eligible bidders through a fixed participant cap');
+assert.deepEqual(
+    new Set(uncappedRoom.session!.rivals.map(rival => rival.platformId)),
+    new Set(expectedUncappedPlatformIds),
+    'Every naturally eligible platform receives a saved room participant record',
+);
+const uncappedReload = normalizeOwnedStreamingPlatformState(uncappedRoom.player.ownedStreamingPlatform, uncappedRoom.player.id);
+assert.equal(uncappedReload.buyerAuctionSessions[0].rivals.length, expectedUncappedPlatformIds.length,
+    'Save normalization preserves the complete bidder field');
 
 const reloadedPlatform = normalizeOwnedStreamingPlatformState(opened.player.ownedStreamingPlatform, opened.player.id);
 const reloadedSession = reloadedPlatform.buyerAuctionSessions.find(session => session.id === openedSession.id)!;
@@ -50,6 +261,21 @@ const privateBlocked = submitContentMarketPrivateOffer(opened.player, lot.listin
 });
 assert.equal(privateBlocked.changed, false, 'An auction-designated listing cannot simultaneously enter private negotiation');
 assert.match(privateBlocked.detail || '', /live auction/i);
+
+assert.ok(lot.minimumGuarantee <= Math.max(100_000, lot.referenceValue * 0.03),
+    'A lot uses only a tiny technical floor, not a forced half-valuation opening bid');
+const leadingBeforeLowOffer = openedSession.bids.find(bid => bid.id === openedSession.leaderBidId)!;
+const lowOffer = placeStreamingBuyerAuctionBid(opened.player, openedSession.id, {
+    minimumGuarantee: lot.minimumGuarantee,
+    licensorRevenueShare: lot.allowedTerms.backendMinimum,
+    marketingGuarantee: 0,
+    futureGreenlight: false,
+}, 1_000_500);
+assert.ok(lowOffer.changed && lowOffer.session?.playerBidId,
+    'A valid low offer is recorded even when it does not beat the current leader');
+const recordedLowOffer = lowOffer.session!.bids.find(bid => bid.id === lowOffer.session!.playerBidId)!;
+assert.ok(recordedLowOffer.sellerValue < leadingBeforeLowOffer.sellerValue,
+    'A player offer may remain visibly non-leading instead of being rejected');
 
 const bidTerms = {
     minimumGuarantee: lot.minimumGuarantee,

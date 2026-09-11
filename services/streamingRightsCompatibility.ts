@@ -1,5 +1,4 @@
 import type {
-    PlatformId,
     StreamingBiddingRightsLot,
     StreamingLicenseExclusivity,
     StreamingLicenseTerritory,
@@ -51,7 +50,7 @@ export interface StreamingRightsConflict {
 export interface StreamingRightsCompatibilityInput {
     world: Pick<WorldState, 'streamingRightsContracts'>;
     sourceProjectId: string;
-    buyerPlatformId: PlatformId | null;
+    buyerPlatformId: string | null;
     sellerPartyId?: string | null;
     territory: StreamingLicenseTerritory;
     countryIds?: string[];
@@ -86,7 +85,7 @@ export interface StreamingRightsAvailabilityInput {
     player?: unknown;
     world: Pick<WorldState, 'streamingRightsContracts'>;
     sourceProjectId: string;
-    buyerPlatformId: PlatformId | null;
+    buyerPlatformId: string | null;
     exclusivity: StreamingLicenseExclusivity;
     startsAtAbsoluteWeek: number;
     expiresAtAbsoluteWeek: number;
@@ -262,7 +261,7 @@ const sourceRestriction = (
         source.buyer.platformId,
         source.buyerPlatformId,
     ].filter(Boolean));
-    if (input.sellerPartyId && !sourceControllerIds.has(input.sellerPartyId as PlatformId)) {
+    if (input.sellerPartyId && !sourceControllerIds.has(input.sellerPartyId)) {
         return makeConflict('SUBLICENSE_SELLER_MISMATCH', requestedCountryIds, [source]);
     }
     const sourceCountries = new Set(getContractCountryIds(source));

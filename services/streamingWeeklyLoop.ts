@@ -63,6 +63,9 @@ import {
     calculateStreamingRunwayFromTrailingCosts,
     calculateStreamingSubscriptionRevenueFullCurrency,
 } from './streamingEconomyCore';
+import { getWorldStreamingPlayerOutcome } from './worldEconomy/worldStreamingCompetition';
+import { getWorldStreamingPlayerCustomerOutcome } from './worldEconomy/worldStreamingCustomers';
+import { getWorldStreamingPlayerViewingOutcome } from './worldEconomy/worldStreamingViewing';
 
 const clamp = (value: number, minimum: number, maximum: number): number => (
     Math.min(maximum, Math.max(minimum, Number.isFinite(value) ? value : minimum))
@@ -439,7 +442,15 @@ export const processOwnedStreamingPlatformWeek = (
 
     const rng = createDeterministicRng(`${platform.simulationSeed}:weekly:${absoluteWeek}`);
     const programWeek = getProgramWeek(platform, absoluteWeek);
-    const previousSubscribers = Math.max(platform.metrics.subscribers, launchCommit.initialSubscribers);
+    const worldCustomerOutcome = player.world.worldStreamingCustomers?.lastProcessedAbsoluteWeek === absoluteWeek
+        ? getWorldStreamingPlayerCustomerOutcome(player.world.worldStreamingCustomers)
+        : null;
+    const worldViewingOutcome = player.world.worldStreamingViewing?.lastProcessedAbsoluteWeek === absoluteWeek
+        ? getWorldStreamingPlayerViewingOutcome(player.world.worldStreamingViewing)
+        : null;
+    const previousSubscribers = worldCustomerOutcome
+        ? worldCustomerOutcome.startingPaidAccounts
+        : Math.max(platform.metrics.subscribers, launchCommit.initialSubscribers);
     const slateEntries = getOwnedStreamingProgramEntries({
         ...player,
         ownedStreamingPlatform: platform,
@@ -476,11 +487,34 @@ export const processOwnedStreamingPlatformWeek = (
         item.status === 'LOCKED' && item.targetAbsoluteWeek === absoluteWeek
     )) || null;
     const growthEffects = growthAction ? getStreamingGrowthEffects(platform, growthAction) : null;
-    const weightedArpu = (
+    const legacyWeightedArpu = (
         platform.subscriptionPrices.BASIC * 0.48
         + platform.subscriptionPrices.PREMIUM * 0.34
         + platform.subscriptionPrices.FAMILY * 0.18
     );
+    const worldCompetitionOutcome = player.world.worldStreamingCompetition?.lastProcessedAbsoluteWeek === absoluteWeek
+        ? getWorldStreamingPlayerOutcome(player.world.worldStreamingCompetition)
+        : null;
+    const worldCompetitionTargetSubscribers = worldCompetitionOutcome?.households;
+    const worldCompetitionEffectiveMonthlyPrice = worldCompetitionOutcome && worldCompetitionOutcome.households > 0
+        ? worldCompetitionOutcome.monthlySubscriptionRevenue / worldCompetitionOutcome.households
+        : legacyWeightedArpu;
+    const worldCompetitionPlanAllocations = worldCompetitionOutcome?.planAllocations || [];
+    const worldCompetitionTopRival = (() => {
+        if (!player.world.worldStreamingCompetition) return null;
+        const totals = new Map<string, { name: string; households: number }>();
+        Object.values(player.world.worldStreamingCompetition.countries).forEach(country => {
+            country.platformAllocations.filter(row => row.platformId !== 'PLAYER').forEach(row => {
+                const current = totals.get(row.platformId) || { name: row.platformName, households: 0 };
+                current.households += row.households;
+                totals.set(row.platformId, current);
+            });
+        });
+        return [...totals.values()].sort((left, right) => right.households - left.households || left.name.localeCompare(right.name))[0] || null;
+    })();
+    const weightedArpu = worldCustomerOutcome && worldCustomerOutcome.endingPaidAccounts > 0
+        ? worldCustomerOutcome.monthlySubscriptionRevenue / worldCustomerOutcome.endingPaidAccounts
+        : worldCompetitionOutcome ? worldCompetitionEffectiveMonthlyPrice : legacyWeightedArpu;
     const pricePressure = clamp((weightedArpu - 11) / 350, -0.004, 0.006);
     const weeksLive = Math.max(2, programWeek);
     const launchTail = clamp(0.018 - (weeksLive - 2) * 0.0018, 0.003, 0.018);
@@ -529,7 +563,8 @@ export const processOwnedStreamingPlatformWeek = (
         0.1,
         0.42,
     );
-    const peakConcurrentStreams = Math.max(1, Math.round(previousSubscribers * peakActivityRate));
+    const accessLoadAccounts = worldCustomerOutcome?.accessLoadAccounts ?? previousSubscribers;
+    const peakConcurrentStreams = Math.max(1, Math.round(accessLoadAccounts * peakActivityRate));
     const burstCapacity = Math.max(1, platform.capacity.burstConcurrentStreams * infrastructureOperationsEffects.capacityMultiplier);
     const capacityUtilizationPercent = peakConcurrentStreams / burstCapacity * 100;
     const overloadPenalty = capacityUtilizationPercent > 100
@@ -591,10 +626,10 @@ export const processOwnedStreamingPlatformWeek = (
         0.004,
         0.09,
     );
-    const joinedSubscribers = Math.round(previousSubscribers * acquisitionRate);
-    const cancellations = Math.round(previousSubscribers * churnRate);
-    const organicJoinedSubscribers = Math.round(previousSubscribers * counterfactualAcquisitionRate);
-    const organicCancellations = Math.round(previousSubscribers * counterfactualChurnRate);
+    const legacyJoinedSubscribers = Math.round(previousSubscribers * acquisitionRate);
+    const legacyCancellations = Math.round(previousSubscribers * churnRate);
+    const legacyOrganicJoinedSubscribers = Math.round(previousSubscribers * counterfactualAcquisitionRate);
+    const legacyOrganicCancellations = Math.round(previousSubscribers * counterfactualChurnRate);
     const reactivationRate = clamp(
         0.001
         + contentFreshness / 55_000
@@ -603,9 +638,41 @@ export const processOwnedStreamingPlatformWeek = (
         0.001,
         0.012,
     );
-    const reactivations = Math.round(previousSubscribers * reactivationRate);
+    let reactivations = Math.round(previousSubscribers * reactivationRate);
+    let joinedSubscribers = legacyJoinedSubscribers;
+    let cancellations = legacyCancellations;
+    let organicJoinedSubscribers = legacyOrganicJoinedSubscribers;
+    let organicCancellations = legacyOrganicCancellations;
+    if (worldCustomerOutcome) {
+        joinedSubscribers = worldCustomerOutcome.joins;
+        cancellations = worldCustomerOutcome.cancellations;
+        reactivations = worldCustomerOutcome.reactivations;
+        organicJoinedSubscribers = joinedSubscribers;
+        organicCancellations = cancellations;
+    } else if (worldCompetitionOutcome && worldCompetitionTargetSubscribers !== undefined) {
+        const targetGap = worldCompetitionTargetSubscribers - previousSubscribers;
+        const convergenceRate = targetGap >= 0
+            ? clamp(.1 + acquisitionRate * 1.6, .1, .25)
+            : clamp(.12 + churnRate * 1.8, .12, .3);
+        const desiredNetMovement = Math.round(targetGap * convergenceRate);
+        if (desiredNetMovement >= 0) {
+            cancellations = legacyCancellations;
+            joinedSubscribers = Math.max(0, desiredNetMovement + cancellations - reactivations);
+        } else {
+            joinedSubscribers = Math.min(legacyJoinedSubscribers, Math.max(0, Math.round(previousSubscribers * .01)));
+            cancellations = Math.max(0, joinedSubscribers + reactivations - desiredNetMovement);
+        }
+        const incrementalGrowthJoins = Math.max(0, legacyJoinedSubscribers - legacyOrganicJoinedSubscribers);
+        organicJoinedSubscribers = Math.max(0, joinedSubscribers - incrementalGrowthJoins);
+        organicCancellations = Math.max(0, cancellations + legacyOrganicCancellations - legacyCancellations);
+    }
     const netSubscriberMovement = joinedSubscribers + reactivations - cancellations;
-    const subscribers = Math.max(0, previousSubscribers + netSubscriberMovement);
+    const subscribers = worldCustomerOutcome
+        ? worldCustomerOutcome.endingPaidAccounts
+        : Math.max(0, previousSubscribers + netSubscriberMovement);
+    const reportedChurnRate = worldCustomerOutcome
+        ? clamp(cancellations / Math.max(1, previousSubscribers), 0, 1)
+        : churnRate;
     const organicSubscribers = Math.max(
         0,
         previousSubscribers + organicJoinedSubscribers + reactivations - organicCancellations,
@@ -643,16 +710,20 @@ export const processOwnedStreamingPlatformWeek = (
     );
     const averageActiveSubscribers = (previousSubscribers + subscribers) / 2;
     const organicAverageActiveSubscribers = (previousSubscribers + organicSubscribers) / 2;
-    const subscriptionRevenue = roundMoney(calculateStreamingSubscriptionRevenueFullCurrency({
-        subscribers: averageActiveSubscribers,
-        monthlyArpu: weightedArpu,
-        paidSubscriberShare: 1,
-    }));
+    const subscriptionRevenue = worldCustomerOutcome
+        ? roundMoney(worldCustomerOutcome.monthlySubscriptionRevenue / 4.33)
+        : roundMoney(calculateStreamingSubscriptionRevenueFullCurrency({
+            subscribers: averageActiveSubscribers,
+            monthlyArpu: weightedArpu,
+            paidSubscriberShare: 1,
+        }));
     const productRevenue = roundMoney(
         averageActiveSubscribers * productEffects.weeklyRevenuePerSubscriber,
     );
+    const worldViewingIncrementalRevenue = roundMoney(worldViewingOutcome?.revenue.totalIncrementalRevenue || 0);
+    const totalOperatingRevenue = subscriptionRevenue + productRevenue + worldViewingIncrementalRevenue;
     const partnerRevenueShareCost = roundMoney(calculateStreamingPartnerRevenueShareFullCurrency({
-        weeklySubscriptionRevenueFullCurrency: subscriptionRevenue,
+        weeklySubscriptionRevenueFullCurrency: subscriptionRevenue + worldViewingIncrementalRevenue,
         licenses: platform.catalogLicenses,
         availableTitleCount: availableEntries.length || platform.catalogProjectIds.length,
         absoluteWeek,
@@ -671,13 +742,19 @@ export const processOwnedStreamingPlatformWeek = (
     const productSuiteCost = productEffects.weeklyOperatingCost;
     const governanceCost = getStreamingGovernanceWeeklyCost(
         platform,
-        subscriptionRevenue + productRevenue,
+        totalOperatingRevenue,
     );
     const competitiveOperationsCost = roundMoney(competitiveEffects.weeklyOperatingCost);
     const acquisitionIntegrationCost = roundMoney(acquisitionEffects.weeklyOperatingCost);
     const crisisRecoveryCost = roundMoney(crisisEffects.weeklyRecoveryCost);
     const infrastructureOperationsCost = roundMoney(infrastructureOperationsEffects.weeklyOperatingCost);
-    const marketCosts = calculateStreamingMarketOperatingCosts(platform, subscriptionRevenue + productRevenue);
+    const audienceEnforcementCost = worldCustomerOutcome ? roundMoney((() => {
+        const policy = platform.audienceAccessPolicy.enforcementInvestment;
+        const fixed = policy === 'AGGRESSIVE' ? 350_000 : policy === 'STANDARD' ? 100_000 : 25_000;
+        const perAccessAccount = policy === 'AGGRESSIVE' ? .025 : policy === 'STANDARD' ? .012 : .005;
+        return fixed + worldCustomerOutcome.accessLoadAccounts * perAccessAccount;
+    })()) : 0;
+    const marketCosts = calculateStreamingMarketOperatingCosts(platform, totalOperatingRevenue);
     const marketPolicyCost = roundMoney(marketCosts.marketPolicyCost);
     const marketOperatingCost = roundMoney(marketCosts.marketOperatingCost);
     const totalCashCost = roundMoney(
@@ -695,11 +772,12 @@ export const processOwnedStreamingPlatformWeek = (
         + acquisitionIntegrationCost
         + crisisRecoveryCost
         + infrastructureOperationsCost
+        + audienceEnforcementCost
         + marketPolicyCost
         + marketOperatingCost,
     );
     const treasuryAfter = Math.max(0, roundMoney(
-        platform.treasuryCash + subscriptionRevenue + productRevenue - totalCashCost,
+        platform.treasuryCash + totalOperatingRevenue - totalCashCost,
     ));
     const netCashContribution = treasuryAfter - platform.treasuryCash;
     const contentAmortization = roundMoney((
@@ -710,7 +788,7 @@ export const processOwnedStreamingPlatformWeek = (
     const cashRunwayWeeks = calculateStreamingRunwayFromTrailingCosts({
         cash: treasuryAfter,
         trailingWeeklyOperatingCost: totalCashCost,
-        trailingWeeklyNetCashFlow: subscriptionRevenue + productRevenue - totalCashCost,
+        trailingWeeklyNetCashFlow: totalOperatingRevenue - totalCashCost,
     }).lossRunwayWeeks ?? 5_200;
     const technologyHealth = clamp(
         platform.metrics.technologyHealth * 0.58
@@ -752,6 +830,48 @@ export const processOwnedStreamingPlatformWeek = (
             detail: `${joinedSubscribers.toLocaleString()} joined, ${reactivations.toLocaleString()} returned and ${cancellations.toLocaleString()} cancelled.`,
             impact: netSubscriberMovement >= 0 ? 'POSITIVE' : 'NEGATIVE',
         },
+        ...(worldCompetitionOutcome ? [{
+            id: 'world-plan-competition',
+            label: `${worldCompetitionPlanAllocations.length} plan${worldCompetitionPlanAllocations.length === 1 ? '' : 's'} competed for real households`,
+            detail: worldCustomerOutcome
+                ? `${worldCustomerOutcome.endingPaidAccounts.toLocaleString()} paid accounts now sit across ${worldCustomerOutcome.planAllocations.length} real plans; WE5 records the exact customer movement rather than recalculating it here.`
+                : `${worldCompetitionTargetSubscribers?.toLocaleString() || '0'} households chose the platform at an effective ${worldCompetitionEffectiveMonthlyPrice.toFixed(2)} monthly price; weekly movement closes that gap gradually rather than teleporting subscribers.`,
+            impact: (worldCompetitionTargetSubscribers || 0) >= previousSubscribers ? 'POSITIVE' as const : 'NEGATIVE' as const,
+        }] : []),
+        ...(worldCompetitionOutcome ? [{
+            id: 'world-catalogue-localization-fit',
+            label: 'Catalogue and local access shaped conversion',
+            detail: `${availableEntries.length} available titles, ${genreBreadth} represented genres and ${platform.localizationOperations.titleLanguageAssets.length} localized title assets contributed to household fit.`,
+            impact: contentFreshness >= 55 ? 'POSITIVE' as const : 'NEGATIVE' as const,
+        }] : []),
+        ...(worldCustomerOutcome ? [{
+            id: 'world-customer-access',
+            label: `${worldCustomerOutcome.externalSharedHouseholds.toLocaleString()} households watched through external sharing`,
+            detail: `${worldCustomerOutcome.accessLoadAccounts.toLocaleString()} access-load accounts reached the service while ${worldCustomerOutcome.piracyReach.toLocaleString()} people used piracy; neither path was counted as a paid subscription.`,
+            impact: worldCustomerOutcome.externalSharedHouseholds > worldCustomerOutcome.endingPaidAccounts * .15 ? 'NEGATIVE' as const : 'NEUTRAL' as const,
+        }] : []),
+        ...(worldCustomerOutcome ? [{
+            id: 'world-customer-enforcement',
+            label: `${platform.audienceAccessPolicy.enforcementInvestment.toLowerCase()} access enforcement is active`,
+            detail: `${audienceEnforcementCost.toLocaleString()} funded this week's platform-wide enforcement posture; stricter control can reduce sharing and piracy but may raise cancellation pressure.`,
+            impact: 'NEUTRAL' as const,
+        }] : []),
+        ...(worldViewingOutcome ? [{
+            id: 'world-title-viewing',
+            label: worldViewingOutcome.titlePerformance[0]
+                ? `${worldViewingOutcome.titlePerformance[0].title} led this week's viewing`
+                : 'The catalogue found no eligible viewing',
+            detail: `${worldViewingOutcome.totalViewingAccounts.toLocaleString()} accounts watched for ${worldViewingOutcome.totalHoursViewed.toLocaleString()} hours; ${worldViewingOutcome.unmetDemandAccounts.toLocaleString()} accounts still found no eligible title and incremental products earned ${worldViewingOutcome.revenue.totalIncrementalRevenue.toLocaleString()}.`,
+            impact: worldViewingOutcome.totalViewingAccounts > worldViewingOutcome.unmetDemandAccounts
+                ? 'POSITIVE' as const
+                : 'NEGATIVE' as const,
+        }] : []),
+        ...(worldCompetitionTopRival ? [{
+            id: 'world-major-rival',
+            label: `${worldCompetitionTopRival.name} set the largest rival benchmark`,
+            detail: `${worldCompetitionTopRival.households.toLocaleString()} aggregate subscriptions made it the strongest current rival across the simulated country market.`,
+            impact: 'NEGATIVE' as const,
+        }] : []),
         {
             id: 'delivery',
             label: capacityUtilizationPercent < 85 ? 'The network kept breathing room' : 'Peak load tested the stack',
@@ -761,7 +881,7 @@ export const processOwnedStreamingPlatformWeek = (
         {
             id: 'cash-contribution',
             label: netCashContribution >= 0 ? 'Operations added cash' : 'Operations consumed cash',
-            detail: `${(subscriptionRevenue + productRevenue).toLocaleString()} total operating revenue produced a ${netCashContribution >= 0 ? 'positive' : 'negative'} ${Math.abs(netCashContribution).toLocaleString()} treasury movement.`,
+            detail: `${totalOperatingRevenue.toLocaleString()} total operating revenue produced a ${netCashContribution >= 0 ? 'positive' : 'negative'} ${Math.abs(netCashContribution).toLocaleString()} treasury movement.`,
             impact: netCashContribution >= 0 ? 'POSITIVE' : 'NEGATIVE',
         },
         ...(marketCosts.activeCountryCount ? [{
@@ -892,7 +1012,7 @@ export const processOwnedStreamingPlatformWeek = (
                 : netCashContribution >= 0
                     ? 'A quiet week still strengthened the company.'
                     : 'The platform held audience but paid for it.';
-    const summary = `${netSubscriberMovement >= 0 ? '+' : ''}${netSubscriberMovement.toLocaleString()} net subscribers, ${(churnRate * 100).toFixed(1)}% churn and ${playbackSuccessRate.toFixed(2)}% playback success. ${netCashContribution >= 0 ? 'Treasury gained' : 'Treasury used'} ${Math.abs(netCashContribution).toLocaleString()}.`;
+    const summary = `${netSubscriberMovement >= 0 ? '+' : ''}${netSubscriberMovement.toLocaleString()} net subscribers, ${(reportedChurnRate * 100).toFixed(1)}% churn and ${playbackSuccessRate.toFixed(2)}% playback success. ${netCashContribution >= 0 ? 'Treasury gained' : 'Treasury used'} ${Math.abs(netCashContribution).toLocaleString()}.`;
     const nextWeekHook = infrastructureOperationsEffects.activeIncident
         ? infrastructureOperationsEffects.activeIncident.stage === 'RECOVERING'
             ? `Facility recovery verification is scheduled for game week ${infrastructureOperationsEffects.activeIncident.recoveryReadyAtAbsoluteWeek}.`
@@ -946,7 +1066,7 @@ export const processOwnedStreamingPlatformWeek = (
     const revenueAllocation = distributeIntegerTotal(subscriptionRevenue, titleWeights);
     const cashCostAllocation = distributeIntegerTotal(totalCashCost, titleWeights);
     const amortizationAllocation = distributeIntegerTotal(contentAmortization, titleWeights);
-    const titlePerformance: OwnedStreamingTitleWeekPerformance[] = availableEntries.map((entry, index) => {
+    const legacyTitlePerformance: OwnedStreamingTitleWeekPerformance[] = availableEntries.map((entry, index) => {
         const titleRng = createDeterministicRng(`${platform.simulationSeed}:title:${entry.projectId}:${absoluteWeek}`);
         const weeksAvailable = Math.max(1, programWeek - entry.launchWeek + 1);
         const completionRate = clamp(
@@ -1023,14 +1143,79 @@ export const processOwnedStreamingPlatformWeek = (
             )),
         };
     });
+    const worldViewingWeights = worldViewingOutcome?.titlePerformance.map(title => (
+        Math.max(1, title.viewingAccounts)
+    )) || [];
+    const worldViewingCashCostAllocation = distributeIntegerTotal(totalCashCost, worldViewingWeights);
+    const worldViewingAmortizationAllocation = distributeIntegerTotal(contentAmortization, worldViewingWeights);
+    const worldTitlePerformance: OwnedStreamingTitleWeekPerformance[] = worldViewingOutcome
+        ? worldViewingOutcome.titlePerformance.map((title, index) => {
+            const titleRng = createDeterministicRng(`${platform.simulationSeed}:world-title:${title.projectId}:${absoluteWeek}`);
+            const attributedSubscriptionRevenue = title.revenue.attributedSubscriptionRevenue;
+            const incrementalRevenue = title.revenue.totalIncrementalRevenue;
+            const allocatedCashCost = worldViewingCashCostAllocation[index] || 0;
+            const allocatedContentAmortization = worldViewingAmortizationAllocation[index] || 0;
+            const cashContributionForTitle = attributedSubscriptionRevenue + incrementalRevenue - allocatedCashCost;
+
+            return {
+                id: createDeterministicId('streaming_title_week', platform.simulationSeed, title.projectId, absoluteWeek),
+                projectId: title.projectId,
+                title: title.title,
+                source: title.source,
+                projectType: title.projectType,
+                genre: title.genre,
+                absoluteWeek,
+                programWeek,
+                weeksAvailable: title.weeksAvailable,
+                viewingAccounts: title.viewingAccounts,
+                estimatedViewers: title.estimatedViewers,
+                starts: title.starts,
+                hoursViewed: title.hoursViewed,
+                completionRate: title.completionRate,
+                repeatViewingRate: title.repeatViewingRate,
+                abandonmentRate: title.abandonmentRate,
+                paidViewingAccounts: title.accessMix.paidViewingAccounts,
+                sharedViewingAccounts: title.accessMix.sharedViewingAccounts,
+                piracyViewingAccounts: title.accessMix.piracyViewingAccounts,
+                topCountryId: title.topCountryId,
+                acquisitionAttributedAccounts: title.acquisitionAttributedAccounts,
+                retentionAttributedAccounts: title.retentionAttributedAccounts,
+                satisfactionScore: title.satisfactionScore,
+                discoveryMix: { ...title.discoveryMix },
+                attributedSubscriptionRevenue,
+                advertisingRevenue: title.revenue.advertisingRevenue,
+                premiumRevenue: title.revenue.premiumRevenue,
+                rentalRevenue: title.revenue.rentalRevenue,
+                purchaseRevenue: title.revenue.purchaseRevenue,
+                sponsorshipRevenue: title.revenue.sponsorshipRevenue,
+                incrementalRevenue,
+                allocatedCashCost,
+                allocatedContentAmortization,
+                cashContribution: cashContributionForTitle,
+                accountingContribution: cashContributionForTitle - allocatedContentAmortization,
+                playbackSuccessRate: roundPercent(clamp(
+                    playbackSuccessRate + (titleRng() - 0.5) * 0.22,
+                    75,
+                    99.99,
+                )),
+            };
+        })
+        : [];
+    const titlePerformance = worldViewingOutcome
+        ? worldTitlePerformance
+        : legacyTitlePerformance;
     const growthTargetIndex = growthAction
         ? availableEntries.findIndex(entry => entry.projectId === growthAction.projectId)
         : -1;
     const growthTargetEntry = growthTargetIndex >= 0 ? availableEntries[growthTargetIndex] : null;
-    const growthTargetPerformance = growthTargetIndex >= 0 ? titlePerformance[growthTargetIndex] : null;
-    const attributedViewingAccounts = growthTargetIndex >= 0
-        ? Math.max(0, (viewingAllocation[growthTargetIndex] || 0) - (organicViewingAllocation[growthTargetIndex] || 0))
-        : 0;
+    const growthTargetPerformance = growthTargetEntry
+        ? titlePerformance.find(title => title.projectId === growthTargetEntry.projectId) || null
+        : null;
+    const attributedViewingAccounts = worldViewingOutcome
+        ? growthTargetPerformance?.acquisitionAttributedAccounts || 0
+        : growthTargetIndex >= 0
+            ? Math.max(0, (viewingAllocation[growthTargetIndex] || 0) - (organicViewingAllocation[growthTargetIndex] || 0))
+            : 0;
     const attributedJoins = growthAction
         ? Math.max(0, joinedSubscribers - organicJoinedSubscribers)
         : 0;
@@ -1046,13 +1231,20 @@ export const processOwnedStreamingPlatformWeek = (
         observedDiscoveryMix: growthTargetPerformance?.discoveryMix || null,
         summary: `${growthAction.title} gained ${attributedViewingAccounts.toLocaleString()} modeled incremental viewing accounts and ${attributedJoins.toLocaleString()} attributed joins against the same week without the action.`,
     } : null;
+    const reportedEngagementRate = worldViewingOutcome && worldCustomerOutcome
+        ? clamp(
+            worldViewingOutcome.totalViewingAccounts / Math.max(1, worldCustomerOutcome.accessLoadAccounts),
+            0,
+            1,
+        )
+        : engagementRate;
     const snapshot: OwnedStreamingWeeklySnapshot = {
         id: createDeterministicId('streaming_snapshot', platform.simulationSeed, absoluteWeek),
         absoluteWeek,
         subscribers,
         netSubscriberMovement,
-        churnRate: roundRate(churnRate),
-        engagementRate: roundRate(engagementRate),
+        churnRate: roundRate(reportedChurnRate),
+        engagementRate: roundRate(reportedEngagementRate),
         averageRevenuePerUser: roundPercent(weightedArpu),
         cashRunwayWeeks: roundPercent(cashRunwayWeeks),
         technologyHealth: roundPercent(technologyHealth),
@@ -1064,6 +1256,38 @@ export const processOwnedStreamingPlatformWeek = (
             cancellations,
             reactivations,
             subscriptionRevenue,
+            worldCompetitionTargetSubscribers,
+            worldCompetitionEffectiveMonthlyPrice: worldCompetitionOutcome
+                ? roundPercent(worldCompetitionEffectiveMonthlyPrice)
+                : undefined,
+            worldCompetitionPlanAllocations: worldCompetitionOutcome
+                ? worldCompetitionPlanAllocations.map(row => ({ ...row }))
+                : undefined,
+            worldCustomerStartingPaidAccounts: worldCustomerOutcome?.startingPaidAccounts,
+            worldCustomerEndingPaidAccounts: worldCustomerOutcome?.endingPaidAccounts,
+            worldCustomerPayingHouseholds: worldCustomerOutcome?.payingHouseholds,
+            worldCustomerUpgrades: worldCustomerOutcome?.upgrades,
+            worldCustomerDowngrades: worldCustomerOutcome?.downgrades,
+            worldCustomerSwitchIns: worldCustomerOutcome?.switchIns,
+            worldCustomerSwitchOuts: worldCustomerOutcome?.switchOuts,
+            worldCustomerExternalSharedHouseholds: worldCustomerOutcome?.externalSharedHouseholds,
+            worldCustomerSharedActiveViewers: worldCustomerOutcome?.sharedActiveViewers,
+            worldCustomerPiracyReach: worldCustomerOutcome?.piracyReach,
+            worldCustomerAccessLoadAccounts: worldCustomerOutcome?.accessLoadAccounts,
+            worldCustomerMonthlySubscriptionRevenue: worldCustomerOutcome?.monthlySubscriptionRevenue,
+            worldCustomerPlanAllocations: worldCustomerOutcome?.planAllocations.map(row => ({ ...row })),
+            audienceEnforcementCost: worldCustomerOutcome ? audienceEnforcementCost : undefined,
+            worldViewingAccounts: worldViewingOutcome?.totalViewingAccounts,
+            worldViewingHours: worldViewingOutcome?.totalHoursViewed,
+            worldViewingUnmetDemandAccounts: worldViewingOutcome?.unmetDemandAccounts,
+            worldViewingAdvertisingRevenue: worldViewingOutcome?.revenue.advertisingRevenue,
+            worldViewingTransactionRevenue: worldViewingOutcome
+                ? worldViewingOutcome.revenue.premiumRevenue
+                    + worldViewingOutcome.revenue.rentalRevenue
+                    + worldViewingOutcome.revenue.purchaseRevenue
+                : undefined,
+            worldViewingSponsorshipRevenue: worldViewingOutcome?.revenue.sponsorshipRevenue,
+            worldViewingIncrementalRevenue: worldViewingOutcome?.revenue.totalIncrementalRevenue,
             partnerRevenueShareCost,
             infrastructureCost,
             leadershipCost,

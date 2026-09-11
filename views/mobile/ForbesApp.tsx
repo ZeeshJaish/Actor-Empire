@@ -2,7 +2,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Business, NPCActor, Player } from '../../types';
 import { formatMoney } from '../../services/formatUtils';
-import { getGenderedAvatar, NPC_DATABASE } from '../../services/npcLogic';
+import { NPC_DATABASE } from '../../services/npcLogic';
 import { getEnabledGlobalCreatorSocialProfiles } from '../../services/youtubeLogic';
 import { STUDIO_CATALOG } from '../../services/studioLogic';
 import { PLATFORMS } from '../../services/streamingLogic';
@@ -45,6 +45,7 @@ import {
     requestPrivateEquityExit,
 } from '../../services/privateEquityLogic';
 import StreamingPlatformBrand from '../../components/StreamingPlatformBrand';
+import { getCanonicalProfileAvatar } from '../../services/profileAvatar';
 
 interface ForbesAppProps {
   player: Player;
@@ -81,7 +82,9 @@ const isForbesCelebRankingEntry = (npc: Pick<NPCActor, 'occupation' | 'forbesCat
     return FORBES_CELEB_OCCUPATIONS.has(npc.occupation) || FORBES_PERSON_CATEGORY_PATTERN.test(category);
 };
 
-const getForbesCelebAvatar = (npc: Pick<NPCActor, 'avatar' | 'gender' | 'name'>): string => npc.avatar || getGenderedAvatar(npc.gender, npc.name);
+const getForbesCelebAvatar = (npc: Pick<NPCActor, 'avatar' | 'gender' | 'name'>): string => (
+    getCanonicalProfileAvatar(npc.avatar, npc.gender, npc.name)
+);
 
 export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePlayer, onOpenStocks, onImmersiveChange, initialStudioId, initialStudioName, onInitialStudioConsumed, onInitialStudioUnavailable }) => {
   const [tab, setTab] = useState<Tab>('ACTORS');
@@ -150,7 +153,7 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
           netWorth: playerNetWorth,
           isPlayer: true,
           tier: player.stats.fame > 90 ? 'ICON' : player.stats.fame > 70 ? 'A_LIST' : player.stats.fame > 40 ? 'ESTABLISHED' : 'RISING',
-          avatar: player.avatar,
+          avatar: getCanonicalProfileAvatar(player.avatar, player.gender, player.name),
           forbesCategory: 'Actor'
       }
   ].sort((a, b) => b.netWorth - a.netWorth);
@@ -809,7 +812,7 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
                             initial={{ scale: 1.2, opacity: 0 }}
                             animate={{ scale: 1, opacity: 0.6 }}
                             transition={{ duration: 1.5 }}
-                            src={player.avatar} 
+                            src={getCanonicalProfileAvatar(player.avatar, player.gender, player.name)}
                             className="w-full h-full object-cover grayscale" 
                         />
                         

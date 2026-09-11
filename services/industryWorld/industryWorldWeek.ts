@@ -14,6 +14,7 @@ import { resolveIndustryMediaClaims } from './industryMediaClaimResolution';
 import { publishIndustryMediaClaimBeats } from './industryMediaClaimPublication';
 import { advanceIndustryMediaNarratives } from './industryMediaNarratives';
 import { advanceIndustryMediaRelationships } from './industryMediaRelationships';
+import { processStreamingUpcomingRightsWeek } from '../streamingUpcomingRights';
 
 export type IndustryWorldExecutionStage =
     | 'PLATFORM_AI'
@@ -64,14 +65,18 @@ export const processIndustryWorldWeek = (
         streaming.world,
         absoluteWeek,
     );
+    const upcomingRights = processStreamingUpcomingRightsWeek(
+        { ...player, world: studio.world },
+        absoluteWeek,
+    );
     executionOrder.push('PRESENTATION');
-    const facts = collectIndustryEventFacts(world, studio.world, absoluteWeek);
+    const facts = collectIndustryEventFacts(world, upcomingRights.player.world, absoluteWeek);
     const collectedWorld: WorldState = {
-        ...studio.world,
-        industryEvents: appendIndustryEventFacts(studio.world.industryEvents, facts),
+        ...upcomingRights.player.world,
+        industryEvents: appendIndustryEventFacts(upcomingRights.player.world.industryEvents, facts),
     };
     const presentation = projectIndustryEvents(
-        { ...player, world: collectedWorld },
+        { ...upcomingRights.player, world: collectedWorld },
         collectedWorld.industryEvents,
         absoluteWeek,
         collectedWorld.industryMedia,

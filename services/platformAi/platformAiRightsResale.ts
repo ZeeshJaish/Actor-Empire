@@ -141,12 +141,12 @@ export const processPlatformAiRightsResaleWeek = (
             && contract.buyer.type === 'AI_PLATFORM'
             && contract.buyer.platformId
             && contract.expiresAtAbsoluteWeek - absoluteWeek >= MINIMUM_REMAINING_WEEKS
-            && resolvePlatformController(player, contract.buyer.platformId) === 'AI'
-            && sellerNeedsDisposal(world.platforms?.[contract.buyer.platformId])
+            && resolvePlatformController(player, contract.buyer.platformId as PlatformId) === 'AI'
+            && sellerNeedsDisposal(world.platforms?.[contract.buyer.platformId as PlatformId])
         ))
         .sort((left, right) => left.expiresAtAbsoluteWeek - right.expiresAtAbsoluteWeek || left.id.localeCompare(right.id));
     for (const source of candidates) {
-        const sellerId = source.buyer.platformId!;
+        const sellerId = source.buyer.platformId! as PlatformId;
         const seller = world.platforms?.[sellerId];
         if (!seller?.ai) continue;
         const price = transferPrice(source, absoluteWeek);

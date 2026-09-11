@@ -79,6 +79,11 @@ export default function StreamingWeeklyCeoLoop({
   const selectedPlan = loop.planOptions.find(option => option.id === selectedPlanId)!;
   const latest = loop.latestSnapshot;
   const operations = latest?.operations;
+  const viewingAccess = operations?.titlePerformance?.reduce((totals, title) => ({
+    paid: totals.paid + (title.paidViewingAccounts || 0),
+    shared: totals.shared + (title.sharedViewingAccounts || 0),
+    piracy: totals.piracy + (title.piracyViewingAccounts || 0),
+  }), { paid: 0, shared: 0, piracy: 0 }) || { paid: 0, shared: 0, piracy: 0 };
 
   const reviewResult = () => {
     if (latest) onUpdatePlayer(acknowledgeStreamingWeeklyReport(player, latest.absoluteWeek));
@@ -179,6 +184,29 @@ export default function StreamingWeeklyCeoLoop({
                 <i style={{ width: `${Math.min(100, operations.cancellations / Math.max(1, operations.joinedSubscribers) * 100)}%` }} />
                 <strong>-{operations.cancellations.toLocaleString()}</strong>
               </div>
+              {operations.worldCustomerEndingPaidAccounts !== undefined ? (
+                <div className="weekly-customer-evidence">
+                  <span>PLAN MOVEMENT</span>
+                  <div><small>UPGRADES</small><strong>{formatCompact(operations.worldCustomerUpgrades || 0)}</strong></div>
+                  <div><small>DOWNGRADES</small><strong>{formatCompact(operations.worldCustomerDowngrades || 0)}</strong></div>
+                  <span>ACCESS BEYOND THE BILL</span>
+                  <div><small>SHARED ACCESS</small><strong>{formatCompact(operations.worldCustomerExternalSharedHouseholds || 0)}</strong></div>
+                  <div><small>PIRACY REACH</small><strong>{formatCompact(operations.worldCustomerPiracyReach || 0)}</strong></div>
+                  <p>Paid accounts fund subscription revenue. Shared access affects service load; piracy does not enter the ledger.</p>
+                </div>
+              ) : null}
+              {operations.worldViewingAccounts !== undefined ? (
+                <div className="weekly-customer-evidence">
+                  <span>TITLE VIEWING</span>
+                  <div><small>WATCHING ACCOUNTS</small><strong>{formatCompact(operations.worldViewingAccounts || 0)}</strong></div>
+                  <div><small>WATCH HOURS</small><strong>{formatCompact(operations.worldViewingHours || 0)}</strong></div>
+                  <span>ACCESS OUTCOME</span>
+                  <div><small>PAID VIEWING</small><strong>{formatCompact(viewingAccess.paid)}</strong></div>
+                  <div><small>SHARED VIEWING</small><strong>{formatCompact(viewingAccess.shared)}</strong></div>
+                  <div><small>PIRATED VIEWING</small><strong>{formatCompact(viewingAccess.piracy)}</strong></div>
+                  <div><small>UNMET DEMAND</small><strong>{formatCompact(operations.worldViewingUnmetDemandAccounts || 0)}</strong></div>
+                </div>
+              ) : null}
             </section>
 
             <section className="weekly-economics">
@@ -188,12 +216,20 @@ export default function StreamingWeeklyCeoLoop({
               </div>
               <dl>
                 <div><dt>Subscription cash</dt><dd>{formatMoney(operations.subscriptionRevenue)}</dd></div>
+                {operations.worldViewingIncrementalRevenue !== undefined ? (
+                  <>
+                    <div><dt>Advertising</dt><dd>{formatMoney(operations.worldViewingAdvertisingRevenue || 0)}</dd></div>
+                    <div><dt>Transactions</dt><dd>{formatMoney(operations.worldViewingTransactionRevenue || 0)}</dd></div>
+                    <div><dt>Sponsorship</dt><dd>{formatMoney(operations.worldViewingSponsorshipRevenue || 0)}</dd></div>
+                    <div><dt>Incremental revenue</dt><dd>{formatMoney(operations.worldViewingIncrementalRevenue || 0)}</dd></div>
+                  </>
+                ) : null}
                 <div><dt>Cash operating costs</dt><dd>-{formatMoney(operations.totalCashCost)}</dd></div>
                 <div className="is-total"><dt>Net treasury movement</dt><dd className={operations.netCashContribution >= 0 ? 'is-positive' : 'is-negative'}>{formatMoney(operations.netCashContribution)}</dd></div>
                 <div><dt>Content amortization</dt><dd>-{formatMoney(operations.contentAmortization)}</dd></div>
                 <div><dt>Accounting contribution</dt><dd>{formatMoney(operations.accountingContribution)}</dd></div>
               </dl>
-              <small>Content was paid earlier; amortization avoids charging treasury twice.</small>
+              <small>Subscription cash is counted once. Title attribution does not duplicate it; amortization avoids charging treasury twice.</small>
             </section>
           </div>
 

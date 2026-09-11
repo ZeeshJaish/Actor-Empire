@@ -131,7 +131,7 @@ const createFixture = (): Player => {
     };
 };
 
-assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 23, 'The current schema should retain the Phase 6 catalog fields.');
+assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 25, 'The current schema should retain the Phase 6 catalog fields.');
 const migrated = normalizeOwnedStreamingPlatformState({ schemaVersion: 4, catalogProjectIds: ['legacy-title'] }, 'legacy-player');
 assert(migrated.schemaVersion === OWNED_STREAMING_PLATFORM_SCHEMA_VERSION, 'Older saves should normalize into the current schema.');
 assert(migrated.catalogSetupDraft === null && migrated.starterCatalog === null, 'Older saves should receive empty Phase 6 setup fields.');

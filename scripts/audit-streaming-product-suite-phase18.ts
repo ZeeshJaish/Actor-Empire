@@ -126,9 +126,9 @@ const createFixture = (): Player => {
     };
 };
 
-assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 23, 'The canonical foundation should preserve Product Lab in schema v23.');
+assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 25, 'The canonical foundation should preserve Product Lab in schema v25.');
 const migrated = normalizeOwnedStreamingPlatformState({ schemaVersion: 15 }, 'phase18-migration');
-assert(migrated.schemaVersion === 23 && migrated.productLines.length === 0, 'Schema v15 saves should migrate with a safe empty product portfolio.');
+assert(migrated.schemaVersion === 25 && migrated.productLines.length === 0, 'Schema v15 saves should migrate with a safe empty product portfolio.');
 assert(STREAMING_PRODUCT_DEFINITIONS.length === 7, 'The product suite should expose exactly Core, Kids, Free, Live, Fan, Store and Interactive.');
 
 let fixture = createFixture();

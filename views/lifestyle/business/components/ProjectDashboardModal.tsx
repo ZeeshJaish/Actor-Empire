@@ -8,6 +8,7 @@ import { canRenameProjectTitle } from '../../../../services/projectNaming';
 import { WorkingTitleDialog } from './WorkingTitleDialog';
 import { getContinuationEligibility } from '../../../../services/sequelFlow';
 import { getProjectReleaseLabel, getProjectReleaseTiming } from '../../../../services/releaseTiming';
+import { getReleasePlanningCtaLabel } from '../../../../services/releasePlanningCommitment';
 import { getPlayerLanguage, t } from '../../../../services/i18n';
 import { createCustomPosterBlobFromFile, saveCustomPosterMedia } from '../../../../services/customPosterMedia';
 import { CustomPosterImage } from '../../../../components/CustomPosterImage';
@@ -210,9 +211,10 @@ interface ProjectDashboardModalProps {
     onMakeSpinoff?: (project: any) => void;
     onStartStreamingBidding?: (project: any) => void;
     onRenameProject?: (title: string) => void;
+    onConfigureRelease?: (project: any) => void;
 }
 
-export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ project, player, studio, onClose, onUpdatePlayer, onMakeSequel, onMakeSpinoff, onStartStreamingBidding, onRenameProject }) => {
+export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ project, player, studio, onClose, onUpdatePlayer, onMakeSequel, onMakeSpinoff, onStartStreamingBidding, onRenameProject, onConfigureRelease }) => {
     const [view, setView] = useState<'DETAILS'>('DETAILS');
     const [isRenamingTitle, setIsRenamingTitle] = useState(false);
     const [isFundingExplainerOpen, setIsFundingExplainerOpen] = useState(false);
@@ -1294,6 +1296,14 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
 
                                  {/* Actions */}
                                 <div className="md:col-span-2 flex flex-col sm:flex-row gap-4 mt-8">
+                                    {onConfigureRelease && project.projectDetails?.releasePlanningDraft && (
+                                        <button
+                                            onClick={() => onConfigureRelease(project)}
+                                            className="flex-1 py-5 bg-amber-500 hover:bg-amber-400 text-black font-black uppercase tracking-[0.16em] rounded-2xl transition-all shadow-xl hover:shadow-amber-500/20 flex items-center justify-center gap-3 active:scale-95"
+                                        >
+                                            <Globe size={20} /> {getReleasePlanningCtaLabel(project.projectDetails.releasePlanningDraft)}
+                                        </button>
+                                    )}
                                     {project.phase === 'BIDDING' && onStartStreamingBidding && (
                                         <button 
                                             onClick={() => onStartStreamingBidding(project)}

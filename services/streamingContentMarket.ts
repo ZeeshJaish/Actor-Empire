@@ -11,7 +11,10 @@ import {
 } from './streamingRightsMarketplace';
 import { resolveStreamingRightsCompatibility } from './streamingRightsCompatibility';
 import { getOwnedTitleCountryAccess } from './streamingContentAvailability';
-import { createDeterministicId } from './deterministicRandom';
+import { createDeterministicId, hashDeterministicSeed } from './deterministicRandom';
+import { getStreamingMarketSupplyProfile } from './streamingMarketSupply';
+
+export { followStreamingUpcomingRightsSale, getStreamingUpcomingRightsSales, processStreamingUpcomingRightsWeek } from './streamingUpcomingRights';
 
 export const getContentMarketFunds = (player: Player): number => {
     const p = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
@@ -45,16 +48,77 @@ export const getContentMarketListings = (player: Player) => {
     });
 };
 
-/**
- * Stable CM3 sale-method split. The first listing stays available to CM1 while
- * every third eligible studio listing after it moves to the live auction floor.
- */
-export const getContentMarketAuctionListings = (player: Player) => getContentMarketListings(player)
-    .filter(listing => !listing.unavailableReason && !listing.sourceLicenseId)
-    .filter((_listing, index) => index % 3 === 1);
+export interface ContentMarketAuctionAssignments {
+    listingIds: Set<string>;
+    collectionIds: Set<string>;
+}
+
+export interface ContentMarketSupplySummary {
+    directListings: number;
+    collections: number;
+    collectionTitles: number;
+    liveAuctions: number;
+    totalCanonicalTitles: number;
+    foundingBoost: boolean;
+    nextRotationAbsoluteWeek: number;
+}
+
+/** One deterministic auction allocation shared by title and package inventory. */
+export const getContentMarketAuctionAssignments = (player: Player): ContentMarketAuctionAssignments => {
+    const profile = getStreamingMarketSupplyProfile(player);
+    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+    const liveProjectIds = new Set(platform.buyerAuctionSessions
+        .filter(session => session.status === 'LIVE')
+        .map(session => session.lot.sourceProjectId));
+    const livePackageIds = new Set(platform.buyerAuctionSessions
+        .filter(session => session.status === 'LIVE')
+        .map(session => session.lot.cataloguePackageId)
+        .filter((id): id is string => Boolean(id)));
+    const listings = getContentMarketListings(player)
+        .filter(listing => !listing.unavailableReason && !listing.sourceLicenseId)
+        .filter(listing => !liveProjectIds.has(listing.title.id));
+    const collections = getContentMarketCollections(player)
+        .filter(collection => !livePackageIds.has(collection.id))
+        .filter(collection => !collection.package.components.some(component => liveProjectIds.has(component.sourceProjectId)));
+    const score = (kind: 'TITLE' | 'COLLECTION', id: string): number => hashDeterministicSeed([
+        platform.simulationSeed,
+        'content-market-auction',
+        profile.cycle,
+        kind,
+        id,
+    ].join(':'));
+    // Keep the leading commercial headliner available for immediate purchase;
+    // auctions draw from the remaining eligible discovery shelf.
+    const titleCandidates = listings.slice(listings.length > 1 ? 1 : 0)
+        .map(listing => ({ kind: 'TITLE' as const, id: listing.id }));
+    const collectionCandidates = collections.map(collection => ({ kind: 'COLLECTION' as const, id: collection.id }));
+    const selected: Array<{ kind: 'TITLE' | 'COLLECTION'; id: string }> = [];
+    if (titleCandidates.length) {
+        selected.push(titleCandidates.slice().sort((left, right) => score('TITLE', right.id) - score('TITLE', left.id) || left.id.localeCompare(right.id))[0]);
+    }
+    if (collectionCandidates.length && selected.length < profile.auctionLimit) {
+        selected.push(collectionCandidates.slice().sort((left, right) => score('COLLECTION', right.id) - score('COLLECTION', left.id) || left.id.localeCompare(right.id))[0]);
+    }
+    const selectedKeys = new Set(selected.map(item => `${item.kind}:${item.id}`));
+    const remaining = [...titleCandidates, ...collectionCandidates]
+        .filter(item => !selectedKeys.has(`${item.kind}:${item.id}`))
+        .sort((left, right) => score(right.kind, right.id) - score(left.kind, left.id) || left.id.localeCompare(right.id));
+    selected.push(...remaining.slice(0, Math.max(0, profile.auctionLimit - selected.length)));
+    return {
+        listingIds: new Set(selected.filter(item => item.kind === 'TITLE').map(item => item.id)),
+        collectionIds: new Set(selected.filter(item => item.kind === 'COLLECTION').map(item => item.id)),
+    };
+};
+
+export const getContentMarketAuctionListings = (player: Player) => {
+    const assignments = getContentMarketAuctionAssignments(player);
+    return getContentMarketListings(player).filter(listing => assignments.listingIds.has(listing.id));
+};
 
 export const isContentMarketAuctionListing = (player: Player, listingId: string): boolean => (
     getContentMarketAuctionListings(player).some(listing => listing.id === listingId)
+    || normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id).buyerAuctionSessions
+        .some(session => session.status === 'LIVE' && session.lot.listingKind === 'TITLE' && session.lot.listingId === listingId)
 );
 
 export const submitContentMarketPrivateOffer = (
@@ -65,16 +129,44 @@ export const submitContentMarketPrivateOffer = (
     ? { player, changed: false, reason: 'NOT_READY', detail: 'These rights are assigned to a live auction. Enter the auction room to compete.' }
     : openStreamingPrivateOffer(player, listingId, terms);
 
-export const getContentMarketCollections = (player: Player) => getStreamingCataloguePackageOpportunities(player).map(o => ({
+export const getContentMarketCollections = (player: Player, includeReservedOpportunityId?: string) => getStreamingCataloguePackageOpportunities(player, {
+    includeReservedOpportunityId,
+}).map(o => ({
     ...o, signature: JSON.stringify([o.id, o.totalGuarantee, o.rows]),
 }));
 
-/** Keep the leading collection available to CM1; later eligible collections rotate onto the live floor. */
-export const getContentMarketAuctionCollections = (player: Player) => getContentMarketCollections(player)
-    .filter((_collection, index) => index % 3 === 1);
+export const getContentMarketAuctionCollections = (player: Player) => {
+    const assignments = getContentMarketAuctionAssignments(player);
+    return getContentMarketCollections(player).filter(collection => assignments.collectionIds.has(collection.id));
+};
+
+export const getContentMarketSupplySummary = (player: Player): ContentMarketSupplySummary => {
+    const profile = getStreamingMarketSupplyProfile(player);
+    const listings = getContentMarketListings(player);
+    const collections = getContentMarketCollections(player);
+    const assignments = getContentMarketAuctionAssignments(player);
+    const collectionTitleIds = new Set(collections.flatMap(collection => (
+        collection.package.components.map(component => component.sourceProjectId)
+    )));
+    const allTitleIds = new Set([
+        ...listings.map(listing => listing.title.id),
+        ...collectionTitleIds,
+    ]);
+    return {
+        directListings: listings.length,
+        collections: collections.length,
+        collectionTitles: collectionTitleIds.size,
+        liveAuctions: assignments.listingIds.size + assignments.collectionIds.size,
+        totalCanonicalTitles: allTitleIds.size,
+        foundingBoost: profile.foundingBoost,
+        nextRotationAbsoluteWeek: (profile.cycle + 1) * 3,
+    };
+};
 
 export const isContentMarketAuctionCollection = (player: Player, collectionId: string): boolean => (
     getContentMarketAuctionCollections(player).some(collection => collection.id === collectionId)
+    || normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id).buyerAuctionSessions
+        .some(session => session.status === 'LIVE' && session.lot.listingKind === 'CATALOGUE_PACKAGE' && session.lot.listingId === collectionId)
 );
 
 export const getContentMarketOwnedTitles = (player: Player) => {
