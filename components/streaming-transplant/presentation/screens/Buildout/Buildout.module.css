@@ -1,6 +1,10 @@
 .bld,.bld .rh{position:fixed;inset:0;max-width:520px;margin:0 auto;background:#050609;color:#eef0f5;
   font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
   display:flex;flex-direction:column;overflow:hidden}
+/* The standalone rehearsal is opened from the Studio Finance Build wizard,
+   whose route shell sits at z-index 9000. Keep this sibling above that shell;
+   the nested `.rh` layer cannot escape a lower parent stacking context. */
+.bld.rehearsalLayer{z-index:9010}
 .bld :where(*),.bld .rh :where(*){margin:0;padding:0;box-sizing:border-box;min-width:0;-webkit-tap-highlight-color:transparent}
 .bld :where(button),.bld .rh :where(button){font-family:inherit;border:none;background:none;color:inherit;
   cursor:pointer;text-align:inherit}
@@ -977,6 +981,8 @@
   border:1px solid var(--epx-brand-line);
   background:radial-gradient(circle at 50% 0,var(--epx-brand-veil),transparent 62%),var(--epx-s-surface)}
 .bld .map svg{display:block;width:100%;height:auto}
+.bld .map :global(.interactive-region-map),.mapEmbedded :global(.interactive-region-map){
+  border:0;border-radius:0;padding:0;background:transparent;box-shadow:none}
 
 .bld .mapDot{fill:#2c313c;transition:fill var(--epx-d-slow) var(--epx-ease-out),r var(--epx-d-slow) var(--epx-ease-out)}
 .bld .mapDot.lit{fill:color-mix(in srgb,var(--epx-brand) 42%,#2c313c)}
@@ -1012,8 +1018,7 @@
 .bld .mapLabel.alignStart{transform:translate(-10px,calc(-100% - 22px))}
 .bld .mapLabel.on{color:var(--epx-brand)}
 
-.bld .mapKey{display:flex;flex-wrap:wrap;gap:var(--epx-sp-2) var(--epx-sp-3);
-  padding:var(--epx-sp-2) var(--epx-sp-3) var(--epx-sp-3)}
+.bld .mapKey{display:flex;flex-wrap:nowrap;gap:var(--epx-sp-2) var(--epx-sp-3)}
 .bld .mapKey span{display:flex;align-items:center;gap:var(--epx-sp-1);
   font-size:var(--epx-t-micro);font-weight:var(--epx-fw-black);
   letter-spacing:var(--epx-track-caps);text-transform:uppercase;color:var(--epx-fg-4)}
@@ -1061,8 +1066,7 @@
 .mapEmbedded .mapLabel.alignEnd{transform:translate(calc(-100% + 10px),calc(-100% - 22px))}
 .mapEmbedded .mapLabel.alignStart{transform:translate(-10px,calc(-100% - 22px))}
 .mapEmbedded .mapLabel.on{color:var(--epx-brand)}
-.mapEmbedded .mapKey{display:flex;flex-wrap:wrap;gap:var(--epx-sp-2) var(--epx-sp-3);
-  padding:var(--epx-sp-2) var(--epx-sp-3) var(--epx-sp-3)}
+.mapEmbedded .mapKey{display:flex;flex-wrap:nowrap;gap:var(--epx-sp-2) var(--epx-sp-3)}
 .mapEmbedded .mapKey span{display:flex;align-items:center;gap:var(--epx-sp-1);
   font-size:var(--epx-t-micro);font-weight:var(--epx-fw-black);letter-spacing:var(--epx-track-caps);
   text-transform:uppercase;color:var(--epx-fg-4)}
@@ -1071,6 +1075,13 @@
 .mapEmbedded .keyHub{background:var(--epx-brand-lift)}
 .mapEmbedded .keyEdge{background:var(--epx-brand-deep)}
 .mapEmbedded .keyPlanned{border:1px dashed var(--epx-fg-5)}
+.bld .mapKey,.mapEmbedded .mapKey{position:absolute;left:50%;bottom:8px;z-index:4;
+  transform:translateX(-50%);align-items:center;width:max-content;max-width:calc(100% - 16px);
+  padding:6px 10px;border:1px solid var(--epx-line-strong);border-radius:999px;
+  background:color-mix(in srgb,var(--epx-s-void) 84%,transparent);
+  box-shadow:0 8px 24px color-mix(in srgb,var(--epx-s-void) 56%,transparent);
+  backdrop-filter:blur(10px);pointer-events:none}
+.bld .mapKey span,.mapEmbedded .mapKey span{white-space:nowrap}
 .mapEmbeddedEmpty{display:flex;flex-direction:column;align-items:center;text-align:center;
   gap:var(--epx-sp-2);padding:var(--epx-sp-8) var(--epx-sp-5);border:1px dashed var(--epx-line-strong)}
 .mapEmbeddedEmpty b{font-size:var(--epx-t-value);font-weight:var(--epx-fw-bold);color:var(--epx-fg-2)}

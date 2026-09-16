@@ -1,0 +1,205 @@
+/* InteractiveRegionMap — the few things attributes cannot express: transitions, keyframes, halos. */
+
+.irm-svg { display: block; width: 100%; height: auto; -webkit-tap-highlight-color: transparent; }
+.irm-svg.irm-drilldown { touch-action: pan-y; }
+.irm-svg.irm-drilldown.irm-zoomed { touch-action: none; }
+.irm-cinematic-svg { touch-action: pan-y; }
+.irm-cinematic .irm-hit, .irm-cinematic .irm-pin, .irm-cinematic .region-map-hit-area { cursor: default; }
+
+.irm-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 7px 10px 8px;
+  overflow-x: auto;
+  border-bottom: 1px solid rgba(255, 255, 255, .1);
+  color: rgba(255, 255, 255, .82);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  line-height: 1.25;
+  text-transform: uppercase;
+  white-space: nowrap;
+  scrollbar-width: none;
+}
+.irm-breadcrumb::-webkit-scrollbar { display: none; }
+.irm-breadcrumb button { color: #fff; }
+.irm-breadcrumb button:focus-visible { outline: 2px solid #7dd3fc; outline-offset: 2px; border-radius: 3px; }
+@media (max-width: 480px) {
+  .irm-breadcrumb { gap: 5px; padding-inline: 6px; font-size: 8px; letter-spacing: .04em; }
+}
+
+.irm-region-base { transition: fill-opacity .2s ease, stroke-opacity .2s ease; }
+.irm-region-warning { filter: drop-shadow(0 0 5px rgba(251, 113, 133, .45)); }
+.irm-region-tint { transition: fill-opacity .2s ease; pointer-events: none; }
+.irm-region-ring { fill: none; pointer-events: none; }
+.irm-hit { cursor: pointer; outline: none; }
+.irm-hit:focus-visible { stroke: #7dd3fc; stroke-opacity: 1; stroke-width: 2.5; }
+
+.irm-country { transition: fill-opacity .15s ease; cursor: pointer; outline: none; }
+.irm-country-focused { filter: drop-shadow(0 0 5px rgba(52, 211, 153, .72)); }
+.irm-country:focus-visible { stroke: #7dd3fc; stroke-opacity: 1; stroke-width: 2; }
+
+/* routes: strokes are in screen pixels via vector-effect */
+.irm-route { animation: irm-fadein .5s ease both; }
+.irm-route-glow { fill: none; stroke: #fef3c7; stroke-opacity: .14; stroke-width: 6; stroke-linecap: round; }
+.irm-route-core { fill: none; stroke: #fef3c7; stroke-opacity: .62; stroke-width: 1.4; stroke-linecap: round; stroke-dasharray: 6 7; animation: irm-dash 5s linear infinite; }
+.irm-route-head { fill: #fff7d6; }
+.irm-route-end { fill: none; stroke: #fef3c7; stroke-opacity: .75; stroke-width: 1; }
+.irm-route-planned .irm-route-glow { stroke: #cbd5e1; stroke-opacity: .08; }
+.irm-route-planned .irm-route-core { stroke: #cbd5e1; stroke-opacity: .38; stroke-dasharray: 3 8; animation: none; }
+.irm-route-planned .irm-route-end { stroke: #cbd5e1; stroke-opacity: .48; }
+
+/* legacy flight paths (toggle mode with locationRoutes) */
+.irm-flight-path { fill: none; stroke: #fef3c7; stroke-opacity: .55; stroke-width: 1.6; stroke-dasharray: 6 7; animation: irm-dash 5s linear infinite; }
+.irm-flight-head { fill: #fff7d6; }
+
+/* overlay: scaled to CSS pixels, so every size here is a screen pixel */
+.irm-ov { transition: opacity .25s ease; }
+.irm-ov-faded { opacity: .4; }
+.irm-lbl { font-family: inherit; font-weight: 800; pointer-events: none; paint-order: stroke; stroke: #06121f; stroke-width: 2.6px; stroke-linejoin: round; fill: #eaf6ff; letter-spacing: .14em; }
+.irm-region-label-hit { cursor: pointer; }
+.irm-lbl-sub { font-weight: 700; font-size: 8.5px; letter-spacing: .14em; fill: #fcd34d; pointer-events: none; paint-order: stroke; stroke: #06121f; stroke-width: 3px; stroke-linejoin: round; }
+.irm-country-lbl { font-weight: 700; paint-order: stroke; stroke: #06121f; stroke-width: 3.2px; stroke-linejoin: round; fill: #f8fafc; pointer-events: none; letter-spacing: .04em; transition: opacity .2s ease; }
+.irm-country-content-dot { fill: #fcd34d; stroke: #1b1500; stroke-width: 1.5px; filter: drop-shadow(0 0 4px rgba(252, 211, 77, .72)); }
+.irm-country-has-content .irm-country-lbl { fill: #fff7d6; font-weight: 800; }
+.irm-pin-lbl { font-weight: 700; paint-order: stroke; stroke: #06121f; stroke-width: 3.4px; stroke-linejoin: round; fill: #ffffff; pointer-events: none; transition: opacity .2s ease; }
+.irm-pin-badge { font-weight: 700; font-size: 9.5px; letter-spacing: .08em; paint-order: stroke; stroke: #06121f; stroke-width: 3px; stroke-linejoin: round; fill: #bae6fd; pointer-events: none; }
+.irm-pin-tag { font-weight: 800; font-size: 8.5px; letter-spacing: .18em; paint-order: stroke; stroke: #06121f; stroke-width: 3px; stroke-linejoin: round; fill: #fcd34d; pointer-events: none; }
+
+.irm-pin { cursor: pointer; outline: none; }
+.irm-pin-hit { fill: #fff; fill-opacity: .001; }
+.irm-pin-dot { fill: #ffffff; stroke: #0c4a6e; stroke-width: 2; }
+.irm-pin-load { fill: none; stroke: #67e8f9; stroke-width: 1.8; stroke-linecap: round; transform: rotate(-90deg); vector-effect: non-scaling-stroke; }
+.irm-pin-recommended .irm-pin-dot { fill: #c4b5fd; stroke: #4c1d95; }
+.irm-pin-planned .irm-pin-dot { fill: #0f172a; stroke: #cbd5e1; stroke-dasharray: 2 2; }
+.irm-pin-built .irm-pin-dot { fill: #34d399; stroke: #064e3b; }
+.irm-pin-active .irm-pin-dot { fill: #fcd34d; stroke: #422006; }
+.irm-pin-active .irm-pin-ring { animation: irm-pulse 1.6s ease-out infinite; }
+.irm-pin-origin .irm-pin-dot { fill: #fcd34d; stroke: #713f12; }
+.irm-pin-relay .irm-pin-dot { fill: #67e8f9; stroke: #164e63; }
+.irm-pin-cache .irm-pin-dot { fill: #c4b5fd; stroke: #4c1d95; }
+.irm-pin-market .irm-pin-dot { stroke-width: 2.5; }
+.irm-pin-shoot .irm-pin-dot { fill: #fde68a; stroke: #6b5300; stroke-width: 1.5; }
+.irm-pin-player .irm-pin-dot { fill: #bae6fd; stroke: #0c4a6e; stroke-width: 1.5; }
+.irm-pin-home .irm-pin-dot { fill: #fcd34d; stroke: #1b1500; stroke-width: 1.5; }
+.irm-pin-selected .irm-pin-dot { fill: #fcd34d; stroke: #1b1500; }
+.irm-pin-focused .irm-pin-dot { fill: #fcd34d; stroke: #1b1500; }
+.irm-pin-context .irm-pin-dot { fill: #bae6fd; fill-opacity: .68; stroke-width: 1.2; }
+.irm-greenlight-location .irm-pin:not(.irm-pin-selected):not(.irm-pin-focused) .irm-pin-dot {
+  fill: #bae6fd;
+  stroke: #164e63;
+  fill-opacity: .86;
+}
+.irm-greenlight-location .irm-pin-selected:not(.irm-pin-focused) .irm-pin-dot {
+  transform: scale(.84);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.irm-greenlight-location .irm-pin-selected:not(.irm-pin-focused) .irm-pin-ring {
+  animation: none;
+  opacity: .5;
+  transform: scale(.82);
+}
+.irm-greenlight-location .irm-pin-focused .irm-pin-ring {
+  stroke-width: 2;
+}
+.irm-pin-ring { fill: none; stroke: #fcd34d; stroke-width: 1.5; opacity: .9; transform-box: fill-box; transform-origin: center; }
+.irm-pin-selected .irm-pin-ring { animation: irm-pulse 1.6s ease-out infinite; }
+.irm-pin:focus-visible .irm-pin-dot { stroke: #7dd3fc; stroke-width: 3; }
+.irm-glow { fill: #7dd3fc; fill-opacity: .22; stroke: #7dd3fc; stroke-opacity: .5; stroke-width: 1; pointer-events: none; }
+
+.irm-legacy-lbl { font-weight: 900; letter-spacing: 2px; pointer-events: none; }
+
+@keyframes irm-pulse { 0% { transform: scale(.6); opacity: .9; } 100% { transform: scale(2.4); opacity: 0; } }
+@keyframes irm-dash { to { stroke-dashoffset: -130; } }
+@keyframes irm-fadein { from { opacity: 0; } to { opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .irm-pin-selected .irm-pin-ring { animation: none; transform: scale(1.8); opacity: .6; }
+  .irm-route-core, .irm-flight-path, .irm-route { animation: none; }
+  .irm-region-base, .irm-region-tint, .irm-country, .irm-ov { transition: none; }
+}
+.irm-map-toolbar {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+    padding: 9px 11px;
+    border: 1px solid color-mix(in srgb, var(--irm-toolbar-accent) 28%, transparent);
+    border-radius: 16px;
+    background: color-mix(in srgb, var(--irm-toolbar-accent) 10%, rgba(2, 12, 22, .9));
+    color: #eef8ff;
+    box-shadow: 0 10px 28px -24px var(--irm-toolbar-accent);
+    font: 900 9px/1.1 ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+}
+
+.irm-map-toolbar--release { --irm-toolbar-accent: #fb923c; }
+.irm-map-toolbar--production { --irm-toolbar-accent: #5eead4; }
+.irm-map-toolbar--network { --irm-toolbar-accent: #67e8f9; }
+
+.irm-map-toolbar__place,
+.irm-map-toolbar__actions {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 8px;
+}
+
+.irm-map-toolbar .irm-map-toolbar__place svg {
+    display: block;
+    width: 16px !important;
+    height: 16px !important;
+    max-width: 16px;
+    max-height: 16px;
+    flex: 0 0 auto;
+    fill: none;
+    stroke: var(--irm-toolbar-accent);
+    stroke-width: 1.8;
+}
+
+.irm-map-toolbar__place strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.irm-map-toolbar__actions { flex: 0 0 auto; }
+
+.irm-map-toolbar__status {
+    padding: 6px 9px;
+    border-radius: 999px;
+    background: var(--irm-toolbar-accent);
+    color: #05201f;
+    font-size: 8px;
+    letter-spacing: .08em;
+    white-space: nowrap;
+}
+
+.irm-map-toolbar__actions button {
+    padding: 5px 2px;
+    color: var(--irm-toolbar-accent);
+    font: inherit;
+    font-size: 8px;
+    letter-spacing: .08em;
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, var(--irm-toolbar-accent) 45%, transparent);
+    text-underline-offset: 3px;
+}
+
+.irm-map-toolbar__actions button:focus-visible {
+    border-radius: 6px;
+    outline: 2px solid var(--irm-toolbar-accent);
+    outline-offset: 2px;
+}
+
+@media (max-width: 360px) {
+    .irm-map-toolbar { gap: 6px; padding-inline: 9px; }
+    .irm-map-toolbar__place { gap: 6px; }
+    .irm-map-toolbar__status { padding-inline: 7px; }
+}

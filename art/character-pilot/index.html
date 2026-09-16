@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Actor Empire · Character lab</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="preview.css">
+  <script type="importmap">{"imports":{"three":"./vendor/three.module.js"}}</script>
+</head>
+<body>
+  <header><a class="brand" href="./">ACTOR <span>EMPIRE</span></a><span class="lab-label">CHARACTER LAB <i>•</i> FIRST PLAYABLE STUDY</span></header>
+  <main>
+    <div class="intro"><div><p class="eyebrow">THE FACE OF YOUR NEXT STORY</p><h1>Meet your character.</h1></div><p>Try the shapes. Change the attitude.<br>Make someone worth remembering.</p></div>
+    <div class="workspace">
+      <section class="stage" aria-label="Interactive character preview">
+        <div class="stage-top"><span class="take">BOLD CARTOON <b>/</b> PILOT 01</span><span id="live-label">Loading character…</span></div>
+        <div id="viewport" tabindex="0" role="img" aria-label="3D character. Drag to rotate, or use the view buttons below."></div>
+        <p id="loading" role="status">Opening the casting room…</p>
+        <div class="portrait-card"><img id="portrait" alt="Profile portrait of your selected character" hidden><div><span>YOUR PROFILE</span><strong>Same character.<br>Every screen.</strong></div></div>
+        <div class="stage-bottom"><span class="hint">Drag to look around</span><div class="view-controls"><button type="button" id="full" aria-pressed="true">Full body</button><button type="button" id="headshot" aria-pressed="false">Headshot</button><button type="button" id="turn" aria-pressed="false">Head turn</button></div></div>
+      </section>
+      <aside class="controls" aria-label="Character customization">
+        <div class="controls-title"><h2>Make it yours.</h2><button type="button" id="randomize" title="Choose another combination">Shuffle ↗</button></div>
+        <fieldset><legend>Face shape</legend><div class="choices" data-category="face">
+          <button type="button" data-value="square" aria-pressed="true"><span class="shape-icon square"></span>Square</button>
+          <button type="button" data-value="round" aria-pressed="false"><span class="shape-icon round"></span>Round</button>
+          <button type="button" data-value="tapered" aria-pressed="false"><span class="shape-icon tapered"></span>Tapered</button>
+        </div></fieldset>
+        <fieldset><legend>Hair</legend><div class="choices" data-category="hair">
+          <button type="button" data-value="bald" aria-pressed="true">Bald</button><button type="button" data-value="crop" aria-pressed="false">Crop</button><button type="button" data-value="swept" aria-pressed="false">Swept</button>
+        </div></fieldset>
+        <fieldset><legend>Brows</legend><div class="choices" data-category="brows">
+          <button type="button" data-value="straight" aria-pressed="true"><span class="brow-icon straight"></span>Straight</button><button type="button" data-value="angled" aria-pressed="false"><span class="brow-icon angled"></span>Angled</button><button type="button" data-value="arched" aria-pressed="false"><span class="brow-icon arched"></span>Arched</button>
+        </div></fieldset>
+        <div class="look-info"><span id="look-name">Square / Bald / Straight</span><small>3 faces × 3 hairstyles × 3 brows</small></div>
+        <button type="button" id="save" class="primary">Save look <span>→</span></button>
+        <p id="save-status" role="status" aria-live="polite">Saves in this preview on this device.</p>
+        <details><summary>Keep a copy</summary><div class="file-controls"><button type="button" id="export">Export recipe</button><label class="file-button">Import recipe<input type="file" id="import" accept="application/json,.json"></label><button type="button" id="download-portrait">Save portrait</button></div></details>
+      </aside>
+    </div>
+    <footer><p><strong>A small cast of possibilities.</strong> 27 combinations from one modular Blender asset.</p><p>Art & movement study · Not connected to game saves</p><details class="gallery-section"><summary>See all 27 combinations</summary><div id="gallery"></div></details></footer>
+  </main>
+  <script type="module" src="./preview.mjs"></script>
+</body>
+</html>

@@ -183,14 +183,10 @@ export function StepMarkets({ data, draft, patch, chosen, handlers }: StepProps)
         eyebrow={`${footprint.countries} markets · ${footprint.regions} regions`}
         title="Opening footprint"
         footer={
-          <button
-            type="button"
-            className="sf-btn sf-btn--primary"
-            disabled={footprint.countries === 0}
-            onClick={() => { handlers.onSaveFootprint?.(draft.selectedCountryIds); setFootprintOpen(false); }}
-          >
-            Save opening footprint
-          </button>
+          <span className="lw-autosave-state is-current" role="status">
+            <i aria-hidden="true" />
+            Autosaved on this device
+          </span>
         }
       >
         <div className="cr-tiles">

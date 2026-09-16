@@ -11,7 +11,7 @@
    have to scroll to find out what moving a price did.
    ========================================================================== */
 
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   CUSTOM_PLAN_COLORS, PLAN_FEATURES, REVENUE_STREAMS, forecastPricing,
   type CustomPlanColorId, type Plan, type PricingSettings, type StreamId,
@@ -19,6 +19,11 @@ import {
 import type { StepProps } from './LaunchWizard';
 import { compactCount, money, moneyPrecise, pct } from '../../finance/format';
 import { ResearchLockMark } from './ResearchLockMark';
+import {
+  STREAMING_MAXIMUM_PLAN_PRICE,
+  STREAMING_MINIMUM_PAID_PLAN_PRICE,
+  normalizeStreamingPlanPrice,
+} from '../../../../services/streamingPricingEconomy';
 
 const GROUPS = [
   { id: 'quality' as const, label: 'Picture & sound' },
@@ -55,23 +60,85 @@ const assignPlanColor = (plans: Plan[]): CustomPlanColorId => {
   return pool[Math.floor(Math.random() * pool.length)];
 };
 
+export function PlanPriceEditorControl({
+  value,
+  minimum,
+  maximum,
+  onCommit,
+}: {
+  value: number;
+  minimum: number;
+  maximum: number;
+  onCommit: (value: number) => void;
+}) {
+  const [draftValue, setDraftValue] = useState(String(value));
+  useEffect(() => setDraftValue(String(value)), [value]);
+  const commit = () => {
+    const parsed = Number(draftValue);
+    const next = Number.isFinite(parsed)
+      ? Math.min(maximum, Math.max(minimum, parsed))
+      : value;
+    const rounded = Math.round(next * 100) / 100;
+    setDraftValue(String(rounded));
+    onCommit(rounded);
+  };
+  return (
+    <div className="pr-price">
+      <button type="button" className="st-step" onClick={() => onCommit(Math.max(minimum, Math.round((value - 1) * 100) / 100))} aria-label="Lower price">−</button>
+      <label className="pr-price-figure">
+        <span aria-hidden="true">$</span>
+        <input
+          type="number"
+          inputMode="decimal"
+          min={minimum}
+          max={maximum}
+          step="0.01"
+          value={draftValue}
+          aria-label="Monthly plan price"
+          onChange={(event) => setDraftValue(event.target.value)}
+          onBlur={commit}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') event.currentTarget.blur();
+          }}
+        />
+        <i>/mo</i>
+      </label>
+      <button type="button" className="st-step" onClick={() => onCommit(Math.min(maximum, Math.round((value + 1) * 100) / 100))} aria-label="Raise price">+</button>
+    </div>
+  );
+}
+
 export function StepPricing({ data, draft, patch, chosen, handlers }: StepProps) {
   const settings: PricingSettings = draft.pricing ?? data.pricing;
   const addressable = useMemo(() => chosen.reduce((sum, c) => sum + c.addressableHouseholds, 0), [chosen]);
   const pricingCohorts = useMemo(() => chosen.flatMap(country => country.pricingCohorts || []), [chosen]);
+  const worldForecast = useMemo(
+    () => handlers.onForecastPricing?.(settings, chosen.map(country => country.id)) ?? null,
+    [handlers.onForecastPricing, settings, chosen],
+  );
   const forecast = useMemo(
-    () => forecastPricing(settings, addressable, data.market, pricingCohorts),
-    [settings, addressable, data.market, pricingCohorts],
+    () => forecastPricing(settings, addressable, data.market, pricingCohorts, worldForecast),
+    [settings, addressable, data.market, pricingCohorts, worldForecast],
   );
 
   const write = (next: Partial<PricingSettings>) => patch({ pricing: { ...settings, ...next } });
   const writePlan = (id: string, next: Partial<Plan>) =>
     write({ plans: settings.plans.map((p) => (p.id === id ? { ...p, ...next } : p)) });
-  const toggleStream = (id: StreamId) => write({
-    streams: settings.streams.includes(id)
-      ? settings.streams.filter((s) => s !== id)
-      : [...settings.streams, id],
-  });
+  const toggleStream = (id: StreamId) => {
+    const removing = settings.streams.includes(id);
+    write({
+      streams: removing
+        ? settings.streams.filter((s) => s !== id)
+        : [...settings.streams, id],
+      ...(id === 'ads' && removing ? {
+        plans: settings.plans.map(plan => ({
+          ...plan,
+          ads: false,
+          monthly: normalizeStreamingPlanPrice(plan.monthly, false),
+        })),
+      } : {}),
+    });
+  };
 
   const top = [...forecast.streams].sort((a, b) => b.monthly - a.monthly)[0];
   const [openDetail, setOpenDetail] = useState(false);
@@ -123,9 +190,14 @@ export function StepPricing({ data, draft, patch, chosen, handlers }: StepProps)
         {openDetail && (
           <div className="pr-live-detail">
             <p className="pr-sub">
-              {forecast.subscribers > 0 ? `${compactCount(forecast.subscribers)} paying · ` : ''}
+              {forecast.subscribers > 0 ? `${compactCount(forecast.subscribers)} subscribed · ` : ''}
               of {compactCount(forecast.addressable)} reachable · {money(forecast.yearlyRevenue)} a year
             </p>
+            {forecast.activeRivalCount !== undefined && (
+              <p className="pr-position">
+                Competing with {forecast.activeRivalCount} active services · rival median entry {moneyPrecise(forecast.rivalMedianEntryPrice || 0)}
+              </p>
+            )}
             <p className="pr-position">
               Range · {money(forecast.conservativeMonthlyRevenue)} conservative · {money(forecast.monthlyRevenue)} expected · {money(forecast.breakoutMonthlyRevenue)} breakout
             </p>
@@ -254,11 +326,20 @@ export function StepPricing({ data, draft, patch, chosen, handlers }: StepProps)
                 )}
               </header>
 
-              <div className="pr-price">
-                <button type="button" className="st-step" onClick={() => writePlan(openPlan.id, { monthly: Math.max(0, openPlan.monthly - 1) })} aria-label="Lower price">−</button>
-                <span className="pr-price-figure">{money(openPlan.monthly)}<i>/mo</i></span>
-                <button type="button" className="st-step" onClick={() => writePlan(openPlan.id, { monthly: openPlan.monthly + 1 })} aria-label="Raise price">+</button>
-              </div>
+              <PlanPriceEditorControl
+                value={openPlan.monthly}
+                minimum={openPlan.ads && settings.streams.includes('ads') ? 0 : STREAMING_MINIMUM_PAID_PLAN_PRICE}
+                maximum={STREAMING_MAXIMUM_PLAN_PRICE}
+                onCommit={(monthly) => writePlan(openPlan.id, {
+                  monthly: normalizeStreamingPlanPrice(monthly, openPlan.ads && settings.streams.includes('ads')),
+                })}
+              />
+              {forecast.rivalMedianEntryPrice !== undefined && openPlan.monthly > forecast.rivalMedianEntryPrice * 2 && (
+                <p className="pr-price-warning">Most reachable households cannot afford this tier. Its features must justify more than twice the rival entry price.</p>
+              )}
+              {forecast.rivalMedianEntryPrice !== undefined && openPlan.monthly > 0 && openPlan.monthly < forecast.rivalMedianEntryPrice * .35 && (
+                <p className="pr-price-warning is-watch">This can win volume, but every new household still creates content, delivery and support costs.</p>
+              )}
 
               {planTone(openPlan) === 'custom' && (
                 <div className="pr-plan-colour-picker">
@@ -318,7 +399,10 @@ export function StepPricing({ data, draft, patch, chosen, handlers }: StepProps)
                       <button
                         type="button"
                         className={openPlan.ads ? 'pr-chip is-ads is-on' : 'pr-chip'}
-                        onClick={() => writePlan(openPlan.id, { ads: !openPlan.ads })}
+                        onClick={() => writePlan(openPlan.id, {
+                          ads: !openPlan.ads,
+                          monthly: normalizeStreamingPlanPrice(openPlan.monthly, !openPlan.ads),
+                        })}
                       >
                         {openPlan.ads ? 'This plan carries adverts' : 'No adverts on this plan'}
                       </button>
@@ -419,9 +503,10 @@ export function StepPricing({ data, draft, patch, chosen, handlers }: StepProps)
         <div><span>Forecast a year</span><b>{money(forecast.yearlyRevenue)}</b></div>
       </div>
 
-      <button type="button" className="sf-btn sf-btn--primary" onClick={() => handlers.onSavePricing?.(settings)}>
-        Save pricing
-      </button>
+      <p className="lw-autosave-state is-current" role="status">
+        <i aria-hidden="true" />
+        Autosaved as you edit
+      </p>
     </>
   );
 }

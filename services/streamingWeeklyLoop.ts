@@ -66,6 +66,11 @@ import {
 import { getWorldStreamingPlayerOutcome } from './worldEconomy/worldStreamingCompetition';
 import { getWorldStreamingPlayerCustomerOutcome } from './worldEconomy/worldStreamingCustomers';
 import { getWorldStreamingPlayerViewingOutcome } from './worldEconomy/worldStreamingViewing';
+import { processOwnedStreamingLaunchMarketingWeek } from './streamingLaunchMarketingLifecycle';
+import {
+    calculateStreamingFundingPressure,
+    getStreamingBlendedMonthlyPrice,
+} from './streamingPricingEconomy';
 
 const clamp = (value: number, minimum: number, maximum: number): number => (
     Math.min(maximum, Math.max(minimum, Number.isFinite(value) ? value : minimum))
@@ -414,6 +419,8 @@ export const processOwnedStreamingPlatformWeek = (
         .map(session => `${session.id}:${session.status}`).join('|');
     const privateOffers = processStreamingPrivateOffersWeek(player, absoluteWeek);
     player = privateOffers.player;
+    const launchMarketing = processOwnedStreamingLaunchMarketingWeek(player);
+    player = launchMarketing.player;
     const normalizedPlatform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     const launchCommit = normalizedPlatform.launchCommit;
     const weekKey = `owned-streaming-week:${absoluteWeek}`;
@@ -423,7 +430,11 @@ export const processOwnedStreamingPlatformWeek = (
         || absoluteWeek <= launchCommit.committedAtAbsoluteWeek
         || normalizedPlatform.processedWeekKeys.includes(weekKey)
     ) {
-        return { player, processed: auctionsChanged || privateOffers.resolvedOfferIds.length > 0, snapshot: null };
+        return {
+            player,
+            processed: auctionsChanged || privateOffers.resolvedOfferIds.length > 0 || launchMarketing.processed,
+            snapshot: null,
+        };
     }
     const leadershipCompletion = completeDueStreamingExecutiveDevelopment(normalizedPlatform, absoluteWeek);
     const researchCompletion = advanceDueStreamingResearchPrograms(leadershipCompletion.platform, absoluteWeek);
@@ -487,11 +498,7 @@ export const processOwnedStreamingPlatformWeek = (
         item.status === 'LOCKED' && item.targetAbsoluteWeek === absoluteWeek
     )) || null;
     const growthEffects = growthAction ? getStreamingGrowthEffects(platform, growthAction) : null;
-    const legacyWeightedArpu = (
-        platform.subscriptionPrices.BASIC * 0.48
-        + platform.subscriptionPrices.PREMIUM * 0.34
-        + platform.subscriptionPrices.FAMILY * 0.18
-    );
+    const legacyWeightedArpu = getStreamingBlendedMonthlyPrice(platform);
     const worldCompetitionOutcome = player.world.worldStreamingCompetition?.lastProcessedAbsoluteWeek === absoluteWeek
         ? getWorldStreamingPlayerOutcome(player.world.worldStreamingCompetition)
         : null;
@@ -721,6 +728,7 @@ export const processOwnedStreamingPlatformWeek = (
         averageActiveSubscribers * productEffects.weeklyRevenuePerSubscriber,
     );
     const worldViewingIncrementalRevenue = roundMoney(worldViewingOutcome?.revenue.totalIncrementalRevenue || 0);
+    const worldViewingCommercialOperatingCost = roundMoney(worldViewingOutcome?.revenue.commercialOperatingCost || 0);
     const totalOperatingRevenue = subscriptionRevenue + productRevenue + worldViewingIncrementalRevenue;
     const partnerRevenueShareCost = roundMoney(calculateStreamingPartnerRevenueShareFullCurrency({
         weeklySubscriptionRevenueFullCurrency: subscriptionRevenue + worldViewingIncrementalRevenue,
@@ -773,9 +781,15 @@ export const processOwnedStreamingPlatformWeek = (
         + crisisRecoveryCost
         + infrastructureOperationsCost
         + audienceEnforcementCost
+        + worldViewingCommercialOperatingCost
         + marketPolicyCost
         + marketOperatingCost,
     );
+    const fundingPressure = calculateStreamingFundingPressure({
+        treasuryBefore: platform.treasuryCash,
+        operatingRevenue: totalOperatingRevenue,
+        operatingCost: totalCashCost,
+    });
     const treasuryAfter = Math.max(0, roundMoney(
         platform.treasuryCash + totalOperatingRevenue - totalCashCost,
     ));
@@ -795,6 +809,7 @@ export const processOwnedStreamingPlatformWeek = (
         + playbackSuccessRate * 0.42
         + platform.technologyLevels.SECURITY * 0.018
         - technicalDebt * 0.12
+        - fundingPressure.technologyHealthPenalty
         - (capacityUtilizationPercent > 100 ? 4 : 0)
         - (crisisEffects.activeCrisis
             ? crisisEffects.activeCrisis.severity === 'CRITICAL' ? 5
@@ -884,6 +899,12 @@ export const processOwnedStreamingPlatformWeek = (
             detail: `${totalOperatingRevenue.toLocaleString()} total operating revenue produced a ${netCashContribution >= 0 ? 'positive' : 'negative'} ${Math.abs(netCashContribution).toLocaleString()} treasury movement.`,
             impact: netCashContribution >= 0 ? 'POSITIVE' : 'NEGATIVE',
         },
+        ...(fundingPressure.distressed ? [{
+            id: 'unfunded-operations',
+            label: 'The platform could not fund every weekly obligation',
+            detail: `${fundingPressure.unfundedCost.toLocaleString()} of this week's operating cost went unfunded. Service health will keep deteriorating until the player raises capital or cuts costs.`,
+            impact: 'NEGATIVE' as const,
+        }] : []),
         ...(marketCosts.activeCountryCount ? [{
             id: 'living-market-policy',
             label: `${marketCosts.activeCountryCount} active ${marketCosts.activeCountryCount === 1 ? 'market is' : 'markets are'} shaping the P&L`,
@@ -1032,6 +1053,7 @@ export const processOwnedStreamingPlatformWeek = (
         netSubscriberMovement >= 0 ? 'SUBSCRIBER_GROWTH' : 'SUBSCRIBER_DECLINE',
         capacityUtilizationPercent >= 90 ? 'CAPACITY_PRESSURE' : 'CAPACITY_HEALTHY',
         netCashContribution >= 0 ? 'POSITIVE_CASH_CONTRIBUTION' : 'NEGATIVE_CASH_CONTRIBUTION',
+        ...(fundingPressure.distressed ? ['UNFUNDED_OPERATIONS'] : []),
         ...(plan ? [`PLAN_${plan.id}`] : ['BALANCED_AUTOPILOT']),
         ...(growthAction ? ['GROWTH_ACTION_APPLIED'] : []),
         ...(productCompletion.launchedLines.length ? ['PRODUCT_LAUNCHED'] : []),
@@ -1187,6 +1209,9 @@ export const processOwnedStreamingPlatformWeek = (
                 premiumRevenue: title.revenue.premiumRevenue,
                 rentalRevenue: title.revenue.rentalRevenue,
                 purchaseRevenue: title.revenue.purchaseRevenue,
+                dayPassRevenue: title.revenue.dayPassRevenue,
+                meteredRevenue: title.revenue.meteredRevenue,
+                patronRevenue: title.revenue.patronRevenue,
                 sponsorshipRevenue: title.revenue.sponsorshipRevenue,
                 incrementalRevenue,
                 allocatedCashCost,
@@ -1285,9 +1310,13 @@ export const processOwnedStreamingPlatformWeek = (
                 ? worldViewingOutcome.revenue.premiumRevenue
                     + worldViewingOutcome.revenue.rentalRevenue
                     + worldViewingOutcome.revenue.purchaseRevenue
+                    + worldViewingOutcome.revenue.dayPassRevenue
+                    + worldViewingOutcome.revenue.meteredRevenue
+                    + worldViewingOutcome.revenue.patronRevenue
                 : undefined,
             worldViewingSponsorshipRevenue: worldViewingOutcome?.revenue.sponsorshipRevenue,
             worldViewingIncrementalRevenue: worldViewingOutcome?.revenue.totalIncrementalRevenue,
+            worldViewingCommercialOperatingCost: worldViewingOutcome?.revenue.commercialOperatingCost,
             partnerRevenueShareCost,
             infrastructureCost,
             leadershipCost,

@@ -164,7 +164,7 @@ const createFixture = (): Player => {
     };
 };
 
-assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 25, 'The canonical foundation should advance the owned-streaming schema to v24.');
+assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 26, 'The canonical foundation should advance the owned-streaming schema to v24.');
 
 const player = createFixture();
 const before = JSON.stringify(player.ownedStreamingPlatform);

@@ -13,6 +13,8 @@ import * as viewingEngine from '../services/worldEconomy/worldStreamingViewing';
 import { processOwnedStreamingPlatformWeek } from '../services/streamingWeeklyLoop';
 import { migratePlayerSave } from '../services/saveMigration';
 import { getStreamingContentAvailability } from '../services/streamingContentAvailability';
+import { createWorldStreamingPlatformEconomyState } from '../services/worldEconomy/worldStreamingPlatformEconomy';
+import { normalizeOwnedStreamingPlatformState } from '../services/ownedStreamingPlatform';
 
 const createViewing = (viewingEngine as any).createWorldStreamingViewingState;
 const normalizeViewing = (viewingEngine as any).normalizeWorldStreamingViewingState;
@@ -37,12 +39,15 @@ player.ownedStreamingPlatform.identity = {
 player.ownedStreamingPlatform.serviceConfiguration.source = 'PLAYER_ACTION';
 player.ownedStreamingPlatform.serviceConfiguration.pricing = {
     ...player.ownedStreamingPlatform.serviceConfiguration.pricing,
-    streams: ['subs', 'ads', 'rentals', 'premium', 'sponsor'],
+    streams: ['subs', 'ads', 'rentals', 'premium', 'daypass', 'sponsor', 'metered', 'patron'],
     plans: [
         { id: 'ESSENTIAL', name: 'Essential', monthly: 7, featureIds: ['hd'], ads: true, colorId: 'emerald' },
         { id: 'PREMIERE', name: 'Premiere', monthly: 18, featureIds: ['uhd', 'streams4', 'downloads', 'noads'], ads: false, colorId: 'magenta' },
     ],
+    daypass: { price: 7 },
     sponsor: { perTitle: 3_000_000, titles: 1 },
+    metered: { perHour: 1.5 },
+    patron: { monthly: 9 },
 };
 player.ownedStreamingPlatform.metrics.subscribers = 250_000;
 
@@ -151,7 +156,7 @@ assert.equal(
 
 assert.deepEqual(state, repeated, 'identical canonical inputs create identical WE6 state');
 assert.equal(JSON.stringify(player), before, 'WE6 construction does not mutate the player');
-assert.equal(state.schemaVersion, 1, 'WE6 stores a versioned canonical state');
+assert.equal(state.schemaVersion, 2, 'WE6 stores the commercial-settlement schema');
 assert.equal(state.lastProcessedAbsoluteWeek, absoluteWeek, 'WE6 commits the requested absolute week');
 assert.ok(Number.isFinite(state.global.totalViewingAccounts), 'WE6 global viewing total is finite');
 assert.ok(Number.isFinite(state.global.totalHoursViewed), 'WE6 global watch-hour total is finite');
@@ -214,14 +219,42 @@ assert.ok(outcome.revenue.advertisingImpressions > 0 && outcome.revenue.advertis
 assert.ok(outcome.revenue.premiumTransactions > 0 && outcome.revenue.premiumRevenue > 0, 'eligible fresh premieres can create premium transactions');
 assert.ok(outcome.revenue.rentalTransactions > 0 && outcome.revenue.rentalRevenue > 0, 'eligible title demand can create rentals');
 assert.ok(outcome.revenue.purchaseTransactions > 0 && outcome.revenue.purchaseRevenue > 0, 'eligible title demand can create purchases');
+assert.ok(outcome.revenue.dayPassTransactions > 0 && outcome.revenue.dayPassRevenue > 0, 'non-subscribers can purchase day-pass access');
+assert.ok(outcome.revenue.meteredAccounts > 0 && outcome.revenue.meteredRevenue > 0, 'light viewers can purchase metered access');
+assert.ok(outcome.revenue.patronAccounts > 0 && outcome.revenue.patronRevenue > 0, 'engaged viewers can fund the platform as patrons');
 assert.ok(outcome.revenue.sponsorshipImpressions > 0 && outcome.revenue.sponsorshipRevenue > 0, 'configured sponsored titles earn against delivered exposure');
 assert.ok(outcome.revenue.sponsorshipRevenue <= player.ownedStreamingPlatform.serviceConfiguration.pricing.sponsor.perTitle / 52, 'weekly sponsorship earnings remain capped by the configured annual contract');
 assert.equal(
     outcome.revenue.totalIncrementalRevenue,
     outcome.revenue.advertisingRevenue + outcome.revenue.premiumRevenue + outcome.revenue.rentalRevenue
-        + outcome.revenue.purchaseRevenue + outcome.revenue.sponsorshipRevenue,
+        + outcome.revenue.purchaseRevenue + outcome.revenue.dayPassRevenue + outcome.revenue.meteredRevenue
+        + outcome.revenue.patronRevenue + outcome.revenue.sponsorshipRevenue,
     'incremental commercial revenue reconciles without subscription attribution',
 );
+assert.ok(outcome.revenue.commercialOperatingCost > 0, 'commercial settlement retains payment and delivery costs');
+const aiCommercialOutcomes = Object.values(state.platforms).filter((platform: any) => platform.platformId !== 'PLAYER');
+assert.ok(aiCommercialOutcomes.some((platform: any) => platform.revenue.premiumRevenue > 0 || platform.revenue.rentalRevenue > 0),
+    'eligible AI platforms earn transaction revenue through the shared commercial engine');
+assert.ok(aiCommercialOutcomes.some((platform: any) => platform.revenue.sponsorshipRevenue > 0),
+    'eligible AI platforms earn sponsorship revenue through the shared commercial engine');
+assert.ok(aiCommercialOutcomes.some((platform: any) => platform.revenue.dayPassRevenue > 0),
+    'eligible AI platforms can operate day-pass products');
+const economyInput = structuredClone(player) as Player;
+economyInput.world.worldStreamingViewing = state;
+const platformEconomy = createWorldStreamingPlatformEconomyState(economyInput, absoluteWeek);
+const aiEconomyRow = Object.values(platformEconomy.platforms).find(row => row.platformId !== 'PLAYER'
+    && (state.platforms[row.platformId]?.revenue.commercialOperatingCost || 0) > 0)!;
+const aiViewing = state.platforms[aiEconomyRow.platformId];
+const aiCountryCount = aiEconomyRow.countryEconomy.length;
+const aiAccessLoadAccounts = Object.values(player.world.worldStreamingCustomers.countries)
+    .flatMap(country => country.platformSummaries)
+    .filter(row => row.platformId === aiEconomyRow.platformId)
+    .reduce((sum, row) => sum + row.accessLoadAccounts, 0);
+const aiBaseOperatingCost = aiAccessLoadAccounts * .035 + aiViewing.totalHoursViewed * .0015
+    + Math.max(1, aiCountryCount) * 125_000;
+assert.equal(aiEconomyRow.standardWeeklyOperatingCost,
+    Math.round((aiBaseOperatingCost + aiViewing.revenue.commercialOperatingCost) * 100) / 100,
+    'AI world settlement includes shared commercial payment and delivery costs');
 const subscriptionsOnly = structuredClone(player) as Player;
 subscriptionsOnly.ownedStreamingPlatform.serviceConfiguration.pricing.streams = ['subs'];
 const subscriptionsOnlyState = createViewing(subscriptionsOnly, absoluteWeek);
@@ -241,9 +274,21 @@ assert.equal(weeklyOperations?.worldViewingUnmetDemandAccounts, outcome.unmetDem
 assert.equal(weeklyOperations?.worldViewingIncrementalRevenue, outcome.revenue.totalIncrementalRevenue, 'weekly cash settlement consumes WE6 incremental revenue once');
 assert.equal(weeklyOperations?.worldViewingAdvertisingRevenue, outcome.revenue.advertisingRevenue, 'weekly operations retain advertising revenue evidence');
 assert.equal(weeklyOperations?.worldViewingTransactionRevenue,
-    outcome.revenue.premiumRevenue + outcome.revenue.rentalRevenue + outcome.revenue.purchaseRevenue,
+    outcome.revenue.premiumRevenue + outcome.revenue.rentalRevenue + outcome.revenue.purchaseRevenue
+        + outcome.revenue.dayPassRevenue + outcome.revenue.meteredRevenue + outcome.revenue.patronRevenue,
     'weekly operations retain transaction revenue evidence');
 assert.equal(weeklyOperations?.worldViewingSponsorshipRevenue, outcome.revenue.sponsorshipRevenue, 'weekly operations retain sponsorship revenue evidence');
+assert.equal(weeklyOperations?.worldViewingCommercialOperatingCost, outcome.revenue.commercialOperatingCost,
+    'weekly operations settle commercial operating costs exactly once');
+const normalizedWeeklyPlatform = normalizeOwnedStreamingPlatformState(
+    JSON.parse(JSON.stringify(weeklyResult.player.ownedStreamingPlatform)),
+    weeklyResult.player.id,
+);
+const normalizedWeeklySnapshot = normalizedWeeklyPlatform.weeklyHistory.find(item => item.absoluteWeek === absoluteWeek)!;
+assert.equal(normalizedWeeklySnapshot.operations?.worldViewingCommercialOperatingCost, outcome.revenue.commercialOperatingCost,
+    'save normalization preserves weekly commercial operating costs');
+assert.equal(normalizedWeeklySnapshot.operations?.titlePerformance?.reduce((sum, title) => sum + (title.dayPassRevenue || 0), 0),
+    outcome.revenue.dayPassRevenue, 'save normalization preserves title-level day-pass revenue');
 assert.equal(weeklyOperations?.subscriptionRevenue, canonicalWeeklySubscriptionRevenue, 'WE5 subscription cash remains the single canonical subscription amount');
 assert.equal(
     weeklyOperations?.titlePerformance?.reduce((sum: number, title: any) => sum + title.hoursViewed, 0),
@@ -275,6 +320,18 @@ assert.ok(repaired.platforms.PLAYER.titlePerformance.every((title: any) => title
 assert.ok(repaired.platforms.PLAYER.titlePerformance.every((title: any) => Number.isFinite(title.revenue.advertisingRevenue)), 'malformed title revenue rebuilds to finite cash');
 const reloadedSameWeek = normalizeViewing(JSON.parse(JSON.stringify(state)), player, absoluteWeek);
 assert.deepEqual(reloadedSameWeek, state, 'same-week JSON save/reload preserves the immutable WE6 outcome');
+const legacyViewing = structuredClone(state) as any;
+legacyViewing.schemaVersion = 1;
+Object.values(legacyViewing.platforms).forEach((platform: any) => {
+    delete platform.revenue.dayPassRevenue;
+    delete platform.revenue.meteredRevenue;
+    delete platform.revenue.patronRevenue;
+    delete platform.revenue.commercialOperatingCost;
+});
+const upgradedViewing = normalizeViewing(legacyViewing, player, absoluteWeek);
+assert.equal(upgradedViewing.schemaVersion, 2, 'legacy viewing states rebuild into the commercial-settlement schema');
+assert.ok(Object.values(upgradedViewing.platforms).every((platform: any) => Number.isFinite(platform.revenue.commercialOperatingCost)),
+    'legacy viewing migration supplies finite commercial costs');
 
 const runLongHorizon = () => {
     const horizonPlayer = structuredClone(player) as Player;

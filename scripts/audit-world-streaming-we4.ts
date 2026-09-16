@@ -61,8 +61,17 @@ assert.equal(JSON.stringify(player), before, 'reading the offer registry does no
 
 const aiOffers = offers.offers.filter((offer: any) => !offer.isPlayer);
 assert.ok(aiOffers.length >= 30, 'every seeded global and regional operator receives an offer without a top-four cap');
-assert.ok(aiOffers.every((offer: any) => offer.plans.length >= 1 && offer.plans.length <= 3), 'AI operators expose bounded concrete plan choices');
-assert.ok(aiOffers.every((offer: any) => offer.plans.every((plan: any) => plan.monthlyPrice > 0)), 'AI plan prices remain positive');
+assert.ok(aiOffers.every((offer: any) => offer.plans.length >= 1 && offer.plans.length <= 4), 'AI operators expose bounded concrete plan choices');
+assert.ok(aiOffers.every((offer: any) => {
+    const freePlans = offer.plans.filter((plan: any) => plan.monthlyPrice === 0);
+    return freePlans.length === 0 || (
+        offer.plans.length === 4
+        && freePlans.length === 1
+        && freePlans[0].id === 'FREE'
+        && freePlans[0].ads === true
+    );
+}), 'only an explicit ad-supported FREE tier may use zero pricing');
+assert.ok(aiOffers.every((offer: any) => offer.plans.every((plan: any) => plan.monthlyPrice >= 0)), 'AI plan prices never become negative');
 assert.ok(offers.byCountry.IN.includes('JIOHOTSTAR'), 'a regional operator competes in its actual market');
 assert.ok(!offers.byCountry.US.includes('JIOHOTSTAR'), 'a regional operator is excluded outside its active markets');
 assert.ok(offers.byCountry.US.includes('PLAYER') && offers.byCountry.IN.includes('PLAYER'), 'the player competes only in their active countries');

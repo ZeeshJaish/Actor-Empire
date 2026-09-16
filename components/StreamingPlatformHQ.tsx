@@ -2,10 +2,12 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {BadgeCheck, BarChart3, Banknote, Building2, Check, ChevronRight, CircleDot, Clapperboard, Compass, Crown, Eye, Film, Gauge, Globe2, Home, Layers3, LockKeyhole, Play, RadioTower, Rocket, Server, ShieldCheck, Sparkles, TrendingUp, UsersRound, WalletCards, X, type LucideIcon} from 'lucide-react';
 import type {
   OwnedStreamingLaunchRehearsalSnapshot,
+  OwnedStreamingLaunchMarketingDraft,
   Player,
   StreamingHqSection,
   StreamingDefineLaunchStepId,
   StreamingLogoKey,
+  StreamingOpeningProgrammeFocus,
   StreamingTechnologyBranch,
 } from '../types';
 import {
@@ -82,7 +84,7 @@ import StreamingFinanceRoom from './streaming-transplant/StreamingFinanceRoom';
 import StreamingContentMarket from './StreamingContentMarket';
 import { establishContentMarketCatalogue } from '../services/streamingContentMarket';
 import StreamingDefineLaunchWizard from './StreamingDefineLaunchExperience';
-import type { LaunchDraft } from './studio-finance/finance/launch';
+import StreamingOpeningProgramme from './streaming-transplant/StreamingOpeningProgramme';
 import {
   PremiereNight as StreamingPremiereExperience,
   type PremiereInputs as StreamingPremiereInputs,
@@ -112,6 +114,7 @@ import {
 } from '../services/streamingCatalog';
 import { getAbsoluteWeek } from '../services/legacyLogic';
 import { updateWorldStreamingCustomerAccessPolicy } from '../services/worldEconomy/worldStreamingCustomers';
+import { forecastWorldStreamingBuildDemand } from '../services/worldEconomy/worldStreamingPricingForecast';
 import { getStreamingOriginalLiveStatus } from '../services/streamingOriginals';
 import { getStreamingTechnologyCampus } from '../services/streamingTechnologyCampus';
 import { getStreamingProductSuite } from '../services/streamingProductSuite';
@@ -129,11 +132,10 @@ import { getStreamingCompetitiveWorld } from '../services/streamingCompetitiveWo
 import { getStreamingIncidentCommand } from '../services/streamingCrisisSecurity';
 import { getStreamingInfrastructureChronicle } from '../services/streamingInfrastructureProgression';
 import {
-  commitStreamingInfrastructureSetup,
   createDefaultStreamingInfrastructureDraft,
   getSuggestedStreamingNetworkPlacements,
   getStreamingInfrastructureForecast,
-  runStreamingInfrastructureLoadTest,
+  saveStreamingInfrastructureRehearsal,
   saveStreamingInfrastructureDraft,
 } from '../services/streamingInfrastructure';
 import {
@@ -142,10 +144,30 @@ import {
 } from '../services/streamingFacilities';
 import { commitOwnedStreamingLaunch, getStreamingLaunchReadiness } from '../services/streamingLaunch';
 import {
+  isStreamingDefineLaunchWizardMilestone,
+  getStreamingLaunchBudgetView,
+  getStreamingLaunchDefinitionSignature,
   getStreamingLaunchProgramView,
   saveStreamingStorefrontPlan,
   type StreamingLaunchDestination,
 } from '../services/streamingLaunchProgram';
+import { resolveLinkedBudgetDestination } from './studio-finance/finance/budgetLinks';
+import {
+  STREAMING_LAUNCH_MARKETING_CHANNELS,
+  forecastStreamingLaunchMarketing,
+  getStreamingLaunchMarketingRecommendations,
+  type StreamingLaunchMarketingInput,
+} from '../services/streamingLaunchMarketing';
+import {
+  saveOwnedStreamingLaunchMarketingDraft,
+} from '../services/streamingLaunchMarketingLifecycle';
+import {
+  commissionStreamingOpeningProgramme,
+  getStreamingOpeningCommissionQuote,
+  getStreamingOpeningProgrammeFocus,
+  getStreamingOpeningProgrammeView,
+} from '../services/streamingOpeningProgramme';
+import { resolveStreamingMarketRequirement, resumeStreamingMarketClearance } from '../services/streamingMarkets';
 import '../styles/streaming-hq.css';
 
 const STREAMING_NETWORK_COVERAGE_REGIONS: StreamingRegionId[] = [
@@ -275,6 +297,8 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
   const identity = platform.identity!;
   const snapshot = useMemo(() => getStreamingHqSnapshot(player), [player]);
   const launchProgram = useMemo(() => getStreamingLaunchProgramView(player), [player]);
+  const openingProgramme = useMemo(() => getStreamingOpeningProgrammeView(player), [player]);
+  const launchBudget = useMemo(() => getStreamingLaunchBudgetView(player), [player]);
   const technologyCampus = useMemo(() => getStreamingTechnologyCampus(player), [player]);
   const productSuite = useMemo(() => getStreamingProductSuite(player), [player]);
   const openingCatalogue = useMemo(() => getStreamingOpeningCatalogueView(player), [player]);
@@ -336,8 +360,11 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
   const [showDefineLaunch, setShowDefineLaunch] = useState(false);
   const [defineLaunchMode, setDefineLaunchMode] = useState<'OPENING' | 'EXPANSION'>('OPENING');
   const [defineLaunchInitialStep, setDefineLaunchInitialStep] = useState<StreamingDefineLaunchStepId | undefined>(undefined);
-  const launchDraftRef = useRef<LaunchDraft | null>(null);
+  const [defineLaunchInitialSheet, setDefineLaunchInitialSheet] = useState<'money' | 'plan' | undefined>(undefined);
   const [showCinematicBuild, setShowCinematicBuild] = useState(false);
+  const [showOpeningProgramme, setShowOpeningProgramme] = useState(false);
+  const [openingProgrammeFocus, setOpeningProgrammeFocus] = useState<StreamingOpeningProgrammeFocus>('OVERVIEW');
+  const [buildInitialSheet, setBuildInitialSheet] = useState<'money' | 'build' | undefined>(undefined);
   const [showCinematicPricing, setShowCinematicPricing] = useState(false);
   const [showFinanceRoom, setShowFinanceRoom] = useState(initialDestination === 'FINANCE');
   const [financeInitialTab, setFinanceInitialTab] = useState<'SNAPSHOT' | 'CAPITAL'>('SNAPSHOT');
@@ -345,6 +372,14 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
   const [showCinematicPremiere, setShowCinematicPremiere] = useState(Boolean(pendingLaunchReveal));
   const [showCinematicStock, setShowCinematicStock] = useState(false);
   const [buildRunResult, setBuildRunResult] = useState<StreamingBuildRunResult | null>(null);
+
+  useEffect(() => {
+    if (showDefineLaunch && defineLaunchInitialSheet) setDefineLaunchInitialSheet(undefined);
+  }, [defineLaunchInitialSheet, showDefineLaunch]);
+
+  useEffect(() => {
+    if (showCinematicBuild && buildInitialSheet) setBuildInitialSheet(undefined);
+  }, [buildInitialSheet, showCinematicBuild]);
   const buildCommittedPlayerRef = useRef<Player | null>(null);
   const [companyFeedback, setCompanyFeedback] = useState('');
 
@@ -402,6 +437,10 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
         .slice(0, 1)
     ));
   }, [identity.dayOneMarketIds, platform.marketOperations, visualRegions]);
+  const hasExplicitBuildMarkets = useMemo(() => (
+    platform.marketOperations.some(operation => operation.entryKind === 'OPENING' && operation.countryId && operation.status !== 'EXITED')
+    || Boolean(identity.dayOneMarketIds?.length)
+  ), [identity.dayOneMarketIds, platform.marketOperations]);
 
   const initialInfrastructureDraft = platform.infrastructureSetupDraft
     || createDefaultStreamingInfrastructureDraft(player);
@@ -430,12 +469,14 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
           : streamingPresetPlacements(initialInfrastructureDraft.capacityPackageId, visualRegions, null),
       ),
     managementPolicy: initialInfrastructureDraft.managementPolicy,
+    assistedPlanApproved: initialInfrastructureDraft.assistedPlanApproved,
+    assistedPlanClass: initialInfrastructureDraft.assistedPlanClass,
     arch: initialInfrastructureDraft.strategy === 'CLOUD_FIRST'
       ? 'CLOUD'
       : initialInfrastructureDraft.strategy === 'OWNED_INFRASTRUCTURE'
         ? 'OWNED'
         : 'HYBRID',
-    doctrine: initialInfrastructureDraft.rolloutPace,
+    doctrine: 'STANDARD',
     campaign: 'NONE',
   }));
   const [pricingSelection, setPricingSelection] = useState<StreamingPricingSelection>(() => ({
@@ -765,6 +806,11 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
     () => deriveStreamingPricing(pricingSelection, pricingCapabilities),
     [pricingCapabilities, pricingSelection],
   );
+  const buildWorldDemand = useMemo(() => forecastWorldStreamingBuildDemand(
+    player,
+    platform.serviceConfiguration.pricing,
+    buildMarkets.map(market => market.id),
+  ), [buildMarkets, platform.serviceConfiguration.pricing, player]);
   const buildAbsoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
   const buildInputs = useMemo(() => ({
     absoluteWeek: buildAbsoluteWeek,
@@ -793,16 +839,18 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
         amount: commitment.paidAmount,
         note: commitment.category === 'MARKET' ? 'Define the Launch · market filing' : 'Define the Launch · service identity',
       })),
-    defineLaunchChecks: (launchProgram.tracks.find(track => track.id === 'DEFINE_LAUNCH')?.milestones || []).flatMap(milestone => {
-      const step = DEFINE_STEP_BY_DESTINATION[milestone.destination];
-      return step ? [{
-        id: milestone.id,
-        label: milestone.label,
-        complete: milestone.complete,
-        detail: milestone.complete ? 'Confirmed' : milestone.description,
-        step,
-      }] : [];
-    }),
+    defineLaunchChecks: (launchProgram.tracks.find(track => track.id === 'DEFINE_LAUNCH')?.milestones || [])
+      .filter(isStreamingDefineLaunchWizardMilestone)
+      .flatMap(milestone => {
+        const step = DEFINE_STEP_BY_DESTINATION[milestone.destination];
+        return step ? [{
+          id: milestone.id,
+          label: milestone.label,
+          complete: milestone.complete,
+          detail: milestone.complete ? 'Confirmed' : milestone.description,
+          step,
+        }] : [];
+      }),
     premiereTitle: platform.launchSlate?.entries[0]?.title
       || (platform.originalCommissions || [])[0]?.title
       || 'First Original',
@@ -817,20 +865,116 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
       recommendedCityId: market.recommendedCityId,
       localizationNote: market.localizationNote,
     })),
+    hasExplicitOpeningMarkets: hasExplicitBuildMarkets,
     recommendedPlacements: getSuggestedStreamingNetworkPlacements(
       buildMarkets.map(market => market.id),
       pricingDerived.reachMul,
+      buildWorldDemand.likely,
     ),
     homeCityId: buildSelection.placements[0]?.cityId || null,
     audienceMul: pricingDerived.reachMul,
+    openingDemandForecast: {
+      low: buildWorldDemand.low,
+      likely: buildWorldDemand.likely,
+      high: buildWorldDemand.high,
+      byMarket: { ...buildWorldDemand.byMarket },
+    },
+    facilityMarketContextByCountryId: Object.fromEntries(Object.entries(player.world.worldPopulation?.countries || {}).map(([countryId, population]) => {
+      const audience = player.world.worldAudienceEconomy?.countries?.[countryId];
+      return [countryId, {
+        absoluteWeek: buildAbsoluteWeek,
+        purchasingPowerIndex: population.macro.purchasingPowerIndex,
+        inflationPressure: population.macro.inflationPressure,
+        consumerConfidence: population.macro.consumerConfidence,
+        reliableInternetPercent: population.reliableInternetPercent,
+        commercialHouseholds: audience?.commercialHouseholds || population.households,
+      }];
+    })),
     debtWeekly: (platform.finance.loans || [])
       .filter(loan => loan.status === 'ACTIVE')
       .reduce((sum, loan) => sum + loan.outstandingPrincipal * loan.weeklyInterestRate, 0),
-  }), [buildAbsoluteWeek, buildMarkets, buildSelection.placements, launchProgram, platform, pricingDerived.reachMul, visualRegions]);
+  }), [buildAbsoluteWeek, buildMarkets, buildSelection.placements, buildWorldDemand, hasExplicitBuildMarkets, launchProgram, platform, player.world.worldAudienceEconomy, player.world.worldPopulation, pricingDerived.reachMul, visualRegions]);
   const buildDerived = useMemo(
     () => deriveStreamingBuild(buildSelection, buildInputs),
     [buildInputs, buildSelection],
   );
+  const launchMarketingInput = useMemo<StreamingLaunchMarketingInput>(() => ({
+    platformKey: identity.slug || player.id,
+    absoluteWeek: buildAbsoluteWeek,
+    buildWeeks: Math.max(1, buildDerived.weeks),
+    availableTreasury: platform.treasuryCash,
+    protectedOperatingCash: Math.max(0, buildDerived.weekly * 12),
+    hasSellablePlan: pricingDerived.sellable.length > 0,
+    hasFlagshipOriginal: platform.originalCommissions.some(original => (
+      ['DELIVERED', 'RELEASED'].includes(getStreamingOriginalLiveStatus(player, original))
+    )),
+    pricingRevision: platform.serviceConfiguration.revision,
+    catalogueRevision: (platform.launchSlate?.revision || 0) + platform.catalogLicenses.length,
+    localizationRevision: platform.localizationOperations.jobs.length + platform.localizationOperations.titleLanguageAssets.length,
+    competitionRevision: platform.competitiveWorld.weeklyRivalHistory.length,
+    countries: buildMarkets.map(market => {
+      const population = player.world.worldPopulation?.countries?.[market.id];
+      const audience = player.world.worldAudienceEconomy?.countries?.[market.id];
+      const competitionPressure = market.competition === 'FIERCE' ? .88 : market.competition === 'BUSY' ? .68 : .45;
+      const catalogueCoverage = Math.min(1, Math.max(.08, (
+        platform.catalogProjectIds.length + platform.catalogLicenses.length + platform.originalCommissions.length
+      ) / 24));
+      return {
+        countryId: market.id,
+        countryName: market.country,
+        reachableHouseholds: Math.max(1, audience?.commercialHouseholds || population?.households || Math.round(market.streamingAudience / 2.4)),
+        baseConcurrentStreams: Math.max(0, buildWorldDemand.byMarket[market.id] || 0),
+        conversionHeadroom: Math.max(.12, Math.min(.9, 1 - market.rivals.reduce((sum, rival) => sum + rival.watchSharePercent, 0) / 140)),
+        mediaCostIndex: market.launchDifficulty === 'HARD' ? 1.35 : market.launchDifficulty === 'EASY' ? .72 : 1,
+        purchasingPowerIndex: population?.macro.purchasingPowerIndex
+          ? population.macro.purchasingPowerIndex / 100 : 1,
+        consumerConfidence: population?.macro.consumerConfidence
+          ? population.macro.consumerConfidence / 100 : .65,
+        internetAccess: (population?.reliableInternetPercent || 72) / 100,
+        localizationCoverage: Math.min(1, .42 + platform.localizationOperations.titleLanguageAssets.length / Math.max(1, market.languages.length * 4)),
+        catalogueCoverage,
+        competitionPressure,
+        priorAwareness: platform.launchMarketingPlan?.countryAwareness[market.id] || .03,
+      };
+    }),
+    channelAvailability: {
+      DEVICE_STORES: {
+        available: platform.technologyLevels.PRODUCT_EXPERIENCE >= 1,
+        efficiency: 1,
+        reason: 'Research Product Experience level 1.',
+      },
+      TELCO_BUNDLES: {
+        available: platform.serviceConfiguration.pricing.streams.includes('sponsor')
+          || platform.technologyLevels.ADVERTISING_COMMERCE >= 1,
+        efficiency: 1,
+        reason: 'Enable commerce partnerships or research Advertising Commerce.',
+      },
+    },
+  }), [buildAbsoluteWeek, buildDerived.weeks, buildDerived.weekly, buildMarkets, buildWorldDemand.byMarket, identity.slug, platform, player, pricingDerived.sellable.length]);
+  const launchMarketing = useMemo(() => {
+    const draft = platform.launchMarketingDraft!;
+    return {
+      draft,
+      recommendations: getStreamingLaunchMarketingRecommendations(launchMarketingInput),
+      forecast: forecastStreamingLaunchMarketing(launchMarketingInput, draft),
+      channels: STREAMING_LAUNCH_MARKETING_CHANNELS.map(channel => ({
+        id: channel.id,
+        label: channel.label,
+        line: channel.line,
+        available: launchMarketingInput.channelAvailability?.[channel.id]?.available !== false,
+        reason: launchMarketingInput.channelAvailability?.[channel.id]?.reason,
+      })),
+    };
+  }, [launchMarketingInput, platform.launchMarketingDraft]);
+  const marketingBuildInputs = useMemo(() => ({
+    ...buildInputs,
+    openingDemandForecast: {
+      low: launchMarketing.forecast.concurrentStreams.low,
+      likely: launchMarketing.forecast.concurrentStreams.likely,
+      high: launchMarketing.forecast.concurrentStreams.high,
+      byMarket: Object.fromEntries(launchMarketing.forecast.countryForecasts.map(country => [country.countryId, country.likelyConcurrentStreams])),
+    },
+  }), [buildInputs, launchMarketing.forecast]);
   const builtPlacements = useMemo(() => platform.infrastructureSetup
     ? platform.infrastructureSetup.networkPlacements?.length
       ? platform.infrastructureSetup.networkPlacements.map(placement => ({ ...placement }))
@@ -968,7 +1112,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
     preserveRehearsal = true,
   ) => {
     const selectionDerived = deriveStreamingBuild(selection, {
-      ...buildInputs,
+      ...marketingBuildInputs,
       homeCityId: selection.placements[0]?.cityId || null,
     });
     const packageId = selectionDerived.racks <= 2
@@ -988,7 +1132,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
       currentStep: 4,
       strategy,
       capacityPackageId: packageId,
-      rolloutPace: selection.doctrine,
+      rolloutPace: 'STANDARD',
       networkPlacements: selection.placements.map(placement => ({ ...placement })),
       facilities: (selection.facilities || migratePlacementsToStreamingFacilities(selection.placements))
         .map(facility => ({
@@ -1000,6 +1144,8 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
           })),
         })),
       managementPolicy: selection.managementPolicy,
+      assistedPlanApproved: selection.assistedPlanApproved,
+      assistedPlanClass: selection.assistedPlanClass,
       openingDemandForecast: {
         low: selectionDerived.demandTotal('QUIET'),
         likely: selectionDerived.demandTotal('LIKELY'),
@@ -1022,10 +1168,21 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
     persist(saveStreamingInfrastructureDraft(player, canonicalInfrastructureDraft(nextSelection, false)));
   };
 
-  const recordBuildRehearsal = (result: StreamingBuildRunResult | null) => {
+  const updateLaunchMarketing = (patch: Partial<OwnedStreamingLaunchMarketingDraft>) => {
+    if (!onUpdatePlayer) return;
+    const saved = saveOwnedStreamingLaunchMarketingDraft(player, patch);
+    if (!saved.changed) {
+      setCompanyFeedback(saved.reason === 'LOCKED' ? 'Launch marketing is locked while this build is underway.' : 'Marketing plan was unchanged.');
+      return;
+    }
+    setBuildRunResult(null);
+    persist(saved.player);
+  };
+
+  const recordBuildRehearsal = (result: StreamingBuildRunResult | null, testedSelection = buildSelection) => {
     setBuildRunResult(result);
     if (!result || !onUpdatePlayer) return;
-    const draft = canonicalInfrastructureDraft(buildSelection, false);
+    const draft = canonicalInfrastructureDraft(testedSelection, false);
     const forecast = getStreamingInfrastructureForecast(player, draft);
     const rehearsal: OwnedStreamingLaunchRehearsalSnapshot = {
       configurationSignature: forecast.configurationSignature,
@@ -1065,12 +1222,32 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
       })),
       completedAtAbsoluteWeek: buildAbsoluteWeek,
     };
-    const saved = saveStreamingInfrastructureDraft(player, { ...draft, lastLaunchRehearsal: rehearsal });
-    persist(runStreamingInfrastructureLoadTest(saved).player);
+    setBuildSelection(testedSelection);
+    persist(saveStreamingInfrastructureRehearsal(player, draft, rehearsal));
+  };
+
+  const prepareCinematicBuild = (selection: StreamingBuildSelection = buildSelection) => {
+    const savedPlayer = saveStreamingInfrastructureDraft(player, canonicalInfrastructureDraft(selection));
+    const draft = savedPlayer.ownedStreamingPlatform.infrastructureSetupDraft || canonicalInfrastructureDraft(selection);
+    return { player: savedPlayer, draft, forecast: getStreamingInfrastructureForecast(savedPlayer, draft) };
+  };
+
+  const validateCinematicBuild = (selection: StreamingBuildSelection) => {
+    if (!onUpdatePlayer) return { ok: false, message: 'The company save is not available, so no money was moved.' };
+    const prepared = prepareCinematicBuild(selection);
+    const quote = getStreamingOpeningCommissionQuote(prepared.player, prepared.draft, launchMarketing.forecast);
+    if (!quote.ready) return { ok: false, message: quote.blockers[0] || 'The opening programme is not ready.' };
+    if (prepared.player.ownedStreamingPlatform.treasuryCash < quote.totalCashRequired) {
+      return { ok: false, message: 'Company treasury cannot cover the complete commission.' };
+    }
+    if (prepared.player.energy.current < quote.filingEnergy) {
+      return { ok: false, message: 'Not enough energy remains to file every opening-market application.' };
+    }
+    return { ok: true, message: 'The exact tested setup is ready to commission.' };
   };
 
   const quoteCinematicBuild = (selection: StreamingBuildSelection) => {
-    const forecast = getStreamingInfrastructureForecast(player, canonicalInfrastructureDraft(selection));
+    const { forecast } = prepareCinematicBuild(selection);
     return {
       transactionCost: forecast.transactionCost,
       weeklyOperatingCost: forecast.weeklyOperatingCost,
@@ -1086,22 +1263,19 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
 
   const commitCinematicBuild = (selection: StreamingBuildSelection = buildSelection) => {
     if (!onUpdatePlayer) return { ok: false, message: 'The company save is not available, so no money was moved.' } as const;
-    const draft = canonicalInfrastructureDraft(selection);
-    const withDraft = saveStreamingInfrastructureDraft(player, draft);
-    const rehearsed = runStreamingInfrastructureLoadTest(withDraft, draft);
-    const testedDraft = rehearsed.player.ownedStreamingPlatform.infrastructureSetupDraft || {
-      ...draft,
-      lastLoadTestSignature: rehearsed.forecast.configurationSignature,
-    };
-    const committed = commitStreamingInfrastructureSetup(rehearsed.player, testedDraft);
-    if (!committed.changed && committed.reason !== 'ALREADY_CONFIGURED') {
-      setCompanyFeedback(committed.issues[0]?.message || 'The company could not commission this build.');
-      return {
-        ok: false,
-        message: committed.issues[0]?.message || 'The company could not commission this build.',
-      } as const;
+    const { player: withDraft, draft: testedDraft } = prepareCinematicBuild(selection);
+    const draft = testedDraft;
+    const committed = commissionStreamingOpeningProgramme(withDraft, {
+      infrastructureDraft: testedDraft,
+      marketingForecast: launchMarketing.forecast,
+      openingCountryIds: buildMarkets.map(market => market.id),
+      expectedLaunchDefinitionSignature: getStreamingLaunchDefinitionSignature(withDraft),
+    });
+    if (!committed.changed && committed.reason !== 'ALREADY_COMMISSIONED') {
+      setCompanyFeedback(committed.message);
+      return { ok: false, message: committed.message } as const;
     }
-    const committedPlayer = committed.changed ? committed.player : rehearsed.player;
+    const committedPlayer = committed.player;
     buildCommittedPlayerRef.current = committedPlayer;
     persist(committedPlayer);
     const setup = committedPlayer.ownedStreamingPlatform.infrastructureSetup;
@@ -1116,6 +1290,8 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
       ? `${networkLabel} commissioned. The network becomes operational in ${weeksRemaining} week${weeksRemaining === 1 ? '' : 's'}.`
       : `${networkLabel} commissioned and operational.`;
     setCompanyFeedback(message);
+    setOpeningProgrammeFocus('OVERVIEW');
+    setShowOpeningProgramme(true);
     return { ok: true, message, next: 'BACK' as const };
   };
 
@@ -1582,14 +1758,24 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
 
   const openCommandEvent = (event: StreamingCommandEvent) => {
     if (event.id === 'INCIDENT' && incidentCommand.available) return setShowIncidentCommand(true);
-    if (event.id === 'LAUNCH') return platform.infrastructureSetup
-      ? openCinematicPremiere()
-      : setShowCinematicBuild(true);
+    if (event.id === 'LAUNCH') {
+      if (openingProgramme.commissioned && !platform.launchCommit) {
+        setOpeningProgrammeFocus('OVERVIEW');
+        setShowOpeningProgramme(true);
+        return;
+      }
+      return platform.infrastructureSetup ? openCinematicPremiere() : setShowCinematicBuild(true);
+    }
     if (event.id === 'RIVAL') return setShowPlatformWars(true);
     setShowOperationsOffice(true);
   };
 
   const openLaunchDestination = (destination: StreamingLaunchDestination) => {
+    if (openingProgramme.commissioned && !platform.launchCommit) {
+      setOpeningProgrammeFocus(getStreamingOpeningProgrammeFocus(destination));
+      setShowOpeningProgramme(true);
+      return;
+    }
     if (destination === 'FINANCE') return openFinanceRoom('CAPITAL', 'INJECT');
     const defineStep = DEFINE_STEP_BY_DESTINATION[destination];
     if (defineStep) {
@@ -1617,8 +1803,19 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
         setShowTitleDossier(true);
       }}
       onSeeAll={() => selectSection('CONTENT')}
-      onLaunch={() => platform.infrastructureSetup ? openCinematicPremiere() : setShowCinematicBuild(true)}
+      onLaunch={() => {
+        if (openingProgramme.commissioned && !platform.launchCommit) {
+          setOpeningProgrammeFocus('OVERVIEW');
+          setShowOpeningProgramme(true);
+        } else if (platform.infrastructureSetup) openCinematicPremiere();
+        else setShowCinematicBuild(true);
+      }}
       onOpenLaunchTrack={track => {
+        if (openingProgramme.commissioned && !platform.launchCommit) {
+          setOpeningProgrammeFocus(track === 'BUILD_PLATFORM' ? 'INFRASTRUCTURE' : 'LAUNCH_PLAN');
+          setShowOpeningProgramme(true);
+          return;
+        }
         if (track === 'DEFINE_LAUNCH') {
           setDefineLaunchMode('OPENING');
           setDefineLaunchInitialStep(undefined);
@@ -1764,6 +1961,36 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
     return renderHome();
   };
 
+  if (openingProgramme.commissioned && !platform.launchCommit
+    && (showOpeningProgramme || showCinematicBuild || showDefineLaunch || showCinematicPricing)) {
+    return (
+      <StreamingOpeningProgramme
+        brand={commandDeckBrand}
+        view={openingProgramme}
+        focus={openingProgrammeFocus}
+        onBack={() => {
+          setShowOpeningProgramme(false);
+          setShowCinematicBuild(false);
+          setShowDefineLaunch(false);
+          setShowCinematicPricing(false);
+        }}
+        onOpenCommissionedPlan={() => setOpeningProgrammeFocus('INFRASTRUCTURE')}
+        onResolveClearance={(operationId) => {
+          const operation = player.ownedStreamingPlatform.marketOperations.find(item => item.id === operationId);
+          if (!operation?.clearance) return;
+          const result = operation.clearance.outcome === 'ADDITIONAL_REQUIREMENT'
+            ? resolveStreamingMarketRequirement(player, operationId)
+            : resumeStreamingMarketClearance(player, operationId);
+          if (result.changed) persist(result.player);
+          else setCompanyFeedback(result.reason === 'TOO_EARLY'
+            ? 'This revised application is still inside its cooling period.'
+            : 'That government request cannot be resolved yet.');
+        }}
+        onOpeningNight={openCinematicPremiere}
+      />
+    );
+  }
+
   if (showDefineLaunch && onUpdatePlayer) {
     return (
       <StreamingDefineLaunchWizard
@@ -1790,6 +2017,12 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
           setShowDefineLaunch(false);
           setShowCinematicBuild(true);
         }}
+        onOpenBuildBudget={() => {
+          const destination = resolveLinkedBudgetDestination('LAUNCH');
+          setShowDefineLaunch(false);
+          setBuildInitialSheet(destination.sheet);
+          setShowCinematicBuild(true);
+        }}
         onOpenPricing={() => {
           setShowDefineLaunch(false);
           setShowCinematicPricing(true);
@@ -1800,8 +2033,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
         }}
         mode={defineLaunchMode}
         initialStep={defineLaunchInitialStep}
-        initialDraft={launchDraftRef.current}
-        onDraftChange={(draft) => { launchDraftRef.current = draft; }}
+        initialSheet={defineLaunchInitialSheet}
       />
     );
   }
@@ -1810,14 +2042,27 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
     return (
       <StreamingBuildExperience
         brand={commandDeckBrand}
-        inputs={buildInputs}
+        signatoryName={player.name}
+        inputs={marketingBuildInputs}
         sel={buildSelection}
         result={buildRunResult}
+        savedRehearsal={platform.infrastructureSetupDraft?.lastLaunchRehearsal}
+        rehearsalConfigurationSignature={prepareCinematicBuild().forecast.configurationSignature}
         built={builtPlacements}
         builtFacilities={builtFacilities}
+        construction={platform.infrastructureSetup && !platform.launchCommit ? {
+          committedAtAbsoluteWeek: platform.infrastructureSetup.committedAtAbsoluteWeek,
+          readyAtAbsoluteWeek: platform.infrastructureSetup.readyAtAbsoluteWeek,
+        } : null}
         isLive={Boolean(platform.launchCommit)}
+        initialSheet={buildInitialSheet}
+        launchBudget={launchBudget}
+        launchBlueprintSaved={Boolean(launchProgram.milestones.find(milestone => milestone.id === 'LAUNCH_BLUEPRINT')?.complete)}
+        marketing={launchMarketing}
+        onChangeMarketing={updateLaunchMarketing}
         onResult={recordBuildRehearsal}
         onCommit={commitCinematicBuild}
+        onValidateCommit={validateCinematicBuild}
         quoteSelection={quoteCinematicBuild}
         onOpenNight={openCinematicPremiere}
         onOpenContent={() => {
@@ -1832,6 +2077,13 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
           }
           setDefineLaunchMode('OPENING');
           setDefineLaunchInitialStep(step);
+          setShowDefineLaunch(true);
+        }}
+        onOpenLaunchBudget={() => {
+          const destination = resolveLinkedBudgetDestination('BUILD');
+          setShowCinematicBuild(false);
+          setDefineLaunchMode('OPENING');
+          setDefineLaunchInitialSheet(destination.sheet);
           setShowDefineLaunch(true);
         }}
         onChange={updateBuildSelection}

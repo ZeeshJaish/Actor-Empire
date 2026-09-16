@@ -20,6 +20,7 @@ import {
     type PlatformAiLocalizationJob,
     type PlatformAiLocalizationMode,
     type PlatformAiLanguageCapability,
+    type PlatformAiLaunchMarketingCampaign,
     type PlatformAiPendingOneTimeObligation,
     type PlatformAiReleaseEntry,
     type PlatformAiReleaseReadinessSnapshot,
@@ -125,6 +126,7 @@ const REQUIRED_RUNTIME_ARRAY_FIELDS = [
     'releaseMemory',
     'financeHistory',
     'decisionHistory',
+    'launchMarketingHistory',
     'distressEpisodes',
     'externalRecapitalizations',
     'externalCommitments',
@@ -134,6 +136,7 @@ const REQUIRED_RUNTIME_ARRAY_FIELDS = [
     'pendingAudienceSettlements',
 ] as const;
 const DISTRESS_EPISODE_HISTORY_LIMIT = 8;
+const LAUNCH_MARKETING_HISTORY_LIMIT = 104;
 
 interface PlatformAiNormalizationDiagnostics {
     deepValidationCount: number;
@@ -166,6 +169,26 @@ export const markPlatformAiStateCanonicalForTurn = (
         canonicalTurnStates.set(platform, { absoluteWeek });
     }
     return platform;
+};
+
+/**
+ * Carries an in-memory trust marker across the controlled Process Week clone.
+ * Persisted/imported objects never pass through this seam, so they still receive
+ * the complete structural validation on first use after loading.
+ */
+export const transferPlatformAiCanonicalTurnMarker = (
+    source: PlatformState,
+    target: PlatformState,
+): PlatformState => {
+    const marker = canonicalTurnStates.get(source);
+    if (
+        marker
+        && target.ai?.schemaVersion === PLATFORM_AI_RUNTIME_SCHEMA_VERSION
+        && target.ai.profileId === target.id
+    ) {
+        canonicalTurnStates.set(target, marker);
+    }
+    return target;
 };
 
 export const resetPlatformAiNormalizationDiagnostics = (): void => {
@@ -855,9 +878,14 @@ const normalizeFinanceHistory = (value: unknown, fallbackDebtMillions: number): 
         const revenueMillions = finiteNonNegative(raw.revenueMillions);
         const subscriptionRevenueMillions = finiteNonNegative(raw.subscriptionRevenueMillions, revenueMillions);
         const advertisingRevenueMillions = finiteNonNegative(raw.advertisingRevenueMillions);
+        const transactionRevenueMillions = finiteNonNegative(raw.transactionRevenueMillions);
+        const sponsorshipRevenueMillions = finiteNonNegative(raw.sponsorshipRevenueMillions);
+        const communityRevenueMillions = finiteNonNegative(raw.communityRevenueMillions);
+        const commercialOperatingCostMillions = finiteNonNegative(raw.commercialOperatingCostMillions);
         const verifiedContractIncomeMillions = finiteNonNegative(
             raw.verifiedContractIncomeMillions ?? raw.contractIncomeMillions,
-            Math.max(0, revenueMillions - subscriptionRevenueMillions - advertisingRevenueMillions),
+            Math.max(0, revenueMillions - subscriptionRevenueMillions - advertisingRevenueMillions
+                - transactionRevenueMillions - sponsorshipRevenueMillions - communityRevenueMillions),
         );
         const rescueIncomeMillions = finiteNonNegative(raw.rescueIncomeMillions);
         const rescueDebtReductionMillions = finiteNonNegative(raw.rescueDebtReductionMillions);
@@ -914,6 +942,10 @@ const normalizeFinanceHistory = (value: unknown, fallbackDebtMillions: number): 
             openingCashMillions,
             subscriptionRevenueMillions,
             advertisingRevenueMillions,
+            transactionRevenueMillions,
+            sponsorshipRevenueMillions,
+            communityRevenueMillions,
+            commercialOperatingCostMillions,
             verifiedContractIncomeMillions,
             rescueIncomeMillions,
             rescueDebtReductionMillions,
@@ -1817,6 +1849,41 @@ const normalizeDecisionHistory = (value: unknown): PlatformAiDecisionRecord[] =>
     return appendPlatformAiDecisions(normalized, []);
 };
 
+const normalizePlatformAiLaunchMarketingHistory = (value: unknown): PlatformAiLaunchMarketingCampaign[] => (
+    (Array.isArray(value) ? value : []).flatMap(rawValue => {
+        if (!isRecord(rawValue)) return [];
+        const id = String(rawValue.id || '').trim();
+        const forecastSignature = String(rawValue.forecastSignature || '').trim();
+        const objectives = new Set(['PLATFORM_INTRODUCTION', 'FLAGSHIP_ORIGINAL', 'VALUE_PROPOSITION', 'CATALOGUE_SHOWCASE']);
+        const timelines = new Set(['FRONT_LOADED', 'BALANCED', 'LAST_WEEK_PUSH']);
+        if (!id || !forecastSignature || !objectives.has(String(rawValue.objective)) || !timelines.has(String(rawValue.timeline))) return [];
+        const countryIds = [...new Set((Array.isArray(rawValue.countryIds) ? rawValue.countryIds : [])
+            .filter((countryId): countryId is string => typeof countryId === 'string' && Boolean(countryId.trim()))
+            .map(countryId => countryId.trim().toUpperCase()))].sort();
+        if (!countryIds.length) return [];
+        return [{
+            id,
+            absoluteWeek: normalizeNonNegativeInteger(rawValue.absoluteWeek, 0),
+            countryIds,
+            objective: String(rawValue.objective) as PlatformAiLaunchMarketingCampaign['objective'],
+            timeline: String(rawValue.timeline) as PlatformAiLaunchMarketingCampaign['timeline'],
+            budgetCeilingMillions: finiteNonNegative(rawValue.budgetCeilingMillions ?? rawValue.paidBudgetMillions),
+            weeklyScheduleMillions: (Array.isArray(rawValue.weeklyScheduleMillions) ? rawValue.weeklyScheduleMillions : [])
+                .map(value => finiteNonNegative(value)),
+            accruedSpendMillions: finiteNonNegative(rawValue.accruedSpendMillions),
+            lastProcessedAbsoluteWeek: rawValue.lastProcessedAbsoluteWeek === null || rawValue.lastProcessedAbsoluteWeek === undefined
+                ? null : normalizeNonNegativeInteger(rawValue.lastProcessedAbsoluteWeek, 0),
+            status: rawValue.status === 'COMPLETE' ? 'COMPLETE' : 'ACTIVE',
+            likelyPaidAccounts: finiteNonNegative(rawValue.likelyPaidAccounts),
+            likelyConcurrentStreams: finiteNonNegative(rawValue.likelyConcurrentStreams),
+            awarenessLift: Math.max(0, Math.min(1, Number(rawValue.awarenessLift) || 0)),
+            forecastSignature,
+        } satisfies PlatformAiLaunchMarketingCampaign];
+    })
+        .sort((left, right) => left.absoluteWeek - right.absoluteWeek || left.id.localeCompare(right.id))
+        .slice(-LAUNCH_MARKETING_HISTORY_LIMIT)
+);
+
 const normalizePlatformAiExternalRecapitalizations = (
     value: unknown,
     platformId: PlatformId,
@@ -2336,6 +2403,7 @@ const isCanonicalPlatformAiState = (
         candidate.debtMillions,
     ))) return false;
     if (!isCanonicalNormalizedCollection(candidate.decisionHistory, normalizeDecisionHistory)) return false;
+    if (!isCanonicalNormalizedCollection(candidate.launchMarketingHistory, normalizePlatformAiLaunchMarketingHistory)) return false;
     if (!isCanonicalNormalizedCollection(candidate.distressEpisodes, source => (
         normalizePlatformAiDistressEpisodes(source, platformId, absoluteWeek)
     ))) return false;
@@ -2632,6 +2700,7 @@ export const normalizePlatformAiState = (
             },
         financeHistory: normalizeFinanceHistory(existing?.financeHistory, debtMillions),
         decisionHistory: normalizeDecisionHistory(existing?.decisionHistory),
+        launchMarketingHistory: normalizePlatformAiLaunchMarketingHistory(existing?.launchMarketingHistory),
         distressEpisodes: normalizePlatformAiDistressEpisodes(
             existing?.distressEpisodes,
             platform.id,

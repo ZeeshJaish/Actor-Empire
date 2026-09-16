@@ -1,0 +1,27 @@
+{
+  "glb_bytes": 660120,
+  "mesh_primitives": 254,
+  "vertices_in_export": 15058,
+  "triangles": 19552,
+  "finite_positions": true,
+  "valid_triangle_indices": true,
+  "renders": {
+    "front": {
+      "width": 1100,
+      "height": 1350
+    },
+    "three-quarter": {
+      "width": 1100,
+      "height": 1350
+    },
+    "side": {
+      "width": 1100,
+      "height": 1350
+    },
+    "portrait": {
+      "width": 1000,
+      "height": 1000
+    }
+  },
+  "source_bytes": 255828
+}

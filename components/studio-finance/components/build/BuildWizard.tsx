@@ -13,10 +13,14 @@ import React, { useEffect, useMemo, useState } from 'react';
 import type { BuildData, BuildDraft, BuildHandlers, BuildStageId } from '../../finance/build';
 import {
   BUILD_STAGES, REDUNDANCY_COPY, STAGE_STATE_COPY,
-  buildTotals, headerLine, moneyPlan, serviceForecast, stageStates,
+  buildTotals, constructionProgress, headerLine, infrastructureMoneyPlan, moneyPlan, serviceForecast, stageStates,
 } from '../../finance/build';
+import type { BuildTeamProposal } from '../../finance/buildPlanner';
+import type { LinkedBudgetSummary } from '../../finance/budgetLinks';
 import { brandVars } from '../../finance/brand';
 import { money } from '../../finance/format';
+import { BuildBudgetContent } from '../BudgetSheets';
+import { Row, Sheet } from '../ui';
 import { StageSites } from './StageSites';
 import { StagePlans } from './StagePlans';
 import { StageMoney } from './StageMoney';
@@ -32,11 +36,14 @@ export interface BuildWizardProps extends BuildHandlers {
   data: BuildData;
   initialStage?: BuildStageId;
   initialDraft?: BuildDraft;
+  initialSheet?: 'money' | 'build' | null;
+  launchBudgetSummary?: LinkedBudgetSummary;
   onDraftChange?: (draft: BuildDraft) => void;
 }
 
-export function BuildWizard({ data, initialStage = 'sites', initialDraft, onDraftChange, ...handlers }: BuildWizardProps) {
+export function BuildWizard({ data, initialStage = 'sites', initialDraft, initialSheet, launchBudgetSummary, onDraftChange, ...handlers }: BuildWizardProps) {
   const [stageId, setStageId] = useState<BuildStageId>(initialStage);
+  const [openSheet, setOpenSheet] = useState<'money' | 'build' | null>(initialSheet ?? null);
   const [draft, setDraft] = useState<BuildDraft>(() => initialDraft ?? ({
     facilities: [...data.existing],
     architecture: 'HYBRID',
@@ -49,6 +56,7 @@ export function BuildWizard({ data, initialStage = 'sites', initialDraft, onDraf
     rehearsal: null,
     override: false,
   }));
+  const [teamProposal, setTeamProposal] = useState<BuildTeamProposal | null>(null);
   const externalRehearsal = initialDraft?.rehearsal ?? null;
 
   /* The full-screen legacy rehearsal persists its canonical result in the
@@ -76,13 +84,37 @@ export function BuildWizard({ data, initialStage = 'sites', initialDraft, onDraf
   const totals = useMemo(() => buildTotals(data, draft), [data, draft]);
   const states = useMemo(() => stageStates(data, draft), [data, draft]);
   const plan = useMemo(() => moneyPlan(data, draft), [data, draft]);
+  const buildPlan = useMemo(() => infrastructureMoneyPlan(plan), [plan]);
   const services = useMemo(() => serviceForecast(data, draft), [data, draft]);
+  const managed = draft.mode === 'ASSISTED' && Boolean(draft.teamPlanApproved);
+  const construction = data.construction
+    ? constructionProgress(data.company.week, data.construction.committedAtWeek, data.construction.readyAtWeek)
+    : null;
+  const constructionLocked = construction?.status === 'BUILDING';
 
-  const patch = (next: Partial<BuildDraft>) => setDraft((prev) => ({ ...prev, ...next }));
-  const go = (to: number) => setStageId(BUILD_STAGES[Math.max(0, Math.min(BUILD_STAGES.length - 1, to))].id);
+  const patch = (next: Partial<BuildDraft>) => {
+    if (constructionLocked) return;
+    setDraft((prev) => ({ ...prev, ...next }));
+  };
+  const selectStage = (next: BuildStageId) => {
+    setOpenSheet(null);
+    setStageId(next);
+  };
+  const go = (to: number) => selectStage(BUILD_STAGES[Math.max(0, Math.min(BUILD_STAGES.length - 1, to))].id);
 
-  const shared = { data, draft, patch, totals, plan, services, handlers };
+  const shared = { data, draft, patch, totals, plan, services, handlers, managed, teamProposal, setTeamProposal };
   const red = REDUNDANCY_COPY[totals.redundancy];
+  const editableStage = stageId === 'sites' ? <StageSites {...shared} />
+    : stageId === 'plans' ? <ManagedStage managed={managed} onTakeControl={() => patch({ mode: 'HANDS', teamPlanApproved: false, teamPlanClass: undefined })}><StagePlans {...shared} /></ManagedStage>
+      : stageId === 'money' ? <ManagedStage managed={managed} onTakeControl={() => patch({ mode: 'HANDS', teamPlanApproved: false, teamPlanClass: undefined })}><StageMoney {...shared} /></ManagedStage>
+        : stageId === 'test' ? <StageTest {...shared} />
+          : null;
+  const constructionPhase = !construction ? ''
+    : construction.progressPercent < 25 ? 'Rooms and contracts'
+      : construction.progressPercent < 50 ? 'Power, cooling and fibre'
+        : construction.progressPercent < 75 ? 'Racks and machines'
+          : construction.progressPercent < 90 ? 'Network routing'
+            : 'Final commissioning checks';
 
   return (
     <div className="sf lw bw" style={brand as React.CSSProperties}>
@@ -109,7 +141,7 @@ export function BuildWizard({ data, initialStage = 'sites', initialDraft, onDraf
               key={s.id}
               type="button"
               className={`lw-stop is-${state} health-${health.toLowerCase()}`}
-              onClick={() => setStageId(s.id)}
+              onClick={() => selectStage(s.id)}
               aria-label={s.verb}
               aria-current={i === index ? 'step' : undefined}
             >
@@ -123,24 +155,29 @@ export function BuildWizard({ data, initialStage = 'sites', initialDraft, onDraf
       </nav>
 
       {/* --- the budget rail: what the drawing would cost, always visible --- */}
-      <section className={plan.shortfall > 0 ? 'lw-rail is-over' : 'lw-rail'}>
+      <section className={buildPlan.shortfall > 0 ? 'lw-rail is-over' : 'lw-rail'}>
         <div className="lw-rail-top">
-          <div className="lw-rail-cell">
+          <button type="button" className="lw-rail-cell" onClick={() => setOpenSheet('money')} aria-haspopup="dialog">
             <em>Studio money</em>
             <b>{money(plan.available)}</b>
-          </div>
-          <div className="lw-rail-cell is-end">
-            <em>This build</em>
-            <b className={plan.shortfall > 0 ? 'sf-tone-bad' : undefined}>{money(plan.total)}</b>
-          </div>
+          </button>
+          <button type="button" className="lw-rail-cell is-end lw-bill-toggle" onClick={() => setOpenSheet('build')} aria-haspopup="dialog">
+            <span>
+              <em>This build</em>
+              <svg className="lw-bill-chevron" viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M3 10l5-5 5 5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </span>
+            <b className={buildPlan.shortfall > 0 ? 'sf-tone-bad' : undefined}>{money(buildPlan.total)}</b>
+          </button>
         </div>
 
-        <div className="lw-gauge" role="img" aria-label={`Plan ${money(plan.total)} against ${money(plan.available)}`}>
-          <i className="lw-gauge-fill" style={{ width: `${Math.min(100, (Math.min(plan.total, plan.available) / Math.max(1, plan.available, plan.total)) * 100)}%` }} />
-          {plan.shortfall > 0 && (
-            <i className="lw-gauge-over" style={{ width: `${(plan.shortfall / Math.max(1, plan.total)) * 100}%` }} />
+        <div className="lw-gauge" role="img" aria-label={`Build ${money(buildPlan.total)} against ${money(buildPlan.available)}`}>
+          <i className="lw-gauge-fill" style={{ width: `${Math.min(100, (Math.min(buildPlan.total, buildPlan.available) / Math.max(1, buildPlan.available, buildPlan.total)) * 100)}%` }} />
+          {buildPlan.shortfall > 0 && (
+            <i className="lw-gauge-over" style={{ width: `${(buildPlan.shortfall / Math.max(1, buildPlan.total)) * 100}%` }} />
           )}
-          <span className="lw-gauge-mark" style={{ left: `${(plan.available / Math.max(1, plan.available, plan.total)) * 100}%` }} aria-hidden="true" />
+          <span className="lw-gauge-mark" style={{ left: `${(buildPlan.available / Math.max(1, buildPlan.available, buildPlan.total)) * 100}%` }} aria-hidden="true" />
         </div>
 
         {/* The size of the network gets its own line: squeezed between the two
@@ -151,17 +188,23 @@ export function BuildWizard({ data, initialStage = 'sites', initialDraft, onDraf
           <span className={`sf-tone-${red.tone}`}>{red.label}</span>
         </div>
 
-        <div className="lw-rail-foot">
-          {plan.shortfall > 0 ? (
-            <>
-              <span className="sf-tone-bad">{money(plan.shortfall)} short of commissioning</span>
-              <button type="button" className="lw-inject" onClick={() => handlers.onOpenStudioFinance?.()}>Add money</button>
-            </>
-          ) : (
-            <span>{money(plan.headroom)} headroom · nothing charged until you commission</span>
-          )}
-        </div>
+        {buildPlan.shortfall > 0 && (
+          <div className="lw-rail-foot">
+            <span className="sf-tone-bad">{money(buildPlan.shortfall)} short of commissioning</span>
+            <button type="button" className="lw-inject" onClick={() => handlers.onOpenStudioFinance?.()}>Add money</button>
+          </div>
+        )}
       </section>
+
+      {constructionLocked && construction && (
+        <section className="bw-construction-status" role="status" aria-live="polite" aria-label="Construction underway">
+          <header><b>Construction underway</b><strong>Week {construction.elapsedWeeks} of {construction.totalWeeks}</strong></header>
+          <div className="bw-construction-track" role="progressbar" aria-valuemin={0} aria-valuemax={construction.totalWeeks} aria-valuenow={construction.elapsedWeeks}>
+            <i style={{ width: `${construction.progressPercent}%` }} />
+          </div>
+          <p><span>{constructionPhase}</span><em>{construction.remainingWeeks} {construction.remainingWeeks === 1 ? 'week' : 'weeks'} remaining</em></p>
+        </section>
+      )}
 
       {/* One sentence saying what this stage is for, and whether it is settled.
           The wizard is long; this line is what stops it feeling long. */}
@@ -172,10 +215,12 @@ export function BuildWizard({ data, initialStage = 'sites', initialDraft, onDraf
 
       <div className="sf-scroll" key={stageId}>
         <div className="lw-body lw-enter">
-          {stageId === 'sites' && <StageSites {...shared} />}
-          {stageId === 'plans' && <StagePlans {...shared} />}
-          {stageId === 'money' && <StageMoney {...shared} />}
-          {stageId === 'test' && <StageTest {...shared} />}
+          {constructionLocked && editableStage ? (
+            <fieldset className="bw-construction-locked" disabled>
+              <legend>Commissioned configuration locked while crews build</legend>
+              {editableStage}
+            </fieldset>
+          ) : editableStage}
           {stageId === 'launch' && <StageLaunch {...shared} onJump={setStageId} />}
           <div className="sf-tail" />
         </div>
@@ -194,6 +239,70 @@ export function BuildWizard({ data, initialStage = 'sites', initialDraft, onDraf
           {index === BUILD_STAGES.length - 1 ? 'Commission below' : `Next · ${BUILD_STAGES[index + 1].label}`}
         </button>
       </footer>
+
+      <Sheet
+        open={openSheet === 'money'}
+        onClose={() => setOpenSheet(null)}
+        eyebrow="Company money"
+        title={buildPlan.shortfall > 0 ? `${money(buildPlan.shortfall)} short` : 'Studio money'}
+        footer={
+          <button type="button" className="sf-btn sf-btn--primary" onClick={() => { setOpenSheet(null); handlers.onOpenStudioFinance?.(); }}>
+            Open Studio Finance
+          </button>
+        }
+      >
+        <div className="lw-injectbars">
+          <div>
+            <span className="sf-eyebrow">Studio holds</span>
+            <b>{money(buildPlan.available)}</b>
+            <i style={{ width: '100%' }} className="is-have" />
+          </div>
+          <div>
+            <span className="sf-eyebrow">This build</span>
+            <b className={buildPlan.shortfall > 0 ? 'sf-tone-bad' : undefined}>{money(buildPlan.total)}</b>
+            <i style={{ width: `${Math.min(100, (buildPlan.total / Math.max(1, buildPlan.available, buildPlan.total)) * 100)}%` }} className={buildPlan.shortfall > 0 ? 'is-over' : 'is-plan'} />
+          </div>
+        </div>
+        <Row label="Define the Launch already committed" value={money(-data.treasury.committedLaunch)} tone={data.treasury.committedLaunch > 0 ? 'bad' : 'flat'} />
+        <Row label="Current build drawing" value={money(-buildPlan.total)} tone={buildPlan.total > 0 ? 'bad' : 'flat'} />
+        <Row
+          label={buildPlan.shortfall > 0 ? 'Still needed' : 'Treasury after this build'}
+          value={money(buildPlan.shortfall > 0 ? buildPlan.shortfall : buildPlan.headroom)}
+          tone={buildPlan.shortfall > 0 ? 'bad' : 'good'}
+        />
+      </Sheet>
+
+      <Sheet
+        open={openSheet === 'build'}
+        onClose={() => setOpenSheet(null)}
+        eyebrow="Build budget"
+        title={`${money(buildPlan.total)} build plan`}
+        footer={buildPlan.shortfall > 0 ? (
+          <button type="button" className="sf-btn sf-btn--primary" onClick={() => setOpenSheet('money')}>
+            Review Studio Money
+          </button>
+        ) : undefined}
+      >
+        <BuildBudgetContent
+          stages={BUILD_STAGES.map(stage => ({
+            id: stage.id,
+            label: stage.label,
+            done: states[stage.id] === 'DONE',
+            detail: STAGE_STATE_COPY[states[stage.id]].label,
+          }))}
+          lines={buildPlan.lines}
+          total={buildPlan.total}
+          available={buildPlan.available}
+          headroom={buildPlan.headroom}
+          shortfall={buildPlan.shortfall}
+          linkedSummary={launchBudgetSummary}
+          onSelectStage={selectStage}
+          onOpenLinked={() => {
+            setOpenSheet(null);
+            handlers.onOpenLaunchBudget?.();
+          }}
+        />
+      </Sheet>
     </div>
   );
 }
@@ -229,4 +338,20 @@ export interface StageProps {
   plan: ReturnType<typeof moneyPlan>;
   services: ReturnType<typeof serviceForecast>;
   handlers: BuildHandlers;
+  managed: boolean;
+  teamProposal: BuildTeamProposal | null;
+  setTeamProposal: React.Dispatch<React.SetStateAction<BuildTeamProposal | null>>;
+}
+
+function ManagedStage({ managed, onTakeControl, children }: { managed: boolean; onTakeControl: () => void; children: React.ReactNode }) {
+  if (!managed) return <>{children}</>;
+  return (
+    <>
+      <div className="bw-managed-bar">
+        <span><b>Managed by your team</b><em>The approved plan is locked while Engineering owns the build.</em></span>
+        <button type="button" onClick={onTakeControl}>Take control</button>
+      </div>
+      <fieldset className="bw-managed-content" disabled>{children}</fieldset>
+    </>
+  );
 }

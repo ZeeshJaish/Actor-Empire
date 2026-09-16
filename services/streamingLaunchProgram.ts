@@ -1,6 +1,7 @@
 import type {
     OwnedStreamingCustomIdentAudio,
     OwnedStreamingCostCommitment,
+    OwnedStreamingDefineLaunchDraftState,
     OwnedStreamingPricingConfiguration,
     Player,
     StreamingCostCommitmentCategory,
@@ -19,6 +20,8 @@ import {
     getStreamingStorefrontDefinition,
     getStreamingStorefrontLockReason,
 } from './streamingStorefront';
+import { normalizeStreamingPricingConfiguration } from './streamingPricingEconomy';
+import { getStreamingInfrastructureForecast } from './streamingInfrastructure';
 
 export type StreamingLaunchTrackId = 'DEFINE_LAUNCH' | 'BUILD_PLATFORM';
 export type StreamingLaunchMilestoneId =
@@ -98,6 +101,23 @@ export interface StreamingLaunchTrackView {
     milestones: StreamingLaunchMilestoneView[];
 }
 
+/** Funding remains a campaign condition, but it is not one of the seven
+ * screens inside Define the Launch. Presentation counters must use this
+ * boundary so a funded, cleared wizard cannot render as 8/7 or 8/8. */
+export const isStreamingDefineLaunchWizardMilestone = (
+    milestone: Pick<StreamingLaunchMilestoneView, 'id' | 'trackId'>,
+): boolean => milestone.trackId === 'DEFINE_LAUNCH' && milestone.id !== 'FUND_COMPANY';
+
+export const getStreamingDefineLaunchWizardProgress = (
+    track: { milestones: Array<Pick<StreamingLaunchMilestoneView, 'id' | 'trackId' | 'complete'>> },
+): { completedCount: number; totalCount: number } => {
+    const milestones = track.milestones.filter(isStreamingDefineLaunchWizardMilestone);
+    return {
+        completedCount: milestones.filter(milestone => milestone.complete).length,
+        totalCount: milestones.length,
+    };
+};
+
 export interface StreamingLaunchBudgetView {
     availableTreasury: number;
     availableToCommit: number;
@@ -132,6 +152,43 @@ export interface StreamingLaunchProgramView {
     budget: StreamingLaunchBudgetView;
     recommendedNextAction: StreamingRecommendedLaunchAction | null;
 }
+
+export interface StreamingOpeningMarketDecisionState {
+    selectedCountryIds: string[];
+    readyToCommission: boolean;
+    reviewComplete: boolean;
+    actionRequiredOperationIds: string[];
+    unfiledOperationIds: string[];
+}
+
+export const getStreamingOpeningMarketDecisionState = (player: Player): StreamingOpeningMarketDecisionState => {
+    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+    const operations = platform.marketOperations.filter(operation => (
+        operation.scope === 'COUNTRY'
+        && operation.entryKind === 'OPENING'
+        && operation.status !== 'EXITED'
+        && Boolean(operation.countryId)
+    ));
+    const actionRequired = operations.filter(operation => (
+        operation.clearance?.outcome === 'ADDITIONAL_REQUIREMENT'
+        || operation.clearance?.outcome === 'TEMPORARILY_REJECTED'
+    ));
+    const selectedCountryIds = operations.map(operation => operation.countryId!).sort();
+    return {
+        selectedCountryIds,
+        readyToCommission: selectedCountryIds.length > 0 && actionRequired.length === 0,
+        reviewComplete: selectedCountryIds.length > 0 && operations.every(operation => (
+            ['READY', 'ACTIVE'].includes(operation.status)
+            || operation.clearance?.outcome === 'APPROVED'
+            || operation.clearance?.outcome === 'APPROVED_WITH_CONDITIONS'
+        )),
+        actionRequiredOperationIds: actionRequired.map(operation => operation.id).sort(),
+        unfiledOperationIds: operations
+            .filter(operation => ['PLANNED', 'AWAITING_FUNDING'].includes(operation.status))
+            .map(operation => operation.id)
+            .sort(),
+    };
+};
 
 const roundMoney = (value: number): number => Math.max(0, Math.round(Number(value) || 0));
 
@@ -231,6 +288,26 @@ export interface StreamingLaunchConfigurationResult {
     reason: 'SAVED' | 'INVALID_STATE' | 'INSUFFICIENT_TREASURY' | 'INCOMPLETE';
     shortfall: number;
 }
+
+/** Persist free wizard intent without executing a paid domain action. */
+export const saveStreamingDefineLaunchDraft = (
+    player: Player,
+    draft: OwnedStreamingDefineLaunchDraftState,
+): StreamingLaunchConfigurationResult => {
+    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+    if (platform.launchCommit) return { player, changed: false, reason: 'INVALID_STATE', shortfall: 0 };
+    const nextPlatform = compactOwnedStreamingPlatformForPersistence({
+        ...platform,
+        launchProgram: {
+            ...platform.launchProgram,
+            defineDraft: draft,
+        },
+    }, player.id);
+    if (JSON.stringify(nextPlatform.launchProgram.defineDraft) === JSON.stringify(platform.launchProgram.defineDraft)) {
+        return { player, changed: false, reason: 'SAVED', shortfall: 0 };
+    }
+    return { player: { ...player, ownedStreamingPlatform: nextPlatform }, changed: true, reason: 'SAVED', shortfall: 0 };
+};
 
 export const setStreamingDefineLaunchStep = (
     player: Player,
@@ -432,7 +509,7 @@ export const saveStreamingPricingPlan = (
         if (feature === 'extraseat') return commerce >= 30;
         return feature === 'noads' || feature === 'catalogue';
     };
-    const safePricing: OwnedStreamingPricingConfiguration = {
+    const safePricing = normalizeStreamingPricingConfiguration({
         ...pricing,
         streams: allowedStreams,
         plans: pricing.plans.slice(0, 6).map(plan => ({
@@ -440,7 +517,7 @@ export const saveStreamingPricingPlan = (
             featureIds: plan.featureIds.filter(featureAllowed),
             ads: allowedStreams.includes('ads') && plan.ads,
         })),
-    };
+    });
     const priceFor = (id: string, index: number, fallback: number) => {
         const plan = safePricing.plans.find(item => item.id === id) || safePricing.plans[index];
         return plan ? Math.max(0, Math.min(100, Number(plan.monthly) || 0)) : fallback;
@@ -471,12 +548,16 @@ export const saveStreamingPricingPlan = (
     return { player: { ...player, ownedStreamingPlatform: nextPlatform }, changed: true, reason: 'SAVED', shortfall: 0 };
 };
 
-export const saveStreamingLaunchBlueprint = (player: Player): StreamingLaunchConfigurationResult => {
+export const checkpointStreamingLaunchBlueprint = (player: Player): StreamingLaunchConfigurationResult => {
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     const view = getStreamingLaunchProgramView(player);
     const required = ['OPENING_MARKETS', 'SERVICE_IDENT', 'STOREFRONT_PRICING', 'OPENING_CATALOGUE', 'PRICING'];
     const complete = required.every(id => view.milestones.find(item => item.id === id)?.complete);
     if (!platform.identity || !complete) return { player, changed: false, reason: 'INCOMPLETE', shortfall: 0 };
+    const signature = getStreamingLaunchDefinitionSignature(player);
+    if (platform.launchProgram.lastBlueprintSignature === signature) {
+        return { player, changed: false, reason: 'SAVED', shortfall: 0 };
+    }
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
     const nextPlatform = compactOwnedStreamingPlatformForPersistence({
         ...platform,
@@ -484,12 +565,15 @@ export const saveStreamingLaunchBlueprint = (player: Player): StreamingLaunchCon
             ...platform.launchProgram,
             status: 'PLANNING',
             defineCurrentStep: 'BLUEPRINT',
-            lastBlueprintSignature: getStreamingLaunchDefinitionSignature(player),
+            lastBlueprintSignature: signature,
             blueprintSavedAtAbsoluteWeek: absoluteWeek,
         },
     }, player.id);
     return { player: { ...player, ownedStreamingPlatform: nextPlatform }, changed: true, reason: 'SAVED', shortfall: 0 };
 };
+
+/** Compatibility alias for older surfaces; new UI checkpoints automatically. */
+export const saveStreamingLaunchBlueprint = checkpointStreamingLaunchBlueprint;
 
 export const getStreamingLaunchBudgetView = (player: Player): StreamingLaunchBudgetView => {
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
@@ -504,7 +588,7 @@ export const getStreamingLaunchBudgetView = (player: Player): StreamingLaunchBud
         .filter(item => item.status === 'COMMITTED')
         .reduce((sum, item) => sum + item.committedAmount, 0);
     const paidSpend = platform.costCommitments
-        .filter(item => ['PAID', 'MIGRATED'].includes(item.status))
+        .filter(item => !['CANCELLED', 'REFUNDED'].includes(item.status))
         .reduce((sum, item) => sum + item.paidAmount, 0);
     const weeklyCommittedBurn = platform.costCommitments
         .filter(item => !['CANCELLED', 'REFUNDED'].includes(item.status))
@@ -562,8 +646,9 @@ export const getStreamingLaunchProgramView = (player: Player): StreamingLaunchPr
     const openingMarkets = platform.marketOperations.filter(operation => (
         operation.scope === 'COUNTRY' && operation.entryKind === 'OPENING' && operation.status !== 'EXITED'
     ));
+    const marketDecision = getStreamingOpeningMarketDecisionState(player);
     const marketsChosen = openingMarkets.length > 0;
-    const marketsCleared = marketsChosen && openingMarkets.every(operation => ['READY', 'ACTIVE'].includes(operation.status));
+    const marketsCleared = marketDecision.reviewComplete;
     const identPurchases = getStreamingIdentPurchaseView(player);
     const activeIdentPackage = platform.serviceConfiguration.identPackageId;
     const hasIdent = Boolean(
@@ -610,7 +695,16 @@ export const getStreamingLaunchProgramView = (player: Player): StreamingLaunchPr
         || facilities.some(facility => Boolean(facility.physical)),
     );
     const isCommissioned = Boolean(commissioned);
-    const rehearsed = Boolean(platform.launchProgram.lastRehearsalSignature || platform.launchCommit);
+    const draftForecast = draft ? getStreamingInfrastructureForecast(player, draft) : null;
+    const rehearsalEvidence = draft?.lastLaunchRehearsal || commissioned?.loadTest.launchRehearsal;
+    const rehearsalSignature = draftForecast?.configurationSignature || commissioned?.loadTest.configurationSignature;
+    const currentBuildRehearsal = Boolean(
+        rehearsalEvidence
+        && rehearsalSignature
+        && rehearsalEvidence.configurationSignature === rehearsalSignature
+        && rehearsalEvidence.verdict !== 'BROKE',
+    );
+    const rehearsed = currentBuildRehearsal || Boolean(platform.launchProgram.lastRehearsalSignature || platform.launchCommit);
     const launched = Boolean(platform.launchCommit);
     const funded = hasPositiveFundingHistory(player);
 
@@ -627,9 +721,9 @@ export const getStreamingLaunchProgramView = (player: Player): StreamingLaunchPr
         },
         {
             id: 'MARKET_CLEARANCES', trackId: 'DEFINE_LAUNCH', label: 'Clear the markets', shortLabel: 'Market clearance',
-            description: 'Resolve market access, regulation and launch approval in each opening country.',
-            destination: 'MARKET_CLEARANCE', complete: marketsCleared,
-            inProgress: marketsChosen && !marketsCleared,
+            description: 'Prepare every opening-country application and resolve any government request.',
+            destination: 'MARKET_CLEARANCE', complete: marketDecision.readyToCommission,
+            inProgress: marketDecision.readyToCommission && !marketsCleared,
             blocker: marketsChosen ? null : 'Choose at least one Opening Market before beginning clearance.',
         },
         {
@@ -656,12 +750,12 @@ export const getStreamingLaunchProgramView = (player: Player): StreamingLaunchPr
             inProgress: Boolean(platform.serviceConfiguration.pricingApproach || platform.serviceConfiguration.pricing.plans.length),
         },
         {
-            id: 'LAUNCH_BLUEPRINT', trackId: 'DEFINE_LAUNCH', label: 'Save the launch blueprint', shortLabel: 'Launch blueprint',
-            description: 'Checkpoint markets, service, pricing, catalogue and campaign assumptions for Build.',
+            id: 'LAUNCH_BLUEPRINT', trackId: 'DEFINE_LAUNCH', label: 'Launch blueprint', shortLabel: 'Launch blueprint',
+            description: 'Keep markets, service, pricing, catalogue and campaign assumptions current for Build.',
             destination: 'LAUNCH_BLUEPRINT', complete: blueprintSaved,
             blocker: hasCatalogue && hasIdent && hasStorefront && hasPricing
                 ? null
-                : 'Finish the required launch definition before saving its blueprint.',
+                : 'Finish the required launch definition before its blueprint can become current.',
         },
         {
             id: 'NETWORK_BLUEPRINT', trackId: 'BUILD_PLATFORM', label: 'Draw the network blueprint', shortLabel: 'Network blueprint',
@@ -688,25 +782,27 @@ export const getStreamingLaunchProgramView = (player: Player): StreamingLaunchPr
             blocker: hasRackGroups ? null : 'Rack groups are required before physical capacity can be tested.',
         },
         {
-            id: 'COMMISSIONING', trackId: 'BUILD_PLATFORM', label: 'Commission the network', shortLabel: 'Commissioning',
-            description: 'Lock the funded infrastructure plan and bring the opening network online.',
-            destination: 'COMMISSIONING', complete: isCommissioned,
-            inProgress: Boolean(draft && hasPhysicalCapacity),
-            blocker: hasPhysicalCapacity ? null : 'Clear physical capacity before commissioning the network.',
+            id: 'REHEARSAL', trackId: 'BUILD_PLATFORM', label: 'Rehearse the service', shortLabel: 'Rehearsal',
+            description: 'Run opening-night demand through the exact catalogue, markets and proposed network.',
+            destination: 'REHEARSAL', complete: currentBuildRehearsal,
+            blocker: hasPhysicalCapacity && marketDecision.readyToCommission && hasCatalogue && hasIdent && hasStorefront && blueprintSaved
+                ? null
+                : 'Finish the launch definition and physical network before running its load rehearsal.',
         },
         {
-            id: 'REHEARSAL', trackId: 'BUILD_PLATFORM', label: 'Rehearse the service', shortLabel: 'Rehearsal',
-            description: 'Run opening-night demand through the exact catalogue, markets and commissioned network.',
-            destination: 'REHEARSAL', complete: rehearsed,
-            blocker: isCommissioned && marketsCleared && hasCatalogue && hasIdent && hasStorefront && blueprintSaved
-                ? null
-                : 'The saved launch blueprint and commissioned infrastructure must both be current before rehearsal.',
+            id: 'COMMISSIONING', trackId: 'BUILD_PLATFORM', label: 'Commission the network', shortLabel: 'Commissioning',
+            description: 'Lock the tested, funded infrastructure plan and start construction.',
+            destination: 'COMMISSIONING', complete: isCommissioned,
+            inProgress: Boolean(draft && currentBuildRehearsal),
+            blocker: currentBuildRehearsal ? null : 'Run a successful load rehearsal for this exact network before commissioning.',
         },
         {
             id: 'OPENING_NIGHT', trackId: 'FINALE', label: 'Opening Night', shortLabel: 'Opening Night',
             description: 'Commit the signal and let the first viewers into the service.',
             destination: 'OPENING_NIGHT', complete: launched,
-            blocker: rehearsed ? null : 'Complete the launch rehearsal before Opening Night.',
+            blocker: isCommissioned && rehearsed
+                ? null
+                : 'Commission the successfully rehearsed network before Opening Night.',
         },
     ];
 
@@ -732,7 +828,7 @@ export const getStreamingLaunchProgramView = (player: Player): StreamingLaunchPr
     });
     if (platform.launchProgram.lastBlueprintSignature && !blueprintSaved) warnings.push({
         id: 'launch-warning:blueprint-stale', milestoneId: 'LAUNCH_BLUEPRINT', tone: 'WARNING',
-        message: 'The launch definition changed after its last checkpoint. Save a new blueprint and rehearse again.',
+        message: 'The launch definition changed after its last checkpoint. Resolve the changed requirement and rehearse again.',
     });
 
     const blockerByMilestone = new Map(blockers.map(blocker => [blocker.milestoneId, blocker]));

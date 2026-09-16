@@ -45,6 +45,7 @@ import {
     getPlatformAiPostFundingRestrictions,
     quotePlatformAiExternalRecapitalization,
 } from './platformAiFinancing';
+import { getPlatformAiOperatingProfile } from './platformAiOperatingProfiles';
 
 const CATALOGUE_DEAL_DURATION_WEEKS = 104;
 const CATALOGUE_DEAL_TIMEOUT_WEEKS = 4;
@@ -53,6 +54,24 @@ const CATALOGUE_DISTRESS_DISCOUNT = 0.7;
 const RESTRUCTURED_INTEREST_MULTIPLIER = 0.5;
 
 const roundMillions = (value: number): number => Math.round(value * 1_000_000) / 1_000_000;
+
+export const selectPlatformAiWithdrawableMarket = (
+    platform: PlatformState,
+): NonNullable<PlatformState['ai']>['marketOperations'][number] | undefined => {
+    const homeCountryIds = new Set(getPlatformAiOperatingProfile(platform.id).homeCountryIds);
+    return (platform.ai?.marketOperations || [])
+        .filter(operation => (
+            operation.status === 'ACTIVE'
+            && Boolean(operation.countryId)
+            && !homeCountryIds.has(operation.countryId!)
+        ))
+        .slice()
+        .sort((left, right) => (
+            Number(left.countryProfile?.audienceSize || 0) - Number(right.countryProfile?.audienceSize || 0)
+            || Number(right.weeklyOperatingCost || 0) - Number(left.weeklyOperatingCost || 0)
+            || left.id.localeCompare(right.id)
+        ))[0];
+};
 
 const getProtectedOneTimeObligationIds = (
     platform: PlatformState,
@@ -1612,14 +1631,7 @@ const progressPlatform = (
             result = unavailableResult(stage, absoluteWeek, 'No unpaid commission was eligible to hold.');
         }
     } else if (stage === 'WITHDRAW_REGION') {
-        const withdrawable = platform.ai!.marketOperations
-            .filter(operation => operation.status === 'ACTIVE')
-            .slice()
-            .sort((left, right) => (
-                Number(left.countryProfile?.audienceSize || 0) - Number(right.countryProfile?.audienceSize || 0)
-                || Number(right.weeklyOperatingCost || 0) - Number(left.weeklyOperatingCost || 0)
-                || left.id.localeCompare(right.id)
-            ))[0];
+        const withdrawable = selectPlatformAiWithdrawableMarket(platform);
         if (withdrawable) {
             result = appliedResult(
                 stage,

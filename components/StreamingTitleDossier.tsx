@@ -280,7 +280,7 @@ export default function StreamingTitleDossier({ player, onClose, onOpenPromotion
     <div className="std-report-grid">
       <div className="std-metric-rack is-wide">
         <DossierMetric icon={BadgeDollarSign} label="Subscription attribution" value={formatMoney(title.attributedSubscriptionRevenue!)} detail="Existing subscription cash allocated by attention" tone="positive" />
-        <DossierMetric icon={CircleDollarSign} label="Incremental revenue" value={formatMoney(title.incrementalRevenue || 0)} detail={`${formatMoney(title.advertisingRevenue || 0)} ads · ${formatMoney((title.premiumRevenue || 0) + (title.rentalRevenue || 0) + (title.purchaseRevenue || 0))} transactions`} tone="positive" />
+        <DossierMetric icon={CircleDollarSign} label="Incremental revenue" value={formatMoney(title.incrementalRevenue || 0)} detail={`${formatMoney(title.advertisingRevenue || 0)} ads · ${formatMoney((title.premiumRevenue || 0) + (title.rentalRevenue || 0) + (title.purchaseRevenue || 0) + (title.dayPassRevenue || 0) + (title.meteredRevenue || 0) + (title.patronRevenue || 0))} transactions`} tone="positive" />
         <DossierMetric icon={Sparkles} label="Sponsorship" value={formatMoney(title.sponsorshipRevenue || 0)} detail="Exposure earned against active sponsor inventory" />
         <DossierMetric icon={CircleDollarSign} label="Allocated cash cost" value={formatMoney(title.allocatedCashCost!)} detail="Share of this period’s real cash spend" />
         <DossierMetric icon={BookOpenCheck} label="Content amortization" value={formatMoney(title.allocatedContentAmortization!)} detail="Accounting recognition, not a second cash payment" />

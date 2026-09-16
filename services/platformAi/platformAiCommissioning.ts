@@ -399,6 +399,7 @@ export const commissionPlatformAiOriginal = (
         producerStudioId,
         commissioningPlatformId: input.platformId,
         platformContentPlanId: plan.id,
+        source: 'PLATFORM_COMMISSION',
         status: 'PRE_PRODUCTION',
         productionCalendar,
         budgetMillions: plan.productionFundingMillions,

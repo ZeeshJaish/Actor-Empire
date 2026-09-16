@@ -14,10 +14,13 @@ import {
     queueOwnedStreamingCinematic,
     transitionOwnedStreamingLifecycle,
 } from './ownedStreamingPlatform';
+import { settleOwnedStreamingLaunchMarketingAtOpening } from './streamingLaunchMarketingLifecycle';
 import { getStreamingCatalogLicenseStatus } from './streamingCatalog';
 import { getStreamingOriginalLiveStatus } from './streamingOriginals';
 import { resolveOwnedStreamingReach } from './streamingProgression';
 import { getStreamingLaunchDefinitionSignature } from './streamingLaunchProgram';
+import { getStreamingOpeningProgrammeView } from './streamingOpeningProgramme';
+import { getStreamingBlendedMonthlyPrice } from './streamingPricingEconomy';
 
 export type StreamingLaunchReadinessTone = 'READY' | 'WATCH' | 'BLOCKED';
 
@@ -156,6 +159,23 @@ export const getStreamingLaunchReadiness = (player: Player): StreamingLaunchRead
         platform.launchProgram.lastBlueprintSignature
         && platform.launchProgram.lastBlueprintSignature === getStreamingLaunchDefinitionSignature(player),
     );
+    const openingProgramme = getStreamingOpeningProgrammeView(player);
+
+    items.push(createItem(
+        'opening-programme',
+        'Opening Programme',
+        openingProgramme.state === 'LIVE'
+            ? 'The commissioned service is live.'
+            : openingProgramme.state === 'READY_TO_OPEN'
+            ? 'Construction, government clearance and launch preparation are complete.'
+            : openingProgramme.state === 'ACTION_REQUIRED'
+                ? 'The commissioned programme needs a government response before Opening Night.'
+                : openingProgramme.commissioned
+                    ? `${openingProgramme.remainingWeeks} week${openingProgramme.remainingWeeks === 1 ? '' : 's'} remain on the controlling workstream.`
+                    : 'Commission the tested launch plan before Opening Night.',
+        ['READY_TO_OPEN', 'LIVE'].includes(openingProgramme.state) ? 'READY' : 'BLOCKED',
+        'HOME',
+    ));
 
     items.push(createItem(
         'company',
@@ -266,8 +286,17 @@ export const getStreamingLaunchReadiness = (player: Player): StreamingLaunchRead
             + (slate.entries.some(entry => entry.projectType === 'SERIES') ? 0.06 : 0)
             + (originalEntry?.marketingPlan === 'EVENT' ? 0.12 : 0)
         : 1;
-    const forecastLikelyConcurrentStreams = roundCapacity(reach.demandRange.likely * slateBoost);
-    const forecastHighConcurrentStreams = roundCapacity(reach.demandRange.high * (slateBoost + 0.08));
+    const commissionedDemand = setup?.loadTest;
+    const baseLikelyConcurrentStreams = commissionedDemand
+        && commissionedDemand.forecastLikelyConcurrentStreams >= commissionedDemand.forecastLowConcurrentStreams
+        ? commissionedDemand.forecastLikelyConcurrentStreams
+        : reach.demandRange.likely;
+    const baseHighConcurrentStreams = commissionedDemand
+        && commissionedDemand.forecastHighConcurrentStreams >= baseLikelyConcurrentStreams
+        ? commissionedDemand.forecastHighConcurrentStreams
+        : reach.demandRange.high;
+    const forecastLikelyConcurrentStreams = roundCapacity(baseLikelyConcurrentStreams * slateBoost);
+    const forecastHighConcurrentStreams = roundCapacity(baseHighConcurrentStreams * (slateBoost + 0.08));
     const baseBurst = platform.capacity.burstConcurrentStreams;
     const capacityOptions: StreamingLaunchCapacityOption[] = ([
         'STANDARD',
@@ -390,6 +419,7 @@ export const commitOwnedStreamingLaunch = (
         outcomeTier,
         openingTitleCount: readiness.openingTitleCount,
         openingOriginalTitle: readiness.openingOriginalTitle,
+        marketingForecastSnapshotId: platform.launchMarketingPlan?.forecastSnapshot.id || null,
     };
     const launchLedger: OwnedStreamingLedgerEntry = {
         id: createDeterministicId('streaming_event', platform.simulationSeed, idempotencyKey),
@@ -406,11 +436,7 @@ export const commitOwnedStreamingLaunch = (
             outcomeTier,
         },
     };
-    const weightedArpu = (
-        platform.subscriptionPrices.BASIC * 0.48
-        + platform.subscriptionPrices.PREMIUM * 0.34
-        + platform.subscriptionPrices.FAMILY * 0.18
-    );
+    const weightedArpu = getStreamingBlendedMonthlyPrice(platform);
     const withLaunchFacts = compactOwnedStreamingPlatformForPersistence({
         ...platform,
         launchCommit,
@@ -447,8 +473,12 @@ export const commitOwnedStreamingLaunch = (
         title: `${platform.identity?.name || 'EMPIRE+'} is live`,
         factIds: [launchLedger.id],
     });
+    const settledMarketing = settleOwnedStreamingLaunchMarketingAtOpening({
+        ...player,
+        ownedStreamingPlatform: withCinematic,
+    });
     return {
-        player: { ...player, ownedStreamingPlatform: withCinematic },
+        player: settledMarketing.player,
         changed: true,
         launchCommit,
     };

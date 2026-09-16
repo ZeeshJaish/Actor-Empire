@@ -75,9 +75,9 @@ const createFixture = (): Player => {
             committedAtAbsoluteWeek: 2_101,
             loadTest: {
                 configurationSignature: 'phase8-load-test',
-                forecastLowConcurrentStreams: 700_000,
-                forecastLikelyConcurrentStreams: 1_000_000,
-                forecastHighConcurrentStreams: 1_550_000,
+                forecastLowConcurrentStreams: 470_000,
+                forecastLikelyConcurrentStreams: 830_000,
+                forecastHighConcurrentStreams: 1_230_000,
                 testedBurstCapacity: 3_000_000,
                 headroomPercent: 94,
                 status: 'PASS',
@@ -220,7 +220,7 @@ const createFixture = (): Player => {
 };
 
 const migrated = normalizeOwnedStreamingPlatformState({ schemaVersion: 7 }, 'phase8-migration');
-assert(migrated.schemaVersion === 25 && migrated.launchCommit === null, 'Schema v7 saves should migrate with a safe empty launch commit.');
+assert(migrated.schemaVersion === 26 && migrated.launchCommit === null, 'Schema v7 saves should migrate with a safe empty launch commit.');
 
 const productionBlocked: Player = {
     ...createFixture(),
@@ -240,6 +240,14 @@ assert(readiness.canLaunch && readiness.blockerCount === 0, 'A delivered Origina
 assert(readiness.items.length >= 6, 'Launch Command should derive a complete go/no-go board.');
 assert(readiness.capacityOptions.length === 3, 'Players should receive standard, cloud-burst and staggered premiere choices.');
 assert(readiness.demandRegions.length >= 2, 'Earned reach should produce a modeled demand map.');
+assert(
+    readiness.forecastLikelyConcurrentStreams === 979_000,
+    'Launch Command must inherit the commissioned Build likely-demand evidence before applying the finalized slate boost.',
+);
+assert(
+    readiness.forecastHighConcurrentStreams === 1_550_000,
+    'Launch Command must inherit the commissioned Build surge evidence before applying the finalized slate boost.',
+);
 
 const cloudOption = readiness.capacityOptions.find(option => option.id === 'CLOUD_BURST')!;
 assert(cloudOption.cost > 0 && cloudOption.protectedPeakConcurrentStreams > fixture.ownedStreamingPlatform.capacity.burstConcurrentStreams, 'Cloud burst should trade company treasury for real temporary protection.');

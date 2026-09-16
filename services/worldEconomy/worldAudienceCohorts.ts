@@ -11,6 +11,7 @@ import type {
     WorldPopulationIncomeBandId,
     WorldPopulationState,
 } from '../../types';
+import { isWorldEconomyStateCanonical, markWorldEconomyStateCanonical } from './worldEconomyCanonicalState';
 
 export const WORLD_AUDIENCE_ECONOMY_SCHEMA_VERSION = 1 as const;
 const WORLD_AUDIENCE_MAX_SNAPSHOTS = 32;
@@ -447,8 +448,12 @@ export const normalizeWorldAudienceEconomyState = (
     population: WorldPopulationState,
     absoluteWeek: number,
 ): WorldAudienceEconomyState => {
-    if (!isStructurallyUsableState(input, population)) return createWorldAudienceEconomyState(population, absoluteWeek);
-    return advanceWorldAudienceEconomyToWeek(input, population, absoluteWeek);
+    const targetWeek = Math.max(population.epochAbsoluteWeek, Math.round(Number(absoluteWeek) || 0));
+    if (isWorldEconomyStateCanonical(input, targetWeek, [population])) return input as WorldAudienceEconomyState;
+    const normalized = !isStructurallyUsableState(input, population)
+        ? createWorldAudienceEconomyState(population, targetWeek)
+        : advanceWorldAudienceEconomyToWeek(input, population, targetWeek);
+    return markWorldEconomyStateCanonical(normalized, targetWeek, [population]);
 };
 
 export const getWorldAudienceCountry = (

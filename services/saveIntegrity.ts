@@ -1,4 +1,8 @@
 import type { Player } from '../types';
+import { compactIndustryIntelligenceState } from './industryIntelligence/industryIntelligenceState';
+import { getAbsoluteWeek } from './legacyLogic';
+import { normalizePlatformAiState } from './platformAi/platformAiState';
+import { normalizeStudioAiState } from './studioAi/studioAiState';
 
 export const SAVE_INTEGRITY_FORMAT_VERSION = 1;
 
@@ -37,6 +41,7 @@ export interface SaveProtectedState {
     premiumEntitlements: SaveIdentityFingerprint;
     ownedStreamingIdentity: string;
     ownedStreamingTreasury: number;
+    worldEconomy: string;
 }
 
 export interface SaveIntegrityManifest {
@@ -190,30 +195,68 @@ const studioCompanyState = (player: Player): string => stableHash(
         })),
 );
 
-const industryIntelligenceState = (player: Player): string => stableHash([
-    ...Object.values(player.world?.studios || {}).map(studio => studio.ai?.intelligence),
-    ...Object.values(player.world?.platforms || {}).map(platform => platform.ai?.intelligence),
-]
+const industryIntelligenceState = (player: Player): string => {
+    const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+    const acquiredPlatformIds = new Set<string>(
+        player.ownedStreamingPlatform?.corporateDevelopment?.acquiredPlatformIds || [],
+    );
+    const states = [
+        ...Object.values(player.world?.studios || {}).map(studio => (
+            studio.ai ? normalizeStudioAiState(studio, { absoluteWeek }).intelligence : undefined
+        )),
+        ...Object.entries(player.world?.platforms || {}).map(([platformId, platform]) => {
+            if (!platform.ai?.intelligence) return undefined;
+            if (acquiredPlatformIds.has(platformId)) return platform.ai.intelligence;
+            return normalizePlatformAiState(platform, player.id, absoluteWeek).ai?.intelligence;
+        }),
+    ];
+    return stableHash(states
     .filter(Boolean)
-    .map(state => ({
-        schemaVersion: state!.schemaVersion,
-        companyId: state!.companyId,
-        companyKind: state!.companyKind,
-        lastProcessedAbsoluteWeek: state!.lastProcessedAbsoluteWeek,
-        nextDueAbsoluteWeek: state!.nextDueAbsoluteWeek,
-        decisionCycleByLane: state!.decisionCycleByLane,
-        momentum: state!.momentum,
-        averageOutcomeByLane: state!.learning.averageOutcomeByLane,
-        capabilityProgress: state!.learning.capabilityProgress,
-        repetitionFatigue: state!.learning.repetitionFatigue,
-        franchiseFatigue: state!.learning.franchiseFatigue,
-        content: state!.content,
-        materialProposalIds: state!.proposals
-            .filter(proposal => proposal.status !== 'SHADOW')
-            .map(proposal => proposal.id)
-            .sort(),
-    }))
+    .map(state => {
+        // Integrity must compare the same canonical representation that will be
+        // written. Older/runtime states may omit newly introduced lane keys;
+        // compaction safely supplies those defaults and must not look like loss.
+        const canonical = compactIndustryIntelligenceState(state!);
+        return {
+            schemaVersion: canonical.schemaVersion,
+            companyId: canonical.companyId,
+            companyKind: canonical.companyKind,
+            lastProcessedAbsoluteWeek: canonical.lastProcessedAbsoluteWeek,
+            nextDueAbsoluteWeek: canonical.nextDueAbsoluteWeek,
+            decisionCycleByLane: canonical.decisionCycleByLane,
+            momentum: canonical.momentum,
+            averageOutcomeByLane: canonical.learning.averageOutcomeByLane,
+            capabilityProgress: canonical.learning.capabilityProgress,
+            repetitionFatigue: canonical.learning.repetitionFatigue,
+            franchiseFatigue: canonical.learning.franchiseFatigue,
+            content: canonical.content,
+            materialProposalIds: canonical.proposals
+                .filter(proposal => proposal.status !== 'SHADOW')
+                .map(proposal => proposal.id)
+                .sort(),
+        };
+    })
     .sort((left, right) => left.companyId.localeCompare(right.companyId)));
+};
+
+const worldEconomyState = (player: Player): string => {
+    const world = player.world;
+    const states = [
+        world?.worldPopulation,
+        world?.worldAudienceEconomy,
+        world?.worldAudienceParticipation,
+        world?.worldStreamingCompetition,
+        world?.worldStreamingCustomers,
+        world?.worldStreamingViewing,
+        world?.worldStreamingPlatformEconomy,
+    ];
+    return stableHash(states.map(state => state ? ({
+        schemaVersion: state.schemaVersion,
+        lastProcessedAbsoluteWeek: state.lastProcessedAbsoluteWeek,
+        sourceFingerprint: 'sourceFingerprint' in state ? state.sourceFingerprint : undefined,
+        global: state.global,
+    }) : null));
+};
 
 const nonFiniteCanonicalMoneyPaths = (player: Player): string[] => {
     const paths: string[] = [];
@@ -308,6 +351,7 @@ const createProtectedState = (player: Player): SaveProtectedState => {
             lifecycle: cleanText(platform?.lifecycle),
         }),
         ownedStreamingTreasury: treasury,
+        worldEconomy: worldEconomyState(player),
     };
 };
 
@@ -382,6 +426,7 @@ export const compareProtectedSaveState = (before: Player, after: Player): Protec
     if (left.ownedStreamingIdentity !== right.ownedStreamingIdentity) violations.push('owned streaming identity changed');
     if (!Number.isFinite(right.ownedStreamingTreasury)) violations.push('owned streaming treasury is not finite');
     else if (left.ownedStreamingTreasury !== right.ownedStreamingTreasury) violations.push('owned streaming treasury changed');
+    if (left.worldEconomy !== right.worldEconomy) violations.push('world economy canonical state changed');
     return violations.length ? { ok: false, violations } : { ok: true };
 };
 
@@ -400,9 +445,8 @@ export const verifySaveIntegrity = (
     if (manifest.formatVersion !== SAVE_INTEGRITY_FORMAT_VERSION) violations.push('integrity format is unsupported');
     const rebuilt = createSaveIntegrityManifest(player, manifest.reason, manifest.createdAt, manifest.needsRecoveryCheckpoint === true);
     if (rebuilt.digest !== manifest.digest) {
-        const legacyProtected = { ...rebuilt.protected } as SaveProtectedState;
-        delete legacyProtected.industryIntelligenceState;
-        const legacyDigest = stableHash(manifestDigestSource({
+        const legacyProtected = { ...rebuilt.protected } as Partial<SaveProtectedState>;
+        const digestForLegacyProtected = (protectedState: Partial<SaveProtectedState>): string => stableHash(manifestDigestSource({
             formatVersion: rebuilt.formatVersion,
             saveMigrationVersion: rebuilt.saveMigrationVersion,
             playerId: rebuilt.playerId,
@@ -411,9 +455,15 @@ export const verifySaveIntegrity = (
             week: rebuilt.week,
             reason: rebuilt.reason,
             needsRecoveryCheckpoint: rebuilt.needsRecoveryCheckpoint,
-            protected: legacyProtected,
+            protected: protectedState as SaveProtectedState,
         }));
-        if (legacyDigest !== manifest.digest) violations.push('integrity digest does not match save payload');
+        delete legacyProtected.worldEconomy;
+        const digestWithoutWorldEconomy = digestForLegacyProtected(legacyProtected);
+        delete legacyProtected.industryIntelligenceState;
+        const legacyDigest = digestForLegacyProtected(legacyProtected);
+        if (digestWithoutWorldEconomy !== manifest.digest && legacyDigest !== manifest.digest) {
+            violations.push('integrity digest does not match save payload');
+        }
     }
     return violations.length ? { ok: false, violations } : { ok: true };
 };

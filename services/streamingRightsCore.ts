@@ -58,6 +58,7 @@ const LEGACY_SOURCES = new Set([
 ]);
 const GUARANTEE_RECOUPMENT_TERMS = new Set<StreamingGuaranteeRecoupment>(['NON_RECOUPABLE', 'RECOUPABLE']);
 const canonicalStreamingRightsRegistries = new WeakSet<object>();
+const streamingRightsIdempotencyIndexes = new WeakMap<object, Map<string, StreamingRightsContract>>();
 
 const asRecord = (value: unknown): Record<string, any> => (
     value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, any> : {}
@@ -201,9 +202,9 @@ const normalizeStreamingRightsContract = (value: unknown): StreamingRightsContra
             paymentKey: cleanText(settlementSource.paymentKey, `streaming-guarantee:${id}`, 180),
             settledAtAbsoluteWeek: settledWeek,
         },
-        legacySource: LEGACY_SOURCES.has(source.legacySource)
-            ? source.legacySource
-            : undefined,
+        ...(LEGACY_SOURCES.has(source.legacySource) ? {
+            legacySource: source.legacySource as StreamingRightsContract['legacySource'],
+        } : {}),
         rootContractId: cleanText(source.rootContractId, id, 180),
         parentContractId: cleanText(source.parentContractId, '', 180) || null,
         rightsTransactionId: cleanText(source.rightsTransactionId, '', 180) || null,
@@ -223,14 +224,27 @@ export const normalizeStreamingRightsContractRegistry = (
     }
     const source = asRecord(value);
     const registry: StreamingRightsContractRegistry = {};
+    const idempotencyIndex = new Map<string, StreamingRightsContract>();
     Object.values(source).forEach(rawContract => {
         const contract = normalizeStreamingRightsContract(rawContract);
         if (!contract || registry[contract.id]) return;
         registry[contract.id] = contract;
+        if (!idempotencyIndex.has(contract.idempotencyKey)) {
+            idempotencyIndex.set(contract.idempotencyKey, contract);
+        }
     });
     canonicalStreamingRightsRegistries.add(registry);
+    streamingRightsIdempotencyIndexes.set(registry, idempotencyIndex);
     return registry;
 };
+
+export const isCanonicalStreamingRightsContractRegistry = (
+    value: unknown,
+): value is StreamingRightsContractRegistry => (
+    Boolean(value)
+    && typeof value === 'object'
+    && canonicalStreamingRightsRegistries.has(value as object)
+);
 
 export const getStreamingRightsContract = (
     registry: StreamingRightsContractRegistry | null | undefined,
@@ -261,14 +275,27 @@ export const registerStreamingRightsContract = (
     const registry = normalizeStreamingRightsContractRegistry(value);
     const normalizedCandidate = normalizeStreamingRightsContract(candidate);
     if (!normalizedCandidate) return { registry, contract: null, changed: false };
+    let idempotencyIndex = streamingRightsIdempotencyIndexes.get(registry);
+    if (!idempotencyIndex) {
+        idempotencyIndex = new Map<string, StreamingRightsContract>();
+        for (const contract of Object.values(registry)) {
+            if (!idempotencyIndex.has(contract.idempotencyKey)) {
+                idempotencyIndex.set(contract.idempotencyKey, contract);
+            }
+        }
+        streamingRightsIdempotencyIndexes.set(registry, idempotencyIndex);
+    }
     const existing = registry[normalizedCandidate.id]
-        || Object.values(registry).find(contract => contract.idempotencyKey === normalizedCandidate.idempotencyKey);
+        || idempotencyIndex.get(normalizedCandidate.idempotencyKey);
     if (existing) {
         const originalRegistry = value && Object.keys(registry).length === Object.keys(value).length ? value : registry;
         return { registry: originalRegistry, contract: existing, changed: false };
     }
     const nextRegistry = { ...registry, [normalizedCandidate.id]: normalizedCandidate };
     canonicalStreamingRightsRegistries.add(nextRegistry);
+    const nextIdempotencyIndex = new Map(idempotencyIndex);
+    nextIdempotencyIndex.set(normalizedCandidate.idempotencyKey, normalizedCandidate);
+    streamingRightsIdempotencyIndexes.set(nextRegistry, nextIdempotencyIndex);
     return { registry: nextRegistry, contract: normalizedCandidate, changed: true };
 };
 

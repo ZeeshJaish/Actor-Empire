@@ -15,7 +15,11 @@ import { choosePlatformContentCandidate } from './platformAiPlanning';
 import { hasEligiblePlayerProductionStudio } from './platformAiPlayerCommissions';
 import { commitPlatformResearch } from './platformAiResearch';
 import { choosePlatformResearchPortfolio } from './platformAiResearchPortfolio';
-import { normalizePlatformAiState, resolvePlatformController } from './platformAiState';
+import {
+    markPlatformAiStateCanonicalForTurn,
+    normalizePlatformAiState,
+    resolvePlatformController,
+} from './platformAiState';
 import {
     appendPlatformIntelligenceOutcome,
     normalizePlatformIntelligenceMigrationState,
@@ -86,6 +90,10 @@ const executeContentIntent = (
     let nextWorld = committed.world;
     if (committed.plan.source === 'COMMISSIONED_ORIGINAL'
         && !hasEligiblePlayerProductionStudio({ ...input.player, world: nextWorld }, input.platformId)) {
+        const committedPlatform = nextWorld.platforms?.[input.platformId];
+        if (committedPlatform) {
+            markPlatformAiStateCanonicalForTurn(committedPlatform, input.player.id, input.absoluteWeek);
+        }
         nextWorld = commissionPlatformAiOriginal({
             ...input,
             player: { ...input.player, world: nextWorld },
@@ -197,6 +205,7 @@ export const executePlatformIntelligenceProposals = (
         .sort((left, right) => left.absoluteWeek - right.absoluteWeek || left.id.localeCompare(right.id));
     if (!proposals.length) return { world: input.world, changed: false, outcomes: [] };
     let world = updatePlatform(input.world, input.platformId, () => normalized);
+    markPlatformAiStateCanonicalForTurn(world.platforms![input.platformId], input.player.id, input.absoluteWeek);
     const outcomes: PlatformIntelligenceOutcome[] = [];
     for (const proposal of proposals) {
         const platform = world.platforms![input.platformId];
@@ -207,6 +216,7 @@ export const executePlatformIntelligenceProposals = (
             spendingRestricted: isRestrictedForProposal(platform, proposal, input.absoluteWeek),
         });
         const platformBeforeExecution = platform;
+        markPlatformAiStateCanonicalForTurn(platform, input.player.id, input.absoluteWeek);
         const execution = executeIntent(input, world, intent);
         world = execution.world;
         const outcome: PlatformIntelligenceOutcome = {
@@ -247,6 +257,7 @@ export const executePlatformIntelligenceProposals = (
                 },
             },
         }; });
+        markPlatformAiStateCanonicalForTurn(world.platforms![input.platformId], input.player.id, input.absoluteWeek);
     }
     return { world, changed: outcomes.length > 0, outcomes };
 };

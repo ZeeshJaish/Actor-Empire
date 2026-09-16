@@ -1,4 +1,6 @@
 import type { Player } from '../types';
+import { transferPlatformAiCanonicalTurnMarker } from './platformAi/platformAiState';
+import { isCanonicalStreamingRightsContractRegistry } from './streamingRightsCore';
 
 const OMIT = Symbol('omit-json-value');
 
@@ -28,16 +30,18 @@ const cloneJsonValue = (
     ancestors.add(value);
     try {
         if (Array.isArray(value)) {
-            return Array.from({ length: value.length }, (_unused, index) => {
+            const output = new Array<unknown>(value.length);
+            for (let index = 0; index < value.length; index += 1) {
                 const child = cloneJsonValue(value[index], ancestors, true);
-                return child === OMIT ? null : child;
-            });
+                output[index] = child === OMIT ? null : child;
+            }
+            return output;
         }
         const output: Record<string, unknown> = {};
-        Object.keys(value).forEach(key => {
+        for (const key of Object.keys(value)) {
             const child = cloneJsonValue((value as Record<string, unknown>)[key], ancestors, false);
             if (child !== OMIT) output[key] = child;
-        });
+        }
         return output;
     } finally {
         ancestors.delete(value);
@@ -54,5 +58,20 @@ export const clonePlayerForWeekProcessing = <T extends Player>(player: T): T => 
     if (cloned === OMIT || !cloned || typeof cloned !== 'object') {
         throw new TypeError('Player state could not be cloned for weekly processing.');
     }
-    return cloned as T;
+    const result = cloned as T;
+    if (isCanonicalStreamingRightsContractRegistry(player.world?.streamingRightsContracts)) {
+        result.world.streamingRightsContracts = player.world.streamingRightsContracts;
+    }
+    const sourcePlatforms = player.world?.platforms;
+    const clonedPlatforms = result.world?.platforms;
+    if (sourcePlatforms && clonedPlatforms) {
+        for (const platformId of Object.keys(sourcePlatforms)) {
+            const sourcePlatform = sourcePlatforms[platformId as keyof typeof sourcePlatforms];
+            const clonedPlatform = clonedPlatforms[platformId as keyof typeof clonedPlatforms];
+            if (sourcePlatform && clonedPlatform) {
+                transferPlatformAiCanonicalTurnMarker(sourcePlatform, clonedPlatform);
+            }
+        }
+    }
+    return result;
 };

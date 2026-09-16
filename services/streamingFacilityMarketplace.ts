@@ -31,6 +31,18 @@ export interface StreamingFacilityMarketplaceListing extends StreamingFacilityLe
     marketNote: string;
 }
 
+/** Country-level World Economy facts used to quote a live facility contract.
+ * The chosen terms are snapshotted onto the commissioned facility, so later
+ * macro movement changes new offers rather than rewriting signed base rent. */
+export interface StreamingFacilityMarketContext {
+    absoluteWeek: number;
+    purchasingPowerIndex: number;
+    inflationPressure: number;
+    consumerConfidence: number;
+    reliableInternetPercent: number;
+    commercialHouseholds: number;
+}
+
 const PROVIDERS: Record<ProductionLocationContinentId, string[]> = {
     NA: ['Northstar Colocation', 'Atlas Compute', 'MetroGrid Exchange'],
     SA: ['Andes Fibre House', 'SurGrid Digital', 'Aurora Colocation'],
@@ -68,6 +80,7 @@ const hash = (value: string): number => {
 };
 
 const roundMoney = (value: number): number => Math.max(0, Math.round(value / 1_000) * 1_000);
+const clamp = (value: number, minimum: number, maximum: number): number => Math.min(maximum, Math.max(minimum, value));
 
 const securityFor = (type: StreamingFacilityType): StreamingFacilitySecurityGrade => (
     type === 'RENTED_CABINET' || type === 'CLOUD_ALLOCATION'
@@ -95,7 +108,10 @@ const rackPositionsFor = (type: StreamingFacilityType, variation: number): numbe
 };
 
 /** Stable city listings. Chosen terms are copied onto the facility save. */
-export const getStreamingFacilityMarketplace = (cityId: string): StreamingFacilityMarketplaceListing[] => {
+export const getStreamingFacilityMarketplace = (
+    cityId: string,
+    context?: StreamingFacilityMarketContext,
+): StreamingFacilityMarketplaceListing[] => {
     const city = getProductionLocation(cityId);
     if (!city) return [];
     const cityCost = getStreamingDataCenterCost(city) / 10_000_000;
@@ -105,18 +121,28 @@ export const getStreamingFacilityMarketplace = (cityId: string): StreamingFacili
         if (!base?.marketplaceVisible) return [];
         const fingerprint = hash(`${city.id}.${type}.market-v1`);
         const variation = (fingerprint % 1_000) / 1_000;
+        const marketPulse = context ? Math.sin((context.absoluteWeek + (fingerprint % 29)) / 13) * .025 : 0;
+        const inflationFactor = context ? clamp(1 + (context.inflationPressure - 45) / 360, .78, 1.28) : 1;
+        const demandFactor = context ? clamp(
+            1 + (context.purchasingPowerIndex - 55) / 700
+                + Math.log10(Math.max(1, context.commercialHouseholds)) / 180,
+            .88,
+            1.16,
+        ) : 1;
+        const confidenceFactor = context ? clamp(1 + (context.consumerConfidence - 50) / 900, .94, 1.06) : 1;
         const providerName = providers[(fingerprint + index) % providers.length];
         const rackPositions = rackPositionsFor(type, variation);
         const status: StreamingFacilityListingStatus = type === 'OWNED_DATA_CENTRE'
             ? 'RESEARCH_REQUIRED'
             : variation > 0.78 ? 'LIMITED' : 'OPEN';
         const priceNoise = 0.93 + variation * 0.14;
-        const weeklyRent = roundMoney(base.weeklyLease * cityCost * priceNoise);
-        const setupCost = roundMoney(base.setupCost * cityCost * (0.92 + variation * 0.16));
+        const weeklyRent = roundMoney(base.weeklyLease * cityCost * priceNoise * inflationFactor * demandFactor * confidenceFactor * (1 + marketPulse));
+        const setupCost = roundMoney(base.setupCost * cityCost * (0.92 + variation * 0.16) * inflationFactor * (1 + marketPulse * .6));
         const depositWeeks = type === 'CLOUD_ALLOCATION' ? 2 : type === 'RENTED_CABINET' ? 4 : 8;
         const securityGrade = securityFor(type);
         const fibreGrade = fibreFor(type, city.quality);
         const reliabilityBase = 99.72 + city.quality * 0.022
+            + (context ? (context.reliableInternetPercent - 70) * .0018 : 0)
             + (fibreGrade === 'GLOBAL_BACKBONE' ? 0.035 : fibreGrade === 'CARRIER' ? 0.015 : 0);
         return [{
             listingId: `LEASE-${city.id}-${type}-V1`,
@@ -130,13 +156,15 @@ export const getStreamingFacilityMarketplace = (cityId: string): StreamingFacili
             depositCost: roundMoney(weeklyRent * depositWeeks),
             setupCost,
             weeklyRent,
-            electricityRatePerKwh: Math.round((0.07 + cityCost * 0.055 + (fingerprint % 9) / 100) * 100) / 100,
-            taxRatePercent: Math.round((TAX_BY_CONTINENT[city.continentId] + (fingerprint % 25) / 10) * 10) / 10,
+            electricityRatePerKwh: Math.round((0.07 + cityCost * 0.055 + (fingerprint % 9) / 100) * inflationFactor * (1 + marketPulse) * 100) / 100,
+            taxRatePercent: Math.round((TAX_BY_CONTINENT[city.continentId] + (fingerprint % 25) / 10 + (context ? (context.inflationPressure - 45) / 45 : 0)) * 10) / 10,
             reliabilityPercent: Math.min(99.999, Math.round(reliabilityBase * 1_000) / 1_000),
             securityGrade,
             fibreGrade,
             contractWeeks: type === 'CLOUD_ALLOCATION' ? 13 : type === 'RENTED_CABINET' ? 26 : type === 'PRIVATE_CAGE' ? 52 : 104,
-            provisioningWeeks: Math.max(0, base.provisioningWeeks + (status === 'LIMITED' ? 1 : 0)),
+            provisioningWeeks: Math.max(0, base.provisioningWeeks + (status === 'LIMITED' ? 1 : 0)
+                + (context && context.reliableInternetPercent < 55 ? 1 : 0)
+                + (context && context.consumerConfidence < 30 ? 1 : 0)),
             expansionRackPositions: type === 'OWNED_DATA_CENTRE'
                 ? 96
                 : Math.max(0, Math.round((base.capacityRacks * (0.25 + variation * 0.75)) / 2) * 2),

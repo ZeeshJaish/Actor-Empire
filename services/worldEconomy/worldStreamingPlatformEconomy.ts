@@ -7,9 +7,13 @@ import type {
     WorldStreamingPlatformEconomyState,
     WorldStreamingPlatformEconomySummary,
     WorldStreamingPlatformOperatingCostPolicy,
+    StreamingPlatformEcosystemState,
 } from '../../types';
 import { createDeterministicId } from '../deterministicRandom';
-import { normalizeStreamingPlatformEcosystem } from '../streamingPlatformEcosystem';
+import {
+    normalizeStreamingPlatformEcosystem,
+    repairStreamingEcosystemMarketShares,
+} from '../streamingPlatformEcosystem';
 import { normalizeWorldPlatformAi } from '../platformAi/platformAiState';
 import { normalizeWorldStreamingCustomerState } from './worldStreamingCustomers';
 import { normalizeWorldStreamingViewingState } from './worldStreamingViewing';
@@ -25,9 +29,10 @@ const round2 = (value: number): number => canonicalZero(Math.round((Number.isFin
 const round4 = (value: number): number => canonicalZero(Math.round((Number.isFinite(value) ? value : 0) * 10_000) / 10_000);
 const accountsToMillions = (accounts: number): number => Math.round(Math.max(0, accounts) / 10_000) / 100;
 
-export const resolveWorldStreamingPlatformCostPolicy = (
+const resolveWorldStreamingPlatformCostPolicyFromState = (
     player: Player,
     platformId: string,
+    ecosystem: StreamingPlatformEcosystemState,
 ): WorldStreamingPlatformOperatingCostPolicy => {
     const acquired = player.ownedStreamingPlatform?.corporateDevelopment?.acquiredPlatformIds || [];
     const controller: 'AI' | 'PLAYER' = platformId === 'PLAYER' || acquired.includes(platformId as never)
@@ -41,10 +46,6 @@ export const resolveWorldStreamingPlatformCostPolicy = (
             aiAssistanceActive: false,
         };
     }
-    const ecosystem = normalizeStreamingPlatformEcosystem(
-        player.world.streamingPlatformEcosystem,
-        player.world.streamingPlatformEcosystem?.lastProcessedAbsoluteWeek ?? 0,
-    );
     const efficiency = ecosystem.operators[platformId]?.efficiency ?? 65;
     return {
         controller,
@@ -54,6 +55,18 @@ export const resolveWorldStreamingPlatformCostPolicy = (
         aiAssistanceActive: true,
     };
 };
+
+export const resolveWorldStreamingPlatformCostPolicy = (
+    player: Player,
+    platformId: string,
+): WorldStreamingPlatformOperatingCostPolicy => resolveWorldStreamingPlatformCostPolicyFromState(
+    player,
+    platformId,
+    normalizeStreamingPlatformEcosystem(
+        player.world.streamingPlatformEcosystem,
+        player.world.streamingPlatformEcosystem?.lastProcessedAbsoluteWeek ?? 0,
+    ),
+);
 
 const emptyGlobal = (): WorldStreamingPlatformEconomyGlobalSummary => ({
     platformCount: 0,
@@ -100,6 +113,10 @@ const buildState = (
     const customers = normalizeWorldStreamingCustomerState(player.world.worldStreamingCustomers, player, absoluteWeek);
     const prepared: Player = { ...player, world: { ...player.world, worldStreamingCustomers: customers } };
     const viewing = normalizeWorldStreamingViewingState(prepared.world.worldStreamingViewing, prepared, absoluteWeek);
+    const ecosystem = normalizeStreamingPlatformEcosystem(
+        prepared.world.streamingPlatformEcosystem,
+        prepared.world.streamingPlatformEcosystem?.lastProcessedAbsoluteWeek ?? absoluteWeek,
+    );
     const rowsByPlatform = new Map<string, Array<WorldStreamingCustomerPlatformSummary & { countryId: string }>>();
     Object.values(customers.countries).forEach(country => country.platformSummaries.forEach(row => {
         rowsByPlatform.set(row.platformId, [...(rowsByPlatform.get(row.platformId) || []), { ...row, countryId: country.countryId }]);
@@ -108,7 +125,7 @@ const buildState = (
     const platforms = Object.fromEntries([...rowsByPlatform.entries()].sort(([left], [right]) => left.localeCompare(right)).map(([platformId, rows]) => {
         const merged = mergeCustomerRows(rows);
         const platformViewing = viewing.platforms[platformId];
-        const policy = resolveWorldStreamingPlatformCostPolicy(prepared, platformId);
+        const policy = resolveWorldStreamingPlatformCostPolicyFromState(prepared, platformId, ecosystem);
         const weeklySubscriptionRevenue = round2(merged.monthlySubscriptionRevenue / 4.33);
         const weeklyIncrementalRevenue = round2(platformViewing?.revenue.totalIncrementalRevenue || 0);
         const weeklyRevenue = round2(weeklySubscriptionRevenue + weeklyIncrementalRevenue);
@@ -125,7 +142,8 @@ const buildState = (
         const standardWeeklyOperatingCost = round2(
             merged.accessLoadAccounts * .035
             + (platformViewing?.totalHoursViewed || 0) * .0015
-            + Math.max(1, countryEconomy.length) * 125_000,
+            + Math.max(1, countryEconomy.length) * 125_000
+            + (platformViewing?.revenue.commercialOperatingCost || 0),
         );
         const appliedWeeklyOperatingCost = round2(standardWeeklyOperatingCost * policy.appliedCostMultiplier);
         const audienceMovement = merged.joins + merged.reactivations - merged.cancellations;
@@ -317,11 +335,14 @@ export const synchronizeWorldStreamingPlatformEconomy = (
             .map(summary => ({ summary, country: summary.countryEconomy.find(country => country.countryId === market.countryId) }))
             .filter((row): row is typeof row & { country: NonNullable<typeof row.country> } => Boolean(row.country));
         const total = rows.reduce((sum, row) => sum + row.country.endingPaidAccounts, 0);
-        market.shares = rows.flatMap(row => ecosystem.operators[row.summary.platformId] && row.country.endingPaidAccounts > 0 ? [{
+        const repairedShares = repairStreamingEcosystemMarketShares(rows.flatMap(row => (
+            ecosystem.operators[row.summary.platformId] && row.country.endingPaidAccounts > 0 ? [{
             operatorId: row.summary.platformId,
-            sharePercent: round2(row.country.endingPaidAccounts / Math.max(1, total) * 100),
-        }] : []).sort((left, right) => right.sharePercent - left.sharePercent || left.operatorId.localeCompare(right.operatorId));
-        market.othersSharePercent = round2(Math.max(0, 100 - market.shares.reduce((sum, row) => sum + row.sharePercent, 0)));
+            sharePercent: row.country.endingPaidAccounts / Math.max(1, total) * 100,
+        }] : []
+        )));
+        market.shares = repairedShares.shares;
+        market.othersSharePercent = repairedShares.othersSharePercent;
         market.lastRebalancedAtAbsoluteWeek = absoluteWeek;
     });
     return {

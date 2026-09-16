@@ -9,11 +9,26 @@ import type {
 import { createDeterministicId } from '../deterministicRandom';
 import { normalizeOwnedStreamingPlatformState } from '../ownedStreamingPlatform';
 import { normalizeStreamingPlatformEcosystem } from '../streamingPlatformEcosystem';
+import {
+    effectiveMonthlyStreamingPlanPrice,
+    normalizeStreamingPricingConfiguration,
+} from '../streamingPricingEconomy';
+import { createAiStreamingCommercialConfiguration } from './worldStreamingCommercialEconomy';
 
 const clamp = (value: number, minimum: number, maximum: number): number => (
     Math.min(maximum, Math.max(minimum, Number.isFinite(value) ? value : minimum))
 );
 const round2 = (value: number): number => Math.round(value * 100) / 100;
+const commercialSignature = (pricing: ReturnType<typeof normalizeStreamingPricingConfiguration>): string => [
+    pricing.streams.join(','),
+    `${pricing.ads.minutesPerHour}:${pricing.ads.cpm}`,
+    `${pricing.rentals.rent}:${pricing.rentals.buy}:${pricing.rentals.windowWeeks}`,
+    pricing.premium.price,
+    pricing.daypass.price,
+    `${pricing.sponsor.perTitle}:${pricing.sponsor.titles}`,
+    pricing.metered.perHour,
+    pricing.patron.monthly,
+].join('|');
 
 const FEATURE_APPEAL: Record<string, number> = {
     hd: 5,
@@ -35,15 +50,11 @@ const planAppeal = (featureIds: string[], ads: boolean): number => round2(clamp(
     100,
 ));
 
-const effectivePrice = (monthly: number, annualDiscount: number, introOffer: number): number => round2(
-    Math.max(.5, monthly) * (1 - clamp(annualDiscount, 0, 80) / 100 * .3 - clamp(introOffer, 0, 90) / 100 * .25),
-);
-
 const createPlayerOffer = (player: Player, absoluteWeek: number): WorldStreamingPlatformOffer | null => {
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     if (platform.lifecycle !== 'ACTIVE' || !platform.identity) return null;
-    const pricing = platform.serviceConfiguration.pricing;
-    if (!pricing.streams.includes('subs') || !pricing.plans.length) return null;
+    const pricing = normalizeStreamingPricingConfiguration(platform.serviceConfiguration.pricing);
+    if (!pricing.streams.length) return null;
     const activeCountryIds = [...new Set([
         ...platform.marketOperations.filter(operation => operation.status === 'ACTIVE').map(operation => operation.countryId),
         ...(platform.identity.dayOneMarketIds || []),
@@ -89,17 +100,32 @@ const createPlayerOffer = (player: Player, absoluteWeek: number): WorldStreaming
     const campaignMarketingBoost = growthAction
         ? clamp(4 + growthAction.channels.length * 2 + Math.log10(Math.max(1, growthAction.cashCost)) * .7, 4, 15)
         : 0;
-    const plans: WorldStreamingPlanOffer[] = pricing.plans.map(plan => ({
+    const weeksSinceOfferStart = platform.launchCommit
+        ? Math.max(0, absoluteWeek - platform.launchCommit.committedAtAbsoluteWeek)
+        : platform.launchProgram.status === 'LAUNCHED'
+            ? Math.max(0, absoluteWeek - platform.identity.foundedAtAbsoluteWeek)
+            : 0;
+    const accessPlans = pricing.streams.includes('subs') && pricing.plans.length
+        ? pricing.plans
+        : [{
+            id: 'OPEN_ACCESS',
+            name: pricing.streams.includes('ads') ? 'Free access' : 'Transaction access',
+            monthly: 0,
+            featureIds: ['catalogue'],
+            ads: pricing.streams.includes('ads'),
+        }];
+    const plans: WorldStreamingPlanOffer[] = accessPlans.map(plan => ({
         id: plan.id,
         name: plan.name,
-        monthlyPrice: round2(Math.max(.5, plan.monthly)),
-        effectiveMonthlyPrice: effectivePrice(plan.monthly, pricing.annualDiscount, pricing.introOffer),
+        monthlyPrice: plan.monthly,
+        effectiveMonthlyPrice: effectiveMonthlyStreamingPlanPrice(plan.monthly, pricing.annualDiscount, pricing.introOffer, weeksSinceOfferStart),
         featureIds: [...plan.featureIds],
         ads: plan.ads,
         appealIndex: planAppeal(plan.featureIds, plan.ads),
     }));
     const sourceFingerprint = createDeterministicId('world-streaming-player-offer', platform.serviceConfiguration.revision,
         activeCountryIds.join(','), plans.map(plan => `${plan.id}:${plan.monthlyPrice}:${plan.featureIds.join('.')}:${plan.ads}`).join('|'),
+        commercialSignature(pricing),
         catalogueStrengthIndex, localizationStrengthIndex, reliabilityIndex, platform.competitiveWorld.globalPrestige,
         platform.competitiveWorld.rivalryHeat, platform.metrics.subscribers);
     return {
@@ -108,6 +134,7 @@ const createPlayerOffer = (player: Player, absoluteWeek: number): WorldStreaming
         isPlayer: true,
         activeCountryIds,
         plans,
+        commercialConfiguration: pricing,
         annualDiscountPercent: pricing.annualDiscount,
         introOfferPercent: pricing.introOffer,
         catalogueStrengthIndex: round2(catalogueStrengthIndex),
@@ -131,7 +158,11 @@ const hashUnit = (value: string): number => {
     return (hash >>> 0) / 0xffffffff;
 };
 
-const createAiPlans = (operator: StreamingEcosystemOperator): WorldStreamingPlanOffer[] => {
+const createAiPlans = (
+    operator: StreamingEcosystemOperator,
+    absoluteWeek: number,
+    includeFreeAdAccess: boolean,
+): WorldStreamingPlanOffer[] => {
     const prestigePrice = operator.prestige * .055 + operator.cataloguePower * .035;
     const homeAdjustment = operator.kind === 'REGIONAL_REAL' ? -.9 : operator.kind === 'DYNAMIC_FICTIONAL' ? -.3 : 1.2;
     const jitter = (hashUnit(operator.id) - .5) * 1.8;
@@ -139,23 +170,27 @@ const createAiPlans = (operator: StreamingEcosystemOperator): WorldStreamingPlan
     const planCount = operator.kind === 'CORE_GLOBAL' || operator.kind === 'GLOBAL_REAL' || operator.startingClass === 'GLOBAL_ENTRANT'
         ? 3 : operator.cataloguePower + operator.technology >= 160 ? 2 : 1;
     const plans: Array<{ id: string; name: string; monthly: number; features: string[]; ads: boolean }> = [];
+    if (includeFreeAdAccess) {
+        plans.push({ id: 'FREE', name: 'Free', monthly: 0, features: ['hd', 'catalogue'], ads: true });
+    }
     if (planCount >= 2) plans.push({ id: 'VALUE', name: 'Essential', monthly: middle * .62, features: ['hd', 'streams2'], ads: true });
     plans.push({ id: 'STANDARD', name: planCount === 1 ? 'Access' : 'Standard', monthly: middle, features: ['hd', 'streams2', 'downloads', 'catalogue'], ads: false });
     if (planCount >= 3) plans.push({ id: 'PREMIUM', name: 'Premiere', monthly: middle * 1.48, features: ['uhd', 'spatial', 'streams4', 'downloads', 'noads', 'catalogue'], ads: false });
     const annualDiscount = round2(clamp(8 + (100 - operator.brandPower) * .12 + hashUnit(`${operator.id}:annual`) * 8, 5, 24));
     const introOffer = round2(clamp((100 - operator.brandPower) * .18 + hashUnit(`${operator.id}:intro`) * 10, 0, 28));
+    const weeksSinceOfferStart = Math.max(0, absoluteWeek - operator.foundedAtAbsoluteWeek);
     return plans.map(plan => ({
         id: plan.id,
         name: plan.name,
         monthlyPrice: round2(plan.monthly),
-        effectiveMonthlyPrice: effectivePrice(plan.monthly, annualDiscount, introOffer),
+        effectiveMonthlyPrice: effectiveMonthlyStreamingPlanPrice(plan.monthly, annualDiscount, introOffer, weeksSinceOfferStart),
         featureIds: plan.features,
         ads: plan.ads,
         appealIndex: planAppeal(plan.features, plan.ads),
     }));
 };
 
-const createAiOffer = (player: Player, operator: StreamingEcosystemOperator): WorldStreamingPlatformOffer | null => {
+const createAiOffer = (player: Player, operator: StreamingEcosystemOperator, absoluteWeek: number): WorldStreamingPlatformOffer | null => {
     if (operator.lifecycle === 'CLOSED' || operator.lifecycle === 'ACQUIRED' || !operator.activeCountryIds.length) return null;
     if (player.ownedStreamingPlatform?.corporateDevelopment?.acquiredPlatformIds?.some(id => (
         id === operator.corePlatformId || id === operator.id
@@ -165,11 +200,32 @@ const createAiOffer = (player: Player, operator: StreamingEcosystemOperator): Wo
     const activeCountryIds = [...new Set((ai?.capabilities.activeCountryIds || operator.activeCountryIds)
         .map(id => String(id || '').trim().toUpperCase()).filter(Boolean))].sort();
     if (!activeCountryIds.length) return null;
-    const plans = createAiPlans(operator);
     const technologyLevels = ai ? Object.values(ai.capabilities.technologyLevels) : [];
     const technology = technologyLevels.length
         ? technologyLevels.reduce((sum, value) => sum + value, 0) / technologyLevels.length * 10
         : operator.technology;
+    const commercialConfiguration = createAiStreamingCommercialConfiguration({
+        platformId: operator.id,
+        kind: operator.kind,
+        technology,
+        brandPower: operator.brandPower,
+        cataloguePower: operator.cataloguePower,
+        prestige: authoritative?.reputation ?? operator.prestige,
+        absoluteWeek,
+        foundedAtAbsoluteWeek: operator.foundedAtAbsoluteWeek,
+    });
+    const includeFreeAdAccess = commercialConfiguration.streams.includes('ads') && (
+        operator.id === 'YOUTUBE'
+        || (operator.kind === 'DYNAMIC_FICTIONAL' && hashUnit(`${operator.id}:free-ad-access`) < .18)
+    );
+    const plans = createAiPlans(operator, absoluteWeek, includeFreeAdAccess);
+    commercialConfiguration.plans = plans.map(plan => ({
+        id: plan.id,
+        name: plan.name,
+        monthly: plan.monthlyPrice,
+        featureIds: [...plan.featureIds],
+        ads: plan.ads,
+    }));
     const annualDiscountPercent = round2(clamp(8 + (100 - operator.brandPower) * .12 + hashUnit(`${operator.id}:annual`) * 8, 5, 24));
     const introOfferPercent = round2(clamp((100 - operator.brandPower) * .18 + hashUnit(`${operator.id}:intro`) * 10, 0, 28));
     return {
@@ -178,6 +234,7 @@ const createAiOffer = (player: Player, operator: StreamingEcosystemOperator): Wo
         isPlayer: false,
         activeCountryIds,
         plans,
+        commercialConfiguration,
         annualDiscountPercent,
         introOfferPercent,
         catalogueStrengthIndex: clamp(ai?.audienceHealth.catalogueStrengthIndex ?? operator.cataloguePower, 0, 100),
@@ -192,6 +249,7 @@ const createAiOffer = (player: Player, operator: StreamingEcosystemOperator): Wo
         preferredGenres: [...operator.preferredGenres],
         sourceFingerprint: createDeterministicId('world-streaming-ai-offer', operator.id, activeCountryIds.join(','),
             operator.cataloguePower, operator.localization, operator.technology, operator.brandPower, operator.prestige,
+            commercialSignature(commercialConfiguration),
             ai?.audienceHealth.catalogueStrengthIndex, ai?.capabilities.subtitleCoveragePercent,
             ai?.capabilities.dubCoveragePercent, authoritative?.reputation),
     };
@@ -201,7 +259,7 @@ export const getWorldStreamingOffers = (player: Player, absoluteWeek: number): W
     const week = Math.max(0, Math.round(Number(absoluteWeek) || 0));
     const ecosystem = normalizeStreamingPlatformEcosystem(player.world.streamingPlatformEcosystem, week);
     const offers = Object.values(ecosystem.operators)
-        .map(operator => createAiOffer(player, operator))
+        .map(operator => createAiOffer(player, operator, week))
         .filter((offer): offer is WorldStreamingPlatformOffer => Boolean(offer));
     const playerOffer = createPlayerOffer(player, week);
     if (playerOffer) offers.push(playerOffer);

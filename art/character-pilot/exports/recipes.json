@@ -1,0 +1,164 @@
+[
+  {
+    "version": 1,
+    "face": "square",
+    "hair": "bald",
+    "brows": "straight"
+  },
+  {
+    "version": 1,
+    "face": "square",
+    "hair": "bald",
+    "brows": "angled"
+  },
+  {
+    "version": 1,
+    "face": "square",
+    "hair": "bald",
+    "brows": "arched"
+  },
+  {
+    "version": 1,
+    "face": "square",
+    "hair": "crop",
+    "brows": "straight"
+  },
+  {
+    "version": 1,
+    "face": "square",
+    "hair": "crop",
+    "brows": "angled"
+  },
+  {
+    "version": 1,
+    "face": "square",
+    "hair": "crop",
+    "brows": "arched"
+  },
+  {
+    "version": 1,
+    "face": "square",
+    "hair": "swept",
+    "brows": "straight"
+  },
+  {
+    "version": 1,
+    "face": "square",
+    "hair": "swept",
+    "brows": "angled"
+  },
+  {
+    "version": 1,
+    "face": "square",
+    "hair": "swept",
+    "brows": "arched"
+  },
+  {
+    "version": 1,
+    "face": "round",
+    "hair": "bald",
+    "brows": "straight"
+  },
+  {
+    "version": 1,
+    "face": "round",
+    "hair": "bald",
+    "brows": "angled"
+  },
+  {
+    "version": 1,
+    "face": "round",
+    "hair": "bald",
+    "brows": "arched"
+  },
+  {
+    "version": 1,
+    "face": "round",
+    "hair": "crop",
+    "brows": "straight"
+  },
+  {
+    "version": 1,
+    "face": "round",
+    "hair": "crop",
+    "brows": "angled"
+  },
+  {
+    "version": 1,
+    "face": "round",
+    "hair": "crop",
+    "brows": "arched"
+  },
+  {
+    "version": 1,
+    "face": "round",
+    "hair": "swept",
+    "brows": "straight"
+  },
+  {
+    "version": 1,
+    "face": "round",
+    "hair": "swept",
+    "brows": "angled"
+  },
+  {
+    "version": 1,
+    "face": "round",
+    "hair": "swept",
+    "brows": "arched"
+  },
+  {
+    "version": 1,
+    "face": "tapered",
+    "hair": "bald",
+    "brows": "straight"
+  },
+  {
+    "version": 1,
+    "face": "tapered",
+    "hair": "bald",
+    "brows": "angled"
+  },
+  {
+    "version": 1,
+    "face": "tapered",
+    "hair": "bald",
+    "brows": "arched"
+  },
+  {
+    "version": 1,
+    "face": "tapered",
+    "hair": "crop",
+    "brows": "straight"
+  },
+  {
+    "version": 1,
+    "face": "tapered",
+    "hair": "crop",
+    "brows": "angled"
+  },
+  {
+    "version": 1,
+    "face": "tapered",
+    "hair": "crop",
+    "brows": "arched"
+  },
+  {
+    "version": 1,
+    "face": "tapered",
+    "hair": "swept",
+    "brows": "straight"
+  },
+  {
+    "version": 1,
+    "face": "tapered",
+    "hair": "swept",
+    "brows": "angled"
+  },
+  {
+    "version": 1,
+    "face": "tapered",
+    "hair": "swept",
+    "brows": "arched"
+  }
+]

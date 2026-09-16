@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Actor Empire · Details and lighting</title>
+  <link rel="stylesheet" href="study.css">
+  <script type="importmap">{"imports":{"three":"../vendor/three.module.js"}}</script>
+</head>
+<body>
+<main>
+  <header>
+    <p class="eyebrow">Actor Empire / Character study 04</p>
+    <h1>Details. Light. Character.</h1>
+    <p class="intro">Refined cloth folds, tailored pockets, a zipper pull, connected hands, and subtler facial detail. Compare three lighting setups on the same character.</p>
+  </header>
+  <div class="comparison">
+    <section class="reference-panel" aria-label="Character reference">
+      <h2>Your reference <span>Visual target</span></h2>
+      <div class="reference-art"><img src="../volume-study/reference-lineup.png" alt="Bald actor from the supplied character lineup"></div>
+      <a class="reference-link" href="../volume-study/">Open the previous 3D study ↗</a>
+    </section>
+    <section class="study-panel" aria-label="Detailed character preview">
+      <h2>Refined character <span id="stage-label">Drag to rotate</span></h2>
+      <div id="stage">
+        <div id="live" role="img" aria-label="Interactive detailed character. Drag to rotate and scroll to zoom."></div>
+        <img id="render" src="renders/warm-cool.png" alt="Blender render of the refined character" hidden>
+        <p id="loading" role="status">Opening the character…</p>
+      </div>
+      <div class="toolbar" role="group" aria-label="Character view">
+        <button data-view="front" data-live-only aria-pressed="false">Front</button>
+        <button data-view="three-quarter" aria-pressed="true">¾ view</button>
+        <button data-view="side" data-live-only aria-pressed="false">Side</button>
+        <button data-view="portrait" aria-pressed="false">Portrait</button>
+      </div>
+      <div class="modebar" role="group" aria-label="Preview mode">
+        <button id="live-mode" aria-pressed="true">Rotate in 3D</button>
+        <button id="render-mode" aria-pressed="false">Studio render</button>
+      </div>
+      <div class="lighting-controls">
+        <p class="control-label">Lighting</p>
+        <div class="light-options" role="group" aria-label="Lighting preset">
+          <button data-rig="studio" aria-pressed="false">Soft studio</button>
+          <button data-rig="warm-cool" aria-pressed="true">Warm / cool</button>
+          <button data-rig="daylight" aria-pressed="false">Daylight</button>
+        </div>
+        <p id="rig-description" class="rig-description">Warm face light with a cool edge around the head and jacket.</p>
+        <div id="light-sliders">
+          <label for="key-power">Key light <output id="key-value" for="key-power">100%</output></label>
+          <input id="key-power" type="range" min="0" max="180" step="5" value="100">
+          <label for="rim-power">Rim light <output id="rim-value" for="rim-power">100%</output></label>
+          <input id="rim-power" type="range" min="0" max="180" step="5" value="100">
+        </div>
+      </div>
+    </section>
+  </div>
+  <section class="lighting-board" aria-label="Blender lighting comparisons">
+    <h2>Same character. Same camera.</h2>
+    <p>These are Blender renders. Select a lighting treatment above to inspect it in 3D.</p>
+    <div class="lighting-grid">
+      <figure><a href="renders/studio.png"><img src="renders/studio.png" loading="lazy" alt="Detailed character under soft studio lighting"></a><figcaption><strong>Soft studio</strong><span>Even face visibility for profiles.</span></figcaption></figure>
+      <figure><a href="renders/warm-cool.png"><img src="renders/warm-cool.png" loading="lazy" alt="Detailed character under warm light with a cool rim"></a><figcaption><strong>Warm / cool</strong><span>More depth and separation for scenes.</span></figcaption></figure>
+      <figure><a href="renders/daylight.png"><img src="renders/daylight.png" loading="lazy" alt="Detailed character under directional daylight"></a><figcaption><strong>Daylight</strong><span>Stronger shadows reveal surface shapes.</span></figcaption></figure>
+    </div>
+  </section>
+  <details class="before-after">
+    <summary>Compare the detail pass under the same studio light</summary>
+    <div class="before-grid">
+      <figure><a href="renders/before-studio.png"><img src="renders/before-studio.png" loading="lazy" alt="Previous character under the same soft studio light"></a><figcaption>Before</figcaption></figure>
+      <figure><a href="renders/studio.png"><img src="renders/studio.png" loading="lazy" alt="Refined character under the same soft studio light"></a><figcaption>Refined</figcaption></figure>
+    </div>
+  </details>
+  <section class="details">
+    <div><h2>A character art study.</h2><p class="status">Static pose · Not yet rigged or integrated into the game. Live 3D approximates the Blender lighting; studio renders show the full material treatment.</p></div>
+    <nav aria-label="Character files"><a href="actor-detail-study-04.blend" download>Blender source ↗</a><a href="actor-detail-study-04.glb" download>3D model ↗</a><a href="renders/warm-cool-portrait.png">Portrait render ↗</a></nav>
+  </section>
+</main>
+<script type="module" src="study.mjs"></script>
+</body>
+</html>

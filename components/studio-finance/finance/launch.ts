@@ -11,6 +11,8 @@
    ========================================================================== */
 
 import type { CustomPoster, StreamingPricingPlanColorId } from '../../../types';
+import type { WorldStreamingLaunchPricingForecast } from '../../../services/worldEconomy/worldStreamingPricingForecast';
+import { calculateWorldStreamingCommercialRevenue } from '../../../services/worldEconomy/worldStreamingCommercialEconomy';
 
 export type LaunchStepId =
   | 'markets' | 'clearance' | 'ident'
@@ -493,12 +495,15 @@ export interface LaunchHandlers {
   onRemoveCustomIdentAudio?: () => void;
   onSaveViewerOffer?: (storefrontId: string) => void;
   onSavePricing?: (pricing: PricingSettings) => void;
+  /** Counterfactual launch offer evaluated by the live country/cohort/rival engine. */
+  onForecastPricing?: (pricing: PricingSettings, countryIds: string[]) => WorldStreamingLaunchPricingForecast;
   onSetTierPrices?: () => void;
   onAssembleCatalogue?: () => void;
   onOpenContentDesk?: () => void;
   onOpenRightsDesk?: () => void;
   onSaveBlueprint?: () => void;
   onOpenBuildPlatform?: () => void;
+  onOpenBuildBudget?: () => void;
   onStepChange?: (step: LaunchStepId) => void;
 }
 
@@ -514,7 +519,7 @@ export const STEPS: Array<{ id: LaunchStepId; label: string; verb: string }> = [
   { id: 'storefront', label: 'Store', verb: 'Design the front page' },
   { id: 'catalogue', label: 'Catalogue', verb: 'Assemble opening night' },
   { id: 'pricing', label: 'Pricing', verb: 'Price the service' },
-  { id: 'blueprint', label: 'Blueprint', verb: 'Save the blueprint' },
+  { id: 'blueprint', label: 'Blueprint', verb: 'Review the launch blueprint' },
 ];
 
 export function spendable(treasury: LaunchTreasury): number {
@@ -749,6 +754,8 @@ export interface PricingForecast {
   perHousehold: number;
   position: string;
   entryPrice: number;
+  activeRivalCount?: number;
+  rivalMedianEntryPrice?: number;
 }
 
 const AD_SPOTS_PER_MINUTE = 2;      // 30-second spots
@@ -774,6 +781,7 @@ export function forecastPricing(
   addressable: number,
   market: { rivalAveragePrice: number; reachRate: number },
   cohortSignals: PricingCohortSignal[] = [],
+  worldForecast?: WorldStreamingLaunchPricingForecast | null,
 ): PricingForecast {
   const on = (id: StreamId) => settings.streams.includes(id);
   const plans = on('subs') ? settings.plans : [];
@@ -790,7 +798,8 @@ export function forecastPricing(
     ? cohortSignals.reduce((total, cohort) => {
       const budget = Math.max(.5, cohort.monthlyStreamingBudgetPerHousehold);
       const eligible = plans.filter(plan => plan.monthly <= budget * 1.15);
-      const candidates = eligible.length ? eligible : plans.filter(plan => plan.monthly === entryPrice);
+      if (!eligible.length) return total;
+      const candidates = eligible;
       const planScores = candidates.map(plan => {
         const priceFit = Math.max(.08, 1 - plan.monthly / Math.max(1, budget) * (.42 + cohort.priceSensitivityIndex / 260));
         return { plan, score: Math.max(.01, planAppeal(plan) * priceFit) };
@@ -814,13 +823,14 @@ export function forecastPricing(
       return total + won;
     }, 0)
     : addressable * subReach;
-  const subscribers = Math.min(addressable, cohortSubscribers);
+  const resolvedAddressable = worldForecast?.reachableHouseholds ?? addressable;
+  const subscribers = worldForecast?.subscribers ?? Math.min(addressable, cohortSubscribers);
 
   /* A service with advertising also reaches households that never pay. */
   const freeHouseholds = on('ads')
     ? Math.min(
-      Math.max(0, addressable - subscribers),
-      addressable * market.reachRate * (plans.length > 0 ? 0.6 : FREE_REACH_BONUS),
+      Math.max(0, resolvedAddressable - subscribers),
+      resolvedAddressable * market.reachRate * (plans.length > 0 ? 0.6 : FREE_REACH_BONUS),
     )
     : 0;
   const households = subscribers + freeHouseholds;
@@ -832,6 +842,14 @@ export function forecastPricing(
   const pull = plans.map((plan) => ({ plan, weight: planAppeal(plan) / Math.max(1, plan.monthly) ** 0.9 }));
   const totalPull = pull.reduce((sum, p) => sum + p.weight, 0) || 1;
   const planRows: PlanForecast[] = pull.map(({ plan, weight }) => {
+    const worldRow = worldForecast?.planAllocations.find(row => row.planId === plan.id);
+    if (worldRow) return {
+      plan,
+      share: subscribers > 0 ? worldRow.households / subscribers * 100 : 0,
+      subscribers: worldRow.households,
+      revenuePerSubscriber: worldRow.households > 0 ? worldRow.monthlySubscriptionRevenue / worldRow.households : 0,
+      monthly: worldRow.monthlySubscriptionRevenue,
+    };
     const share = (weight / totalPull) * 100;
     const rawCohortSubscribers = cohortPlanSubscribers.get(plan.id);
     const cohortTotal = Array.from(cohortPlanSubscribers.values()).reduce((sum, value) => sum + value, 0);
@@ -853,91 +871,64 @@ export function forecastPricing(
       basis: `${plans.length} plan${plans.length === 1 ? '' : 's'} from ${entryPrice > 0 ? `$${entryPrice}` : 'free'}`,
     });
   }
-
-  if (on('ads')) {
-    /* Every household that sees adverts: the free ones, plus anyone on a plan
-       that carries them. */
-    const adHouseholds = freeHouseholds
-      + planRows.filter((r) => r.plan.ads).reduce((sum, r) => sum + r.subscribers, 0);
-    const spots = HOURS_PER_MONTH * settings.ads.minutesPerHour * AD_SPOTS_PER_MINUTE;
-    streams.push({
-      id: 'ads',
-      name: 'Advertising',
-      monthly: adHouseholds * spots * (settings.ads.cpm / 1000),
-      basis: `${settings.ads.minutesPerHour} min an hour at $${settings.ads.cpm} CPM`,
-    });
-  }
-
-  if (on('rentals')) {
-    streams.push({
-      id: 'rentals',
-      name: 'Rentals & purchases',
-      monthly: households * (RENTER_SHARE * settings.rentals.rent * RENT_PER_MONTH + BUYER_SHARE * settings.rentals.buy * 0.15),
-      basis: `$${settings.rentals.rent} to rent · $${settings.rentals.buy} to own`,
-    });
-  }
-
-  if (on('premium')) {
-    streams.push({
-      id: 'premium',
-      name: 'Premium access',
-      monthly: households * PREMIUM_SHARE * settings.premium.price * PREMIUM_PER_QUARTER,
-      basis: `$${settings.premium.price} a premiere`,
-    });
-  }
-
-  if (on('daypass')) {
-    streams.push({
-      id: 'daypass',
-      name: 'Day passes',
-      monthly: addressable * market.reachRate * DAYPASS_SHARE * settings.daypass.price * DAYPASS_PER_MONTH,
-      basis: `$${settings.daypass.price} for 24 hours`,
-    });
-  }
-
-  if (on('sponsor')) {
-    streams.push({
-      id: 'sponsor',
-      name: 'Sponsored titles',
-      monthly: (settings.sponsor.perTitle * settings.sponsor.titles) / 12,
-      basis: `${settings.sponsor.titles} titles at ${Math.round(settings.sponsor.perTitle / 1_000_000)}M`,
-    });
-  }
-
-  if (on('metered')) {
-    const meteredHouseholds = addressable * market.reachRate * 0.22;
-    streams.push({
-      id: 'metered',
-      name: 'Pay by the hour',
-      monthly: meteredHouseholds * METERED_HOURS * settings.metered.perHour,
-      basis: `$${settings.metered.perHour} an hour · about ${METERED_HOURS} hours a household`,
-    });
-  }
-
-  if (on('patron')) {
-    streams.push({
-      id: 'patron',
-      name: 'Fund the show',
-      monthly: households * PATRON_SHARE * settings.patron.monthly,
-      basis: `$${settings.patron.monthly} a month from ${Math.round(PATRON_SHARE * 100)}% of households`,
-    });
-  }
+  const adHouseholds = freeHouseholds
+    + planRows.filter((row) => row.plan.ads).reduce((sum, row) => sum + row.subscribers, 0);
+  const projectedViewingAccounts = Math.max(0, Math.round(Math.max(households, resolvedAddressable * market.reachRate * .18) * .62));
+  const projectedPaidViewingAccounts = Math.max(0, Math.round(subscribers * .62));
+  const projectedNonSubscriberOpportunity = Math.max(0, Math.round(resolvedAddressable - subscribers));
+  const commercial = calculateWorldStreamingCommercialRevenue({
+    pricing: {
+      ...settings,
+      sponsor: {
+        ...settings.sponsor,
+        perTitle: settings.sponsor.perTitle * Math.max(0, settings.sponsor.titles),
+      },
+    },
+    paidViewingAccounts: projectedPaidViewingAccounts,
+    viewingAccounts: projectedViewingAccounts,
+    nonSubscriberOpportunityAccounts: projectedNonSubscriberOpportunity,
+    hoursViewed: projectedViewingAccounts * HOURS_PER_MONTH / 4.33,
+    adEligibleHours: adHouseholds * HOURS_PER_MONTH / 4.33,
+    estimatedViewers: projectedViewingAccounts * 1.45,
+    completionRate: .68,
+    repeatViewingRate: .1,
+    isFreshMovie: true,
+    isRentalEligible: true,
+    isSponsorEligible: settings.sponsor.titles > 0,
+    commerceCapabilityIndex: 55,
+    reputationIndex: 55,
+  });
+  const commercialMonth = 4.33;
+  if (on('ads')) streams.push({ id: 'ads', name: 'Advertising', monthly: commercial.advertisingRevenue * commercialMonth, basis: `${settings.ads.minutesPerHour} min an hour at $${settings.ads.cpm} CPM` });
+  if (on('rentals')) streams.push({ id: 'rentals', name: 'Rentals & purchases', monthly: (commercial.rentalRevenue + commercial.purchaseRevenue) * commercialMonth, basis: `$${settings.rentals.rent} to rent · $${settings.rentals.buy} to own` });
+  if (on('premium')) streams.push({ id: 'premium', name: 'Premium access', monthly: commercial.premiumRevenue * commercialMonth, basis: `$${settings.premium.price} a premiere` });
+  if (on('daypass')) streams.push({ id: 'daypass', name: 'Day passes', monthly: commercial.dayPassRevenue * commercialMonth, basis: `$${settings.daypass.price} for 24 hours` });
+  if (on('sponsor')) streams.push({ id: 'sponsor', name: 'Sponsored titles', monthly: commercial.sponsorshipRevenue * commercialMonth, basis: `${settings.sponsor.titles} titles at ${Math.round(settings.sponsor.perTitle / 1_000_000)}M` });
+  if (on('metered')) streams.push({ id: 'metered', name: 'Pay by the hour', monthly: commercial.meteredRevenue * commercialMonth, basis: `$${settings.metered.perHour} an hour` });
+  if (on('patron')) streams.push({ id: 'patron', name: 'Fund the show', monthly: commercial.patronRevenue * commercialMonth, basis: `$${settings.patron.monthly} a month per patron` });
 
   const monthlyRevenue = streams.reduce((sum, stream) => sum + stream.monthly, 0);
+  const subscriptionMonthlyRevenue = streams.find(stream => stream.id === 'subs')?.monthly || 0;
+  const yearlyRevenue = worldForecast
+    ? worldForecast.firstYearSubscriptionRevenue + (monthlyRevenue - subscriptionMonthlyRevenue) * 12
+    : monthlyRevenue * 12;
+  const resolvedRivalPrice = worldForecast?.rivalMedianEntryPrice || market.rivalAveragePrice;
 
   return {
-    addressable,
+    addressable: resolvedAddressable,
     subscribers,
     households,
     plans: planRows,
     streams,
     monthlyRevenue,
-    yearlyRevenue: monthlyRevenue * 12,
+    yearlyRevenue,
     conservativeMonthlyRevenue: monthlyRevenue * 0.7,
     breakoutMonthlyRevenue: monthlyRevenue * 1.45,
     perHousehold: households > 0 ? monthlyRevenue / households : 0,
     entryPrice,
-    position: positionOf(settings, entryPrice, market.rivalAveragePrice),
+    position: positionOf(settings, entryPrice, resolvedRivalPrice),
+    activeRivalCount: worldForecast?.activeRivalCount,
+    rivalMedianEntryPrice: worldForecast?.rivalMedianEntryPrice,
   };
 }
 

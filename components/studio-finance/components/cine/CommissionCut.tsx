@@ -14,6 +14,7 @@ import { getProductionLocation } from '../../../../services/productionLocations'
 import {
   InteractiveRegionMap,
   type RegionMapLocationPin,
+  type RegionMapLocationRoute,
 } from '../../../../views/lifestyle/business/components/InteractiveRegionMap';
 import type { Beat } from './Cutscene';
 import { Worker } from './Scenery';
@@ -23,6 +24,7 @@ export function commissionBeats(
   plan: MoneyPlan,
   cities: City[],
   company: string,
+  signatoryName = company,
 ): Beat[] {
   const commissionNow = plan.commissionNow ?? plan.total;
   return [
@@ -30,7 +32,7 @@ export function commissionBeats(
       id: 'sign', mark: '01', ms: 4000,
       title: 'You sign it',
       line: 'Sixty months of floor space, in your name, on paper a court would read back to you.',
-      scene: <Contract company={company} totals={totals} total={commissionNow} />,
+      scene: <Contract company={company} signatoryName={signatoryName} totals={totals} total={commissionNow} />,
     },
     {
       id: 'wire', mark: '02', ms: 3600,
@@ -40,8 +42,8 @@ export function commissionBeats(
     },
     {
       id: 'site', mark: '03', ms: 4200,
-      title: 'The site goes up',
-      line: 'Hoardings at dawn, a tower crane by Thursday, a delivery slot every ninety minutes.',
+      title: 'Construction begins',
+      line: `${totals.weeks} ${totals.weeks === 1 ? 'week' : 'weeks'} to operational. Hoardings rise at dawn and the crews take the site.`,
       scene: <SiteScene cities={cities.length} weeks={totals.weeks} />,
     },
     {
@@ -69,7 +71,7 @@ export function commissionBeats(
    A desk under a lamp. Warm paper against the void is what makes this read as
    an object in a room and not another panel of the interface. */
 
-function Contract({ company, totals, total }: { company: string; totals: BuildTotals; total: number }) {
+function Contract({ company, signatoryName, totals, total }: { company: string; signatoryName: string; totals: BuildTotals; total: number }) {
   return (
     <div className="cs-scene cs-desk">
       <span className="cs-lamp" aria-hidden="true" />
@@ -95,18 +97,7 @@ function Contract({ company, totals, total }: { company: string; totals: BuildTo
           </p>
 
           <div className="cs-signblock">
-            <svg viewBox="0 0 210 56" className="cs-sig" aria-hidden="true">
-              <path
-                className="cs-sig-ink" pathLength={1}
-                d="M5 44C9 20 14 6 17 15s-3 26 3 27 9-18 13-29 9-7 7 5-2 24 4 23 12-16 17-27 10-6 8 6-1 24 5 23 15-14 23-25 12-5 10 8-1 24 6 22 20-16 30-26"
-                fill="none" stroke="#1a1712" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round"
-              />
-              <path
-                className="cs-sig-ink is-late" pathLength={1}
-                d="M62 40c22 8 48-6 72-12"
-                fill="none" stroke="#1a1712" strokeWidth="1.5" strokeLinecap="round"
-              />
-            </svg>
+            <span className="cs-signature-script">{signatoryName}</span>
             <span className="cs-sign-rule" />
             <span className="cs-sign-name">For and on behalf of {company}</span>
           </div>
@@ -565,22 +556,36 @@ function WorldWake({ cities }: { cities: City[] }) {
     const regionId = getProductionLocation(city.id)?.regionId;
     return regionId ? [regionId] : [];
   }))) as BoxOfficeRegionId[];
-  const locationPins: RegionMapLocationPin[] = cities.map(city => ({
-    id: city.id,
-    name: city.name,
-    x: city.plot.x,
-    y: city.plot.y,
-    longitude: city.coord.lng,
-    latitude: city.coord.lat,
-    selected: true,
-    regionId: getProductionLocation(city.id)?.regionId,
-  }));
+  const locationPins: RegionMapLocationPin[] = cities.map(city => {
+    const canonical = getProductionLocation(city.id);
+    return {
+      id: city.id,
+      name: city.name,
+      x: city.plot.x,
+      y: city.plot.y,
+      longitude: canonical?.longitude ?? city.coord.lng,
+      latitude: canonical?.latitude ?? city.coord.lat,
+      selected: true,
+      regionId: canonical?.regionId,
+      countryId: canonical?.countryId,
+      countryCode: canonical?.countryCode ?? city.code,
+      state: 'built',
+      built: true,
+    };
+  });
+  const hubId = cities[0]?.id;
+  const locationRoutes: RegionMapLocationRoute[] = hubId
+    ? cities.slice(1).map(city => ({ fromId: hubId, toId: city.id, animated: true, planned: false }))
+    : [];
 
   return (
     <div className="cs-scene cs-net cs-scout-net bw-game-map">
       <InteractiveRegionMap
         selectedRegionIds={selectedRegionIds}
         locationPins={locationPins}
+        locationRoutes={locationRoutes}
+        interaction="cinematic"
+        cinematic={{ durationMs: 3_600 }}
         visualTone="production"
         compact
         showPreview={false}

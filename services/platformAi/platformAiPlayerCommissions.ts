@@ -420,6 +420,7 @@ export const finalizePlatformAiPlayerCommissionGreenlight = (input: {
         producerStudioId: input.studioId as StudioId,
         commissioningPlatformId: offer.platformId,
         platformContentPlanId: offer.platformContentPlanId,
+        source: 'PLATFORM_COMMISSION',
         status: 'PRE_PRODUCTION',
         productionCalendar: { ...input.productionCalendar, startedAbsoluteWeek: input.absoluteWeek },
         budgetMillions: roundMillions(input.packageBudget / FULL_CURRENCY_PER_MILLION),

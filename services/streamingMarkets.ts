@@ -90,15 +90,20 @@ export const getStreamingMarketClearanceView = (operation: OwnedStreamingMarketO
     };
 };
 
-/** Selecting markets is free planning. A country can have only one live record, regardless of entry kind. */
+/** Selecting markets is free planning. An empty selection clears only mutable
+ * plans; filed or paid market operations remain as historical commitments. A
+ * country can have only one live record, regardless of entry kind. */
 export const saveStreamingMarketPlan = (player: Player, countryIds: string[], entryKind: StreamingMarketEntryKind = 'OPENING'): StreamingMarketMutationResult => {
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     if (!platform.identity || !platform.foundingProfile || platform.launchCommit && entryKind === 'OPENING') return { player, changed: false, reason: 'INVALID_STATE', shortfall: 0, amount: 0 };
     const unavailableCountries = new Set(platform.marketOperations
         .filter(operation => operation.entryKind !== entryKind && operation.countryId && operation.status !== 'EXITED')
         .map(operation => operation.countryId!));
-    const selected = normalizeStreamingDayOneMarketIds(countryIds).filter(countryId => !unavailableCountries.has(countryId));
-    if (!selected.length) return { player, changed: false, reason: 'NO_MARKETS', shortfall: 0, amount: 0 };
+    const requested = normalizeStreamingDayOneMarketIds(countryIds);
+    const selected = requested.filter(countryId => !unavailableCountries.has(countryId));
+    if (requested.length > 0 && selected.length === 0) {
+        return { player, changed: false, reason: 'NO_MARKETS', shortfall: 0, amount: 0 };
+    }
     const selectedSet = new Set(selected);
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
     const existingByCountry = new Map(platform.marketOperations.filter(operation => operation.scope === 'COUNTRY' && operation.countryId && operation.status !== 'EXITED').map(operation => [operation.countryId!, operation]));

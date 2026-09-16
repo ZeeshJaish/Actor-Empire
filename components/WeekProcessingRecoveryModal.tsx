@@ -6,6 +6,8 @@ interface WeekProcessingRecoveryModalProps {
     week: number;
     failedStage: string;
     detail: string;
+    failureCode?: string;
+    failures?: string[];
     isExporting: boolean;
     onRetry: () => void;
     onReturnToMenu: () => void;
@@ -17,6 +19,8 @@ export const WeekProcessingRecoveryModal: React.FC<WeekProcessingRecoveryModalPr
     week,
     failedStage,
     detail,
+    failureCode = 'WEEK_PROCESSING_FAILED',
+    failures = ['Week processing stopped unexpectedly.'],
     isExporting,
     onRetry,
     onReturnToMenu,
@@ -51,6 +55,20 @@ export const WeekProcessingRecoveryModal: React.FC<WeekProcessingRecoveryModalPr
                     <div className="text-[10px] font-black uppercase tracking-[0.18em] text-zinc-500">Stopped while</div>
                     <div className="mt-1 text-sm font-black text-white">{failedStage}</div>
                     <div className="mt-2 text-xs font-semibold leading-relaxed text-zinc-500">{detail}</div>
+                    <div className="mt-4 rounded-2xl border border-white/10 bg-black/25 p-3">
+                        <div className="flex items-center justify-between gap-3">
+                            <span className="text-[9px] font-black uppercase tracking-[0.16em] text-zinc-500">Failure code</span>
+                            <code className="break-all text-right text-[10px] font-bold text-amber-300">{failureCode}</code>
+                        </div>
+                        <ul className="mt-2 space-y-1.5" aria-label="Failure details">
+                            {failures.map((failure, index) => (
+                                <li key={`${failureCode}-${index}`} className="flex gap-2 text-[11px] font-semibold leading-relaxed text-zinc-300">
+                                    <span aria-hidden="true" className="mt-[0.42rem] h-1 w-1 shrink-0 rounded-full bg-amber-300" />
+                                    <span>{failure}</span>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
                     <div className="mt-3 text-[10px] font-black uppercase tracking-[0.16em] text-zinc-600">Age {age} • Week {week}</div>
                 </div>
 

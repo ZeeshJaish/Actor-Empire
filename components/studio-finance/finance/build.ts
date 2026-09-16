@@ -1,3 +1,11 @@
+import type {
+  OwnedStreamingLaunchMarketingDraft,
+  StreamingLaunchMarketingChannelId,
+  StreamingLaunchMarketingForecastSnapshot,
+} from '../../../types';
+import type { StreamingLaunchMarketingRecommendations } from '../../../services/streamingLaunchMarketing';
+import { money as formatMoney } from './format';
+
 /* ============================================================================
    BUILD THE PLATFORM — data contract and rules
 
@@ -89,11 +97,15 @@ export interface City {
 
 export type Availability = 'AVAILABLE' | 'LIMITED' | 'RESEARCH';
 
+import type { StreamingFacilityType } from '../../../types';
+
 export interface FacilityListing {
   id: string;
   cityId: string;
   provider: string;
   name: string;
+  /** Canonical marketplace contract type; old fixtures may omit it. */
+  facilityType?: StreamingFacilityType;
   type: string;
   description: string;
   rackPositions: number;
@@ -110,6 +122,19 @@ export interface FacilityListing {
   expansion: number;
   note: string;
   availability: Availability;
+  /** Canonical engineering envelope quoted by the facility contract service.
+      Optional only for legacy fixtures and saves. */
+  engineering?: {
+    powerContractKw: number;
+    backupPowerKw: number;
+    backupPowerMode: string;
+    coolingCapacityKw: number;
+    coolingMode: string;
+    committedBandwidthMbps: number;
+    burstBandwidthMbps: number;
+    securityRiskReductionPercent: number;
+    securityRecoveryImprovementPercent: number;
+  };
 }
 
 export type Duty = 'ORIGIN' | 'REGIONAL' | 'EDGE' | 'ENCODE' | 'SERVICES' | 'LIVE' | 'FUTURE';
@@ -118,14 +143,14 @@ export type Duty = 'ORIGIN' | 'REGIONAL' | 'EDGE' | 'ENCODE' | 'SERVICES' | 'LIV
    would call it. The plain name leads everywhere in the UI — a player should
    never have to learn the word "origin" to understand that this is where the
    library lives. */
-export const DUTIES: Record<Duty, { name: string; tech: string; line: string; locked?: boolean }> = {
-  ORIGIN: { name: 'Main library', tech: 'Content origin', line: 'Holds every title and makes the master stream the rest of the network copies.' },
-  REGIONAL: { name: 'Region relay', tech: 'Regional cache', line: 'Copies the library closer to a whole region and takes load off the library.' },
-  EDGE: { name: 'Fast cache', tech: 'Local edge', line: 'Keeps the popular titles beside local viewers so playback starts instantly.' },
-  ENCODE: { name: 'Video workshop', tech: 'Encoding', line: 'Makes the phone, tablet and television versions of every title.' },
-  SERVICES: { name: 'Accounts & payments', tech: 'Platform services', line: 'Sign-in, profiles, search, billing, recommendations, parental controls.' },
-  LIVE: { name: 'Premiere surge', tech: 'Live-event delivery', line: 'Machines held back for premieres, sport and anything watched live.' },
-  FUTURE: { name: 'Research bay', tech: 'Future workload', line: 'Reserved for delivery technology you have not researched yet.', locked: true },
+export const DUTIES: Record<Duty, { name: string; tech: string; shortLine: string; line: string; locked?: boolean }> = {
+  ORIGIN: { name: 'Main library', tech: 'Content origin', shortLine: 'Stores masters for the network.', line: 'Holds every title and makes the master stream the rest of the network copies.' },
+  REGIONAL: { name: 'Region relay', tech: 'Regional cache', shortLine: 'Moves the library closer to a region.', line: 'Copies the library closer to a whole region and takes load off the library.' },
+  EDGE: { name: 'Fast cache', tech: 'Local edge', shortLine: 'Keeps popular titles close to viewers.', line: 'Keeps the popular titles beside local viewers so playback starts instantly.' },
+  ENCODE: { name: 'Video workshop', tech: 'Encoding', shortLine: 'Makes versions for every screen.', line: 'Makes the phone, tablet and television versions of every title.' },
+  SERVICES: { name: 'Accounts & payments', tech: 'Platform services', shortLine: 'Runs profiles, billing and discovery.', line: 'Sign-in, profiles, search, billing, recommendations, parental controls.' },
+  LIVE: { name: 'Premiere surge', tech: 'Live-event delivery', shortLine: 'Reserves capacity for live peaks.', line: 'Machines held back for premieres, sport and anything watched live.' },
+  FUTURE: { name: 'Research bay', tech: 'Future workload', shortLine: 'Reserved for future delivery technology.', line: 'Reserved for delivery technology you have not researched yet.', locked: true },
 };
 
 export interface RackGroup {
@@ -313,8 +338,12 @@ export interface RehearsalResult {
 /* --- the whole thing ------------------------------------------------------------- */
 
 export interface BuildData {
-  company: { name: string; week: number; brandHex?: string; logoSrc?: string };
+  company: { name: string; week: number; brandHex?: string; logoSrc?: string; signatoryName?: string };
   treasury: { available: number; committedLaunch: number };
+  /** True only when the player explicitly confirmed at least one Day-One market. */
+  hasExplicitOpeningMarkets?: boolean;
+  /** Canonical concurrent-stream demand from the World Economy bridge. */
+  openingDemand?: { low: number; likely: number; high: number };
   markets: BuildMarket[];
   regions: Region[];
   countries: Country[];
@@ -322,6 +351,18 @@ export interface BuildData {
   listings: FacilityListing[];
   presets: NetworkPreset[];
   campaigns: Campaign[];
+  marketing?: {
+    draft: OwnedStreamingLaunchMarketingDraft;
+    recommendations: StreamingLaunchMarketingRecommendations;
+    forecast: StreamingLaunchMarketingForecastSnapshot;
+    channels: Array<{
+      id: StreamingLaunchMarketingChannelId;
+      label: string;
+      line: string;
+      available: boolean;
+      reason?: string;
+    }>;
+  };
   /** Everything Define the Launch already committed the company to. */
   spend: SpendLine[];
   defineLaunchChecks?: Array<{
@@ -344,12 +385,18 @@ export interface BuildData {
   /** Facilities that already exist, if the player has built before. */
   existing: Facility[];
   commissioned: boolean;
+  /** Canonical game-week window for a commissioned network that is still being built. */
+  construction?: { committedAtWeek: number; readyAtWeek: number };
   /**
    * Actor Empire supplies these derivations from its canonical infrastructure
    * services. The ZIP demo deliberately omits the bridge and uses the local
    * fallback rules below.
    */
   canonical?: {
+    /** Canonical room projections for the current drawing. The Plans stage
+        consumes these so every visible meter agrees with commissioning and
+        rehearsal instead of maintaining a second approximation. */
+    facilities?: (draft: BuildDraft) => Facility[];
     totals: (draft: BuildDraft) => BuildTotals;
     money: (draft: BuildDraft) => MoneyPlan;
     services: (draft: BuildDraft) => CountryService[];
@@ -373,6 +420,10 @@ export interface BuildDraft {
   repairIds: string[];
   rehearsal: RehearsalResult | null;
   override: boolean;
+  /** The team owns editing after its proposal is approved; commissioning remains player-only. */
+  teamPlanApproved?: boolean;
+  /** Capability label earned by the approved proposal. It is descriptive, not a pricing tier. */
+  teamPlanClass?: 'STARTER' | 'ESSENTIAL' | 'GROWTH' | 'PREMIERE';
 }
 
 export interface BuildHandlers {
@@ -380,9 +431,12 @@ export interface BuildHandlers {
   onOpenStudioFinance?: () => void;
   onEditPricing?: () => void;
   onOpenDefine?: (step: import('../../../types').StreamingDefineLaunchStepId) => void;
+  onOpenLaunchBudget?: () => void;
   onOpenRehearsal?: (draft: BuildDraft) => void;
+  onValidateCommission?: (draft: BuildDraft) => { ok: boolean; message: string } | void;
   onCommission?: (draft: BuildDraft) => { ok: boolean; message: string } | void;
   onOpeningNight?: () => void;
+  onChangeMarketing?: (patch: Partial<OwnedStreamingLaunchMarketingDraft>) => void;
 }
 
 /* --- derivations ------------------------------------------------------------------ */
@@ -403,6 +457,132 @@ export function facilityRacks(facility: Facility): number {
   return facility.groups.reduce((sum, g) => sum + g.racks, 0);
 }
 
+export interface CityTemplateCopyResult {
+  facilities: Facility[];
+  destinationCities: number;
+  affectedRooms: number;
+  reducedRooms: number;
+  requestedRacks: number;
+  copiedRacks: number;
+}
+
+/** Fits a rack-duty drawing inside a physical room without inventing space.
+    Existing duties are retained where the room has enough positions, and each
+    retained group's per-rack capacity stays unchanged. */
+export function fitRackGroupsToLimit(groups: RackGroup[], rackLimit: number): RackGroup[] {
+  const active = groups.filter(group => group.racks > 0);
+  const requested = active.reduce((sum, group) => sum + group.racks, 0);
+  const target = Math.max(0, Math.min(requested, Math.floor(rackLimit)));
+  if (target === 0 || active.length === 0) return [];
+
+  let allocations: number[];
+  if (target >= requested) {
+    allocations = active.map(group => group.racks);
+  } else if (target < active.length) {
+    const retained = new Set(active
+      .map((group, index) => ({ index, racks: group.racks, critical: group.duty === 'ORIGIN' }))
+      .sort((left, right) => Number(right.critical) - Number(left.critical)
+        || right.racks - left.racks
+        || left.index - right.index)
+      .slice(0, target)
+      .map(item => item.index));
+    allocations = active.map((_, index) => retained.has(index) ? 1 : 0);
+  } else {
+    const remaining = target - active.length;
+    const shares = active.map((group, index) => {
+      const exact = remaining * (group.racks / requested);
+      return { index, floor: Math.floor(exact), remainder: exact - Math.floor(exact) };
+    });
+    allocations = shares.map(item => item.floor + 1);
+    let unassigned = target - allocations.reduce((sum, racks) => sum + racks, 0);
+    shares
+      .slice()
+      .sort((left, right) => right.remainder - left.remainder || left.index - right.index)
+      .forEach(item => {
+        if (unassigned <= 0) return;
+        allocations[item.index] += 1;
+        unassigned -= 1;
+      });
+  }
+
+  return active.flatMap((group, index) => {
+    const racks = allocations[index] ?? 0;
+    if (racks <= 0) return [];
+    const capacityPerRack = group.capacity / Math.max(1, group.racks);
+    return [{
+      ...group,
+      racks,
+      capacity: Math.round(capacityPerRack * racks),
+    }];
+  });
+}
+
+function fitTemplateGroups(groups: RackGroup[], destinationId: string, rackLimit: number): RackGroup[] {
+  return fitRackGroupsToLimit(groups, rackLimit).map((group, index) => ({
+    ...group,
+    id: `${destinationId}:template:${index}:${group.duty}`,
+  }));
+}
+
+/** Copies a city's rack layout into rooms that already exist elsewhere.
+    Physical leases and economics stay local; only rack groups and duties move. */
+export function copyCityTemplateToNetwork(
+  data: BuildData,
+  draft: BuildDraft,
+  sourceCityId: string,
+): CityTemplateCopyResult {
+  const sourceFacilities = draft.facilities.filter(facility => facility.cityId === sourceCityId);
+  const destinations = draft.facilities.filter(facility => facility.cityId !== sourceCityId);
+  if (sourceFacilities.length === 0 || destinations.length === 0) {
+    return {
+      facilities: draft.facilities,
+      destinationCities: 0,
+      affectedRooms: 0,
+      reducedRooms: 0,
+      requestedRacks: 0,
+      copiedRacks: 0,
+    };
+  }
+
+  const listingKey = (facility: Facility): string => {
+    const listing = listingFor(data, facility);
+    return listing?.facilityType ?? listing?.type ?? facility.listingId;
+  };
+  const roomLimit = (facility: Facility): number => (
+    listingFor(data, facility)?.rackPositions ?? facilityRacks(facility)
+  );
+  const sourceOrder = new Map(sourceFacilities.map((facility, index) => [facility.id, index]));
+  let reducedRooms = 0;
+  let requestedRacks = 0;
+  let copiedRacks = 0;
+
+  const copiedById = new Map(destinations.map(destination => {
+    const exactType = sourceFacilities.filter(source => listingKey(source) === listingKey(destination));
+    const candidates = exactType.length > 0 ? exactType : sourceFacilities;
+    const destinationLimit = roomLimit(destination);
+    const source = candidates.slice().sort((left, right) => (
+      Math.abs(roomLimit(left) - destinationLimit) - Math.abs(roomLimit(right) - destinationLimit)
+      || (sourceOrder.get(left.id) ?? 0) - (sourceOrder.get(right.id) ?? 0)
+    ))[0];
+    const wanted = facilityRacks(source);
+    const groups = fitTemplateGroups(source.groups, destination.id, destinationLimit);
+    const copied = groups.reduce((sum, group) => sum + group.racks, 0);
+    requestedRacks += wanted;
+    copiedRacks += copied;
+    if (copied < wanted) reducedRooms += 1;
+    return [destination.id, { ...destination, groups }] as const;
+  }));
+
+  return {
+    facilities: draft.facilities.map(facility => copiedById.get(facility.id) ?? facility),
+    destinationCities: new Set(destinations.map(facility => facility.cityId)).size,
+    affectedRooms: destinations.length,
+    reducedRooms,
+    requestedRacks,
+    copiedRacks,
+  };
+}
+
 export function listingFor(data: BuildData, facility: Facility): FacilityListing | undefined {
   return data.listings.find((l) => l.id === facility.listingId);
 }
@@ -411,11 +591,55 @@ export function cityFor(data: BuildData, facility: Facility): City | undefined {
   return data.cities.find((c) => c.id === facility.cityId);
 }
 
-/** What is stopping this room from carrying another rack. */
+/** Repeated leases remain separate physical rooms, but Sites presents contracts
+    from the same marketplace listing as one readable stack. */
+export interface FacilityLeaseGroup {
+  listingId: string;
+  listing?: FacilityListing;
+  facilities: Facility[];
+  count: number;
+  racks: number;
+  weeklyRent: number;
+}
+
+export function groupFacilityLeases(data: BuildData, facilities: Facility[]): FacilityLeaseGroup[] {
+  const groups = new Map<string, FacilityLeaseGroup>();
+  facilities.forEach((facility) => {
+    const listing = listingFor(data, facility);
+    const current = groups.get(facility.listingId);
+    if (current) {
+      current.facilities.push(facility);
+      current.count += 1;
+      current.racks += facilityRacks(facility);
+      current.weeklyRent += listing?.weeklyRent ?? 0;
+      return;
+    }
+    groups.set(facility.listingId, {
+      listingId: facility.listingId,
+      listing,
+      facilities: [facility],
+      count: 1,
+      racks: facilityRacks(facility),
+      weeklyRent: listing?.weeklyRent ?? 0,
+    });
+  });
+  return Array.from(groups.values());
+}
+
+/** A stable human label for one physical room inside a repeated lease stack. */
+export function facilityRoomLabel(data: BuildData, facilities: Facility[], facility: Facility): string {
+  const peers = facilities.filter((candidate) => candidate.listingId === facility.listingId);
+  const ordinal = Math.max(0, peers.findIndex((candidate) => candidate.id === facility.id)) + 1;
+  const city = cityFor(data, facility)?.name ?? 'Facility';
+  return `${city} · Room ${String(ordinal).padStart(2, '0')}`;
+}
+
+/** What prevents this room from running the rack drawing. A room using every
+    valid floor position is full, not broken; only overflow is a constraint. */
 export function limitingFactor(data: BuildData, facility: Facility): Limiting {
   const listing = listingFor(data, facility);
   const racks = facilityRacks(facility);
-  if (listing && racks >= listing.rackPositions) return 'RACK';
+  if (listing && racks > listing.rackPositions) return 'RACK';
   if (facility.power.used >= facility.power.contracted) return 'POWER';
   if (facility.cooling.used >= facility.cooling.available) return 'COOLING';
   if (facility.bandwidth.used >= facility.bandwidth.available) return 'BANDWIDTH';
@@ -464,8 +688,6 @@ export function architectureFor(share: number): Architecture {
   if (share >= 0.9) return 'METAL';
   return 'HYBRID';
 }
-const DOCTRINE_COST: Record<Doctrine, number> = { HARDENED: 1.12, STANDARD: 1, SPRINT: 1.22 };
-const DOCTRINE_WEEKS: Record<Doctrine, number> = { HARDENED: 1.4, STANDARD: 1, SPRINT: 0.65 };
 const RACK_COST = 3_750_000;   // one rack, delivered and racked
 
 export interface BuildTotals {
@@ -500,16 +722,19 @@ export function buildTotals(data: BuildData, draft: BuildDraft): BuildTotals {
   const burst = capacity * burstFactor(share);
 
   const longest = Math.max(0, ...draft.facilities.map((f) => listingFor(data, f)?.provisioningWeeks ?? 0));
-  const weeks = Math.round((longest + racks * 0.45) * DOCTRINE_WEEKS[draft.doctrine]);
+  const extraRooms = Math.max(0, draft.facilities.length - cities);
+  const weeks = Math.max(4, Math.min(15, Math.ceil(
+    2 + longest * .35 + racks * .28 + Math.max(0, cities - 1) * .7 + extraRooms * .18,
+  )));
 
   return {
     racks,
     cities,
     capacity: Math.round(capacity),
     burst: Math.round(burst),
-    buildCost: Math.round((racks * RACK_COST * buildCostFactor(share) + moveIn) * DOCTRINE_COST[draft.doctrine] + repairs),
+    buildCost: Math.round(racks * RACK_COST * buildCostFactor(share) + moveIn + repairs),
     weeklyCost: Math.round((rent + ops) * weeklyFactor(share)),
-    weeks: Math.max(1, weeks),
+    weeks,
     energy: draft.facilities.reduce((sum, f) => sum + f.energyPerWeek, 0),
     water: draft.facilities.reduce((sum, f) => sum + f.waterPerWeek, 0),
     sustainability: average(draft.facilities.map((f) => f.sustainability)),
@@ -535,6 +760,22 @@ export interface MoneyPlan {
   available: number;
   headroom: number;
   shortfall: number;
+}
+
+/** The Build shell represents infrastructure. Deferred opening-night spend is
+ * still preserved in the complete Money-stage plan, but it must not inflate
+ * the persistent "This build" rail or the Build budget sheet. */
+export function infrastructureMoneyPlan(plan: MoneyPlan): MoneyPlan {
+  if (plan.commissionNow === undefined) return plan;
+  const total = Math.max(0, plan.commissionNow);
+  return {
+    ...plan,
+    lines: plan.lines.filter(line => line.timing !== 'OPENING_NIGHT'),
+    total,
+    deferred: 0,
+    headroom: Math.max(0, plan.available - total),
+    shortfall: Math.max(0, total - plan.available),
+  };
 }
 
 export function moneyPlan(data: BuildData, draft: BuildDraft): MoneyPlan {
@@ -563,7 +804,7 @@ export function moneyPlan(data: BuildData, draft: BuildDraft): MoneyPlan {
 }
 
 function formatWeekly(value: number): string {
-  return value >= 1_000_000 ? `$${(value / 1_000_000).toFixed(1)}M` : `$${Math.round(value / 1000)}K`;
+  return formatMoney(value);
 }
 
 /* --- who gets served -------------------------------------------------------------- */
@@ -609,7 +850,7 @@ export function serviceForecast(data: BuildData, draft: BuildDraft): CountryServ
     const load = headroom > 0 ? peak / headroom : 99;
 
     const startupMs = Math.round(320 + nearest.km * 0.06 + (hasEdge ? 0 : 260) + (draft.architecture === 'CLOUD' ? 90 : 0));
-    const buffering = Math.round(Math.max(0, (load - 0.75) * 120) + (hasEdge ? 0 : 4) + (draft.doctrine === 'SPRINT' ? 3 : 0));
+    const buffering = Math.round(Math.max(0, (load - 0.75) * 120) + (hasEdge ? 0 : 4));
 
     let state: ServiceState = 'READY';
     if (load > 1.25) state = 'UNSTABLE';
@@ -721,7 +962,29 @@ export function signatureOf(data: BuildData, draft: BuildDraft): string {
     .sort()
     .join('|');
   const demand = data.markets.map((m) => `${m.id}:${m.demand}`).join(',');
-  return [rooms, draft.architecture, String(draft.ownedShare ?? ''), draft.doctrine, draft.campaignId, [...draft.repairIds].sort().join('+'), demand].join('/');
+  return [rooms, draft.architecture, String(draft.ownedShare ?? ''), draft.campaignId, [...draft.repairIds].sort().join('+'), demand].join('/');
+}
+
+export interface ConstructionProgress {
+  status: 'BUILDING' | 'OPERATIONAL';
+  totalWeeks: number;
+  elapsedWeeks: number;
+  remainingWeeks: number;
+  progressPercent: number;
+}
+
+/** One game-week clock powers Build, Define the Launch and Opening Night. */
+export function constructionProgress(currentWeek: number, committedAtWeek: number, readyAtWeek: number): ConstructionProgress {
+  const totalWeeks = Math.max(0, readyAtWeek - committedAtWeek);
+  const elapsedWeeks = Math.max(0, Math.min(totalWeeks, currentWeek - committedAtWeek));
+  const remainingWeeks = Math.max(0, readyAtWeek - currentWeek);
+  return {
+    status: remainingWeeks > 0 ? 'BUILDING' : 'OPERATIONAL',
+    totalWeeks,
+    elapsedWeeks,
+    remainingWeeks,
+    progressPercent: totalWeeks > 0 ? Math.round(elapsedWeeks / totalWeeks * 100) : 100,
+  };
 }
 
 export function rehearsalStale(data: BuildData, draft: BuildDraft): boolean {
@@ -835,16 +1098,23 @@ export function gates(data: BuildData, draft: BuildDraft): Gate[] {
 
   return [
     {
+      id: 'team-plan', stage: 'sites', label: 'Team plan',
+      value: draft.mode !== 'ASSISTED' ? 'Hands-On control'
+        : draft.teamPlanApproved ? `${draft.teamPlanClass || 'Approved'} · approved`
+          : 'Waiting for founder approval',
+      ok: draft.mode !== 'ASSISTED' || Boolean(draft.teamPlanApproved),
+    },
+    {
       id: 'network', stage: 'sites', label: 'Network',
       value: totals.racks > 0
-        ? `${totals.racks} ${totals.racks === 1 ? 'rack' : 'racks'} in ${totals.cities} ${totals.cities === 1 ? 'city' : 'cities'}`
+        ? `${totals.racks} ${totals.racks === 1 ? 'rack' : 'racks'} · ${totals.cities} ${totals.cities === 1 ? 'city' : 'cities'}`
         : 'No servers drawn',
       ok: totals.racks > 0,
     },
     {
       id: 'origin', stage: 'plans', label: 'Content origin',
       value: draft.facilities.some((f) => f.groups.some((g) => g.duty === 'ORIGIN'))
-        ? 'Master catalogue has a home'
+        ? 'Master catalogue ready'
         : 'Nothing holds the masters',
       ok: draft.facilities.some((f) => f.groups.some((g) => g.duty === 'ORIGIN')),
     },
@@ -864,7 +1134,7 @@ export function gates(data: BuildData, draft: BuildDraft): Gate[] {
         const constrained = draft.facilities.filter((f) => limitingFactor(data, f) !== 'NONE');
         if (draft.facilities.length === 0) return 'No rooms leased';
         return constrained.length === 0
-          ? 'Every room can run its racks'
+          ? 'All rooms within limits'
           : `${constrained.length} room${constrained.length > 1 ? 's' : ''} short of power, cooling or fibre`;
       })(),
       ok: draft.facilities.length > 0 && draft.facilities.every((f) => limitingFactor(data, f) === 'NONE'),

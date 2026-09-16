@@ -147,7 +147,7 @@ const audienceSource = readFileSync('components/streaming-transplant/StreamingAu
 const flagSource = readFileSync('components/studio-finance/components/FlagField.tsx', 'utf8');
 const flagAsset = readFileSync('public/assets/streaming/country-flags.svg', 'utf8');
 assert(wizardSource.includes('Government review') && wizardSource.includes('Country terms') && wizardSource.includes('SUBMIT REQUIREMENT'), 'The clearance wizard should show the living government-review experience and recovery action.');
-assert(launchExperienceSource.includes('saveStreamingMarketPlan(props.player, plannedCountryIds || countryIds') && launchExperienceSource.includes('beginStreamingMarketClearance(filingBase'), 'Filing from the transplanted wizard must save the visible footprint before starting government review.');
+assert(launchExperienceSource.includes('saveStreamingMarketPlan(currentPlayerRef.current, plannedCountryIds || countryIds') && launchExperienceSource.includes('beginStreamingMarketClearance(filingBase'), 'Filing from the transplanted wizard must save the visible footprint against the latest player state before starting government review.');
 assert(audienceSource.includes('Country portfolio') && audienceSource.includes('one living record per market') && audienceSource.includes('NEXT POLICY CYCLE'), 'Audience Markets should be the permanent country expansion headquarters.');
 assert(flagSource.includes("/assets/streaming/country-flags.svg") && flagSource.includes('FLAG_CELLS'), 'Every supported market should use the supplied country-flag kit through one shared renderer.');
 assert(flagAsset.startsWith('<svg') || flagAsset.includes('<svg'), 'The transplanted country-flag asset should remain a valid SVG document.');

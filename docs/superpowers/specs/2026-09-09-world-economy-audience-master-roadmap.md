@@ -2,8 +2,8 @@
 
 **Date:** 2026-09-09
 **Audience:** Actor Empire development and future implementation chats
-**Status:** WE1 through WE7 delivered; focused validation, 400-year annual-checkpoint validation, and production build green
-**Current next phase:** WE8 — Economy, History, Performance, and Save Safety
+**Status:** WE1 through WE8 delivered; focused validation, 400-year annual-checkpoint validation, mature-save performance, and production build green
+**Current phase:** WE1-WE8 complete; WE9 remains the future cinema and box-office adapter
 
 ## Purpose
 
@@ -243,11 +243,17 @@ Make the cohort world authoritative for both the player's service and all AI-con
 - newly generated platforms enter the world through the same interfaces;
 - existing Platform AI, rights, content-market, research, localization, and finance flows remain compatible.
 
-**Delivery status:** Complete. WE7 now derives player, core AI, regional, and generated-platform subscribers, households, joins, cancellations, sharing, piracy exposure, viewing, revenue, operating costs, and strategy signals from the same WE5/WE6 facts. The canonical result synchronizes into Platform AI, ecosystem/Forbes standings, acquisitions, market shares, and the shared intelligence adapter without creating rival player-style workflows. AI operating assistance remains explicit and applies only while AI-controlled; acquisition preserves the platform's audience/history and immediately restores standard player costs. Current and 52-week per-platform histories are bounded, save-migrated, deterministic after reload, and verified across a 400-year annual-checkpoint horizon. WE8 retains ownership of full performance budgets, broad shock/balance matrices, legacy-history policy, and final save-safety hardening.
+**Delivery status:** Complete. WE7 now derives player, core AI, regional, and generated-platform subscribers, households, joins, cancellations, sharing, piracy exposure, viewing, revenue, operating costs, and strategy signals from the same WE5/WE6 facts. The canonical result synchronizes into Platform AI, ecosystem/Forbes standings, acquisitions, market shares, and the shared intelligence adapter without creating rival player-style workflows. AI operating assistance remains explicit and applies only while AI-controlled; acquisition preserves the platform's audience/history and immediately restores standard player costs. Current and 52-week per-platform histories are bounded, save-migrated, deterministic after reload, and verified across a 400-year annual-checkpoint horizon. WE8 completed the performance, shock, history, explanation, and save-safety closure around this economy.
 
 ---
 
 # Phase WE8 — Economy, History, Performance, and Save Safety
+
+## Delivery status
+
+Complete. Runtime integrity, one-pass derived recovery, atomic candidate validation, deterministic WE replay, save-manifest protection, migration v47, bounded WE histories, 24 shock scenarios, material player explanations, and the 400-year annual-checkpoint engine soak are implemented and green.
+
+The extreme 25.85 MB mature-save release run completed at a 307.64 ms median p95 across three isolated processes, below the 350 ms desktop gate. It retained 6,055 rights contracts, 536 Platform AI plans, 179 world projects, and advanced all 20 measured weeks exactly once without mutating the prior player state. The complete 19-check WE8 release command passed with zero skipped checks. See `docs/superpowers/reports/2026-09-11-world-economy-we8-report.md` for evidence and limitations.
 
 ## Purpose
 
@@ -269,6 +275,8 @@ Make the world simulation balanced, explainable, and sustainable over many gener
 - saved history remains bounded without deleting material legacy records;
 - financial, audience, and population totals remain reconcilable;
 - casual play requires no cohort micromanagement.
+
+Current gate result: all correctness, product, save, long-horizon, and desktop performance gates pass. Physical-device evidence was intentionally not inferred from Node.
 
 ---
 
@@ -320,6 +328,7 @@ Advanced reports may reveal country, cohort, plan, participation, and title brea
 3. Implement WE3 and freeze the first industry-adapter interface.
 4. Connect streaming through WE4–WE7.
 5. Complete long-run balance and save hardening in WE8.
+6. Keep WE9 dormant until the cinema-chain and box-office project is approved.
 6. Preserve the WE9 interface until the cinema project begins, then implement it against the same canonical world.
 
 Each phase requires its own approved specification, implementation plan, focused audits, production build, save migration coverage where applicable, and a completion report before the next phase begins.

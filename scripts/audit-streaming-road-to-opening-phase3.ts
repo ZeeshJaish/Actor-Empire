@@ -62,7 +62,7 @@ assert(opening.budget.availableTreasury === 0 && opening.budget.shortfall === 0,
 assert(opening.warnings.some(warning => warning.id === 'launch-warning:unfunded'), 'The campaign must explain that planning is open while commitments are locked.');
 assert(!opening.milestones.find(item => item.id === 'PRICING')?.complete, 'A fresh company must not silently inherit a completed commercial offer.');
 
-const lockedStorefront = saveStreamingStorefrontPlan(incorporated, { storefrontLayoutId: 'concierge' });
+const lockedStorefront = saveStreamingStorefrontPlan(incorporated, { storefrontLayoutId: 'vertical-feed' });
 assert(!lockedStorefront.changed && lockedStorefront.reason === 'INVALID_STATE', 'Research-gated storefronts must not bypass Technology through a direct service call.');
 const baselineStorefront = saveStreamingStorefrontPlan(incorporated, { storefrontLayoutId: 'cinema' });
 assert(baselineStorefront.changed, 'A baseline editorial storefront must remain available to a zero-technology company.');

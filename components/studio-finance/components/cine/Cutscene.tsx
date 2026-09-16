@@ -6,12 +6,11 @@
    a list you scrolled. A list is a receipt. These are supposed to feel like
    something happened.
 
-   So: full screen, no chrome, one beat at a time. Each beat owns the whole
-   viewport, holds for its own length, and hands over. The player can tap to
-   push it along, or skip straight to the card at the end — nothing here is
-   load-bearing, the state change happens when the sequence completes either
-   way. Reduced motion turns every animation off and leaves the final frame
-   of each beat, which still reads.
+   So: full screen, one beat at a time. Each beat owns the whole viewport,
+   holds for its own length, and hands over. Commissioning can keep that
+   authored timing without progress or skip chrome; other moments can retain
+   interactive navigation. Reduced motion turns every animation off and leaves
+   the final frame of each beat, which still reads.
    ========================================================================== */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -20,7 +19,7 @@ import { brandVars } from '../../finance/brand';
 
 export interface Beat {
   id: string;
-  /** Two digits in the corner. Cheap, and it tells you how far in you are. */
+  /** Two digits beside the scene caption. */
   mark: string;
   title: string;
   line: string;
@@ -29,7 +28,7 @@ export interface Beat {
   scene: React.ReactNode;
 }
 
-export function Cutscene({ beats, finale, brandHex, onComplete, onClose, closeLabel = 'Continue', finaleTone = 'dark' }: {
+export function Cutscene({ beats, finale, brandHex, onComplete, onClose, closeLabel = 'Continue', finaleTone = 'dark', navigation = 'interactive' }: {
   beats: Beat[];
   finale: React.ReactNode;
   brandHex?: string;
@@ -39,14 +38,16 @@ export function Cutscene({ beats, finale, brandHex, onComplete, onClose, closeLa
   closeLabel?: string;
   /** 'paper' lets a finale be a printed object rather than another dark card. */
   finaleTone?: 'dark' | 'paper';
+  /** Timed sequences keep the authored pacing and remove progress/skip chrome. */
+  navigation?: 'interactive' | 'timed';
 }) {
   const [i, setI] = useState(0);
   const still = usePrefersStill();
   const brand = useMemo(() => brandVars(brandHex), [brandHex]);
   const ended = i >= beats.length;
 
-  /* The state change belongs to the sequence, not to the button at the end —
-     a player who skips has still commissioned the build. Fired once. */
+  /* The state change belongs to the sequence, not to the button at the end.
+     Fired once. */
   const fired = useRef(false);
   useEffect(() => {
     if (ended && !fired.current) { fired.current = true; onComplete?.(); }
@@ -75,26 +76,27 @@ export function Cutscene({ beats, finale, brandHex, onComplete, onClose, closeLa
 
       {!ended && (
         <>
-          {/* progress: one segment a beat, filling in real time */}
-          <div className="cine-rail" aria-hidden="true">
-            {beats.map((b, n) => (
-              <i
-                key={b.id}
-                className={n < i ? 'is-done' : n === i ? 'is-now' : undefined}
-                style={n === i ? { ['--hold' as string]: `${b.ms}ms` } : undefined}
+          {navigation === 'interactive' && (
+            <>
+              <div className="cine-rail" aria-hidden="true">
+                {beats.map((b, n) => (
+                  <i
+                    key={b.id}
+                    className={n < i ? 'is-done' : n === i ? 'is-now' : undefined}
+                    style={n === i ? { ['--hold' as string]: `${b.ms}ms` } : undefined}
+                  />
+                ))}
+              </div>
+
+              <button type="button" className="cine-skip" onClick={() => setI(beats.length)}>Skip</button>
+              <button
+                type="button"
+                className="cine-advance"
+                aria-label="Next"
+                onClick={() => setI((n) => n + 1)}
               />
-            ))}
-          </div>
-
-          <button type="button" className="cine-skip" onClick={() => setI(beats.length)}>Skip</button>
-
-          {/* tap anywhere to push it along — nobody should be held hostage */}
-          <button
-            type="button"
-            className="cine-advance"
-            aria-label="Next"
-            onClick={() => setI((n) => n + 1)}
-          />
+            </>
+          )}
 
           <div className="cine-stage" key={beat.id}>{beat.scene}</div>
 

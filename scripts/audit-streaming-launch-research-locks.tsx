@@ -3,13 +3,14 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 import { StepIdent } from '../components/studio-finance/components/launch/StepIdent';
+import { StepBlueprint } from '../components/studio-finance/components/launch/StepBlueprint';
 import { StepPricing } from '../components/studio-finance/components/launch/StepPricing';
 import { StepStorefront } from '../components/studio-finance/components/launch/StepStorefront';
 import type { StepProps } from '../components/studio-finance/components/launch/LaunchWizard';
 import type { LaunchData, LaunchDraft } from '../components/studio-finance/finance/launch';
 
-const pricing = {
-  streams: ['subs'] as const,
+const pricing: LaunchDraft['pricing'] = {
+  streams: ['subs'],
   plans: [{ id: 'opening', name: 'Opening', monthly: 9, featureIds: ['noads', 'catalogue'], ads: false }],
   annualDiscount: 10,
   introOffer: 0,
@@ -119,5 +120,43 @@ assert.match(
 const pricingMarkup = renderToStaticMarkup(<StepPricing {...props} />);
 assert.equal(lockCount(pricingMarkup), 1, 'Collapsed pricing keeps revenue-model research requirements visible without rendering every plan editor.');
 assert.match(visibleText(pricingMarkup), /Research locked.*Commerce level 20 or EMPIRE\+ Free/);
+
+const blueprintPlans = [
+  { id: 'essential', name: 'Essential', monthly: 8, featureIds: [], ads: false },
+  { id: 'standard', name: 'Standard', monthly: 13, featureIds: ['hd'], ads: false },
+  { id: 'premiere', name: 'Premiere', monthly: 18, featureIds: ['hd', 'downloads'], ads: false },
+];
+const blueprintMarkup = renderToStaticMarkup(
+  <StepBlueprint
+    {...props}
+    data={{
+      ...data,
+      company: {
+        ...data.company,
+        logoSrc: 'data:image/svg+xml,%3Csvg viewBox=%220 0 40 40%22%3E%3Cpath d=%22M20 2 38 20 20 38 2 20z%22/%3E%3C/svg%3E',
+      },
+    }}
+    draft={{
+      ...draft,
+      pricing: { ...pricing, plans: blueprintPlans },
+    }}
+    onJump={() => undefined}
+  />,
+);
+assert.match(
+  blueprintMarkup,
+  /class="bl-hero-mark"[^>]*><img[^>]+data:image\/svg\+xml/,
+  'The blueprint hero must render the exact custom platform mark used by the Identity step.',
+);
+assert.doesNotMatch(
+  blueprintMarkup,
+  /class="bl-hero-mark"[^>]*><i(?:\s|>)/,
+  'The blueprint hero must not replace the selected platform mark with a generic three-bar symbol.',
+);
+assert.match(
+  blueprintMarkup,
+  /class="bl-ladder"[^>]*style="--bl-plan-count:3"/,
+  'The household ladder must publish its real plan count so every price receives an equal layout slot.',
+);
 
 console.log('Streaming launch research-lock UX audit passed.');

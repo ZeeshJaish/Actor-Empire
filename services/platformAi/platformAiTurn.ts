@@ -37,6 +37,7 @@ import { getPlatformAiLocalizationRequirements } from './platformAiLocalizationC
 import { choosePlatformAiPremiere } from './platformAiReleaseReadiness';
 import { processPlatformAiRightsResaleWeek } from './platformAiRightsResale';
 import { executePlatformIntelligenceProposals } from './platformIntelligenceExecution';
+import { preparePlatformAiLaunchMarketingWeek } from './platformAiLaunchMarketing';
 
 const PLATFORM_TURN_ORDER: PlatformId[] = ['NETFLIX', 'APPLE_TV', 'DISNEY_PLUS', 'HULU', 'YOUTUBE'];
 const MAX_PREMIERE_SEARCH_WEEKS = 52;
@@ -516,12 +517,23 @@ export const processPlatformAiWorldTurn = (
         // only when its disclosed lead time has actually elapsed.
         nextWorld = ensureLocalizationJobs(player, nextWorld, platformId, absoluteWeek);
 
+        // Rival launch and expansion marketing uses the same country-aware
+        // forecast kernel as the player. Its scheduled instalment enters the
+        // existing discretionary-cost ledger exactly once per canonical week.
+        const marketing = preparePlatformAiLaunchMarketingWeek({
+            player: { ...player, world: nextWorld },
+            platform: nextWorld.platforms![platformId],
+            absoluteWeek,
+        });
+        nextWorld = updatePlatform(nextWorld, platformId, marketing.platform);
+
         const economyPlayer = { ...player, world: nextWorld };
         markCurrentPlatformCanonical(nextWorld, platformId, player.id, absoluteWeek);
         const economy = settlePlatformAiEconomy({
             player: economyPlayer,
             platform: nextWorld.platforms![platformId],
             absoluteWeek,
+            discretionaryCostMillions: marketing.discretionaryCostMillions,
         });
         nextWorld = updatePlatform(nextWorld, platformId, economy.platform);
         markCurrentPlatformCanonical(nextWorld, platformId, player.id, absoluteWeek);
@@ -626,6 +638,15 @@ export const processPlatformAiWorldTurn = (
         const presentation = presentationNews(platformId, platform, knownEventIds, absoluteWeek);
         news.push(...presentation.news);
         logs.push(...presentation.logs);
+    }
+
+    // Guarantee that every canonical object crossing the in-memory turn
+    // boundary keeps its trust marker, including platforms replaced by a
+    // late cross-platform distress or rights transfer.
+    for (const platformId of PLATFORM_TURN_ORDER) {
+        if (resolvePlatformController(player, platformId) !== 'PLAYER') {
+            markCurrentPlatformCanonical(nextWorld, platformId, player.id, absoluteWeek);
+        }
     }
 
     return { world: nextWorld, news, logs };

@@ -4,6 +4,7 @@ import type {
   Architecture,
   BuildData,
   BuildDraft,
+  BuildHandlers,
   BuildTotals,
   City as BuildCity,
   CountryService,
@@ -15,10 +16,12 @@ import type {
   Scenario,
 } from '../studio-finance/finance/build';
 import {
+  fitRackGroupsToLimit,
   signatureOf,
 } from '../studio-finance/finance/build';
 import type {
   OwnedStreamingFacility,
+  OwnedStreamingLaunchRehearsalSnapshot,
   OwnedStreamingRackGroup,
   StreamingDefineLaunchStepId,
   StreamingInfrastructureManagementPolicy,
@@ -34,11 +37,14 @@ import {
 import {
   createStreamingFacilityFromListing,
   getStreamingFacilityMarketplace,
+  type StreamingFacilityMarketContext,
   type StreamingFacilityMarketplaceListing,
 } from '../../services/streamingFacilityMarketplace';
 import {
   getStreamingFacilityCapacity,
   getStreamingFacilityContract,
+  getDefaultStreamingFacilityPhysical,
+  getStreamingFacilitySecurityProfile,
   migratePlacementsToStreamingFacilities,
 } from '../../services/streamingFacilities';
 import {
@@ -53,7 +59,6 @@ import {
   projectFacilityNetworkRole,
 } from '../../services/streamingRackGroups';
 import {
-  CAMPAIGNS,
   PACKAGES,
   PER_RACK_CEILING,
   derive,
@@ -71,6 +76,7 @@ import {
   type Brand,
   type RegionId,
 } from './StreamingBrandVisuals';
+import { countCompletedBudgetSteps, createLaunchBudgetSummary } from '../studio-finance/finance/budgetLinks';
 
 export interface StreamingBuildQuote {
   transactionCost: number;
@@ -86,14 +92,19 @@ export interface StreamingBuildQuote {
 
 export interface StreamingBuildWizardExperienceProps {
   brand: Brand;
+  signatoryName?: string;
   inputs: BuildInputs;
   sel: BuildSel;
   result?: RunResult | null;
+  savedRehearsal?: OwnedStreamingLaunchRehearsalSnapshot | null;
+  rehearsalConfigurationSignature?: string;
   built?: Placement[] | null;
   builtFacilities?: OwnedStreamingFacility[] | null;
+  construction?: { committedAtAbsoluteWeek: number; readyAtAbsoluteWeek: number } | null;
   isLive?: boolean;
-  onResult?: (result: RunResult | null) => void;
+  onResult?: (result: RunResult | null, selection?: BuildSel) => void;
   onCommit?: (selection: BuildSel) => BuildCommitResult | void;
+  onValidateCommit?: (selection: BuildSel) => BuildCommitResult;
   quoteSelection?: (selection: BuildSel) => StreamingBuildQuote;
   onOpenNight?: () => void;
   onChange: (selection: BuildSel) => void;
@@ -102,8 +113,18 @@ export interface StreamingBuildWizardExperienceProps {
   onOpenPricing?: () => void;
   onOpenContent?: () => void;
   onOpenDefine?: (step: StreamingDefineLaunchStepId) => void;
+  onOpenLaunchBudget?: () => void;
+  initialSheet?: 'money' | 'build' | null;
+  launchBudget?: {
+    plannedSpend: number;
+    committedSpend: number;
+    paidSpend: number;
+  };
+  launchBlueprintSaved?: boolean;
   funding?: { borrowed: number; soldPct: number; own: number };
   onRaise?: () => void;
+  marketing?: BuildData['marketing'];
+  onChangeMarketing?: BuildHandlers['onChangeMarketing'];
 }
 
 const REGION_LINES: Record<RegionId, string> = {
@@ -154,14 +175,6 @@ const ARCH_TO_GAME: Record<Architecture, BuildSel['arch']> = {
   CLOUD: 'CLOUD', HYBRID: 'HYBRID', METAL: 'OWNED',
 };
 
-const doctrineToBuild = (value: BuildSel['doctrine']): BuildDraft['doctrine'] => (
-  value === 'SAFE' ? 'HARDENED' : value === 'RUSHED' ? 'SPRINT' : 'STANDARD'
-);
-
-const doctrineToGame = (value: BuildDraft['doctrine']): BuildSel['doctrine'] => (
-  value === 'HARDENED' ? 'SAFE' : value === 'SPRINT' ? 'RUSHED' : 'STANDARD'
-);
-
 const campaignToBuild = (value: BuildSel['campaign']): string => value.toLowerCase();
 const campaignToGame = (value: string): BuildSel['campaign'] => (
   value === 'national' ? 'NATIONAL' : value === 'regional' ? 'REGIONAL' : 'NONE'
@@ -203,11 +216,29 @@ const hslToHex = (hue: number, saturation: number, lightness = 58): string => {
   return `#${[r0, g0, b0].map(value => Math.round((value + m) * 255).toString(16).padStart(2, '0')).join('')}`;
 };
 
+const engineeringFromListing = (listing: StreamingFacilityMarketplaceListing): NonNullable<FacilityListing['engineering']> => {
+  const physical = getDefaultStreamingFacilityPhysical(listing.facilityType, 1, listing);
+  const security = getStreamingFacilitySecurityProfile(listing.securityGrade);
+  return {
+    powerContractKw: physical.powerContractKw,
+    backupPowerKw: physical.backupPowerKw,
+    backupPowerMode: physical.backupPowerMode,
+    coolingCapacityKw: physical.coolingCapacityKw,
+    coolingMode: physical.coolingMode === 'DIRECT_LIQUID' ? 'Direct liquid'
+      : physical.coolingMode === 'IMMERSION' ? 'Immersion' : 'Air',
+    committedBandwidthMbps: physical.bandwidthMbps,
+    burstBandwidthMbps: physical.burstBandwidthMbps,
+    securityRiskReductionPercent: Math.round((1 - security.incidentRiskMultiplier) * 100),
+    securityRecoveryImprovementPercent: Math.round((1 - security.recoveryMultiplier) * 100),
+  };
+};
+
 const listingToBuild = (listing: StreamingFacilityMarketplaceListing): FacilityListing => ({
   id: listing.listingId,
   cityId: listing.cityId,
   provider: listing.providerName,
   name: listing.facilityName,
+  facilityType: listing.facilityType,
   type: getStreamingFacilityContract(listing.facilityType).name,
   description: listing.description,
   rackPositions: listing.rackPositions,
@@ -226,16 +257,19 @@ const listingToBuild = (listing: StreamingFacilityMarketplaceListing): FacilityL
   note: listing.marketNote,
   availability: listing.status === 'RESEARCH_REQUIRED' ? 'RESEARCH'
     : listing.status === 'LIMITED' ? 'LIMITED' : 'AVAILABLE',
+  engineering: engineeringFromListing(listing),
 });
 
 const syntheticListing = (facility: OwnedStreamingFacility): FacilityListing => {
   const contract = getStreamingFacilityContract(facility.type);
   const city = PRODUCTION_LOCATION_CATALOG.find(item => item.id === facility.cityId);
+  const physical = getStreamingFacilityPhysicalView(facility, facility.lease?.electricityRatePerKwh);
   return {
     id: `LEGACY:${facility.id}`,
     cityId: facility.cityId,
     provider: facility.lease?.providerName || 'Existing company contract',
     name: contract.name,
+    facilityType: facility.type,
     type: contract.shortName,
     description: contract.description,
     rackPositions: getStreamingFacilityCapacity(facility),
@@ -253,28 +287,41 @@ const syntheticListing = (facility: OwnedStreamingFacility): FacilityListing => 
     expansion: facility.lease?.expansionRackPositions || 0,
     note: city?.desc || 'A facility preserved from the company save.',
     availability: 'AVAILABLE',
+    engineering: {
+      powerContractKw: physical.state.powerContractKw,
+      backupPowerKw: physical.state.backupPowerKw,
+      backupPowerMode: physical.state.backupPowerMode,
+      coolingCapacityKw: physical.state.coolingCapacityKw,
+      coolingMode: physical.state.coolingMode === 'DIRECT_LIQUID' ? 'Direct liquid'
+        : physical.state.coolingMode === 'IMMERSION' ? 'Immersion' : 'Air',
+      committedBandwidthMbps: physical.state.bandwidthMbps,
+      burstBandwidthMbps: physical.state.burstBandwidthMbps,
+      securityRiskReductionPercent: Math.round((1 - physical.securityIncidentRiskMultiplier) * 100),
+      securityRecoveryImprovementPercent: Math.round((1 - physical.securityRecoveryMultiplier) * 100),
+    },
   };
 };
 
 const facilityToBuild = (facility: OwnedStreamingFacility, built: boolean): Facility => {
   const groups = normalizeStreamingRackGroups(facility.rackGroups, facility.id, facility.installedRacks, facility.role);
   const physical = getStreamingFacilityPhysicalView(facility, facility.lease?.electricityRatePerKwh);
+  const projectedGroups = groups.map(group => {
+    const duty = DUTY_FROM_GAME[getProjectedRackDuty(group)];
+    const rule = getStreamingRackDutyRule(getProjectedRackDuty(group));
+    return {
+      id: group.id,
+      name: group.name,
+      duty,
+      racks: group.rackCount,
+      capacity: Math.round(group.rackCount * PER_RACK_CEILING * rule.capacityMultiplier),
+    };
+  });
   return {
     id: facility.id,
     listingId: facility.lease?.listingId || `LEGACY:${facility.id}`,
     cityId: facility.cityId,
     built,
-    groups: groups.map(group => {
-      const duty = DUTY_FROM_GAME[getProjectedRackDuty(group)];
-      const rule = getStreamingRackDutyRule(getProjectedRackDuty(group));
-      return {
-        id: group.id,
-        name: group.name,
-        duty,
-        racks: group.rackCount,
-        capacity: Math.round(group.rackCount * PER_RACK_CEILING * rule.capacityMultiplier),
-      };
-    }),
+    groups: fitRackGroupsToLimit(projectedGroups, getStreamingFacilityCapacity(facility)),
     power: { used: physical.powerUsedKw, contracted: physical.state.powerContractKw },
     cooling: { used: physical.coolingUsedKw, available: physical.state.coolingCapacityKw },
     bandwidth: { used: physical.bandwidthUsedMbps, available: physical.state.bandwidthMbps },
@@ -295,10 +342,11 @@ const facilityToBuild = (facility: OwnedStreamingFacility, built: boolean): Faci
 const selectBaseFacility = (
   draftFacility: Facility,
   existing: OwnedStreamingFacility[],
+  marketContext?: StreamingFacilityMarketContext,
 ): OwnedStreamingFacility | null => {
   const current = existing.find(item => item.id === draftFacility.id);
   if (current) return current;
-  const listing = getStreamingFacilityMarketplace(draftFacility.cityId)
+  const listing = getStreamingFacilityMarketplace(draftFacility.cityId, marketContext)
     .find(item => item.listingId === draftFacility.listingId);
   if (!listing) return migratePlacementsToStreamingFacilities([{
     cityId: draftFacility.cityId,
@@ -308,16 +356,18 @@ const selectBaseFacility = (
   return { ...createStreamingFacilityFromListing(listing, existing, 'EDGE_CACHE', 1), id: draftFacility.id };
 };
 
-const buildSelectionFromDraft = (
+export const buildSelectionFromDraft = (
   draft: BuildDraft,
   base: BuildSel,
   absoluteWeek: number,
+  marketContextByCityId: Record<string, StreamingFacilityMarketContext> = {},
 ): BuildSel => {
   const originalFacilities = facilitiesOf(base);
   const facilities = draft.facilities.flatMap(draftFacility => {
-    const source = selectBaseFacility(draftFacility, originalFacilities);
+    const source = selectBaseFacility(draftFacility, originalFacilities, marketContextByCityId[draftFacility.cityId]);
     if (!source) return [];
-    const rackGroups: OwnedStreamingRackGroup[] = draftFacility.groups
+    const fittedGroups = fitRackGroupsToLimit(draftFacility.groups, getStreamingFacilityCapacity(source));
+    const rackGroups: OwnedStreamingRackGroup[] = fittedGroups
       .filter(group => group.racks > 0)
       .map(group => ({
         id: group.id,
@@ -344,9 +394,11 @@ const buildSelectionFromDraft = (
   return selectionWithFacilities({
     ...base,
     arch: ARCH_TO_GAME[draft.architecture],
-    doctrine: doctrineToGame(draft.doctrine),
+    doctrine: 'STANDARD',
     campaign: campaignToGame(draft.campaignId),
     managementPolicy: managementToGame(draft),
+    assistedPlanApproved: Boolean(draft.teamPlanApproved),
+    assistedPlanClass: draft.teamPlanClass,
   }, facilities);
 };
 
@@ -355,6 +407,8 @@ const selectionKey = (selection: BuildSel): string => JSON.stringify({
   doctrine: selection.doctrine,
   campaign: selection.campaign,
   managementPolicy: selection.managementPolicy,
+  assistedPlanApproved: selection.assistedPlanApproved,
+  assistedPlanClass: selection.assistedPlanClass,
   facilities: facilitiesOf(selection).map(facility => ({
     id: facility.id,
     cityId: facility.cityId,
@@ -398,6 +452,42 @@ const rehearsalToBuild = (result: RunResult, signature: string): RehearsalResult
   })),
 });
 
+export const rehearsalSnapshotToBuild = (
+  snapshot: OwnedStreamingLaunchRehearsalSnapshot,
+  signature: string,
+  cityNameById: ReadonlyMap<string, string>,
+  expectedCanonicalSignature = snapshot.configurationSignature,
+): RehearsalResult | null => expectedCanonicalSignature !== snapshot.configurationSignature ? null : ({
+  signature,
+  scenario: snapshot.scenario,
+  verdict: snapshot.verdict === 'BURST' ? 'RENTED' : snapshot.verdict,
+  peak: snapshot.peakConcurrentStreams,
+  capacity: snapshot.steadyCapacity,
+  spare: Math.max(0, snapshot.steadyCapacity + snapshot.burstCapacity - snapshot.peakConcurrentStreams),
+  failedPct: snapshot.failedPercent,
+  catalogue: snapshot.catalogueAvailabilityPercent / 100,
+  spof: snapshot.regionalSinglePointFailures.length,
+  held: snapshot.countries.filter(country => country.verdict !== 'BROKE').map(country => country.country),
+  failed: snapshot.countries.filter(country => country.verdict === 'BROKE').map(country => country.country),
+  countries: snapshot.countries.map(country => ({
+    name: country.country,
+    code: country.marketId,
+    demand: country.demand,
+    failedPct: country.failedPercent,
+    state: country.verdict === 'BROKE' ? 'UNSTABLE' : country.verdict === 'BURST' ? 'WATCH' : 'READY',
+  })),
+  rooms: snapshot.facilities.map(facility => ({
+    city: cityNameById.get(facility.cityId) || facility.cityId,
+    load: facility.loadPercent / 100,
+    limiting: facility.limitingFactor === 'POWER' ? 'POWER'
+      : facility.limitingFactor === 'COOLING' ? 'COOLING'
+        : facility.limitingFactor === 'BANDWIDTH' ? 'BANDWIDTH'
+          : facility.limitingFactor === 'MAINTENANCE' ? 'CONDITION'
+            : facility.limitingFactor === 'RACK_SPACE' ? 'RACK' : 'NONE',
+    failedPct: facility.failedPercent,
+  })),
+});
+
 const plotFor = (index: number, count: number): { x: number; y: number } => {
   const slots = [{ x: 30, y: 46 }, { x: 58, y: 38 }, { x: 48, y: 66 }, { x: 72, y: 58 }];
   return slots[Math.min(index, Math.max(0, Math.min(slots.length - 1, count - 1)))] || slots[0];
@@ -405,9 +495,9 @@ const plotFor = (index: number, count: number): { x: number; y: number } => {
 
 export const StreamingBuildWizardExperience: React.FC<StreamingBuildWizardExperienceProps> = props => {
   const {
-    brand, inputs, sel, result, built, builtFacilities, onResult, onCommit,
+    brand, inputs, sel, result, savedRehearsal, built, builtFacilities, onResult, onCommit,
     quoteSelection, onOpenNight, onChange, onBack, pricing, onOpenPricing,
-    onOpenContent, onOpenDefine, onRaise,
+    onOpenContent, onOpenDefine, onOpenLaunchBudget, onRaise, marketing, onChangeMarketing,
   } = props;
   const absoluteWeek = inputs.absoluteWeek || 0;
   const [rehearsalSelection, setRehearsalSelection] = useState<BuildSel | null>(null);
@@ -456,31 +546,40 @@ export const StreamingBuildWizardExperience: React.FC<StreamingBuildWizardExperi
     });
   }, [inputs.markets, inputs.recommendedPlacements]);
 
+  const marketContextByCityId = useMemo<Record<string, StreamingFacilityMarketContext>>(() => Object.fromEntries(
+    cities.flatMap(city => {
+      const context = inputs.facilityMarketContextByCountryId?.[city.code];
+      return context ? [[city.id, context]] : [];
+    }),
+  ), [cities, inputs.facilityMarketContextByCountryId]);
+
   const listings = useMemo<FacilityListing[]>(() => {
-    const marketListings = cities.flatMap(city => getStreamingFacilityMarketplace(city.id).map(listingToBuild));
+    const marketListings = cities.flatMap(city => getStreamingFacilityMarketplace(city.id, marketContextByCityId[city.id]).map(listingToBuild));
     const known = new Set(marketListings.map(listing => listing.id));
     const legacy = [...baseFacilities, ...(builtFacilities || [])]
       .filter(facility => !facility.lease || !known.has(facility.lease.listingId))
       .map(syntheticListing);
     return [...marketListings, ...legacy];
-  }, [baseFacilities, builtFacilities, cities]);
+  }, [baseFacilities, builtFacilities, cities, marketContextByCityId]);
 
   const initialDraft = useMemo<BuildDraft>(() => ({
     facilities: baseFacilities.map(facility => facilityToBuild(facility, builtIds.has(facility.id))),
     architecture: ARCH_TO_BUILD[sel.arch],
     ownedShare: sel.arch === 'CLOUD' ? .15 : sel.arch === 'OWNED' ? 1 : .6,
-    doctrine: doctrineToBuild(sel.doctrine),
+    doctrine: 'STANDARD',
     campaignId: campaignToBuild(sel.campaign),
     mode: sel.managementPolicy?.mode === 'HANDS_ON' ? 'HANDS' : 'ASSISTED',
     instructions: managementToBuild(sel.managementPolicy),
     repairIds: [],
     rehearsal: null,
     override: false,
+    teamPlanApproved: Boolean(sel.assistedPlanApproved),
+    teamPlanClass: sel.assistedPlanClass,
   }), [baseFacilities, builtIds, sel]);
 
   const canonicalFor = useCallback((draft: BuildDraft) => (
-    buildSelectionFromDraft(draft, sel, absoluteWeek)
-  ), [absoluteWeek, sel]);
+    buildSelectionFromDraft(draft, sel, absoluteWeek, marketContextByCityId)
+  ), [absoluteWeek, marketContextByCityId, sel]);
 
   const data = useMemo<BuildData>(() => {
     const servicesFor = (draft: BuildDraft): CountryService[] => {
@@ -534,11 +633,11 @@ export const StreamingBuildWizardExperience: React.FC<StreamingBuildWizardExperi
       const quote = quoteSelection?.(selection);
       const derived = derive(selection, { ...inputs, homeCityId: selection.placements[0]?.cityId || null });
       const infrastructure = quote?.transactionCost ?? derived.capex;
-      const campaign = CAMPAIGNS.find(item => item.id === selection.campaign)?.cost || 0;
+      const campaign = marketing?.draft.budgetCeiling || 0;
       const lines = [
         ...(inputs.defineLaunchPaid || []).map(item => ({ ...item, locked: true, timing: 'SETTLED' as const })),
         { id: 'infra', label: 'Infrastructure commissioning', amount: infrastructure, note: `${derived.racks} racks · ${derived.uniqueCityCount} cities`, timing: 'COMMISSION' as const },
-        { id: 'campaign', label: 'Opening-night campaign', amount: campaign, note: campaign ? 'Reserved for opening night' : 'No paid campaign', timing: 'OPENING_NIGHT' as const },
+        { id: 'campaign', label: 'Launch marketing ceiling', amount: campaign, note: campaign ? 'Reserved and spent across construction' : 'Organic launch', timing: 'OPENING_NIGHT' as const },
         { id: 'catalogue', label: 'Catalogue licences already signed', amount: inputs.catalogueSpend, note: `${inputs.catalogueTitles} titles · already settled`, locked: true, timing: 'SETTLED' as const },
         { id: 'originals', label: 'Originals already funded', amount: inputs.originalsSpend, note: `${inputs.originalsCount} commissions · already settled`, locked: true, timing: 'SETTLED' as const },
       ].filter(line => line.amount > 0 || line.id === 'campaign');
@@ -555,23 +654,57 @@ export const StreamingBuildWizardExperience: React.FC<StreamingBuildWizardExperi
     };
 
     const canonical = {
+      facilities: (draft: BuildDraft): Facility[] => {
+        const selection = canonicalFor(draft);
+        const derived = derive(selection, { ...inputs, homeCityId: selection.placements[0]?.cityId || null });
+        const hallByFacilityId = new Map(derived.halls.map(hall => [hall.facilityId, hall]));
+        return facilitiesOf(selection).map(facility => {
+          const projected = facilityToBuild(facility, builtIds.has(facility.id));
+          const hall = hallByFacilityId.get(facility.id);
+          if (!hall) return projected;
+          const capacityByGroup = new Map(hall.rackGroups.map(group => [group.id, group.capacity]));
+          return {
+            ...projected,
+            groups: projected.groups.map(group => ({
+              ...group,
+              capacity: capacityByGroup.get(group.id) ?? group.capacity,
+            })),
+            opCost: hall.weekly,
+          };
+        });
+      },
       totals: totalsFor,
       money: moneyFor,
       services: servicesFor,
-      signature: (draft: BuildDraft) => selectionKey(canonicalFor(draft)),
+      signature: (draft: BuildDraft) => `${selectionKey(canonicalFor(draft))}/${marketing?.forecast.signature || 'organic'}`,
       rehearse: (draft: BuildDraft, scenario: Scenario) => {
         const selection = canonicalFor(draft);
         const derived = derive(selection, { ...inputs, homeCityId: selection.placements[0]?.cityId || null });
         const canonicalResult = deriveStreamingLaunchRehearsal(derived, inputs, selection, scenario);
         onResult?.(canonicalResult);
-        return rehearsalToBuild(canonicalResult, selectionKey(selection));
+        return rehearsalToBuild(canonicalResult, `${selectionKey(selection)}/${marketing?.forecast.signature || 'organic'}`);
       },
     };
 
     const demandById = new Map(servicesFor(initialDraft).map(service => [service.marketId, service.peak]));
     return {
-      company: { name: brand.name, week: absoluteWeek, brandHex: hslToHex(brand.hue, brand.sat) },
-      treasury: { available: inputs.treasury, committedLaunch: 0 },
+      company: {
+        name: brand.name,
+        week: absoluteWeek,
+        brandHex: hslToHex(brand.hue, brand.sat),
+        signatoryName: props.signatoryName,
+      },
+      treasury: {
+        available: inputs.treasury,
+        committedLaunch: (inputs.defineLaunchPaid || []).reduce((sum, item) => sum + item.amount, 0)
+          + inputs.catalogueSpend + inputs.originalsSpend,
+      },
+      hasExplicitOpeningMarkets: inputs.hasExplicitOpeningMarkets !== false && Boolean(inputs.markets?.length),
+      openingDemand: inputs.openingDemandForecast ? {
+        low: inputs.openingDemandForecast.low,
+        likely: inputs.openingDemandForecast.likely,
+        high: inputs.openingDemandForecast.high,
+      } : undefined,
       markets: (inputs.markets || []).map(market => {
         const location = PRODUCTION_LOCATION_CATALOG.find(item => item.id === market.recommendedCityId);
         const service = servicesFor(initialDraft).find(item => item.marketId === market.id);
@@ -589,7 +722,8 @@ export const StreamingBuildWizardExperience: React.FC<StreamingBuildWizardExperi
       cities,
       listings,
       presets: PACKAGES.map(item => ({ id: item.id.toLowerCase(), name: item.name, racks: item.racks, cities: item.cities, line: item.sub })),
-      campaigns: CAMPAIGNS.map(item => ({ id: item.id.toLowerCase(), name: item.name, cost: item.cost, line: item.line, multiplier: item.demandMul })),
+      campaigns: [],
+      marketing,
       spend: [],
       defineLaunchChecks: inputs.defineLaunchChecks,
       pricing: {
@@ -617,17 +751,46 @@ export const StreamingBuildWizardExperience: React.FC<StreamingBuildWizardExperi
       team: managementToBuild(sel.managementPolicy),
       existing: (builtFacilities || []).map(facility => facilityToBuild(facility, true)),
       commissioned: Boolean(built),
+      construction: props.construction ? {
+        committedAtWeek: props.construction.committedAtAbsoluteWeek,
+        readyAtWeek: props.construction.readyAtAbsoluteWeek,
+      } : undefined,
       canonical,
     };
-  }, [absoluteWeek, baseFacilities, brand, built, builtFacilities, canonicalFor, cities, countries, initialDraft, inputs, listings, onResult, pricing, quoteSelection, regions, sel.managementPolicy]);
+  }, [absoluteWeek, baseFacilities, brand, built, builtFacilities, canonicalFor, cities, countries, initialDraft, inputs, listings, marketing, onResult, pricing, props.construction, props.signatoryName, quoteSelection, regions, sel.managementPolicy]);
 
   const draftWithResult = useMemo<BuildDraft>(() => {
-    if (!result) return initialDraft;
+    if (!result && !savedRehearsal) return initialDraft;
+    const canonicalEvidenceRequired = props.rehearsalConfigurationSignature !== undefined;
     return {
       ...initialDraft,
-      rehearsal: rehearsalToBuild(result, signatureOf(data, initialDraft)),
+      rehearsal: result && !canonicalEvidenceRequired
+        ? rehearsalToBuild(result, signatureOf(data, initialDraft))
+        : savedRehearsal ? rehearsalSnapshotToBuild(
+          savedRehearsal,
+          signatureOf(data, initialDraft),
+          new Map(cities.map(city => [city.id, city.name])),
+          props.rehearsalConfigurationSignature,
+        ) : null,
     };
-  }, [data, initialDraft, result]);
+  }, [cities, data, initialDraft, result, savedRehearsal, props.rehearsalConfigurationSignature]);
+
+  const launchBudgetSummary = useMemo(() => {
+    const checks = data.defineLaunchChecks || [];
+    const knownSubtotal = (props.launchBudget?.plannedSpend || 0)
+      + (props.launchBudget?.committedSpend || 0)
+      + (props.launchBudget?.paidSpend || 0);
+    const paidAmount = props.launchBudget?.paidSpend || data.treasury.committedLaunch;
+    return createLaunchBudgetSummary({
+      completedStages: countCompletedBudgetSteps(checks),
+      totalStages: 7,
+      knownSubtotal,
+      paidAmount,
+      dueAmount: Math.max(0, knownSubtotal - paidAmount),
+      blueprintSaved: Boolean(props.launchBlueprintSaved),
+      live: Boolean(props.isLive),
+    });
+  }, [data.defineLaunchChecks, data.treasury.committedLaunch, props.isLive, props.launchBlueprintSaved, props.launchBudget]);
 
   const lastSelectionKey = useRef(selectionKey(sel));
   const handleDraftChange = useCallback((draft: BuildDraft) => {
@@ -644,18 +807,23 @@ export const StreamingBuildWizardExperience: React.FC<StreamingBuildWizardExperi
       <BuildWizard
         data={data}
         initialDraft={draftWithResult}
+        initialSheet={props.initialSheet}
+        launchBudgetSummary={launchBudgetSummary}
         onDraftChange={handleDraftChange}
         onExit={onBack}
         onOpenStudioFinance={onRaise}
         onEditPricing={onOpenPricing}
         onOpenDefine={onOpenDefine}
+        onOpenLaunchBudget={onOpenLaunchBudget}
         onOpenRehearsal={draft => setRehearsalSelection(canonicalFor(draft))}
+        onValidateCommission={draft => props.onValidateCommit?.(canonicalFor(draft))}
         onCommission={draft => {
           const selection = canonicalFor(draft);
           const outcome = onCommit?.(selection);
           return outcome || { ok: true, message: 'Infrastructure commissioned.' };
         }}
         onOpeningNight={onOpenNight}
+        onChangeMarketing={onChangeMarketing}
       />
 
       {rehearsalSelection && (
@@ -668,7 +836,7 @@ export const StreamingBuildWizardExperience: React.FC<StreamingBuildWizardExperi
           inp={inputs}
           sel={rehearsalSelection}
           onClose={() => setRehearsalSelection(null)}
-          onResult={next => onResult?.(next)}
+          onResult={next => onResult?.(next, rehearsalSelection)}
           onOpenContent={onOpenContent}
           onRepair={next => {
             onResult?.(null);

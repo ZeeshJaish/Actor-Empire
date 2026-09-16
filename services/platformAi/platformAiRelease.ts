@@ -39,8 +39,8 @@ const clamp = (value: number, minimum: number, maximum: number): number => (
 const round = (value: number, precision = 100): number => Math.round(value * precision) / precision;
 
 /** Disclosed long-run balance thresholds, measured on the canonical 0-100 commercial score. */
-export const PLATFORM_AI_HIT_COMMERCIAL_SCORE = 89;
-export const PLATFORM_AI_FLOP_COMMERCIAL_SCORE = 84.5;
+export const PLATFORM_AI_HIT_COMMERCIAL_SCORE = 87.5;
+export const PLATFORM_AI_FLOP_COMMERCIAL_SCORE = 82.25;
 /**
  * A hit is measured against the audience scale and brand promise of the service
  * that released it. These public thresholds classify the same canonical
@@ -48,10 +48,10 @@ export const PLATFORM_AI_FLOP_COMMERCIAL_SCORE = 84.5;
  */
 export const PLATFORM_AI_OUTCOME_THRESHOLDS: Record<PlatformId, { hit: number; flop: number }> = {
     NETFLIX: { hit: PLATFORM_AI_HIT_COMMERCIAL_SCORE, flop: PLATFORM_AI_FLOP_COMMERCIAL_SCORE },
-    APPLE_TV: { hit: 86, flop: 82 },
-    DISNEY_PLUS: { hit: 88, flop: 84 },
-    HULU: { hit: 84, flop: 80 },
-    YOUTUBE: { hit: 87.5, flop: 83.5 },
+    APPLE_TV: { hit: 81.5, flop: 77 },
+    DISNEY_PLUS: { hit: 85, flop: 80.5 },
+    HULU: { hit: 79, flop: 74 },
+    YOUTUBE: { hit: 80, flop: 75 },
 };
 
 const activeCountryOperations = (platform: PlatformState): Map<string, NonNullable<PlatformState['ai']>['marketOperations'][number]> => (

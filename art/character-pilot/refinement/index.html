@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Actor Empire · Character study 02</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#eeeae2;color:#242b32;font-family:system-ui,sans-serif}
+    main{max-width:1140px;margin:auto;padding:32px 22px 50px}
+    .eyebrow{font-size:11px;letter-spacing:.17em;text-transform:uppercase;font-weight:750;color:#586360}
+    h1{font-size:clamp(25px,4vw,42px);letter-spacing:-.04em;margin:10px 0 12px;line-height:1.08}
+    .intro{font-size:15px;line-height:1.55;max-width:760px;color:#59615f;margin-bottom:28px}
+    .pair{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    figure{margin:0;min-width:0;background:#f7f4ef;border:1px solid #d7d1c7}
+    figcaption{padding:14px 16px 12px;display:flex;gap:8px;justify-content:space-between;align-items:center;font-weight:700;font-size:14px}
+    .tag{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#6d726b;font-weight:600}
+    .art{position:relative;width:100%;aspect-ratio:480/590;overflow:hidden;background:#f5f2ed}
+    .reference img{position:absolute;width:320%;max-width:none;left:-116.6667%;top:-20.339%;height:auto}
+    .render img{position:absolute;width:126%;max-width:none;left:-13%;top:-10.5%;height:auto}
+    .caption{font-size:12px;line-height:1.5;margin:0;padding:13px 16px;color:#646a64;border-top:1px solid #e4ded5;min-height:64px}
+    .lower{display:grid;grid-template-columns:200px 1fr;gap:26px;margin-top:28px;align-items:center}
+    .portrait{display:block;width:100%;border:1px solid #d7d1c7}
+    h2{font-size:19px;letter-spacing:-.02em;margin:0 0 10px}
+    .notes{font-size:14px;line-height:1.6;color:#59615f}
+    a{color:#294b42;text-underline-offset:3px}a:focus-visible{outline:3px solid #618273;outline-offset:4px}
+    .links{display:flex;flex-wrap:wrap;gap:12px 22px;margin-top:18px;font-size:13px}
+    @media(max-width:640px){main{padding:23px 12px}.pair{gap:8px}figcaption{display:block;padding:10px;font-size:12px}.tag{display:block;margin-top:4px;font-size:9px}.caption{padding:10px;font-size:11px;min-height:92px}.lower{grid-template-columns:130px 1fr;gap:15px}.notes{font-size:12px}}
+    @media(max-width:360px){.lower{grid-template-columns:1fr}.portrait{max-width:180px}}
+  </style>
+</head>
+<body>
+  <main>
+    <div class="eyebrow">Actor Empire / Character art / Study 02</div>
+    <h1>One character. A closer direction.</h1>
+    <p class="intro">A new Blender study of the bald character: a broader jacket, folded arms, a stronger jaw, heavy brows, tiny eyes, and flat graphic shading. Compare the actual render with the target.</p>
+    <section class="pair" aria-label="Reference and Blender comparison">
+      <figure>
+        <figcaption>Your reference <span class="tag">Visual target</span></figcaption>
+        <div class="art reference"><img src="reference-board.png" alt="Bald cartoon actor from the supplied concept board, with a broad navy jacket and folded arms"></div>
+        <p class="caption">The concept establishes the proportions, expression, shape design, and level of finish we are aiming for.</p>
+      </figure>
+      <figure>
+        <figcaption>New Blender render <span class="tag">Editable geometry</span></figcaption>
+        <div class="art render"><img src="renders/bald-actor-v2.png" alt="New Blender render of one bald character with folded arms, tiny eyes, heavy eyebrows, and a navy jacket"></div>
+        <p class="caption">Rendered from the saved .blend file. The sculpted forms and surface detail still need refinement to reach the target.</p>
+      </figure>
+    </section>
+    <section class="lower" aria-label="Portrait and production status">
+      <a href="renders/bald-actor-v2-portrait.png"><img class="portrait" src="renders/bald-actor-v2-portrait.png" alt="Portrait rendered from the same Blender character"></a>
+      <div>
+        <h2>The same model, cropped as a profile.</h2>
+        <p class="notes">This is a static art study. It uses Blender materials and rendered outlines; those outlines are not yet part of the live 3D preview. A modular library and an animation rig come after the character design is settled.</p>
+        <nav class="links" aria-label="Study files">
+          <a href="bald-actor-study-v2.blend" download>Download Blender source</a>
+          <a href="renders/bald-actor-v2.png">Open full render</a>
+          <a href="reference-board.png">Open full reference</a>
+          <a href="../">Earlier modular pilot</a>
+        </nav>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

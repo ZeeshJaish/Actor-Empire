@@ -7,46 +7,162 @@
    ceiling — and the repair for that ceiling sits next to it.
    ========================================================================== */
 
-import React, { useState } from 'react';
-import type { Duty, Facility } from '../../finance/build';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import type { BuildData, Duty, Facility } from '../../finance/build';
 import type { Limiting } from '../../finance/build';
 import {
-  ARCHITECTURES, ARCH_SHARE, DOCTRINES, DUTIES, LIMITING_COPY, SUPPLY_COPY,
-  architectureFor, cityFor, facilityRacks, limitingFactor, listingFor, usableCapacity,
+  ARCHITECTURES, ARCH_SHARE, DUTIES, LIMITING_COPY, SUPPLY_COPY,
+  architectureFor, copyCityTemplateToNetwork, facilityRacks, facilityRoomLabel, fitRackGroupsToLimit, limitingFactor, listingFor, usableCapacity,
 } from '../../finance/build';
 import type { StageProps } from './BuildWizard';
 import { compactCount, money, pct } from '../../finance/format';
 import { RackWall, DUTY_TINT } from './RackWall';
+import { ResourceMetric } from './ResourceMetric';
+import { BuildMetricSheet, type BuildMetricInfo } from './BuildMetricSheet';
 import { Sheet } from '../ui';
+
+interface CityPlan {
+  id: string;
+  name: string;
+  facilities: Facility[];
+  racks: number;
+  capacity: number;
+  weeklyCost: number;
+  attention: number;
+}
+
+export function roomCapacityFeedback(used: number, limit: number): {
+  canAdd: boolean;
+  message: string | null;
+} {
+  if (used < limit) return { canAdd: true, message: null };
+  return {
+    canAdd: false,
+    message: `Room full — ${used} of ${limit} rack positions used. Remove a rack or lease another room in Sites.`,
+  };
+}
+
+function cityPlansFor(data: BuildData, facilities: Facility[]): CityPlan[] {
+  const plans = new Map<string, CityPlan>();
+  facilities.forEach(facility => {
+    const listing = listingFor(data, facility);
+    const city = data.cities.find(candidate => candidate.id === facility.cityId);
+    const current = plans.get(facility.cityId) ?? {
+      id: facility.cityId,
+      name: city?.name ?? 'Unknown city',
+      facilities: [],
+      racks: 0,
+      capacity: 0,
+      weeklyCost: 0,
+      attention: 0,
+    };
+    current.facilities.push(facility);
+    current.racks += facilityRacks(facility);
+    current.capacity += facility.groups.reduce((sum, group) => sum + group.capacity, 0);
+    current.weeklyCost += facility.opCost + (listing?.weeklyRent ?? 0);
+    if (limitingFactor(data, facility) !== 'NONE') current.attention += 1;
+    plans.set(facility.cityId, current);
+  });
+  return Array.from(plans.values()).sort((left, right) => (
+    right.attention - left.attention || left.name.localeCompare(right.name)
+  ));
+}
 
 export function StagePlans({ data, draft, patch, totals }: StageProps) {
   const [dutyFor, setDutyFor] = useState<{ facilityId: string; groupId: string } | null>(null);
+  const [openInfo, setOpenInfo] = useState<BuildMetricInfo | null>(null);
+  const facilities = useMemo(
+    () => data.canonical?.facilities?.(draft) ?? draft.facilities,
+    [data, draft],
+  );
+  const cityPlans = useMemo(() => cityPlansFor(data, facilities), [data, facilities]);
+  const firstAttentionCity = cityPlans.find(city => city.attention > 0) ?? cityPlans[0];
+  const firstAttentionRoom = firstAttentionCity?.facilities.find(facility => limitingFactor(data, facility) !== 'NONE')
+    ?? firstAttentionCity?.facilities[0];
+  const [cityFilter, setCityFilter] = useState<'ALL' | 'ATTENTION'>('ALL');
+  const [activeCityId, setActiveCityId] = useState(firstAttentionCity?.id ?? '');
+  const [activeFacilityId, setActiveFacilityId] = useState(firstAttentionRoom?.id ?? '');
+  const [copyOpen, setCopyOpen] = useState(false);
+  const [copyUndo, setCopyUndo] = useState<Facility[] | null>(null);
+  const [capacityFeedback, setCapacityFeedback] = useState<{ facilityId: string; message: string } | null>(null);
+  const capacityFeedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cityButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const attentionCityCount = cityPlans.filter(city => city.attention > 0).length;
+  const visibleCities = cityFilter === 'ATTENTION'
+    ? cityPlans.filter(city => city.attention > 0)
+    : cityPlans;
+  const activeCity = visibleCities.find(city => city.id === activeCityId) ?? visibleCities[0] ?? cityPlans[0];
+  const activeFacility = activeCity?.facilities.find(facility => facility.id === activeFacilityId)
+    ?? activeCity?.facilities.find(facility => limitingFactor(data, facility) !== 'NONE')
+    ?? activeCity?.facilities[0];
+  const copyResult = useMemo(
+    () => activeCity ? copyCityTemplateToNetwork(data, draft, activeCity.id) : null,
+    [activeCity?.id, data, draft],
+  );
+  const copyWarningRooms = useMemo(() => {
+    if (!copyOpen || !copyResult) return 0;
+    const previewDraft = { ...draft, facilities: copyResult.facilities };
+    const previewFacilities = data.canonical?.facilities?.(previewDraft) ?? copyResult.facilities;
+    return previewFacilities
+      .filter(facility => facility.cityId !== activeCity?.id)
+      .filter(facility => limitingFactor(data, facility) !== 'NONE')
+      .length;
+  }, [activeCity?.id, copyOpen, copyResult, data, draft]);
 
-  if (draft.facilities.length === 0) {
+  useEffect(() => {
+    if (!activeCity) return;
+    if (activeCity.id !== activeCityId) setActiveCityId(activeCity.id);
+    if (!activeCity.facilities.some(facility => facility.id === activeFacilityId)) {
+      const next = activeCity.facilities.find(facility => limitingFactor(data, facility) !== 'NONE')
+        ?? activeCity.facilities[0];
+      setActiveFacilityId(next?.id ?? '');
+    }
+  }, [activeCity, activeCityId, activeFacilityId, data]);
+
+  useEffect(() => {
+    if (!activeCity) return;
+    cityButtonRefs.current[activeCity.id]?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+  }, [activeCity?.id, cityFilter]);
+
+  useEffect(() => () => {
+    if (capacityFeedbackTimer.current) clearTimeout(capacityFeedbackTimer.current);
+  }, []);
+
+  if (facilities.length === 0) {
     return <p className="lw-empty">No rooms leased yet. Go back and put something on the map.</p>;
   }
 
-  const constrained = draft.facilities.filter((f) => limitingFactor(data, f) !== 'NONE');
-  const lowest = Math.min(...draft.facilities.map((f) => usableCapacity(data, f)));
+  const constrained = facilities.filter((f) => limitingFactor(data, f) !== 'NONE');
+  const lowest = Math.min(...facilities.map((f) => usableCapacity(data, f)));
   const backup = Math.round(
-    (draft.facilities.reduce((sum, f) => sum + f.backupCoverage, 0) / draft.facilities.length) * 100,
+    (facilities.reduce((sum, f) => sum + f.backupCoverage, 0) / facilities.length) * 100,
   );
   const share = draft.ownedShare ?? ARCH_SHARE[draft.architecture];
   const ownedPct = Math.round(share * 100);
 
+  const editPatch = (next: Parameters<typeof patch>[0]) => {
+    setCopyUndo(null);
+    patch(next);
+  };
+
   const writeFacility = (id: string, next: Partial<Facility>) =>
-    patch({ facilities: draft.facilities.map((f) => (f.id === id ? { ...f, ...next } : f)) });
+    editPatch({ facilities: draft.facilities.map((f) => (f.id === id ? { ...f, ...next } : f)) });
 
-  const changeRacks = (facility: Facility, groupId: string, delta: number) => {
-    const groups = facility.groups.map((g) => {
-      if (g.id !== groupId) return g;
-      const racks = Math.max(0, g.racks + delta);
-      return { ...g, racks, capacity: racks * (g.duty === 'ORIGIN' ? 140_000 : g.duty === 'REGIONAL' ? 130_000 : 120_000) };
-    }).filter((g) => g.racks > 0 || g.duty === 'ORIGIN');
-
-    const racks = groups.reduce((sum, g) => sum + g.racks, 0);
+  const writeGroups = (facility: Facility, groups: Facility['groups']) => {
+    const rackLimit = listingFor(data, facility)?.rackPositions ?? Number.POSITIVE_INFINITY;
+    const requested = groups.reduce((sum, group) => sum + Math.max(0, group.racks), 0);
+    const safeGroups = requested > rackLimit ? fitRackGroupsToLimit(groups, rackLimit) : groups;
+    const withCapacity = safeGroups.map(group => ({
+      ...group,
+      capacity: group.racks * (group.duty === 'ORIGIN' ? 140_000 : group.duty === 'REGIONAL' ? 130_000 : 120_000),
+    }));
+    if (data.canonical?.facilities) {
+      writeFacility(facility.id, { groups: withCapacity });
+      return;
+    }
+    const racks = withCapacity.reduce((sum, group) => sum + group.racks, 0);
     writeFacility(facility.id, {
-      groups,
+      groups: withCapacity,
       power: { ...facility.power, used: racks * 12 },
       cooling: { ...facility.cooling, used: racks * 11 },
       bandwidth: { ...facility.bandwidth, used: racks * 40 },
@@ -55,27 +171,48 @@ export function StagePlans({ data, draft, patch, totals }: StageProps) {
     });
   };
 
+  const showRoomCapacityFeedback = (facility: Facility, rackLimit: number) => {
+    const feedback = roomCapacityFeedback(facilityRacks(facility), rackLimit);
+    if (!feedback.message) return false;
+    setCapacityFeedback({ facilityId: facility.id, message: feedback.message });
+    if (capacityFeedbackTimer.current) clearTimeout(capacityFeedbackTimer.current);
+    capacityFeedbackTimer.current = setTimeout(() => setCapacityFeedback(null), 3000);
+    return true;
+  };
+
+  const changeRacks = (facility: Facility, groupId: string, delta: number) => {
+    const rackLimit = listingFor(data, facility)?.rackPositions ?? Number.POSITIVE_INFINITY;
+    if (delta > 0 && showRoomCapacityFeedback(facility, rackLimit)) return;
+    if (delta < 0 && capacityFeedback?.facilityId === facility.id) setCapacityFeedback(null);
+    const groups = facility.groups.map((g) => {
+      if (g.id !== groupId) return g;
+      const racks = Math.max(0, g.racks + delta);
+      return { ...g, racks };
+    }).filter((g) => g.racks > 0 || g.duty === 'ORIGIN');
+    writeGroups(facility, groups);
+  };
+
   const addGroup = (facility: Facility, duty: Duty) => {
-    writeFacility(facility.id, {
-      groups: [...facility.groups, {
+    const rackLimit = listingFor(data, facility)?.rackPositions ?? Number.POSITIVE_INFINITY;
+    if (showRoomCapacityFeedback(facility, rackLimit)) return;
+    writeGroups(facility, [...facility.groups, {
         id: `g-${facility.id}-${duty}-${Date.now()}`,
         name: DUTIES[duty].name,
         duty,
         racks: 1,
         capacity: 120_000,
-      }],
-    });
+      }]);
   };
 
   const setDuty = (facility: Facility, groupId: string, duty: Duty) => {
-    writeFacility(facility.id, {
-      groups: facility.groups.map((g) => (g.id === groupId ? { ...g, duty, name: DUTIES[duty].name } : g)),
-    });
+    writeGroups(facility, facility.groups.map((g) => (
+      g.id === groupId ? { ...g, duty, name: DUTIES[duty].name } : g
+    )));
     setDutyFor(null);
   };
 
   const toggleRepair = (id: string) =>
-    patch({ repairIds: draft.repairIds.includes(id) ? draft.repairIds.filter((r) => r !== id) : [...draft.repairIds, id] });
+    editPatch({ repairIds: draft.repairIds.includes(id) ? draft.repairIds.filter((r) => r !== id) : [...draft.repairIds, id] });
 
   return (
     <>
@@ -83,7 +220,7 @@ export function StagePlans({ data, draft, patch, totals }: StageProps) {
         <b>
           {constrained.length === 0
             ? 'Every room can run every rack you have drawn.'
-            : `${constrained.length} of ${draft.facilities.length} rooms cannot run every rack you have drawn.`}
+            : `${constrained.length} of ${facilities.length} rooms are not ready to run as drawn.`}
         </b>
         {/* Three sentences, not three metrics. "Lowest usable capacity" is a
             phrase from an engineering report, not something a player should
@@ -92,7 +229,9 @@ export function StagePlans({ data, draft, patch, totals }: StageProps) {
           <li>
             <i className={lowest >= 1 ? 'is-good' : 'is-warn'} aria-hidden="true" />
             {lowest >= 1
-              ? 'Every rack you have drawn can actually be switched on.'
+              ? constrained.length === 0
+                ? 'Every rack you have drawn can actually be switched on.'
+                : 'Power, cooling and fibre can feed the racks; the highlighted rooms have another constraint.'
               : `The tightest room can only run ${pct(lowest * 100, 0)} of the racks drawn in it.`}
           </li>
           <li>
@@ -106,20 +245,130 @@ export function StagePlans({ data, draft, patch, totals }: StageProps) {
         </ul>
       </section>
 
-      {draft.facilities.map((facility) => {
+      <section className="bw-network-roster" aria-label="Network rooms">
+        <header className="bw-roster-head">
+          <div>
+            <p className="sf-eyebrow">Network rooms</p>
+            <b>{cityPlans.length} {cityPlans.length === 1 ? 'city' : 'cities'} · {facilities.length} rooms</b>
+          </div>
+          <div className="bw-roster-filters" aria-label="Filter cities">
+            <button type="button" className={cityFilter === 'ALL' ? 'is-on' : ''} onClick={() => setCityFilter('ALL')}>All</button>
+            <button
+              type="button"
+              className={cityFilter === 'ATTENTION' ? 'is-on is-warn' : ''}
+              disabled={attentionCityCount === 0}
+              onClick={() => {
+                const first = cityPlans.find(city => city.attention > 0);
+                setCityFilter('ATTENTION');
+                if (first) {
+                  setActiveCityId(first.id);
+                  setActiveFacilityId(first.facilities.find(facility => limitingFactor(data, facility) !== 'NONE')?.id ?? first.facilities[0]?.id ?? '');
+                }
+              }}
+            >
+              Needs attention {attentionCityCount > 0 && <i>{attentionCityCount}</i>}
+            </button>
+          </div>
+        </header>
+
+        <div className="bw-city-strip" aria-label="Cities in this network">
+          {visibleCities.map(city => (
+            <button
+              ref={element => { cityButtonRefs.current[city.id] = element; }}
+              key={city.id}
+              type="button"
+              data-city-plan={city.id}
+              className={`bw-city-plan${activeCity?.id === city.id ? ' is-on' : ''}${city.attention > 0 ? ' is-warn' : ''}`}
+              aria-pressed={activeCity?.id === city.id}
+              aria-label={`Open ${city.name}, ${city.facilities.length} rooms, ${city.attention} needs attention`}
+              onClick={() => {
+                setActiveCityId(city.id);
+                setActiveFacilityId(city.facilities.find(facility => limitingFactor(data, facility) !== 'NONE')?.id ?? city.facilities[0]?.id ?? '');
+              }}
+            >
+              <span className="bw-city-plan-top">
+                <b>{city.name}</b>
+                <i className={city.attention > 0 ? 'is-warn' : 'is-good'}>{city.attention > 0 ? city.attention : '✓'}</i>
+              </span>
+              <span>{city.facilities.length} {city.facilities.length === 1 ? 'room' : 'rooms'} · {city.racks} racks</span>
+              <span>{compactCount(city.capacity)} streams · {money(city.weeklyCost)}/wk</span>
+            </button>
+          ))}
+        </div>
+
+        {activeCity && (
+          <div className="bw-city-workspace">
+            <div className="bw-city-workspace-head">
+              <span><em>Working city</em><b>{activeCity.name}</b></span>
+              <div className="bw-city-workspace-actions">
+                <span className={activeCity.attention > 0 ? 'is-warn' : 'is-good'}>
+                  {activeCity.attention > 0
+                    ? `${activeCity.attention} ${activeCity.attention === 1 ? 'room needs' : 'rooms need'} attention`
+                    : 'All rooms ready'}
+                </span>
+                <button
+                  type="button"
+                  className="bw-copy-city"
+                  disabled={!copyResult || copyResult.affectedRooms === 0}
+                  onClick={() => setCopyOpen(true)}
+                >
+                  Copy setup to all cities
+                </button>
+                {copyUndo && (
+                  <button
+                    type="button"
+                    className="bw-copy-undo"
+                    onClick={() => {
+                      patch({ facilities: copyUndo });
+                      setCopyUndo(null);
+                    }}
+                  >
+                    Undo copy
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className="bw-room-strip" aria-label={`Rooms in ${activeCity.name}`}>
+              {activeCity.facilities.map((facility, index) => {
+                const listing = listingFor(data, facility);
+                const limiting = limitingFactor(data, facility);
+                return (
+                  <button
+                    key={facility.id}
+                    type="button"
+                    data-room-picker={facility.id}
+                    className={`bw-room-picker${activeFacility?.id === facility.id ? ' is-on' : ''}${limiting !== 'NONE' ? ' is-warn' : ''}`}
+                    aria-pressed={activeFacility?.id === facility.id}
+                    onClick={() => setActiveFacilityId(facility.id)}
+                  >
+                    <span><i className={limiting === 'NONE' ? 'is-good' : 'is-warn'} />Room {String(index + 1).padStart(2, '0')}</span>
+                    <b>{facilityRacks(facility)}<small>/{listing?.rackPositions ?? 0} racks</small></b>
+                    <em>{limiting === 'NONE' ? 'Ready' : SUPPLY_COPY[limiting as Exclude<Limiting, 'NONE'>]?.name ?? 'Attention'}</em>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </section>
+
+      {activeFacility && (() => {
+        const facility = activeFacility;
+        const editableFacility = draft.facilities.find(candidate => candidate.id === facility.id) ?? facility;
         const listing = listingFor(data, facility);
-        const city = cityFor(data, facility);
         const limiting = limitingFactor(data, facility);
+        const rackLimit = listing?.rackPositions ?? facilityRacks(facility);
+        const roomFull = facilityRacks(facility) === rackLimit;
         const repairs = data.repairs.filter((r) => r.facilityId === facility.listingId);
 
         return (
-          <section key={facility.id} className="bw-room">
+          <section key={facility.id} className="bw-room" data-room-workbench={facility.id}>
             <header className="bw-room-head">
               <div>
-                <b>{city?.name}</b>
+                <b>{facilityRoomLabel(data, facilities, facility)}</b>
                 <em>{listing?.name} · {listing?.provider}</em>
               </div>
-              <span className="bw-room-count">{facilityRacks(facility)}<s>/{listing?.rackPositions ?? 0}</s></span>
+              <span className={`bw-room-count${capacityFeedback?.facilityId === facility.id ? ' is-limit-hit' : ''}`}>{facilityRacks(facility)}<s>/{listing?.rackPositions ?? 0}</s></span>
             </header>
 
             {/* Which machines you own and which you are renting — the
@@ -140,7 +389,17 @@ export function StagePlans({ data, draft, patch, totals }: StageProps) {
               owned={Math.round(facilityRacks(facility) * share)}
             />
 
-            <p className={limiting === 'NONE' ? 'bw-limit is-ok' : 'bw-limit'}>{LIMITING_COPY[limiting]}</p>
+            <p className={limiting === 'NONE' ? `bw-limit is-ok${roomFull ? ' is-full' : ''}` : 'bw-limit'}>
+              {limiting === 'NONE' && roomFull
+                ? `Room full · ${facilityRacks(facility)} of ${rackLimit} rack positions assigned`
+                : LIMITING_COPY[limiting]}
+            </p>
+
+            {capacityFeedback?.facilityId === facility.id && (
+              <p className="bw-capacity-feedback" role="status" aria-live="polite">
+                {capacityFeedback.message}
+              </p>
+            )}
 
             {/* The repair that fixes the actual ceiling comes first and alone.
                 Everything else about the room is one tap away — a room has
@@ -157,7 +416,7 @@ export function StagePlans({ data, draft, patch, totals }: StageProps) {
                       <b>{repair.label}</b>
                       <span className="st-model-switch" aria-hidden="true"><i /></span>
                     </span>
-                    <s>{repair.what}</s>
+                    <span className="bw-fix-copy">{repair.what}</span>
                     <span className="bw-fix-chips">
                       <i>{money(repair.cost)}</i>
                       <i>{repair.weeks} weeks</i>
@@ -175,8 +434,18 @@ export function StagePlans({ data, draft, patch, totals }: StageProps) {
                 <span><em>Condition</em><b>{pct(facility.condition * 100, 0)}</b></span>
                 <span><em>Backup</em><b>{facility.backup}</b></span>
                 <span><em>Backup covers</em><b>{pct(facility.backupCoverage * 100, 0)}</b></span>
-                <span><em>Energy a week</em><b>{facility.energyPerWeek} MWh</b></span>
-                <span><em>Water a week</em><b>{facility.waterPerWeek} m³</b></span>
+                <ResourceMetric resource="energy" label="Energy a week" value={facility.energyPerWeek} unit="MWh" compact onExplain={() => setOpenInfo({
+                  title: 'Weekly energy use', value: `${facility.energyPerWeek} MWh`,
+                  summary: 'The electricity these machines consume during a normal operating week.',
+                  impact: 'Energy use contributes to operating cost and the network’s sustainability score.',
+                  guidance: 'Reduce rack load, choose more efficient facilities, or improve the power setup.',
+                })} />
+                <ResourceMetric resource="water" label="Water a week" value={facility.waterPerWeek} unit="m³" compact onExplain={() => setOpenInfo({
+                  title: 'Weekly water use', value: `${facility.waterPerWeek} m³`,
+                  summary: 'The water used by this facility’s cooling systems in a normal week.',
+                  impact: 'Higher water use can reduce sustainability and make the site more expensive to operate.',
+                  guidance: 'Use efficient cooling or move future capacity to facilities with a better resource profile.',
+                })} />
                 <span><em>Running a week</em><b>{money(facility.opCost)}</b></span>
                 <span><em>Free slots</em><b>{Math.max(0, (listing?.rackPositions ?? 0) - facilityRacks(facility))}</b></span>
               </div>
@@ -196,7 +465,7 @@ export function StagePlans({ data, draft, patch, totals }: StageProps) {
                               <b>{repair.label}</b>
                               <span className="st-model-switch" aria-hidden="true"><i /></span>
                             </span>
-                            <s>{repair.what}</s>
+                            <span className="bw-fix-copy">{repair.what}</span>
                             <span className="bw-fix-chips">
                               <i>{money(repair.cost)}</i>
                               <i>{repair.weeks} weeks</i>
@@ -218,13 +487,19 @@ export function StagePlans({ data, draft, patch, totals }: StageProps) {
                   <span className="bw-group-tint" style={{ background: DUTY_TINT[group.duty] }} aria-hidden="true" />
                   <span className="bw-group-body">
                     <b>{DUTIES[group.duty].name}<i>{DUTIES[group.duty].tech}</i></b>
-                    <em>{DUTIES[group.duty].line}</em>
+                    <em>{DUTIES[group.duty].shortLine}</em>
                     <s>{compactCount(group.capacity)} streams</s>
                   </span>
                   <span className="bw-group-racks">
-                    <button type="button" className="st-step" onClick={() => changeRacks(facility, group.id, -1)} aria-label="Remove a rack">−</button>
+                    <button type="button" className="st-step" onClick={() => changeRacks(editableFacility, group.id, -1)} aria-label="Remove a rack">−</button>
                     <b>{group.racks}</b>
-                    <button type="button" className="st-step" onClick={() => changeRacks(facility, group.id, 1)} aria-label="Add a rack">+</button>
+                    <button
+                      type="button"
+                      className={`st-step${roomFull ? ' is-capacity-locked' : ''}`}
+                      aria-disabled={roomFull}
+                      onClick={() => changeRacks(editableFacility, group.id, 1)}
+                      aria-label="Add a rack"
+                    >+</button>
                   </span>
                   <button type="button" className="bw-group-duty" onClick={() => setDutyFor({ facilityId: facility.id, groupId: group.id })}>
                     Duty
@@ -237,7 +512,13 @@ export function StagePlans({ data, draft, patch, totals }: StageProps) {
               {(['EDGE', 'REGIONAL', 'ENCODE', 'SERVICES', 'LIVE'] as Duty[])
                 .filter((duty) => !facility.groups.some((g) => g.duty === duty))
                 .map((duty) => (
-                  <button key={duty} type="button" className="pr-chip" onClick={() => addGroup(facility, duty)}>
+                  <button
+                    key={duty}
+                    type="button"
+                    className={`pr-chip${roomFull ? ' is-capacity-locked' : ''}`}
+                    aria-disabled={roomFull}
+                    onClick={() => addGroup(editableFacility, duty)}
+                  >
                     + {DUTIES[duty].name}
                   </button>
                 ))}
@@ -245,7 +526,7 @@ export function StagePlans({ data, draft, patch, totals }: StageProps) {
 
           </section>
         );
-      })}
+      })()}
 
       {/* --- two choices, three ways each ------------------------------------
           These were six tall cards. They are two rows now: pick one, read one
@@ -254,14 +535,22 @@ export function StagePlans({ data, draft, patch, totals }: StageProps) {
           The three names are presets on one dial. "Hybrid" was a word the
           player had to accept; now it is a mix they set. */}
       <section className="lw-block">
-        <p className="sf-eyebrow lw-block-head">Own it or rent it</p>
+        <div className="bw-section-title">
+          <p className="sf-eyebrow lw-block-head">Own it or rent it</p>
+          <InfoButton label="About ownership mix" onClick={() => setOpenInfo({
+            title: 'Ownership mix', value: `${ownedPct}% owned`,
+            summary: 'This decides how many machines you buy and how many you rent from infrastructure partners.',
+            impact: 'Owning costs more now but less each week. Renting opens faster and supplies surge capacity, but keeps a larger weekly bill.',
+            guidance: 'Move the slider and compare the live build cost, weekly cost, timing, and surge capacity below.',
+          })} />
+        </div>
         <div className="bw-tri">
           {(Object.keys(ARCHITECTURES) as Array<keyof typeof ARCHITECTURES>).map((id) => (
             <button
               key={id}
               type="button"
               className={architectureFor(share) === id ? 'bw-tri-btn is-on' : 'bw-tri-btn'}
-              onClick={() => patch({ architecture: id, ownedShare: ARCH_SHARE[id] })}
+              onClick={() => editPatch({ architecture: id, ownedShare: ARCH_SHARE[id] })}
             >
               {ARCHITECTURES[id].name}
             </button>
@@ -282,7 +571,7 @@ export function StagePlans({ data, draft, patch, totals }: StageProps) {
             value={ownedPct}
             onChange={(e) => {
               const next = Number(e.target.value) / 100;
-              patch({ ownedShare: next, architecture: architectureFor(next) });
+              editPatch({ ownedShare: next, architecture: architectureFor(next) });
             }}
             aria-label="How much of the fleet you own"
           />
@@ -292,42 +581,100 @@ export function StagePlans({ data, draft, patch, totals }: StageProps) {
           </div>
         </div>
 
-        <p className="bw-tri-line">
-          {ownedPct >= 90
-            ? 'Every machine is yours. Dearest to build, cheapest to keep, and nothing to fall back on when a night goes bigger than planned.'
-            : ownedPct <= 30
-              ? 'Almost everything is rented. Cheap to stand up, expensive every week, and you can borrow capacity on the night.'
-              : `You own the core and rent the edge. ${money(totals.weeklyCost)} a week to keep, with ${compactCount(totals.burst)} of rented burst behind you.`}
-        </p>
-      </section>
-
-      <section className="lw-block">
-        <p className="sf-eyebrow lw-block-head">How hard you push the crews</p>
-        <div className="bw-tri">
-          {(Object.keys(DOCTRINES) as Array<keyof typeof DOCTRINES>).map((id) => (
-            <button key={id} type="button" className={draft.doctrine === id ? 'bw-tri-btn is-on' : 'bw-tri-btn'} onClick={() => patch({ doctrine: id })}>
-              {DOCTRINES[id].name}
-            </button>
-          ))}
+        <div className="bw-decision-facts" aria-label="Ownership consequences">
+          <span><em>Upfront</em><b>{money(totals.buildCost)} build cost</b></span>
+          <span><em>Every week</em><b>{money(totals.weeklyCost)} running cost</b></span>
+          <span><em>Timeline</em><b>{totals.weeks} weeks to build</b></span>
+          <span><em>Traffic buffer</em><b>{compactCount(totals.burst)} temporary capacity</b></span>
         </div>
-        <p className="bw-tri-line">{DOCTRINES[draft.doctrine].line}</p>
-        <div className="lw-effects">{DOCTRINES[draft.doctrine].effects.map((e) => <i key={e}>{e}</i>)}</div>
       </section>
 
       {/* --- what the estate costs to keep -------------------------------------- */}
       <section className="bw-estate">
         <p className="sf-eyebrow">Every week, once it is running</p>
         <div className="cr-tiles">
-          <span><em>Running cost</em><b>{money(totals.weeklyCost)}</b></span>
-          <span><em>Energy</em><b>{totals.energy}<s>MWh</s></b></span>
-          <span><em>Water</em><b>{totals.water}<s>m³</s></b></span>
-          <span><em>Burst held</em><b>{compactCount(totals.burst)}</b></span>
+          <ResourceMetric resource="money" label="Running cost" value={money(totals.weeklyCost)} unit="/wk" onExplain={() => setOpenInfo({
+            title: 'Weekly running cost', value: `${money(totals.weeklyCost)}/week`,
+            summary: 'The recurring facility, rental, and operating bill after this network is commissioned.',
+            impact: 'This amount leaves the platform treasury every week whether viewing is high or low.',
+            guidance: 'Choose cheaper sites, own more machines, or reduce the planned rack count.',
+          })} />
+          <ResourceMetric resource="energy" label="Energy" value={totals.energy} unit="MWh" onExplain={() => setOpenInfo({
+            title: 'Network energy use', value: `${totals.energy} MWh/week`,
+            summary: 'The electricity consumed by every facility in this proposed network.',
+            impact: 'It contributes to weekly operating pressure and sustainability performance.',
+            guidance: 'Use fewer racks or favour efficient facilities when energy use becomes too high.',
+          })} />
+          <ResourceMetric resource="water" label="Water" value={totals.water} unit="m³" onExplain={() => setOpenInfo({
+            title: 'Network water use', value: `${totals.water} m³/week`,
+            summary: 'The cooling water consumed across the complete proposed network.',
+            impact: 'Water-intensive cooling can lower sustainability and increase operating pressure.',
+            guidance: 'Prefer facilities with efficient cooling and avoid unnecessary rack capacity.',
+          })} />
+          <ResourceMetric resource="network" label="Traffic buffer" value={compactCount(totals.burst)} onExplain={() => setOpenInfo({
+            title: 'Traffic buffer', value: compactCount(totals.burst),
+            summary: 'Temporary extra streaming capacity available above the network’s steady limit.',
+            impact: 'It absorbs sudden premiere traffic. With no surge capacity, excess viewers may buffer or lose access.',
+            guidance: 'Rent part of the fleet or add capacity in another facility before a major opening.',
+            status: totals.burst > 0 ? 'good' : 'warn',
+          })} />
         </div>
         <div className="bw-scores">
           <Score label="Sustainability" value={totals.sustainability} />
           <Score label="Public reputation" value={totals.reputation} />
         </div>
       </section>
+
+      <Sheet
+        open={copyOpen}
+        onClose={() => setCopyOpen(false)}
+        eyebrow="City template"
+        title={`Copy ${activeCity?.name ?? 'this city'} setup?`}
+        footer={(
+          <div className="sf-sheet-actions">
+            <button type="button" className="sf-btn sf-btn--ghost" onClick={() => setCopyOpen(false)}>Cancel</button>
+            <button
+              type="button"
+              className="sf-btn sf-btn--primary"
+              disabled={!copyResult || copyResult.affectedRooms === 0}
+              onClick={() => {
+                if (!copyResult) return;
+                setCopyUndo(draft.facilities);
+                patch({ facilities: copyResult.facilities });
+                setCopyOpen(false);
+              }}
+            >
+              Copy setup
+            </button>
+          </div>
+        )}
+      >
+        <p className="bw-copy-explain">
+          Rack duties and quantities will be repeated across rooms already leased in the other cities.
+          Providers, leases, prices, repairs and physical room limits stay local.
+        </p>
+        {copyResult && (
+          <div className="bw-copy-preview" aria-label="Copy setup preview">
+            <span><em>Cities</em><b>{copyResult.destinationCities}</b></span>
+            <span><em>Rooms</em><b>{copyResult.affectedRooms}</b></span>
+            <span><em>Racks placed</em><b>{copyResult.copiedRacks}</b></span>
+            <span><em>Scaled rooms</em><b>{copyResult.reducedRooms}</b></span>
+          </div>
+        )}
+        {copyResult && copyResult.reducedRooms > 0 && (
+          <p className="bw-copy-notice is-warn">
+            {copyResult.reducedRooms} {copyResult.reducedRooms === 1 ? 'room is' : 'rooms are'} smaller than the source template.
+            The duty mix will be preserved while {copyResult.requestedRacks - copyResult.copiedRacks} excess racks are left out.
+          </p>
+        )}
+        <p className={copyWarningRooms > 0 ? 'bw-copy-notice is-warn' : 'bw-copy-notice is-good'}>
+          {copyWarningRooms > 0
+            ? `${copyWarningRooms} destination ${copyWarningRooms === 1 ? 'room still needs' : 'rooms still need'} attention after the copy.`
+            : 'Every destination room is expected to remain ready after the copy.'}
+        </p>
+      </Sheet>
+
+      <BuildMetricSheet info={openInfo} onClose={() => setOpenInfo(null)} />
 
       <Sheet
         open={dutyFor !== null}
@@ -361,6 +708,10 @@ export function StagePlans({ data, draft, patch, totals }: StageProps) {
       </Sheet>
     </>
   );
+}
+
+function InfoButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return <button type="button" className="bw-info-btn" aria-label={label} onClick={onClick}>i</button>;
 }
 
 /* One glyph per supply, so a repair is recognisable before it is read. */

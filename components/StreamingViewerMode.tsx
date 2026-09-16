@@ -45,6 +45,7 @@ import {
   getOwnedStreamingProgramEntries,
   getStreamingOriginalLiveStatus,
 } from '../services/streamingOriginals';
+import { getStreamingEntryPrice } from '../services/streamingPricingEconomy';
 import { getStreamingLaunchAftermath } from '../services/streamingAftermath';
 import {
   getStreamingProductSuite,
@@ -678,7 +679,7 @@ export default function StreamingViewerMode({
   const originalsRow = viewerData.originals.filter(item => !openingKeys.has(item.key));
   const ownedRow = viewerData.owned.filter(item => !openingKeys.has(item.key));
   const licensedRow = viewerData.licensed.filter(item => !openingKeys.has(item.key));
-  const basicPrice = platform.subscriptionPrices.BASIC;
+  const basicPrice = getStreamingEntryPrice(platform);
   const heroStatus = !heroTitle
     ? null
     : isSuspended

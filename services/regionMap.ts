@@ -1,6 +1,9 @@
 import type { BoxOfficeRegionId, ScreeningStrategy } from '../types';
 import { BOX_OFFICE_REGIONS } from './cinemaChains';
 
+/** A longitude/latitude rectangle: [[west, south], [east, north]]. */
+export type LonLatBox = [[number, number], [number, number]];
+
 export interface RegionMapOverlay {
     id: BoxOfficeRegionId;
     label: string;
@@ -10,6 +13,9 @@ export interface RegionMapOverlay {
     labelY: number;
     accent: string;
     countryIds: string[];
+    labelLonLat: [number, number];
+    fitBox: LonLatBox;
+    hubCityId: string;
 }
 
 export interface RegionMapSummary {
@@ -17,6 +23,35 @@ export interface RegionMapSummary {
     marketWeight: number;
     labels: string[];
     shortLabels: string[];
+}
+
+export interface RegionMapLocationPin {
+    id: string;
+    name: string;
+    /** Short real-data descriptor shown below the place name at country zoom. */
+    badge?: string;
+    ariaLabel?: string;
+    x: number;
+    y: number;
+    longitude?: number;
+    latitude?: number;
+    selected?: boolean;
+    market?: boolean;
+    regionId?: BoxOfficeRegionId;
+    countryId?: string;
+    countryCode?: string;
+    state?: 'idle' | 'recommended' | 'planned' | 'built' | 'active';
+    variant?: 'default' | 'origin' | 'relay' | 'cache';
+    size?: number;
+    load?: number;
+    built?: boolean;
+}
+
+export interface RegionMapLocationRoute {
+    fromId: string;
+    toId: string;
+    animated?: boolean;
+    planned?: boolean;
 }
 
 const regionMeta = Object.fromEntries(
@@ -47,7 +82,10 @@ export const REGION_MAP_OVERLAYS: RegionMapOverlay[] = [
         labelX: 218,
         labelY: 163,
         accent: '#49f2b0',
-        countryIds: countryIds('124', '840', '484', '188', '222', '320', '340', '558', '591', '192', '214', '332', '388', '028', '052', '084', '212', '308', '630', '659', '662', '670', '780', '534', '060', '796', '850')
+        labelLonLat: [-100, 41],
+        fitBox: [[-168, 7], [-52, 72]],
+        hubCityId: 'us-la',
+        countryIds: countryIds('124', '840', '484', '188', '222', '320', '340', '558', '591', '192', '214', '332', '388', '028', '052', '084', '212', '308', '630', '659', '662', '670', '780', '534', '060', '796', '850', '044', '136', '660', '092', '500', '533', '531', '666', '663', '652')
     },
     {
         id: 'SOUTH_AMERICA',
@@ -57,7 +95,10 @@ export const REGION_MAP_OVERLAYS: RegionMapOverlay[] = [
         labelX: 247,
         labelY: 355,
         accent: '#ffb86b',
-        countryIds: countryIds('032', '068', '076', '152', '170', '218', '328', '600', '604', '740', '858', '862', '254')
+        labelLonLat: [-60, -12],
+        fitBox: [[-82, -56], [-34, 13]],
+        hubCityId: 'br-sp',
+        countryIds: countryIds('032', '068', '076', '152', '170', '218', '328', '600', '604', '740', '858', '862', '254', '238', '239')
     },
     {
         id: 'EUROPE',
@@ -67,7 +108,10 @@ export const REGION_MAP_OVERLAYS: RegionMapOverlay[] = [
         labelX: 522,
         labelY: 165,
         accent: '#ffd166',
-        countryIds: countryIds('008', '040', '056', '100', '112', '191', '196', '203', '208', '233', '246', '250', '276', '300', '304', '348', '352', '372', '380', '428', '440', '442', '470', '492', '498', '499', '528', '578', '616', '620', '642', '643', '674', '688', '703', '705', '724', '752', '756', '804', '807', '826', '020', '070')
+        labelLonLat: [14, 50],
+        fitBox: [[-25, 34], [45, 72]],
+        hubCityId: 'gb-lon',
+        countryIds: countryIds('008', '040', '056', '100', '112', '191', '196', '203', '208', '233', '246', '250', '276', '300', '304', '348', '352', '372', '380', '428', '440', '442', '470', '492', '498', '499', '528', '578', '616', '620', '642', '643', '674', '688', '703', '705', '724', '752', '756', '804', '807', '826', '020', '070', '336', '832', '831', '833', '438', '248', '234')
     },
     {
         id: 'ASIA',
@@ -77,7 +121,10 @@ export const REGION_MAP_OVERLAYS: RegionMapOverlay[] = [
         labelX: 758,
         labelY: 205,
         accent: '#ff6b6b',
-        countryIds: countryIds('004', '031', '050', '051', '064', '096', '104', '116', '144', '156', '268', '356', '360', '364', '368', '376', '392', '398', '400', '408', '410', '414', '417', '418', '422', '458', '462', '496', '512', '524', '586', '608', '626', '634', '682', '702', '704', '760', '762', '764', '784', '792', '795', '860', '887')
+        labelLonLat: [88, 33],
+        fitBox: [[25, -12], [150, 55]],
+        hubCityId: 'in-mum',
+        countryIds: countryIds('004', '031', '050', '051', '064', '096', '104', '116', '144', '156', '268', '356', '360', '364', '368', '376', '392', '398', '400', '408', '410', '414', '417', '418', '422', '458', '462', '496', '512', '524', '586', '608', '626', '634', '682', '702', '704', '760', '762', '764', '784', '792', '795', '860', '887', '158', '048', '446', '344')
     },
     {
         id: 'AFRICA',
@@ -87,7 +134,10 @@ export const REGION_MAP_OVERLAYS: RegionMapOverlay[] = [
         labelX: 563,
         labelY: 319,
         accent: '#c4b5fd',
-        countryIds: countryIds('012', '024', '072', '108', '120', '140', '148', '174', '178', '180', '204', '231', '232', '262', '266', '270', '275', '288', '324', '384', '404', '426', '430', '434', '450', '454', '466', '478', '504', '508', '516', '562', '566', '624', '646', '686', '694', '706', '710', '716', '728', '729', '732', '748', '768', '788', '800', '818', '894')
+        labelLonLat: [19, 6],
+        fitBox: [[-18, -36], [52, 38]],
+        hubCityId: 'ng-lag',
+        countryIds: countryIds('012', '024', '072', '108', '120', '140', '148', '174', '178', '180', '204', '231', '232', '262', '266', '270', '275', '288', '324', '384', '404', '426', '430', '434', '450', '454', '466', '478', '504', '508', '516', '562', '566', '624', '646', '686', '694', '706', '710', '716', '728', '729', '732', '748', '768', '788', '800', '818', '894', '834', '854', '226', '690', '678', '480', '132', '654', '086', '260')
     },
     {
         id: 'OCEANIA',
@@ -97,7 +147,10 @@ export const REGION_MAP_OVERLAYS: RegionMapOverlay[] = [
         labelX: 846,
         labelY: 419,
         accent: '#93c5fd',
-        countryIds: countryIds('036', '242', '296', '520', '554', '583', '584', '585', '598', '776', '798', '882', '090', '548')
+        labelLonLat: [134, -25],
+        fitBox: [[110, -48], [180, -5]],
+        hubCityId: 'au-syd',
+        countryIds: countryIds('036', '242', '296', '520', '554', '583', '584', '585', '598', '776', '798', '882', '090', '548', '580', '316', '016', '612', '570', '184', '876', '258', '540', '574', '334')
     }
 ];
 
@@ -106,6 +159,20 @@ const overlayById = Object.fromEntries(
 ) as Record<BoxOfficeRegionId, RegionMapOverlay>;
 
 export const getRegionMapOverlay = (regionId: BoxOfficeRegionId): RegionMapOverlay | undefined => overlayById[regionId];
+
+export const REGION_ID_BY_COUNTRY: Record<string, BoxOfficeRegionId> = REGION_MAP_OVERLAYS.reduce<Record<string, BoxOfficeRegionId>>(
+    (lookup, region) => {
+        region.countryIds.forEach(countryId => { lookup[countryId] = region.id; });
+        return lookup;
+    },
+    {}
+);
+
+export const ASSIGNED_COUNTRY_IDS: ReadonlySet<string> = new Set(Object.keys(REGION_ID_BY_COUNTRY));
+
+export const getRegionIdForCountry = (countryId: string | null | undefined): BoxOfficeRegionId | undefined => (
+    countryId ? REGION_ID_BY_COUNTRY[countryId] : undefined
+);
 
 export const normalizeReleaseRegionIds = (
     selectedRegionIds: Array<BoxOfficeRegionId | string | null | undefined>

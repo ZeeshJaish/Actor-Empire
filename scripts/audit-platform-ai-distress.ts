@@ -14,6 +14,7 @@ import {
     cancelPendingPlatformAiCatalogueDistressDealsForAcquisition,
     DISTRESS_STAGE_ORDER,
     progressPlatformAiDistressWorld,
+    selectPlatformAiWithdrawableMarket,
 } from '../services/platformAi/platformAiDistress';
 import { settlePlatformAiEconomy } from '../services/platformAi/platformAiEconomy';
 import {
@@ -137,6 +138,34 @@ assert.deepEqual(
 );
 
 const fixture = distressedFixture();
+const homeOnlyHulu = normalizePlatformAiState(
+    structuredClone(fixture.world.platforms!.HULU),
+    fixture.id,
+    START_WEEK,
+);
+homeOnlyHulu.ai!.marketOperations = homeOnlyHulu.ai!.marketOperations.map(operation => ({
+    ...operation,
+    status: operation.countryId === 'US' ? 'ACTIVE' as const : 'SUSPENDED' as const,
+}));
+homeOnlyHulu.ai!.capabilities.activeCountryIds = ['US'];
+assert.equal(
+    selectPlatformAiWithdrawableMarket(homeOnlyHulu),
+    undefined,
+    'Distress must never withdraw an AI platform from its final protected home market.',
+);
+const multiMarketHulu = structuredClone(homeOnlyHulu);
+multiMarketHulu.ai!.marketOperations = multiMarketHulu.ai!.marketOperations.map(operation => ({
+    ...operation,
+    status: operation.countryId === 'US' || operation.countryId === 'JP'
+        ? 'ACTIVE' as const
+        : operation.status,
+}));
+multiMarketHulu.ai!.capabilities.activeCountryIds = ['US', 'JP'];
+assert.equal(
+    selectPlatformAiWithdrawableMarket(multiMarketHulu)?.countryId,
+    'JP',
+    'Distress may withdraw a non-home market while preserving the operating home market.',
+);
 const opened = progressPlatformAiDistressWorld({
     player: fixture,
     world: fixture.world,

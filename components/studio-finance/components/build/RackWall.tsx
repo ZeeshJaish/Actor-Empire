@@ -141,10 +141,16 @@ export function RackWall({ facility, listing, limiting, activeGroupId, compact, 
           const fill = Math.min(1, line.used / Math.max(1, line.cap));
           const tight = limiting === line.id;
           return (
-            <li key={line.id} className={`is-${line.tone}${tight ? ' is-tight' : ''}`}>
+            <li
+              key={line.id}
+              className={`is-${line.tone}${line.id === 'POWER' ? ' sf-resource-line is-energy' : line.id === 'COOLING' ? ' sf-resource-line is-water' : ' sf-resource-line is-network'}${tight ? ' is-tight' : ''}`}
+            >
               <em>{line.label}</em>
               <span className="rw-bar"><i style={{ width: `${fill * 100}%` }} /></span>
-              <s>{Math.round(line.used)}/{Math.round(line.cap)}{line.unit}</s>
+              <span className="rw-reading">
+                {Math.round(line.used)}/{Math.round(line.cap)}
+                <small className="sf-resource-unit">{line.unit}</small>
+              </span>
             </li>
           );
         })}

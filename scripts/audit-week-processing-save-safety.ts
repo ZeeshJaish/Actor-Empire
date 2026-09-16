@@ -3,6 +3,7 @@ import { INITIAL_PLAYER, type Player } from '../types';
 import { generateLegalHearing } from '../services/lifeEventLogic';
 import { compactPlayerForPersistence } from '../services/saveCompaction';
 import { processGameWeek } from '../services/gameLoop';
+import { prepareVerifiedPlayerForPersistence } from '../services/savePreparation';
 
 const assert = (condition: unknown, message: string) => {
   if (!condition) throw new Error(message);
@@ -69,6 +70,10 @@ scheduledPlayer.flags = {
 };
 
 const weeklyResult = await processGameWeek(scheduledPlayer);
+assert(
+  prepareVerifiedPlayerForPersistence(weeklyResult.player, 'PROCESS_WEEK').comparison.ok,
+  'A processed week must remain verifiable after persistence compaction.'
+);
 const scheduledHearing = weeklyResult.player.scheduledEvents.find(event => event.id === 'hearing_case_scheduled_week_qa_1');
 assert(scheduledHearing, 'Age Up Week should schedule the legal hearing.');
 assert(scheduledHearing?.data?.caseId === 'case_scheduled_week_qa', 'Scheduled legal hearing must preserve its case id.');
@@ -105,6 +110,10 @@ multiWeekPlayer.flags = {
 
 for (let tick = 0; tick < 8; tick += 1) {
   const result = await processGameWeek(multiWeekPlayer);
+  assert(
+    prepareVerifiedPlayerForPersistence(result.player, 'PROCESS_WEEK').comparison.ok,
+    `Processed week ${tick + 1} must remain verifiable after persistence compaction.`
+  );
   const persistedTick = compactPlayerForPersistence(result.player);
   structuredClone(persistedTick);
   assert(

@@ -57,6 +57,7 @@ import {
   createStreamingFacilityFromListing,
   getRecommendedStreamingFacilityListing,
   getStreamingFacilityMarketplace,
+  type StreamingFacilityMarketContext,
   type StreamingFacilityMarketplaceListing,
 } from '../../services/streamingFacilityMarketplace';
 import { normalizeStreamingInfrastructureManagementPolicy } from '../../services/streamingInfrastructureManagement';
@@ -114,6 +115,8 @@ export interface BuildSel {
   campaign: CampId;
   /** Workflow preference only. It never modifies derive() by itself. */
   managementPolicy?: StreamingInfrastructureManagementPolicy;
+  assistedPlanApproved?: boolean;
+  assistedPlanClass?: PkgId;
 }
 
 export interface BuildInputs {
@@ -146,6 +149,7 @@ export interface BuildInputs {
   /** where the app can be opened, even before those places become paid launch markets */
   coverageRegions?: RegionId[];
   /** exact countries chosen in Day-One Markets; regions remain a migration fallback */
+  hasExplicitOpeningMarkets?: boolean;
   markets?: Array<{
     id: string;
     country: string;
@@ -161,6 +165,17 @@ export interface BuildInputs {
   homeCityId: string | null;
   /** how much bigger the crowd is because of the plans on sale (see pricing.tsx) */
   audienceMul: number;
+  /** Canonical country/cohort/rival demand from the shared World Economy.
+      Older saves and isolated fixtures may omit it and use the legacy audience fallback. */
+  openingDemandForecast?: {
+    low: number;
+    likely: number;
+    high: number;
+    byMarket: Record<string, number>;
+  };
+  /** Country macro facts from the shared World Economy. Facility contracts
+      consume these without owning or duplicating population simulation. */
+  facilityMarketContextByCountryId?: Record<string, StreamingFacilityMarketContext>;
   /** weekly repayment on anything borrowed (see raise.tsx) */
   debtWeekly?: number;
 }
@@ -175,7 +190,7 @@ export interface BuildCommitResult {
 export const PER_RACK_CEILING = 65_000;
 const PER_RACK_CAPEX = 3_750_000;
 const PER_RACK_WEEKLY = 90_000;
-/** viewers per person of reachable population on a premiere night */
+/** Legacy fallback for saves and fixtures that predate the shared World Economy handoff. */
 const DEMAND_RATE = 0.00018;
 
 const ROLE_RULES: Record<StreamingNetworkNodeRole, {
@@ -509,7 +524,7 @@ export interface Derived {
 }
 
 export function derive(sel: BuildSel, inp: BuildInputs): Derived {
-  const a = archOf(sel.arch), d = docOf(sel.doctrine), c = campOf(sel.campaign);
+  const a = archOf(sel.arch), d = docOf(sel.doctrine);
   const marketTerr = territoriesOf(inp.regions);
   const terr = territoriesOf(inp.coverageRegions?.length ? inp.coverageRegions : inp.regions);
 
@@ -529,15 +544,25 @@ export function derive(sel: BuildSel, inp: BuildInputs): Derived {
   const marketViewers = inp.markets?.length
     ? inp.markets.reduce((sum, market) => sum + market.audience, 0)
     : marketTerr.reduce((s, r) => s + regionOf(r).viewers, 0);
-  const marketViewersByRegion = new Map<RegionId, number>();
+  const worldDemand = inp.openingDemandForecast;
+  const hasWorldDemand = Boolean(
+    worldDemand
+    && worldDemand.low >= 0
+    && worldDemand.likely >= worldDemand.low
+    && worldDemand.high >= worldDemand.likely,
+  );
+  const marketDemandByRegion = new Map<RegionId, number>();
   if (inp.markets?.length) {
-    inp.markets.forEach(market => marketViewersByRegion.set(
-      market.region,
-      (marketViewersByRegion.get(market.region) || 0) + market.audience,
-    ));
+    inp.markets.forEach(market => {
+      const weight = hasWorldDemand
+        ? Math.max(0, worldDemand?.byMarket[market.id] || 0)
+        : market.audience;
+      marketDemandByRegion.set(market.region, (marketDemandByRegion.get(market.region) || 0) + weight);
+    });
   } else {
-    marketTerr.forEach(region => marketViewersByRegion.set(region, regionOf(region).viewers));
+    marketTerr.forEach(region => marketDemandByRegion.set(region, regionOf(region).viewers));
   }
+  const marketDemandWeight = Array.from(marketDemandByRegion.values()).reduce((sum, value) => sum + value, 0);
   const cityShare = new Map<string, number>();
   const poolOf = new Map<RegionId, string[]>();
 
@@ -550,12 +575,12 @@ export function derive(sel: BuildSel, inp: BuildInputs): Derived {
     })).sort((x, y) => x.ms - y.ms);
 
     const worldwideShare = totalViewers ? regionOf(r).viewers / totalViewers : 0;
-    const demandShare = marketTerr.includes(r) && marketViewers
-      ? (marketViewersByRegion.get(r) || 0) / marketViewers
+    const demandShare = marketTerr.includes(r) && marketDemandWeight
+      ? (marketDemandByRegion.get(r) || 0) / marketDemandWeight
       : 0;
     // Headline experience numbers describe the market the player is actually
     // opening today. The expanded table still previews every future region.
-    const share = demandShare || (marketViewers ? 0 : worldwideShare);
+    const share = demandShare || (marketDemandWeight ? 0 : worldwideShare);
     if (!cands.length) {
       return {
         region: r, label: regionOf(r).label, viewers: regionOf(r).viewers,
@@ -689,7 +714,7 @@ export function derive(sel: BuildSel, inp: BuildInputs): Derived {
     ) * a.weeksMul * d.weeksMul));
 
   const opsReserve = weekly * 6;
-  const campaignCost = c.cost;
+  const campaignCost = 0;
   /* borrowed money starts costing the week it is drawn, launched or not */
   const debtReserve = (inp.debtWeekly ?? 0) * 6;
   const committed = capex + opsReserve + campaignCost + debtReserve
@@ -700,11 +725,37 @@ export function derive(sel: BuildSel, inp: BuildInputs): Derived {
   const burstCeiling = halls.reduce((s, h) => s + h.burstCeiling, 0);
   const uniqueCityCount = new Set(halls.map(hall => hall.city.id)).size;
 
-  /* three separate things swell the crowd, and none of them build a rack:
-     the size of your territories, what the plans cost, and the campaign */
+  /* Current saves receive country/cohort/rival demand from World Economy.
+     Launch marketing is already folded into openingDemandForecast by the
+     canonical adapter, so Build must never multiply that demand again. */
   const base = marketViewers * DEMAND_RATE * (inp.audienceMul || 1);
-  const demandTotal = (s: Scenario) =>
-    Math.round(base * c.demandMul * SCENARIOS.find(x => x.id === s)!.mul);
+  const demandTotal = (s: Scenario) => {
+    const canonical = hasWorldDemand
+      ? s === 'QUIET' ? worldDemand!.low : s === 'SURGE' ? worldDemand!.high : worldDemand!.likely
+      : base * SCENARIOS.find(x => x.id === s)!.mul;
+    return Math.round(canonical);
+  };
+  const likelyDemandTotal = demandTotal('LIKELY');
+  const marketDemandRows = (inp.markets || []).map(market => {
+    const weight = hasWorldDemand
+      ? Math.max(0, worldDemand?.byMarket[market.id] || 0)
+      : Math.max(0, market.audience);
+    const exact = marketDemandWeight > 0 ? likelyDemandTotal * weight / marketDemandWeight : 0;
+    return { marketId: market.id, exact, demand: Math.floor(exact) };
+  });
+  let unallocatedDemand = Math.max(
+    0,
+    likelyDemandTotal - marketDemandRows.reduce((sum, row) => sum + row.demand, 0),
+  );
+  [...marketDemandRows]
+    .sort((left, right) => (right.exact - right.demand) - (left.exact - left.demand)
+      || left.marketId.localeCompare(right.marketId))
+    .forEach(row => {
+      if (unallocatedDemand <= 0) return;
+      row.demand += 1;
+      unallocatedDemand -= 1;
+    });
+  const likelyDemandByMarket = new Map(marketDemandRows.map(row => [row.marketId, row.demand]));
   const demandOfCity = (cityId: string, s: Scenario) =>
     Math.round(demandTotal(s) * (cityShare.get(cityId) ?? 0));
 
@@ -727,11 +778,12 @@ export function derive(sel: BuildSel, inp: BuildInputs): Derived {
     const servingHall = regional?.cityId
       ? halls.find(hall => hall.city.id === regional.cityId) || poolHalls[0]
       : null;
-    const regionalDemand = demandTotal('LIKELY')
-      * ((marketViewersByRegion.get(market.region) || 0) / Math.max(1, marketViewers));
+    const regionalDemand = (inp.markets || [])
+      .filter(item => item.region === market.region)
+      .reduce((sum, item) => sum + (likelyDemandByMarket.get(item.id) || 0), 0);
     const regionalCapacity = poolHalls.reduce((sum, hall) => sum + hall.ceiling, 0);
     const loadPct = regionalCapacity ? Math.round((regionalDemand / regionalCapacity) * 100) : 999;
-    const demand = Math.round(demandTotal('LIKELY') * (market.audience / Math.max(1, marketViewers)));
+    const demand = likelyDemandByMarket.get(market.id) || 0;
     const quality: CoverageRow['quality'] = !regional || regional.latency === null ? 'POOR'
       : loadPct > 118 ? 'POOR'
         : loadPct > 90 && regional.quality === 'EXCELLENT' ? 'UNSTABLE'
@@ -2192,7 +2244,7 @@ const Rehearsal: React.FC<{
  * tokens and fixed mobile frame without duplicating any simulation logic.
  */
 export const StreamingLoadRehearsalExperience: React.FC<React.ComponentProps<typeof Rehearsal>> = props => (
-  <div className={css.bld} style={brandVars(props.brand)}>
+  <div className={cx(css.bld, css.rehearsalLayer)} style={brandVars(props.brand)}>
     <Rehearsal {...props} />
   </div>
 );
@@ -2768,7 +2820,7 @@ export const TheBuild: React.FC<{
               {managementPolicy.mode === 'HANDS_ON' ? (
                 <div className={css.handsonnote}>
                   <span>HANDS-ON CONTROL ACTIVE</span>
-                  <b>Facilities, rack duties, architecture and build pace are unlocked below.</b>
+                  <b>Facilities, rack duties and architecture are unlocked below.</b>
                   <button type="button" onClick={() => saveManagementPolicy({ mode: 'ASSISTED' })}>
                     Hand it back to the team
                   </button>

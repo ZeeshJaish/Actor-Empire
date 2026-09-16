@@ -250,21 +250,20 @@ const compactStudioAiCompanies = (value: unknown, absoluteWeek: number) => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
   return Object.fromEntries(Object.entries(value as Record<string, any>).map(([studioId, studio]) => {
     if (!studio?.ai) return [studioId, studio];
+    const normalizedAi = normalizeStudioAiState(studio, { absoluteWeek });
     const compactedStudio = {
       ...studio,
       ai: {
-        ...studio.ai,
-        ledger: trimRecent(studio.ai.ledger, STUDIO_AI_LEDGER_MAX_ITEMS) || [],
-        events: trimRecent(studio.ai.events, STUDIO_AI_EVENT_MAX_ITEMS) || [],
-        decisions: trimRecent(studio.ai.decisions, STUDIO_AI_DECISION_MAX_ITEMS) || [],
-        migrationKeys: trimRecent(studio.ai.migrationKeys, STUDIO_AI_LEDGER_MAX_ITEMS) || [],
-        handoffKeys: trimRecent(studio.ai.handoffKeys, STUDIO_AI_LEDGER_MAX_ITEMS) || [],
-        intelligence: studio.ai.intelligence
-          ? compactIndustryIntelligenceState(studio.ai.intelligence)
-          : undefined,
-        legacyVenture: studio.ai.legacyVenture ? {
-          ...studio.ai.legacyVenture,
-          history: trimHead(studio.ai.legacyVenture.history, 24) || [],
+        ...normalizedAi,
+        ledger: trimRecent(normalizedAi.ledger, STUDIO_AI_LEDGER_MAX_ITEMS) || [],
+        events: trimRecent(normalizedAi.events, STUDIO_AI_EVENT_MAX_ITEMS) || [],
+        decisions: trimRecent(normalizedAi.decisions, STUDIO_AI_DECISION_MAX_ITEMS) || [],
+        migrationKeys: trimRecent(normalizedAi.migrationKeys, STUDIO_AI_LEDGER_MAX_ITEMS) || [],
+        handoffKeys: trimRecent(normalizedAi.handoffKeys, STUDIO_AI_LEDGER_MAX_ITEMS) || [],
+        intelligence: compactIndustryIntelligenceState(normalizedAi.intelligence),
+        legacyVenture: normalizedAi.legacyVenture ? {
+          ...normalizedAi.legacyVenture,
+          history: trimHead(normalizedAi.legacyVenture.history, 24) || [],
         } : undefined,
       },
     };
@@ -670,6 +669,12 @@ const compactTalentBookingHistory = (value: unknown, platforms: any, productions
 const compactStreamingRightsContracts = (player: any): Record<string, any> => {
   const registry = normalizeStreamingRightsContractRegistry(player?.world?.streamingRightsContracts);
   const absoluteWeek = getApproxAbsoluteWeek(Number(player?.age), Number(player?.currentWeek));
+  const contracts = Object.values(registry);
+  if (contracts.every(contract => (
+    contract.status === 'ACTIVE' && contract.expiresAtAbsoluteWeek >= absoluteWeek
+  ))) {
+    return registry;
+  }
   const referencedIds = new Set<string>();
   (Array.isArray(player?.activeReleases) ? player.activeReleases : []).forEach((release: any) => {
     const contractId = stableHistoryId(release?.streamingContractId || release?.streaming?.contractId);
@@ -687,7 +692,6 @@ const compactStreamingRightsContracts = (player: any): Record<string, any> => {
       .filter((license: any) => license?.status === 'ACTIVE' && Number(license?.expiresAtAbsoluteWeek || 0) >= absoluteWeek)
       .forEach((license: any) => referencedIds.add(stableHistoryId(license?.id)));
   });
-  const contracts = Object.values(registry);
   const protectedContracts = contracts.filter(contract => (
     contract.status === 'ACTIVE' && contract.expiresAtAbsoluteWeek >= absoluteWeek
     || referencedIds.has(contract.id)
@@ -773,6 +777,40 @@ const compactStreamingCataloguePackages = (
   return Object.fromEntries([...protectedPackages, ...terminal].map(cataloguePackage => [cataloguePackage.id, cataloguePackage]));
 };
 
+const compactWorldEconomy = (world: any) => {
+  const trimSnapshots = (state: any, limit: number) => state && typeof state === 'object'
+    ? { ...state, snapshots: Array.isArray(state.snapshots) ? state.snapshots.slice(-limit) : [] }
+    : state;
+  const population = trimSnapshots(world.worldPopulation, 32);
+  const audience = trimSnapshots(world.worldAudienceEconomy, 32);
+  const participation = trimSnapshots(world.worldAudienceParticipation, 32);
+  const competition = trimSnapshots(world.worldStreamingCompetition, 32);
+  const customersBase = trimSnapshots(world.worldStreamingCustomers, 52);
+  const customers = customersBase && typeof customersBase === 'object'
+    ? { ...customersBase, recentMovements: Array.isArray(customersBase.recentMovements) ? customersBase.recentMovements.slice(-624) : [] }
+    : customersBase;
+  const viewing = trimSnapshots(world.worldStreamingViewing, 52);
+  const economyBase = trimSnapshots(world.worldStreamingPlatformEconomy, 52);
+  const economy = economyBase && typeof economyBase === 'object'
+    ? {
+        ...economyBase,
+        historyByPlatform: Object.fromEntries(Object.entries(economyBase.historyByPlatform || {}).map(([platformId, history]) => [
+          platformId,
+          Array.isArray(history) ? history.slice(-52) : [],
+        ])),
+      }
+    : economyBase;
+  return {
+    worldPopulation: population,
+    worldAudienceEconomy: audience,
+    worldAudienceParticipation: participation,
+    worldStreamingCompetition: competition,
+    worldStreamingCustomers: customers,
+    worldStreamingViewing: viewing,
+    worldStreamingPlatformEconomy: economy,
+  };
+};
+
 const compactWorld = (player: any) => {
   const world = player?.world;
   if (!world || typeof world !== 'object') return world;
@@ -793,13 +831,12 @@ const compactWorld = (player: any) => {
         const rawPlatform = platformValue as any;
         if (!rawPlatform?.ai) return [platformId, rawPlatform];
         if (acquiredPlatformIds.has(platformId)) return [platformId, rawPlatform];
-        // Bypass the one-turn WeakMap marker with a shallow wrapper so save
-        // compaction always starts from the same fully validated AI state that
-        // migration would restore. Protection and retention are then computed
-        // from canonical collections on the first pass, making compaction
-        // idempotent instead of changing future sourcing decisions on reload.
+        // Weekly processing marks this exact object as canonical for the entered
+        // week. Reuse that validation here; imported or stale values still take
+        // the full repair path inside normalizePlatformAiState. The dedicated
+        // compaction passes below remain authoritative for history retention.
         const platform = normalizePlatformAiState(
-          { ...rawPlatform },
+          rawPlatform,
           String(player?.id || ''),
           absoluteWeek,
         ) as any;
@@ -961,6 +998,7 @@ const compactWorld = (player: any) => {
     : platforms;
   const compactedWorld = {
     ...world,
+    ...compactWorldEconomy(world),
     studios: compactStudioAiCompanies(world.studios, absoluteWeek),
     platforms: platformsWithRetainedTalentRefs,
     platformAiCatalogueDistressDeals: catalogueDistressDeals,

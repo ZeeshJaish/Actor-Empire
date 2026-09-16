@@ -124,6 +124,8 @@ type PendingWeekProcessingFailure = {
   week: number;
   failedStage: string;
   detail: string;
+  failureCode: string;
+  failures: string[];
 };
 
 const getMedicalPromptCooldownWeeks = (severity?: string) => {
@@ -3086,6 +3088,8 @@ export const App: React.FC = () => {
               week={pendingWeekProcessingFailure.week}
               failedStage={pendingWeekProcessingFailure.failedStage}
               detail={pendingWeekProcessingFailure.detail}
+              failureCode={pendingWeekProcessingFailure.failureCode}
+              failures={pendingWeekProcessingFailure.failures}
               isExporting={isExportingWeekBackup}
               onRetry={handleRetryFailedWeek}
               onExportBackup={() => void handleExportFailedWeekBackup()}

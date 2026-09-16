@@ -11,6 +11,7 @@ import {
     getStreamingInfrastructureForecast,
     runStreamingInfrastructureLoadTest,
     saveStreamingInfrastructureDraft,
+    saveStreamingInfrastructureRehearsal,
 } from '../services/streamingInfrastructure';
 import {
     createDefaultStreamingFoundingDraft,
@@ -23,6 +24,7 @@ import {
     type StreamingRehearsalFacilityInput,
     type StreamingRehearsalCountryInput,
 } from '../services/streamingLaunchRehearsal';
+import { rehearsalSnapshotToBuild } from '../components/streaming-transplant/StreamingBuildWizardExperience';
 
 const assert = (condition: unknown, message: string) => {
     if (!condition) throw new Error(message);
@@ -165,12 +167,43 @@ const incorporated = createIncorporatedPlayer();
 const draft = createDefaultStreamingInfrastructureDraft(incorporated);
 const signature = getStreamingInfrastructureForecast(incorporated, draft).configurationSignature;
 const snapshot = toSnapshot(result, signature);
-const saved = saveStreamingInfrastructureDraft(incorporated, { ...draft, lastLaunchRehearsal: snapshot });
+assert(
+    rehearsalSnapshotToBuild(snapshot, 'build-signature', new Map(), 'changed-canonical-signature') === null,
+    'A stale canonical rehearsal must not be relabelled as current proof by the Build UI.',
+);
+const restoredBuildRehearsal = rehearsalSnapshotToBuild(snapshot, 'build-signature', new Map([
+    ['LA', 'Los Angeles'],
+    ['NYC', 'New York'],
+]))!;
+assert(restoredBuildRehearsal.signature === 'build-signature', 'Verified canonical evidence may be mapped to its current presentation signature.');
+assert(
+    restoredBuildRehearsal.verdict === (result.verdict === 'BURST' ? 'RENTED' : result.verdict),
+    'A persisted rehearsal must restore the same Build proof verdict.',
+);
+assert(restoredBuildRehearsal.rooms.map(room => room.city).join(',') === 'Los Angeles,New York', 'Persisted facility evidence must restore readable room labels.');
+const saved = saveStreamingInfrastructureRehearsal(incorporated, draft, { ...snapshot, configurationSignature: 'pre-normalization' });
 assert(saved.ownedStreamingPlatform.infrastructureSetupDraft?.lastLaunchRehearsal?.warningSummary === result.warningSummary, 'Country rehearsal evidence must survive draft persistence.');
 const tested = runStreamingInfrastructureLoadTest(saved);
+assert(
+    tested.player.ownedStreamingPlatform.infrastructureSetupDraft?.lastLaunchRehearsal?.configurationSignature === tested.forecast.configurationSignature,
+    'Recording a new rehearsal must bind its evidence to the normalized configuration that commissioning validates.',
+);
 const committed = commitStreamingInfrastructureSetup(tested.player);
 assert(committed.changed, 'A tested Phase 6 drawing must commission normally.');
 assert(committed.player.ownedStreamingPlatform.infrastructureSetup?.loadTest.launchRehearsal?.countries.length === 2, 'Commissioning must freeze country-level launch evidence into the canonical load test.');
+
+const changedDrawing = saveStreamingInfrastructureDraft(saved, {
+    ...saved.ownedStreamingPlatform.infrastructureSetupDraft!,
+    networkPlacements: draft.networkPlacements.map((placement, index) => ({
+        ...placement, racks: placement.racks + (index === 0 ? 1 : 0),
+    })),
+});
+const changedForecast = getStreamingInfrastructureForecast(changedDrawing);
+const oldEvidence = changedDrawing.ownedStreamingPlatform.infrastructureSetupDraft!.lastLaunchRehearsal!;
+assert(
+    rehearsalSnapshotToBuild(oldEvidence, 'changed-build', new Map(), changedForecast.configurationSignature) === null,
+    'Changing rack capacity after testing must invalidate the old rehearsal rather than silently reapprove it.',
+);
 
 const legacy = normalizeOwnedStreamingPlatformState({
     schemaVersion: 1,
@@ -191,6 +224,25 @@ const normalizedEvidence = normalizeOwnedStreamingPlatformState({
 }, 'phase6-evidence-normalization');
 assert(normalizedEvidence.infrastructureSetupDraft?.lastLaunchRehearsal?.failedPercent === 100, 'Migrated rehearsal failure percentages must be clamped safely.');
 assert(normalizedEvidence.infrastructureSetupDraft?.lastLaunchRehearsal?.spareCapacityPercent === -100, 'Migrated negative spare capacity must preserve a bounded warning.');
+const recoveredAssistedApproval = normalizeOwnedStreamingPlatformState({
+    ...legacy,
+    infrastructureSetupDraft: {
+        ...legacy.infrastructureSetupDraft,
+        capacityPackageId: 'GROWTH',
+        managementPolicy: { mode: 'ASSISTED' },
+        assistedPlanApproved: false,
+        assistedPlanClass: undefined,
+        lastLaunchRehearsal: snapshot,
+    },
+}, 'phase6-assisted-approval-recovery');
+assert(
+    recoveredAssistedApproval.infrastructureSetupDraft?.assistedPlanApproved === true,
+    'A persisted assisted rehearsal must recover approval metadata lost by older draft saves.',
+);
+assert(
+    recoveredAssistedApproval.infrastructureSetupDraft?.assistedPlanClass === 'GROWTH',
+    'Recovered assisted approval must retain the tested capacity class.',
+);
 
 const engineSource = readFileSync('services/streamingLaunchRehearsal.ts', 'utf8');
 const buildSource = readFileSync('components/streaming-transplant/StreamingBuildoutExperience.tsx', 'utf8');

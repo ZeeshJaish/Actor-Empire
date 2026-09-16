@@ -31,6 +31,7 @@ export interface PlatformAiProfile {
     weeklyAdRevenuePerSubscriber: number;
     weeklyDeliveryCostPerSubscriber: number;
     baseWeeklyOperationsMillions: number;
+    referenceSubscriberMillions: number;
     regionWeeklyCostMillions: number;
     targetRunwayWeeks: number;
 }
@@ -55,6 +56,7 @@ export const PLATFORM_AI_PROFILES: Record<PlatformId, PlatformAiProfile> = {
         weeklyAdRevenuePerSubscriber: 0.34,
         weeklyDeliveryCostPerSubscriber: 0.08,
         baseWeeklyOperationsMillions: 160,
+        referenceSubscriberMillions: 260,
         regionWeeklyCostMillions: 3.2,
         targetRunwayWeeks: 52,
     },
@@ -77,6 +79,7 @@ export const PLATFORM_AI_PROFILES: Record<PlatformId, PlatformAiProfile> = {
         weeklyAdRevenuePerSubscriber: 0.22,
         weeklyDeliveryCostPerSubscriber: 0.07,
         baseWeeklyOperationsMillions: 90,
+        referenceSubscriberMillions: 45,
         regionWeeklyCostMillions: 2.5,
         targetRunwayWeeks: 78,
     },
@@ -99,6 +102,7 @@ export const PLATFORM_AI_PROFILES: Record<PlatformId, PlatformAiProfile> = {
         weeklyAdRevenuePerSubscriber: 0.30,
         weeklyDeliveryCostPerSubscriber: 0.08,
         baseWeeklyOperationsMillions: 140,
+        referenceSubscriberMillions: 150,
         regionWeeklyCostMillions: 3,
         targetRunwayWeeks: 52,
     },
@@ -121,6 +125,7 @@ export const PLATFORM_AI_PROFILES: Record<PlatformId, PlatformAiProfile> = {
         weeklyAdRevenuePerSubscriber: 0.40,
         weeklyDeliveryCostPerSubscriber: 0.09,
         baseWeeklyOperationsMillions: 70,
+        referenceSubscriberMillions: 48,
         regionWeeklyCostMillions: 1.8,
         targetRunwayWeeks: 39,
     },
@@ -143,6 +148,7 @@ export const PLATFORM_AI_PROFILES: Record<PlatformId, PlatformAiProfile> = {
         weeklyAdRevenuePerSubscriber: 0.52,
         weeklyDeliveryCostPerSubscriber: 0.06,
         baseWeeklyOperationsMillions: 200,
+        referenceSubscriberMillions: 2700,
         regionWeeklyCostMillions: 4,
         targetRunwayWeeks: 65,
     },

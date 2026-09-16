@@ -15,9 +15,13 @@ import { cx } from './presentation/cx';
 import { brandVars } from './presentation/brand';
 import React, { useMemo, useState } from 'react';
 import { Brand, Mark, RegionId, typeFace } from './StreamingBrandVisuals';
+import {
+  getStreamingDefineLaunchWizardProgress,
+  isStreamingDefineLaunchWizardMilestone,
+  type StreamingLaunchProgramView,
+} from '../../services/streamingLaunchProgram';
 import type {
   StreamingLaunchDestination,
-  StreamingLaunchProgramView,
   StreamingLaunchTrackId,
 } from '../../services/streamingLaunchProgram';
 
@@ -281,15 +285,21 @@ export const PlatformHQ: React.FC<{
           {!state.live && state.launchProgram && (
             <nav className={css.launchCommandRows} aria-label="Pre-launch wizards">
               {state.launchProgram.tracks.map(track => {
-                const next = track.milestones.find(item => !item.complete);
-                const cleared = track.completedCount === track.totalCount;
+                const displayedMilestones = track.id === 'DEFINE_LAUNCH'
+                  ? track.milestones.filter(isStreamingDefineLaunchWizardMilestone)
+                  : track.milestones;
+                const displayedProgress = track.id === 'DEFINE_LAUNCH'
+                  ? getStreamingDefineLaunchWizardProgress(track)
+                  : { completedCount: track.completedCount, totalCount: track.totalCount };
+                const next = displayedMilestones.find(item => !item.complete);
+                const cleared = displayedProgress.completedCount === displayedProgress.totalCount;
                 return (
                   <button
                     type="button"
                     key={track.id}
                     className={cx(css.launchCommandRow, track.id === 'BUILD_PLATFORM' ? css.buildCommandRow : '', cleared ? css.commandCleared : '')}
                     onClick={() => onOpenLaunchTrack?.(track.id)}
-                    aria-label={`${track.label}. ${track.completedCount} of ${track.totalCount} checks cleared.${next ? ` Next: ${next.shortLabel}.` : ''}`}
+                    aria-label={`${track.label}. ${displayedProgress.completedCount} of ${displayedProgress.totalCount} checks cleared.${next ? ` Next: ${next.shortLabel}.` : ''}`}
                   >
                     <span className={css.commandSignal} aria-hidden="true"><i /></span>
                     <span className={css.commandCopy}>
@@ -297,7 +307,7 @@ export const PlatformHQ: React.FC<{
                       <b>{track.label}</b>
                       <em>{next ? `Next · ${next.shortLabel}` : 'Wizard cleared'}</em>
                     </span>
-                    <strong>{track.completedCount}/{track.totalCount}</strong>
+                    <strong>{displayedProgress.completedCount}/{displayedProgress.totalCount}</strong>
                     <i className={css.commandChevron} aria-hidden="true">›</i>
                   </button>
                 );

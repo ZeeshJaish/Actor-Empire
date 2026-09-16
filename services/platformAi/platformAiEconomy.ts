@@ -27,6 +27,7 @@ import {
     calculatePlatformAiPartnerRevenueShares,
     createPlatformAiTradeRoyaltyEvidenceDecision,
     progressPlatformAiDistressWorld,
+    selectPlatformAiWithdrawableMarket,
 } from './platformAiDistress';
 import {
     normalizePlatformAiExternalCommitments,
@@ -35,6 +36,7 @@ import {
 } from './platformAiExternalCommitments';
 import {
     appendPlatformAiDecisions,
+    markPlatformAiStateCanonicalForTurn,
     normalizePlatformAiAudienceSettlements,
     normalizePlatformAiState,
     normalizeWorldPlatformAi,
@@ -47,6 +49,7 @@ const FINANCE_HISTORY_LIMIT = 104;
 const RESCUE_COOLDOWN_WEEKS = 104;
 const DEBT_WEEKLY_INTEREST_RATE = 0.001;
 const HEALTHY_RECOVERY_WEEKS = 4;
+const DORMANT_RELAUNCH_WEEKS = 13;
 const RESTRUCTURING_FAILURE_WEEKS = 13;
 const RESTRUCTURED_INTEREST_MULTIPLIER = 0.5;
 
@@ -63,6 +66,21 @@ const roundMillions = (value: unknown): number => Math.round(
 const average = (values: number[], fallback = 0): number => values.length
     ? roundMillions(values.reduce((sum, value) => sum + safe(value, -Number.MAX_SAFE_INTEGER), 0) / values.length)
     : fallback;
+
+/**
+ * Keeps a real fixed-cost floor while allowing a distressed company to resize
+ * operations as its audience changes. This is scale arithmetic, not the
+ * separate AI-only efficiency advantage applied later in settlement.
+ */
+export const calculatePlatformAiScaledBaseOperationsMillions = (
+    platformId: PlatformId,
+    subscriberMillions: number,
+): number => {
+    const profile = PLATFORM_AI_PROFILES[platformId];
+    const scaleRatio = safe(subscriberMillions) / Math.max(1, profile.referenceSubscriberMillions);
+    const scaleMultiplier = Math.min(1.6, Math.max(0.25, 0.25 + 0.75 * Math.pow(scaleRatio, 0.65)));
+    return roundMillions(profile.baseWeeklyOperationsMillions * scaleMultiplier);
+};
 
 const activeMarkets = (platform: PlatformState): OwnedStreamingMarketOperation[] => (
     (platform.ai?.marketOperations || []).filter(operation => (
@@ -376,8 +394,38 @@ export const calculatePlatformAiWeeklyEconomy = (
                 paidSubscriberShare: profile.paidSubscriberShare,
             }),
         );
-    const advertisingRevenueMillions = canonicalPlatformEconomy
+    const canonicalViewing = input.player.world.worldStreamingViewing;
+    const platformViewingRevenue = canonicalViewing
+        && canonicalViewing.lastProcessedAbsoluteWeek <= input.absoluteWeek
+        ? canonicalViewing.platforms[platform.id]?.revenue
+        : null;
+    const canonicalIncrementalMillions = canonicalPlatformEconomy
         ? fullCurrencyToMillions(Math.round(canonicalPlatformEconomy.weeklyIncrementalRevenue))
+        : 0;
+    const transactionRevenueMillions = platformViewingRevenue
+        ? fullCurrencyToMillions(
+            platformViewingRevenue.premiumRevenue
+            + platformViewingRevenue.rentalRevenue
+            + platformViewingRevenue.purchaseRevenue
+            + platformViewingRevenue.dayPassRevenue
+            + platformViewingRevenue.meteredRevenue,
+        )
+        : 0;
+    const sponsorshipRevenueMillions = platformViewingRevenue
+        ? fullCurrencyToMillions(platformViewingRevenue.sponsorshipRevenue)
+        : 0;
+    const communityRevenueMillions = platformViewingRevenue
+        ? fullCurrencyToMillions(platformViewingRevenue.patronRevenue)
+        : 0;
+    const classifiedCommercialRevenueMillions = platformViewingRevenue
+        ? fullCurrencyToMillions(platformViewingRevenue.advertisingRevenue)
+            + transactionRevenueMillions + sponsorshipRevenueMillions + communityRevenueMillions
+        : 0;
+    const advertisingRevenueMillions = canonicalPlatformEconomy
+        ? roundMillions((platformViewingRevenue
+            ? fullCurrencyToMillions(platformViewingRevenue.advertisingRevenue)
+                + Math.max(0, canonicalIncrementalMillions - classifiedCommercialRevenueMillions)
+            : canonicalIncrementalMillions))
         : fullCurrencyToMillions(
             calculateStreamingAdvertisingRevenueFullCurrency({
                 subscribers: safe(platform.subscribers) * 1_000_000,
@@ -388,20 +436,24 @@ export const calculatePlatformAiWeeklyEconomy = (
     const verifiedContractIncomeMillions = roundMillions(input.verifiedContractIncomeMillions || 0);
     const rescueIncomeMillions = roundMillions(input.rescueIncomeMillions || 0);
     const revenueMillions = roundMillions(
-        subscriptionRevenueMillions + advertisingRevenueMillions + verifiedContractIncomeMillions,
+        subscriptionRevenueMillions + advertisingRevenueMillions + transactionRevenueMillions
+        + sponsorshipRevenueMillions + communityRevenueMillions + verifiedContractIncomeMillions,
     );
     const deliveryCostMillions = roundMillions(
         safe(platform.subscribers) * profile.weeklyDeliveryCostPerSubscriber,
     );
     const baseOperationsCostMillions = roundMillions(
-        profile.baseWeeklyOperationsMillions
+        calculatePlatformAiScaledBaseOperationsMillions(platform.id, platform.subscribers)
         + (markets.length === 0 ? legacyRegionCount * profile.regionWeeklyCostMillions : 0),
     );
+    const commercialOperatingCostMillions = platformViewingRevenue
+        ? fullCurrencyToMillions(platformViewingRevenue.commercialOperatingCost)
+        : 0;
     const marketOperatingCostMillions = roundMillions(markets.reduce((sum, operation) => (
         sum + fullCurrencyToMillions(safe(operation.weeklyOperatingCost))
     ), 0));
     const standardEligibleRecurringCostMillions = roundMillions(
-        deliveryCostMillions + baseOperationsCostMillions + marketOperatingCostMillions,
+        deliveryCostMillions + baseOperationsCostMillions + marketOperatingCostMillions + commercialOperatingCostMillions,
     );
     const recurringEfficiency = createPlatformAiRecurringEfficiencySnapshot(
         standardEligibleRecurringCostMillions,
@@ -627,6 +679,10 @@ export const calculatePlatformAiWeeklyEconomy = (
         openingCashMillions,
         subscriptionRevenueMillions,
         advertisingRevenueMillions,
+        transactionRevenueMillions,
+        sponsorshipRevenueMillions,
+        communityRevenueMillions,
+        commercialOperatingCostMillions,
         verifiedContractIncomeMillions,
         rescueIncomeMillions,
         rescueDebtReductionMillions: 0,
@@ -910,13 +966,7 @@ const resolvePlatformAiDistressLegacy = (
                 },
             };
         } else {
-            const withdrawable = activeMarkets(platform)
-                .slice()
-                .sort((left, right) => (
-                    safe(left.countryProfile?.audienceSize) - safe(right.countryProfile?.audienceSize)
-                    || right.weeklyOperatingCost - left.weeklyOperatingCost
-                    || left.id.localeCompare(right.id)
-                ))[0];
+            const withdrawable = selectPlatformAiWithdrawableMarket(platform);
             if (!hasDistressAction(platform, 'WITHDRAW_REGION') && withdrawable) {
                 action = 'WITHDRAW_REGION';
                 summary = 'WITHDRAW_REGION';
@@ -1072,6 +1122,7 @@ export const settlePlatformAiEconomy = (
     }
     const normalizedPlatform = normalizePlatformAiState(input.platform, input.player.id, input.absoluteWeek);
     const audienceSettledPlatform = settlePendingAudience(normalizedPlatform, input.absoluteWeek);
+    markPlatformAiStateCanonicalForTurn(audienceSettledPlatform, input.player.id, input.absoluteWeek);
     const calculated = calculatePlatformAiWeeklyEconomy({ ...input, platform: audienceSettledPlatform });
     if (!calculated.snapshot) return calculated;
     const snapshot = calculated.snapshot;
@@ -1098,16 +1149,22 @@ export const settlePlatformAiEconomy = (
         cashImpactMillions: snapshot.debtIncurredMillions,
     }] : [];
     const wasRestructuring = calculated.platform.ai!.status === 'RESTRUCTURING';
-    const healthyRestructuringWeek = wasRestructuring
+    const wasDormant = calculated.platform.ai!.status === 'DORMANT';
+    const healthyRecoveryWeek = (wasRestructuring || wasDormant)
         && snapshot.debtIncurredMillions === 0
         && snapshot.closingDebtMillions === 0
-        && snapshot.operatingNetCashFlowMillions >= 0;
-    const healthyOperatingWeeks = healthyRestructuringWeek
+        && snapshot.operatingNetCashFlowMillions >= 0
+        && (!wasDormant || snapshot.closingCashMillions >= snapshot.operatingCostMillions * 13);
+    const healthyOperatingWeeks = healthyRecoveryWeek
         ? calculated.platform.ai!.healthyOperatingWeeks + 1
         : 0;
-    const recovered = wasRestructuring && healthyOperatingWeeks >= HEALTHY_RECOVERY_WEEKS;
+    const recovered = (
+        wasRestructuring && healthyOperatingWeeks >= HEALTHY_RECOVERY_WEEKS
+    ) || (
+        wasDormant && healthyOperatingWeeks >= DORMANT_RELAUNCH_WEEKS
+    );
     const restructuringFailed = wasRestructuring
-        && !healthyRestructuringWeek
+        && !healthyRecoveryWeek
         && calculated.platform.ai!.restructuringStartedAtAbsoluteWeek !== null
         && input.absoluteWeek - calculated.platform.ai!.restructuringStartedAtAbsoluteWeek >= RESTRUCTURING_FAILURE_WEEKS;
     let platform: PlatformState = {
@@ -1119,6 +1176,8 @@ export const settlePlatformAiEconomy = (
                 ? 'ACTIVE'
                 : wasRestructuring
                     ? 'RESTRUCTURING'
+                    : wasDormant
+                        ? 'DORMANT'
                     : snapshot.debtIncurredMillions > 0 ? 'DISTRESSED' : calculated.platform.ai!.status,
             debtMillions: snapshot.closingDebtMillions,
             healthyOperatingWeeks: recovered ? 0 : healthyOperatingWeeks,
@@ -1144,6 +1203,15 @@ export const settlePlatformAiEconomy = (
                     ...shortfallDecision,
                     ...allocationDecisions,
                     ...(platformTradeRoyaltyEvidence ? [platformTradeRoyaltyEvidence] : []),
+                    ...(recovered && wasDormant ? [{
+                        id: createDeterministicId('platform_ai_decision', input.platform.id, input.absoluteWeek, 'DORMANT_RELAUNCH'),
+                        absoluteWeek: input.absoluteWeek,
+                        type: 'DISTRESS_RESPONSE' as const,
+                        action: 'DORMANT_RELAUNCH' as const,
+                        summary: 'DORMANT_RELAUNCH',
+                        reason: 'Thirteen debt-free profitable weeks and a full operating cushion supported a controlled relaunch.',
+                        cashImpactMillions: 0,
+                    }] : []),
                 ],
             ),
         },

@@ -15,6 +15,7 @@ import { getWorldStreamingOffers } from './worldStreamingOffers';
 import { normalizeWorldAudienceEconomyState } from './worldAudienceCohorts';
 import { normalizeWorldAudienceParticipationState } from './worldAudienceParticipation';
 import { normalizeWorldPopulationState } from './worldPopulation';
+import { calculateStreamingCommercialAudienceAdjustment } from './worldStreamingCommercialEconomy';
 
 export const WORLD_STREAMING_COMPETITION_SCHEMA_VERSION = 1 as const;
 const MAX_SNAPSHOTS = 32;
@@ -99,6 +100,9 @@ const planUtility = (
     const trustFit = offer.reliabilityIndex
         + (cohort.primaryPersonaId === 'HABIT_STREAMERS' ? offer.loyaltyIndex * .16 : 0);
     const momentum = clamp(offer.countryMomentum[countryId] || 0, -20, 20);
+    const commercialAccessFit = offer.commercialConfiguration
+        ? calculateStreamingCommercialAudienceAdjustment(offer.commercialConfiguration)
+        : 0;
     const utility = round2(
         affordability * (.18 + cohort.priceSensitivityIndex / 500)
         + featureFit * .19
@@ -109,7 +113,8 @@ const planUtility = (
         + offer.marketingIndex * .05
         + offer.loyaltyIndex * .04
         + momentum
-        + participation.streamingInterestIndex * .08,
+        + participation.streamingInterestIndex * .08
+        + commercialAccessFit,
     );
     const drivers = [
         { id: 'PRICE_FIT', value: affordability * (.18 + cohort.priceSensitivityIndex / 500) },
@@ -366,6 +371,18 @@ const structurallyValid = (state: unknown): state is WorldStreamingCompetitionSt
     if (!validCountries) return false;
     const playerRows = countries.flatMap(country => country.platformAllocations.filter(row => row.platformId === 'PLAYER'));
     const playerPlans = mergePlans(playerRows);
+    const savedPlayerPlans = input.global.playerPlanAllocations;
+    const playerPlansMatch = Array.isArray(savedPlayerPlans)
+        && savedPlayerPlans.length === playerPlans.length
+        && savedPlayerPlans.every((saved, index) => {
+            const expected = playerPlans[index];
+            return Boolean(expected)
+                && saved.planId === expected.planId
+                && saved.planName === expected.planName
+                && saved.households === expected.households
+                && saved.effectiveMonthlyPrice === expected.effectiveMonthlyPrice
+                && saved.monthlySubscriptionRevenue === expected.monthlySubscriptionRevenue;
+        });
     return input.global.streamingReachableHouseholds === countries.reduce((sum, country) => sum + country.streamingReachableHouseholds, 0)
         && input.global.subscribingHouseholds === countries.reduce((sum, country) => sum + country.subscribingHouseholds, 0)
         && input.global.unclaimedHouseholds === countries.reduce((sum, country) => sum + country.unclaimedHouseholds, 0)
@@ -374,7 +391,7 @@ const structurallyValid = (state: unknown): state is WorldStreamingCompetitionSt
         && input.global.playerHouseholds === playerRows.reduce((sum, row) => sum + row.households, 0)
         && input.global.playerPrimaryHouseholds === playerRows.reduce((sum, row) => sum + row.primaryHouseholds, 0)
         && Math.abs(input.global.playerMonthlySubscriptionRevenue - round2(playerRows.reduce((sum, row) => sum + row.monthlySubscriptionRevenue, 0))) < .011
-        && JSON.stringify(input.global.playerPlanAllocations) === JSON.stringify(playerPlans);
+        && playerPlansMatch;
 };
 
 export const normalizeWorldStreamingCompetitionState = (

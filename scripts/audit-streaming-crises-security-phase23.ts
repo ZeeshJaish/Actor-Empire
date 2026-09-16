@@ -158,9 +158,9 @@ const createFixture = (): Player => {
     };
 };
 
-assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 25, 'The canonical foundation should own streaming schema v25.');
+assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 26, 'The canonical foundation should own streaming schema v25.');
 const migrated = normalizeOwnedStreamingPlatformState({ schemaVersion: 20 }, 'phase23-migration');
-assert(migrated.schemaVersion === 25, 'Schema v20 saves should migrate to the current schema.');
+assert(migrated.schemaVersion === 26, 'Schema v20 saves should migrate to the current schema.');
 assert(
     migrated.crisisSecurity.publicTrust === 72
     && migrated.crisisSecurity.employeeLoyalty === 75

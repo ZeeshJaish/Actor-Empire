@@ -1,6 +1,7 @@
 import type {
     OwnedStreamingCapabilityPortfolio,
     OwnedStreamingCostCommitment,
+    OwnedStreamingDefineLaunchDraftState,
     OwnedStreamingInstalledCapability,
     OwnedStreamingLaunchProgramState,
     OwnedStreamingLegacyLocalizationGrant,
@@ -51,6 +52,7 @@ import {
 } from './streamingDayOneMarkets';
 import { normalizeStreamingStorefrontLayoutId } from './streamingStorefront';
 import { normalizeStreamingLanguageId } from './streamingLocalizationCapabilities';
+import { normalizeStreamingPricingConfiguration } from './streamingPricingEconomy';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -90,7 +92,7 @@ const SERVICE_SOURCES: StreamingServiceConfigurationSource[] = ['UNCONFIGURED', 
 const IDENT_PACKAGES: StreamingIdentPackageId[] = ['STANDARD', 'FULL', 'CINEMATIC', 'GENRE', 'ADAPTIVE', 'LIVING'];
 const LOCALIZATION_PACKAGES: StreamingOriginalLocalizationPackage[] = ['DOMESTIC', 'MULTI_REGION', 'GLOBAL'];
 const COMMITMENT_CATEGORIES: StreamingCostCommitmentCategory[] = [
-    'MARKET', 'SERVICE', 'TECHNOLOGY', 'LOCALIZATION', 'NETWORK', 'CONTENT', 'OTHER',
+    'MARKET', 'SERVICE', 'TECHNOLOGY', 'LOCALIZATION', 'NETWORK', 'CONTENT', 'MARKETING', 'OTHER',
 ];
 const COMMITMENT_STATUSES: StreamingCostCommitmentStatus[] = [
     'PLANNED', 'COMMITTED', 'PAID', 'CANCELLED', 'REFUNDED', 'MIGRATED',
@@ -420,6 +422,7 @@ const normalizeLaunchProgram = (root: UnknownRecord): OwnedStreamingLaunchProgra
         buildCurrentStep: oneOf(source.buildCurrentStep, BUILD_STEPS, 'BLUEPRINT'),
         lastBlueprintSignature: text(source.lastBlueprintSignature, '', 160) || null,
         blueprintSavedAtAbsoluteWeek: nullableWeek(source.blueprintSavedAtAbsoluteWeek),
+        defineDraft: normalizeDefineLaunchDraft(root, source),
     };
 };
 
@@ -452,7 +455,7 @@ const normalizePricingConfiguration = (root: UnknownRecord, source: UnknownRecor
     const sponsor = asRecord(pricing.sponsor);
     const metered = asRecord(pricing.metered);
     const patron = asRecord(pricing.patron);
-    return {
+    return normalizeStreamingPricingConfiguration({
         streams: asArray(pricing.streams).length
             ? Array.from(new Set(asArray(pricing.streams).map(value => oneOf(value, REVENUE_STREAMS, 'subs'))))
             : ['subs'],
@@ -466,8 +469,32 @@ const normalizePricingConfiguration = (root: UnknownRecord, source: UnknownRecor
         sponsor: { perTitle: number(sponsor.perTitle, 4_000_000, 100_000_000), titles: number(sponsor.titles, 0, 100) },
         metered: { perHour: decimal(metered.perHour, 1, 20) },
         patron: { monthly: decimal(patron.monthly, 10, 100) },
-    };
+    });
 };
+
+function normalizeDefineLaunchDraft(root: UnknownRecord, launchProgram: UnknownRecord): OwnedStreamingDefineLaunchDraftState | null {
+    const source = asRecord(launchProgram.defineDraft);
+    if (!Object.keys(source).length) return null;
+    const audio = asRecord(source.customAudio);
+    const dataUrl = text(audio.dataUrl, '', 900_000);
+    const customAudio = dataUrl.startsWith('data:audio/wav;base64,') ? {
+        dataUrl,
+        originalName: text(audio.originalName, 'Custom ident.wav', 120),
+        durationSeconds: number(audio.durationSeconds, 0, 8),
+        sampleRate: number(audio.sampleRate, 8_000, 48_000),
+        byteLength: number(audio.byteLength, 0, 700_000),
+        fingerprint: text(audio.fingerprint, '', 80),
+    } : null;
+    return {
+        selectedCountryIds: normalizeStreamingDayOneMarketIds(source.selectedCountryIds),
+        soundId: text(source.soundId, '', 40) || null,
+        packageId: text(source.packageId, '', 40) || null,
+        customAudio,
+        storefrontId: text(source.storefrontId, '', 80) || null,
+        pricing: normalizePricingConfiguration(root, { pricing: source.pricing }),
+        updatedAtAbsoluteWeek: number(source.updatedAtAbsoluteWeek),
+    };
+}
 
 const normalizeServiceConfiguration = (root: UnknownRecord): OwnedStreamingServiceConfiguration => {
     const source = asRecord(root.serviceConfiguration);

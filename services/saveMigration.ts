@@ -59,8 +59,9 @@ import { normalizeWorldStreamingCompetitionState } from './worldEconomy/worldStr
 import { normalizeWorldStreamingCustomerState } from './worldEconomy/worldStreamingCustomers';
 import { normalizeWorldStreamingViewingState } from './worldEconomy/worldStreamingViewing';
 import { normalizeWorldStreamingPlatformEconomyState } from './worldEconomy/worldStreamingPlatformEconomy';
+import { createWorldEconomyHealthSummary } from './worldEconomy/worldEconomyIntegrity';
 
-const SAVE_MIGRATION_VERSION = 46;
+export const SAVE_MIGRATION_VERSION = 47;
 const RUNAWAY_STOCK_CASH_CEILING = 10_000_000_000_000;
 const ACQUISITION_RIVAL_BID_MAX_ROUNDS = 3;
 
@@ -1331,9 +1332,22 @@ export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
             ),
         },
     };
-    const migratedPlayer = {
+    const migratedPlayerWithoutHealth = {
         ...playerWithWorldStreamingPlatformEconomy,
         flags: migrateFlags(base.flags, playerWithWorldStreamingPlatformEconomy),
+    };
+    const migratedPlayer: Player = {
+        ...migratedPlayerWithoutHealth,
+        world: {
+            ...migratedPlayerWithoutHealth.world,
+            worldEconomyHealth: createWorldEconomyHealthSummary(
+                migratedPlayerWithoutHealth,
+                migratedAbsoluteWeek,
+                SAVE_MIGRATION_VERSION,
+                [],
+                base.world?.worldEconomyHealth?.workloadMode === 'LARGE_SAVE' ? 'LARGE_SAVE' : 'NORMAL',
+            ),
+        },
     };
     const repairedPlayer = normalizePlayerProfileAvatars(migrateLegacyCharacterIdentity(reverseLegacyImportedAcquisitionDebtCharge(
         repairAcquiredStudioAssetPortfolios(

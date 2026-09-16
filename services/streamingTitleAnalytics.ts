@@ -42,6 +42,9 @@ export interface StreamingTitleDossierSummary {
     premiumRevenue: number | null;
     rentalRevenue: number | null;
     purchaseRevenue: number | null;
+    dayPassRevenue: number | null;
+    meteredRevenue: number | null;
+    patronRevenue: number | null;
     sponsorshipRevenue: number | null;
     incrementalRevenue: number | null;
     allocatedCashCost: number | null;
@@ -229,6 +232,9 @@ export const getStreamingTitleAnalytics = (
             premiumRevenue: measuredWeeks ? sum(titleRecords.map(record => record.premiumRevenue || 0)) : null,
             rentalRevenue: measuredWeeks ? sum(titleRecords.map(record => record.rentalRevenue || 0)) : null,
             purchaseRevenue: measuredWeeks ? sum(titleRecords.map(record => record.purchaseRevenue || 0)) : null,
+            dayPassRevenue: measuredWeeks ? sum(titleRecords.map(record => record.dayPassRevenue || 0)) : null,
+            meteredRevenue: measuredWeeks ? sum(titleRecords.map(record => record.meteredRevenue || 0)) : null,
+            patronRevenue: measuredWeeks ? sum(titleRecords.map(record => record.patronRevenue || 0)) : null,
             sponsorshipRevenue: measuredWeeks ? sum(titleRecords.map(record => record.sponsorshipRevenue || 0)) : null,
             incrementalRevenue: measuredWeeks ? sum(titleRecords.map(record => record.incrementalRevenue || 0)) : null,
             allocatedCashCost: measuredWeeks ? sum(titleRecords.map(record => record.allocatedCashCost)) : null,

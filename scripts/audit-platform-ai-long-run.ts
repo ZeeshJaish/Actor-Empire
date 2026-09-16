@@ -22,6 +22,14 @@ import {
     selectPlatformAiTalent,
 } from '../services/platformAi';
 import { createDeterministicRng } from '../services/deterministicRandom';
+import { normalizeWorldAudienceEconomyState } from '../services/worldEconomy/worldAudienceCohorts';
+import { normalizeWorldAudienceParticipationState } from '../services/worldEconomy/worldAudienceParticipation';
+import { WORLD_POPULATION_EPOCH_ABSOLUTE_WEEK } from '../services/worldEconomy/worldPopulation';
+import { normalizeWorldPopulationState } from '../services/worldEconomy/worldPopulation';
+import { normalizeWorldStreamingCompetitionState } from '../services/worldEconomy/worldStreamingCompetition';
+import { normalizeWorldStreamingCustomerState } from '../services/worldEconomy/worldStreamingCustomers';
+import { normalizeWorldStreamingViewingState } from '../services/worldEconomy/worldStreamingViewing';
+import { settleWorldStreamingPlatformEconomyWeek } from '../services/worldEconomy/worldStreamingPlatformEconomy';
 import {
     AWARD_CALENDAR,
     resolveCanonicalAwardSeason,
@@ -61,6 +69,10 @@ const SKIP_PREFLIGHT = process.env.PLATFORM_AI_LONG_RUN_SKIP_PREFLIGHT === '1';
 const TRACE_PERFORMANCE = process.env.PLATFORM_AI_LONG_RUN_TRACE_PERFORMANCE === '1';
 const MAX_FIXTURE_RUNTIME_MS = Number(process.env.PLATFORM_AI_LONG_RUN_MAX_FIXTURE_RUNTIME_MS || 0);
 const RUN_INLINE = process.env.PLATFORM_AI_LONG_RUN_INLINE === '1';
+const REQUESTED_ECONOMY_CADENCE = process.env.PLATFORM_AI_LONG_RUN_ECONOMY_CADENCE === 'ANNUAL_CHECKPOINT'
+    ? 'ANNUAL_CHECKPOINT' as const
+    : 'WEEKLY' as const;
+const FIXTURE_START_ABSOLUTE_WEEK = WORLD_POPULATION_EPOCH_ABSOLUTE_WEEK;
 const REQUESTED_CONCURRENCY = Number(process.env.PLATFORM_AI_LONG_RUN_CONCURRENCY || 2);
 const FIXTURE_CONCURRENCY = Number.isFinite(REQUESTED_CONCURRENCY) && REQUESTED_CONCURRENCY > 0
     ? Math.max(1, Math.min(4, Math.round(REQUESTED_CONCURRENCY)))
@@ -205,6 +217,40 @@ const firstDifference = (left: unknown, right: unknown, path = 'world'): string 
     }
     return null;
 };
+
+/**
+ * World-economy health is derived validation metadata refreshed by the full
+ * game loop and by save migration. This Platform AI harness deliberately runs
+ * the narrower industry seam, so persistence parity compares the canonical
+ * simulation data while leaving that independently audited health stamp out.
+ */
+const firstCanonicalWorldDifference = (left: WorldState, right: WorldState): string | null => {
+    const { worldEconomyHealth: _leftHealth, ...leftCanonical } = left;
+    const { worldEconomyHealth: _rightHealth, ...rightCanonical } = right;
+    void _leftHealth;
+    void _rightHealth;
+    return firstDifference(leftCanonical, rightCanonical);
+};
+
+const canonicalPlayerEnvelopeForResume = (player: Player): Omit<Player, 'world'> => {
+    const { world: _world, ...envelope } = player;
+    const flags = { ...(envelope.flags || {}) };
+    // Audit metadata records when migration ran; it is intentionally different
+    // after a real serialization round-trip and is never a simulation input.
+    delete flags.saveMigratedAtWeek;
+    void _world;
+    return { ...envelope, flags };
+};
+
+const canonicalObserverForResume = (observer: ObserverState): ObserverState => ({
+    ...observer,
+    industry: {
+        ...observer.industry,
+        // Serialized byte count includes migration audit metadata. Save size is
+        // bounded independently; it is not deterministic simulation state.
+        maxSaveBytes: 0,
+    },
+});
 
 const blankTotals = (platformId: PlatformId): PlatformTotals => ({
     platformId,
@@ -361,8 +407,8 @@ const createFixture = (spec: FixtureSpec): SimulationBranch => {
     let player = clearAcquisitions({
         ...source,
         id: `platform-ai-long-run-${spec.regime.toLowerCase()}-${spec.seed}`,
-        currentWeek: 1,
-        age: 40,
+        currentWeek: FIXTURE_START_ABSOLUTE_WEEK % 52 + 1,
+        age: Math.floor(FIXTURE_START_ABSOLUTE_WEEK / 52) + 1,
     });
     const world: WorldState = {
         ...structuredClone(source.world),
@@ -761,7 +807,14 @@ const observeIndustryWeek = (
     }
     for (const market of Object.values(ecosystem.markets)) {
         const totalShare = market.shares.reduce((sum, share) => sum + share.sharePercent, 0) + market.othersSharePercent;
-        closeTo(totalShare, 100, `${market.countryId} market-share normalization at week ${absoluteWeek}`);
+        closeTo(
+            totalShare,
+            100,
+            `${market.countryId} market-share normalization at week ${absoluteWeek} ${JSON.stringify({
+                shares: market.shares,
+                othersSharePercent: market.othersSharePercent,
+            })}`,
+        );
     }
 };
 
@@ -945,10 +998,15 @@ const resolveCanonicalCeremonyWeek = (
     };
 };
 
-const processWeek = (branch: SimulationBranch, absoluteWeek: number): SimulationBranch => {
+const processWeek = (
+    branch: SimulationBranch,
+    elapsedWeek: number,
+    economyCadence: 'WEEKLY' | 'ANNUAL_CHECKPOINT' = 'WEEKLY',
+): SimulationBranch => {
     const weekStartedAt = performance.now();
-    const shouldInjectIndustryRelease = (absoluteWeek - 1) % HORIZON_PROJECT_INTERVAL_WEEKS === 0;
-    const injectedProjectIndex = BACK_CATALOGUE_TITLES + Math.floor((absoluteWeek - 1) / HORIZON_PROJECT_INTERVAL_WEEKS);
+    const absoluteWeek = FIXTURE_START_ABSOLUTE_WEEK + Math.max(1, elapsedWeek) - 1;
+    const shouldInjectIndustryRelease = (elapsedWeek - 1) % HORIZON_PROJECT_INTERVAL_WEEKS === 0;
+    const injectedProjectIndex = BACK_CATALOGUE_TITLES + Math.floor((elapsedWeek - 1) / HORIZON_PROJECT_INTERVAL_WEEKS);
     const injectedWorld = shouldInjectIndustryRelease
         && !branch.world.projects.some(project => project.id === `platform-ai-long-run-${branch.observer.fixtureSeed}-project-${injectedProjectIndex}`)
             ? {
@@ -956,27 +1014,88 @@ const processWeek = (branch: SimulationBranch, absoluteWeek: number): Simulation
                 projects: [...branch.world.projects, projectAt(branch.observer.fixtureSeed, injectedProjectIndex, absoluteWeek)],
             }
             : branch.world;
-    const synchronizedPlayer = { ...branch.player, world: injectedWorld };
+    const worldPopulation = normalizeWorldPopulationState(injectedWorld.worldPopulation, absoluteWeek);
+    const worldAudienceEconomy = normalizeWorldAudienceEconomyState(
+        injectedWorld.worldAudienceEconomy,
+        worldPopulation,
+        absoluteWeek,
+    );
+    const worldAudienceParticipation = normalizeWorldAudienceParticipationState(
+        injectedWorld.worldAudienceParticipation,
+        worldPopulation,
+        worldAudienceEconomy,
+        absoluteWeek,
+    );
+    const preparedWorld: WorldState = {
+        ...injectedWorld,
+        worldPopulation,
+        worldAudienceEconomy,
+        worldAudienceParticipation,
+    };
+    const synchronizedPlayer = { ...branch.player, world: preparedWorld };
     const before = synchronizedPlayer.world;
     const result = processPlatformAiPhase8StreamingWeek(synchronizedPlayer, before, absoluteWeek);
     const simulationFinishedAt = performance.now();
-    const world = resolveCanonicalCeremonyWeek(synchronizedPlayer, result.world, absoluteWeek);
+    let economyPlayer: Player = { ...result.player, world: result.world };
+    const refreshCommercialEconomy = economyCadence === 'WEEKLY'
+        || elapsedWeek === 1
+        || elapsedWeek % 52 === 0
+        || CHECKPOINT_WEEKS.has(elapsedWeek)
+        || elapsedWeek === MIDPOINT_WEEK
+        || elapsedWeek === HORIZON_WEEKS;
+    if (refreshCommercialEconomy) {
+        economyPlayer = {
+            ...economyPlayer,
+            world: {
+                ...economyPlayer.world,
+                worldStreamingCompetition: normalizeWorldStreamingCompetitionState(
+                    economyPlayer.world.worldStreamingCompetition,
+                    economyPlayer,
+                    absoluteWeek,
+                ),
+            },
+        };
+        economyPlayer = {
+            ...economyPlayer,
+            world: {
+                ...economyPlayer.world,
+                worldStreamingCustomers: normalizeWorldStreamingCustomerState(
+                    economyPlayer.world.worldStreamingCustomers,
+                    economyPlayer,
+                    absoluteWeek,
+                ),
+            },
+        };
+        economyPlayer = {
+            ...economyPlayer,
+            world: {
+                ...economyPlayer.world,
+                worldStreamingViewing: normalizeWorldStreamingViewingState(
+                    economyPlayer.world.worldStreamingViewing,
+                    economyPlayer,
+                    absoluteWeek,
+                ),
+            },
+        };
+        economyPlayer = settleWorldStreamingPlatformEconomyWeek(economyPlayer, absoluteWeek);
+    }
+    const world = resolveCanonicalCeremonyWeek(economyPlayer, economyPlayer.world, absoluteWeek);
     const observer = branch.observer;
     observeWeek(synchronizedPlayer, before, world, observer, absoluteWeek);
-    observeIndustryWeek(result.player, world, result.news, observer, absoluteWeek);
+    observeIndustryWeek(economyPlayer, world, result.news, observer, absoluteWeek);
     const observationFinishedAt = performance.now();
-    if (CHECKPOINT_WEEKS.has(absoluteWeek)) captureCheckpoint(world, observer, absoluteWeek);
-    const playerWithCanonicalWorld = { ...result.player, world };
-    const player = absoluteWeek % 52 === 0 || CHECKPOINT_WEEKS.has(absoluteWeek)
+    if (CHECKPOINT_WEEKS.has(elapsedWeek)) captureCheckpoint(world, observer, elapsedWeek);
+    const playerWithCanonicalWorld = { ...economyPlayer, world };
+    const player = elapsedWeek % 52 === 0 || CHECKPOINT_WEEKS.has(elapsedWeek)
         ? compactPlayerForPersistence(playerWithCanonicalWorld)
         : playerWithCanonicalWorld;
-    if (absoluteWeek % 52 === 0 || CHECKPOINT_WEEKS.has(absoluteWeek)) {
+    if (elapsedWeek % 52 === 0 || CHECKPOINT_WEEKS.has(elapsedWeek)) {
         observer.industry.maxSaveBytes = Math.max(
             observer.industry.maxSaveBytes,
             Buffer.byteLength(JSON.stringify(player), 'utf8'),
         );
     }
-    if (TRACE_PERFORMANCE && absoluteWeek % PROGRESS_INTERVAL_WEEKS === 0) {
+    if (TRACE_PERFORMANCE && elapsedWeek % PROGRESS_INTERVAL_WEEKS === 0) {
         const memory = process.memoryUsage();
         const plans = PLATFORM_AI_TURN_ORDER.flatMap(platformId => world.platforms![platformId].ai!.slate);
         const planStatuses = plans.reduce<Record<string, number>>((counts, plan) => {
@@ -985,6 +1104,7 @@ const processWeek = (branch: SimulationBranch, absoluteWeek: number): Simulation
         }, {});
         console.log('PHASE8_WEEK_TIMING', JSON.stringify({
             absoluteWeek,
+            elapsedWeek,
             simulationMs: round(simulationFinishedAt - weekStartedAt),
             observationMs: round(observationFinishedAt - simulationFinishedAt),
             persistenceMs: round(performance.now() - observationFinishedAt),
@@ -1012,13 +1132,13 @@ const runFixture = (spec: FixtureSpec): FixtureReport => {
     const startedAt = performance.now();
     let primary = createFixture(spec);
     for (let absoluteWeek = 1; absoluteWeek <= HORIZON_WEEKS; absoluteWeek += 1) {
-        primary = processWeek(primary, absoluteWeek);
+        primary = processWeek(primary, absoluteWeek, REQUESTED_ECONOMY_CADENCE);
         if (absoluteWeek % PROGRESS_INTERVAL_WEEKS === 0) {
             console.log(`Fixture ${spec.seed}: ${absoluteWeek}/${HORIZON_WEEKS} weeks verified`);
         }
         if (absoluteWeek === MIDPOINT_WEEK) {
             const restored = resumeThroughProductionPersistence(primary);
-            const midpointDifference = firstDifference(primary.world, restored.world);
+            const midpointDifference = firstCanonicalWorldDifference(primary.world, restored.world);
             const midpointPlanDiagnostic = midpointDifference?.includes('.slate.')
                 ? (() => {
                     const match = midpointDifference.match(/world\.platforms\.([^.]+)\.ai\.slate\.(\d+)/);
@@ -1066,10 +1186,8 @@ const runFixture = (spec: FixtureSpec): FixtureReport => {
                 null,
                 `Midpoint migration changed canonical world: ${midpointDifference}; plan diagnostic: ${JSON.stringify(midpointPlanDiagnostic)}; localization diagnostic: ${JSON.stringify(midpointLocalizationDiagnostic)}`,
             );
-            const { world: _primaryWorld, ...primaryEnvelope } = primary.player;
-            const { world: _restoredWorld, ...restoredEnvelope } = restored.player;
-            void _primaryWorld;
-            void _restoredWorld;
+            const primaryEnvelope = canonicalPlayerEnvelopeForResume(primary.player);
+            const restoredEnvelope = canonicalPlayerEnvelopeForResume(restored.player);
             const midpointPlayerDifference = firstDifference(primaryEnvelope, restoredEnvelope, 'player');
             assert.equal(midpointPlayerDifference, null, `Midpoint migration changed deterministic player input: ${midpointPlayerDifference}`);
             // The balance simulation continues on the restored branch only.
@@ -1078,7 +1196,7 @@ const runFixture = (spec: FixtureSpec): FixtureReport => {
         }
     }
     const persistedPrimary = resumeThroughProductionPersistence(primary);
-    const finalWorldDifference = firstDifference(primary.world, persistedPrimary.world);
+    const finalWorldDifference = firstCanonicalWorldDifference(primary.world, persistedPrimary.world);
     const renewalMigrationDiagnostic = finalWorldDifference?.includes('.rightsRenewals')
         || finalWorldDifference?.includes('.pendingOneTimeObligations')
         ? Object.fromEntries(PLATFORM_AI_TURN_ORDER.map(platformId => [platformId, {
@@ -1154,6 +1272,39 @@ const runFixture = (spec: FixtureSpec): FixtureReport => {
         null,
         `Fixture ${spec.seed} final migration changed canonical world: ${finalWorldDifference}; renewal diagnostic: ${JSON.stringify(renewalMigrationDiagnostic)}; localization diagnostic: ${JSON.stringify(localizationMigrationDiagnostic)}`,
     );
+    if (TRACE_PERFORMANCE) {
+        console.log('PHASE8_FINAL_FINANCE', JSON.stringify(Object.fromEntries(
+            PLATFORM_AI_TURN_ORDER.map(platformId => {
+                const platform = persistedPrimary.world.platforms![platformId];
+                const snapshot = platform.ai!.financeHistory.at(-1) || null;
+                return [platformId, {
+                    status: platform.ai!.status,
+                    subscribersMillions: platform.subscribers,
+                    cashMillions: platform.cashReserve,
+                    debtMillions: platform.ai!.debtMillions,
+                    finance: snapshot ? {
+                        revenueMillions: snapshot.revenueMillions,
+                        subscriptionRevenueMillions: snapshot.subscriptionRevenueMillions,
+                        advertisingRevenueMillions: snapshot.advertisingRevenueMillions,
+                        transactionRevenueMillions: snapshot.transactionRevenueMillions,
+                        operatingCostMillions: snapshot.operatingCostMillions,
+                        operatingNetCashFlowMillions: snapshot.operatingNetCashFlowMillions,
+                        reserveCoverageWeeks: snapshot.reserveCoverageWeeks,
+                    } : null,
+                    worldEconomy: (() => {
+                        const economy = persistedPrimary.world.worldStreamingPlatformEconomy?.platforms[platformId];
+                        return economy ? {
+                            endingPaidAccounts: economy.endingPaidAccounts,
+                            viewingAccounts: economy.viewingAccounts,
+                            weeklyRevenue: economy.weeklyRevenue,
+                            weeklyIncrementalRevenue: economy.weeklyIncrementalRevenue,
+                            weeklyOperatingResult: economy.weeklyOperatingResult,
+                        } : null;
+                    })(),
+                }];
+            }),
+        )));
+    }
     const report = deterministicReport(spec, persistedPrimary);
     return { ...report, runtimeMs: round(performance.now() - startedAt) };
 };
@@ -1164,7 +1315,7 @@ const assertExactWeeklyResumeParity = (): void => {
         primary = processWeek(primary, absoluteWeek);
     }
     let restored = resumeThroughProductionPersistence(primary);
-    const initialResumeDifference = firstDifference(primary.world, restored.world);
+    const initialResumeDifference = firstCanonicalWorldDifference(primary.world, restored.world);
     const initialResumeDiagnostic = initialResumeDifference?.includes('.slate.')
         ? (() => {
             const match = initialResumeDifference.match(/world\.platforms\.([^.]+)\.ai\.slate\.(\d+)/);
@@ -1195,19 +1346,21 @@ const assertExactWeeklyResumeParity = (): void => {
     ) {
         primary = processWeek(primary, absoluteWeek);
         restored = processWeek(restored, absoluteWeek);
-        const worldDifference = firstDifference(primary.world, restored.world);
+        const worldDifference = firstCanonicalWorldDifference(primary.world, restored.world);
         assert.equal(worldDifference, null, `Exact resume parity diverged at week ${absoluteWeek}: ${worldDifference}`);
-        const { world: _primaryWorld, ...primaryEnvelope } = primary.player;
-        const { world: _restoredWorld, ...restoredEnvelope } = restored.player;
-        void _primaryWorld;
-        void _restoredWorld;
+        const primaryEnvelope = canonicalPlayerEnvelopeForResume(primary.player);
+        const restoredEnvelope = canonicalPlayerEnvelopeForResume(restored.player);
         assert.equal(
             firstDifference(primaryEnvelope, restoredEnvelope, 'player'),
             null,
             `Exact resume player envelope diverged at week ${absoluteWeek}.`,
         );
         assert.equal(
-            firstDifference(primary.observer, restored.observer, 'observer'),
+            firstDifference(
+                canonicalObserverForResume(primary.observer),
+                canonicalObserverForResume(restored.observer),
+                'observer',
+            ),
             null,
             `Exact resume observer diverged at week ${absoluteWeek}.`,
         );
@@ -1231,7 +1384,11 @@ const assertAcquisitionStopInvariant = (): void => {
     const acquiredBefore = JSON.stringify(branch.world.platforms!.NETFLIX);
     const otherCheckpoint = branch.world.platforms!.HULU.ai!.lastProcessedAbsoluteWeek;
     const ecosystemCheckpoint = branch.world.streamingPlatformEcosystem!.lastProcessedAbsoluteWeek;
-    const result = processPlatformAiPhase8StreamingWeek(branch.player, branch.world, 2);
+    const result = processPlatformAiPhase8StreamingWeek(
+        branch.player,
+        branch.world,
+        FIXTURE_START_ABSOLUTE_WEEK + 1,
+    );
     assert.equal(JSON.stringify(result.world.platforms!.NETFLIX), acquiredBefore, 'Acquired platform must remain byte-for-byte unchanged');
     assert.ok(result.world.platforms!.HULU.ai!.lastProcessedAbsoluteWeek > otherCheckpoint, 'Unacquired platform must keep processing');
     assert.ok(

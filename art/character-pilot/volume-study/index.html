@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Actor Empire · Volume study 03</title>
+  <link rel="stylesheet" href="study.css">
+  <script type="importmap">{"imports":{"three":"../vendor/three.module.js"}}</script>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">Actor Empire / Character study 03</p>
+      <h1>Bald actor. Navy bomber.</h1>
+      <p class="intro">Rounded skull, shaped jaw, dimensional features, and padded clothing. Turn the character to inspect the form.</p>
+    </header>
+    <div class="comparison">
+      <section class="reference-panel" aria-label="Character reference">
+        <h2>Your reference <span>Visual target</span></h2>
+        <div class="reference-art"><img src="reference-lineup.png" alt="The bald character in the supplied lineup, wearing a navy bomber jacket and blue jeans"></div>
+        <a class="reference-link" href="reference-lineup.png">View the complete lineup ↗</a>
+      </section>
+      <section class="study-panel" aria-label="New character">
+        <h2>New 3D model <span id="stage-label">Drag to rotate</span></h2>
+        <div id="stage">
+          <div id="live" role="img" aria-label="Interactive 3D character. Drag to rotate or use the view buttons."></div>
+          <img id="render" src="renders/three-quarter.png" alt="Blender studio render of the same character" hidden>
+          <p id="loading" role="status">Opening the character…</p>
+        </div>
+        <div class="toolbar" role="group" aria-label="Character view">
+          <button data-view="front" aria-pressed="false">Front</button>
+          <button data-view="three-quarter" aria-pressed="true">¾ view</button>
+          <button data-view="side" aria-pressed="false">Side</button>
+          <button data-view="portrait" aria-pressed="false">Portrait</button>
+        </div>
+        <div class="modebar" role="group" aria-label="Preview mode">
+          <button id="live-mode" aria-pressed="true">Rotate in 3D</button>
+          <button id="render-mode" aria-pressed="false">Studio render</button>
+        </div>
+      </section>
+    </div>
+    <section class="details">
+      <div>
+        <h2>One model, several angles.</h2>
+        <p>The skull, cheeks, chin, ears, and nose are modeled in three dimensions. The jacket has a raised collar, open front, seams, pockets, cuffs, and knitted hem.</p>
+        <p class="status">Art study for review · Static pose · Not yet rigged or integrated into the game</p>
+      </div>
+      <nav aria-label="Character files">
+        <a href="actor-volume-study-03.blend" download>Blender source ↗</a>
+        <a href="actor-volume-study-03.glb" download>3D model ↗</a>
+        <a href="renders/portrait.png">Portrait render ↗</a>
+      </nav>
+    </section>
+  </main>
+  <script type="module" src="study.mjs"></script>
+</body>
+</html>

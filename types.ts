@@ -3038,6 +3038,18 @@ export type StreamingMarketOperationStatus =
     | 'EXITED';
 export type StreamingMarketOperationSource = 'PLAYER_ACTION' | 'PLATFORM_AI' | 'LEGACY_DAY_ONE' | 'LEGACY_REGIONAL';
 
+/** Free, resumable intent from Define the Launch. It is deliberately separate
+ * from paid clearances and commissioned service configuration. */
+export interface OwnedStreamingDefineLaunchDraftState {
+    selectedCountryIds: string[];
+    soundId: string | null;
+    packageId: string | null;
+    customAudio: OwnedStreamingCustomIdentAudio | null;
+    storefrontId: string | null;
+    pricing: OwnedStreamingPricingConfiguration;
+    updatedAtAbsoluteWeek: number;
+}
+
 export interface OwnedStreamingLaunchProgramState {
     status: StreamingLaunchProgramStatus;
     startedAtAbsoluteWeek: number | null;
@@ -3049,6 +3061,35 @@ export interface OwnedStreamingLaunchProgramState {
     buildCurrentStep: StreamingBuildLaunchStepId;
     lastBlueprintSignature: string | null;
     blueprintSavedAtAbsoluteWeek: number | null;
+    defineDraft: OwnedStreamingDefineLaunchDraftState | null;
+}
+
+export type StreamingOpeningProgrammeState =
+    | 'DRAFT'
+    | 'READY_TO_COMMISSION'
+    | 'EXECUTING'
+    | 'ACTION_REQUIRED'
+    | 'READY_TO_OPEN'
+    | 'LIVE';
+
+export type StreamingOpeningProgrammeFocus =
+    | 'OVERVIEW'
+    | 'INFRASTRUCTURE'
+    | 'CLEARANCES'
+    | 'MARKETING'
+    | 'LAUNCH_PLAN';
+
+/** Immutable evidence captured when editable launch planning becomes execution. */
+export interface OwnedStreamingOpeningProgrammeCommission {
+    id: string;
+    idempotencyKey: string;
+    committedAtAbsoluteWeek: number;
+    launchDefinitionSignature: string;
+    infrastructureConfigurationSignature: string;
+    rehearsalSignature: string;
+    openingCountryIds: string[];
+    marketingForecastSignature: string;
+    revision: number;
 }
 
 export interface OwnedStreamingMarketCostBreakdown {
@@ -3311,6 +3352,7 @@ export type StreamingCostCommitmentCategory =
     | 'LOCALIZATION'
     | 'NETWORK'
     | 'CONTENT'
+    | 'MARKETING'
     | 'OTHER';
 export type StreamingCostCommitmentStatus = 'PLANNED' | 'COMMITTED' | 'PAID' | 'CANCELLED' | 'REFUNDED' | 'MIGRATED';
 
@@ -4474,6 +4516,10 @@ export interface OwnedStreamingInfrastructureSetupDraft {
     facilities?: OwnedStreamingFacility[];
     /** Optional for legacy saves; normalized to a deterministic default. */
     managementPolicy?: StreamingInfrastructureManagementPolicy;
+    /** True only after the founder approves the current assisted drawing. */
+    assistedPlanApproved?: boolean;
+    /** Capability earned by the approved drawing; never inferred from spend alone. */
+    assistedPlanClass?: StreamingCapacityPackageId;
     /** Exact opening-night demand handed over by the Day-One Markets rehearsal. */
     openingDemandForecast?: {
         low: number;
@@ -5789,6 +5835,91 @@ export interface OwnedStreamingLaunchSlate {
     revision: number;
 }
 
+export type StreamingLaunchMarketingObjective =
+    | 'PLATFORM_INTRODUCTION'
+    | 'CATALOGUE_SHOWCASE'
+    | 'FLAGSHIP_ORIGINAL'
+    | 'VALUE_PROPOSITION';
+
+export type StreamingLaunchMarketingTimeline = 'FRONT_LOADED' | 'BALANCED' | 'LAST_WEEK_PUSH';
+export type StreamingLaunchMarketingAllocationMode = 'AUTO' | 'MANUAL';
+export type StreamingLaunchMarketingChannelId =
+    | 'SOCIAL_DIGITAL'
+    | 'CREATORS'
+    | 'TV_OUTDOOR'
+    | 'DEVICE_STORES'
+    | 'TELCO_BUNDLES'
+    | 'PRESS_EVENTS';
+export type StreamingLaunchMarketingWarningCode =
+    | 'NO_OPENING_COUNTRIES'
+    | 'NO_SELLABLE_PLAN'
+    | 'MISSING_FLAGSHIP_ORIGINAL'
+    | 'INSUFFICIENT_MARKET_COVERAGE'
+    | 'MANUAL_ALLOCATION_REVIEW'
+    | 'LOCKED_CHANNEL'
+    | 'BUDGET_SHORTFALL';
+
+export interface StreamingLaunchMarketingCountryForecast {
+    countryId: string;
+    countryName: string;
+    allocatedAmount: number;
+    organicAwareness: number;
+    likelyAwarenessLift: number;
+    likelyAcquiredAccounts: number;
+    likelyConcurrentStreams: number;
+    customerAcquisitionCost: number | null;
+    confidenceScore: number;
+    confidence: 'LOW' | 'MEDIUM' | 'HIGH';
+}
+
+export interface StreamingLaunchMarketingForecastSnapshot {
+    id: string;
+    version: 1;
+    signature: string;
+    effectiveBudget: number;
+    organicAwareness: number;
+    likelyAwarenessLift: number;
+    /** Opening demand before paid launch marketing changes it. */
+    baselineConcurrentStreams: number;
+    /** How much of the useful paid reach has already been captured. */
+    saturationPercent: number;
+    efficiencyStatus: 'ORGANIC' | 'EFFICIENT' | 'DIMINISHING' | 'SATURATED';
+    acquiredAccounts: { low: number; likely: number; high: number };
+    concurrentStreams: { low: number; likely: number; high: number };
+    customerAcquisitionCost: number | null;
+    confidenceScore: number;
+    confidence: 'LOW' | 'MEDIUM' | 'HIGH';
+    countryForecasts: StreamingLaunchMarketingCountryForecast[];
+    warnings: StreamingLaunchMarketingWarningCode[];
+}
+
+export interface OwnedStreamingLaunchMarketingDraft {
+    schemaVersion: 1;
+    objective: StreamingLaunchMarketingObjective;
+    timeline: StreamingLaunchMarketingTimeline;
+    budgetCeiling: number;
+    allocationMode: StreamingLaunchMarketingAllocationMode;
+    countryWeights: Record<string, number>;
+    channelAllocations: Partial<Record<StreamingLaunchMarketingChannelId, number>>;
+    updatedAtAbsoluteWeek: number;
+    revision: number;
+}
+
+export interface OwnedStreamingLaunchMarketingPlan extends OwnedStreamingLaunchMarketingDraft {
+    id: string;
+    idempotencyKey: string;
+    status: 'RESERVED' | 'SPENDING' | 'SETTLED' | 'CANCELLED';
+    openingCountryIds: string[];
+    committedAtAbsoluteWeek: number;
+    startsAtAbsoluteWeek: number;
+    endsAtAbsoluteWeek: number;
+    spentAmount: number;
+    returnedAmount: number;
+    lastProcessedAbsoluteWeek: number | null;
+    forecastSnapshot: StreamingLaunchMarketingForecastSnapshot;
+    countryAwareness: Record<string, number>;
+}
+
 export type StreamingLaunchCapacityPlan = 'STANDARD' | 'CLOUD_BURST' | 'STAGGERED_PREMIERE';
 export type StreamingLaunchOutcomeTier = 'SMOOTH_OPENING' | 'PRESSURED_OPENING' | 'DEGRADED_OPENING';
 
@@ -5813,6 +5944,7 @@ export interface OwnedStreamingLaunchCommit {
     outcomeTier: StreamingLaunchOutcomeTier;
     openingTitleCount: number;
     openingOriginalTitle: string;
+    marketingForecastSnapshotId?: string | null;
 }
 
 export interface OwnedStreamingPlatformMetrics {
@@ -5914,6 +6046,7 @@ export interface OwnedStreamingWeeklyOperations {
     worldViewingTransactionRevenue?: number;
     worldViewingSponsorshipRevenue?: number;
     worldViewingIncrementalRevenue?: number;
+    worldViewingCommercialOperatingCost?: number;
     partnerRevenueShareCost: number;
     infrastructureCost: number;
     leadershipCost: number;
@@ -5986,6 +6119,9 @@ export interface OwnedStreamingTitleWeekPerformance {
     premiumRevenue?: number;
     rentalRevenue?: number;
     purchaseRevenue?: number;
+    dayPassRevenue?: number;
+    meteredRevenue?: number;
+    patronRevenue?: number;
     sponsorshipRevenue?: number;
     incrementalRevenue?: number;
     allocatedCashCost: number;
@@ -6305,6 +6441,7 @@ export interface OwnedStreamingPlatformState {
     legacy: OwnedStreamingLegacyState;
     finance: OwnedStreamingFinanceState;
     launchProgram: OwnedStreamingLaunchProgramState;
+    openingProgrammeCommission: OwnedStreamingOpeningProgrammeCommission | null;
     marketOperations: OwnedStreamingMarketOperation[];
     serviceConfiguration: OwnedStreamingServiceConfiguration;
     capabilities: OwnedStreamingCapabilityPortfolio;
@@ -6330,6 +6467,8 @@ export interface OwnedStreamingPlatformState {
     originalCommissions: OwnedStreamingOriginalCommission[];
     launchSlateDraft: OwnedStreamingLaunchSlate | null;
     launchSlate: OwnedStreamingLaunchSlate | null;
+    launchMarketingDraft: OwnedStreamingLaunchMarketingDraft | null;
+    launchMarketingPlan: OwnedStreamingLaunchMarketingPlan | null;
     launchCommit: OwnedStreamingLaunchCommit | null;
     subscriptionPrices: Record<StreamingSubscriptionTierId, number>;
     founderOwnershipPercent: number;
@@ -6357,7 +6496,7 @@ export interface OwnedStreamingPlatformState {
     milestoneKeys: string[];
 }
 
-export const OWNED_STREAMING_PLATFORM_SCHEMA_VERSION = 25;
+export const OWNED_STREAMING_PLATFORM_SCHEMA_VERSION = 26;
 
 export const createInitialOwnedStreamingPlatformState = (playerId = ''): OwnedStreamingPlatformState => ({
     schemaVersion: OWNED_STREAMING_PLATFORM_SCHEMA_VERSION,
@@ -6472,7 +6611,9 @@ export const createInitialOwnedStreamingPlatformState = (playerId = ''): OwnedSt
         buildCurrentStep: 'BLUEPRINT',
         lastBlueprintSignature: null,
         blueprintSavedAtAbsoluteWeek: null,
+        defineDraft: null,
     },
+    openingProgrammeCommission: null,
     marketOperations: [],
     serviceConfiguration: {
         source: 'UNCONFIGURED',
@@ -6549,6 +6690,18 @@ export const createInitialOwnedStreamingPlatformState = (playerId = ''): OwnedSt
     originalCommissions: [],
     launchSlateDraft: null,
     launchSlate: null,
+    launchMarketingDraft: {
+        schemaVersion: 1,
+        objective: 'PLATFORM_INTRODUCTION',
+        timeline: 'BALANCED',
+        budgetCeiling: 0,
+        allocationMode: 'AUTO',
+        countryWeights: {},
+        channelAllocations: {},
+        updatedAtAbsoluteWeek: 0,
+        revision: 0,
+    },
+    launchMarketingPlan: null,
     launchCommit: null,
     subscriptionPrices: {
         BASIC: 7.99,
@@ -8757,6 +8910,10 @@ export interface PlatformAiFinanceSnapshot {
     openingCashMillions: number;
     subscriptionRevenueMillions: number;
     advertisingRevenueMillions: number;
+    transactionRevenueMillions?: number;
+    sponsorshipRevenueMillions?: number;
+    communityRevenueMillions?: number;
+    commercialOperatingCostMillions?: number;
     verifiedContractIncomeMillions: number;
     rescueIncomeMillions: number;
     /** Portion of a parent rescue applied directly to principal before cash is replenished. */
@@ -8838,7 +8995,8 @@ export type PlatformAiDistressAction =
     | 'PARENT_RESCUE'
     | 'EXTERNAL_RECAPITALIZATION'
     | 'BANKRUPTCY_ADMINISTRATION'
-    | 'DORMANT';
+    | 'DORMANT'
+    | 'DORMANT_RELAUNCH';
 
 export type PlatformAiDistressEpisodeStatus =
     | 'ACTIVE'
@@ -8986,7 +9144,24 @@ export interface PlatformAiAdministrationState {
     referenceId: string | null;
 }
 
-export const PLATFORM_AI_RUNTIME_SCHEMA_VERSION = 11 as const;
+export interface PlatformAiLaunchMarketingCampaign {
+    id: string;
+    absoluteWeek: number;
+    countryIds: string[];
+    objective: StreamingLaunchMarketingObjective;
+    timeline: StreamingLaunchMarketingTimeline;
+    budgetCeilingMillions: number;
+    weeklyScheduleMillions: number[];
+    accruedSpendMillions: number;
+    lastProcessedAbsoluteWeek: number | null;
+    status: 'ACTIVE' | 'COMPLETE';
+    likelyPaidAccounts: number;
+    likelyConcurrentStreams: number;
+    awarenessLift: number;
+    forecastSignature: string;
+}
+
+export const PLATFORM_AI_RUNTIME_SCHEMA_VERSION = 12 as const;
 
 export interface PlatformAiRuntimeState {
     schemaVersion: typeof PLATFORM_AI_RUNTIME_SCHEMA_VERSION;
@@ -9017,6 +9192,7 @@ export interface PlatformAiRuntimeState {
     productionOutcomeMemory: PlatformAiProductionOutcomeMemory;
     financeHistory: PlatformAiFinanceSnapshot[];
     decisionHistory: PlatformAiDecisionRecord[];
+    launchMarketingHistory: PlatformAiLaunchMarketingCampaign[];
     distressEpisodes: PlatformAiDistressEpisode[];
     externalRecapitalizations: PlatformAiExternalRecapitalization[];
     administration: PlatformAiAdministrationState | null;
@@ -9543,6 +9719,8 @@ export interface WorldStreamingPlatformOffer {
     isPlayer: boolean;
     activeCountryIds: string[];
     plans: WorldStreamingPlanOffer[];
+    /** Full commercial strategy used by the same world-economy settlement for player and AI services. */
+    commercialConfiguration: OwnedStreamingPricingConfiguration;
     annualDiscountPercent: number;
     introOfferPercent: number;
     catalogueStrengthIndex: number;
@@ -9859,9 +10037,17 @@ export interface WorldStreamingViewingRevenue {
     rentalRevenue: number;
     purchaseTransactions: number;
     purchaseRevenue: number;
+    dayPassTransactions: number;
+    dayPassRevenue: number;
+    meteredAccounts: number;
+    meteredHours: number;
+    meteredRevenue: number;
+    patronAccounts: number;
+    patronRevenue: number;
     sponsorshipImpressions: number;
     sponsorshipRevenue: number;
     totalIncrementalRevenue: number;
+    commercialOperatingCost: number;
 }
 
 export interface WorldStreamingViewingCountryTitleState {
@@ -9967,7 +10153,7 @@ export interface WorldStreamingViewingSnapshot {
 }
 
 export interface WorldStreamingViewingState {
-    schemaVersion: 1;
+    schemaVersion: 2;
     initializedAtAbsoluteWeek: number;
     lastProcessedAbsoluteWeek: number;
     sourceFingerprint: string;
@@ -10077,6 +10263,31 @@ export interface WorldStreamingPlatformEconomyState {
     historyByPlatform: Record<string, WorldStreamingPlatformEconomyHistoryEntry[]>;
 }
 
+export type WorldEconomyIntegrityStatus = 'VALID' | 'REBUILD_DERIVED' | 'ABORT_PROTECTED';
+export type WorldEconomyIntegritySystem = 'WE1' | 'WE2' | 'WE3' | 'WE4' | 'WE5' | 'WE6' | 'WE7' | 'WEEK';
+export type WorldEconomyIntegritySeverity = 'DERIVED' | 'PROTECTED';
+
+export interface WorldEconomyIntegrityViolation {
+    code: string;
+    system: WorldEconomyIntegritySystem;
+    severity: WorldEconomyIntegritySeverity;
+}
+
+export interface WorldEconomyValidationResult {
+    status: WorldEconomyIntegrityStatus;
+    violations: WorldEconomyIntegrityViolation[];
+}
+
+export interface WorldEconomyHealthSummary {
+    schemaVersion: 1;
+    lastValidatedAbsoluteWeek: number;
+    sourceFingerprints: Partial<Record<WorldEconomyIntegritySystem, string>>;
+    workloadMode: 'NORMAL' | 'LARGE_SAVE' | 'LEGACY_RECOVERY';
+    warningCodes: string[];
+    stateSizeCounters: Record<string, number>;
+    lastSuccessfulMigrationVersion: number;
+}
+
 export interface WorldState {
     projects: IndustryProject[];
     trendingGenre: Genre;
@@ -10112,6 +10323,7 @@ export interface WorldState {
     worldStreamingCustomers?: WorldStreamingCustomerState;
     worldStreamingViewing?: WorldStreamingViewingState;
     worldStreamingPlatformEconomy?: WorldStreamingPlatformEconomyState;
+    worldEconomyHealth?: WorldEconomyHealthSummary;
 }
 
 export interface LogEntry {

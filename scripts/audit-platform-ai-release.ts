@@ -86,14 +86,14 @@ assert.deepEqual(
     'Mixed-market planning should preserve supported assets while unsupported markets remain intentionally unlocalized.',
 );
 
-assert.equal(PLATFORM_AI_HIT_COMMERCIAL_SCORE, 89, 'Long-run Netflix HIT threshold must remain disclosed and auditable.');
-assert.equal(PLATFORM_AI_FLOP_COMMERCIAL_SCORE, 84.5, 'Long-run Netflix clear-flop threshold must preserve a meaningful lower tail.');
+assert.equal(PLATFORM_AI_HIT_COMMERCIAL_SCORE, 87.5, 'Long-run Netflix HIT threshold must remain disclosed and auditable.');
+assert.equal(PLATFORM_AI_FLOP_COMMERCIAL_SCORE, 82.25, 'Long-run Netflix clear-flop threshold must preserve a meaningful lower tail.');
 assert.deepEqual(PLATFORM_AI_OUTCOME_THRESHOLDS, {
-    NETFLIX: { hit: 89, flop: 84.5 },
-    APPLE_TV: { hit: 86, flop: 82 },
-    DISNEY_PLUS: { hit: 88, flop: 84 },
-    HULU: { hit: 84, flop: 80 },
-    YOUTUBE: { hit: 87.5, flop: 83.5 },
+    NETFLIX: { hit: 87.5, flop: 82.25 },
+    APPLE_TV: { hit: 81.5, flop: 77 },
+    DISNEY_PLUS: { hit: 85, flop: 80.5 },
+    HULU: { hit: 79, flop: 74 },
+    YOUTUBE: { hit: 80, flop: 75 },
 }, 'Each service should use a disclosed expectation band with room for solid releases.');
 for (const [platformId, thresholds] of Object.entries(PLATFORM_AI_OUTCOME_THRESHOLDS)) {
     assert.ok(

@@ -1,0 +1,19 @@
+{
+  "blender_version": "5.1.1",
+  "head_dimensions": {
+    "width": 1.3671000003814697,
+    "depth": 1.27433580160141,
+    "height": 1.5499999523162842
+  },
+  "head_depth_to_width": 0.9321452719229205,
+  "head_vertices": 1392,
+  "head_faces": 1346,
+  "views": [
+    "front",
+    "three-quarter",
+    "side",
+    "portrait"
+  ],
+  "rigged": false,
+  "reference": "Owner supplied five-character lineup, 2026-09-06"
+}

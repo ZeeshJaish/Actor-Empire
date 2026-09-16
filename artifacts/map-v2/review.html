@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Actor Empire shared map review</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 0; min-height: 100vh; background: #05070d; color: white; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+      button { font: inherit; }
+      .review-shell { width: min(100%, 980px); margin: 0 auto; padding: 18px 14px 48px; }
+      .review-kicker { margin: 0 0 6px; color: #fcd34d; font-size: 10px; font-weight: 900; letter-spacing: .24em; text-transform: uppercase; }
+      .review-title { margin: 0; font-size: clamp(24px, 6vw, 42px); line-height: 1; }
+      .review-copy { margin: 10px 0 16px; color: #a1a1aa; font-size: 13px; line-height: 1.5; }
+      .review-tabs { display: flex; gap: 8px; margin-bottom: 14px; overflow-x: auto; padding-bottom: 3px; }
+      .review-tabs::-webkit-scrollbar { display: none; }
+      .review-tabs a { border: 1px solid #334155; border-radius: 999px; padding: 8px 12px; color: #cbd5e1; font-size: 11px; font-weight: 800; text-decoration: none; }
+      .review-tabs a[data-active="true"] { border-color: #fcd34d; color: #fcd34d; background: rgba(252,211,77,.08); }
+      .interactive-region-map { position: relative; overflow: hidden; border: 1px solid rgba(186,230,253,.25); border-radius: 27px; padding: 12px; background: rgba(8,47,73,.32); box-shadow: 0 24px 60px rgba(0,0,0,.42); }
+      .interactive-region-map > button { color: white; }
+      .release-review { min-height: 760px; padding: 10px 4px 100px; background: #0a0908; color: #f3efe8; }
+      .map-product-review { --epx-brand: #9d7cff; --epx-brand-lift: #67e8f9; --epx-brand-deep: #7c3aed; --epx-brand-line: rgba(157,124,255,.34); --epx-brand-veil: rgba(157,124,255,.15); --epx-bad: #fb7185; --epx-warn: #fbbf24; --epx-good: #34d399; --epx-fg-max: #fff; --epx-fg-2: #e2e8f0; --epx-fg-4: #94a3b8; --epx-fg-5: #64748b; --epx-s-void: #05070d; --epx-s-surface: #0b1020; --epx-line-strong: rgba(255,255,255,.2); --epx-r-lg: 22px; --epx-r-sm: 10px; --epx-sp-1: 4px; --epx-sp-2: 8px; --epx-sp-3: 12px; --epx-sp-5: 20px; --epx-sp-8: 32px; --epx-t-micro: 10px; --epx-t-body: 13px; --epx-t-value: 16px; --epx-fw-bold: 800; --epx-fw-black: 900; --epx-track-caps: .12em; --epx-lh-body: 1.5; }
+      .review-status-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 7px; margin-bottom: 10px; }
+      .review-status-grid span, .review-selection { display: block; padding: 10px 11px; border: 1px solid rgba(255,255,255,.1); border-radius: 12px; background: #0b1020; }
+      .review-status-grid small, .review-selection small { display: block; color: #a78bfa; font-size: 9px; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; }
+      .review-status-grid b { display: block; margin-top: 4px; font-size: 12px; overflow-wrap: anywhere; }
+      .review-selection { margin-top: 10px; }
+      .review-selection b { display: block; margin-top: 5px; color: white; font-size: 14px; }
+      .review-selection span { display: block; margin-top: 4px; color: #94a3b8; font-size: 11px; line-height: 1.45; }
+      .review-cinematic-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+      .review-cinematic-head small { display: block; color: #a78bfa; font-size: 9px; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; }
+      .review-cinematic-head b { display: block; margin-top: 4px; font-size: 14px; }
+      .review-cinematic-head button { flex: none; border: 1px solid #fcd34d; border-radius: 999px; padding: 9px 12px; background: rgba(252,211,77,.08); color: #fcd34d; font-size: 10px; font-weight: 900; text-transform: uppercase; }
+      .review-certification { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; margin-bottom: 12px; }
+      .review-certification span { min-width: 0; padding: 10px; border: 1px solid rgba(52,211,153,.24); border-radius: 12px; background: rgba(6,78,59,.14); }
+      .review-certification small, .review-certification b { display: block; overflow-wrap: anywhere; }
+      .review-certification small { color: #6ee7b7; font-size: 8px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
+      .review-certification b { margin-top: 4px; font-size: 11px; }
+      .map7-grid { display: grid; gap: 12px; }
+      .map7-grid article { min-width: 0; padding: 10px; border: 1px solid rgba(255,255,255,.1); border-radius: 16px; background: #090d16; }
+      .map7-grid h2 { margin: 0 0 8px; color: #c4b5fd; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; }
+      @media (max-width: 430px) { .review-shell { padding-inline: 10px; } .review-copy { min-height: 58px; } .review-tabs a { white-space: nowrap; } }
+      @media (max-width: 430px) { .review-certification { grid-template-columns: 1fr; } .review-cinematic-head { align-items: flex-start; } }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/artifacts/map-v2/review.tsx"></script>
+  </body>
+</html>

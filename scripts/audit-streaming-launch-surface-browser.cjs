@@ -201,6 +201,43 @@ const pixels = value => Number.parseFloat(value || '0');
     assert.equal(new Set(narrowTabs.map(card => card.width)).size, 1,
       'Compact plan summaries remain balanced at 320px');
     await page.screenshot({ path: '/tmp/streaming-launch-pricing-320.png' });
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('http://127.0.0.1:3000/scripts/fixtures/streaming-launch-surface.html?step=blueprint');
+    await page.waitForLoadState('networkidle');
+    await page.getByRole('heading', { name: 'Empire+' }).waitFor();
+
+    const blueprintMark = page.locator('.bl-hero-mark');
+    assert.equal(await blueprintMark.locator('img').count(), 1,
+      'The launch blueprint reuses the custom platform logo selected in Identity');
+    assert.equal(await blueprintMark.locator(':scope > i').count(), 0,
+      'The launch blueprint never substitutes the old three-bar placeholder for the selected logo');
+
+    const ladderMetrics = await page.locator('.bl-ladder').evaluate(element => {
+      const ladder = element.getBoundingClientRect();
+      const bars = Array.from(element.querySelectorAll(':scope > span')).map(bar => {
+        const rect = bar.getBoundingClientRect();
+        const label = bar.querySelector('em')?.getBoundingClientRect();
+        return {
+          left: rect.left,
+          right: rect.right,
+          labelLeft: label?.left ?? 0,
+          labelRight: label?.right ?? 0,
+        };
+      });
+      return { width: ladder.width, bars };
+    });
+    assert.ok(ladderMetrics.width >= 120,
+      'The household price ladder fills the tile instead of collapsing around its labels');
+    assert.ok(ladderMetrics.bars.every((bar, index, bars) => (
+      index === 0 || bar.left >= bars[index - 1].right
+    )), 'Every household plan receives a distinct bar slot');
+    assert.ok(ladderMetrics.bars.every((bar, index, bars) => (
+      index === 0 || bar.labelLeft >= bars[index - 1].labelRight
+    )), 'Household plan price labels do not overlap');
+    assert.equal(await page.locator('.sf.lw').evaluate(element => element.scrollWidth <= element.clientWidth), true,
+      'The repaired blueprint remains inside the mobile viewport');
+    await page.screenshot({ path: '/tmp/streaming-launch-blueprint-390.png' });
     console.log('Streaming launch soft-surface browser audit passed.');
   } finally {
     await browser.close();

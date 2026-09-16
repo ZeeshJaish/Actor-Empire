@@ -14,13 +14,58 @@ export interface ProductionLocation {
     latitude: number;
     continentId: ProductionLocationContinentId;
     regionId: BoxOfficeRegionId;
+    countryId: string;
+    countryCode: string;
+    countryName: string;
 }
+
+interface ProductionLocationCountry {
+    countryId: string;
+    countryCode: string;
+    countryName: string;
+}
+
+const COUNTRY_BY_LOCATION_ID: Record<string, ProductionLocationCountry> = {
+    LA: { countryId: '840', countryCode: 'US', countryName: 'United States' },
+    ATL: { countryId: '840', countryCode: 'US', countryName: 'United States' },
+    NYC: { countryId: '840', countryCode: 'US', countryName: 'United States' },
+    VAN: { countryId: '124', countryCode: 'CA', countryName: 'Canada' },
+    MEX: { countryId: '484', countryCode: 'MX', countryName: 'Mexico' },
+    TOR: { countryId: '124', countryCode: 'CA', countryName: 'Canada' },
+    LDN: { countryId: '826', countryCode: 'GB', countryName: 'United Kingdom' },
+    PAR: { countryId: '250', countryCode: 'FR', countryName: 'France' },
+    PRG: { countryId: '203', countryCode: 'CZ', countryName: 'Czechia' },
+    ROM: { countryId: '380', countryCode: 'IT', countryName: 'Italy' },
+    BER: { countryId: '276', countryCode: 'DE', countryName: 'Germany' },
+    MAD: { countryId: '724', countryCode: 'ES', countryName: 'Spain' },
+    TOK: { countryId: '392', countryCode: 'JP', countryName: 'Japan' },
+    SEO: { countryId: '410', countryCode: 'KR', countryName: 'South Korea' },
+    BOM: { countryId: '356', countryCode: 'IN', countryName: 'India' },
+    HKG: { countryId: '344', countryCode: 'HK', countryName: 'Hong Kong' },
+    BEI: { countryId: '156', countryCode: 'CN', countryName: 'China' },
+    BKK: { countryId: '764', countryCode: 'TH', countryName: 'Thailand' },
+    RIO: { countryId: '076', countryCode: 'BR', countryName: 'Brazil' },
+    BUE: { countryId: '032', countryCode: 'AR', countryName: 'Argentina' },
+    BOG: { countryId: '170', countryCode: 'CO', countryName: 'Colombia' },
+    LIM: { countryId: '604', countryCode: 'PE', countryName: 'Peru' },
+    CPT: { countryId: '710', countryCode: 'ZA', countryName: 'South Africa' },
+    CAI: { countryId: '818', countryCode: 'EG', countryName: 'Egypt' },
+    MAR: { countryId: '504', countryCode: 'MA', countryName: 'Morocco' },
+    LAG: { countryId: '566', countryCode: 'NG', countryName: 'Nigeria' },
+    SYD: { countryId: '036', countryCode: 'AU', countryName: 'Australia' },
+    MEL: { countryId: '036', countryCode: 'AU', countryName: 'Australia' },
+    AKL: { countryId: '554', countryCode: 'NZ', countryName: 'New Zealand' },
+};
 
 const location = (
     continentId: ProductionLocationContinentId,
     regionId: BoxOfficeRegionId,
-    value: Omit<ProductionLocation, 'continentId' | 'regionId'>,
-): ProductionLocation => ({ ...value, continentId, regionId });
+    value: Omit<ProductionLocation, 'continentId' | 'regionId' | keyof ProductionLocationCountry>,
+): ProductionLocation => {
+    const country = COUNTRY_BY_LOCATION_ID[value.id];
+    if (!country) throw new Error(`Production location ${value.id} is missing country metadata.`);
+    return { ...value, ...country, continentId, regionId };
+};
 
 /**
  * The shared Actor Empire location directory used by Greenlight production

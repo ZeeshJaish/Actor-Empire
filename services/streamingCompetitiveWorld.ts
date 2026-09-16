@@ -28,6 +28,7 @@ import {
     normalizeOwnedStreamingPlatformState,
 } from './ownedStreamingPlatform';
 import { resolveOwnedStreamingReach } from './streamingProgression';
+import { getStreamingEntryPrice } from './streamingPricingEconomy';
 import { getStreamingCountryMarketProfile } from './streamingDayOneMarkets';
 import { isStreamingLicenseActiveAt } from './streamingRightsCore';
 
@@ -654,8 +655,7 @@ const selectMoveType = (
     absoluteWeek: number,
 ): RivalMoveSelection => {
     const activeExecutives = platform.leadership.appointments.filter(item => item.status === 'ACTIVE');
-    const paidPrices = Object.values(platform.subscriptionPrices).filter(price => price > 0);
-    const playerEntryPrice = paidPrices.length ? Math.min(...paidPrices) : 9.99;
+    const playerEntryPrice = getStreamingEntryPrice(platform) || 9.99;
     const latestWeek = platform.weeklyHistory.at(-1);
     const playback = latestWeek?.operations?.playbackSuccessRate ?? platform.metrics.technologyHealth;
     const activeOriginals = platform.originalCommissions.filter(item => ['GREENLIT', 'IN_PRODUCTION', 'RELEASED'].includes(item.status)).length;

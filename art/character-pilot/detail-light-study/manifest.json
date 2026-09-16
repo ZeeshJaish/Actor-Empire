@@ -1,0 +1,198 @@
+{
+  "source": "/Users/zeesh/Vibe code/Actor empire/art/character-pilot/volume-study/actor-volume-study-03.blend",
+  "output": "actor-detail-study-04.blend",
+  "rigs": {
+    "studio": {
+      "label": "Soft studio",
+      "floor": "DDD9D1",
+      "ambient": 0.32,
+      "world": [
+        0.8,
+        0.86,
+        1.0
+      ],
+      "lights": [
+        [
+          "Key",
+          [
+            -3.8,
+            -5.5,
+            7.6
+          ],
+          850,
+          4.2,
+          [
+            1,
+            0.92,
+            0.84
+          ]
+        ],
+        [
+          "Fill",
+          [
+            4.2,
+            -3.2,
+            4.6
+          ],
+          320,
+          4.5,
+          [
+            0.86,
+            0.93,
+            1
+          ]
+        ],
+        [
+          "Rim",
+          [
+            1.7,
+            3.0,
+            6
+          ],
+          550,
+          3.2,
+          [
+            1,
+            0.97,
+            0.91
+          ]
+        ]
+      ]
+    },
+    "warm-cool": {
+      "label": "Warm key / cool rim",
+      "floor": "26374C",
+      "ambient": 0.12,
+      "world": [
+        0.45,
+        0.62,
+        1.0
+      ],
+      "lights": [
+        [
+          "Key",
+          [
+            -3.4,
+            -4.5,
+            6.2
+          ],
+          930,
+          2.7,
+          [
+            1,
+            0.72,
+            0.48
+          ]
+        ],
+        [
+          "Fill",
+          [
+            3.4,
+            -3.5,
+            4
+          ],
+          150,
+          3.8,
+          [
+            0.56,
+            0.73,
+            1
+          ]
+        ],
+        [
+          "Rim",
+          [
+            2.8,
+            2.2,
+            5.7
+          ],
+          1100,
+          2.4,
+          [
+            0.4,
+            0.7,
+            1
+          ]
+        ]
+      ]
+    },
+    "daylight": {
+      "label": "Directional daylight",
+      "floor": "D4C8B2",
+      "ambient": 0.23,
+      "world": [
+        0.78,
+        0.88,
+        1.0
+      ],
+      "lights": [
+        [
+          "Key",
+          [
+            -4.5,
+            -3.8,
+            7.5
+          ],
+          1100,
+          1.8,
+          [
+            1,
+            0.94,
+            0.84
+          ]
+        ],
+        [
+          "Fill",
+          [
+            4.5,
+            -4,
+            3.8
+          ],
+          180,
+          5.0,
+          [
+            0.73,
+            0.87,
+            1
+          ]
+        ],
+        [
+          "Rim",
+          [
+            2.5,
+            2.8,
+            5.4
+          ],
+          300,
+          3.0,
+          [
+            1,
+            1,
+            1
+          ]
+        ]
+      ]
+    }
+  },
+  "renders": [
+    "before-studio",
+    "before-studio-portrait",
+    "studio",
+    "studio-portrait",
+    "warm-cool",
+    "warm-cool-portrait",
+    "daylight",
+    "daylight-portrait"
+  ],
+  "rigged": false,
+  "matching_cameras": true,
+  "details": [
+    "sculpted cloth folds",
+    "tailored pocket welts",
+    "topstitching",
+    "zipper pull",
+    "continuous hands",
+    "lower eyelids",
+    "material response"
+  ]
+}

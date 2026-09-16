@@ -18,6 +18,7 @@ import type { StepProps } from './LaunchWizard';
 import { compactCount, money, pct } from '../../finance/format';
 import { FlagField } from '../FlagField';
 import { Poster } from '../Poster';
+import { Mark } from '../../../streaming-transplant/StreamingBrandVisuals';
 
 const WAVE: Record<string, number[]> = {
   pulse: [30, 90, 40, 95, 35, 25, 20],
@@ -32,7 +33,9 @@ export function StepBlueprint({ data, draft, chosen, treasury, free, gap, handle
   const footprint = summarize(chosen);
   const settings = draft.pricing ?? data.pricing;
   const addressableHouseholds = chosen.reduce((sum, country) => sum + country.addressableHouseholds, 0);
-  const forecast = forecastPricing(settings, addressableHouseholds, data.market);
+  const pricingCohorts = chosen.flatMap(country => country.pricingCohorts || []);
+  const worldForecast = handlers.onForecastPricing?.(settings, chosen.map(country => country.id)) ?? null;
+  const forecast = forecastPricing(settings, addressableHouseholds, data.market, pricingCohorts, worldForecast);
   const approved = data.clearance.filter((c) => c.outcome === 'APPROVED' || c.outcome === 'CONDITIONS').length;
   const storefront = data.storefronts.find((s) => s.id === draft.storefrontId);
   const sound = data.identSounds.find((s) => s.id === draft.soundId);
@@ -56,7 +59,16 @@ export function StepBlueprint({ data, draft, chosen, treasury, free, gap, handle
       {/* --- the poster for your own launch -------------------------------- */}
       <section className={`bl-hero is-${state}`}>
         <div className="bl-hero-art" aria-hidden="true">
-          <span className="bl-hero-mark"><i /><i /><i /></span>
+          <span className="bl-hero-mark">
+            <Mark
+              brand={{
+                name: data.company.name,
+                markId: data.company.markId || 'BOLT',
+                customMark: data.company.logoSrc || null,
+              }}
+              className="bl-hero-mark-glyph"
+            />
+          </span>
         </div>
         <p className="sf-eyebrow">Opening night plan · week {data.company.week}</p>
         <h2>{data.company.name}</h2>
@@ -122,7 +134,11 @@ export function StepBlueprint({ data, draft, chosen, treasury, free, gap, handle
             : `${settings.streams.length} revenue stream${settings.streams.length > 1 ? 's' : ''}`}>
           {/* The price ladder, drawn against the dearest plan so the shape is
               the shape of your own pricing rather than an arbitrary scale. */}
-          <div className="bl-ladder">
+          <div
+            className="bl-ladder"
+            style={{ ['--bl-plan-count' as string]: Math.max(1, Math.min(5, settings.plans.length)) }}
+            aria-label={`${settings.plans.length} household plan${settings.plans.length === 1 ? '' : 's'}`}
+          >
             {settings.plans.slice(0, 5).map((plan) => {
               const dearest = Math.max(...settings.plans.map((p) => p.monthly), 1);
               return (
@@ -185,15 +201,15 @@ export function StepBlueprint({ data, draft, chosen, treasury, free, gap, handle
       )}
 
       <p className="lw-rule">
-        Saving does not launch the service. This becomes the requirement document
-        for Network Build — and changing markets, pricing or catalogue later
-        invalidates the capacity built against it.
+        This requirement document updates as you work. Changing markets, pricing
+        or catalogue later invalidates any capacity built against the older plan.
       </p>
 
       <div className="lw-actions">
-        <button type="button" className="sf-btn sf-btn--ghost" onClick={() => handlers.onSaveBlueprint?.()}>
-          {data.blueprintSaved ? 'Saved' : 'Save blueprint'}
-        </button>
+        <span className={`lw-autosave-state ${data.blueprintSaved ? 'is-current' : 'is-pending'}`} role="status">
+          <i aria-hidden="true" />
+          {data.blueprintSaved ? 'Autosaved · current' : 'Autosaving requirements'}
+        </span>
         <button type="button" className="sf-btn sf-btn--primary" onClick={() => handlers.onOpenBuildPlatform?.()}>
           Build the Platform
         </button>

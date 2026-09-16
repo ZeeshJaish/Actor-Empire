@@ -1,0 +1,84 @@
+{
+  "glb_bytes": 1793200,
+  "vertices": 44908,
+  "triangles": 77532,
+  "mesh_primitives": 334,
+  "finite_positions": true,
+  "valid_indices": true,
+  "sheen_factors": {
+    "Bomber seam fabric": [
+      0.1,
+      0.1,
+      0.1
+    ],
+    "Midnight navy bomber": [
+      0.1,
+      0.1,
+      0.1
+    ],
+    "Bomber ribbing": [
+      0.1,
+      0.1,
+      0.1
+    ]
+  },
+  "renders": {
+    "before-studio": {
+      "dimensions": [
+        1000,
+        1250
+      ],
+      "sha256": "5b36bf1847341798cf981115b1a082b9dc3065523d1d4e90fc87e1de4bbb7730"
+    },
+    "before-studio-portrait": {
+      "dimensions": [
+        1000,
+        1000
+      ],
+      "sha256": "726577f24a56081ce9f0e8762b14a4f77913985c3266cb929199af2bf3e8670f"
+    },
+    "studio": {
+      "dimensions": [
+        1000,
+        1250
+      ],
+      "sha256": "52d79b73d7f4a279d7aea46453e5ffa839c04dad0c11c9610c316444fabc3630"
+    },
+    "studio-portrait": {
+      "dimensions": [
+        1000,
+        1000
+      ],
+      "sha256": "84de866ce9ddba6b5d3c69d990dfa5f692c3c93fadb5403459754ea1bad84a09"
+    },
+    "warm-cool": {
+      "dimensions": [
+        1000,
+        1250
+      ],
+      "sha256": "780f0470103d4e42206419bc0f9435dff1859e6bfcdcf918f031b84ee2d9c189"
+    },
+    "warm-cool-portrait": {
+      "dimensions": [
+        1000,
+        1000
+      ],
+      "sha256": "8ad51c61f5e4df5f4460c83982dd85825f564c8211e3f5afb9230618905df136"
+    },
+    "daylight": {
+      "dimensions": [
+        1000,
+        1250
+      ],
+      "sha256": "1cf7b76e5a48884ea8d4ad1f6dfbcf8728126eae05d447ef917cd694e5c935b4"
+    },
+    "daylight-portrait": {
+      "dimensions": [
+        1000,
+        1000
+      ],
+      "sha256": "8c0cda7f1afecf8ce9f754761c79b7ab0799339cb7043f5bc5428a51c98907ae"
+    }
+  },
+  "build_complete_without_errors": true
+}

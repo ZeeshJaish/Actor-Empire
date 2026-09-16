@@ -19,7 +19,11 @@ import {
     normalizeOwnedStreamingPlatformState,
     queueOwnedStreamingCinematic,
 } from './ownedStreamingPlatform';
-import { aggregateStreamingFacilities, normalizeStreamingFacilityPhysical } from './streamingFacilities';
+import {
+    aggregateStreamingFacilities,
+    getStreamingFacilitySecurityProfile,
+    normalizeStreamingFacilityPhysical,
+} from './streamingFacilities';
 import { getStreamingFacilityNetworkSnapshot } from './streamingInfrastructure';
 import {
     getStreamingFacilityPhysicalView,
@@ -144,6 +148,8 @@ export const getStreamingInfrastructureIncidentResponsePreview = (
 ): StreamingInfrastructureIncidentResponsePreview => {
     const definition = STREAMING_INFRASTRUCTURE_RESPONSE_OPTIONS.find(item => item.id === action)!;
     const multiplier = severityMultiplier[incident.severity];
+    const incidentFacility = platform.infrastructureSetup?.facilities?.find(facility => facility.id === incident.facilityId);
+    const security = getStreamingFacilitySecurityProfile(incidentFacility?.lease?.securityGrade);
     const compensationCost = compensation === 'FULL'
         ? Math.max(1_200_000, incident.affectedSubscribers * 9)
         : compensation === 'TARGETED' ? Math.max(400_000, incident.affectedSubscribers * 3) : 0;
@@ -158,7 +164,11 @@ export const getStreamingInfrastructureIncidentResponsePreview = (
         compensationCost: roundMoney(compensationCost),
         insuranceRecovery,
         netCost: Math.max(0, grossCost - insuranceRecovery),
-        recoveryWeeks: Math.max(1, Math.round(definition.recoveryWeeks + (incident.severity === 'CRITICAL' ? 1 : 0) - (platform.technologyLevels.RELIABILITY >= 20 ? 1 : 0))),
+        recoveryWeeks: Math.max(1, Math.round(
+            (definition.recoveryWeeks + (incident.severity === 'CRITICAL' ? 1 : 0)
+                - (platform.technologyLevels.RELIABILITY >= 20 ? 1 : 0))
+            * security.recoveryMultiplier,
+        )),
         restoredCapacityPercent: actionRestore,
     };
 };
@@ -403,7 +413,7 @@ export const commitStreamingInfrastructureOperationsWeek = (
     const lastIncidentWeek = operations.incidents.at(-1)?.detectedAtAbsoluteWeek ?? -100;
     const weakest = [...facilities].sort((left, right) => getStreamingFacilityPhysicalView(left).state.maintenanceConditionPercent - getStreamingFacilityPhysicalView(right).state.maintenanceConditionPercent)[0];
     const weakestView = getStreamingFacilityPhysicalView(weakest);
-    const risk = clamp(
+    const rawRisk = clamp(
         .035
         + Math.max(0, 88 - weakestView.state.maintenanceConditionPercent) / 130
         + Math.max(0, (snapshot.operations?.capacityUtilizationPercent || 0) - 82) / 170
@@ -415,21 +425,22 @@ export const commitStreamingInfrastructureOperationsWeek = (
         .02,
         .72,
     );
+    const risk = clamp(rawRisk * weakestView.securityIncidentRiskMultiplier, .008, .72);
     const rng = createDeterministicRng(`${platform.simulationSeed}:infrastructure-operations:${snapshot.absoluteWeek}`);
     let detected: OwnedStreamingInfrastructureIncident | null = null;
     if (!unresolvedGeneralCrisis && !unresolvedIncident && snapshot.absoluteWeek - lastIncidentWeek >= 5 && rng() < risk) {
         const type = incidentTypeFor(platform, weakest, snapshot, rng);
-        const severity = severityFor(risk + rng() * .2);
+        const severity = severityFor((risk + rng() * .2) * weakestView.securityIncidentSeverityMultiplier);
         const multiplier = severityMultiplier[severity];
         const copy = INCIDENT_COPY[type];
         const key = `infrastructure-incident:${snapshot.absoluteWeek}:${weakest.id}:${type}`;
         detected = {
             id: createDeterministicId('streaming_infrastructure_incident', platform.simulationSeed, key), idempotencyKey: key, type, severity, stage: 'DETECTED',
             title: copy.title, detail: copy.detail,
-            cause: `${facilityName(weakest)} entered the week at ${weakestView.state.maintenanceConditionPercent.toFixed(0)}% condition with ${weakestView.backupCoveragePercent.toFixed(0)}% backup coverage.`,
+            cause: `${facilityName(weakest)} entered the week at ${weakestView.state.maintenanceConditionPercent.toFixed(0)}% condition with ${weakestView.backupCoveragePercent.toFixed(0)}% backup coverage and ${(weakest.lease?.securityGrade || 'STANDARD').toLowerCase().replace('_', ' ')} facility security.`,
             facilityId: weakest.id, cityId: weakest.cityId, detectedAtAbsoluteWeek: snapshot.absoluteWeek,
-            affectedSubscribers: Math.round(snapshot.subscribers * clamp(.018 * multiplier, .006, .28)),
-            capacityLossPercent: clamp(12 * multiplier + rng() * 12, 8, 58), conditionLossPercent: clamp(4 * multiplier + rng() * 5, 3, 18),
+            affectedSubscribers: Math.round(snapshot.subscribers * clamp(.018 * multiplier * weakestView.securityIncidentSeverityMultiplier, .004, .28)),
+            capacityLossPercent: clamp((12 * multiplier + rng() * 12) * weakestView.securityIncidentSeverityMultiplier, 5, 58), conditionLossPercent: clamp((4 * multiplier + rng() * 5) * weakestView.securityIncidentSeverityMultiplier, 2, 18),
             responseAction: null, rerouteFacilityId: null, compensation: null, insuranceClaimed: false, responseCost: 0, insuranceRecovery: 0,
             recoveryReadyAtAbsoluteWeek: null, resolvedAtAbsoluteWeek: null, assistedHandled: false,
             publicReaction: 'The interruption is visible and the public is waiting for a credible operating response.',

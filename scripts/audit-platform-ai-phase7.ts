@@ -125,10 +125,16 @@ assert.equal(
 
 const gameLoopSource = readFileSync(resolve(process.cwd(), 'services/gameLoop.ts'), 'utf8');
 const calendarAdvanceIndex = gameLoopSource.indexOf('nextPlayer.currentWeek += 1');
-const industryTurnIndex = gameLoopSource.indexOf('processStreamingIndustryWorldWeek(');
+const industryTurnIndex = gameLoopSource.indexOf('processIndustryWorldWeek(');
 const ownedStreamingIndex = gameLoopSource.indexOf('processOwnedStreamingPlatformWeek(nextPlayer)');
 assert.ok(calendarAdvanceIndex >= 0 && industryTurnIndex > calendarAdvanceIndex, 'Rival streaming must settle after the calendar advances.');
 assert.ok(ownedStreamingIndex > industryTurnIndex, 'The rival/ecosystem coordinator must settle before the player-owned streaming report for the same entered week.');
+
+const industryWorldSource = readFileSync(resolve(process.cwd(), 'services/industryWorld/industryWorldWeek.ts'), 'utf8');
+assert.ok(
+    industryWorldSource.includes('processStreamingIndustryWorldWeek(player, world, absoluteWeek)'),
+    'The shared industry coordinator must still delegate rival streaming to its canonical Platform AI weekly turn.',
+);
 
 const worldLogicSource = readFileSync(resolve(process.cwd(), 'services/worldLogic.ts'), 'utf8');
 assert.equal(
@@ -143,9 +149,14 @@ assert.equal(
 );
 
 const forbesSource = readFileSync(resolve(process.cwd(), 'views/mobile/ForbesApp.tsx'), 'utf8');
-for (const field of ['plat.cashMillions', 'plat.activeCountryIds', 'plat.technology', 'plat.lifecycle', 'plat.lastProcessedAbsoluteWeek']) {
+for (const field of ['plat.cashMillions', 'plat.activeCountryIds', 'plat.technology', 'plat.lastProcessedAbsoluteWeek']) {
     assert.ok(forbesSource.includes(field), `Forbes Stream cards must render canonical ${field.replace('plat.', '')}.`);
 }
+assert.equal(
+    forbesSource.includes('plat.lifecycle'),
+    false,
+    'Forbes must communicate company health through results rather than exposing an internal lifecycle label.',
+);
 const platformWarsSource = readFileSync(resolve(process.cwd(), 'components/StreamingPlatformWars.tsx'), 'utf8');
 for (const field of ['company.cashMillions', 'company.activeCountryIds', 'company.technology', 'company.cataloguePower', 'company.lastProcessedAbsoluteWeek']) {
     assert.ok(platformWarsSource.includes(field), `Platform Wars challengers must render canonical ${field.replace('company.', '')}.`);

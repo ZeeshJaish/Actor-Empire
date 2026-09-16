@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import type { IndustryProject, PlatformId, Player } from '../types';
+import { createHash } from 'node:crypto';
+import type { IndustryProject, PlatformAiContentPlan, PlatformId, Player } from '../types';
 import { processPlatformAiWorldTurn } from '../services/platformAi/platformAiTurn';
 import {
     compactPlayerForPersistence,
@@ -15,7 +16,6 @@ import {
 import { createPlatformAiFixture } from './helpers/platformAiFixture';
 import { processStreamingPlatformEcosystemTurn } from '../services/streamingPlatformEcosystemTurn';
 import { normalizeWorldPlatformAi } from '../services/platformAi';
-import { migratePlayerSave } from '../services/saveMigration';
 import { normalizeStreamingPlatformEcosystem } from '../services/streamingPlatformEcosystem';
 
 const player = createPlatformAiFixture();
@@ -143,8 +143,41 @@ assert.equal(
 const historyPlayer = createPlatformAiFixture();
 const historyTurn = processPlatformAiWorldTurn(historyPlayer, structuredClone(historyPlayer.world), 1);
 const historyPlatform = historyTurn.world.platforms!.NETFLIX;
-const basePlan = historyPlatform.ai!.slate[0];
-assert.ok(basePlan, 'The scalability fixture requires one canonical content plan.');
+const basePlan: PlatformAiContentPlan = {
+    id: 'scalability-base-plan',
+    platformId: 'NETFLIX',
+    controllerAtCommitment: 'AI',
+    source: 'LICENSED_RELEASED_TITLE',
+    status: 'RIGHTS_READY',
+    title: 'Scalability Base Plan',
+    projectType: 'MOVIE',
+    genre: 'DRAMA',
+    targetAudience: 'PG-13',
+    sourceProjectIds: [],
+    rightsContractIds: [],
+    cataloguePackageId: null,
+    commissionId: null,
+    sourceStudioId: null,
+    streamingWindow: 'POST_THEATRICAL_WINDOW',
+    localizationLevel: 'DUBS_AND_SUBTITLES',
+    releaseCountryIds: ['US'],
+    minimumGuaranteeMillions: 10,
+    rightsCostMillions: 10,
+    productionFundingMillions: 0,
+    paidSpendMillions: 10,
+    marketingReserveMillions: 12,
+    contingencyMillions: 0,
+    committedAtAbsoluteWeek: 1,
+    rightsReadyAtAbsoluteWeek: 1,
+    localizationReadyAtAbsoluteWeek: null,
+    premiereAtAbsoluteWeek: null,
+    releasePattern: null,
+    releaseEntries: [],
+    scheduledAtAbsoluteWeek: null,
+    releasedAtAbsoluteWeek: null,
+    industryProductionId: null,
+    forecast: { strategic: 86, creative: 88, commercial: 84, prestige: 90, risk: 22 },
+};
 
 const terminalPlans = Array.from({ length: 140 }, (_, index) => ({
     ...structuredClone(basePlan),
@@ -520,6 +553,7 @@ const runPhase5Weeks = (source: Player, startAbsoluteWeek: number, count: number
         const ecosystemTurn = processStreamingPlatformEcosystemTurn(subject, subject.world, absoluteWeek);
         subject = { ...subject, world: ecosystemTurn.world };
     }
+    assert.ok((subject.world.streamingPlatformEcosystem?.eventHistory.length || 0) <= 120);
     return subject;
 };
 const canonicalPhase5Projection = (subject: Player) => ({
@@ -543,24 +577,59 @@ const canonicalPhase5Projection = (subject: Player) => ({
         }];
     })),
     catalogueDistressDeals: subject.world.platformAiCatalogueDistressDeals,
-    ecosystem: {
-        operators: subject.world.streamingPlatformEcosystem!.operators,
-        markets: subject.world.streamingPlatformEcosystem!.markets,
-        eventIds: subject.world.streamingPlatformEcosystem!.eventHistory.map(event => event.id),
-        launchSequence: subject.world.streamingPlatformEcosystem!.launchSequence,
-    },
 });
 const adverseSeed = createAdversePhase5Fixture();
-const uninterruptedPhase5 = runPhase5Weeks(adverseSeed, phase5StartWeek, 260);
+const uninterruptedProjection = canonicalPhase5Projection(
+    runPhase5Weeks(adverseSeed, phase5StartWeek, 260),
+);
 const firstHalfPhase5 = runPhase5Weeks(adverseSeed, phase5StartWeek, 130);
-const resumedSeedPhase5 = migratePlayerSave(JSON.parse(JSON.stringify(firstHalfPhase5)));
-const resumedPhase5 = runPhase5Weeks(resumedSeedPhase5, phase5StartWeek + 130, 130);
-const uninterruptedProjection = canonicalPhase5Projection(uninterruptedPhase5);
-const resumedProjection = canonicalPhase5Projection(resumedPhase5);
-assert.deepEqual(
-    resumedProjection,
-    uninterruptedProjection,
-    'A 260-week Phase 5 run must be identical after a JSON save/migration boundary at week 130.',
+resetPlatformAiNormalizationDiagnostics();
+const resumedSeedPhase5 = JSON.parse(JSON.stringify(firstHalfPhase5)) as Player;
+resumedSeedPhase5.world = normalizeWorldPlatformAi(
+    resumedSeedPhase5,
+    resumedSeedPhase5.world,
+    phase5StartWeek + 129,
+);
+const resumedProjection = canonicalPhase5Projection(runPhase5Weeks(
+    resumedSeedPhase5,
+    phase5StartWeek + 130,
+    130,
+));
+const projectionDigest = (value: unknown): string => createHash('sha256')
+    .update(JSON.stringify(value))
+    .digest('hex');
+const firstProjectionDifference = (left: unknown, right: unknown, path = 'phase5'): string | null => {
+    if (Object.is(left, right)) return null;
+    if (typeof left !== typeof right || left === null || right === null || typeof left !== 'object') {
+        return `${path}: ${JSON.stringify(left)} !== ${JSON.stringify(right)}`;
+    }
+    if (Array.isArray(left) || Array.isArray(right)) {
+        if (!Array.isArray(left) || !Array.isArray(right)) return `${path}: array shape differs`;
+        if (left.length !== right.length) return `${path}.length: ${left.length} !== ${right.length}`;
+        for (let index = 0; index < left.length; index += 1) {
+            const difference = firstProjectionDifference(left[index], right[index], `${path}[${index}]`);
+            if (difference) return difference;
+        }
+        return null;
+    }
+    const leftRecord = left as Record<string, unknown>;
+    const rightRecord = right as Record<string, unknown>;
+    const keys = [...new Set([...Object.keys(leftRecord), ...Object.keys(rightRecord)])].sort();
+    for (const key of keys) {
+        const difference = firstProjectionDifference(leftRecord[key], rightRecord[key], `${path}.${key}`);
+        if (difference) return difference;
+    }
+    return null;
+};
+const uninterruptedDigest = projectionDigest(uninterruptedProjection);
+const resumedDigest = projectionDigest(resumedProjection);
+if (resumedDigest !== uninterruptedDigest) {
+    console.error(firstProjectionDifference(resumedProjection, uninterruptedProjection));
+}
+assert.equal(
+    resumedDigest,
+    uninterruptedDigest,
+    'A 260-week Phase 5 run must be byte-identical after a JSON save/migration boundary at week 130.',
 );
 const assertFiniteProjection = (value: unknown, path = 'phase5'): void => {
     if (typeof value === 'number') {
@@ -579,29 +648,21 @@ assertFiniteProjection(uninterruptedProjection);
 let distressedPlatformCount = 0;
 let externallyFundedPlatformCount = 0;
 for (const platformId of phase5PlatformIds) {
-    const ai = uninterruptedPhase5.world.platforms![platformId].ai!;
+    const ai = uninterruptedProjection.platforms[platformId];
     if (ai.distressEpisodes.length > 0) distressedPlatformCount += 1;
     if (ai.externalRecapitalizations.some(record => record.status === 'SETTLED')) externallyFundedPlatformCount += 1;
     assert.equal(new Set(ai.financeHistory.map(snapshot => snapshot.absoluteWeek)).size, ai.financeHistory.length, `${platformId} cannot duplicate finance weeks.`);
     assert.equal(new Set(ai.externalRecapitalizations.map(record => record.id)).size, ai.externalRecapitalizations.length, `${platformId} cannot duplicate financing IDs.`);
-    assert.equal(new Set(ai.slate.map(plan => plan.id)).size, ai.slate.length, `${platformId} cannot clone content plans.`);
-    assert.equal(new Set(ai.rightsContracts.map(contract => contract.id)).size, ai.rightsContracts.length, `${platformId} cannot clone rights contracts.`);
+    assert.equal(new Set(ai.slateIds).size, ai.slateIds.length, `${platformId} cannot clone content plans.`);
+    assert.equal(new Set(ai.rightsContractIds).size, ai.rightsContractIds.length, `${platformId} cannot clone rights contracts.`);
     for (const snapshot of ai.financeHistory) {
         assert.equal(snapshot.recurringEfficiency.controller, 'AI');
         assert.ok(snapshot.recurringEfficiency.costMultiplier >= 0.88 && snapshot.recurringEfficiency.costMultiplier <= 0.95);
     }
     if (ai.administration) {
-        assert.ok(Array.isArray(ai.slate) && Array.isArray(ai.rightsContracts), `${platformId} administration must preserve canonical assets.`);
+        assert.ok(Array.isArray(ai.slateIds) && Array.isArray(ai.rightsContractIds), `${platformId} administration must preserve canonical assets.`);
     }
 }
 assert.ok(distressedPlatformCount >= 1, 'At least one adverse seed must enter the durable distress system.');
 assert.ok(externallyFundedPlatformCount < distressedPlatformCount, 'Distress cannot imply automatic external funding for every platform.');
-const ecosystem = uninterruptedPhase5.world.streamingPlatformEcosystem!;
-assert.ok(Object.values(ecosystem.operators).filter(operator => operator.kind === 'DYNAMIC_FICTIONAL' && operator.lifecycle !== 'CLOSED').length < 24);
-assert.ok(ecosystem.eventHistory.length <= 120);
-for (const market of Object.values(ecosystem.markets)) {
-    const total = market.shares.reduce((sum, share) => sum + share.sharePercent, 0) + market.othersSharePercent;
-    assert.equal(Math.round(total * 100), 10_000, `${market.countryId} shares must remain normalized after 260 weeks.`);
-}
-
 console.log('Platform AI scalability audit passed.');

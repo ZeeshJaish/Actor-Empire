@@ -1,7 +1,9 @@
-import React from 'react';
-import type { BoxOfficeRegionId } from '../../../../types';
+import React, { useEffect, useMemo, useState } from 'react';
 import { InteractiveRegionMap } from '../components/InteractiveRegionMap';
+import { MapNavigationToolbar } from '../components/MapNavigationToolbar';
+import { WORLD_VIEW, type RegionMapView } from '../components/regionMapView';
 import css from './ReleaseStrategy.module.css';
+import { createTheatricalRegionMapModel } from './theatricalRegionMap';
 
 export interface TheatricalChainModel {
   id: string;
@@ -44,16 +46,42 @@ export const TheatricalDeskStep: React.FC<TheatricalDeskModel & {
   onBack: () => void;
 }> = ({ regions, selectedRegionCount, totalScreens, bookingCost, studioShare, expectedFootfall, openingRange, onToggleRegion, onToggleChain, onAutoBuild, onContinue, onBack }) => {
   const exhibitorShare = Math.max(0, 1 - studioShare);
+  const [mapView, setMapView] = useState<RegionMapView>(WORLD_VIEW);
+  const mapModel = useMemo(() => createTheatricalRegionMapModel(regions, mapView), [mapView, regions]);
+  const activeRegionName = mapView.regionId
+    ? regions.find(region => region.id === mapView.regionId)?.label ?? 'Theatrical region'
+    : 'Theatrical world';
+  useEffect(() => {
+    if (mapView.level === 'world') return undefined;
+    const returnTimer = window.setTimeout(() => setMapView(WORLD_VIEW), 1100);
+    return () => window.clearTimeout(returnTimer);
+  }, [mapView]);
   return <>
     <button type="button" className={css.auto} onClick={onAutoBuild}>AUTO-BUILD FOOTPRINT</button>
     <section className={css.map} aria-label="Distribution map">
       <span className={css.seclabel}>WHERE IT OPENS</span>
       <p className={css.secnote}>Tap the markets that get your opening weekend.</p>
       <div className={css.mapVisual}>
+        <MapNavigationToolbar
+          scope="theatrical"
+          title={activeRegionName}
+          status={`${selectedRegionCount} selected`}
+          view={mapView}
+          onWorld={() => setMapView(WORLD_VIEW)}
+          tone="release"
+        />
         <InteractiveRegionMap
-          selectedRegionIds={regions.filter(region => region.selected).map(region => region.id as BoxOfficeRegionId)}
+          selectedRegionIds={mapModel.selectedRegionIds}
           onSelectRegion={regionId => onToggleRegion(regionId)}
           visualTone="release"
+          interaction={mapModel.interaction}
+          maximumViewLevel={mapModel.maximumViewLevel}
+          drilldownRegionSelection={mapModel.drilldownRegionSelection}
+          showCountryLabels={mapModel.showCountryLabels}
+          showBreadcrumb={false}
+          view={mapModel.view}
+          onViewChange={setMapView}
+          frameHeight={620}
           compact
           showPreview={false}
           ariaLabel="Interactive theatrical release map"
@@ -81,8 +109,8 @@ export const TheatricalDeskStep: React.FC<TheatricalDeskModel & {
 
     <section className={css.split}>
       <div className={css.splitbar}>
-        <span className={css.splitmine} style={{ width: `${studioShare * 100}%` }}><i>{Math.round(studioShare * 100)}¢</i></span>
-        <span className={css.splittheirs} style={{ width: `${exhibitorShare * 100}%` }}><i>{Math.round(exhibitorShare * 100)}¢</i></span>
+        <span className={css.splitmine} style={{ width: `${studioShare * 100}%` }}><i>{Math.round(studioShare * 100)}%</i></span>
+        <span className={css.splittheirs} style={{ width: `${exhibitorShare * 100}%` }}><i>{Math.round(exhibitorShare * 100)}%</i></span>
       </div>
       <div className={css.splitkey}><em className={css.keymine}>YOUR STUDIO</em><em className={css.keytheirs}>EXHIBITORS</em></div>
       <p><b>{totalScreens.toLocaleString()} screens</b> · {count(expectedFootfall)} expected visits · {money(bookingCost)} booking cost · opening read {money(openingRange[0])}–{money(openingRange[1])}</p>

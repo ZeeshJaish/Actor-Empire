@@ -24,6 +24,8 @@ import {
   lockStreamingWeeklyPlan,
 } from '../services/streamingWeeklyLoop';
 import '../styles/streaming-weekly-loop.css';
+import { buildWorldEconomyExplanations } from '../services/worldEconomy/worldEconomyExplanations';
+import { getAbsoluteWeek } from '../services/legacyLogic';
 
 interface Props {
   player: Player;
@@ -62,6 +64,10 @@ export default function StreamingWeeklyCeoLoop({
   onReturnToGame,
 }: Props) {
   const loop = useMemo(() => getStreamingWeeklyCeoLoop(player), [player]);
+  const economyExplanations = useMemo(() => buildWorldEconomyExplanations(
+    player,
+    getAbsoluteWeek(player.age, player.currentWeek),
+  ).filter(item => item.surfaces.includes('CEO_REPORT')), [player]);
   const [screen, setScreen] = useState<'RESULT' | 'BRIEF'>(
     loop.hasUnreviewedResult ? 'RESULT' : 'BRIEF',
   );
@@ -247,6 +253,17 @@ export default function StreamingWeeklyCeoLoop({
                 </article>
               ))}
             </div>
+            {economyExplanations.length ? (
+              <div className="weekly-driver-grid" aria-label="World economy explanations">
+                {economyExplanations.map(item => (
+                  <article key={item.id} className={`is-${item.tone === 'CRITICAL' ? 'negative' : item.tone === 'POSITIVE' ? 'positive' : 'neutral'}`}>
+                    <span>WORLD SIGNAL</span>
+                    <strong>{item.title}</strong>
+                    <p>{item.reason}</p>
+                  </article>
+                ))}
+              </div>
+            ) : null}
           </section>
 
           <aside className="weekly-hook">

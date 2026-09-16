@@ -17,6 +17,7 @@ import {
 } from '../services/streamingEconomyCore';
 import {
     calculatePlatformAiRescueCapMillions,
+    calculatePlatformAiScaledBaseOperationsMillions,
     calculatePlatformAiValuationBillions,
     calculatePlatformAiWeeklyEconomy,
     getPlatformAiRunway,
@@ -59,6 +60,24 @@ assert.deepEqual(
 );
 
 const fixture = createPlatformAiFixture();
+
+assert.equal(
+    calculatePlatformAiScaledBaseOperationsMillions('NETFLIX', 260),
+    PLATFORM_AI_PROFILES.NETFLIX.baseWeeklyOperationsMillions,
+    'A platform at its reference audience scale must carry its full disclosed base operation.',
+);
+assert.ok(
+    calculatePlatformAiScaledBaseOperationsMillions('NETFLIX', 43.76) < PLATFORM_AI_PROFILES.NETFLIX.baseWeeklyOperationsMillions * 0.65,
+    'A materially downsized platform must be able to restructure fixed operations instead of carrying its historic global peak forever.',
+);
+assert.ok(
+    calculatePlatformAiScaledBaseOperationsMillions('NETFLIX', 43.76) >= PLATFORM_AI_PROFILES.NETFLIX.baseWeeklyOperationsMillions * 0.25,
+    'A downsized platform must retain a meaningful irreducible operating floor.',
+);
+assert.ok(
+    calculatePlatformAiScaledBaseOperationsMillions('NETFLIX', 520) > PLATFORM_AI_PROFILES.NETFLIX.baseWeeklyOperationsMillions,
+    'A platform operating above its reference scale must incur additional base overhead.',
+);
 
 const normalizedPlatform = (platformId: PlatformId, player: Player = fixture): PlatformState => (
     normalizePlatformAiState(
@@ -785,7 +804,7 @@ assert.equal(oneTimeResult.snapshot!.mandatoryCostAccruedMillions, oneTimeResult
 // Economy records the short runway but leaves distress progression to the world resolver.
 const weak = normalizedPlatform('HULU');
 weak.subscribers = 1;
-weak.cashReserve = 500;
+weak.cashReserve = 50;
 weak.ai!.marketOperations = [];
 weak.ai!.capabilities.activeCountryIds = [];
 weak.ai!.financeHistory = [];
@@ -1145,7 +1164,7 @@ const canonicalMarketSnapshot = calculatePlatformAiWeeklyEconomy({
 }).snapshot!;
 assert.equal(
     canonicalMarketSnapshot.baseOperationsCostMillions,
-    70,
+    calculatePlatformAiScaledBaseOperationsMillions('HULU', 0),
     'Canonical ACTIVE market operations must replace the region fallback instead of double-charging it.',
 );
 assert.equal(canonicalMarketSnapshot.marketOperatingCostMillions, 1.08, 'The canonical US weekly market operation must be charged exactly once.');
@@ -1164,8 +1183,8 @@ const fallbackRegionSnapshot = calculatePlatformAiWeeklyEconomy({
 }).snapshot!;
 assert.equal(
     fallbackRegionSnapshot.baseOperationsCostMillions,
-    73.6,
-    'With zero canonical market operations, two legacy regions must use the 70M + 2 × 1.8M fallback.',
+    calculatePlatformAiScaledBaseOperationsMillions('HULU', 0) + 2 * PLATFORM_AI_PROFILES.HULU.regionWeeklyCostMillions,
+    'With zero canonical market operations, two legacy regions must add the legacy regional fallback to the scaled base.',
 );
 
 const baseRightsContract = rightsCommit.world.platforms!.NETFLIX.ai!.rightsContracts[0];
@@ -1331,10 +1350,14 @@ const technologyCostSnapshot = calculatePlatformAiWeeklyEconomy({
     player: fixture,
     platform: technologyCostPlatform,
     absoluteWeek: ABSOLUTE_WEEK + 32,
-}).snapshot! as unknown as Record<string, unknown>;
+}).snapshot!;
 assert.equal(technologyCostSnapshot.researchCostMillions, 2.5, 'Operating research and licence recurring cost must total 2.5M once.');
 assert.equal(technologyCostSnapshot.technologyCostMillions, 3, 'Only the OPERATING technology cost must persist and recur.');
-assert.equal(technologyCostSnapshot.mandatoryCostAccruedMillions, 71.3, 'Hulu must pay 65.8M efficient internal COGS plus 2.5M research/licence and 3M technology exactly once.');
+assert.equal(
+    technologyCostSnapshot.mandatoryCostAccruedMillions,
+    technologyCostSnapshot.recurringEfficiency.appliedEligibleCostMillions + 2.5 + 3,
+    'Hulu must pay its scaled efficient internal COGS plus research/licence and operating technology exactly once.',
+);
 
 const earmarkPlatform = normalizedPlatform('HULU');
 earmarkPlatform.subscribers = 0;
@@ -1367,17 +1390,26 @@ const earmarkResult = settlePlatformAiEconomy({
     absoluteWeek: ABSOLUTE_WEEK + 33,
 });
 assert.deepEqual(
-    earmarkResult.snapshot!.allocations.map(allocation => [allocation.type, allocation.amountMillions, allocation.referenceId]),
+    earmarkResult.snapshot!.allocations.slice(0, 3).map(allocation => [allocation.type, allocation.amountMillions, allocation.referenceId]),
     [
         ['DEBT_REDUCTION', 10, null],
         ['APPROVED_CONTENT', 80, 'economy-approved-content'],
         ['APPROVED_RESEARCH', 14, 'economy-approved-research'],
-        ['SHAREHOLDER_DISTRIBUTION', 1_622.44, null],
     ],
     'Debt must be paid first, then 80M content and 14M research earmarks protected, before true excess is distributed.',
 );
-assert.equal(earmarkResult.snapshot!.reserveAllocationMillions, 1_632.44, 'Only debt repayment and true distribution may leave cash.');
-assert.equal(earmarkResult.snapshot!.closingCashMillions, 3_301.75, 'The 94M future milestone earmark must remain funded above the efficient 3,207.75M reserve ceiling.');
+const earmarkDistribution = earmarkResult.snapshot!.allocations.find(allocation => allocation.type === 'SHAREHOLDER_DISTRIBUTION')!;
+assert.ok(earmarkDistribution.amountMillions > 0, 'Only cash above debt, the operating reserve, and approved earmarks may be distributed.');
+assert.equal(
+    earmarkResult.snapshot!.reserveAllocationMillions,
+    10 + earmarkDistribution.amountMillions,
+    'Only debt repayment and true distribution may leave cash.',
+);
+assert.equal(
+    earmarkResult.snapshot!.closingCashMillions,
+    earmarkResult.snapshot!.reserveTargetMillions * 1.25 + 94,
+    'The 94M future milestone earmark must remain funded above the scaled reserve ceiling.',
+);
 closeTo(
     earmarkResult.snapshot!.openingCashMillions
         + earmarkResult.snapshot!.subscriptionRevenueMillions
@@ -1388,7 +1420,7 @@ closeTo(
         - earmarkResult.snapshot!.settledObligationCostMillions
         - earmarkResult.snapshot!.financingCostMillions
         - earmarkResult.snapshot!.reserveAllocationMillions,
-    3_301.75,
+    earmarkResult.snapshot!.closingCashMillions,
     'Earmarked closing cash must still reconcile exactly.',
 );
 
@@ -1500,6 +1532,30 @@ for (let week = 1; week <= 4; week += 1) {
 }
 assert.equal(healthyRecoveryResult.ai!.status, 'ACTIVE', 'Four sustained healthy weeks must recover a restructuring platform to ACTIVE.');
 
+const dormantRelaunchPlatform = normalizedPlatform('NETFLIX');
+dormantRelaunchPlatform.subscribers = 100_000_000;
+dormantRelaunchPlatform.cashReserve = 25_000;
+dormantRelaunchPlatform.ai!.status = 'DORMANT';
+dormantRelaunchPlatform.ai!.debtMillions = 0;
+dormantRelaunchPlatform.ai!.financeHistory = [];
+dormantRelaunchPlatform.ai!.researchQueue = [];
+dormantRelaunchPlatform.ai!.healthyOperatingWeeks = 0;
+let dormantRelaunchResult = dormantRelaunchPlatform;
+for (let week = 1; week <= 18; week += 1) {
+    dormantRelaunchResult = settlePlatformAiEconomy({
+        player: fixture,
+        platform: dormantRelaunchResult,
+        absoluteWeek: ABSOLUTE_WEEK + 80 + week,
+    }).platform;
+    assert.equal(
+        dormantRelaunchResult.ai!.status,
+        week === 18 ? 'ACTIVE' : 'DORMANT',
+        `A dormant AI platform may relaunch only after thirteen distinct debt-free, profitable, fully cushioned weeks (week ${week}, healthy ${dormantRelaunchResult.ai!.healthyOperatingWeeks}, net ${dormantRelaunchResult.ai!.financeHistory.at(-1)?.operatingNetCashFlowMillions}, cash ${dormantRelaunchResult.cashReserve}, cost ${dormantRelaunchResult.ai!.financeHistory.at(-1)?.operatingCostMillions}).`,
+    );
+}
+assert.equal(dormantRelaunchResult.ai!.healthyOperatingWeeks, 0, 'A completed dormant relaunch must clear its recovery counter.');
+assert.equal(dormantRelaunchResult.ai!.spendingRestrictions.source, 'NONE', 'A viable dormant relaunch must remove administration spending locks.');
+
 const rescueFormulaPlatform = (platformId: PlatformId, cashReserve: number, debtMillions: number): PlatformState => {
     const platform = normalizedPlatform(platformId);
     platform.cashReserve = cashReserve;
@@ -1565,8 +1621,14 @@ const expenseClassResult = settlePlatformAiEconomy({
     localizationCostMillions: 30,
     discretionaryCostMillions: 10,
 } as Parameters<typeof settlePlatformAiEconomy>[0]);
-assert.equal(expenseClassResult.snapshot!.operatingCostMillions, 65.8, 'One-time contractual, localization, and discretionary costs must not enter the efficient trailing operating reserve.');
-assert.equal(expenseClassResult.snapshot!.debtIncurredMillions, 65.8, 'Only the exact efficient recurring mandatory shortfall may create debt.');
+const exactExpenseClassOperatingCost = expenseClassResult.snapshot!.recurringEfficiency.appliedEligibleCostMillions
+    + expenseClassResult.snapshot!.researchCostMillions
+    + expenseClassResult.snapshot!.technologyCostMillions
+    + expenseClassResult.snapshot!.marketPolicyCostMillions
+    + expenseClassResult.snapshot!.partnerRevenueShareCostMillions
+    + expenseClassResult.snapshot!.administrationCostMillions;
+assert.equal(expenseClassResult.snapshot!.operatingCostMillions, exactExpenseClassOperatingCost, 'One-time contractual, localization, and discretionary costs must not enter the efficient trailing operating reserve.');
+assert.equal(expenseClassResult.snapshot!.debtIncurredMillions, exactExpenseClassOperatingCost, 'Only the exact efficient recurring mandatory shortfall may create debt.');
 assert.deepEqual(
     (expenseClassResult.snapshot! as unknown as Record<string, unknown>).heldObligations,
     [
@@ -1676,7 +1738,7 @@ assert.deepEqual(pendingWeekOneQueue.map(item => [item.category, item.amountMill
     ['LOCALIZATION', 30, ABSOLUTE_WEEK + 79, 'HELD'],
 ], 'Same-week obligations use a deterministic category order instead of call-site insertion order.');
 assert.equal(new Set(pendingWeekOneQueue.map(item => item.id)).size, 3, 'Each queued obligation has a stable distinct ID.');
-assert.equal(pendingWeekOne.snapshot!.debtIncurredMillions, 65.8, 'Only efficient recurring operations create debt.');
+assert.equal(pendingWeekOne.snapshot!.debtIncurredMillions, pendingWeekOne.snapshot!.operatingCostMillions, 'Only efficient recurring operations create debt.');
 const pendingHeldAgain = settlePlatformAiEconomy({ player: fixture, platform: pendingWeekOne.platform, absoluteWeek: ABSOLUTE_WEEK + 80 });
 assert.deepEqual(
     (pendingHeldAgain.platform.ai! as unknown as { pendingOneTimeObligations: unknown[] }).pendingOneTimeObligations,

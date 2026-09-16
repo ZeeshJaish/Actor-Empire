@@ -1,5 +1,6 @@
 import type {
     OwnedStreamingInfrastructureSetupDraft,
+    OwnedStreamingLaunchRehearsalSnapshot,
     OwnedStreamingFacility,
     OwnedStreamingLedgerEntry,
     OwnedStreamingNetworkPlacement,
@@ -402,17 +403,6 @@ const STRATEGY_MODIFIERS: Record<ConfigurableInfrastructureStrategy, {
     },
 };
 
-const ROLLOUT_MODIFIERS: Record<StreamingInfrastructureRolloutPace, {
-    upfront: number;
-    build: number;
-    reliability: number;
-    technicalDebt: number;
-}> = {
-    SAFE: { upfront: 1.1, build: 1.25, reliability: 0.03, technicalDebt: 0 },
-    STANDARD: { upfront: 1, build: 1, reliability: 0, technicalDebt: 4 },
-    RUSHED: { upfront: 1.15, build: 0.55, reliability: -0.15, technicalDebt: 14 },
-};
-
 const roundMoney = (value: number): number => Math.max(0, Math.round(value / 10_000) * 10_000);
 const roundCapacity = (value: number): number => Math.max(0, Math.round(value / 1_000) * 1_000);
 const roundPrice = (value: number): number => Math.round(value * 100) / 100;
@@ -481,7 +471,6 @@ export const getStreamingInfrastructureSignature = (
     roundCapacity(demandRange.high),
     draft.strategy,
     draft.capacityPackageId,
-    draft.rolloutPace,
     networkSignature(draft.networkPlacements),
     facilitySignature(draft.facilities, draft.networkPlacements),
 ].join(':');
@@ -495,11 +484,16 @@ export const getStreamingInfrastructureSignature = (
 export const getSuggestedStreamingNetworkPlacements = (
     marketIds: string[],
     audienceMultiplier = 1,
+    canonicalLikelyOpeningDemand?: number,
 ): OwnedStreamingNetworkPlacement[] => {
     const summary = summarizeStreamingDayOneMarkets(marketIds);
     const regionCount = getStreamingDayOneRegionIds(marketIds).length;
     const cityIds = getRecommendedStreamingCoreCityIds(marketIds, 6);
-    const likelyOpeningDemand = summary.streamingAudience * 0.00018 * Math.max(0.25, audienceMultiplier || 1);
+    const likelyOpeningDemand = canonicalLikelyOpeningDemand !== undefined
+        && Number.isFinite(canonicalLikelyOpeningDemand)
+        && canonicalLikelyOpeningDemand >= 0
+        ? canonicalLikelyOpeningDemand
+        : summary.streamingAudience * 0.00018 * Math.max(0.25, audienceMultiplier || 1);
     const targetRacks = clamp(
         Math.ceil((likelyOpeningDemand * 1.25) / NETWORK_RACK_BASELINE_STREAMS),
         2,
@@ -535,7 +529,7 @@ export const createDefaultStreamingInfrastructureDraft = (
     const strategy: ConfigurableInfrastructureStrategy = platform.infrastructureStrategy === 'UNDECIDED'
         ? 'HYBRID'
         : platform.infrastructureStrategy;
-    const rolloutPace = current?.rolloutPace || 'STANDARD';
+    const rolloutPace = 'STANDARD';
     const racks = capacityPackageId === 'STARTER' ? 2
         : capacityPackageId === 'ESSENTIAL' ? 4
             : capacityPackageId === 'GROWTH' ? 7 : 10;
@@ -571,6 +565,8 @@ export const createDefaultStreamingInfrastructureDraft = (
             })),
         })),
         managementPolicy: normalizeStreamingInfrastructureManagementPolicy(current?.managementPolicy),
+        assistedPlanApproved: false,
+        assistedPlanClass: undefined,
         lastLoadTestSignature: current?.loadTest.configurationSignature || null,
         lastLaunchRehearsal: current?.loadTest.launchRehearsal
             ? {
@@ -608,7 +604,6 @@ const getConfigurationValues = (
     const capacityPackage = STREAMING_CAPACITY_PACKAGES.find(item => item.id === draft.capacityPackageId)
         || STREAMING_CAPACITY_PACKAGES[0];
     const strategy = STRATEGY_MODIFIERS[draft.strategy];
-    const rollout = ROLLOUT_MODIFIERS[draft.rolloutPace];
     const facilities = sanitizeFacilities(draft.facilities, draft.networkPlacements);
     const network = facilities.length
         ? sanitizeNetworkPlacements(aggregateStreamingFacilities(facilities))
@@ -673,20 +668,23 @@ const getConfigurationValues = (
             : network.reduce((sum, item) => (
                 sum + item.racks * NETWORK_RACK_WEEKLY * cityCost(item.cityId) * NETWORK_ROLE_RULES[item.role].weekly
             ), 0);
-        const upfrontCost = roundMoney(
-            (rackCapex + facilitySetup) * strategy.upfront * rollout.upfront
-            + physicalSummary.upgradeCapitalCost,
-        );
         const weeklyOperatingCost = roundMoney(
             (rackWeekly + facilityWeekly) * strategy.weekly
             + physicalSummary.weeklyOperatingCost,
         );
         const distributionBonus = Math.min(0.24, Math.max(0, network.length - 1) * 0.04);
         const biggestCampus = network.reduce((max, item) => Math.max(max, item.racks), 0);
+        const extraRooms = Math.max(0, facilities.length - network.length);
+        const physicalBuildWeeks = 2
+            + biggestCampus * 0.28
+            + Math.max(0, network.length - 1) * 0.7
+            + extraRooms * 0.18
+            + facilities.reduce((max, facility) => Math.max(max, getStreamingFacilityContract(facility.type).provisioningWeeks), 0) * .35
+            + dutyGroups.reduce((max, item) => Math.max(max, item.group.migration?.weeks || 0), 0);
         return {
             strategy: draft.strategy,
             capacityPackageId: draft.capacityPackageId,
-            rolloutPace: draft.rolloutPace,
+            rolloutPace: 'STANDARD',
             baselineConcurrentStreams,
             burstConcurrentStreams: roundCapacity(burstBaseCapacity * strategy.baseline * burstMultiplier),
             storageCapacityHours: Math.round(dutyGroups.length
@@ -696,11 +694,14 @@ const getConfigurationValues = (
                     sum + item.racks * NETWORK_RACK_STORAGE_HOURS * NETWORK_ROLE_RULES[item.role].storage
                 ), 0)),
             reliabilityTarget: Math.round(clamp(
-                physicalSummary.reliabilityPercent + strategy.reliability + rollout.reliability + distributionBonus,
+                physicalSummary.reliabilityPercent + strategy.reliability + distributionBonus,
                 90,
                 99.999,
             ) * 1_000) / 1_000,
-            upfrontCost,
+            upfrontCost: roundMoney(
+                (rackCapex + facilitySetup) * strategy.upfront
+                + physicalSummary.upgradeCapitalCost,
+            ),
             weeklyOperatingCost,
             physicalWeeklyOperatingCost: physicalSummary.weeklyOperatingCost,
             physicalUpgradeCapitalCost: physicalSummary.upgradeCapitalCost,
@@ -712,27 +713,23 @@ const getConfigurationValues = (
             backupCoveragePercent: physicalSummary.backupCoveragePercent,
             physicalLimitingFactors: physicalSummary.limitingFactors,
             staffRequired: Math.max(2, Math.ceil(rackCount * 1.15 + network.length * 1.5)),
-            buildWeeks: Math.max(1, Math.ceil((2 + biggestCampus * 0.28
-                + Math.max(0, network.length - 1) * 0.7
-                + facilities.reduce((max, facility) => Math.max(max, getStreamingFacilityContract(facility.type).provisioningWeeks), 0) * .35
-                + dutyGroups.reduce((max, item) => Math.max(max, item.group.migration?.weeks || 0), 0)
-            ) * strategy.build * rollout.build)),
-            technicalDebt: rollout.technicalDebt,
+            buildWeeks: clamp(Math.ceil(physicalBuildWeeks * strategy.build), 4, 15),
+            technicalDebt: 0,
         };
     }
     return {
         strategy: draft.strategy,
         capacityPackageId: draft.capacityPackageId,
-        rolloutPace: draft.rolloutPace,
+        rolloutPace: 'STANDARD',
         baselineConcurrentStreams: roundCapacity(capacityPackage.baselineConcurrentStreams * strategy.baseline),
         burstConcurrentStreams: roundCapacity(capacityPackage.burstConcurrentStreams * strategy.burst),
         storageCapacityHours: Math.round(capacityPackage.storageCapacityHours),
         reliabilityTarget: Math.round(clamp(
-            capacityPackage.reliabilityTarget + strategy.reliability + rollout.reliability,
+            capacityPackage.reliabilityTarget + strategy.reliability,
             98,
             99.999,
         ) * 1_000) / 1_000,
-        upfrontCost: roundMoney(capacityPackage.upfrontCost * strategy.upfront * rollout.upfront),
+        upfrontCost: roundMoney(capacityPackage.upfrontCost * strategy.upfront),
         weeklyOperatingCost: roundMoney(capacityPackage.weeklyOperatingCost * strategy.weekly),
         physicalWeeklyOperatingCost: 0,
         physicalUpgradeCapitalCost: 0,
@@ -744,8 +741,8 @@ const getConfigurationValues = (
         backupCoveragePercent: 0,
         physicalLimitingFactors: [],
         staffRequired: Math.max(1, Math.ceil(capacityPackage.staffRequired * strategy.staff)),
-        buildWeeks: Math.max(1, Math.ceil(capacityPackage.baseBuildWeeks * strategy.build * rollout.build)),
-        technicalDebt: rollout.technicalDebt,
+        buildWeeks: clamp(Math.ceil(capacityPackage.baseBuildWeeks * strategy.build), 4, 15),
+        technicalDebt: 0,
     };
 };
 
@@ -874,7 +871,6 @@ export const getStreamingInfrastructureForecast = (
         existing
         && platform.infrastructureStrategy === draft.strategy
         && existing.capacityPackageId === draft.capacityPackageId
-        && existing.rolloutPace === draft.rolloutPace
         && networkSignature(existing.networkPlacements) === networkSignature(draft.networkPlacements)
         && facilitySignature(existing.facilities, existing.networkPlacements)
             === facilitySignature(draft.facilities, draft.networkPlacements)
@@ -883,7 +879,7 @@ export const getStreamingInfrastructureForecast = (
         ...draft,
         strategy: platform.infrastructureStrategy === 'UNDECIDED' ? draft.strategy : platform.infrastructureStrategy,
         capacityPackageId: existing.capacityPackageId,
-        rolloutPace: existing.rolloutPace,
+        rolloutPace: 'STANDARD',
         networkPlacements: existing.networkPlacements,
         facilities: existing.facilities,
     }) : null;
@@ -969,7 +965,6 @@ export const validateStreamingInfrastructureDraft = (
         platform.infrastructureSetup
         && platform.infrastructureStrategy === draft.strategy
         && platform.infrastructureSetup.capacityPackageId === draft.capacityPackageId
-        && platform.infrastructureSetup.rolloutPace === draft.rolloutPace
         && networkSignature(platform.infrastructureSetup.networkPlacements) === networkSignature(draft.networkPlacements)
         && facilitySignature(platform.infrastructureSetup.facilities, platform.infrastructureSetup.networkPlacements)
             === facilitySignature(draft.facilities, draft.networkPlacements)
@@ -1030,9 +1025,7 @@ export const saveStreamingInfrastructureDraft = (
         capacityPackageId: STREAMING_CAPACITY_PACKAGES.some(item => item.id === inputDraft.capacityPackageId)
             ? inputDraft.capacityPackageId
             : defaults.capacityPackageId,
-        rolloutPace: STREAMING_ROLLOUT_PACES.some(item => item.id === inputDraft.rolloutPace)
-            ? inputDraft.rolloutPace
-            : defaults.rolloutPace,
+        rolloutPace: 'STANDARD',
         subscriptionPrices: Object.fromEntries(STREAMING_SUBSCRIPTION_TIERS.map(tier => [
             tier.id,
             roundPrice(Number(inputDraft.subscriptionPrices[tier.id])),
@@ -1040,6 +1033,10 @@ export const saveStreamingInfrastructureDraft = (
         networkPlacements: sanitizeNetworkPlacements(inputDraft.networkPlacements),
         facilities: sanitizeFacilities(inputDraft.facilities, inputDraft.networkPlacements),
         managementPolicy: normalizeStreamingInfrastructureManagementPolicy(inputDraft.managementPolicy),
+        assistedPlanApproved: inputDraft.assistedPlanApproved === true,
+        assistedPlanClass: STREAMING_CAPACITY_PACKAGES.some(item => item.id === inputDraft.assistedPlanClass)
+            ? inputDraft.assistedPlanClass
+            : undefined,
         openingDemandForecast: inputDraft.openingDemandForecast
             ? {
                 low: roundCapacity(Number(inputDraft.openingDemandForecast.low) || 0),
@@ -1098,6 +1095,28 @@ export const runStreamingInfrastructureLoadTest = (
     };
 };
 
+/** Record freshly executed evidence only after the drawing is canonicalized.
+ * Existing saved evidence must never be rebound by a load-test or UI adapter. */
+export const saveStreamingInfrastructureRehearsal = (
+    player: Player,
+    inputDraft: OwnedStreamingInfrastructureSetupDraft,
+    evidence: OwnedStreamingLaunchRehearsalSnapshot,
+): Player => {
+    const saved = saveStreamingInfrastructureDraft(player, {
+        ...inputDraft,
+        lastLaunchRehearsal: undefined,
+    });
+    const draft = saved.ownedStreamingPlatform.infrastructureSetupDraft;
+    if (!draft) return player;
+    const forecast = getStreamingInfrastructureForecast(saved, draft);
+    const recorded = saveStreamingInfrastructureDraft(saved, {
+        ...draft,
+        lastLaunchRehearsal: { ...evidence, configurationSignature: forecast.configurationSignature },
+        lastLoadTestSignature: forecast.configurationSignature,
+    });
+    return recorded;
+};
+
 export interface CommitStreamingInfrastructureResult {
     changed: boolean;
     reason: 'COMMITTED' | 'ALREADY_CONFIGURED' | 'INVALID_DRAFT' | 'INSUFFICIENT_TREASURY';
@@ -1119,7 +1138,6 @@ export const commitStreamingInfrastructureSetup = (
         platform.infrastructureSetup
         && platform.infrastructureStrategy === draft.strategy
         && platform.infrastructureSetup.capacityPackageId === draft.capacityPackageId
-        && platform.infrastructureSetup.rolloutPace === draft.rolloutPace
         && networkSignature(platform.infrastructureSetup.networkPlacements) === networkSignature(draft.networkPlacements)
         && facilitySignature(platform.infrastructureSetup.facilities, platform.infrastructureSetup.networkPlacements)
             === facilitySignature(draft.facilities, draft.networkPlacements)
@@ -1189,7 +1207,7 @@ export const commitStreamingInfrastructureSetup = (
         metadata: {
             strategy: draft.strategy,
             capacityPackageId: draft.capacityPackageId,
-            rolloutPace: draft.rolloutPace,
+            rolloutPace: 'STANDARD',
             transactionCost: forecast.transactionCost,
             weeklyOperatingCost: forecast.weeklyOperatingCost,
             readyAtAbsoluteWeek,
@@ -1208,7 +1226,7 @@ export const commitStreamingInfrastructureSetup = (
         infrastructureSetupDraft: null,
         infrastructureSetup: {
             capacityPackageId: draft.capacityPackageId,
-            rolloutPace: draft.rolloutPace,
+            rolloutPace: 'STANDARD',
             storageCapacityHours: forecast.storageCapacityHours,
             reliabilityTarget: forecast.reliabilityTarget,
             weeklyOperatingCost: forecast.weeklyOperatingCost,

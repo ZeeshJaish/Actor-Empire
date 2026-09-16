@@ -6,6 +6,7 @@ import type {
 import {
     getStreamingFacilityCapacity,
     getStreamingFacilityContract,
+    getStreamingFacilitySecurityProfile,
     normalizeStreamingFacilityPhysical,
 } from './streamingFacilities';
 import {
@@ -39,6 +40,10 @@ export interface StreamingFacilityPhysicalView {
     weeklyOperatingCost: number;
     sustainabilityScore: number;
     publicReputation: number;
+    /** Multipliers consumed by the live incident system; lower is safer/faster. */
+    securityIncidentRiskMultiplier: number;
+    securityIncidentSeverityMultiplier: number;
+    securityRecoveryMultiplier: number;
     repairActions: Array<{ id: StreamingFacilityRepairAction; label: string; cost: number; detail: string }>;
 }
 
@@ -139,6 +144,7 @@ export const getStreamingFacilityPhysicalView = (
     // architecture and distribution bonuses. Preserve that baseline while
     // letting explicit marketplace leases carry their own advertised SLA.
     const baseReliability = facility.lease?.reliabilityPercent ?? 99.62;
+    const security = getStreamingFacilitySecurityProfile(facility.lease?.securityGrade);
     const backupCoveragePercent = Math.round(clamp(
         state.backupPowerKw / Math.max(1, powerUsedKw),
         0,
@@ -147,6 +153,7 @@ export const getStreamingFacilityPhysicalView = (
     const reliabilityPercent = Math.round(clamp(
         baseReliability
             + backupReliabilityBonus[state.backupPowerMode] * (backupCoveragePercent / 100)
+            + security.reliabilityBonusPercent
             - conditionPenalty
             - overloadPenalty,
         90,
@@ -204,6 +211,9 @@ export const getStreamingFacilityPhysicalView = (
         weeklyOperatingCost,
         sustainabilityScore,
         publicReputation,
+        securityIncidentRiskMultiplier: security.incidentRiskMultiplier,
+        securityIncidentSeverityMultiplier: security.incidentSeverityMultiplier,
+        securityRecoveryMultiplier: security.recoveryMultiplier,
         repairActions,
     };
 };

@@ -42,6 +42,8 @@ import {
   formatStreamingAnalyticsCompact,
 } from './streaming-analytics/StreamingGraphSystem';
 import '../styles/streaming-analytics.css';
+import { buildWorldEconomyExplanations } from '../services/worldEconomy/worldEconomyExplanations';
+import { getAbsoluteWeek } from '../services/legacyLogic';
 
 interface Props {
   player: Player;
@@ -106,6 +108,10 @@ export default function StreamingAnalyticsCenter({
   const [mode, setMode] = useState<'CEO' | 'ANALYST'>(initialMode);
   const [analystTab, setAnalystTab] = useState<AnalystTab>(initialAnalystTab);
   const analytics = useMemo(() => getStreamingPlatformAnalytics(player, range), [player, range]);
+  const economyExplanations = useMemo(() => buildWorldEconomyExplanations(
+    player,
+    getAbsoluteWeek(player.age, player.currentWeek),
+  ).filter(item => item.surfaces.includes('ANALYTICS')), [player]);
   const latestSubscriber = analytics.subscriberTimeline.at(-1)?.value ?? analytics.platform.launchCommit?.initialSubscribers ?? 0;
   const combinedCapacity = [...analytics.capacityTimeline, ...analytics.capacityForecast];
 
@@ -382,6 +388,17 @@ export default function StreamingAnalyticsCenter({
                   );
                 })}
               </div>
+
+              {economyExplanations.length ? (
+                <section className="sac-data-panel is-wide" aria-label="Material world economy signals">
+                  <div className="sac-panel-head"><div><span>WORLD SIGNALS</span><h2>What materially moved the result</h2></div><BrainCircuit size={20} /></div>
+                  <div className="sac-unmeasured-grid">
+                    {economyExplanations.map(item => (
+                      <article key={item.id}><Activity size={18} /><div><strong>{item.title}</strong><p>{item.reason}</p></div><span>{item.tone}</span></article>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
 
               <div className="sac-metric-row">
                 <MetricCard icon={UsersRound} label="Subscribers" value={formatStreamingAnalyticsCompact(latestSubscriber)} detail={`${analytics.waterfall?.reconciled ? 'Reconciled' : 'Pending'} audience waterfall`} tone="positive" />

@@ -5,6 +5,8 @@ import type {
     StreamingBackupPowerMode,
     StreamingCoolingMode,
     StreamingFacilityLeaseSnapshot,
+    StreamingFacilityFibreGrade,
+    StreamingFacilitySecurityGrade,
     StreamingFacilityType,
     StreamingNetworkNodeRole,
 } from '../types';
@@ -149,6 +151,40 @@ export const getStreamingFacilityWeeklyRent = (facility: OwnedStreamingFacility)
     facility.lease?.weeklyRent ?? getStreamingFacilityContract(facility.type).weeklyLease
 );
 
+export interface StreamingFacilityFibreProfile {
+    committedMbpsPerRack: number;
+    burstMbpsPerRack: number;
+    minimumCommittedMbps: number;
+    minimumBurstMbps: number;
+}
+
+export interface StreamingFacilitySecurityProfile {
+    incidentRiskMultiplier: number;
+    incidentSeverityMultiplier: number;
+    recoveryMultiplier: number;
+    reliabilityBonusPercent: number;
+}
+
+const FIBRE_PROFILES: Record<StreamingFacilityFibreGrade, StreamingFacilityFibreProfile> = {
+    METRO: { committedMbpsPerRack: 2_400, burstMbpsPerRack: 3_600, minimumCommittedMbps: 2_400, minimumBurstMbps: 3_600 },
+    CARRIER: { committedMbpsPerRack: 4_400, burstMbpsPerRack: 6_600, minimumCommittedMbps: 4_400, minimumBurstMbps: 6_600 },
+    GLOBAL_BACKBONE: { committedMbpsPerRack: 6_800, burstMbpsPerRack: 10_200, minimumCommittedMbps: 6_800, minimumBurstMbps: 10_200 },
+};
+
+const SECURITY_PROFILES: Record<StreamingFacilitySecurityGrade, StreamingFacilitySecurityProfile> = {
+    STANDARD: { incidentRiskMultiplier: 1, incidentSeverityMultiplier: 1, recoveryMultiplier: 1, reliabilityBonusPercent: 0 },
+    REINFORCED: { incidentRiskMultiplier: .78, incidentSeverityMultiplier: .82, recoveryMultiplier: .88, reliabilityBonusPercent: .015 },
+    FORTIFIED: { incidentRiskMultiplier: .55, incidentSeverityMultiplier: .65, recoveryMultiplier: .72, reliabilityBonusPercent: .035 },
+};
+
+export const getStreamingFacilityFibreProfile = (
+    grade: StreamingFacilityFibreGrade = 'CARRIER',
+): StreamingFacilityFibreProfile => FIBRE_PROFILES[grade] || FIBRE_PROFILES.CARRIER;
+
+export const getStreamingFacilitySecurityProfile = (
+    grade: StreamingFacilitySecurityGrade = 'STANDARD',
+): StreamingFacilitySecurityProfile => SECURITY_PROFILES[grade] || SECURITY_PROFILES.STANDARD;
+
 const finite = (value: unknown, fallback: number): number => {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : fallback;
@@ -176,14 +212,17 @@ export const getDefaultStreamingFacilityPhysical = (
     const contract = getStreamingFacilityContract(type);
     const profile = physicalProfileFor(type);
     const capacityRacks = Math.max(1, Math.round(lease?.rackPositions || contract.capacityRacks));
+    const fibre = lease?.fibreGrade
+        ? getStreamingFacilityFibreProfile(lease.fibreGrade)
+        : { committedMbpsPerRack: 3_200, burstMbpsPerRack: 4_800, minimumCommittedMbps: 3_200, minimumBurstMbps: 4_800 };
     return {
         powerContractKw: Math.max(12, Math.round(capacityRacks * 12 * profile.powerFactor)),
         backupPowerKw: Math.max(8, Math.round(capacityRacks * 12 * (profile.backupPowerMode === 'N_PLUS_ONE' ? 1 : profile.backupPowerMode === 'GENERATOR' ? .72 : .4))),
         backupPowerMode: profile.backupPowerMode,
         coolingCapacityKw: Math.max(contract.coolingKwPerRack, Math.round(capacityRacks * contract.coolingKwPerRack * profile.coolingFactor)),
         coolingMode: profile.coolingMode,
-        bandwidthMbps: Math.max(3_200, capacityRacks * 3_200),
-        burstBandwidthMbps: Math.max(4_800, capacityRacks * 4_800),
+        bandwidthMbps: Math.max(fibre.minimumCommittedMbps, capacityRacks * fibre.committedMbpsPerRack),
+        burstBandwidthMbps: Math.max(fibre.minimumBurstMbps, capacityRacks * fibre.burstMbpsPerRack),
         maintenanceConditionPercent: 96,
         lastMaintenanceAbsoluteWeek: 0,
         powerUpgradeCount: 0,

@@ -1,5 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import type {
+  OwnedStreamingCustomIdentAudio,
+  OwnedStreamingDefineLaunchDraftState,
   OwnedStreamingPricingConfiguration,
   Player,
   StreamingDefineLaunchStepId,
@@ -25,7 +27,9 @@ import {
   getStreamingLaunchBudgetView,
   getStreamingIdentPurchaseView,
   getStreamingLaunchProgramView,
+  checkpointStreamingLaunchBlueprint,
   removeStreamingCustomIdentAudio,
+  saveStreamingDefineLaunchDraft,
   saveStreamingLaunchBlueprint,
   saveStreamingPricingPlan,
   saveStreamingServiceIdent,
@@ -57,6 +61,9 @@ import StreamingMarketExpansionWizard from './StreamingMarketExpansionWizard';
 import { normalizeWorldAudienceEconomyState } from '../services/worldEconomy/worldAudienceCohorts';
 import { normalizeWorldAudienceParticipationState } from '../services/worldEconomy/worldAudienceParticipation';
 import { normalizeWorldPopulationState } from '../services/worldEconomy/worldPopulation';
+import { forecastWorldStreamingLaunchPricing } from '../services/worldEconomy/worldStreamingPricingForecast';
+import { getStreamingInfrastructureForecast } from '../services/streamingInfrastructure';
+import { createBuildBudgetSummary } from './studio-finance/finance/budgetLinks';
 
 interface Props {
   player: Player;
@@ -66,11 +73,13 @@ interface Props {
   onOpenCatalogue: () => void;
   onOpenContentDesk?: () => void;
   onOpenBuild: () => void;
+  onOpenBuildBudget?: () => void;
   onOpenPricing: () => void;
   onOpenTechnology: () => void;
   mode?: 'OPENING' | 'EXPANSION';
   initialStep?: StreamingDefineLaunchStepId;
   initialDraft?: LaunchDraft | null;
+  initialSheet?: 'money' | 'plan' | null;
   onDraftChange?: (draft: LaunchDraft) => void;
 }
 
@@ -505,29 +514,130 @@ const buildLaunchData = (player: Player): LaunchData => {
 function OpeningLaunchExperience(props: Props) {
   const data = useMemo(() => buildLaunchData(props.player), [props.player]);
   const platform = props.player.ownedStreamingPlatform;
+  const currentPlayerRef = useRef(props.player);
+  useEffect(() => { currentPlayerRef.current = props.player; }, [props.player]);
   const currentStep = props.initialStep || platform.launchProgram.defineCurrentStep;
+  const restoredDraft = useMemo<LaunchDraft | null>(() => {
+    const saved = platform.launchProgram.defineDraft;
+    if (!saved) return props.initialDraft ?? null;
+    return {
+      selectedCountryIds: [...saved.selectedCountryIds],
+      soundId: saved.soundId ?? undefined,
+      packageId: saved.packageId ?? undefined,
+      customAudio: saved.customAudio ? { ...saved.customAudio } : saved.customAudio,
+      storefrontId: saved.storefrontId ?? undefined,
+      pricing: saved.pricing,
+    };
+  }, [platform.launchProgram.defineDraft, props.initialDraft]);
+  const buildBudgetSummary = useMemo(() => {
+    const absoluteWeek = getAbsoluteWeek(props.player.age, props.player.currentWeek);
+    const draft = platform.infrastructureSetupDraft;
+    const commissioned = platform.infrastructureSetup;
+    const forecast = draft ? getStreamingInfrastructureForecast(props.player, draft) : null;
+    const facilities = commissioned?.facilities || draft?.facilities || [];
+    const placements = commissioned?.networkPlacements || draft?.networkPlacements || [];
+    const racks = facilities.length
+      ? facilities.reduce((sum, facility) => sum + facility.installedRacks, 0)
+      : placements.reduce((sum, placement) => sum + placement.racks, 0);
+    const cities = new Set((facilities.length ? facilities : placements).map(item => item.cityId)).size;
+    const hasPlan = Boolean(draft || commissioned);
+    return createBuildBudgetSummary({
+      hasDraft: hasPlan,
+      approved: Boolean(draft?.assistedPlanApproved || commissioned),
+      commissioned: Boolean(commissioned),
+      live: Boolean(platform.launchCommit),
+      total: commissioned?.capitalInvested ?? forecast?.transactionCost ?? 0,
+      weeklyOperatingCost: commissioned?.weeklyOperatingCost ?? forecast?.weeklyOperatingCost ?? 0,
+      buildWeeks: commissioned
+        ? Math.max(0, commissioned.readyAtAbsoluteWeek - commissioned.committedAtAbsoluteWeek)
+        : forecast?.buildWeeks ?? 0,
+      buildWeeksRemaining: commissioned
+        ? Math.max(0, commissioned.readyAtAbsoluteWeek - absoluteWeek)
+        : undefined,
+      racks,
+      cities,
+      redundancy: !hasPlan ? 'Not planned' : cities >= 2 ? 'Redundant' : 'Single point',
+    });
+  }, [platform, props.player]);
 
-  const update = (next: Player) => props.onUpdatePlayer(next);
-  const findOperation = (countryId: string) => props.player.ownedStreamingPlatform.marketOperations.find(operation => operation.countryId === countryId && operation.entryKind === 'OPENING' && operation.status !== 'EXITED');
+  const update = (next: Player) => {
+    const checkpoint = checkpointStreamingLaunchBlueprint(next);
+    const current = checkpoint.changed ? checkpoint.player : next;
+    currentPlayerRef.current = current;
+    props.onUpdatePlayer(current);
+  };
+  const findOperation = (countryId: string) => currentPlayerRef.current.ownedStreamingPlatform.marketOperations.find(operation => operation.countryId === countryId && operation.entryKind === 'OPENING' && operation.status !== 'EXITED');
+  const persistDraft = (draft: LaunchDraft) => {
+    const absoluteWeek = getAbsoluteWeek(currentPlayerRef.current.age, currentPlayerRef.current.currentWeek);
+    const persisted: OwnedStreamingDefineLaunchDraftState = {
+      selectedCountryIds: [...draft.selectedCountryIds],
+      soundId: draft.soundId ?? null,
+      packageId: draft.packageId ?? null,
+      customAudio: (draft.customAudio as OwnedStreamingCustomIdentAudio | null | undefined) ?? null,
+      storefrontId: draft.storefrontId ?? null,
+      pricing: (draft.pricing || data.pricing) as OwnedStreamingPricingConfiguration,
+      updatedAtAbsoluteWeek: absoluteWeek,
+    };
+    let next = currentPlayerRef.current;
+    const draftResult = saveStreamingDefineLaunchDraft(next, persisted);
+    if (draftResult.changed) next = draftResult.player;
+
+    const desiredMarkets = [...persisted.selectedCountryIds].sort();
+    const currentMarkets = next.ownedStreamingPlatform.marketOperations
+      .filter(operation => operation.entryKind === 'OPENING' && operation.countryId && operation.status !== 'EXITED')
+      .map(operation => operation.countryId!)
+      .sort();
+    if (JSON.stringify(desiredMarkets) !== JSON.stringify(currentMarkets)) {
+      const marketResult = saveStreamingMarketPlan(next, desiredMarkets, 'OPENING');
+      if (marketResult.changed) next = marketResult.player;
+    }
+
+    const currentStorefront = next.ownedStreamingPlatform.serviceConfiguration.storefrontLayoutId;
+    if (persisted.storefrontId && persisted.storefrontId !== currentStorefront) {
+      const storefrontResult = saveStreamingStorefrontPlan(next, { storefrontLayoutId: persisted.storefrontId });
+      if (storefrontResult.changed) next = storefrontResult.player;
+    }
+
+    const currentPricing = next.ownedStreamingPlatform.serviceConfiguration.pricing;
+    const currentPricingApproach = next.ownedStreamingPlatform.serviceConfiguration.pricingApproach;
+    if (persisted.pricing.streams.length
+      && (!persisted.pricing.streams.includes('subs') || persisted.pricing.plans.length > 0)
+      && (currentPricingApproach !== 'CUSTOM' || JSON.stringify(persisted.pricing) !== JSON.stringify(currentPricing))) {
+      const pricingResult = saveStreamingPricingPlan(next, persisted.pricing);
+      if (pricingResult.changed) next = pricingResult.player;
+    }
+
+    props.onDraftChange?.(draft);
+    if (next !== currentPlayerRef.current) update(next);
+  };
+  const restoredDraftKey = restoredDraft ? JSON.stringify(restoredDraft) : '';
+  const restoredDraftKeyRef = useRef('');
+  useEffect(() => {
+    if (!restoredDraft || restoredDraftKeyRef.current === restoredDraftKey) return;
+    restoredDraftKeyRef.current = restoredDraftKey;
+    persistDraft(restoredDraft);
+  }, [restoredDraftKey]);
 
   return (
     <LaunchWizard
       data={data}
       initialStep={STEP_FROM_CANONICAL[currentStep] || 'markets'}
-      initialDraft={props.initialDraft}
-      onDraftChange={props.onDraftChange}
+      initialDraft={restoredDraft}
+      initialSheet={props.initialSheet}
+      buildBudgetSummary={buildBudgetSummary}
+      onDraftChange={persistDraft}
       onExit={props.onClose}
       onOpenStudioFinance={props.onOpenFinance}
       onStepChange={(step) => update(setStreamingDefineLaunchStep(props.player, STEP_TO_CANONICAL[step]))}
       onSaveFootprint={(countryIds) => {
-        const result = saveStreamingMarketPlan(props.player, countryIds, 'OPENING');
+        const result = saveStreamingMarketPlan(currentPlayerRef.current, countryIds, 'OPENING');
         if (result.changed) update(result.player);
       }}
       onBeginMarketEntry={(countryIds, plannedCountryIds) => {
         /* The visible wizard draft is the player's intent. Persist it first,
            then file against that exact canonical state in the same action. */
-        const planResult = saveStreamingMarketPlan(props.player, plannedCountryIds || countryIds, 'OPENING');
-        const filingBase = planResult.changed ? planResult.player : props.player;
+        const planResult = saveStreamingMarketPlan(currentPlayerRef.current, plannedCountryIds || countryIds, 'OPENING');
+        const filingBase = planResult.changed ? planResult.player : currentPlayerRef.current;
         const result = beginStreamingMarketClearance(filingBase, countryIds, 'OPENING');
         if (result.changed || planResult.changed) update(result.player);
         if (result.reason === 'INSUFFICIENT_TREASURY') props.onOpenFinance();
@@ -535,19 +645,19 @@ function OpeningLaunchExperience(props: Props) {
       onSubmitRequirement={(countryId) => {
         const operation = findOperation(countryId);
         if (!operation) return;
-        const result = resolveStreamingMarketRequirement(props.player, operation.id);
+        const result = resolveStreamingMarketRequirement(currentPlayerRef.current, operation.id);
         if (result.changed) update(result.player);
         if (result.reason === 'INSUFFICIENT_TREASURY') props.onOpenFinance();
       }}
       onFileRevisedApplication={(countryId) => {
         const operation = findOperation(countryId);
         if (!operation) return;
-        const result = resumeStreamingMarketClearance(props.player, operation.id);
+        const result = resumeStreamingMarketClearance(currentPlayerRef.current, operation.id);
         if (result.changed) update(result.player);
       }}
       onCommissionIdent={(soundId, packageId, customAudio) => {
         const usesCustomAudio = soundId === 'custom' && Boolean(customAudio);
-        const result = saveStreamingServiceIdent(props.player, {
+        const result = saveStreamingServiceIdent(currentPlayerRef.current, {
           soundIdentKey: usesCustomAudio ? 'PULSE' : soundId.toUpperCase() as StreamingSoundIdentKey,
           identPackageId: PACKAGE_TO_CANONICAL[packageId] || 'STANDARD',
           customIdentAudio: usesCustomAudio ? customAudio : null,
@@ -557,24 +667,30 @@ function OpeningLaunchExperience(props: Props) {
       }}
       onOpenTechnology={props.onOpenTechnology}
       onRemoveCustomIdentAudio={() => {
-        const result = removeStreamingCustomIdentAudio(props.player);
+        const result = removeStreamingCustomIdentAudio(currentPlayerRef.current);
         if (result.changed) update(result.player);
       }}
       onSaveViewerOffer={(storefrontId) => {
-        const result = saveStreamingStorefrontPlan(props.player, { storefrontLayoutId: storefrontId });
+        const result = saveStreamingStorefrontPlan(currentPlayerRef.current, { storefrontLayoutId: storefrontId });
         if (result.changed) update(result.player);
       }}
       onSavePricing={(pricing: PricingSettings) => {
-        const result = saveStreamingPricingPlan(props.player, pricing as OwnedStreamingPricingConfiguration);
+        const result = saveStreamingPricingPlan(currentPlayerRef.current, pricing as OwnedStreamingPricingConfiguration);
         if (result.changed) update(result.player);
       }}
+      onForecastPricing={(pricing, countryIds) => forecastWorldStreamingLaunchPricing(
+        props.player,
+        pricing as OwnedStreamingPricingConfiguration,
+        countryIds,
+      )}
       onAssembleCatalogue={props.onOpenCatalogue}
       onOpenContentDesk={props.onOpenContentDesk || props.onOpenCatalogue}
       onSaveBlueprint={() => {
-        const result = saveStreamingLaunchBlueprint(props.player);
+        const result = saveStreamingLaunchBlueprint(currentPlayerRef.current);
         if (result.changed) update(result.player);
       }}
       onOpenBuildPlatform={props.onOpenBuild}
+      onOpenBuildBudget={props.onOpenBuildBudget}
     />
   );
 }

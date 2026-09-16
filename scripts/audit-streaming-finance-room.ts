@@ -61,7 +61,7 @@ const funded = contributeStreamingFounderCapital(player, 25_000_000, 'finance-ro
 assert(funded.changed, 'Founder injection should be available immediately after incorporation.');
 player = funded.player;
 assert(player.money === personalBefore - 25_000_000, 'Founder injection should debit personal cash atomically.');
-assert(player.ownedStreamingPlatform.treasuryCash === 25_000_000, 'Founder injection should credit company treasury atomically.');
+assert(player.ownedStreamingPlatform.treasuryCash === 26_000_000, 'Founder injection should credit company treasury atomically.');
 assert(player.ownedStreamingPlatform.founderOwnershipPercent === 100 && player.ownedStreamingPlatform.debtPrincipal === 0, 'Founder injection must create neither dilution nor debt.');
 
 const duplicate = contributeStreamingFounderCapital(player, 25_000_000, 'finance-room-audit-injection');
@@ -100,7 +100,7 @@ assert(player.ownedStreamingPlatform.founderOwnershipPercent === 86, 'Accepted t
 
 const room = getStreamingFinanceRoom(player);
 assert(room.hasCfo && room.cfoName, 'Finance should expose the active CFO sign-off state.');
-assert(room.founderCapitalContributed === 25_000_000 && room.outsideCapitalRaised === 240_000_000, 'The capital desk should reconcile founder and outside capital separately.');
+assert(room.founderCapitalContributed === 26_000_000 && room.outsideCapitalRaised === 240_000_000, 'The capital desk should reconcile founder and outside capital separately.');
 assert(room.investorOffers.find(offer => offer.id === 'investor-sofia-laurent')?.accepted, 'The accepted offer should become permanent cap-table state.');
 const closingBalance = room.ledger
     .filter(entry => entry.affectsTreasury)

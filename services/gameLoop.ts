@@ -147,6 +147,10 @@ import { getContinuationPerformanceGross, shouldResolveContinuationDecision } fr
 import { processLivingEnsembleWeek } from './livingEnsemble';
 import { processOwnedStreamingPlatformWeek } from './streamingWeeklyLoop';
 import { advanceStreamingMarketClearances } from './streamingMarkets';
+import {
+    appendStreamingOpeningProgrammeTransitions,
+    StreamingOpeningProgrammeWeekError,
+} from './streamingOpeningProgramme';
 import { advanceStreamingTitleLocalization } from './streamingOpeningCatalogue';
 import {
     migrateStreamingRightsContractRegistry,
@@ -154,11 +158,19 @@ import {
 } from './streamingRightsCore';
 import { normalizeWorldAudienceEconomyState } from './worldEconomy/worldAudienceCohorts';
 import { normalizeWorldAudienceParticipationState } from './worldEconomy/worldAudienceParticipation';
-import { advanceWorldPopulationToWeek, normalizeWorldPopulationState } from './worldEconomy/worldPopulation';
+import { normalizeWorldPopulationState } from './worldEconomy/worldPopulation';
 import { normalizeWorldStreamingCompetitionState } from './worldEconomy/worldStreamingCompetition';
 import { normalizeWorldStreamingCustomerState } from './worldEconomy/worldStreamingCustomers';
 import { normalizeWorldStreamingViewingState } from './worldEconomy/worldStreamingViewing';
 import { settleWorldStreamingPlatformEconomyWeek } from './worldEconomy/worldStreamingPlatformEconomy';
+import {
+    repairDerivedWorldEconomyState,
+    createWorldEconomyHealthSummary,
+    validateWorldEconomyCandidate,
+    WorldEconomyIntegrityError,
+} from './worldEconomy/worldEconomyIntegrity';
+import type { WorldEconomyValidationResult } from '../types';
+import { createWeekSimulationSeed } from './weekProcessingDeterminism';
 
 // --- CONSTANTS ---
 const ANNUAL_TAX_FREE_ALLOWANCE = 25000;
@@ -1516,6 +1528,8 @@ const buildFriendFavorRequest = (player: Player, absoluteWeek: number): Message 
 
 export type ProcessGameWeekDiagnostics = {
     onStage?: (stage: string, context?: Record<string, unknown>) => void;
+    validateWorldEconomy?: (candidate: Player, expectedAbsoluteWeek: number) => WorldEconomyValidationResult;
+    repairWorldEconomy?: (candidate: Player, absoluteWeek: number) => Player;
 };
 
 // Returns updated player AND a flag if an ad should be triggered
@@ -1535,6 +1549,8 @@ export const processGameWeek = async (
     });
     let nextPlayer = clonePlayerForWeekProcessing(player);
     let triggerAd = false;
+    const targetAbsoluteWeek = getAbsoluteWeek(player.age, player.currentWeek) + 1;
+    const simulationSeed = createWeekSimulationSeed(player, targetAbsoluteWeek);
     const emitLoopStage = (stage: string, context: Record<string, unknown> = {}) => {
         const stageContext = {
             age: nextPlayer.age,
@@ -1554,7 +1570,7 @@ export const processGameWeek = async (
         });
         addBreadcrumb(`game_loop:${stage}`, stageContext);
     };
-    emitLoopStage('state_cloned');
+    emitLoopStage('state_cloned', { simulation_seed: simulationSeed });
     const language = getPlayerLanguage(nextPlayer);
     const actorArcBeforeWeek = getActorCareerArc(nextPlayer);
     const getCommitmentDisplayName = (commitment: Commitment, currentLanguage: GameLanguage = language) => {
@@ -6455,8 +6471,8 @@ export const processGameWeek = async (
 
     const enteredStreamingAbsoluteWeek = getAbsoluteWeek(nextPlayer.age, nextPlayer.currentWeek);
     emitLoopStage('world_population_start', { absolute_week: enteredStreamingAbsoluteWeek });
-    nextPlayer.world.worldPopulation = advanceWorldPopulationToWeek(
-        normalizeWorldPopulationState(nextPlayer.world.worldPopulation, enteredStreamingAbsoluteWeek),
+    nextPlayer.world.worldPopulation = normalizeWorldPopulationState(
+        nextPlayer.world.worldPopulation,
         enteredStreamingAbsoluteWeek,
     );
     emitLoopStage('world_population_done', {
@@ -6576,7 +6592,16 @@ export const processGameWeek = async (
     });
 
     emitLoopStage('owned_streaming_start');
-    nextPlayer = advanceStreamingMarketClearances(nextPlayer).player;
+    const openingProgrammeBeforeWeek = nextPlayer;
+    try {
+        nextPlayer = advanceStreamingMarketClearances(nextPlayer).player;
+    } catch (error) {
+        throw new StreamingOpeningProgrammeWeekError(
+            'CLEARANCES',
+            'Advancing government clearances',
+            error,
+        );
+    }
     nextPlayer = advanceStreamingTitleLocalization(nextPlayer).player;
     emitLoopStage('world_streaming_competition_start', { absolute_week: enteredStreamingAbsoluteWeek });
     nextPlayer.world.worldStreamingCompetition = normalizeWorldStreamingCompetitionState(
@@ -6623,8 +6648,20 @@ export const processGameWeek = async (
         paid_accounts: nextPlayer.world.worldStreamingPlatformEconomy?.global.endingPaidAccounts || 0,
         weekly_revenue: nextPlayer.world.worldStreamingPlatformEconomy?.global.weeklyRevenue || 0,
     });
-    const ownedStreamingResult = processOwnedStreamingPlatformWeek(nextPlayer);
-    nextPlayer = ownedStreamingResult.player;
+    let ownedStreamingResult: ReturnType<typeof processOwnedStreamingPlatformWeek>;
+    try {
+        ownedStreamingResult = processOwnedStreamingPlatformWeek(nextPlayer);
+    } catch (error) {
+        throw new StreamingOpeningProgrammeWeekError(
+            'MARKETING',
+            'Advancing the commissioned streaming programme',
+            error,
+        );
+    }
+    nextPlayer = appendStreamingOpeningProgrammeTransitions(
+        openingProgrammeBeforeWeek,
+        ownedStreamingResult.player,
+    );
     if (ownedStreamingResult.snapshot?.operations) {
         logsToAdd.push({
             msg: `EMPIRE+ weekly brief: ${ownedStreamingResult.snapshot.operations.headline}`,
@@ -7188,6 +7225,40 @@ export const processGameWeek = async (
         inbox_messages: nextPlayer.inbox?.length || 0,
         news_items: nextPlayer.news?.length || 0,
     });
+
+    const integrityWeek = getAbsoluteWeek(nextPlayer.age, nextPlayer.currentWeek);
+    const validateIntegrity = diagnostics.validateWorldEconomy || validateWorldEconomyCandidate;
+    const repairIntegrity = diagnostics.repairWorldEconomy || repairDerivedWorldEconomyState;
+    emitLoopStage('world_integrity_start', { absolute_week: integrityWeek });
+    let integrity = validateIntegrity(nextPlayer, integrityWeek);
+    let integrityWarningCodes: string[] = [];
+    if (integrity.status === 'REBUILD_DERIVED') {
+        integrityWarningCodes = integrity.violations.map(item => item.code);
+        emitLoopStage('world_integrity_repair', {
+            absolute_week: integrityWeek,
+            violation_count: integrity.violations.length,
+            violation_codes: integrity.violations.map(item => item.code).slice(0, 12),
+        });
+        nextPlayer = repairIntegrity(nextPlayer, integrityWeek);
+        integrity = validateIntegrity(nextPlayer, integrityWeek);
+    }
+    if (integrity.status !== 'VALID') {
+        throw new WorldEconomyIntegrityError(integrity);
+    }
+    nextPlayer = {
+        ...nextPlayer,
+        world: {
+            ...nextPlayer.world,
+            worldEconomyHealth: createWorldEconomyHealthSummary(
+                nextPlayer,
+                integrityWeek,
+                Number(nextPlayer.flags?.saveMigrationVersion) || 0,
+                integrityWarningCodes,
+                nextPlayer.world.worldEconomyHealth?.workloadMode || 'NORMAL',
+            ),
+        },
+    };
+    emitLoopStage('world_integrity_done', { absolute_week: integrityWeek });
 
     addBreadcrumb('game_loop:complete', {
         age: nextPlayer.age,

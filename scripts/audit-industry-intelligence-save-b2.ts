@@ -13,6 +13,7 @@ import { ensureStudioEcosystem } from '../services/studioEcosystem';
 import { attachNormalizedStudioAiState } from '../services/studioAi';
 import { compactPlayerForPersistence } from '../services/saveCompaction';
 import { createSaveIntegrityManifest } from '../services/saveIntegrity';
+import { prepareVerifiedPlayerForPersistence } from '../services/savePreparation';
 
 const absoluteWeek = 1_500;
 const player = structuredClone(INITIAL_PLAYER);
@@ -53,6 +54,27 @@ oversized.learning.samples = Array.from({ length: 100 }, (_, index) => ({
 oversized.learning.processedEvidenceIds = Array.from({ length: 200 }, (_, index) => `evidence_${index}`);
 oversized.processedKeys = Array.from({ length: 200 }, (_, index) => `key_${index}`);
 player.world.studios![studioId].ai!.intelligence = oversized;
+
+assert.doesNotThrow(
+    () => prepareVerifiedPlayerForPersistence(player, 'PROCESS_WEEK'),
+    'Bounded intelligence compaction must not be mistaken for protected-state corruption.',
+);
+
+const legacyShaped = structuredClone(player);
+delete (legacyShaped.world.studios![studioId].ai!.intelligence!.nextDueAbsoluteWeek as Partial<typeof initial.nextDueAbsoluteWeek>).CONTENT_STRATEGY;
+assert.doesNotThrow(
+    () => prepareVerifiedPlayerForPersistence(legacyShaped, 'PROCESS_WEEK'),
+    'Canonicalizing an older partial lane schedule must not block the next verified save.',
+);
+
+const legacyOwnerMetadata = structuredClone(player);
+legacyOwnerMetadata.world.studios![studioId].ai!.intelligence!.companyId = 'legacy_studio_alias';
+legacyOwnerMetadata.world.studios![studioId].ai!.intelligence!.companyKind = 'STREAMING_PLATFORM';
+legacyOwnerMetadata.world.studios![studioId].ai!.intelligence!.seed = 'legacy_seed_alias';
+assert.doesNotThrow(
+    () => prepareVerifiedPlayerForPersistence(legacyOwnerMetadata, 'PROCESS_WEEK'),
+    'Repairing legacy intelligence ownership metadata to the authoritative studio must not block a verified save.',
+);
 
 const compacted = compactPlayerForPersistence(player);
 const compactedState = compacted.world.studios![studioId].ai!.intelligence!;

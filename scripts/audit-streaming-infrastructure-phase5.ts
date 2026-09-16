@@ -58,13 +58,13 @@ const createIncorporatedPlayer = (): Player => {
     return funded.player;
 };
 
-assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 25, 'The current schema should retain Phase 5 infrastructure fields.');
+assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 26, 'The current schema should retain Phase 5 infrastructure fields.');
 assert(STREAMING_INFRASTRUCTURE_STRATEGIES.length === 3, 'Cloud, owned and hybrid strategies should all remain available.');
 assert(
     STREAMING_CAPACITY_PACKAGES.map(item => item.id).join(',') === 'STARTER,ESSENTIAL,GROWTH,PREMIERE',
     'Phase 5 should offer the entry-level Starter Rack plus three earned expansion packages.',
 );
-assert(STREAMING_ROLLOUT_PACES.map(item => item.id).join(',') === 'SAFE,STANDARD,RUSHED', 'Safe, standard and rushed rollout choices should all exist.');
+assert(STREAMING_ROLLOUT_PACES.some(item => item.id === 'STANDARD'), 'Legacy saves must retain a neutral rollout value.');
 assert(STREAMING_SUBSCRIPTION_TIERS.map(item => item.id).join(',') === 'BASIC,PREMIUM,FAMILY', 'Basic, Premium and Family should be the opening subscription tiers.');
 
 const incorporated = createIncorporatedPlayer();
@@ -91,7 +91,7 @@ const ownedForecast = getStreamingInfrastructureForecast(incorporated, {
 assert(cloudForecast.upfrontCost < ownedForecast.upfrontCost, 'Cloud-first should require less opening capital than owned infrastructure.');
 assert(cloudForecast.weeklyOperatingCost > ownedForecast.weeklyOperatingCost, 'Cloud-first should cost more per operating week than owned infrastructure.');
 assert(cloudForecast.burstConcurrentStreams > ownedForecast.burstConcurrentStreams, 'Cloud-first should provide more elastic premiere burst capacity.');
-assert(cloudForecast.buildWeeks < ownedForecast.buildWeeks, 'Cloud-first should deploy faster than owned infrastructure.');
+assert(cloudForecast.buildWeeks <= ownedForecast.buildWeeks, 'Cloud-first must never take longer than an equivalent owned build.');
 
 const safeForecast = getStreamingInfrastructureForecast(incorporated, {
     ...defaultDraft,
@@ -101,9 +101,11 @@ const rushedForecast = getStreamingInfrastructureForecast(incorporated, {
     ...defaultDraft,
     rolloutPace: 'RUSHED',
 });
-assert(safeForecast.buildWeeks > rushedForecast.buildWeeks, 'Safe rollout should take more game weeks than rushed rollout.');
-assert(safeForecast.technicalDebt < rushedForecast.technicalDebt, 'Rushed rollout should create more starting technical debt.');
-assert(safeForecast.reliabilityTarget > rushedForecast.reliabilityTarget, 'Safe rollout should forecast better reliability.');
+assert(safeForecast.buildWeeks === rushedForecast.buildWeeks, 'A retired hidden pace value must not change construction time.');
+assert(safeForecast.transactionCost === rushedForecast.transactionCost, 'A retired hidden pace value must not change build cost.');
+assert(safeForecast.technicalDebt === rushedForecast.technicalDebt, 'A retired hidden pace value must not create technical debt.');
+assert(safeForecast.reliabilityTarget === rushedForecast.reliabilityTarget, 'A retired hidden pace value must not change reliability.');
+assert(safeForecast.buildWeeks >= 4 && safeForecast.buildWeeks <= 15, 'Every infrastructure forecast must remain inside the disclosed 4–15 week range.');
 
 const nationalForecast = getStreamingInfrastructureForecast(incorporated, {
     ...defaultDraft,
@@ -133,8 +135,12 @@ const treasuryBeforeDraft = incorporated.ownedStreamingPlatform.treasuryCash;
 const saved = saveStreamingInfrastructureDraft(incorporated, {
     ...defaultDraft,
     currentStep: 2,
+    assistedPlanApproved: true,
+    assistedPlanClass: 'GROWTH',
 });
 assert(saved.ownedStreamingPlatform.infrastructureSetupDraft?.currentStep === 2, 'The setup should persist interrupted-flow progress.');
+assert(saved.ownedStreamingPlatform.infrastructureSetupDraft?.assistedPlanApproved === true, 'An approved assisted plan must remain approved after persistence.');
+assert(saved.ownedStreamingPlatform.infrastructureSetupDraft?.assistedPlanClass === 'GROWTH', 'The approved assisted plan class must survive persistence.');
 assert(saved.money === playerCashBeforeDraft, 'Saving infrastructure choices must not touch personal money.');
 assert(saved.ownedStreamingPlatform.treasuryCash === treasuryBeforeDraft, 'Saving infrastructure choices must not charge company treasury.');
 
@@ -152,8 +158,12 @@ const changedAfterTest = saveStreamingInfrastructureDraft(tested.player, {
     rolloutPace: 'RUSHED',
 });
 assert(
-    validateStreamingInfrastructureDraft(changedAfterTest).issues.some(issue => issue.code === 'LOAD_TEST_REQUIRED'),
-    'Changing rollout after a load test should invalidate the old test signature.',
+    changedAfterTest.ownedStreamingPlatform.infrastructureSetupDraft?.rolloutPace === 'STANDARD',
+    'Retired rollout choices must normalize to the neutral value instead of remaining as hidden gameplay state.',
+);
+assert(
+    !validateStreamingInfrastructureDraft(changedAfterTest).issues.some(issue => issue.code === 'LOAD_TEST_REQUIRED'),
+    'A retired rollout field must not invalidate an otherwise current load test.',
 );
 
 const invalidPricingDraft = {

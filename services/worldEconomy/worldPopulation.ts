@@ -9,6 +9,7 @@ import type {
     WorldPopulationSnapshot,
     WorldPopulationState,
 } from '../../types';
+import { isWorldEconomyStateCanonical, markWorldEconomyStateCanonical } from './worldEconomyCanonicalState';
 import {
     WORLD_COUNTRY_DEFINITIONS,
     WORLD_COUNTRY_DEFINITIONS_BY_ID,
@@ -418,8 +419,11 @@ export const normalizeWorldPopulationState = (
     absoluteWeek: number,
 ): WorldPopulationState => {
     const targetWeek = Math.max(WORLD_POPULATION_EPOCH_ABSOLUTE_WEEK, Math.round(Number(absoluteWeek) || 0));
-    if (!isUsableState(input)) return createWorldPopulationState(targetWeek);
-    return advanceWorldPopulationToWeek(input, targetWeek);
+    if (isWorldEconomyStateCanonical(input, targetWeek)) return input as WorldPopulationState;
+    const normalized = !isUsableState(input)
+        ? createWorldPopulationState(targetWeek)
+        : advanceWorldPopulationToWeek(input, targetWeek);
+    return markWorldEconomyStateCanonical(normalized, targetWeek);
 };
 
 export const getWorldPopulationCountry = (

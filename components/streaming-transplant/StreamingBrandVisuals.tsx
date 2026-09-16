@@ -266,7 +266,20 @@ export interface RegionInfo {
 }
 /** Real cities you can put your one data centre in. `hub` marks the
  *  best-connected option — cheaper latency, higher rent. */
-export interface City { id: string; label: string; region: RegionId; x: number; y: number; hub?: boolean; cost: number; quality: number; }
+export interface City {
+  id: string;
+  label: string;
+  region: RegionId;
+  x: number;
+  y: number;
+  longitude: number;
+  latitude: number;
+  countryId: string;
+  countryCode: string;
+  hub?: boolean;
+  cost: number;
+  quality: number;
+}
 export const CITIES: City[] = PRODUCTION_LOCATION_CATALOG.map(item => ({
   id: item.id,
   label: item.name,
@@ -275,6 +288,10 @@ export const CITIES: City[] = PRODUCTION_LOCATION_CATALOG.map(item => ({
   // uses the older 64 x 26 range, so only the projection changes here.
   x: item.x * 0.64,
   y: item.y * 0.26,
+  longitude: item.longitude,
+  latitude: item.latitude,
+  countryId: item.countryId,
+  countryCode: item.countryCode,
   hub: item.quality >= 9,
   cost: getStreamingDataCenterCost(item),
   quality: item.quality,

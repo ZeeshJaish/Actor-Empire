@@ -27,12 +27,17 @@ import {
     normalizeWorldStreamingCustomerState,
 } from './worldStreamingCustomers';
 import { getWorldStreamingOffers } from './worldStreamingOffers';
+import { calculateWorldStreamingCommercialRevenue } from './worldStreamingCommercialEconomy';
 
-export const WORLD_STREAMING_VIEWING_SCHEMA_VERSION = 1 as const;
+export const WORLD_STREAMING_VIEWING_SCHEMA_VERSION = 2 as const;
 const MAX_SNAPSHOTS = 52;
 
 const clamp = (value: number, minimum: number, maximum: number): number => (
     Math.min(maximum, Math.max(minimum, Number.isFinite(value) ? value : minimum))
+);
+
+export const resolvePlayerStreamingCommerceCapabilityIndex = (value: number): number => (
+    clamp(value, 0, 100)
 );
 const round2 = (value: number): number => Math.round(value * 100) / 100;
 const roundRate = (value: number): number => Math.round(clamp(value, 0, 1) * 10_000) / 10_000;
@@ -104,9 +109,17 @@ const emptyRevenue = (): WorldStreamingViewingRevenue => ({
     rentalRevenue: 0,
     purchaseTransactions: 0,
     purchaseRevenue: 0,
+    dayPassTransactions: 0,
+    dayPassRevenue: 0,
+    meteredAccounts: 0,
+    meteredHours: 0,
+    meteredRevenue: 0,
+    patronAccounts: 0,
+    patronRevenue: 0,
     sponsorshipImpressions: 0,
     sponsorshipRevenue: 0,
     totalIncrementalRevenue: 0,
+    commercialOperatingCost: 0,
 });
 
 const sumRevenue = (rows: WorldStreamingViewingRevenue[]): WorldStreamingViewingRevenue => {
@@ -121,9 +134,17 @@ const sumRevenue = (rows: WorldStreamingViewingRevenue[]): WorldStreamingViewing
         result.rentalRevenue += row.rentalRevenue;
         result.purchaseTransactions += row.purchaseTransactions;
         result.purchaseRevenue += row.purchaseRevenue;
+        result.dayPassTransactions += row.dayPassTransactions;
+        result.dayPassRevenue += row.dayPassRevenue;
+        result.meteredAccounts += row.meteredAccounts;
+        result.meteredHours += row.meteredHours;
+        result.meteredRevenue += row.meteredRevenue;
+        result.patronAccounts += row.patronAccounts;
+        result.patronRevenue += row.patronRevenue;
         result.sponsorshipImpressions += row.sponsorshipImpressions;
         result.sponsorshipRevenue += row.sponsorshipRevenue;
         result.totalIncrementalRevenue += row.totalIncrementalRevenue;
+        result.commercialOperatingCost += row.commercialOperatingCost;
     });
     return result;
 };
@@ -179,14 +200,32 @@ const projectRivalViewing = (
                 sum + (offer.plans.find(plan => plan.id === allocation.planId)?.ads ? allocation.paidAccounts : 0)
             ), 0);
             const adShare = customer.endingPaidAccounts > 0 ? clamp(adSupportedAccounts / customer.endingPaidAccounts, 0, 1) : 0;
-            const advertisingImpressions = Math.round(totalHoursViewed * adShare * clamp(7 + offer.marketingIndex / 25, 7, 11));
-            const advertisingRevenue = Math.round(advertisingImpressions / 1_000 * (7 + offer.reputationIndex * .05));
+            const commercialPricing = {
+                ...offer.commercialConfiguration,
+                sponsor: {
+                    ...offer.commercialConfiguration.sponsor,
+                    perTitle: offer.commercialConfiguration.sponsor.perTitle / Math.max(1, offer.activeCountryIds.length),
+                },
+            };
+            const commercial = calculateWorldStreamingCommercialRevenue({
+                pricing: commercialPricing,
+                paidViewingAccounts,
+                viewingAccounts: totalViewingAccounts,
+                nonSubscriberOpportunityAccounts: Math.max(0, customer.accessLoadAccounts - totalViewingAccounts),
+                hoursViewed: totalHoursViewed,
+                adEligibleHours: totalHoursViewed * adShare,
+                estimatedViewers,
+                completionRate: clamp(.48 + valueStrength / 250, .35, .9),
+                repeatViewingRate: clamp(.04 + offer.catalogueStrengthIndex / 750, .03, .24),
+                isFreshMovie: offer.catalogueStrengthIndex >= 45,
+                isRentalEligible: offer.catalogueStrengthIndex >= 35,
+                isSponsorEligible: commercialPricing.sponsor.titles > 0,
+                commerceCapabilityIndex: clamp(offer.reliabilityIndex * .55 + offer.marketingIndex * .45, 0, 100),
+                reputationIndex: offer.reputationIndex,
+            });
             const revenue: WorldStreamingViewingRevenue = {
-                ...emptyRevenue(),
+                ...commercial,
                 attributedSubscriptionRevenue: Math.max(0, Math.round(customer.monthlySubscriptionRevenue / 4.33)),
-                advertisingImpressions,
-                advertisingRevenue,
-                totalIncrementalRevenue: advertisingRevenue,
             };
             const row: WorldStreamingViewingCountryPlatformSummary = {
                 platformId: customer.platformId,
@@ -620,48 +659,40 @@ const buildViewingState = (
     }, 0);
     const adEligibleShare = playerCustomers.endingPaidAccounts > 0
         ? clamp(configuredAdAccounts / playerCustomers.endingPaidAccounts, 0, 1) : 0;
-    const advertisingLevel = clamp(platform.technologyLevels.ADVERTISING_COMMERCE || 0, 0, 10);
-    const adFillRate = clamp(.52 + advertisingLevel * .035 + platform.competitiveWorld.globalPrestige / 500, .45, .94);
+    const commerceCapabilityIndex = resolvePlayerStreamingCommerceCapabilityIndex(
+        platform.technologyLevels.ADVERTISING_COMMERCE || 0,
+    );
     const sponsoredTitleIds = new Set(baseTitlePerformance.slice(0, Math.max(0, Math.round(pricing.sponsor.titles))).map(title => title.projectId));
+    const nonSubscriberOpportunityAllocation = distributeInteger(
+        Object.values(countryStates).reduce((sum, country) => sum + country.unmetDemandAccounts, 0),
+        baseTitlePerformance.map(title => Math.max(1, title.viewingAccounts)),
+    );
     const titlePerformance = baseTitlePerformance.map((title, index) => {
         const candidate = candidates.find(item => item.entry.projectId === title.projectId)!;
         const legitimateAccessTotal = Math.max(1, title.accessMix.paidViewingAccounts + title.accessMix.sharedViewingAccounts);
         const eligibleAdHours = streams.has('ads')
             ? title.hoursViewed * adEligibleShare * (title.accessMix.paidViewingAccounts / legitimateAccessTotal) : 0;
-        const advertisingImpressions = Math.max(0, Math.round(
-            eligibleAdHours * clamp(pricing.ads.minutesPerHour, 0, 30) * 2 * adFillRate,
-        ));
-        const advertisingRevenue = Math.max(0, Math.round(advertisingImpressions / 1_000 * Math.max(0, pricing.ads.cpm)));
         const freshMovie = title.projectType === 'MOVIE' && candidate.weeksAvailable <= 2;
         const rentalEligible = title.projectType === 'MOVIE' && candidate.weeksAvailable <= Math.max(1, pricing.rentals.windowWeeks);
-        const affordability = clamp(1.08 - Math.max(0, pricing.premium.price - 20) / 80, .35, 1.08);
-        const premiumTransactions = streams.has('premium') && freshMovie
-            ? Math.max(0, Math.round(title.accessMix.paidViewingAccounts * (.012 + title.completionRate * .012) * affordability)) : 0;
-        const rentalTransactions = streams.has('rentals') && rentalEligible
-            ? Math.max(0, Math.round(title.accessMix.paidViewingAccounts * (.018 + title.completionRate * .012))) : 0;
-        const purchaseTransactions = streams.has('rentals') && rentalEligible
-            ? Math.max(0, Math.round(title.accessMix.paidViewingAccounts * (.003 + title.repeatViewingRate * .015))) : 0;
-        const sponsorshipImpressions = streams.has('sponsor') && sponsoredTitleIds.has(title.projectId)
-            ? Math.max(0, title.estimatedViewers) : 0;
-        const sponsorshipCap = Math.max(0, pricing.sponsor.perTitle) / 52;
-        const sponsorshipDelivery = clamp(sponsorshipImpressions / Math.max(50_000, title.estimatedViewers * 1.15), 0, 1);
-        const sponsorshipRevenue = Math.max(0, Math.round(sponsorshipCap * sponsorshipDelivery));
-        const premiumRevenue = Math.max(0, Math.round(premiumTransactions * Math.max(0, pricing.premium.price)));
-        const rentalRevenue = Math.max(0, Math.round(rentalTransactions * Math.max(0, pricing.rentals.rent)));
-        const purchaseRevenue = Math.max(0, Math.round(purchaseTransactions * Math.max(0, pricing.rentals.buy)));
+        const commercial = calculateWorldStreamingCommercialRevenue({
+            pricing,
+            paidViewingAccounts: title.accessMix.paidViewingAccounts,
+            viewingAccounts: title.viewingAccounts,
+            nonSubscriberOpportunityAccounts: nonSubscriberOpportunityAllocation[index] || 0,
+            hoursViewed: title.hoursViewed,
+            adEligibleHours: eligibleAdHours,
+            estimatedViewers: title.estimatedViewers,
+            completionRate: title.completionRate,
+            repeatViewingRate: title.repeatViewingRate,
+            isFreshMovie: freshMovie,
+            isRentalEligible: rentalEligible,
+            isSponsorEligible: sponsoredTitleIds.has(title.projectId),
+            commerceCapabilityIndex,
+            reputationIndex: platform.competitiveWorld.globalPrestige,
+        });
         const revenue: WorldStreamingViewingRevenue = {
+            ...commercial,
             attributedSubscriptionRevenue: subscriptionAllocation[index] || 0,
-            advertisingImpressions,
-            advertisingRevenue,
-            premiumTransactions,
-            premiumRevenue,
-            rentalTransactions,
-            rentalRevenue,
-            purchaseTransactions,
-            purchaseRevenue,
-            sponsorshipImpressions,
-            sponsorshipRevenue,
-            totalIncrementalRevenue: advertisingRevenue + premiumRevenue + rentalRevenue + purchaseRevenue + sponsorshipRevenue,
         };
         const countryWeights = title.countryPerformance.map(country => Math.max(0, country.accessMix.paidViewingAccounts));
         const allocations = {
@@ -674,9 +705,17 @@ const buildViewingState = (
             rentalRevenue: distributeInteger(revenue.rentalRevenue, countryWeights),
             purchaseTransactions: distributeInteger(revenue.purchaseTransactions, countryWeights),
             purchaseRevenue: distributeInteger(revenue.purchaseRevenue, countryWeights),
+            dayPassTransactions: distributeInteger(revenue.dayPassTransactions, countryWeights),
+            dayPassRevenue: distributeInteger(revenue.dayPassRevenue, countryWeights),
+            meteredAccounts: distributeInteger(revenue.meteredAccounts, countryWeights),
+            meteredHours: distributeInteger(revenue.meteredHours, countryWeights),
+            meteredRevenue: distributeInteger(revenue.meteredRevenue, countryWeights),
+            patronAccounts: distributeInteger(revenue.patronAccounts, countryWeights),
+            patronRevenue: distributeInteger(revenue.patronRevenue, countryWeights),
             sponsorshipImpressions: distributeInteger(revenue.sponsorshipImpressions, countryWeights),
             sponsorshipRevenue: distributeInteger(revenue.sponsorshipRevenue, countryWeights),
             totalIncrementalRevenue: distributeInteger(revenue.totalIncrementalRevenue, countryWeights),
+            commercialOperatingCost: distributeInteger(revenue.commercialOperatingCost, countryWeights),
         };
         title.countryPerformance.forEach((country, countryIndex) => {
             country.revenue = {
@@ -689,9 +728,17 @@ const buildViewingState = (
                 rentalRevenue: allocations.rentalRevenue[countryIndex] || 0,
                 purchaseTransactions: allocations.purchaseTransactions[countryIndex] || 0,
                 purchaseRevenue: allocations.purchaseRevenue[countryIndex] || 0,
+                dayPassTransactions: allocations.dayPassTransactions[countryIndex] || 0,
+                dayPassRevenue: allocations.dayPassRevenue[countryIndex] || 0,
+                meteredAccounts: allocations.meteredAccounts[countryIndex] || 0,
+                meteredHours: allocations.meteredHours[countryIndex] || 0,
+                meteredRevenue: allocations.meteredRevenue[countryIndex] || 0,
+                patronAccounts: allocations.patronAccounts[countryIndex] || 0,
+                patronRevenue: allocations.patronRevenue[countryIndex] || 0,
                 sponsorshipImpressions: allocations.sponsorshipImpressions[countryIndex] || 0,
                 sponsorshipRevenue: allocations.sponsorshipRevenue[countryIndex] || 0,
                 totalIncrementalRevenue: allocations.totalIncrementalRevenue[countryIndex] || 0,
+                commercialOperatingCost: allocations.commercialOperatingCost[countryIndex] || 0,
             };
         });
         return {

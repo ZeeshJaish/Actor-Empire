@@ -31,7 +31,7 @@ assert(!wizard.includes('const LocationSelector:'), 'The old inline location sel
 assert(wizard.includes('export const GEAR_TIERS = GREENLIGHT_GEAR_TIERS'), 'Budget logic should share the extracted gear tier source.');
 assert(equipment.includes('studioEquipment={') === false, 'Equipment component should remain reusable and receive state through props.');
 assert(equipment.includes('onChange({ ...choices'), 'Equipment choices should still flow back to Greenlight state.');
-assert(location.includes('onChange(selectedIds.includes'), 'Location selection should still flow back to Greenlight state.');
+assert(location.includes('onChange(toggleProductionLocationSelection(selectedIds, id))'), 'Location selection should still flow back to Greenlight state.');
 assert(location.includes('disabled={selectedIds.length === 0}'), 'Location progression should remain guarded.');
 assert(wizard.includes('<GreenlightScriptStep'), 'Greenlight should render the extracted script step.');
 assert(wizard.includes('<GreenlightDirectorStep'), 'Greenlight should render the extracted director step.');
@@ -107,7 +107,11 @@ assert(!projectBuilder.includes("from 'react'"), 'Project builder should remain 
 assert(!buzzBuilder.includes("from 'react'"), 'Buzz builder should remain independent from React state and effects.');
 assert(!projectBuilder.includes('onUpdatePlayer'), 'Player mutation should remain in the Greenlight coordinator.');
 assert(!projectBuilder.includes('trackGameEvent'), 'Telemetry should remain in the Greenlight coordinator.');
-assert(wizard.includes('onUpdatePlayer(finalizeOwnedStreamingOriginalGreenlight'), 'Wizard should retain the final player update boundary.');
+assert(
+    wizard.includes('const finalizedOwnedOriginal = finalizeOwnedStreamingOriginalGreenlight') &&
+    wizard.includes('onUpdatePlayer(finalizedOwnedOriginal)'),
+    'Wizard should retain the final player update boundary.',
+);
 assert(wizard.includes("markTraceAction('greenlight_completed'"), 'Wizard should retain completion telemetry.');
 
 console.log('Greenlight module audit passed: extracted Greenlight screens retain their wiring and guards.');

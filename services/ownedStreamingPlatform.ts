@@ -64,6 +64,9 @@ import {
     type OwnedStreamingInfrastructureAward,
     type OwnedStreamingProductLine,
     type OwnedStreamingLaunchCommit,
+    type OwnedStreamingLaunchMarketingDraft,
+    type OwnedStreamingLaunchMarketingPlan,
+    type OwnedStreamingOpeningProgrammeCommission,
     type OwnedStreamingLaunchSlate,
     type OwnedStreamingLoadTestSnapshot,
     type OwnedStreamingLaunchRehearsalSnapshot,
@@ -2313,6 +2316,14 @@ const normalizeInfrastructureSetupDraft = (
             high: Math.round(clamp(openingDemandSource.high, 0, Number.MAX_SAFE_INTEGER)),
         }
         : undefined;
+    const capacityPackageId = isOneOf(source.capacityPackageId, CAPACITY_PACKAGE_IDS, 'GROWTH');
+    const managementPolicy = normalizeStreamingInfrastructureManagementPolicy(source.managementPolicy);
+    const lastLaunchRehearsal = normalizeLaunchRehearsalSnapshot(source.lastLaunchRehearsal);
+    // Drafts written before the approval fields were included can still carry
+    // stronger proof: an assisted plan's persisted rehearsal. Recover only
+    // that exact case; hands-on drawings never gain implied team approval.
+    const assistedPlanApproved = source.assistedPlanApproved === true
+        || (managementPolicy.mode === 'ASSISTED' && Boolean(lastLaunchRehearsal));
     return {
         currentStep: Math.round(clamp(source.currentStep, 0, 4)),
         strategy: isOneOf(
@@ -2320,18 +2331,171 @@ const normalizeInfrastructureSetupDraft = (
             ['CLOUD_FIRST', 'OWNED_INFRASTRUCTURE', 'HYBRID'] as const,
             'HYBRID',
         ),
-        capacityPackageId: isOneOf(source.capacityPackageId, CAPACITY_PACKAGE_IDS, 'GROWTH'),
+        capacityPackageId,
         rolloutPace: isOneOf(source.rolloutPace, INFRASTRUCTURE_ROLLOUT_PACES, 'STANDARD'),
         subscriptionPrices: normalizeSubscriptionPrices(source.subscriptionPrices),
         networkPlacements: facilities.length ? aggregateStreamingFacilities(facilities) : networkPlacements,
         facilities,
-        managementPolicy: normalizeStreamingInfrastructureManagementPolicy(source.managementPolicy),
+        managementPolicy,
+        assistedPlanApproved,
+        assistedPlanClass: assistedPlanApproved
+            ? isOneOf(source.assistedPlanClass, CAPACITY_PACKAGE_IDS, capacityPackageId)
+            : undefined,
         openingDemandForecast,
         lastLoadTestSignature: source.lastLoadTestSignature === null || source.lastLoadTestSignature === undefined
             ? null
             : cleanText(source.lastLoadTestSignature, '', 640) || null,
-        lastLaunchRehearsal: normalizeLaunchRehearsalSnapshot(source.lastLaunchRehearsal),
+        lastLaunchRehearsal,
         updatedAtAbsoluteWeek: Math.max(0, Math.round(clamp(source.updatedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
+    };
+};
+
+const LAUNCH_MARKETING_OBJECTIVES = [
+    'PLATFORM_INTRODUCTION', 'CATALOGUE_SHOWCASE', 'FLAGSHIP_ORIGINAL', 'VALUE_PROPOSITION',
+] as const;
+const LAUNCH_MARKETING_TIMELINES = ['FRONT_LOADED', 'BALANCED', 'LAST_WEEK_PUSH'] as const;
+const LAUNCH_MARKETING_CHANNELS = [
+    'SOCIAL_DIGITAL', 'CREATORS', 'TV_OUTDOOR', 'DEVICE_STORES', 'TELCO_BUNDLES', 'PRESS_EVENTS',
+] as const;
+
+const normalizePositiveRecord = (value: unknown, allowedKeys?: ReadonlySet<string>): Record<string, number> => {
+    const source = asRecord(value);
+    return Object.fromEntries(Object.entries(source).flatMap(([rawKey, rawValue]) => {
+        const key = cleanText(rawKey, '', 40).toUpperCase();
+        const amount = Number(rawValue);
+        if (!key || allowedKeys && !allowedKeys.has(key) || !Number.isFinite(amount) || amount < 0) return [];
+        return [[key, Math.round(amount * 10_000) / 10_000]];
+    }).slice(0, 64));
+};
+
+const defaultLaunchMarketingDraft = (budgetCeiling = 0): OwnedStreamingLaunchMarketingDraft => ({
+    schemaVersion: 1,
+    objective: 'PLATFORM_INTRODUCTION',
+    timeline: 'BALANCED',
+    budgetCeiling: Math.max(0, Math.round(budgetCeiling)),
+    allocationMode: 'AUTO',
+    countryWeights: {},
+    channelAllocations: {},
+    updatedAtAbsoluteWeek: 0,
+    revision: 0,
+});
+
+const normalizeLaunchMarketingDraft = (
+    value: unknown,
+    legacyCampaign: unknown,
+): OwnedStreamingLaunchMarketingDraft => {
+    const source = asRecord(value);
+    if (!Object.keys(source).length) {
+        if (legacyCampaign === 'REGIONAL') return { ...defaultLaunchMarketingDraft(1_800_000), timeline: 'BALANCED' };
+        if (legacyCampaign === 'NATIONAL') return { ...defaultLaunchMarketingDraft(4_600_000), timeline: 'LAST_WEEK_PUSH' };
+        return defaultLaunchMarketingDraft();
+    }
+    const rawBudget = Number(source.budgetCeiling);
+    return {
+        schemaVersion: 1,
+        objective: isOneOf(source.objective, LAUNCH_MARKETING_OBJECTIVES, 'PLATFORM_INTRODUCTION'),
+        timeline: isOneOf(source.timeline, LAUNCH_MARKETING_TIMELINES, 'BALANCED'),
+        budgetCeiling: Number.isFinite(rawBudget)
+            ? Math.max(0, Math.min(Number.MAX_SAFE_INTEGER, Math.round(rawBudget))) : 0,
+        allocationMode: isOneOf(source.allocationMode, ['AUTO', 'MANUAL'] as const, 'AUTO'),
+        countryWeights: normalizePositiveRecord(source.countryWeights),
+        channelAllocations: normalizePositiveRecord(
+            source.channelAllocations,
+            new Set<string>(LAUNCH_MARKETING_CHANNELS),
+        ) as OwnedStreamingLaunchMarketingDraft['channelAllocations'],
+        updatedAtAbsoluteWeek: Math.max(0, Math.round(clamp(source.updatedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
+        revision: Math.max(0, Math.round(clamp(source.revision, 0, Number.MAX_SAFE_INTEGER))),
+    };
+};
+
+const normalizeLaunchMarketingConfidenceScore = (
+    value: unknown,
+    label: unknown,
+): number => {
+    const numeric = Number(value);
+    if (Number.isFinite(numeric)) return Math.round(clamp(numeric, 0, 100));
+    const normalizedLabel = isOneOf(label, ['LOW', 'MEDIUM', 'HIGH'] as const, 'LOW');
+    return normalizedLabel === 'HIGH' ? 85 : normalizedLabel === 'MEDIUM' ? 67 : 40;
+};
+
+const normalizeLaunchMarketingPlan = (value: unknown): OwnedStreamingLaunchMarketingPlan | null => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const source = asRecord(value);
+    const id = cleanText(source.id, '', 120);
+    const idempotencyKey = cleanText(source.idempotencyKey, '', 180);
+    const forecastSource = asRecord(source.forecastSnapshot);
+    const signature = cleanText(forecastSource.signature, '', 640);
+    if (!id || !idempotencyKey || !signature) return null;
+    const draft = normalizeLaunchMarketingDraft(source, null);
+    const range = (raw: unknown) => {
+        const item = asRecord(raw);
+        const low = Math.max(0, Math.round(clamp(item.low, 0, Number.MAX_SAFE_INTEGER)));
+        const likely = Math.max(low, Math.round(clamp(item.likely, low, Number.MAX_SAFE_INTEGER)));
+        return { low, likely, high: Math.max(likely, Math.round(clamp(item.high, likely, Number.MAX_SAFE_INTEGER))) };
+    };
+    const validWarningCodes = new Set([
+        'NO_OPENING_COUNTRIES', 'NO_SELLABLE_PLAN', 'MISSING_FLAGSHIP_ORIGINAL',
+        'INSUFFICIENT_MARKET_COVERAGE', 'MANUAL_ALLOCATION_REVIEW', 'LOCKED_CHANNEL', 'BUDGET_SHORTFALL',
+    ]);
+    return {
+        ...draft,
+        id,
+        idempotencyKey,
+        status: isOneOf(source.status, ['RESERVED', 'SPENDING', 'SETTLED', 'CANCELLED'] as const, 'RESERVED'),
+        openingCountryIds: uniqueStrings(source.openingCountryIds, 64),
+        committedAtAbsoluteWeek: Math.max(0, Math.round(clamp(source.committedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
+        startsAtAbsoluteWeek: Math.max(0, Math.round(clamp(source.startsAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
+        endsAtAbsoluteWeek: Math.max(0, Math.round(clamp(source.endsAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
+        spentAmount: Math.max(0, Math.round(clamp(source.spentAmount, 0, Number.MAX_SAFE_INTEGER))),
+        returnedAmount: Math.max(0, Math.round(clamp(source.returnedAmount, 0, Number.MAX_SAFE_INTEGER))),
+        lastProcessedAbsoluteWeek: source.lastProcessedAbsoluteWeek === null || source.lastProcessedAbsoluteWeek === undefined ? null
+            : Math.max(0, Math.round(clamp(source.lastProcessedAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
+        forecastSnapshot: {
+            id: cleanText(forecastSource.id, createDeterministicId('streaming_marketing_forecast', signature), 120),
+            version: 1,
+            signature,
+            effectiveBudget: Math.max(0, Math.round(clamp(forecastSource.effectiveBudget, 0, Number.MAX_SAFE_INTEGER))),
+            organicAwareness: clamp(forecastSource.organicAwareness, 0, 1),
+            likelyAwarenessLift: clamp(forecastSource.likelyAwarenessLift, 0, 1),
+            baselineConcurrentStreams: Math.max(0, Math.round(clamp(
+                forecastSource.baselineConcurrentStreams,
+                0,
+                Number.MAX_SAFE_INTEGER,
+            ))),
+            saturationPercent: Math.round(clamp(forecastSource.saturationPercent, 0, 100)),
+            efficiencyStatus: isOneOf(
+                forecastSource.efficiencyStatus,
+                ['ORGANIC', 'EFFICIENT', 'DIMINISHING', 'SATURATED'] as const,
+                Number(forecastSource.effectiveBudget) > 0 ? 'EFFICIENT' : 'ORGANIC',
+            ),
+            acquiredAccounts: range(forecastSource.acquiredAccounts),
+            concurrentStreams: range(forecastSource.concurrentStreams),
+            customerAcquisitionCost: Number.isFinite(Number(forecastSource.customerAcquisitionCost))
+                ? Math.max(0, Number(forecastSource.customerAcquisitionCost)) : null,
+            confidenceScore: normalizeLaunchMarketingConfidenceScore(forecastSource.confidenceScore, forecastSource.confidence),
+            confidence: isOneOf(forecastSource.confidence, ['LOW', 'MEDIUM', 'HIGH'] as const, 'LOW'),
+            countryForecasts: asArray<unknown>(forecastSource.countryForecasts).flatMap(item => {
+                const country = asRecord(item);
+                const countryId = cleanText(country.countryId, '', 40).toUpperCase();
+                if (!countryId) return [];
+                const rawCac = Number(country.customerAcquisitionCost);
+                return [{
+                    countryId,
+                    countryName: cleanText(country.countryName, countryId, 80),
+                    allocatedAmount: Math.max(0, Math.round(clamp(country.allocatedAmount, 0, Number.MAX_SAFE_INTEGER))),
+                    organicAwareness: clamp(country.organicAwareness, 0, 1),
+                    likelyAwarenessLift: clamp(country.likelyAwarenessLift, 0, 1),
+                    likelyAcquiredAccounts: Math.max(0, Math.round(clamp(country.likelyAcquiredAccounts, 0, Number.MAX_SAFE_INTEGER))),
+                    likelyConcurrentStreams: Math.max(0, Math.round(clamp(country.likelyConcurrentStreams, 0, Number.MAX_SAFE_INTEGER))),
+                    customerAcquisitionCost: Number.isFinite(rawCac) ? Math.max(0, rawCac) : null,
+                    confidenceScore: normalizeLaunchMarketingConfidenceScore(country.confidenceScore, country.confidence),
+                    confidence: isOneOf(country.confidence, ['LOW', 'MEDIUM', 'HIGH'] as const, 'LOW'),
+                }];
+            }).slice(0, 64),
+            warnings: uniqueStrings(forecastSource.warnings, 16)
+                .filter(code => validWarningCodes.has(code)) as OwnedStreamingLaunchMarketingPlan['forecastSnapshot']['warnings'],
+        },
+        countryAwareness: normalizePositiveRecord(source.countryAwareness),
     };
 };
 
@@ -3230,6 +3394,9 @@ const normalizeTitleWeekPerformance = (value: unknown): OwnedStreamingTitleWeekP
         premiumRevenue: source.premiumRevenue === undefined ? undefined : Math.round(clamp(source.premiumRevenue, 0, Number.MAX_SAFE_INTEGER)),
         rentalRevenue: source.rentalRevenue === undefined ? undefined : Math.round(clamp(source.rentalRevenue, 0, Number.MAX_SAFE_INTEGER)),
         purchaseRevenue: source.purchaseRevenue === undefined ? undefined : Math.round(clamp(source.purchaseRevenue, 0, Number.MAX_SAFE_INTEGER)),
+        dayPassRevenue: source.dayPassRevenue === undefined ? undefined : Math.round(clamp(source.dayPassRevenue, 0, Number.MAX_SAFE_INTEGER)),
+        meteredRevenue: source.meteredRevenue === undefined ? undefined : Math.round(clamp(source.meteredRevenue, 0, Number.MAX_SAFE_INTEGER)),
+        patronRevenue: source.patronRevenue === undefined ? undefined : Math.round(clamp(source.patronRevenue, 0, Number.MAX_SAFE_INTEGER)),
         sponsorshipRevenue: source.sponsorshipRevenue === undefined ? undefined : Math.round(clamp(source.sponsorshipRevenue, 0, Number.MAX_SAFE_INTEGER)),
         incrementalRevenue: source.incrementalRevenue === undefined ? undefined : Math.round(clamp(source.incrementalRevenue, 0, Number.MAX_SAFE_INTEGER)),
         allocatedCashCost: Math.round(clamp(source.allocatedCashCost, 0, Number.MAX_SAFE_INTEGER)),
@@ -3336,6 +3503,8 @@ const normalizeWeeklyOperations = (value: unknown): OwnedStreamingWeeklyOperatio
             ? undefined : Math.round(clamp(source.worldViewingSponsorshipRevenue, 0, Number.MAX_SAFE_INTEGER)),
         worldViewingIncrementalRevenue: source.worldViewingIncrementalRevenue === undefined
             ? undefined : Math.round(clamp(source.worldViewingIncrementalRevenue, 0, Number.MAX_SAFE_INTEGER)),
+        worldViewingCommercialOperatingCost: source.worldViewingCommercialOperatingCost === undefined
+            ? undefined : Math.round(clamp(source.worldViewingCommercialOperatingCost, 0, Number.MAX_SAFE_INTEGER)),
         partnerRevenueShareCost: Math.round(clamp(source.partnerRevenueShareCost, 0, Number.MAX_SAFE_INTEGER)),
         infrastructureCost: Math.round(clamp(source.infrastructureCost, 0, Number.MAX_SAFE_INTEGER)),
         leadershipCost: Math.round(clamp(source.leadershipCost, 0, Number.MAX_SAFE_INTEGER)),
@@ -3632,6 +3801,30 @@ const dedupeByKey = <T,>(items: T[], getKey: (item: T) => string): T[] => {
     return Array.from(byKey.values());
 };
 
+const normalizeOpeningProgrammeCommission = (
+    value: unknown,
+): OwnedStreamingOpeningProgrammeCommission | null => {
+    const source = asRecord(value);
+    const idempotencyKey = cleanText(source.idempotencyKey, '', 640);
+    const launchDefinitionSignature = cleanText(source.launchDefinitionSignature, '', 640);
+    const infrastructureConfigurationSignature = cleanText(source.infrastructureConfigurationSignature, '', 640);
+    const rehearsalSignature = cleanText(source.rehearsalSignature, '', 640);
+    const marketingForecastSignature = cleanText(source.marketingForecastSignature, '', 640);
+    if (!idempotencyKey || !launchDefinitionSignature || !infrastructureConfigurationSignature
+        || !rehearsalSignature || !marketingForecastSignature) return null;
+    return {
+        id: cleanText(source.id, createDeterministicId('streaming_opening_programme', idempotencyKey), 180),
+        idempotencyKey,
+        committedAtAbsoluteWeek: Math.max(0, Math.round(clamp(source.committedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
+        launchDefinitionSignature,
+        infrastructureConfigurationSignature,
+        rehearsalSignature,
+        openingCountryIds: normalizeStreamingDayOneMarketIds(source.openingCountryIds).sort(),
+        marketingForecastSignature,
+        revision: Math.max(1, Math.round(clamp(source.revision, 1, Number.MAX_SAFE_INTEGER, 1))),
+    };
+};
+
 export const normalizeOwnedStreamingPlatformState = (
     value: unknown,
     playerId = 'player',
@@ -3722,9 +3915,15 @@ export const normalizeOwnedStreamingPlatformState = (
         ),
         finance,
         ...canonicalFoundation,
+        openingProgrammeCommission: normalizeOpeningProgrammeCommission(source.openingProgrammeCommission),
         hqOnboarding: normalizeHqOnboarding(source.hqOnboarding),
         infrastructureSetupDraft: normalizeInfrastructureSetupDraft(source.infrastructureSetupDraft),
         infrastructureSetup: normalizeInfrastructureSetup(source.infrastructureSetup),
+        launchMarketingDraft: normalizeLaunchMarketingDraft(
+            source.launchMarketingDraft,
+            asRecord(source.infrastructureSetupDraft).campaign,
+        ),
+        launchMarketingPlan: normalizeLaunchMarketingPlan(source.launchMarketingPlan),
         technologyProjects: dedupeByKey(
             asArray<unknown>(source.technologyProjects)
                 .map(normalizeTechnologyProject)

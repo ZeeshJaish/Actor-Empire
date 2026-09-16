@@ -8,6 +8,12 @@ import {
     type SaveIntegrityReason,
 } from './saveIntegrity';
 import { migratePlayerSave } from './saveMigration';
+import { getAbsoluteWeek } from './legacyLogic';
+import {
+    createWorldEconomyHealthSummary,
+    repairDerivedWorldEconomyState,
+    validateWorldEconomyCandidate,
+} from './worldEconomy/worldEconomyIntegrity';
 
 const OVERSIZED_LEGACY_BYTES = 24 * 1024 * 1024;
 
@@ -66,7 +72,20 @@ export const prepareVerifiedPlayerForPersistence = (
     reason: SaveIntegrityReason,
     options: { legacyOrExternal?: boolean; currentIsUnverified?: boolean; sourceByteEstimate?: number } = {},
 ): PreparedVerifiedPlayer => {
-    const canonical = options.legacyOrExternal ? migratePlayerSave(sourcePlayer) : sourcePlayer;
+    let canonical = options.legacyOrExternal ? migratePlayerSave(sourcePlayer) : sourcePlayer;
+    const absoluteWeek = getAbsoluteWeek(canonical.age, canonical.currentWeek);
+    let worldIntegrity = validateWorldEconomyCandidate(canonical, absoluteWeek);
+    const integrityWarnings = worldIntegrity.violations.map(item => item.code);
+    if (worldIntegrity.status === 'ABORT_PROTECTED') {
+        throw new Error(`Save preparation rejected protected world data: ${integrityWarnings.join('; ')}`);
+    }
+    if (worldIntegrity.status === 'REBUILD_DERIVED') {
+        canonical = repairDerivedWorldEconomyState(canonical, absoluteWeek);
+        worldIntegrity = validateWorldEconomyCandidate(canonical, absoluteWeek);
+        if (worldIntegrity.status !== 'VALID') {
+            throw new Error(`Save preparation could not repair world data: ${worldIntegrity.violations.map(item => item.code).join('; ')}`);
+        }
+    }
     const currentIsUnverified = options.currentIsUnverified === true;
     const estimatedSourceBytes = currentIsUnverified
         ? Math.max(0, Number(options.sourceByteEstimate) || estimateSaveJsonBytes(canonical))
@@ -76,7 +95,20 @@ export const prepareVerifiedPlayerForPersistence = (
         || Object.keys(canonical.world?.streamingRightsContracts || {}).length > 1_500
         || (canonical.world?.projects?.length || 0) > 1_200
     );
-    const player = compactPlayerForPersistence(canonical);
+    const compacted = compactPlayerForPersistence(canonical);
+    const player: Player = {
+        ...compacted,
+        world: {
+            ...compacted.world,
+            worldEconomyHealth: createWorldEconomyHealthSummary(
+                compacted,
+                absoluteWeek,
+                Number(compacted.flags?.saveMigrationVersion) || 0,
+                integrityWarnings,
+                oversizedLegacy ? 'LARGE_SAVE' : 'NORMAL',
+            ),
+        },
+    };
     const comparison = compareProtectedSaveState(canonical, player);
     if ('violations' in comparison) {
         throw new Error(`Save compaction rejected: ${comparison.violations.join('; ')}`);

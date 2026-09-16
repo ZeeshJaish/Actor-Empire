@@ -814,7 +814,8 @@ export const processStreamingRightsCalendarWeek = (
         return { player, processed: false, digest: null, createdCaseIds: [], expiredContractIds: [] };
     }
 
-    const contracts = normalizeStreamingRightsContractRegistry(player.world.streamingRightsContracts);
+    const sourceContracts = normalizeStreamingRightsContractRegistry(player.world.streamingRightsContracts);
+    let contracts = sourceContracts;
     const renewalCases = { ...state.renewalCases };
     const renewalCaseByContractId = new Map(
         Object.values(renewalCases).map(candidate => [candidate.sourceContractId, candidate]),
@@ -867,6 +868,7 @@ export const processStreamingRightsCalendarWeek = (
                 renewalCases[renewalCase.id] = renewalCase;
             }
             if (week > contract.expiresAtAbsoluteWeek && contract.status === 'ACTIVE') {
+                if (contracts === sourceContracts) contracts = { ...sourceContracts };
                 contracts[contract.id] = { ...contract, status: 'EXPIRED' };
                 expiredContractIds.push(contract.id);
             }

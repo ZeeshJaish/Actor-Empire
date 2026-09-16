@@ -24,6 +24,11 @@ export function StageTest({ data, draft, totals, services, handlers }: StageProp
   const atRisk = services.filter(service => service.state !== 'READY');
   const worst = [...atRisk].sort((a, b) => riskOrder(b.state) - riskOrder(a.state))[0];
   const canRehearse = totals.racks > 0 && Boolean(handlers.onOpenRehearsal);
+  const unavailableReason = totals.racks === 0
+    ? 'Add server capacity in Sites before running the rehearsal.'
+    : !handlers.onOpenRehearsal
+      ? 'The rehearsal service is unavailable. Return to the Streaming Hall and reopen Build.'
+      : '';
 
   return (
     <>
@@ -39,7 +44,7 @@ export function StageTest({ data, draft, totals, services, handlers }: StageProp
         <div className="cr-tiles">
           <span><em>Likely peak</em><b>{compactCount(expectedPeak)}</b></span>
           <span><em>Own capacity</em><b>{compactCount(totals.capacity)}</b></span>
-          <span><em>Start time</em><b>{averageStartup}<s>ms</s></b></span>
+          <span><em>Start time</em><b>{averageStartup}<small className="sf-unit">ms</small></b></span>
           <span><em>Buffer risk</em><b>{pct(averageBuffering, 0)}</b></span>
         </div>
       </section>
@@ -99,10 +104,12 @@ export function StageTest({ data, draft, totals, services, handlers }: StageProp
           type="button"
           className="sf-btn sf-btn--primary bw-open-rehearsal"
           disabled={!canRehearse}
+          aria-describedby={unavailableReason ? 'bw-rehearsal-unavailable' : undefined}
           onClick={() => handlers.onOpenRehearsal?.(draft)}
         >
           {totals.racks === 0 ? 'Build capacity first' : result && !stale ? 'Test the load again' : 'Test the load'}
         </button>
+        {unavailableReason && <p id="bw-rehearsal-unavailable" className="bw-rehearsal-unavailable" role="note">{unavailableReason}</p>}
       </section>
 
       <p className="lw-rule">

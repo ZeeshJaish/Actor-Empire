@@ -13,12 +13,14 @@
      planning is genuinely free.
    ========================================================================== */
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { LaunchData, LaunchDraft, LaunchHandlers, LaunchStepId } from '../../finance/launch';
 import { STEPS, blockersFor, launchStageSummaries, plannedTotal, resolveLaunchDraftAfterDetour, selectedCountries, shortfall, spendable } from '../../finance/launch';
+import type { LinkedBudgetSummary } from '../../finance/budgetLinks';
 import { brandVars } from '../../finance/brand';
 import { money } from '../../finance/format';
 import { Row, Sheet, useCountUp } from '../ui';
+import { LaunchBudgetContent } from '../BudgetSheets';
 import { StepMarkets } from './StepMarkets';
 import { StepClearance } from './StepClearance';
 import { StepIdent } from './StepIdent';
@@ -34,12 +36,14 @@ export interface LaunchWizardProps extends LaunchHandlers {
   data: LaunchData;
   initialStep?: LaunchStepId;
   initialDraft?: LaunchDraft | null;
+  initialSheet?: 'money' | 'plan' | null;
+  buildBudgetSummary?: LinkedBudgetSummary;
   onDraftChange?: (draft: LaunchDraft) => void;
 }
 
-export function LaunchWizard({ data, initialStep = 'markets', initialDraft, onDraftChange, ...handlers }: LaunchWizardProps) {
+export function LaunchWizard({ data, initialStep = 'markets', initialDraft, initialSheet, buildBudgetSummary, onDraftChange, ...handlers }: LaunchWizardProps) {
   const [stepId, setStepId] = useState<LaunchStepId>(initialStep);
-  const [openSheet, setOpenSheet] = useState<'money' | 'plan' | null>(null);
+  const [openSheet, setOpenSheet] = useState<'money' | 'plan' | null>(initialSheet ?? null);
   const [draft, setDraft] = useState<LaunchDraft>(() => resolveLaunchDraftAfterDetour({
       selectedCountryIds: data.selectedCountryIds,
       soundId: data.ident.soundId,
@@ -48,6 +52,16 @@ export function LaunchWizard({ data, initialStep = 'markets', initialDraft, onDr
       storefrontId: data.offer.storefrontId,
       pricing: data.pricing,
     }, initialDraft));
+  const initialAutosaveSent = useRef(false);
+
+  useEffect(() => {
+    if (initialAutosaveSent.current) return;
+    initialAutosaveSent.current = true;
+    /* Opening or returning to the wizard is itself enough to persist the
+       visible working copy. The player never needs to make a meaningless
+       edit just to turn an older/session-only draft into a device save. */
+    onDraftChange?.(resolveLaunchDraftAfterDetour(draft, null));
+  }, []);
 
   const brand = useMemo(() => brandVars(data.company.brandHex), [data.company.brandHex]);
   const index = Math.max(0, STEPS.findIndex((s) => s.id === stepId));
@@ -60,10 +74,6 @@ export function LaunchWizard({ data, initialStep = 'markets', initialDraft, onDr
   const chosen = useMemo(() => selectedCountries(data, draft), [data, draft]);
   const blockers = blockersFor(stepId, data);
   const stageRows = useMemo(() => launchStageSummaries(data, draft), [data, draft]);
-  const knownSubtotal = stageRows.reduce((sum, row) => sum + (row.cost || 0), 0);
-  const paidSubtotal = stageRows.reduce((sum, row) => sum + row.paidAmount, 0);
-  const dueSubtotal = Math.max(0, knownSubtotal - paidSubtotal);
-  const completedStages = stageRows.filter(row => row.done).length;
 
   /* The plan is the number that moves while the player works, so it counts
      rather than jumping — the rail is the wizard's heartbeat. */
@@ -74,11 +84,14 @@ export function LaunchWizard({ data, initialStep = 'markets', initialDraft, onDr
   const over = (Math.max(0, planned - free) / scale) * 100;
   const budgetMark = (free / scale) * 100;
 
-  const patch = (next: Partial<LaunchDraft>) => setDraft((prev) => {
-    const updated = { ...prev, ...next };
+  const patch = (next: Partial<LaunchDraft>) => {
+    const updated = { ...draft, ...next };
+    setDraft(updated);
+    /* Notify after deriving from the current render, rather than from inside a
+       React state-updater callback. Autosave can update the parent safely
+       without causing a render-during-render warning. */
     onDraftChange?.(resolveLaunchDraftAfterDetour(updated, null));
-    return updated;
-  });
+  };
   const selectStep = (next: LaunchStepId) => {
     setOpenSheet(null);
     setStepId(next);
@@ -271,45 +284,16 @@ export function LaunchWizard({ data, initialStep = 'markets', initialDraft, onDr
           </button>
         ) : undefined}
       >
-        <section className="lw-plan-overview" aria-label="Launch plan summary">
-          <div><span>Stages cleared</span><b>{completedStages}/{stageRows.length}</b></div>
-          <div><span>Known subtotal</span><b>{money(knownSubtotal)}</b></div>
-          <div><span>Still due</span><b className={dueSubtotal > free ? 'sf-tone-bad' : undefined}>{money(dueSubtotal)}</b></div>
-        </section>
-
-        <p className="sf-eyebrow sf-block-head">Launch checklist</p>
-        <div className="lw-stage-bill-list">
-          {stageRows.map(row => {
-            const costLabel = row.cost === null ? 'Not priced' : row.cost === 0 ? 'Included' : money(row.cost);
-            const paymentLabel = row.paymentState === 'paid'
-              ? 'Paid'
-              : row.paymentState === 'partial'
-                ? `${money(row.paidAmount)} paid`
-                : row.paymentState === 'planned'
-                  ? 'Due when confirmed'
-                  : row.paymentState === 'pending'
-                    ? 'Pending'
-                    : 'No charge';
-            return (
-              <button
-                key={row.id}
-                type="button"
-                className={`lw-stage-bill-row ${row.done ? 'is-done' : 'is-open'}`}
-                onClick={() => selectStep(row.id)}
-              >
-                <span className="lw-stage-bill-state" aria-hidden="true">{row.done ? '✓' : '!'}</span>
-                <span className="lw-stage-bill-copy"><b>{row.label}</b><em>{row.done ? 'Done' : 'Not done'}</em></span>
-                <span className="lw-stage-bill-money"><b>{costLabel}</b><em>{paymentLabel}</em></span>
-              </button>
-            );
-          })}
-        </div>
-
-        <section className="lw-plan-totals" aria-label="Launch plan totals">
-          <div><span>Known subtotal</span><b>{money(knownSubtotal)}</b></div>
-          <div><span>Paid in this plan</span><b className="sf-tone-good">{money(paidSubtotal)}</b></div>
-          <div><span>Still due</span><b className={dueSubtotal > free ? 'sf-tone-bad' : undefined}>{money(dueSubtotal)}</b></div>
-        </section>
+        <LaunchBudgetContent
+          rows={stageRows}
+          available={free}
+          linkedSummary={buildBudgetSummary}
+          onSelectStep={selectStep}
+          onOpenLinked={() => {
+            setOpenSheet(null);
+            (handlers.onOpenBuildBudget || handlers.onOpenBuildPlatform)?.();
+          }}
+        />
       </Sheet>
     </div>
   );

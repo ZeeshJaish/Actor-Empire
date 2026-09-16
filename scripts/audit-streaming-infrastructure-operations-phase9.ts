@@ -10,6 +10,7 @@ import {
 import { getAbsoluteWeek } from '../services/legacyLogic';
 import { normalizeOwnedStreamingPlatformState } from '../services/ownedStreamingPlatform';
 import { getStreamingFacilityPhysicalView } from '../services/streamingInfrastructurePhysical';
+import { getStreamingFacilityMarketplace } from '../services/streamingFacilityMarketplace';
 import {
     commitStreamingInfrastructureOperationsWeek,
     getStreamingInfrastructureIncidentResponsePreview,
@@ -154,6 +155,19 @@ player = withIncident(player);
 const incident = player.ownedStreamingPlatform.crisisSecurity.infrastructureOperations.incidents[0];
 const preview = getStreamingInfrastructureIncidentResponsePreview(player.ownedStreamingPlatform, incident, 'REROUTE_TRAFFIC', 'FULL', true);
 assert(preview.insuranceRecovery > 0 && preview.netCost < preview.grossCost, 'The response preview should explain insurance recovery and net treasury cost.');
+const fortifiedLease = getStreamingFacilityMarketplace('LA').find(item => item.securityGrade === 'FORTIFIED');
+assert(fortifiedLease, 'The facility market should provide a fortified contract for the security recovery audit.');
+const fortifiedPlatform = {
+    ...player.ownedStreamingPlatform,
+    infrastructureSetup: {
+        ...player.ownedStreamingPlatform.infrastructureSetup!,
+        facilities: player.ownedStreamingPlatform.infrastructureSetup!.facilities!.map(facility => facility.id === incident.facilityId
+            ? { ...facility, lease: { ...fortifiedLease! } }
+            : facility),
+    },
+};
+const fortifiedPreview = getStreamingInfrastructureIncidentResponsePreview(fortifiedPlatform, incident, 'REROUTE_TRAFFIC', 'FULL', true);
+assert(fortifiedPreview.recoveryWeeks < preview.recoveryWeeks, 'Fortified facility security should shorten the live incident recovery window.');
 assert(!respondToStreamingInfrastructureIncident(player, incident.id, 'REROUTE_TRAFFIC', null, 'FULL', true).changed, 'Emergency rerouting must name another commissioned facility.');
 const treasuryBeforeResponse = player.ownedStreamingPlatform.treasuryCash;
 const response = respondToStreamingInfrastructureIncident(player, incident.id, 'REROUTE_TRAFFIC', 'phase9-mumbai', 'FULL', true);
