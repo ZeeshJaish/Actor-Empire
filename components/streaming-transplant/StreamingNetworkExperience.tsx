@@ -27,7 +27,16 @@ export interface NetComponent {
   name: string;
   status: CompStatus;
   uptime: number;                 // % over the window
-  /** one entry per day, newest last: 0 fine · 1 degraded · 2 down */
+  /** What the percentage measures, when it is not uptime — "reached",
+      "served well". The network signals are shares of an audience, not
+      minutes of a month, and the foot of the card says which. */
+  measure?: string;
+  /** one entry per day, newest last: 0 fine · 1 degraded · 2 down · 3 no data
+
+      3 exists because the strip had no way to say "nothing ran here". A
+      platform with no network filled ninety days with 0 and drew ninety green
+      bars beside "0.00% uptime" — the most reassuring possible way to display
+      an absence. */
   history: number[];
 }
 
@@ -253,12 +262,12 @@ export const PlatformDesk: React.FC<{
                   {/* the uptime strip — the one element that says "status page" instantly */}
                   <div className={s.upstrip}>
                     {comp.history.map((d, n) => (
-                      <i key={n} className={d === 2 ? s.down : d === 1 ? s.deg : s.ok} />
+                      <i key={n} className={d === 3 ? s.none : d === 2 ? s.down : d === 1 ? s.deg : s.ok} />
                     ))}
                   </div>
                   <div className={s.compfoot}>
                     <span>90 days ago</span>
-                    <em>{comp.uptime.toFixed(2)}% uptime</em>
+                    <em>{comp.uptime.toFixed(comp.measure ? 0 : 2)}% {comp.measure ?? 'uptime'}</em>
                     <span>today</span>
                   </div>
                 </div>

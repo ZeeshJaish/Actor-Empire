@@ -97,11 +97,14 @@
   --sf-gold-line: rgba(201, 162, 39, 0.4);
 
   /* --- type ---------------------------------------------------------------- */
-  /* The host game's own faces come through these two names. Nothing is fetched
-     from a CDN — the stacks fall back to the platform faces if the game's fonts
-     are not present. */
-  --sf-font-display: 'Clash Display', 'Bebas Neue', 'Oswald', 'Helvetica Neue', system-ui, sans-serif;
-  --sf-font-ui: 'General Sans', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  /* The host game's own faces come through these two names. Anton and Archivo
+     are the faces the game actually embeds (styles/fonts.css, loaded by every
+     streaming stylesheet); the stacks behind them are the old wishes, kept so
+     the system still falls back to a platform face if fonts.css is absent.
+     Anton is a single weight — anything set in the display face renders at
+     400, because a synthesised bold on a condensed face smears. */
+  --sf-font-display: 'Anton', 'Clash Display', 'Bebas Neue', 'Oswald', 'Helvetica Neue', system-ui, sans-serif;
+  --sf-font-ui: 'Archivo', 'General Sans', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --sf-font-num: 'SF Mono', 'JetBrains Mono', ui-monospace, 'Roboto Mono', monospace;
 
   --sf-t-1: 11px;   /* the floor — eyebrows, units          */

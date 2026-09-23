@@ -25,6 +25,9 @@ interface Props {
   onSelectRegion?: (regionId: string) => void;
   onSelectCountry?: (countryId: string) => void;
   onSelectCity?: (cityId: string) => void;
+  /** Zooming back out to the world has to clear the page's own idea of where it
+      is, or the toolbar says World while the list below still shows one region. */
+  onShowWorld?: () => void;
   showNetworkRoutes?: boolean;
   cinematic?: boolean;
   cinematicDurationMs?: number;
@@ -40,12 +43,14 @@ interface Props {
 export function WorldMap({
   data,
   draft,
+  services,
   selectedRegionId,
   selectedCountryId,
   selectedCityId,
   onSelectRegion,
   onSelectCountry,
   onSelectCity,
+  onShowWorld,
   showNetworkRoutes = false,
   cinematic = false,
   cinematicDurationMs,
@@ -64,8 +69,8 @@ export function WorldMap({
   const [mapView, setMapView] = useState<RegionMapView>(selectedView);
   useEffect(() => setMapView(selectedView), [selectedView]);
   const model = useMemo(
-    () => createStudioFinanceMapModel(data, draft, selectedCityId, mapView, showNetworkRoutes),
-    [data, draft, mapView, selectedCityId, showNetworkRoutes],
+    () => createStudioFinanceMapModel(data, draft, selectedCityId, mapView, showNetworkRoutes, services),
+    [data, draft, mapView, selectedCityId, services, showNetworkRoutes],
   );
   const presentedModel = useMemo(() => {
     if (!cinematic) return model;
@@ -88,6 +93,9 @@ export function WorldMap({
 
   const handleViewChange = (next: RegionMapView) => {
     setMapView(next);
+    /* There was no world branch at all, so zooming out moved the picture and
+       left the page believing it was still inside a country. */
+    if (next.level === 'world') onShowWorld?.();
     if (next.level === 'region' && next.regionId) {
       if (onSelectRegion) onSelectRegion(next.regionId);
       else {
@@ -117,7 +125,7 @@ export function WorldMap({
           title={toolbarTitle}
           status={`${draft.facilities.length} ${draft.facilities.length === 1 ? 'site' : 'sites'}`}
           view={mapView}
-          onWorld={() => setMapView(WORLD_VIEW)}
+          onWorld={() => handleViewChange(WORLD_VIEW)}
           tone="production"
         />
       )}
@@ -130,7 +138,7 @@ export function WorldMap({
         cinematic={cinematic ? { durationMs: cinematicDurationMs, replayKey: cinematicReplayKey } : undefined}
         onViewChange={cinematic ? undefined : handleViewChange}
         onSelectLocation={cinematic ? undefined : handleCitySelect}
-        accentColor={data.company.brandHex}
+        accentColor={data.company?.brandHex}
         visualTone="production"
         compact
         showPreview={false}

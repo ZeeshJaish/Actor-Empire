@@ -1,3 +1,5 @@
+import type { CustomPoster } from '../types';
+
 export type RightsWindowKind = 'FIRST' | 'SECOND' | 'PERPETUAL';
 export type Exclusivity = 'EXCLUSIVE' | 'SHARED';
 export type SellerAppetite = 'CASH' | 'BACKEND' | 'MARKETING' | 'RELATIONSHIP';
@@ -54,11 +56,13 @@ export interface CollectionRow {
   genre: string;
   hue: number;
   runtime: string;
+  poster?: CustomPoster;
 }
 
 export interface Lot {
   id: string;
   sourceId: string;
+  artId?: string;
   sourceKind: 'LISTING' | 'COLLECTION' | 'AUCTION' | 'UPCOMING' | 'STUDIO';
   title: string;
   year: number;
@@ -69,6 +73,7 @@ export interface Lot {
   sellerKind: 'STUDIO' | 'SALES AGENT' | 'PLATFORM RESALE' | 'YOUR STUDIO';
   appetite: SellerAppetite;
   hue: number;
+  poster?: CustomPoster;
   logline: string;
   synopsis: string;
   path: ReleasePath;

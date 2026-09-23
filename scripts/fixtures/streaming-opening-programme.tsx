@@ -29,7 +29,31 @@ const auditBrand: Brand = {
 };
 
 function Fixture() {
-  const [view, setView] = useState(executing);
+  const requestedState = new URLSearchParams(window.location.search).get('state') || 'executing';
+  const initialView: StreamingOpeningProgrammeView = requestedState === 'ready'
+    ? {
+        ...executing, state: 'READY_TO_OPEN', remainingWeeks: 0,
+        earliestOpeningAbsoluteWeek: executing.absoluteWeek, dateCertainty: 'CONFIRMED',
+        controllingWorkstreamId: null,
+        workstreams: executing.workstreams.map(item => ({
+          ...item, controlsDate: false, remainingWeeks: 0,
+          status: item.id === 'REHEARSAL' ? 'PASSED' : 'READY', actionLabel: null, operationIds: [],
+        })),
+      }
+    : requestedState === 'live'
+      ? {
+          ...executing, state: 'LIVE', remainingWeeks: 0,
+          earliestOpeningAbsoluteWeek: executing.absoluteWeek, dateCertainty: 'CONFIRMED',
+          controllingWorkstreamId: null,
+          workstreams: executing.workstreams.map(item => ({
+            ...item, controlsDate: false, remainingWeeks: 0,
+            status: item.id === 'REHEARSAL' ? 'PASSED' : 'READY', actionLabel: null, operationIds: [],
+          })),
+        }
+      : requestedState === 'action'
+        ? { ...executing, state: 'ACTION_REQUIRED' }
+        : executing;
+  const [view, setView] = useState(initialView);
   return <StreamingOpeningProgramme
     brand={auditBrand}
     view={view}

@@ -47,9 +47,9 @@ import StreamingVisualScene from './StreamingVisualScene';
 import AccessibleDialog from './AccessibleDialog';
 import {
   getStreamingDayOneMarket,
-  getStreamingDayOneMarketsForRegion,
   getStreamingDayOneRegionIds,
 } from '../services/streamingDayOneMarkets';
+import { getStreamingBuildMarketAccess } from '../services/streamingBuildMarketAccess';
 import {
   PlatformHQ as StreamingPlatformCommandDeck,
   type DivisionId as StreamingCommandDivisionId,
@@ -142,6 +142,7 @@ import {
   aggregateStreamingFacilities,
   migratePlacementsToStreamingFacilities,
 } from '../services/streamingFacilities';
+import { reconstructStreamingRegionPlans } from '../services/streamingRegionalNetworkPlan';
 import { commitOwnedStreamingLaunch, getStreamingLaunchReadiness } from '../services/streamingLaunch';
 import {
   isStreamingDefineLaunchWizardMilestone,
@@ -294,6 +295,8 @@ function EmptyState({
 
 export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, onReturnToGame, onOpenOriginalProduction, onOpenBank, initialDestination = 'HOME', initialContentMarketOfferId, onContentMarketOfferConsumed }: Props) {
   const platform = player.ownedStreamingPlatform;
+  const constructionSetup = platform.pendingInfrastructureSetup
+    || (!platform.launchCommit ? platform.infrastructureSetup : null);
   const identity = platform.identity!;
   const snapshot = useMemo(() => getStreamingHqSnapshot(player), [player]);
   const launchProgram = useMemo(() => getStreamingLaunchProgramView(player), [player]);
@@ -336,6 +339,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
   const [showLeadershipSuite, setShowLeadershipSuite] = useState(false);
   const [showCatalogSetup, setShowCatalogSetup] = useState(false);
   const [showContentMarket, setShowContentMarket] = useState(Boolean(initialContentMarketOfferId));
+  const [contentMarketInitialTab, setContentMarketInitialTab] = useState<'ALL' | 'OWNED' | undefined>(undefined);
   const [catalogueReturnToLaunch, setCatalogueReturnToLaunch] = useState(false);
   const [catalogSetupInitialStep, setCatalogSetupInitialStep] = useState<0 | 2 | undefined>(undefined);
   const [showOriginalCommissioning, setShowOriginalCommissioning] = useState(false);
@@ -410,37 +414,18 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
     const active = platform.competitiveWorld.regionalLaunches
       .filter(region => region.status === 'ACTIVE')
       .flatMap(region => mapRegion(region.regionId));
-    const canonicalOpeningMarketIds = platform.marketOperations
-      .filter(operation => operation.entryKind === 'OPENING' && operation.countryId && operation.status !== 'EXITED')
-      .map(operation => operation.countryId!);
-    const dayOne = getStreamingDayOneRegionIds(canonicalOpeningMarketIds.length
-      ? canonicalOpeningMarketIds
-      : identity.dayOneMarketIds || []) as StreamingRegionId[];
+    const dayOne = getStreamingDayOneRegionIds(getStreamingBuildMarketAccess(player).countryIds) as StreamingRegionId[];
     const foundingRegion = streamingCityById(identity.launchServerCityId)?.region || 'NORTH_AMERICA';
     return Array.from(new Set<StreamingRegionId>(dayOne.length ? dayOne : active.length ? active : [foundingRegion]));
-  }, [identity.dayOneMarketIds, identity.launchServerCityId, platform.competitiveWorld.regionalLaunches, platform.marketOperations]);
+  }, [identity.launchServerCityId, platform.competitiveWorld.regionalLaunches, player]);
+  const buildMarketAccess = useMemo(() => getStreamingBuildMarketAccess(player), [player]);
   const buildMarkets = useMemo(() => {
-    const canonicalOpeningMarketIds = platform.marketOperations
-      .filter(operation => operation.entryKind === 'OPENING' && operation.countryId && operation.status !== 'EXITED')
-      .map(operation => operation.countryId!);
-    const selected = (canonicalOpeningMarketIds.length ? canonicalOpeningMarketIds : identity.dayOneMarketIds || []).flatMap(marketId => {
+    return buildMarketAccess.countryIds.flatMap(marketId => {
       const market = getStreamingDayOneMarket(marketId);
       return market ? [market] : [];
     });
-    if (selected.length) return selected;
-    // LEGACY MARKET FALLBACK: pre-Day-One-Market saves retain their launch
-    // regions. Give each one a stable lead country so Phase 6 never collapses
-    // into a global percentage with no viewer-level evidence.
-    return visualRegions.flatMap(region => (
-      [...getStreamingDayOneMarketsForRegion(region)]
-        .sort((left, right) => right.streamingAudience - left.streamingAudience)
-        .slice(0, 1)
-    ));
-  }, [identity.dayOneMarketIds, platform.marketOperations, visualRegions]);
-  const hasExplicitBuildMarkets = useMemo(() => (
-    platform.marketOperations.some(operation => operation.entryKind === 'OPENING' && operation.countryId && operation.status !== 'EXITED')
-    || Boolean(identity.dayOneMarketIds?.length)
-  ), [identity.dayOneMarketIds, platform.marketOperations]);
+  }, [buildMarketAccess.countryIds]);
+  const hasExplicitBuildMarkets = buildMarketAccess.editable;
 
   const initialInfrastructureDraft = platform.infrastructureSetupDraft
     || createDefaultStreamingInfrastructureDraft(player);
@@ -449,11 +434,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
       ? aggregateStreamingFacilities(initialInfrastructureDraft.facilities)
       : initialInfrastructureDraft.networkPlacements?.length
       ? initialInfrastructureDraft.networkPlacements.map(placement => ({ ...placement }))
-      : streamingPresetPlacements(
-        initialInfrastructureDraft.capacityPackageId,
-        visualRegions,
-        null,
-      ),
+      : [],
     facilities: initialInfrastructureDraft.facilities?.length
       ? initialInfrastructureDraft.facilities.map(facility => ({
         ...facility,
@@ -463,11 +444,16 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
           migration: group.migration ? { ...group.migration } : undefined,
         })),
       }))
-      : migratePlacementsToStreamingFacilities(
-        initialInfrastructureDraft.networkPlacements?.length
-          ? initialInfrastructureDraft.networkPlacements
-          : streamingPresetPlacements(initialInfrastructureDraft.capacityPackageId, visualRegions, null),
-      ),
+      : migratePlacementsToStreamingFacilities(initialInfrastructureDraft.networkPlacements || []),
+    regionPlans: (initialInfrastructureDraft.regionPlans?.length
+      ? initialInfrastructureDraft.regionPlans
+      : reconstructStreamingRegionPlans(initialInfrastructureDraft.facilities?.length
+        ? initialInfrastructureDraft.facilities
+        : migratePlacementsToStreamingFacilities(initialInfrastructureDraft.networkPlacements || [])))
+      .map(plan => ({
+        ...plan,
+        serverCounts: { ...plan.serverCounts },
+      })),
     managementPolicy: initialInfrastructureDraft.managementPolicy,
     assistedPlanApproved: initialInfrastructureDraft.assistedPlanApproved,
     assistedPlanClass: initialInfrastructureDraft.assistedPlanClass,
@@ -814,6 +800,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
   const buildAbsoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
   const buildInputs = useMemo(() => ({
     absoluteWeek: buildAbsoluteWeek,
+    fibreState: platform.fibre,
     treasury: platform.treasuryCash,
     catalogueSpend: (platform.catalogLicenses || []).reduce((sum, license) => sum + license.minimumGuarantee, 0),
     catalogueTitles: (platform.catalogProjectIds || []).length,
@@ -866,6 +853,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
       localizationNote: market.localizationNote,
     })),
     hasExplicitOpeningMarkets: hasExplicitBuildMarkets,
+    marketPlanning: { editable: buildMarketAccess.editable, reason: buildMarketAccess.reason },
     recommendedPlacements: getSuggestedStreamingNetworkPlacements(
       buildMarkets.map(market => market.id),
       pricingDerived.reachMul,
@@ -893,7 +881,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
     debtWeekly: (platform.finance.loans || [])
       .filter(loan => loan.status === 'ACTIVE')
       .reduce((sum, loan) => sum + loan.outstandingPrincipal * loan.weeklyInterestRate, 0),
-  }), [buildAbsoluteWeek, buildMarkets, buildSelection.placements, buildWorldDemand, hasExplicitBuildMarkets, launchProgram, platform, player.world.worldAudienceEconomy, player.world.worldPopulation, pricingDerived.reachMul, visualRegions]);
+  }), [buildAbsoluteWeek, buildMarketAccess, buildMarkets, buildSelection.placements, buildWorldDemand, hasExplicitBuildMarkets, launchProgram, platform, player.world.worldAudienceEconomy, player.world.worldPopulation, pricingDerived.reachMul, visualRegions]);
   const buildDerived = useMemo(
     () => deriveStreamingBuild(buildSelection, buildInputs),
     [buildInputs, buildSelection],
@@ -1134,6 +1122,13 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
       capacityPackageId: packageId,
       rolloutPace: 'STANDARD',
       networkPlacements: selection.placements.map(placement => ({ ...placement })),
+      regionPlans: (selection.regionPlans?.length
+        ? selection.regionPlans
+        : reconstructStreamingRegionPlans(selection.facilities || migratePlacementsToStreamingFacilities(selection.placements)))
+        .map(plan => ({
+          ...plan,
+          serverCounts: { ...plan.serverCounts },
+        })),
       facilities: (selection.facilities || migratePlacementsToStreamingFacilities(selection.placements))
         .map(facility => ({
           ...facility,
@@ -1163,6 +1158,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
   };
 
   const updateBuildSelection = (nextSelection: StreamingBuildSelection) => {
+    if (!buildMarketAccess.editable) return;
     setBuildSelection(nextSelection);
     if (!onUpdatePlayer) return;
     persist(saveStreamingInfrastructureDraft(player, canonicalInfrastructureDraft(nextSelection, false)));
@@ -1180,6 +1176,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
   };
 
   const recordBuildRehearsal = (result: StreamingBuildRunResult | null, testedSelection = buildSelection) => {
+    if (!buildMarketAccess.editable) return;
     setBuildRunResult(result);
     if (!result || !onUpdatePlayer) return;
     const draft = canonicalInfrastructureDraft(testedSelection, false);
@@ -1233,6 +1230,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
   };
 
   const validateCinematicBuild = (selection: StreamingBuildSelection) => {
+    if (!buildMarketAccess.editable) return { ok: false, message: buildMarketAccess.reason || 'File an opening market first.' };
     if (!onUpdatePlayer) return { ok: false, message: 'The company save is not available, so no money was moved.' };
     const prepared = prepareCinematicBuild(selection);
     const quote = getStreamingOpeningCommissionQuote(prepared.player, prepared.draft, launchMarketing.forecast);
@@ -1246,22 +1244,8 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
     return { ok: true, message: 'The exact tested setup is ready to commission.' };
   };
 
-  const quoteCinematicBuild = (selection: StreamingBuildSelection) => {
-    const { forecast } = prepareCinematicBuild(selection);
-    return {
-      transactionCost: forecast.transactionCost,
-      weeklyOperatingCost: forecast.weeklyOperatingCost,
-      buildWeeks: forecast.buildWeeks,
-      baselineConcurrentStreams: forecast.baselineConcurrentStreams,
-      burstConcurrentStreams: forecast.burstConcurrentStreams,
-      energyKwhWeekly: forecast.energyKwhWeekly,
-      waterLitresWeekly: forecast.waterLitresWeekly,
-      sustainabilityScore: forecast.sustainabilityScore,
-      publicReputation: forecast.publicReputation,
-    };
-  };
-
   const commitCinematicBuild = (selection: StreamingBuildSelection = buildSelection) => {
+    if (!buildMarketAccess.editable) return { ok: false, message: buildMarketAccess.reason || 'File an opening market first.' } as const;
     if (!onUpdatePlayer) return { ok: false, message: 'The company save is not available, so no money was moved.' } as const;
     const { player: withDraft, draft: testedDraft } = prepareCinematicBuild(selection);
     const draft = testedDraft;
@@ -1434,7 +1418,11 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
     window.requestAnimationFrame(() => mainRef.current?.scrollTo({ top: 0, behavior: 'smooth' }));
   };
 
-  const openStarterCatalogueRoute = (step: 0 | 2) => {
+  /* "Bring from my studio" must land on the studio vault, while licensing and
+     catalogue acquisition open the public listings. A disabled empty route
+     cannot explain whether the player owns no studio or is waiting on a release. */
+  const openStarterCatalogueRoute = (_step: 0 | 2) => {
+    setContentMarketInitialTab('OWNED');
     setShowContentMarket(true);
   };
 
@@ -1859,7 +1847,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
             title: 'License released titles',
             description: 'Negotiate a temporary streaming window for a completed film or series.',
             status: 'CONTENT MARKET',
-            onSelect: () => setShowContentMarket(true),
+            onSelect: () => { setContentMarketInitialTab('ALL'); setShowContentMarket(true); },
           },
           {
             id: 'ORIGINAL',
@@ -1875,7 +1863,6 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
             title: 'Bring from my studio',
             description: 'Link released titles you already control without inventing an internal sale.',
             status: eligibleOwnedStreamingTitles.length ? `${eligibleOwnedStreamingTitles.length} RELEASED` : 'NO RELEASED TITLES',
-            disabled: eligibleOwnedStreamingTitles.length === 0,
             onSelect: () => openStarterCatalogueRoute(0),
           },
           {
@@ -1884,7 +1871,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
             title: 'Acquire a catalogue',
             description: 'Purchase a packaged library and its negotiated rights in one transaction.',
             status: 'CONTENT MARKET',
-            onSelect: () => setShowContentMarket(true),
+            onSelect: () => { setContentMarketInitialTab('ALL'); setShowContentMarket(true); },
           },
         ]}
         onRenew={() => setShowRightsExchange(true)}
@@ -2050,9 +2037,9 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
         rehearsalConfigurationSignature={prepareCinematicBuild().forecast.configurationSignature}
         built={builtPlacements}
         builtFacilities={builtFacilities}
-        construction={platform.infrastructureSetup && !platform.launchCommit ? {
-          committedAtAbsoluteWeek: platform.infrastructureSetup.committedAtAbsoluteWeek,
-          readyAtAbsoluteWeek: platform.infrastructureSetup.readyAtAbsoluteWeek,
+        construction={constructionSetup ? {
+          committedAtAbsoluteWeek: constructionSetup.committedAtAbsoluteWeek,
+          readyAtAbsoluteWeek: constructionSetup.readyAtAbsoluteWeek,
         } : null}
         isLive={Boolean(platform.launchCommit)}
         initialSheet={buildInitialSheet}
@@ -2063,7 +2050,6 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
         onResult={recordBuildRehearsal}
         onCommit={commitCinematicBuild}
         onValidateCommit={validateCinematicBuild}
-        quoteSelection={quoteCinematicBuild}
         onOpenNight={openCinematicPremiere}
         onOpenContent={() => {
           setShowCinematicBuild(false);
@@ -2272,16 +2258,17 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
         >
           <div className="hq-welcome">
             <span className="hq-welcome-mark"><LogoMark logoKey={identity.logoKey} /></span>
-            <span className="hq-eyebrow">YOUR COMPANY IS READY</span>
+            <span className="hq-eyebrow">YOUR PLATFORM DASHBOARD</span>
             <h1 id="hq-welcome-title">Welcome to {identity.name} Streaming Hall.</h1>
-            <p>Five rooms. One connected business. Take a short tour now or explore freely.</p>
+            <p>Your platform is registered. Inject founder capital when you are ready to fund operations, or explore the dashboard first. No extra capital moves until you choose an action.</p>
             <div className="hq-welcome-map" aria-label="Streaming Hall areas">
               {STREAMING_HQ_SECTIONS.map(section => {
                 const Icon = SECTION_ICONS[section.id];
                 return <span key={section.id}><Icon size={17} />{section.label}</span>;
               })}
             </div>
-            <button type="button" className="hq-primary-button" onClick={startTour}>Take the Streaming Hall tour <ChevronRight size={18} /></button>
+            <button type="button" className="hq-primary-button" onClick={() => { skipTour(); openFinanceRoom('CAPITAL', 'INJECT'); }}>Inject capital <ChevronRight size={18} /></button>
+            <button type="button" className="hq-text-button" onClick={startTour}>Take the Streaming Hall tour</button>
             <button type="button" className="hq-text-button" onClick={skipTour}>Explore on my own</button>
           </div>
         </AccessibleDialog>
@@ -2403,11 +2390,13 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
       ) : null}
       {showContentMarket && !showOriginalCommissioning && !showCatalogSetup && !showRightsExchange ? (
         <StreamingContentMarket
+          initialTab={contentMarketInitialTab}
           player={player} brand={commandDeckBrand} onUpdatePlayer={persist}
           initialOfferId={initialContentMarketOfferId}
           returnToLaunch={catalogueReturnToLaunch}
           onClose={() => {
             setShowContentMarket(false);
+            setContentMarketInitialTab(undefined);
             if (catalogueReturnToLaunch) {
               setCatalogueReturnToLaunch(false);
               setDefineLaunchInitialStep('CATALOGUE');
@@ -2421,6 +2410,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
           onReview={() => {
             if (platform.starterCatalog) {
               setShowContentMarket(false);
+              setContentMarketInitialTab(undefined);
               setContentInitialTab('LIBRARY');
               selectSection('CONTENT');
             }

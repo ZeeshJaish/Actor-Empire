@@ -22,7 +22,8 @@ import { CreationMenu } from './views/CreationMenu';
 import { DeathScreen } from './views/DeathScreen';
 import { RedCarpetEvent } from './views/RedCarpetEvent';
 import { PressConferenceEvent } from './views/PressConferenceEvent';
-import { ActorEmpireIntroStyle, ActorEmpireLoadingScreen, EmpireStudioBumper } from './components/ActorEmpireIntro';
+import { ActorEmpireIntroStyle, ActorEmpireLoadingScreen } from './components/ActorEmpireIntro';
+import ZedburyStudiosIntro from './components/ZedburyStudiosIntro';
 import type { NewCareerData } from './components/types';
 import { processGameWeek } from './services/gameLoop';
 import { generateAuditions, generatePartTimeJobs, rewardGenreExperience } from './services/roleLogic';
@@ -76,6 +77,7 @@ import { PHASE_ONE_ENERGY_COSTS } from './services/energyCosts';
 import { getPlayerLanguage, isSupportedGameLanguage, t } from './services/i18n';
 import { getHealthConditionLabel } from './services/healthConditions';
 import { applyProjectPromotionAttribution } from './services/projectPromotionAttribution';
+import { quoteRealEstateSale } from './services/realEstateLogic';
 import {
   addBreadcrumb,
   markGameCheckpoint,
@@ -148,7 +150,12 @@ const PREMIUM_ENTITLEMENTS_STORAGE_KEY = 'actorEmpirePremiumEntitlements';
 const PREMIUM_SAVE_SLOT_IDS = [1, 2, 3] as const;
 const AUTOSAVE_DEBOUNCE_MS = 750;
 const PLAYTIME_FLUSH_INTERVAL_MS = 60_000;
-const STARTUP_STUDIO_BUMPER_MS = 2400;
+/* Zedbury Studios ident — the approved timing, kept verbatim from the design:
+   the mark holds for 1150ms, then fades out over 320ms. The frame it leaves is
+   black, which is already the loading screen's frame, so no transition device
+   is needed between the two. */
+const STARTUP_STUDIO_BUMPER_EXIT_MS = 1150;
+const STARTUP_STUDIO_BUMPER_MS = STARTUP_STUDIO_BUMPER_EXIT_MS + 320;
 const STARTUP_LOADING_MIN_MS = 8600;
 const STARTUP_LOADING_LINE_KEYS = [
   'startup.loadingLine.actors',
@@ -494,6 +501,7 @@ export const App: React.FC = () => {
       }
   });
   const [startupStudioBumperElapsed, setStartupStudioBumperElapsed] = useState(false);
+  const [startupStudioBumperExiting, setStartupStudioBumperExiting] = useState(false);
   const [startupMinimumElapsed, setStartupMinimumElapsed] = useState(false);
   const [startupLoadingLineIndex, setStartupLoadingLineIndex] = useState(0);
   const [startupLoadingProgress, setStartupLoadingProgress] = useState(0);
@@ -581,8 +589,12 @@ export const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    const exitTimer = window.setTimeout(() => setStartupStudioBumperExiting(true), STARTUP_STUDIO_BUMPER_EXIT_MS);
     const timer = window.setTimeout(() => setStartupStudioBumperElapsed(true), STARTUP_STUDIO_BUMPER_MS);
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(exitTimer);
+      window.clearTimeout(timer);
+    };
   }, []);
 
   useEffect(() => {
@@ -2623,7 +2635,18 @@ export const App: React.FC = () => {
 	          const allMarketItems = [...PROPERTY_CATALOG, ...CAR_CATALOG, ...MOTORCYCLE_CATALOG, ...BOAT_CATALOG, ...AIRCRAFT_CATALOG, ...CLOTHING_CATALOG];
 	          const item = p.customItems.find(customItem => customItem.id === id) || allMarketItems.find(marketItem => marketItem.id === id);
               const state = (p.assetStates || []).find(assetState => assetState.assetId === id);
-	          const saleValue = item ? Math.floor(Math.max(item.price, Number(state?.currentValue || 0)) * 0.5) : 0;
+	          /* This paid half of a value that was itself floored at the purchase
+	             price, so a sale could never reflect the market in either
+	             direction. A property now sells for what the market says it is
+	             worth less the cost of selling into that cycle — the same quote
+	             the button shows, so the number offered and the number paid
+	             cannot disagree. Everything else still sells at half, which is
+	             what a used car is worth. */
+	          const saleValue = !item
+	              ? 0
+	              : item.type === 'Property'
+	                  ? quoteRealEstateSale(item, state, p).saleProceeds
+	                  : Math.floor(item.price * 0.5);
 	          return {
 	              ...p,
 	              money: p.money + saleValue,
@@ -3032,7 +3055,7 @@ export const App: React.FC = () => {
           <div className="relative h-screen overflow-hidden bg-[#050505] text-white">
               <ActorEmpireIntroStyle />
               {showStudioBumper ? (
-                  <EmpireStudioBumper />
+                  <ZedburyStudiosIntro state={startupStudioBumperExiting ? 'on exit' : 'on'} />
               ) : (
                   <ActorEmpireLoadingScreen
                       progress={startupLoadingProgress}

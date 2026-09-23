@@ -14,15 +14,21 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   CUSTOM_PLAN_COLORS, PLAN_FEATURES, REVENUE_STREAMS, forecastPricing,
-  type CustomPlanColorId, type Plan, type PricingSettings, type StreamId,
+  type CustomPlanColorId, type Plan, type PricingCohortSignal, type PricingSettings, type StreamId,
 } from '../../finance/launch';
 import type { StepProps } from './LaunchWizard';
 import { compactCount, money, moneyPrecise, pct } from '../../finance/format';
 import { ResearchLockMark } from './ResearchLockMark';
 import {
+  STREAMING_MAXIMUM_ANNUAL_DISCOUNT,
+  STREAMING_MAXIMUM_INTRO_OFFER,
   STREAMING_MAXIMUM_PLAN_PRICE,
   STREAMING_MINIMUM_PAID_PLAN_PRICE,
+  effectiveMonthlyStreamingPlanPrice,
+  firstYearStreamingPlanRevenuePerSubscriber,
   normalizeStreamingPlanPrice,
+  streamingDiscountedMonthly,
+  streamingIntroOfferAppliesTo,
 } from '../../../../services/streamingPricingEconomy';
 
 const GROUPS = [
@@ -121,6 +127,22 @@ export function StepPricing({ data, draft, patch, chosen, handlers }: StepProps)
     [settings, addressable, data.market, pricingCohorts, worldForecast],
   );
 
+  /* What each discount is worked out against. Annual billing is on every plan,
+     so it reads as the range from the cheapest to the dearest; the introductory
+     offer is aimed, so it reads against the plan it is aimed at. */
+  const entryPrice = forecast.entryPrice;
+  const dearestPrice = settings.plans.length ? Math.max(...settings.plans.map((plan) => plan.monthly)) : entryPrice;
+  const introPlan = settings.introOfferPlanId
+    ? settings.plans.find((plan) => plan.id === settings.introOfferPlanId)
+    : undefined;
+  const introBasePrice = introPlan ? introPlan.monthly : entryPrice;
+  /* A discount deep enough to hit the least the game lets anyone charge. Worth
+     saying out loud: past it the slider costs margin and buys nothing. */
+  const atFloor = (listPrice: number, percent: number, maximum: number): boolean => (
+    listPrice > STREAMING_MINIMUM_PAID_PLAN_PRICE
+    && streamingDiscountedMonthly(listPrice, percent, maximum) <= STREAMING_MINIMUM_PAID_PLAN_PRICE
+  );
+
   const write = (next: Partial<PricingSettings>) => patch({ pricing: { ...settings, ...next } });
   const writePlan = (id: string, next: Partial<Plan>) =>
     write({ plans: settings.plans.map((p) => (p.id === id ? { ...p, ...next } : p)) });
@@ -141,11 +163,11 @@ export function StepPricing({ data, draft, patch, chosen, handlers }: StepProps)
   };
 
   const top = [...forecast.streams].sort((a, b) => b.monthly - a.monthly)[0];
-  const [openDetail, setOpenDetail] = useState(false);
   const [openPlanId, setOpenPlanId] = useState<string | null>(null);
   const openPlanIndex = settings.plans.findIndex((plan) => plan.id === openPlanId);
   const openPlan = openPlanIndex >= 0 ? settings.plans[openPlanIndex] : null;
   const openPlanRow = openPlan ? forecast.plans.find((row) => row.plan.id === openPlan.id) : null;
+
 
   const addPlan = () => {
     const id = `plan-${Date.now()}`;
@@ -162,143 +184,9 @@ export function StepPricing({ data, draft, patch, chosen, handlers }: StepProps)
     setOpenPlanId(id);
   };
 
-  return (
-    <>
-      {/* --- the answer, pinned above everything that changes it -------------
-          One line by default. It used to be a full panel, which pushed the
-          controls it exists to answer off the screen; the breakdown is one tap
-          away instead. */}
-      <section className={openDetail ? 'pr-live is-open' : 'pr-live'}>
-        <button type="button" className="pr-live-face" onClick={() => setOpenDetail((v) => !v)}>
-          <span className="pr-live-cell">
-            <em>Households</em>
-            <b>{compactCount(forecast.households)}</b>
-          </span>
-          <span className="pr-live-bar" aria-hidden="true">
-            {forecast.streams.map((stream, i) => (
-              <i key={stream.id} style={{ width: `${(stream.monthly / Math.max(1, forecast.monthlyRevenue)) * 100}%`, opacity: 1 - i * 0.13 }} />
-            ))}
-            {forecast.streams.length === 0 && <i className="is-empty" style={{ width: '100%' }} />}
-          </span>
-          <span className="pr-live-cell is-end">
-            <em>A month</em>
-            <b>{money(forecast.monthlyRevenue)}</b>
-          </span>
-          <span className="pr-live-caret" aria-hidden="true">{openDetail ? '▾' : '▸'}</span>
-        </button>
-
-        {openDetail && (
-          <div className="pr-live-detail">
-            <p className="pr-sub">
-              {forecast.subscribers > 0 ? `${compactCount(forecast.subscribers)} subscribed · ` : ''}
-              of {compactCount(forecast.addressable)} reachable · {money(forecast.yearlyRevenue)} a year
-            </p>
-            {forecast.activeRivalCount !== undefined && (
-              <p className="pr-position">
-                Competing with {forecast.activeRivalCount} active services · rival median entry {moneyPrecise(forecast.rivalMedianEntryPrice || 0)}
-              </p>
-            )}
-            <p className="pr-position">
-              Range · {money(forecast.conservativeMonthlyRevenue)} conservative · {money(forecast.monthlyRevenue)} expected · {money(forecast.breakoutMonthlyRevenue)} breakout
-            </p>
-            <ul className="pr-streamkeys">
-              {forecast.streams.map((stream, i) => (
-                <li key={stream.id}>
-                  <i style={{ opacity: 1 - i * 0.13 }} aria-hidden="true" />
-                  <span>{stream.name}</span>
-                  <b>{money(stream.monthly)}</b>
-                </li>
-              ))}
-              {forecast.streams.length === 0 && <li className="is-empty"><span>No way to earn switched on yet</span></li>}
-            </ul>
-            <p className="pr-position">
-              {forecast.position}
-              {top && forecast.streams.length > 1 && ` ${top.name} is ${pct((top.monthly / forecast.monthlyRevenue) * 100, 0)} of the money.`}
-            </p>
-          </div>
-        )}
-      </section>
-
-      {/* --- 1 · which streams are running ---------------------------------- */}
-      <section className="lw-block">
-        <p className="sf-eyebrow lw-block-head">How the service earns</p>
-        <ul className="pr-picks">
-          {REVENUE_STREAMS.map((stream) => {
-            const on = settings.streams.includes(stream.id);
-            const row = forecast.streams.find((s) => s.id === stream.id);
-            const lock = data.capabilityLocks[`stream:${stream.id}`];
-            return (
-              <li key={stream.id}>
-                <button type="button" disabled={Boolean(lock)} aria-label={lock ? `${stream.name} locked: ${lock}` : stream.name} className={`${on ? 'pr-pick is-on' : 'pr-pick'}${lock ? ' is-locked' : ''}`} onClick={() => toggleStream(stream.id)}>
-                  <span className="pr-pick-top">
-                    <b>{stream.name}</b>
-                    {row ? <s>{money(row.monthly)}</s> : <s className="is-off">off</s>}
-                  </span>
-                  <em>{stream.line}</em>
-                  {lock
-                    ? <ResearchLockMark reason={lock} />
-                    : <span className="pr-pick-real">{stream.real}</span>}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      </section>
-
-      {/* --- 2 · configure whatever is running -------------------------------- */}
-      {settings.streams.includes('subs') && (
-        <section className="lw-block">
-          <div className="pr-head">
-            <p className="sf-eyebrow">Plans</p>
-            <button
-              type="button"
-              className="sf-link"
-              onClick={addPlan}
-            >
-              Add a plan
-            </button>
-          </div>
-
-          <ul className="pr-plan-tabs" aria-label="Compare subscription plans">
-            {settings.plans.map((plan) => {
-              const row = forecast.plans.find((r) => r.plan.id === plan.id);
-              const tone = planTone(plan);
-              const colorId = tone === 'custom' ? stablePlanColor(plan) : undefined;
-              const featureNames = PLAN_FEATURES
-                .filter((feature) => plan.featureIds.includes(feature.id))
-                .map((feature) => feature.name);
-              if (plan.ads) featureNames.push('Ad-supported');
-              const visibleFeatures = featureNames.slice(0, 2);
-              const extraFeatures = Math.max(0, featureNames.length - visibleFeatures.length);
-              const isOpen = openPlanId === plan.id;
-              return (
-                <li key={plan.id}>
-                  <button
-                    type="button"
-                    className={isOpen ? 'pr-plan-tab is-open' : 'pr-plan-tab'}
-                    data-plan-tone={tone}
-                    data-plan-color={colorId}
-                    aria-expanded={isOpen}
-                    aria-label={`Edit ${plan.name} plan`}
-                    onClick={() => setOpenPlanId(isOpen ? null : plan.id)}
-                  >
-                    <span className="pr-plan-tab-name">{plan.name}</span>
-                    <strong>{money(plan.monthly)}<i>/mo</i></strong>
-                    <span className="pr-plan-tab-features" title={featureNames.join(', ')}>
-                      {visibleFeatures.length ? visibleFeatures.join(' · ') : 'Base access'}
-                      {extraFeatures > 0 && ` +${extraFeatures}`}
-                    </span>
-                    <span className="pr-plan-tab-foot">
-                      <b>{row ? pct(row.share, 0) : '—'}</b>
-                      <i>{isOpen ? 'Close' : 'Edit'} {isOpen ? '⌃' : '⌄'}</i>
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-
-          {openPlan && (
+  /* The offering picker now lives INSIDE the plan it belongs to, so the card
+     expands rather than handing off to a panel somewhere below it. */
+  const planEditor = openPlan ? (
             <div
               className="pr-plan pr-plan-editor"
               data-plan-tone={planTone(openPlan)}
@@ -385,7 +273,7 @@ export function StepPricing({ data, draft, patch, chosen, handlers }: StepProps)
                             })}
                           >
                             <span className="pr-chip-name">{feature.name}</span>
-                            {lock && <ResearchLockMark reason={lock} compact />}
+                            {lock && <ResearchLockMark compact />}
                           </button>
                         );
                       })}
@@ -411,6 +299,11 @@ export function StepPricing({ data, draft, patch, chosen, handlers }: StepProps)
                 )}
               </div>
 
+              <PlanPricePaths plan={openPlan} settings={settings} share={openPlanRow?.share ?? 0} cohorts={pricingCohorts}
+                pathHouseholds={openPlanRow ? {
+                  monthly: openPlanRow.monthlyBillingSubscribers,
+                  annual: openPlanRow.annualBillingSubscribers,
+                } : undefined} />
               {openPlanRow && (
                 <footer className="pr-plan-foot">
                   <span><b>{compactCount(openPlanRow.subscribers)}</b> households</span>
@@ -419,15 +312,155 @@ export function StepPricing({ data, draft, patch, chosen, handlers }: StepProps)
                 </footer>
               )}
             </div>
-          )}
+  ) : null;
 
-          <div className="pr-dials">
-            <Dial label="Pay yearly" value={settings.annualDiscount} max={40} step={5} suffix="%"
-              note={`${settings.annualDiscount}% off · about a third of households take it`}
-              onChange={(v) => write({ annualDiscount: v })} />
-            <Dial label="First three months" value={settings.introOffer} max={60} step={10} suffix="%"
-              note={settings.introOffer > 0 ? 'Cheap way in, and a churn cliff when it ends' : 'No introductory offer'}
-              onChange={(v) => write({ introOffer: v })} />
+  return (
+    <>
+
+      {/* --- 1 · which streams are running ---------------------------------- */}
+      <section className="lw-block">
+        <p className="sf-eyebrow lw-block-head">How the service earns</p>
+        <ul className="pr-picks">
+          {REVENUE_STREAMS.map((stream) => {
+            const on = settings.streams.includes(stream.id);
+            const row = forecast.streams.find((s) => s.id === stream.id);
+            const lock = data.capabilityLocks[`stream:${stream.id}`];
+            return (
+              <li key={stream.id}>
+                <button type="button" disabled={Boolean(lock)} aria-label={lock ? `${stream.name} locked: ${lock}` : stream.name} className={`${on ? 'pr-pick is-on' : 'pr-pick'}${lock ? ' is-locked' : ''}`} onClick={() => toggleStream(stream.id)}>
+                  <span className="pr-pick-top">
+                    <b>{stream.name}</b>
+                    {row ? <s>{money(row.monthly)}</s> : <s className="is-off">off</s>}
+                  </span>
+                  <em>{stream.line}</em>
+                  {lock
+                    ? <ResearchLockMark reason={lock} />
+                    : <span className="pr-pick-real">{stream.real}</span>}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+
+      {/* --- 2 · configure whatever is running -------------------------------- */}
+      {settings.streams.includes('subs') && (
+        <section className="lw-block">
+          <div className="pr-head">
+            <p className="sf-eyebrow">Plans</p>
+            <button
+              type="button"
+              className="sf-link"
+              onClick={addPlan}
+            >
+              Add a plan
+            </button>
+          </div>
+
+          <ul className="pr-plan-tabs" aria-label="Compare subscription plans">
+            {settings.plans.map((plan) => {
+              const row = forecast.plans.find((r) => r.plan.id === plan.id);
+              const tone = planTone(plan);
+              const colorId = tone === 'custom' ? stablePlanColor(plan) : undefined;
+              const featureNames = PLAN_FEATURES
+                .filter((feature) => plan.featureIds.includes(feature.id))
+                .map((feature) => feature.name);
+              if (plan.ads) featureNames.push('Ad-supported');
+              const visibleFeatures = featureNames.slice(0, 2);
+              const extraFeatures = Math.max(0, featureNames.length - visibleFeatures.length);
+              const isOpen = openPlanId === plan.id;
+              return (
+                <li key={plan.id} className={isOpen ? 'is-open' : undefined}>
+                  <button
+                    type="button"
+                    className={isOpen ? 'pr-plan-tab is-open' : 'pr-plan-tab'}
+                    data-plan-tone={tone}
+                    data-plan-color={colorId}
+                    aria-expanded={isOpen}
+                    aria-label={`Edit ${plan.name} plan`}
+                    onClick={() => setOpenPlanId(isOpen ? null : plan.id)}
+                  >
+                    <span className="pr-plan-tab-name">{plan.name}</span>
+                    <strong><Price value={plan.monthly} /><i>/mo</i></strong>
+                    <span className="pr-plan-tab-features" title={featureNames.join(', ')}>
+                      {visibleFeatures.length ? visibleFeatures.join(' · ') : 'Base access'}
+                      {extraFeatures > 0 && ` +${extraFeatures}`}
+                    </span>
+                    <span className="pr-plan-tab-foot">
+                      <b>{row ? pct(row.share, 0) : '—'}</b>
+                      <i>{isOpen ? 'Close' : 'Edit'} {isOpen ? '⌃' : '⌄'}</i>
+                    </span>
+                  </button>
+                  {isOpen && planEditor}
+                </li>
+              );
+            })}
+          </ul>
+
+
+          {/* The two discounts are a pair — what you give away to get a
+              household in — so they are one block of two rows. Each says the
+              price it produces, because "15%" is not a thing anyone can picture
+              and "$6.79 a month" is.
+
+              Which plan each is on is the thing the screen used to leave
+              unanswered: annual billing is on every tier, the way real services
+              run it, and the introductory offer is aimed — at one plan or at
+              all of them — because that is how a cheap way in is actually sold.
+              Both read the canonical pricing economy, floor included, so the
+              price here is the price the world model charges. */}
+          <div className="pr-offers">
+            <Offer
+              label="Pay yearly"
+              value={settings.annualDiscount}
+              max={STREAMING_MAXIMUM_ANNUAL_DISCOUNT}
+              step={5}
+              from={streamingDiscountedMonthly(entryPrice, settings.annualDiscount, STREAMING_MAXIMUM_ANNUAL_DISCOUNT)}
+              to={dearestPrice > entryPrice
+                ? streamingDiscountedMonthly(dearestPrice, settings.annualDiscount, STREAMING_MAXIMUM_ANNUAL_DISCOUNT)
+                : undefined}
+              onChange={(v) => write({ annualDiscount: v })}
+              aside={settings.annualDiscount > 0
+                ? `on all ${settings.plans.length} ${settings.plans.length === 1 ? 'plan' : 'plans'}`
+                : 'nothing off for paying up front'}
+              floored={settings.annualDiscount > 0 && atFloor(entryPrice, settings.annualDiscount, STREAMING_MAXIMUM_ANNUAL_DISCOUNT)}
+              offLabel="Full price"
+            />
+            <Offer
+              label="First three months"
+              value={settings.introOffer}
+              max={STREAMING_MAXIMUM_INTRO_OFFER}
+              step={10}
+              from={streamingDiscountedMonthly(introBasePrice, settings.introOffer, STREAMING_MAXIMUM_INTRO_OFFER)}
+              onChange={(v) => write({ introOffer: v })}
+              aside={settings.introOffer > 0
+                ? `${introPlan ? introPlan.name : 'every plan'}, then ${moneyPrecise(introBasePrice)}`
+                : 'full price from day one'}
+              floored={settings.introOffer > 0 && atFloor(introBasePrice, settings.introOffer, STREAMING_MAXIMUM_INTRO_OFFER)}
+              offLabel="Full price"
+            >
+              {settings.plans.length > 1 && (
+                <div className="pr-offer-aim" role="group" aria-label="Which plan the introductory offer is on">
+                  <button
+                    type="button"
+                    className={settings.introOfferPlanId ? undefined : 'is-on'}
+                    onClick={() => write({ introOfferPlanId: undefined })}
+                  >
+                    Every plan
+                  </button>
+                  {settings.plans.map((plan) => (
+                    <button
+                      key={plan.id}
+                      type="button"
+                      className={settings.introOfferPlanId === plan.id ? 'is-on' : undefined}
+                      onClick={() => write({ introOfferPlanId: plan.id })}
+                    >
+                      {plan.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </Offer>
           </div>
         </section>
       )}
@@ -498,16 +531,68 @@ export function StepPricing({ data, draft, patch, chosen, handlers }: StepProps)
         </Config>
       )}
 
-      <div className="pr-summary">
-        <div><span>Per household</span><b>{moneyPrecise(forecast.perHousehold)}<i>/mo</i></b></div>
-        <div><span>Forecast a year</span><b>{money(forecast.yearlyRevenue)}</b></div>
-      </div>
-
       <p className="lw-autosave-state is-current" role="status">
         <i aria-hidden="true" />
         Autosaved as you edit
       </p>
     </>
+  );
+}
+
+export function PlanPricePaths({ plan, settings, share, cohorts = [], pathHouseholds }: {
+  plan: Plan;
+  settings: PricingSettings;
+  share: number;
+  cohorts?: PricingCohortSignal[];
+  pathHouseholds?: { monthly: number; annual: number };
+}) {
+  if (plan.monthly <= 0) {
+    return (
+      <section className="pr-price-paths" aria-label={`${plan.name} price and audience forecast`}>
+        <p>Free ad-supported access. Introductory and annual discounts do not apply; advertising revenue is forecast separately.</p>
+        <p>{pct(share, 0)} projected share. Free entry still competes on catalogue, features and rival offers.</p>
+      </section>
+    );
+  }
+  const introApplies = streamingIntroOfferAppliesTo(plan.id, settings.introOfferPlanId);
+  const introActive = introApplies && settings.introOffer > 0;
+  const introMonthly = introActive
+    ? streamingDiscountedMonthly(plan.monthly, settings.introOffer, STREAMING_MAXIMUM_INTRO_OFFER)
+    : plan.monthly;
+  const annualMonthly = streamingDiscountedMonthly(plan.monthly, settings.annualDiscount, STREAMING_MAXIMUM_ANNUAL_DISCOUNT);
+  const openingBlend = effectiveMonthlyStreamingPlanPrice(
+    plan.monthly, settings.annualDiscount, settings.introOffer, 0, introApplies,
+  );
+  const totalBuyers = (pathHouseholds?.monthly || 0) + (pathHouseholds?.annual || 0);
+  const monthlyFirstYear = introMonthly * 3 + plan.monthly * 9;
+  const annualFirstYear = annualMonthly * 12;
+  const firstYear = totalBuyers > 0
+    ? Math.round((monthlyFirstYear * pathHouseholds!.monthly + annualFirstYear * pathHouseholds!.annual) / totalBuyers * 100) / 100
+    : firstYearStreamingPlanRevenuePerSubscriber(plan.monthly, settings.annualDiscount, settings.introOffer, introApplies);
+  const cohortHouseholds = cohorts.reduce((sum, cohort) => sum + Math.max(0, cohort.households), 0);
+  const affordablePercent = (price: number): number | null => cohortHouseholds > 0
+    ? cohorts.reduce((sum, cohort) => sum + (price <= cohort.monthlyStreamingBudgetPerHousehold + .001
+      ? Math.max(0, cohort.households) : 0), 0) / cohortHouseholds * 100
+    : null;
+  const monthlyAffordable = affordablePercent(introMonthly);
+  const annualAffordable = affordablePercent(annualMonthly);
+  return (
+    <section className="pr-price-paths" aria-label={`${plan.name} price and audience forecast`}>
+      <dl>
+        <div><dt>List price</dt><dd>{moneyPrecise(plan.monthly)}/mo</dd></div>
+        <div><dt>First three months</dt><dd>{moneyPrecise(introMonthly)}/mo <small>{introActive ? 'monthly subscribers, then list price' : settings.introOffer > 0 ? 'not targeted' : 'offer off'}</small></dd></div>
+        <div><dt>Pay yearly</dt><dd>{moneyPrecise(annualMonthly)}/mo <small>equivalent · billed yearly</small></dd></div>
+        <div><dt>Opening blend</dt><dd>{moneyPrecise(openingBlend)}/mo <small>33% yearly, 67% monthly reference average, not a charged price</small></dd></div>
+        <div><dt>Year one</dt><dd>{moneyPrecise(firstYear)} <small>per subscriber</small></dd></div>
+      </dl>
+      <p>
+        {pct(share, 0)} projected share. {monthlyAffordable !== null && annualAffordable !== null && (
+          <>Monthly path: {pct(monthlyAffordable, 0)} affordable. Annual path: {pct(annualAffordable, 0)} affordable in the selected-market sample. </>
+        )}
+        {pathHouseholds && <>{Math.round(pathHouseholds.monthly).toLocaleString()} monthly buyers · {Math.round(pathHouseholds.annual).toLocaleString()} annual buyers. </>}
+        Households also weigh features, catalogue and rivals; affordable does not mean guaranteed to subscribe.
+      </p>
+    </section>
   );
 }
 
@@ -523,6 +608,63 @@ function Config({ title, experimental, children }: { title: string; experimental
   );
 }
 
+/* $13.99 is not $14. `money` rounds to whole dollars under a thousand, so the
+   plan card was printing a price the player never typed — and charm pricing is
+   the whole reason they typed the cents. The cents stay, smaller, so $12.99 and
+   $13 are visibly different things. */
+function Price({ value }: { value: number }) {
+  const text = moneyPrecise(value);
+  const dot = text.indexOf('.');
+  if (dot === -1) return <>{text}</>;
+  return <>{text.slice(0, dot)}<span className="pr-cents">{text.slice(dot)}</span></>;
+}
+
+/* A discount, told as the price it produces. The percentage is a chip beside
+   the name; the figure is what a household pays because of it. */
+function Offer({ label, value, max, step, from, to, aside, floored, offLabel, onChange, children }: {
+  label: string; value: number; max: number; step: number;
+  /** The price this discount produces, and the dearest one when it is on more
+      than one plan. */
+  from: number; to?: number;
+  aside: string; floored?: boolean; offLabel: string;
+  onChange: (value: number) => void;
+  children?: ReactNode;
+}) {
+  const on = value > 0;
+  return (
+    <div className={on ? 'pr-offer is-on' : 'pr-offer'}>
+      {/* One line: what it is, how deep it goes, and the price it produces. */}
+      <div className="pr-offer-top">
+        <em>{label}</em>
+        <span className="pr-offer-cut">{on ? `−${value}%` : 'Off'}</span>
+        <b>
+          <Price value={from} />
+          {to !== undefined && to !== from && <>–<Price value={to} /></>}
+        </b>
+        <u className={floored ? 'is-floored' : undefined}>
+          {floored ? `${moneyPrecise(STREAMING_MINIMUM_PAID_PLAN_PRICE)} is the floor` : aside}
+        </u>
+      </div>
+      <input
+        className="sf-slider pr-offer-slider"
+        style={{
+          ['--sf-fill' as string]: `${max > 0 ? Math.round((value / max) * 100) : 0}%`,
+          ['--pr-steps' as string]: `${max / step}`,
+        }}
+        type="range"
+        min={0}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        aria-label={label}
+        aria-valuetext={on ? `${value}% off, ${moneyPrecise(from)} a month` : offLabel}
+      />
+      {children}
+    </div>
+  );
+}
+
 function Dial({ label, value, max, step, note, prefix, suffix, onChange }: {
   label: string; value: number; max: number; step: number; note: string;
   prefix?: string; suffix?: string; onChange: (value: number) => void;
@@ -533,8 +675,13 @@ function Dial({ label, value, max, step, note, prefix, suffix, onChange }: {
         <em>{label}</em>
         <b>{prefix ?? ''}{value}{suffix ?? ''}</b>
       </div>
+      {/* The track used to be a brand-to-transparent wash across its whole
+          width, so a slider at 0% still read as a full red bar. `--sf-fill` is
+          the real value, and the track paints two solid blocks at that exact
+          stop — a fill, not a fade. */}
       <input
         className="sf-slider"
+        style={{ ['--sf-fill' as string]: `${max > 0 ? Math.round((value / max) * 100) : 0}%` }}
         type="range"
         min={0}
         max={max}

@@ -4,7 +4,7 @@
 
 import type { StepProps } from './LaunchWizard';
 import { compactCount, pct } from '../../finance/format';
-import { Poster } from '../Poster';
+import { StreamingTitleArt } from '../StreamingTitleArt';
 
 
 export function StepCatalogue({ data, handlers }: StepProps) {
@@ -48,7 +48,7 @@ export function StepCatalogue({ data, handlers }: StepProps) {
         <div className="cat-rail">
           {c.anchors.map((title) => (
             <span key={title.id} className={title.linked ? 'cat-railitem' : 'cat-railitem is-off'}>
-              <Poster seed={title.posterSeed ?? title.id} size={54} />
+              <StreamingTitleArt id={title.posterSeed ?? title.id} title={title.name} genre={title.format} poster={title.poster} size={54} />
               <em>{title.name}</em>
             </span>
           ))}
@@ -90,7 +90,7 @@ export function StepCatalogue({ data, handlers }: StepProps) {
         <ul className="lw-anchors">
           {c.anchors.map((title) => (
             <li key={title.id}>
-              <Poster seed={title.posterSeed ?? title.id} size={40} />
+              <StreamingTitleArt id={title.posterSeed ?? title.id} title={title.name} genre={title.format} poster={title.poster} size={40} />
               <span className="lw-anchor-body">
                 <b>{title.name}</b>
                 <em>{title.format}{title.note ? ` · ${title.note}` : ''}</em>

@@ -309,7 +309,7 @@ assert.deepEqual(migratePlayerSave(migrated).world.worldStreamingViewing, migrat
 const gameLoopSource = readFileSync(resolve(process.cwd(), 'services/gameLoop.ts'), 'utf8');
 const customerStage = gameLoopSource.indexOf("emitLoopStage('world_streaming_customers_done'");
 const viewingStage = gameLoopSource.indexOf("emitLoopStage('world_streaming_viewing_start'");
-const ownedStreamingStage = gameLoopSource.indexOf('const ownedStreamingResult = processOwnedStreamingPlatformWeek');
+const ownedStreamingStage = gameLoopSource.indexOf('ownedStreamingResult = processOwnedStreamingPlatformWeek(nextPlayer);');
 assert.ok(customerStage >= 0 && viewingStage > customerStage && viewingStage < ownedStreamingStage, 'WE6 advances after WE5 and before owned streaming settlement');
 
 const corrupt = structuredClone(state) as any;

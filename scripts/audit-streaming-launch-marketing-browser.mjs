@@ -22,29 +22,40 @@ try {
     assert.equal(await page.locator('vite-error-overlay').count(), 0);
     assert.deepEqual(errors, []);
 
-    const custom = page.getByRole('spinbutton', { name: 'Custom marketing allocation' });
+    const recommendations = page.getByRole('radiogroup', { name: 'The team recommends' });
+    const openCustom = async () => {
+      await recommendations.getByRole('radio', { name: 'Custom' }).click();
+      return page.getByRole('spinbutton', { name: 'Custom marketing ceiling' });
+    };
+    const closeCustom = async () => page.getByRole('dialog').getByRole('button', { name: 'Done' }).click();
+    let custom = await openCustom();
     await custom.fill('0');
+    await closeCustom();
     await page.getByText('Organic launch', { exact: true }).waitFor();
-    const confidenceSelector = '.bw-country-forecast .bw-section-head small';
+    const confidenceSelector = '.bw-money--forecast .kit-title em';
     const organicConfidence = await page.locator(confidenceSelector).textContent();
-    await page.getByRole('group', { name: 'Recommended marketing ceilings' }).getByRole('button', { name: /Balanced/ }).click();
-    assert.notEqual(await custom.inputValue(), '0');
+    await recommendations.getByRole('radio', { name: /Balanced/ }).click();
     await page.waitForFunction(
       ({ selector, before }) => document.querySelector(selector)?.textContent !== before,
       { selector: confidenceSelector, before: organicConfidence },
     );
     assert.notEqual(await page.locator(confidenceSelector).textContent(), organicConfidence, 'Funded coverage must update the visible confidence score.');
+    custom = await openCustom();
+    assert.notEqual(await custom.inputValue(), '0');
     await custom.fill('1000000000000');
+    await closeCustom();
     await page.getByText('Market saturated', { exact: true }).waitFor();
+    custom = await openCustom();
     await custom.fill('250000000');
-    await page.getByText(/short\. The value is preserved, but commissioning is blocked\./).waitFor();
+    await closeCustom();
+    await page.getByText(/short\. The plan is kept, and commissioning waits for the money\./).waitFor();
 
     await page.getByRole('button', { name: /Lead with an original/ }).click();
-    await page.getByRole('button', { name: /Last-week push/ }).click();
-    const advanced = page.locator('.bw-advanced');
+    await page.getByRole('radiogroup', { name: 'Timing' }).getByRole('radio', { name: /Last-week push/ }).click();
+    const advanced = page.locator('.bw-money-more');
     await advanced.locator('summary').click();
-    await page.getByRole('button', { name: 'Manual' }).click();
-    assert.equal(await page.getByRole('spinbutton', { name: 'United States allocation weight' }).count(), 1);
+    await page.getByRole('radiogroup', { name: 'Country money' }).getByRole('radio', { name: 'Manual' }).click();
+    assert.equal(await page.getByRole('group', { name: 'United States weight' }).count(), 1);
     assert.equal(await shell.evaluate(element => element.scrollWidth <= element.clientWidth), true, `${viewport.height}px expanded controls must not overflow horizontally.`);
 
     await page.screenshot({ path: `/tmp/streaming-build-money-${viewport.width}x${viewport.height}.png`, fullPage: true });

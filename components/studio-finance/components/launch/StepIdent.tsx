@@ -10,8 +10,9 @@
    would actually get.
    ========================================================================== */
 
-import { useRef, useState, type ChangeEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
 import type { StepProps } from './LaunchWizard';
+import type { IdentCustomAudio } from '../../finance/launch';
 import { money } from '../../finance/format';
 import { Mark } from '../../../streaming-transplant/StreamingBrandVisuals';
 import {
@@ -42,7 +43,7 @@ const RHYTHM: Record<string, { beats: number[]; wave: number[]; feel: string }> 
   custom: { beats: [0.1, 0.35, 0.6, 0.85], wave: [30, 60, 42, 86, 55, 72, 38], feel: 'Your own signature' },
 };
 
-export function StepIdent({ data, draft, patch, free, handlers }: StepProps) {
+export function StepIdent({ data, draft, patch, handlers }: StepProps) {
   const [take, setTake] = useState(0);   // bumping this replays the preview
   const [previewPackageId, setPreviewPackageId] = useState(() => draft.packageId || 'sting');
   const [processingUpload, setProcessingUpload] = useState(false);
@@ -56,27 +57,48 @@ export function StepIdent({ data, draft, patch, free, handlers }: StepProps) {
   const previewLock = previewPack ? data.capabilityLocks[`ident:${previewPack.id}`] : undefined;
   const full = Boolean(previewPack && !previewPack.included);
   const cost = pack && !pack.included ? pack.cost : 0;
-  const previewCost = previewPack && !previewPack.included ? previewPack.cost : 0;
   const packagePurchased = Boolean(pack && data.ident.purchasedPackageIds.includes(pack.id));
   const dueNow = pack && !pack.included && !packagePurchased ? cost : 0;
-  const short = Math.max(0, dueNow - free);
   const packageLock = draft.packageId ? data.capabilityLocks[`ident:${draft.packageId}`] : undefined;
   const customReady = sound !== 'custom' || Boolean(draft.customAudio?.dataUrl);
-  const ready = Boolean(draft.soundId && draft.packageId) && customReady && short === 0 && !packageLock;
-  const sameCustomAudio = sound !== 'custom'
-    || draft.customAudio?.fingerprint === data.ident.customAudio?.fingerprint;
-  const matchesCommissioned = data.ident.commissioned
-    && draft.soundId === data.ident.soundId
-    && draft.packageId === data.ident.packageId
-    && sameCustomAudio;
+  /* `ready`, `sameCustomAudio` and `matchesCommissioned` all existed to drive the
+     commission button's disabled state and its label. With choosing as the
+     commitment there is no button to gate, and no "commissioned vs drafted"
+     distinction to draw — the selection IS the saved state. */
 
   const replay = () => {
     setTake((current) => current + 1);
     void playStreamingIdentPreview(sound, draft.customAudio).catch(() => setUploadError('Sound preview is unavailable on this device.'));
   };
 
+  /* Choosing is the commitment — there is no separate commission step. The
+     selection is written to canonical state as it is made; a paid package is
+     planned there and settled at launch, so this spends nothing. */
+  const persistSelection = (next: { soundId?: string; packageId?: string; customAudio?: IdentCustomAudio | null }) => {
+    /* The package is the decision; the sound has a sensible default and no cost,
+       so choosing a kit first does not stall on a sound the player has not
+       thought about. The reverse does stall, deliberately: a sound alone is not
+       an ident. */
+    const soundId = next.soundId ?? draft.soundId ?? data.identSounds[0]?.id;
+    const packageId = next.packageId ?? draft.packageId;
+    if (!soundId || !packageId) return;
+    handlers.onSelectIdent?.(soundId, packageId, next.customAudio !== undefined ? next.customAudio : draft.customAudio);
+  };
+
+  /* A draft restored from a previous session can still name an ident the
+     platform never recorded, so the two are reconciled on mount — but only
+     onto a real, unlocked choice the player actually made. It never invents
+     one, so arriving with nothing chosen leaves the stage open. */
+  useEffect(() => {
+    if (!draft.soundId || !draft.packageId || packageLock) return;
+    if (draft.soundId === data.ident.soundId && draft.packageId === data.ident.packageId) return;
+    handlers.onSelectIdent?.(draft.soundId, draft.packageId, draft.customAudio);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const chooseSound = (next: string) => {
     patch({ soundId: next });
+    persistSelection({ soundId: next });
     setTake((current) => current + 1);
     void playStreamingIdentPreview(next as StreamingIdentPreviewId, draft.customAudio)
       .catch(() => setUploadError('Sound preview is unavailable on this device.'));
@@ -85,7 +107,18 @@ export function StepIdent({ data, draft, patch, free, handlers }: StepProps) {
   const previewPackage = (nextId: string, locked: boolean) => {
     setPreviewPackageId(nextId);
     setTake((current) => current + 1);
-    if (!locked) patch({ packageId: nextId });
+    if (locked) {
+      /* Reaching for a package you cannot have abandons the one you had. The
+         stage ends with nothing selected — and the plan stops carrying the cost
+         of a package the platform no longer names. */
+      if (draft.packageId) {
+        patch({ packageId: undefined });
+        handlers.onClearIdent?.();
+      }
+      return;
+    }
+    patch({ packageId: nextId });
+    persistSelection({ packageId: nextId });
   };
 
   const uploadCustomAudio = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -97,6 +130,7 @@ export function StepIdent({ data, draft, patch, free, handlers }: StepProps) {
     try {
       const customAudio = await optimizeStreamingIdentUpload(file);
       patch({ soundId: 'custom', customAudio });
+      persistSelection({ soundId: 'custom', customAudio });
       setTake((current) => current + 1);
       void playStreamingIdentPreview('custom', customAudio)
         .catch(() => setUploadError('The upload is ready, but this device blocked its preview.'));
@@ -223,6 +257,13 @@ export function StepIdent({ data, draft, patch, free, handlers }: StepProps) {
       {/* --- and what you are actually buying ---------------------------------- */}
       <section className="lw-block">
         <p className="sf-eyebrow lw-block-head">What gets made</p>
+        {/* The single way to open research on this screen, at the top of the kit
+            it refers to rather than below the fold. */}
+        {previewLock && previewPack ? (
+          <button type="button" className="sf-btn sf-btn--research" onClick={() => handlers.onOpenTechnology?.()}>
+            Research {previewPack.name}
+          </button>
+        ) : null}
         {/* Four kits would be four tall cards. They are a picker, and only the
             chosen one explains itself. */}
         <div className="id-kits">
@@ -269,41 +310,34 @@ export function StepIdent({ data, draft, patch, free, handlers }: StepProps) {
               </div>
             )}
             {previewPack.effect && <p className="id-kiteffect">Studio effect · {previewPack.effect}</p>}
-            {previewLock && (
-              <div className="id-research-gate">
-                <ResearchLockMark reason={previewLock} />
-                {handlers.onOpenTechnology && <button type="button" onClick={handlers.onOpenTechnology}>Open research</button>}
-              </div>
-            )}
+            {/* The research gate that sat here was the second of two ways to
+                open research on one screen. The single button above the kit now
+                carries it. */}
           </div>
         )}
       </section>
 
-      <section className="lw-preview">
-        <div><span>Package value</span><b>{previewCost > 0 ? money(previewCost) : 'Included'}</b></div>
-        <div><span>Due on commission</span><b>{previewLock ? 'Research first' : dueNow > 0 ? money(dueNow) : 'Nothing'}</b></div>
-        <div><span>Studio money after</span><b className={!previewLock && short > 0 ? 'sf-tone-bad' : ''}>{previewLock ? '—' : money(Math.max(0, free - dueNow))}</b></div>
-        {!previewLock && short > 0 && <div><span>Short by</span><b className="sf-tone-bad">{money(short)}</b></div>}
-      </section>
+      {/* The Package value / Due on commission / Studio money after table is
+          gone with the commission it described. Nothing is due here any more,
+          and studio money does not move on this screen — the money rail at the
+          top already carries the launch plan, and the line below states this
+          package's share of it. */}
 
-      {matchesCommissioned && (
-        <p className="id-commissioned" role="status"><span aria-hidden="true">✓</span> This exact ident is commissioned and paid.</p>
-      )}
-
-      <button
-        type="button"
-        className="sf-btn sf-btn--primary"
-        disabled={Boolean(previewLock) || !ready || matchesCommissioned}
-        onClick={() => draft.soundId && draft.packageId && handlers.onCommissionIdent?.(draft.soundId, draft.packageId, draft.customAudio)}
-      >
-        {previewLock
-          ? 'Research required to commission'
-          : matchesCommissioned
-          ? 'Current ident commissioned'
-          : data.ident.commissioned
-            ? `Commission changes${dueNow ? ` · ${money(dueNow)}` : ''}`
-            : `Commission this ident${dueNow ? ` · ${money(dueNow)}` : ''}`}
-      </button>
+      {/* No commission button. Choosing the sound and the kit IS the choice, and
+          it is already written to canonical state by the pickers above. What is
+          left to say is what that choice will cost, which the launch bill then
+          carries as `included` or `planned` until launch settles it. */}
+      {/* `pack` is the SELECTED package, not the previewed one. Nothing is
+          chosen until the player chooses it, and a locked kit can be previewed
+          without ever becoming the selection — so this reports the real state
+          rather than whatever is on screen. */}
+      <p className="id-commissioned" role="status">
+        {!pack
+          ? 'No ident selected yet.'
+          : dueNow
+            ? `Selected · ${money(dueNow)} added to the launch plan, payable at launch.`
+            : 'Selected · included at no cost.'}
+      </p>
     </>
   );
 }

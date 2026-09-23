@@ -1,0 +1,74 @@
+/* ================================================================
+   ZEDBURY STUDIOS — studio ident.
+
+   Deliberately plain: the mark fades in, holds, and fades out. About a
+   second and a half, start to finish. No draw-on, no build, no camera
+   move, no colour field — a studio card, not a set piece.
+
+   Flat by design, because it fronts every game we ship: solid brand red
+   on black, no glow, gradient, grain or bevel anywhere.
+
+   Self-contained on purpose: #act1 sits above the host's grain and
+   vignette so the ident stays flat wherever it is dropped in, and it
+   reads nothing from the surrounding app.
+================================================================ */
+:root{
+  --zb-red:#f23117;
+  --zb-ink:#050505;
+  --zb-paper:#efe9e3;
+  /* one size and one optical lift, shared by the mark and the caption so the
+     two stay locked to each other at any viewport */
+  --zb-size:min(70vw,326px);
+  --zb-lift:3vh;
+}
+
+#act1.zb-act{
+  background:var(--zb-ink);
+  z-index:61;              /* above the host's grain/vignette: this ident is flat */
+  overflow:hidden;
+}
+
+.zb-box{
+  position:absolute;left:50%;top:calc(50% - var(--zb-lift));
+  width:var(--zb-size);
+  transform:translate(-50%,-50%);
+  opacity:0;
+}
+.zb-art{width:100%;height:auto;display:block}
+
+.zb-caption{
+  position:absolute;left:50%;
+  /* clears the mark: half its height (the artwork is 1394/1500 as tall as it
+     is wide) plus a fixed gap, measured from the lifted centre */
+  top:calc(50% - var(--zb-lift) + var(--zb-size) * .465 + 46px);
+  transform:translateX(-50%);
+  font-family:'Archivo',sans-serif;
+  font-weight:700;
+  font-size:10px;
+  letter-spacing:.5em;text-indent:.5em;  /* indent balances the trailing track */
+  text-transform:uppercase;
+  color:var(--zb-paper);
+  white-space:nowrap;
+  opacity:0;
+}
+
+/* in */
+#act1.on .zb-box{animation:zbFadeIn .42s ease .12s both}
+#act1.on .zb-caption{animation:zbFadeIn .42s ease .24s both}
+@keyframes zbFadeIn{
+  from{opacity:0}
+  to  {opacity:1}
+}
+
+/* and out — this is also the hand-over: the frame it leaves is black,
+   which is already the next screen's */
+#act1.exit .zb-box,
+#act1.exit .zb-caption{animation:zbFadeOut .32s ease both}
+@keyframes zbFadeOut{
+  from{opacity:1}
+  to  {opacity:0}
+}
+
+@media (prefers-reduced-motion:reduce){
+  #act1.on .zb-box,#act1.on .zb-caption{animation-duration:.2s}
+}

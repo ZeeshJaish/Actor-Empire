@@ -160,6 +160,69 @@ export const quoteRealEstateWeeklyRent = (
     return Math.max(100, Math.round(rent / 50) * 50);
 };
 
+/* --- what it is worth, and what you would actually get ----------------------
+
+   Two separate numbers that were being treated as one, badly.
+
+   The value was floored at the purchase price everywhere it was read
+   (`Math.max(property.price, currentValue)`), so a property could never be
+   worth less than you paid — even though `calculateRealEstateValueUpdate`
+   computes a `lowerCap` of about half and the market has a SLUMP in it. The
+   whole downside of the model was being thrown away at the point of display.
+
+   And the sale was a flat half of that floored figure, which is not a market,
+   it is a fine. Selling costs a spread now, and the spread is the cycle: a
+   boom clears quickly and near the asking price, a slump does not clear at all
+   without giving something up. That also removes the need for a punitive
+   haircut to stop flipping — you cannot flip through a spread that moves
+   against you. */
+
+const cycleSaleSpread: Record<RealEstateMarketCycle, number> = {
+    BOOM: 0.07,
+    GROWTH: 0.09,
+    STABLE: 0.12,
+    COOLING: 0.17,
+    SLUMP: 0.22,
+};
+
+export interface RealEstateSaleQuote {
+    /** What the market says it is worth today. Can be below what you paid. */
+    marketValue: number;
+    /** What you would actually bank, after the cost of selling into this market. */
+    saleProceeds: number;
+    /** The share given up to sell now. */
+    spread: number;
+    cycle: RealEstateMarketCycle;
+    cycleLabel: string;
+    /** Against the purchase price: positive is a gain on the sale. */
+    gainOnCost: number;
+}
+
+export const quoteRealEstateSale = (
+    property: Property,
+    state?: Partial<PlayerAssetState>,
+    player?: Pick<Player, 'age' | 'currentWeek' | 'stats'>,
+): RealEstateSaleQuote => {
+    const snapshot = getRealEstateMarketSnapshot(property, state, player);
+    const basePrice = Math.max(0, Math.round(Number(property.price || 0)));
+    /* Not floored at the purchase price — that floor is the bug. */
+    const marketValue = Math.max(0, Math.round(Number(state?.currentValue ?? basePrice)));
+    /* A neglected building sells for less, on top of whatever the market is
+       doing, because the next owner can see the state of it. */
+    const condition = clamp(Number(state?.condition ?? 100), 25, 100);
+    const conditionSpread = Math.max(0, (92 - condition) / 100) * 0.35;
+    const spread = clampRate(cycleSaleSpread[snapshot.cycle] + conditionSpread, 0.05, 0.45);
+    const saleProceeds = Math.max(0, Math.round(marketValue * (1 - spread)));
+    return {
+        marketValue,
+        saleProceeds,
+        spread,
+        cycle: snapshot.cycle,
+        cycleLabel: snapshot.cycleLabel,
+        gainOnCost: saleProceeds - basePrice,
+    };
+};
+
 export const calculateRealEstateValueUpdate = (
     property: Property,
     state: PlayerAssetState,

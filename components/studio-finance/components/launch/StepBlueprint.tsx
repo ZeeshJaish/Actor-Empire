@@ -17,7 +17,7 @@ import { forecastPricing, summarize } from '../../finance/launch';
 import type { StepProps } from './LaunchWizard';
 import { compactCount, money, pct } from '../../finance/format';
 import { FlagField } from '../FlagField';
-import { Poster } from '../Poster';
+import { StreamingTitleArt } from '../StreamingTitleArt';
 import { Mark } from '../../../streaming-transplant/StreamingBrandVisuals';
 
 const WAVE: Record<string, number[]> = {
@@ -42,48 +42,74 @@ export function StepBlueprint({ data, draft, chosen, treasury, free, gap, handle
   const pack = data.identPackages.find((p) => p.id === draft.packageId);
   const catalogueDepth = data.catalogue.hours / Math.max(1, data.catalogue.hoursNeeded);
 
+  /* The six decisions this wizard is made of. The hero draws one pip each and
+     the grid below draws one tile each, off this same list, so the count in the
+     hero and the tiles under it can never disagree — and a pip jumps to the
+     step it stands for, which is what makes the hero part of the page rather
+     than a picture sitting on top of it. */
   const checks = [
-    { ok: chosen.length > 0, step: 'markets' as LaunchStepId },
-    { ok: approved === chosen.length && chosen.length > 0, step: 'clearance' as LaunchStepId },
-    { ok: data.ident.commissioned, step: 'ident' as LaunchStepId },
-    { ok: Boolean(storefront), step: 'storefront' as LaunchStepId },
-    { ok: settings.streams.length > 0, step: 'pricing' as LaunchStepId },
-    { ok: data.catalogue.readyForLaunch ?? data.catalogue.titles > 0, step: 'catalogue' as LaunchStepId },
+    { label: 'Markets', ok: chosen.length > 0, step: 'markets' as LaunchStepId },
+    { label: 'Clearance', ok: approved === chosen.length && chosen.length > 0, step: 'clearance' as LaunchStepId },
+    { label: 'Ident', ok: data.ident.commissioned, step: 'ident' as LaunchStepId },
+    { label: 'Store', ok: Boolean(storefront), step: 'storefront' as LaunchStepId },
+    { label: 'Pricing', ok: settings.streams.length > 0, step: 'pricing' as LaunchStepId },
+    { label: 'Catalogue', ok: data.catalogue.readyForLaunch ?? data.catalogue.titles > 0, step: 'catalogue' as LaunchStepId },
   ];
   const done = checks.filter((c) => c.ok).length;
   const blocking = data.blockers.filter((b) => b.severity === 'block').length;
+  const blockedSteps = new Set(data.blockers.filter((b) => b.severity === 'block').map((b) => b.step));
   const state = blocking > 0 ? 'blocked' : done === checks.length ? 'ready' : 'warned';
 
   return (
     <>
-      {/* --- the poster for your own launch -------------------------------- */}
+      {/* --- the title card for your own opening night --------------------
+          It was a tall panel with a watermarked bolt filling most of it, a name
+          in the only mixed-case display text on the screen, and two numbers
+          that did not agree: a ring reading 2/6 beside a sentence counting
+          something else entirely. And a week number — 1259 — that meant
+          nothing to anyone.
+
+          It is the splash a household would see the night this opens: the mark
+          drawn properly, the name set the way every other heading is set, and
+          one row of six pips that ARE the six decisions below. Each pip is the
+          step it stands for and jumps to it; the sentence beneath reconciles
+          both counts in one breath. */}
       <section className={`bl-hero is-${state}`}>
-        <div className="bl-hero-art" aria-hidden="true">
-          <span className="bl-hero-mark">
-            <Mark
-              brand={{
-                name: data.company.name,
-                markId: data.company.markId || 'BOLT',
-                customMark: data.company.logoSrc || null,
-              }}
-              className="bl-hero-mark-glyph"
-            />
-          </span>
-        </div>
-        <p className="sf-eyebrow">Opening night plan · week {data.company.week}</p>
+        <span className="bl-hero-mark" aria-hidden="true">
+          <Mark
+            brand={{
+              name: data.company.name,
+              markId: data.company.markId || 'BOLT',
+              customMark: data.company.logoSrc || null,
+            }}
+            className="bl-hero-mark-glyph"
+          />
+        </span>
+        <p className="sf-eyebrow">Opening night</p>
         <h2>{data.company.name}</h2>
-        <div className="bl-hero-state">
-          <span className="bl-ring" style={{ ['--p' as string]: `${(done / checks.length) * 100}%` }} aria-hidden="true">
-            <b>{done}<i>/{checks.length}</i></b>
-          </span>
-          <p>
-            {state === 'ready'
-              ? 'Every decision is made. Build the Platform can start from this.'
-              : state === 'blocked'
-                ? `${blocking} thing${blocking > 1 ? 's' : ''} still block opening night.`
-                : 'Nothing is blocking. The gaps below will be felt on the first weekend.'}
-          </p>
+
+        <div className="bl-hero-pips" role="group" aria-label="The six decisions">
+          {checks.map((check) => (
+            <button
+              key={check.step}
+              type="button"
+              className={check.ok ? 'is-ok' : blockedSteps.has(check.step) ? 'is-blocked' : undefined}
+              onClick={() => onJump(check.step)}
+              aria-label={`${check.label} — ${check.ok ? 'settled' : 'still open'}`}
+            >
+              <i aria-hidden="true" />
+              <em>{check.label}</em>
+            </button>
+          ))}
         </div>
+
+        <p className="bl-hero-read">
+          {state === 'ready'
+            ? `All ${checks.length} decisions are settled. Build the Platform can start from this.`
+            : state === 'blocked'
+              ? `${done} of ${checks.length} settled · ${blocking} ${blocking === 1 ? 'thing still blocks' : 'things still block'} opening night.`
+              : `${done} of ${checks.length} settled · nothing is blocking, and the gaps will be felt on the first weekend.`}
+        </p>
       </section>
 
       {/* --- the decisions, as the pictures they were made with ------------- */}
@@ -155,7 +181,7 @@ export function StepBlueprint({ data, draft, chosen, treasury, free, gap, handle
           value={`${compactCount(data.catalogue.titles)} titles · ${compactCount(data.catalogue.hours)} hours`}>
           <div className="bl-posters">
             {data.catalogue.anchors.slice(0, 4).map((t) => (
-              <span key={t.id}><Poster seed={t.posterSeed ?? t.id} size={26} /></span>
+              <span key={t.id}><StreamingTitleArt id={t.posterSeed ?? t.id} title={t.name} genre={t.format} poster={t.poster} size={26} /></span>
             ))}
             <em>{catalogueDepth.toFixed(1)}×</em>
           </div>
@@ -210,9 +236,9 @@ export function StepBlueprint({ data, draft, chosen, treasury, free, gap, handle
           <i aria-hidden="true" />
           {data.blueprintSaved ? 'Autosaved · current' : 'Autosaving requirements'}
         </span>
-        <button type="button" className="sf-btn sf-btn--primary" onClick={() => handlers.onOpenBuildPlatform?.()}>
-          Build the Platform
-        </button>
+        {/* No build button here. The wizard's own footer already turns into
+            "Open Build the Platform" on the last step, so this was a second
+            primary action for the same destination, stacked directly above it. */}
       </div>
     </>
   );

@@ -1,5 +1,6 @@
 import type {
     Genre,
+    OwnedStreamingPricingConfiguration,
     Player,
     StreamingEcosystemOperator,
     WorldStreamingOfferRegistry,
@@ -11,6 +12,8 @@ import { normalizeOwnedStreamingPlatformState } from '../ownedStreamingPlatform'
 import { normalizeStreamingPlatformEcosystem } from '../streamingPlatformEcosystem';
 import {
     effectiveMonthlyStreamingPlanPrice,
+    streamingBillingPathPrice,
+    streamingIntroOfferAppliesTo,
     normalizeStreamingPricingConfiguration,
 } from '../streamingPricingEconomy';
 import { createAiStreamingCommercialConfiguration } from './worldStreamingCommercialEconomy';
@@ -21,6 +24,7 @@ const clamp = (value: number, minimum: number, maximum: number): number => (
 const round2 = (value: number): number => Math.round(value * 100) / 100;
 const commercialSignature = (pricing: ReturnType<typeof normalizeStreamingPricingConfiguration>): string => [
     pricing.streams.join(','),
+    `${pricing.annualDiscount}:${pricing.introOffer}:${pricing.introOfferPlanId || 'ALL'}`,
     `${pricing.ads.minutesPerHour}:${pricing.ads.cpm}`,
     `${pricing.rentals.rent}:${pricing.rentals.buy}:${pricing.rentals.windowWeeks}`,
     pricing.premium.price,
@@ -118,7 +122,17 @@ const createPlayerOffer = (player: Player, absoluteWeek: number): WorldStreaming
         id: plan.id,
         name: plan.name,
         monthlyPrice: plan.monthly,
-        effectiveMonthlyPrice: effectiveMonthlyStreamingPlanPrice(plan.monthly, pricing.annualDiscount, pricing.introOffer, weeksSinceOfferStart),
+        effectiveMonthlyPrice: effectiveMonthlyStreamingPlanPrice(
+            plan.monthly,
+            pricing.annualDiscount,
+            pricing.introOffer,
+            weeksSinceOfferStart,
+            streamingIntroOfferAppliesTo(plan.id, pricing.introOfferPlanId),
+        ),
+        monthlyBillingPrice: streamingBillingPathPrice(plan.monthly, pricing.annualDiscount, pricing.introOffer,
+            weeksSinceOfferStart, 'MONTHLY', streamingIntroOfferAppliesTo(plan.id, pricing.introOfferPlanId)),
+        annualBillingMonthlyPrice: streamingBillingPathPrice(plan.monthly, pricing.annualDiscount, pricing.introOffer,
+            weeksSinceOfferStart, 'ANNUAL', streamingIntroOfferAppliesTo(plan.id, pricing.introOfferPlanId)),
         featureIds: [...plan.featureIds],
         ads: plan.ads,
         appealIndex: planAppeal(plan.featureIds, plan.ads),
@@ -160,9 +174,8 @@ const hashUnit = (value: string): number => {
 
 const createAiPlans = (
     operator: StreamingEcosystemOperator,
-    absoluteWeek: number,
     includeFreeAdAccess: boolean,
-): WorldStreamingPlanOffer[] => {
+): Omit<WorldStreamingPlanOffer, 'effectiveMonthlyPrice' | 'monthlyBillingPrice' | 'annualBillingMonthlyPrice'>[] => {
     const prestigePrice = operator.prestige * .055 + operator.cataloguePower * .035;
     const homeAdjustment = operator.kind === 'REGIONAL_REAL' ? -.9 : operator.kind === 'DYNAMIC_FICTIONAL' ? -.3 : 1.2;
     const jitter = (hashUnit(operator.id) - .5) * 1.8;
@@ -176,14 +189,10 @@ const createAiPlans = (
     if (planCount >= 2) plans.push({ id: 'VALUE', name: 'Essential', monthly: middle * .62, features: ['hd', 'streams2'], ads: true });
     plans.push({ id: 'STANDARD', name: planCount === 1 ? 'Access' : 'Standard', monthly: middle, features: ['hd', 'streams2', 'downloads', 'catalogue'], ads: false });
     if (planCount >= 3) plans.push({ id: 'PREMIUM', name: 'Premiere', monthly: middle * 1.48, features: ['uhd', 'spatial', 'streams4', 'downloads', 'noads', 'catalogue'], ads: false });
-    const annualDiscount = round2(clamp(8 + (100 - operator.brandPower) * .12 + hashUnit(`${operator.id}:annual`) * 8, 5, 24));
-    const introOffer = round2(clamp((100 - operator.brandPower) * .18 + hashUnit(`${operator.id}:intro`) * 10, 0, 28));
-    const weeksSinceOfferStart = Math.max(0, absoluteWeek - operator.foundedAtAbsoluteWeek);
     return plans.map(plan => ({
         id: plan.id,
         name: plan.name,
         monthlyPrice: round2(plan.monthly),
-        effectiveMonthlyPrice: effectiveMonthlyStreamingPlanPrice(plan.monthly, annualDiscount, introOffer, weeksSinceOfferStart),
         featureIds: plan.features,
         ads: plan.ads,
         appealIndex: planAppeal(plan.features, plan.ads),
@@ -204,7 +213,7 @@ const createAiOffer = (player: Player, operator: StreamingEcosystemOperator, abs
     const technology = technologyLevels.length
         ? technologyLevels.reduce((sum, value) => sum + value, 0) / technologyLevels.length * 10
         : operator.technology;
-    const commercialConfiguration = createAiStreamingCommercialConfiguration({
+    const baseCommercialConfiguration = createAiStreamingCommercialConfiguration({
         platformId: operator.id,
         kind: operator.kind,
         technology,
@@ -214,20 +223,46 @@ const createAiOffer = (player: Player, operator: StreamingEcosystemOperator, abs
         absoluteWeek,
         foundedAtAbsoluteWeek: operator.foundedAtAbsoluteWeek,
     });
-    const includeFreeAdAccess = commercialConfiguration.streams.includes('ads') && (
+    const includeFreeAdAccess = baseCommercialConfiguration.streams.includes('ads') && (
         operator.id === 'YOUTUBE'
         || (operator.kind === 'DYNAMIC_FICTIONAL' && hashUnit(`${operator.id}:free-ad-access`) < .18)
     );
-    const plans = createAiPlans(operator, absoluteWeek, includeFreeAdAccess);
-    commercialConfiguration.plans = plans.map(plan => ({
+    const listedPlans = createAiPlans(operator, includeFreeAdAccess);
+    const annualDiscountPercent = round2(clamp(8 + (100 - operator.brandPower) * .12 + hashUnit(`${operator.id}:annual`) * 8, 5, 24));
+    const introOfferPercent = round2(clamp((100 - operator.brandPower) * .18 + hashUnit(`${operator.id}:intro`) * 10, 0, 28));
+    const introOfferPlanId = listedPlans.length > 1 && hashUnit(`${operator.id}:intro-target`) < .5
+        ? listedPlans[listedPlans.length - 1].id
+        : undefined;
+    const commercialConfiguration: OwnedStreamingPricingConfiguration = normalizeStreamingPricingConfiguration({
+        ...baseCommercialConfiguration,
+        annualDiscount: annualDiscountPercent,
+        introOffer: introOfferPercent,
+        introOfferPlanId,
+        plans: listedPlans.map(plan => ({
         id: plan.id,
         name: plan.name,
         monthly: plan.monthlyPrice,
         featureIds: [...plan.featureIds],
         ads: plan.ads,
+        })),
+    });
+    const weeksSinceOfferStart = Math.max(0, absoluteWeek - operator.foundedAtAbsoluteWeek);
+    const plans: WorldStreamingPlanOffer[] = listedPlans.map(plan => ({
+        ...plan,
+        effectiveMonthlyPrice: effectiveMonthlyStreamingPlanPrice(
+            plan.monthlyPrice,
+            commercialConfiguration.annualDiscount,
+            commercialConfiguration.introOffer,
+            weeksSinceOfferStart,
+            streamingIntroOfferAppliesTo(plan.id, commercialConfiguration.introOfferPlanId),
+        ),
+        monthlyBillingPrice: streamingBillingPathPrice(plan.monthlyPrice, commercialConfiguration.annualDiscount,
+            commercialConfiguration.introOffer, weeksSinceOfferStart, 'MONTHLY',
+            streamingIntroOfferAppliesTo(plan.id, commercialConfiguration.introOfferPlanId)),
+        annualBillingMonthlyPrice: streamingBillingPathPrice(plan.monthlyPrice, commercialConfiguration.annualDiscount,
+            commercialConfiguration.introOffer, weeksSinceOfferStart, 'ANNUAL',
+            streamingIntroOfferAppliesTo(plan.id, commercialConfiguration.introOfferPlanId)),
     }));
-    const annualDiscountPercent = round2(clamp(8 + (100 - operator.brandPower) * .12 + hashUnit(`${operator.id}:annual`) * 8, 5, 24));
-    const introOfferPercent = round2(clamp((100 - operator.brandPower) * .18 + hashUnit(`${operator.id}:intro`) * 10, 0, 28));
     return {
         platformId: operator.id,
         name: authoritative?.name || operator.name,

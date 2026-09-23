@@ -9,6 +9,7 @@ import type {
     WorldStreamingPlanAllocation,
     WorldStreamingPlatformAllocation,
     WorldStreamingPlatformOffer,
+    StreamingBillingPath,
 } from '../../types';
 import { createDeterministicId } from '../deterministicRandom';
 import { getWorldStreamingOffers } from './worldStreamingOffers';
@@ -16,6 +17,7 @@ import { normalizeWorldAudienceEconomyState } from './worldAudienceCohorts';
 import { normalizeWorldAudienceParticipationState } from './worldAudienceParticipation';
 import { normalizeWorldPopulationState } from './worldPopulation';
 import { calculateStreamingCommercialAudienceAdjustment } from './worldStreamingCommercialEconomy';
+import { STREAMING_ANNUAL_BILLING_SHARE } from '../streamingPricingEconomy';
 
 export const WORLD_STREAMING_COMPETITION_SCHEMA_VERSION = 1 as const;
 const MAX_SNAPSHOTS = 32;
@@ -64,18 +66,25 @@ const distributeInteger = (total: number, weights: number[], caps?: number[]): n
 interface Candidate {
     offer: WorldStreamingPlatformOffer;
     plan: WorldStreamingPlatformOffer['plans'][number];
+    billingPath: StreamingBillingPath;
+    billingPrice: number;
     utility: number;
     weight: number;
     driver: string;
 }
 
-interface CohortAllocation {
+interface BillingPathAllocation {
+    billingPath: StreamingBillingPath;
     reachableHouseholds: number;
     subscribingHouseholds: number;
     totalSubscriptions: number;
     totalBudget: number;
     totalSpend: number;
     allocations: Array<Candidate & { households: number; primaryHouseholds: number }>;
+}
+
+interface CohortAllocation extends Omit<BillingPathAllocation, 'billingPath'> {
+    paths: BillingPathAllocation[];
 }
 
 const planUtility = (
@@ -85,8 +94,9 @@ const planUtility = (
     plan: WorldStreamingPlatformOffer['plans'][number],
     countryId: string,
     budgetPerHousehold: number,
+    billingPrice: number,
 ): { utility: number; driver: string } => {
-    const affordability = clamp(100 - plan.effectiveMonthlyPrice / Math.max(.5, budgetPerHousehold) * 62, -80, 95);
+    const affordability = clamp(100 - billingPrice / Math.max(.5, budgetPerHousehold) * 62, -80, 95);
     const featureFit = plan.appealIndex
         + (cohort.lifeStageId === 'FAMILY' && plan.featureIds.includes('streams4') ? 16 : 0)
         + (cohort.primaryPersonaId === 'HABIT_STREAMERS' && plan.featureIds.includes('downloads') ? 10 : 0)
@@ -126,28 +136,35 @@ const planUtility = (
     return { utility, driver: drivers.sort((left, right) => right.value - left.value || left.id.localeCompare(right.id))[0].id };
 };
 
-export const allocateWorldStreamingCohort = (
+const allocateBillingPath = (
     countryId: string,
     cohort: WorldAudienceCohortState,
     participation: WorldAudienceParticipationCohortState,
     offers: WorldStreamingPlatformOffer[],
-): CohortAllocation => {
-    const reachableHouseholds = participation.streamingOnlyHouseholds + participation.dualParticipantHouseholds;
-    const totalBudget = Math.max(0, participation.totalMonthlyStreamingBudget);
+    billingPath: StreamingBillingPath,
+    reachableHouseholds: number,
+    totalBudget: number,
+): BillingPathAllocation => {
     if (!reachableHouseholds || !totalBudget || !offers.length) {
-        return { reachableHouseholds, subscribingHouseholds: 0, totalSubscriptions: 0, totalBudget, totalSpend: 0, allocations: [] };
+        return { billingPath, reachableHouseholds, subscribingHouseholds: 0, totalSubscriptions: 0, totalBudget, totalSpend: 0, allocations: [] };
     }
     const budgetPerHousehold = totalBudget / reachableHouseholds;
     const candidates = offers.flatMap(offer => {
-        const affordablePlans = offer.plans.filter(plan => plan.effectiveMonthlyPrice <= budgetPerHousehold + .001);
+        const affordablePlans = offer.plans.filter(plan => (
+            (billingPath === 'MONTHLY' ? plan.monthlyBillingPrice : plan.annualBillingMonthlyPrice) <= budgetPerHousehold + .001
+        ));
         if (!affordablePlans.length) return [];
-        const ranked = affordablePlans.map(plan => ({ plan, ...planUtility(cohort, participation, offer, plan, countryId, budgetPerHousehold) }))
+        const ranked = affordablePlans.map(plan => {
+            const billingPrice = billingPath === 'MONTHLY' ? plan.monthlyBillingPrice : plan.annualBillingMonthlyPrice;
+            return { plan, billingPrice, ...planUtility(cohort, participation, offer, plan, countryId, budgetPerHousehold, billingPrice) };
+        })
             .sort((left, right) => right.utility - left.utility || left.plan.id.localeCompare(right.plan.id));
         const best = ranked[0];
-        return [{ offer, plan: best.plan, utility: best.utility, weight: Math.max(.05, Math.exp(clamp((best.utility - 45) / 24, -3, 3))), driver: best.driver }];
+        return [{ offer, plan: best.plan, billingPath, billingPrice: best.billingPrice, utility: best.utility,
+            weight: Math.max(.05, Math.exp(clamp((best.utility - 45) / 24, -3, 3))), driver: best.driver }];
     }).sort((left, right) => right.utility - left.utility || left.offer.platformId.localeCompare(right.offer.platformId));
     if (!candidates.length) {
-        return { reachableHouseholds, subscribingHouseholds: 0, totalSubscriptions: 0, totalBudget, totalSpend: 0, allocations: [] };
+        return { billingPath, reachableHouseholds, subscribingHouseholds: 0, totalSubscriptions: 0, totalBudget, totalSpend: 0, allocations: [] };
     }
     const willingnessRate = clamp(
         .12 + participation.streamingEligibilityIndex / 260 + participation.streamingInterestIndex / 210
@@ -156,7 +173,7 @@ export const allocateWorldStreamingCohort = (
         .94,
     );
     const subscribingHouseholds = Math.min(reachableHouseholds, Math.round(reachableHouseholds * willingnessRate));
-    const sortedPrices = candidates.map(candidate => candidate.plan.effectiveMonthlyPrice).sort((left, right) => left - right);
+    const sortedPrices = candidates.map(candidate => candidate.billingPrice).sort((left, right) => left - right);
     let affordableServices = 0;
     let cumulativePrice = 0;
     for (const price of sortedPrices) {
@@ -173,14 +190,14 @@ export const allocateWorldStreamingCohort = (
         + Math.round(subscribingHouseholds * secondaryRate)
         + Math.round(subscribingHouseholds * tertiaryRate);
     const counts = distributeInteger(desiredSlots, candidates.map(candidate => candidate.weight), candidates.map(() => subscribingHouseholds));
-    let spendCents = counts.reduce((sum, count, index) => sum + count * Math.round(candidates[index].plan.effectiveMonthlyPrice * 100), 0);
+    let spendCents = counts.reduce((sum, count, index) => sum + count * Math.round(candidates[index].billingPrice * 100), 0);
     const budgetCents = Math.round(totalBudget * 100);
     const removalOrder = candidates.map((candidate, index) => ({ candidate, index }))
-        .sort((left, right) => right.candidate.plan.effectiveMonthlyPrice - left.candidate.plan.effectiveMonthlyPrice
+        .sort((left, right) => right.candidate.billingPrice - left.candidate.billingPrice
             || left.candidate.utility - right.candidate.utility || left.index - right.index);
     for (const { candidate, index } of removalOrder) {
         if (spendCents <= budgetCents) break;
-        const priceCents = Math.max(1, Math.round(candidate.plan.effectiveMonthlyPrice * 100));
+        const priceCents = Math.max(1, Math.round(candidate.billingPrice * 100));
         const remove = Math.min(counts[index], Math.ceil((spendCents - budgetCents) / priceCents));
         counts[index] -= remove;
         spendCents -= remove * priceCents;
@@ -189,6 +206,7 @@ export const allocateWorldStreamingCohort = (
     const actualSubscribingHouseholds = Math.min(subscribingHouseholds, totalSubscriptions);
     const primaryCounts = distributeInteger(actualSubscribingHouseholds, candidates.map(candidate => candidate.weight), counts);
     return {
+        billingPath,
         reachableHouseholds,
         subscribingHouseholds: actualSubscribingHouseholds,
         totalSubscriptions,
@@ -199,6 +217,32 @@ export const allocateWorldStreamingCohort = (
             households: counts[index],
             primaryHouseholds: primaryCounts[index],
         }] : []),
+    };
+};
+
+export const allocateWorldStreamingCohort = (
+    countryId: string,
+    cohort: WorldAudienceCohortState,
+    participation: WorldAudienceParticipationCohortState,
+    offers: WorldStreamingPlatformOffer[],
+): CohortAllocation => {
+    const reachableHouseholds = participation.streamingOnlyHouseholds + participation.dualParticipantHouseholds;
+    const totalBudget = Math.max(0, participation.totalMonthlyStreamingBudget);
+    const annualHomes = Math.round(reachableHouseholds * STREAMING_ANNUAL_BILLING_SHARE);
+    const monthlyHomes = reachableHouseholds - annualHomes;
+    const monthlyBudget = reachableHouseholds > 0 ? round2(totalBudget * monthlyHomes / reachableHouseholds) : 0;
+    const paths = [
+        allocateBillingPath(countryId, cohort, participation, offers, 'MONTHLY', monthlyHomes, monthlyBudget),
+        allocateBillingPath(countryId, cohort, participation, offers, 'ANNUAL', annualHomes, round2(totalBudget - monthlyBudget)),
+    ];
+    return {
+        reachableHouseholds,
+        subscribingHouseholds: paths.reduce((sum, path) => sum + path.subscribingHouseholds, 0),
+        totalSubscriptions: paths.reduce((sum, path) => sum + path.totalSubscriptions, 0),
+        totalBudget,
+        totalSpend: round2(paths.reduce((sum, path) => sum + path.totalSpend, 0)),
+        allocations: paths.flatMap(path => path.allocations),
+        paths,
     };
 };
 
@@ -234,18 +278,23 @@ const createCountry = (
             };
             current.households += allocation.households;
             current.primaryHouseholds += allocation.primaryHouseholds;
-            const revenue = round2(allocation.households * allocation.plan.effectiveMonthlyPrice);
+            const revenue = round2(allocation.households * allocation.billingPrice);
             current.monthlySubscriptionRevenue = round2(current.monthlySubscriptionRevenue + revenue);
             const planRow = current.planAllocations.find(row => row.planId === allocation.plan.id);
             if (planRow) {
                 planRow.households += allocation.households;
+                planRow.monthlyHouseholds += allocation.billingPath === 'MONTHLY' ? allocation.households : 0;
+                planRow.annualHouseholds += allocation.billingPath === 'ANNUAL' ? allocation.households : 0;
                 planRow.monthlySubscriptionRevenue = round2(planRow.monthlySubscriptionRevenue + revenue);
+                planRow.effectiveMonthlyPrice = round2(planRow.monthlySubscriptionRevenue / planRow.households);
             } else {
                 current.planAllocations.push({
                     planId: allocation.plan.id,
                     planName: allocation.plan.name,
                     households: allocation.households,
-                    effectiveMonthlyPrice: allocation.plan.effectiveMonthlyPrice,
+                    monthlyHouseholds: allocation.billingPath === 'MONTHLY' ? allocation.households : 0,
+                    annualHouseholds: allocation.billingPath === 'ANNUAL' ? allocation.households : 0,
+                    effectiveMonthlyPrice: allocation.billingPrice,
                     monthlySubscriptionRevenue: revenue,
                 });
             }
@@ -275,7 +324,11 @@ const mergePlans = (rows: WorldStreamingPlatformAllocation[]): WorldStreamingPla
         const current = plans.get(row.planId);
         if (current) {
             current.households += row.households;
+            current.monthlyHouseholds += row.monthlyHouseholds;
+            current.annualHouseholds += row.annualHouseholds;
             current.monthlySubscriptionRevenue = round2(current.monthlySubscriptionRevenue + row.monthlySubscriptionRevenue);
+            current.effectiveMonthlyPrice = current.households > 0
+                ? round2(current.monthlySubscriptionRevenue / current.households) : 0;
         } else plans.set(row.planId, { ...row });
     });
     return [...plans.values()].sort((left, right) => left.planId.localeCompare(right.planId));
@@ -366,7 +419,11 @@ const structurallyValid = (state: unknown): state is WorldStreamingCompetitionSt
         if (country.totalMonthlySubscriptionSpend < 0 || country.totalMonthlySubscriptionSpend > country.totalMonthlyStreamingBudget + .01) return false;
         if (country.totalSubscriptions !== country.platformAllocations.reduce((sum, row) => sum + row.households, 0)) return false;
         return country.platformAllocations.every(row => row.households === row.planAllocations.reduce((sum, plan) => sum + plan.households, 0)
-            && Math.abs(row.monthlySubscriptionRevenue - row.planAllocations.reduce((sum, plan) => sum + plan.monthlySubscriptionRevenue, 0)) < .011);
+            && Math.abs(row.monthlySubscriptionRevenue - row.planAllocations.reduce((sum, plan) => sum + plan.monthlySubscriptionRevenue, 0)) < .011
+            && row.planAllocations.every(plan => Number.isInteger(plan.monthlyHouseholds)
+                && Number.isInteger(plan.annualHouseholds)
+                && plan.monthlyHouseholds >= 0 && plan.annualHouseholds >= 0
+                && plan.monthlyHouseholds + plan.annualHouseholds === plan.households));
     });
     if (!validCountries) return false;
     const playerRows = countries.flatMap(country => country.platformAllocations.filter(row => row.platformId === 'PLAYER'));
@@ -380,6 +437,8 @@ const structurallyValid = (state: unknown): state is WorldStreamingCompetitionSt
                 && saved.planId === expected.planId
                 && saved.planName === expected.planName
                 && saved.households === expected.households
+                && saved.monthlyHouseholds === expected.monthlyHouseholds
+                && saved.annualHouseholds === expected.annualHouseholds
                 && saved.effectiveMonthlyPrice === expected.effectiveMonthlyPrice
                 && saved.monthlySubscriptionRevenue === expected.monthlySubscriptionRevenue;
         });

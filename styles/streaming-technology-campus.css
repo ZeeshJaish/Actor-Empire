@@ -820,3 +820,74 @@
   .tech-engineering-ledger { animation: none; }
   .tech-campus-facility { transition: none; }
 }
+
+/* ============================================================================
+   THE FIBRE LADDER
+
+   Sits above the research list because it is the one thing in this room you can
+   buy outright. A generation is a project in the list below; the tuning is a
+   purchase, and both are one position, so they are read together. The standard
+   is beside them because it is the reason either matters — the number you are
+   being measured against, which climbs whether you spend or not.
+   ========================================================================== */
+
+.tech-fibre {
+  --research-accent: var(--tech-cyan, #22d3ee);
+  margin-bottom: 18px;
+  padding: 14px;
+  display: grid;
+  gap: 13px;
+  border: 1px solid color-mix(in srgb, var(--research-accent) 24%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--research-accent) 6%, rgba(255, 255, 255, .02));
+}
+.tech-fibre-where span {
+  color: var(--research-accent);
+  font-size: .55rem;
+  font-weight: 900;
+  letter-spacing: .16em;
+}
+.tech-fibre-where h3 { margin: 3px 0 2px; color: var(--tech-ink, #edf8fa); font-size: .95rem; }
+.tech-fibre-where p { margin: 0; color: var(--tech-muted, #8b999e); font-size: .61rem; line-height: 1.5; }
+
+.tech-fibre-read {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: 9px;
+}
+.tech-fibre-read > div {
+  padding: 9px 10px;
+  border: 1px solid var(--tech-line, rgba(255, 255, 255, .08));
+  border-radius: 11px;
+  background: rgba(255, 255, 255, .02);
+}
+.tech-fibre-read dt {
+  color: var(--tech-muted, #8b999e);
+  font-size: .53rem;
+  font-weight: 800;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+.tech-fibre-read dd { margin: 4px 0 0; display: grid; gap: 1px; }
+.tech-fibre-read dd b { color: var(--tech-ink, #edf8fa); font-size: 1.02rem; font-weight: 900; line-height: 1; }
+.tech-fibre-read dd em { color: var(--tech-muted, #8b999e); font-size: .55rem; font-style: normal; line-height: 1.35; }
+
+.tech-fibre-buy { display: flex; flex-wrap: wrap; gap: 8px; }
+/* The ten-level button is the quieter one: buying ten at a time is convenience,
+   and the single level is the decision being offered. */
+.tech-fibre-buy > button:not(.tech-research-primary) {
+  min-height: 44px;
+  padding: 0 15px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--tech-line, rgba(255, 255, 255, .1));
+  border-radius: 12px;
+  color: var(--tech-ink, #edf8fa);
+  background: rgba(255, 255, 255, .03);
+  font-size: .63rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+.tech-fibre-maxed { margin: 0; color: var(--tech-muted, #8b999e); font-size: .61rem; line-height: 1.5; }

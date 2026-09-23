@@ -15,10 +15,10 @@ import type { StepProps } from './LaunchWizard';
 import { money } from '../../finance/format';
 import { FlagField, flagAccent } from '../FlagField';
 import {
-  STREAMING_MARKET_FILING_ENERGY_PER_COUNTRY,
   STREAMING_MARKET_REAPPLICATION_ENERGY,
   STREAMING_MARKET_REQUIREMENT_ENERGY,
 } from '../../../../services/streamingMarkets';
+import { quoteStreamingMarketFilingEnergy } from '../../../../services/streamingMarketFilingQuote';
 
 const OUTCOME: Record<ClearanceOutcome, { label: string; tone: 'good' | 'warn' | 'bad' | 'flat' }> = {
   NOT_FILED: { label: 'Not filed', tone: 'flat' },
@@ -51,7 +51,8 @@ export function StepClearance({ data, draft, chosen, free, handlers }: StepProps
   const needsYou = states.filter((s) => NEEDS_PLAYER.includes(s)).length;
   const unfiled = chosen.filter((c) => stateOf(c.id).outcome === 'NOT_FILED');
   const due = unfiled.reduce((sum, c) => sum + c.rightsEstimate + c.complianceCost, 0);
-  const filingEnergy = unfiled.length * STREAMING_MARKET_FILING_ENERGY_PER_COUNTRY;
+  const filingEnergy = quoteStreamingMarketFilingEnergy(unfiled.length);
+  const singleFilingEnergy = quoteStreamingMarketFilingEnergy(1);
   const short = Math.max(0, due - free);
 
   const active = chosen.find((c) => c.id === openId) ?? chosen[0];
@@ -69,7 +70,7 @@ export function StepClearance({ data, draft, chosen, free, handlers }: StepProps
             <p className="sf-eyebrow">Markets cleared</p>
             <p className="cl-hero-figure">{cleared}<i>/{chosen.length}</i></p>
           </div>
-          {due > 0 && (
+          {unfiled.length > 0 && (
             <div className="cl-hero-due">
               <p className="sf-eyebrow">Due to file</p>
               <p className={short > 0 ? 'sf-tone-bad' : ''}>{money(due)}</p>
@@ -160,7 +161,7 @@ export function StepClearance({ data, draft, chosen, free, handlers }: StepProps
           <div className="cl-costs">
             <span><em>Market access</em><b>{money(active.rightsEstimate)}</b></span>
             <span><em>Compliance</em><b>{money(active.complianceCost)}</b></span>
-            <span><em>Founder time</em><b>{STREAMING_MARKET_FILING_ENERGY_PER_COUNTRY}E</b></span>
+            <span><em>Founder time alone</em><b>{singleFilingEnergy}E</b></span>
             <span className="is-total"><em>To file</em><b>{money(active.rightsEstimate + active.complianceCost)}</b></span>
           </div>
 
@@ -188,14 +189,14 @@ export function StepClearance({ data, draft, chosen, free, handlers }: StepProps
             <button
               type="button"
               className="sf-btn sf-btn--primary"
-              disabled={active.rightsEstimate + active.complianceCost > free || data.energy.current < STREAMING_MARKET_FILING_ENERGY_PER_COUNTRY}
+              disabled={active.rightsEstimate + active.complianceCost > free || data.energy.current < singleFilingEnergy}
               onClick={() => handlers.onBeginMarketEntry?.([active.id], draft.selectedCountryIds)}
             >
-              {data.energy.current < STREAMING_MARKET_FILING_ENERGY_PER_COUNTRY
-                ? `${STREAMING_MARKET_FILING_ENERGY_PER_COUNTRY - data.energy.current}E short for ${active.name}`
+              {data.energy.current < singleFilingEnergy
+                ? `${singleFilingEnergy - data.energy.current}E short for ${active.name}`
                 : active.rightsEstimate + active.complianceCost > free
                 ? `${money(active.rightsEstimate + active.complianceCost - free)} short for ${active.name}`
-                : `File ${active.name} · ${money(active.rightsEstimate + active.complianceCost)} · ${STREAMING_MARKET_FILING_ENERGY_PER_COUNTRY}E`}
+                : `File ${active.name} · ${money(active.rightsEstimate + active.complianceCost)} · ${singleFilingEnergy}E`}
             </button>
           )}
 

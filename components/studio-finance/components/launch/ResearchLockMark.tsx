@@ -1,5 +1,8 @@
 interface ResearchLockMarkProps {
-  reason: string;
+  /** What unlocks it, e.g. "Product Experience 24". Omit to say only that the
+      option is locked — for dense lists where the requirement is named once
+      elsewhere on the screen rather than repeated on every tile. */
+  reason?: string;
   compact?: boolean;
 }
 
@@ -18,7 +21,7 @@ export function ResearchLockMark({ reason, compact = false }: ResearchLockMarkPr
       </span>
       <span className="lw-research-lock-copy">
         <b>Research locked</b>
-        <em>{reason}</em>
+        {reason ? <em>{reason}</em> : null}
       </span>
     </span>
   );

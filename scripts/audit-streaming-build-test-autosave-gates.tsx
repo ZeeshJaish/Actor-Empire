@@ -78,16 +78,16 @@ const data = {
   existing: [], commissioned: false,
   canonical: {
     facilities: (draft: BuildDraft) => draft.facilities,
-    totals: () => ({ racks: 2, cities: 1, capacity: 200_000, burst: 50_000, buildCost: 10_000_000, weeklyCost: 50_000, weeks: 4, energy: 1, water: 1, sustainability: 80, reputation: 80, redundancy: 'SINGLE' as const }),
+    totals: () => ({ racks: 2, compute: 0, cities: 1, buildingCities: 1, capacity: 200_000, burst: 50_000, buildCost: 10_000_000, weeklyCost: 50_000, weeks: 4, energy: 1, water: 1, sustainability: 80, reputation: 80, redundancy: 'SINGLE' as const }),
     money: () => ({ lines: [{ id: 'infra', label: 'Infrastructure', amount: 10_000_000 }], total: 10_000_000, commissionNow: 10_000_000, deferred: 0, available: 1_000_000_000, headroom: 990_000_000, shortfall: 0 }),
-    services: () => [{ marketId: 'US', name: 'United States', code: 'US', servedBy: ['Los Angeles'], role: 'Origin', state: 'READY' as const, startupMs: 30, buffering: .01, peak: 100_000, catalogue: 1, localization: 'Ready' }],
+    services: () => [{ marketId: 'US', name: 'United States', code: 'US', servedBy: ['Los Angeles'], role: 'Origin', state: 'READY' as const, startupMs: 30, buffering: .01, peak: 100_000, reachedShare: 1, coveredShare: 1, coveredPeak: 100_000, cloudServedShare: 0, catalogue: 1, localization: 'Ready' }],
     signature: () => 'current-signature',
   },
 } as unknown as BuildData;
 const draft = {
   facilities: [{ id: 'LA-1', listingId: 'LA', cityId: 'LA', built: false, groups: [{ id: 'origin', name: 'Origin', duty: 'ORIGIN', racks: 2, capacity: 200_000 }], power: { used: 1, contracted: 2 }, cooling: { used: 1, available: 2 }, bandwidth: { used: 1, available: 2 }, condition: 1, uptime: 1, backup: 'UPS', backupCoverage: 1, energyPerWeek: 1, waterPerWeek: 1, opCost: 1, sustainability: 80, reputation: 80 }],
-  architecture: 'HYBRID', ownedShare: .6, doctrine: 'STANDARD', campaignId: '', mode: 'ASSISTED',
-  instructions: data.team, repairIds: [], rehearsal: null, override: false, teamPlanApproved: true, teamPlanClass: 'ESSENTIAL',
+  architecture: 'HYBRID', ownedShare: .6, doctrine: 'STANDARD', campaignId: '', mode: 'HANDS',
+  instructions: data.team, repairIds: [], rehearsal: null, override: false,
 } as BuildDraft;
 
 const assistedTestMarkup = renderToStaticMarkup(
@@ -120,25 +120,23 @@ const launchMarkup = renderToStaticMarkup(
 const gateCopy = Object.fromEntries(gates(data, launchDraft).map(gate => [gate.id, gate.value]));
 assert.deepEqual(
   {
-    team: gateCopy['team-plan'],
     network: gateCopy.network,
-    origin: gateCopy.origin,
+    servers: gateCopy.servers,
     money: gateCopy.money,
     rooms: gateCopy.physical,
   },
   {
-    team: 'ESSENTIAL · approved',
-    network: '2 racks · 1 city',
-    origin: 'Master catalogue ready',
+    network: '1 room · 1 city',
+    servers: '2 racks installed',
     money: '$990M headroom',
     rooms: 'All rooms within limits',
   },
   'Launch gate copy must stay compact enough to remain readable on a two-column phone layout.',
 );
-assert.match(launchMarkup, /7 of 8 ready/, 'Launch must summarize Build and Define readiness together.');
+assert.match(launchMarkup, /7 of 8 ready/, 'Launch must summarize Build, geographic coverage and Define readiness together.');
 assert.match(launchMarkup, /Final proof/, 'Rehearsal must read as the final full-width proof gate.');
 assert.match(launchMarkup, /Fix before commissioning/, 'An unresolved Define item must be promoted beside the readiness summary.');
-assert.match(launchMarkup, /Due now/, 'The contract must foreground the amount charged at commissioning.');
+assert.match(launchMarkup, /Due on execution/, 'The agreement must foreground the amount charged at commissioning.');
 
 const buildWizardSource = readFileSync(resolve(process.cwd(), 'components/studio-finance/components/build/BuildWizard.tsx'), 'utf8');
 const platformSource = readFileSync(resolve(process.cwd(), 'components/StreamingPlatformHQ.tsx'), 'utf8');

@@ -61,7 +61,7 @@ const funded = contributeStreamingFounderCapital(player, 25_000_000, 'finance-ro
 assert(funded.changed, 'Founder injection should be available immediately after incorporation.');
 player = funded.player;
 assert(player.money === personalBefore - 25_000_000, 'Founder injection should debit personal cash atomically.');
-assert(player.ownedStreamingPlatform.treasuryCash === 26_000_000, 'Founder injection should credit company treasury atomically.');
+assert(player.ownedStreamingPlatform.treasuryCash === 25_000_000, 'Founder injection should credit the exact contributed amount atomically.');
 assert(player.ownedStreamingPlatform.founderOwnershipPercent === 100 && player.ownedStreamingPlatform.debtPrincipal === 0, 'Founder injection must create neither dilution nor debt.');
 
 const duplicate = contributeStreamingFounderCapital(player, 25_000_000, 'finance-room-audit-injection');
@@ -100,7 +100,7 @@ assert(player.ownedStreamingPlatform.founderOwnershipPercent === 86, 'Accepted t
 
 const room = getStreamingFinanceRoom(player);
 assert(room.hasCfo && room.cfoName, 'Finance should expose the active CFO sign-off state.');
-assert(room.founderCapitalContributed === 26_000_000 && room.outsideCapitalRaised === 240_000_000, 'The capital desk should reconcile founder and outside capital separately.');
+assert(room.founderCapitalContributed === 25_000_000 && room.outsideCapitalRaised === 240_000_000, 'The capital desk should reconcile founder and outside capital separately.');
 assert(room.investorOffers.find(offer => offer.id === 'investor-sofia-laurent')?.accepted, 'The accepted offer should become permanent cap-table state.');
 const closingBalance = room.ledger
     .filter(entry => entry.affectsTreasury)
@@ -157,7 +157,12 @@ assert(
     'Studio Finance should use game-native visuals and preserve the title, source and market performance desks.',
 );
 assert(ledgerSource.includes('groupLedger') && ledgerSource.includes('Load earlier') && ledgerSource.includes('sf-search'), 'The company passbook should keep searchable, grouped and progressively disclosed ledger history.');
-assert(capitalSource.includes('onOpenBank') && capitalSource.includes('onOpenLeadership') && capitalSource.includes('onOpenPublicMarkets'), 'Capital doors should connect to existing game systems.');
+assert(
+    capitalSource.includes('handlers.onOpenLeadership?.()')
+    && capitalSource.includes('handlers.onOpenPublicMarkets?.()')
+    && roomSource.includes('onOpenBank={onOpenBank}'),
+    'The live capital doors and the separate Bank handoff should remain connected.',
+);
 assert(
     performanceSource.includes('FlagField')
     && performanceSource.includes('onOpenMarket')
@@ -191,7 +196,11 @@ assert(
     && roomStyles.includes('env(safe-area-inset-top)'),
     'Studio Finance should mount as a safe-area-aware immersive screen with collision-free narrow-phone cash-flow labels.',
 );
-assert(appSource.includes("setLifestyleInitialView('STREAMING_FINANCE')") && appSource.includes("setInitialMobileAppMode('BANK')"), 'Main dashboard and Bank handoffs should be connected at app level.');
+assert(
+    appSource.includes("setLifestyleInitialView('STREAMING_PLATFORM')")
+    && appSource.includes("setInitialMobileAppMode('BANK')"),
+    'Main dashboard should open the platform HQ while its Bank handoff remains connected at app level.',
+);
 assert(leadershipSource.includes('Open Studio Finance') && !leadershipSource.includes('Accept capital and dilution'), 'Leadership should own CFO governance but not duplicate term-sheet execution.');
 
 console.log('Streaming Finance Room audit passed.');

@@ -81,6 +81,9 @@
 .nw .upstrip i.ok{background:#2f9e5f}
 .nw .upstrip i.deg{background:#ffb020}
 .nw .upstrip i.down{background:#ff5a5f}
+/* No data. Nothing ran on these days, which the strip could not say before —
+   an absent network drew ninety green bars next to "0.00% uptime". */
+.nw .upstrip i.none{background:#20262e}
 .nw .compfoot{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .nw .compfoot span{font-size:8px;color:#5f6875}
 .nw .compfoot em{font-style:normal;font-size:9.5px;font-weight:800;color:#8b93a5}

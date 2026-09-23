@@ -6,8 +6,9 @@ import type {
 import { getAbsoluteWeek } from '../legacyLogic';
 import { normalizeOwnedStreamingPlatformState } from '../ownedStreamingPlatform';
 import {
-    firstYearStreamingPlanRevenuePerSubscriber,
     normalizeStreamingPricingConfiguration,
+    streamingBillingPathPrice,
+    streamingIntroOfferAppliesTo,
 } from '../streamingPricingEconomy';
 import {
     createWorldStreamingCompetitionState,
@@ -122,6 +123,8 @@ export const forecastWorldStreamingLaunchPricing = (
         planId: plan.id,
         planName: plan.name,
         households: 0,
+        monthlyHouseholds: 0,
+        annualHouseholds: 0,
         effectiveMonthlyPrice: 0,
         monthlySubscriptionRevenue: 0,
     }));
@@ -130,10 +133,14 @@ export const forecastWorldStreamingLaunchPricing = (
             planId: row.planId,
             planName: row.planName,
             households: 0,
+            monthlyHouseholds: 0,
+            annualHouseholds: 0,
             effectiveMonthlyPrice: row.effectiveMonthlyPrice,
             monthlySubscriptionRevenue: 0,
         };
         current.households += row.households;
+        current.monthlyHouseholds += row.monthlyHouseholds;
+        current.annualHouseholds += row.annualHouseholds;
         current.monthlySubscriptionRevenue = Math.round((current.monthlySubscriptionRevenue + row.monthlySubscriptionRevenue) * 100) / 100;
         current.effectiveMonthlyPrice = current.households > 0
             ? Math.round(current.monthlySubscriptionRevenue / current.households * 100) / 100
@@ -142,13 +149,15 @@ export const forecastWorldStreamingLaunchPricing = (
     });
     const planAllocations = [...allocationsByPlan.values()];
     const priceByPlan = new Map(pricing.plans.map(plan => [plan.id, plan.monthly]));
-    const firstYearSubscriptionRevenue = Math.round(planAllocations.reduce((sum, row) => (
-        sum + row.households * firstYearStreamingPlanRevenuePerSubscriber(
-            priceByPlan.get(row.planId) || 0,
-            pricing.annualDiscount,
-            pricing.introOffer,
-        )
-    ), 0) * 100) / 100;
+    const firstYearSubscriptionRevenue = Math.round(planAllocations.reduce((sum, row) => {
+        const list = priceByPlan.get(row.planId) || 0;
+        const introApplies = streamingIntroOfferAppliesTo(row.planId, pricing.introOfferPlanId);
+        const annualMonth = streamingBillingPathPrice(list, pricing.annualDiscount, pricing.introOffer, 0, 'ANNUAL', introApplies);
+        const introMonth = streamingBillingPathPrice(list, pricing.annualDiscount, pricing.introOffer, 0, 'MONTHLY', introApplies);
+        const matureMonth = streamingBillingPathPrice(list, pricing.annualDiscount, pricing.introOffer, 13, 'MONTHLY', introApplies);
+        return sum + row.annualHouseholds * annualMonth * 12
+            + row.monthlyHouseholds * (introMonth * 3 + matureMonth * 9);
+    }, 0) * 100) / 100;
     const eligibleRivals = registry.offers.filter(offer => (
         !offer.isPlayer && offer.activeCountryIds.some(countryId => countryIds.includes(countryId))
     ));

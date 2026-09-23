@@ -118,6 +118,7 @@ const collectionRows = (player: Player, collection: any, currentYear: number) =>
       genre: displayGenre(project?.genre || component?.genre || 'Mixed'),
       hue: hueFor(row.componentProjectId),
       runtime: 'Feature film',
+      poster: project?.customPoster,
     };
   }) || []
 );
@@ -268,6 +269,7 @@ export const buildExactContentMarketLots = (player: Player, sources: ContentMark
     return {
       id: `studio:${title.id}`,
       sourceId: title.id,
+      artId: title.id,
       sourceKind: 'STUDIO',
       title: title.title,
       year: yearFor(title.releaseYear, currentYear),
@@ -278,6 +280,7 @@ export const buildExactContentMarketLots = (player: Player, sources: ContentMark
       sellerKind: 'YOUR STUDIO',
       appetite: 'RELATIONSHIP',
       hue: hueFor(title.id),
+      poster: title.customPoster || copy.project?.customPoster,
       ...copy,
       path: Number(title.gross || copy.project?.boxOffice || 0) > 0 ? 'POST-THEATRICAL' : 'STREAMING ONLY',
       prior: priorRun(title, copy.project),

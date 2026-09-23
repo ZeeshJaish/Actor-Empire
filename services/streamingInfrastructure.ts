@@ -1,4 +1,5 @@
 import type {
+    OwnedStreamingInfrastructureSetup,
     OwnedStreamingInfrastructureSetupDraft,
     OwnedStreamingLaunchRehearsalSnapshot,
     OwnedStreamingFacility,
@@ -42,6 +43,7 @@ import {
     normalizeStreamingFacilityPhysical,
 } from './streamingFacilities';
 import { normalizeStreamingInfrastructureManagementPolicy } from './streamingInfrastructureManagement';
+import { normalizeStreamingRegionPlans } from './streamingCanonicalState';
 import {
     getStreamingFacilityPhysicalView,
     getStreamingNetworkPhysicalSummary,
@@ -145,6 +147,11 @@ const sanitizeFacilities = (
         }];
     });
 };
+
+/** The same normalized physical drawing used by capacity, signatures and commissions. */
+export const getStreamingInfrastructureDraftFacilities = (
+    draft: Pick<OwnedStreamingInfrastructureSetupDraft, 'facilities' | 'networkPlacements'>,
+): OwnedStreamingFacility[] => sanitizeFacilities(draft.facilities, draft.networkPlacements);
 
 const facilitySignature = (
     facilities: OwnedStreamingFacility[] | null | undefined,
@@ -451,7 +458,7 @@ export interface StreamingInfrastructureForecast {
 
 export interface StreamingInfrastructureValidationIssue {
     step: number;
-    code: 'PRICE_RANGE' | 'PRICE_ORDER' | 'LOAD_TEST_REQUIRED' | 'INSUFFICIENT_TREASURY' | 'INVALID_STATE';
+    code: 'PRICE_RANGE' | 'PRICE_ORDER' | 'LOAD_TEST_REQUIRED' | 'INSUFFICIENT_TREASURY' | 'INVALID_STATE' | 'CHANGE_IN_PROGRESS';
     message: string;
 }
 
@@ -524,27 +531,15 @@ export const createDefaultStreamingInfrastructureDraft = (
     player: Player,
 ): OwnedStreamingInfrastructureSetupDraft => {
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
-    const current = platform.infrastructureSetup;
+    // A live change order is the editable drawing until it becomes operational.
+    // The active setup must remain untouched so gameplay continues to use the
+    // network that is actually carrying viewers.
+    const current = platform.pendingInfrastructureSetup || platform.infrastructureSetup;
     const capacityPackageId: StreamingCapacityPackageId = current?.capacityPackageId || 'STARTER';
     const strategy: ConfigurableInfrastructureStrategy = platform.infrastructureStrategy === 'UNDECIDED'
         ? 'HYBRID'
         : platform.infrastructureStrategy;
     const rolloutPace = 'STANDARD';
-    const racks = capacityPackageId === 'STARTER' ? 2
-        : capacityPackageId === 'ESSENTIAL' ? 4
-            : capacityPackageId === 'GROWTH' ? 7 : 10;
-    const canonicalOpeningMarketIds = platform.marketOperations
-        .filter(operation => operation.entryKind === 'OPENING' && operation.countryId && operation.status !== 'EXITED')
-        .map(operation => operation.countryId!);
-    const dayOneMarketIds = canonicalOpeningMarketIds.length
-        ? canonicalOpeningMarketIds
-        : platform.identity?.dayOneMarketIds || [];
-    const suggestedPlacements = getSuggestedStreamingNetworkPlacements(dayOneMarketIds);
-    const suggestedCityId = suggestedPlacements[0]?.cityId;
-    const launchCityId = current?.networkPlacements?.[0]?.cityId
-        || platform.identity?.launchServerCityId
-        || suggestedCityId
-        || 'LA';
     return {
         currentStep: 0,
         strategy,
@@ -553,9 +548,11 @@ export const createDefaultStreamingInfrastructureDraft = (
         subscriptionPrices: { ...platform.subscriptionPrices },
         networkPlacements: current?.networkPlacements?.length
             ? current.networkPlacements.map(item => ({ ...item }))
-            : dayOneMarketIds.length
-                ? suggestedPlacements
-                : [{ cityId: launchCityId, racks, role: 'CORE_ORIGIN' }],
+            : [],
+        regionPlans: current?.regionPlans?.map(plan => ({
+            ...plan,
+            serverCounts: { ...plan.serverCounts },
+        })),
         facilities: current?.facilities?.map(facility => ({
             ...facility,
             lease: facility.lease ? { ...facility.lease } : undefined,
@@ -972,6 +969,13 @@ export const validateStreamingInfrastructureDraft = (
     if (!['FOUNDING', 'ACTIVE'].includes(platform.lifecycle) || !platform.identity || !platform.foundingProfile) {
         issues.push({ step: 0, code: 'INVALID_STATE', message: 'Infrastructure setup is available after incorporation.' });
     }
+    if (platform.launchCommit && platform.pendingInfrastructureSetup) {
+        issues.push({
+            step: 0,
+            code: 'CHANGE_IN_PROGRESS',
+            message: `Infrastructure revision ${platform.pendingInfrastructureSetup.revision} is already under construction. Finish it before commissioning another change.`,
+        });
+    }
     STREAMING_SUBSCRIPTION_TIERS.forEach(tier => {
         const price = draft.subscriptionPrices[tier.id];
         if (!Number.isFinite(price) || price < tier.minPrice || price > tier.maxPrice) {
@@ -1031,6 +1035,9 @@ export const saveStreamingInfrastructureDraft = (
             roundPrice(Number(inputDraft.subscriptionPrices[tier.id])),
         ])) as Record<StreamingSubscriptionTierId, number>,
         networkPlacements: sanitizeNetworkPlacements(inputDraft.networkPlacements),
+        regionPlans: Array.isArray(inputDraft.regionPlans)
+            ? normalizeStreamingRegionPlans(inputDraft.regionPlans)
+            : undefined,
         facilities: sanitizeFacilities(inputDraft.facilities, inputDraft.networkPlacements),
         managementPolicy: normalizeStreamingInfrastructureManagementPolicy(inputDraft.managementPolicy),
         assistedPlanApproved: inputDraft.assistedPlanApproved === true,
@@ -1119,7 +1126,7 @@ export const saveStreamingInfrastructureRehearsal = (
 
 export interface CommitStreamingInfrastructureResult {
     changed: boolean;
-    reason: 'COMMITTED' | 'ALREADY_CONFIGURED' | 'INVALID_DRAFT' | 'INSUFFICIENT_TREASURY';
+    reason: 'COMMITTED' | 'ALREADY_CONFIGURED' | 'INVALID_DRAFT' | 'INSUFFICIENT_TREASURY' | 'CHANGE_IN_PROGRESS';
     player: Player;
     issues: StreamingInfrastructureValidationIssue[];
     forecast: StreamingInfrastructureForecast;
@@ -1131,25 +1138,40 @@ export const commitStreamingInfrastructureSetup = (
 ): CommitStreamingInfrastructureResult => {
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     const draft = inputDraft || platform.infrastructureSetupDraft || createDefaultStreamingInfrastructureDraft(player);
+    const comparisonSetup = platform.pendingInfrastructureSetup || platform.infrastructureSetup;
+    const comparisonStrategy = platform.pendingInfrastructureSetup?.strategy || platform.infrastructureStrategy;
     const samePrices = STREAMING_SUBSCRIPTION_TIERS.every(tier => (
         platform.subscriptionPrices[tier.id] === draft.subscriptionPrices[tier.id]
     ));
     const sameInfrastructure = Boolean(
-        platform.infrastructureSetup
-        && platform.infrastructureStrategy === draft.strategy
-        && platform.infrastructureSetup.capacityPackageId === draft.capacityPackageId
-        && networkSignature(platform.infrastructureSetup.networkPlacements) === networkSignature(draft.networkPlacements)
-        && facilitySignature(platform.infrastructureSetup.facilities, platform.infrastructureSetup.networkPlacements)
+        comparisonSetup
+        && comparisonStrategy === draft.strategy
+        && comparisonSetup.capacityPackageId === draft.capacityPackageId
+        && networkSignature(comparisonSetup.networkPlacements) === networkSignature(draft.networkPlacements)
+        && facilitySignature(comparisonSetup.facilities, comparisonSetup.networkPlacements)
             === facilitySignature(draft.facilities, draft.networkPlacements)
     );
     const currentForecast = getStreamingInfrastructureForecast(player, draft);
     const sameRehearsal = Boolean(
-        platform.infrastructureSetup
-        && platform.infrastructureSetup.loadTest.configurationSignature === currentForecast.configurationSignature
+        comparisonSetup
+        && comparisonSetup.loadTest.configurationSignature === currentForecast.configurationSignature
     );
     if (sameInfrastructure && samePrices && sameRehearsal) {
         const forecast = currentForecast;
         return { changed: false, reason: 'ALREADY_CONFIGURED', player, issues: [], forecast };
+    }
+    if (platform.launchCommit && platform.pendingInfrastructureSetup) {
+        return {
+            changed: false,
+            reason: 'CHANGE_IN_PROGRESS',
+            player,
+            issues: [{
+                step: 0,
+                code: 'CHANGE_IN_PROGRESS',
+                message: `Infrastructure revision ${platform.pendingInfrastructureSetup.revision} is already under construction.`,
+            }],
+            forecast: currentForecast,
+        };
     }
     const validation = validateStreamingInfrastructureDraft(player, draft);
     const { forecast } = validation;
@@ -1185,7 +1207,7 @@ export const commitStreamingInfrastructureSetup = (
                 : undefined,
             completedAtAbsoluteWeek: absoluteWeek,
         };
-    const revision = (existingSetup?.revision || 0) + 1;
+    const revision = Math.max(existingSetup?.revision || 0, platform.pendingInfrastructureSetup?.revision || 0) + 1;
     const ledgerKey = [
         'infrastructure',
         platform.identity?.slug || player.id,
@@ -1220,45 +1242,52 @@ export const commitStreamingInfrastructureSetup = (
     );
     const committedFacilities = sanitizeFacilities(draft.facilities, draft.networkPlacements)
         .map(finalizeStreamingRackGroupMigrations);
+    const committedSetup: OwnedStreamingInfrastructureSetup = {
+        strategy: draft.strategy,
+        capacityPackageId: draft.capacityPackageId,
+        rolloutPace: 'STANDARD',
+        storageCapacityHours: forecast.storageCapacityHours,
+        reliabilityTarget: forecast.reliabilityTarget,
+        weeklyOperatingCost: forecast.weeklyOperatingCost,
+        staffRequired: forecast.staffRequired,
+        capitalInvested: (existingSetup?.capitalInvested || 0) + forecast.transactionCost,
+        technicalDebt: sameInfrastructure && existingSetup
+            ? existingSetup.technicalDebt
+            : (existingSetup?.technicalDebt || 0) + forecast.technicalDebt,
+        networkPlacements: aggregateStreamingFacilities(committedFacilities),
+        regionPlans: normalizeStreamingRegionPlans(draft.regionPlans),
+        facilities: committedFacilities,
+        managementPolicy: normalizeStreamingInfrastructureManagementPolicy(draft.managementPolicy),
+        physicalSummary: {
+            energyKwhWeekly: forecast.energyKwhWeekly,
+            waterLitresWeekly: forecast.waterLitresWeekly,
+            physicalWeeklyOperatingCost: forecast.physicalWeeklyOperatingCost,
+            sustainabilityScore: forecast.sustainabilityScore,
+            publicReputation: forecast.publicReputation,
+            reliabilityPercent: forecast.physicalReliabilityPercent,
+            backupCoveragePercent: forecast.backupCoveragePercent,
+            limitingFactors: [...forecast.physicalLimitingFactors],
+        },
+        baselineConcurrentStreams: forecast.baselineConcurrentStreams,
+        burstConcurrentStreams: forecast.burstConcurrentStreams,
+        readyAtAbsoluteWeek,
+        revision,
+        committedAtAbsoluteWeek: absoluteWeek,
+        loadTest,
+    };
+    const isLiveChangeOrder = Boolean(platform.launchCommit && existingSetup);
     const nextPlatform = compactOwnedStreamingPlatformForPersistence({
         ...platform,
-        infrastructureStrategy: draft.strategy,
+        infrastructureStrategy: isLiveChangeOrder ? platform.infrastructureStrategy : draft.strategy,
         infrastructureSetupDraft: null,
-        infrastructureSetup: {
-            capacityPackageId: draft.capacityPackageId,
-            rolloutPace: 'STANDARD',
-            storageCapacityHours: forecast.storageCapacityHours,
-            reliabilityTarget: forecast.reliabilityTarget,
-            weeklyOperatingCost: forecast.weeklyOperatingCost,
-            staffRequired: forecast.staffRequired,
-            capitalInvested: (existingSetup?.capitalInvested || 0) + forecast.transactionCost,
-            technicalDebt: sameInfrastructure && existingSetup
-                ? existingSetup.technicalDebt
-                : (existingSetup?.technicalDebt || 0) + forecast.technicalDebt,
-            networkPlacements: aggregateStreamingFacilities(committedFacilities),
-            facilities: committedFacilities,
-            managementPolicy: normalizeStreamingInfrastructureManagementPolicy(draft.managementPolicy),
-            physicalSummary: {
-                energyKwhWeekly: forecast.energyKwhWeekly,
-                waterLitresWeekly: forecast.waterLitresWeekly,
-                physicalWeeklyOperatingCost: forecast.physicalWeeklyOperatingCost,
-                sustainabilityScore: forecast.sustainabilityScore,
-                publicReputation: forecast.publicReputation,
-                reliabilityPercent: forecast.physicalReliabilityPercent,
-                backupCoveragePercent: forecast.backupCoveragePercent,
-                limitingFactors: [...forecast.physicalLimitingFactors],
-            },
-            readyAtAbsoluteWeek,
-            revision,
-            committedAtAbsoluteWeek: absoluteWeek,
-            loadTest,
-        },
+        infrastructureSetup: isLiveChangeOrder ? existingSetup : committedSetup,
+        pendingInfrastructureSetup: isLiveChangeOrder ? committedSetup : null,
         subscriptionPrices: { ...draft.subscriptionPrices },
-        capacity: {
+        capacity: isLiveChangeOrder ? platform.capacity : {
             baselineConcurrentStreams: forecast.baselineConcurrentStreams,
             burstConcurrentStreams: forecast.burstConcurrentStreams,
         },
-        technologyLevels: {
+        technologyLevels: isLiveChangeOrder ? platform.technologyLevels : {
             ...platform.technologyLevels,
             DELIVERY_CAPACITY: Math.max(platform.technologyLevels.DELIVERY_CAPACITY, technologyFloor.delivery),
             RELIABILITY: Math.max(platform.technologyLevels.RELIABILITY, technologyFloor.reliability),
@@ -1279,5 +1308,72 @@ export const commitStreamingInfrastructureSetup = (
             ...player,
             ownedStreamingPlatform: nextPlatform,
         },
+    };
+};
+
+export interface CompleteStreamingInfrastructureExpansionResult {
+    changed: boolean;
+    player: Player;
+    setup: OwnedStreamingInfrastructureSetup | null;
+}
+
+/**
+ * Atomically promotes one paid live-network change order when construction is
+ * due. This is deliberately idempotent: once pending is cleared, retries and
+ * restored saves cannot promote or announce the revision twice.
+ */
+export const completeDueStreamingInfrastructureExpansion = (
+    player: Player,
+): CompleteStreamingInfrastructureExpansionResult => {
+    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+    const pending = platform.pendingInfrastructureSetup;
+    const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+    if (!pending || absoluteWeek < pending.readyAtAbsoluteWeek) {
+        return { changed: false, player, setup: pending };
+    }
+    const ledgerKey = `infrastructure-operational:${pending.revision}:${pending.loadTest.configurationSignature}`;
+    const eventLedger = platform.eventLedger.some(entry => entry.idempotencyKey === ledgerKey)
+        ? platform.eventLedger
+        : [...platform.eventLedger, {
+            id: createDeterministicId('streaming_event', platform.simulationSeed, ledgerKey),
+            idempotencyKey: ledgerKey,
+            absoluteWeek,
+            type: 'MILESTONE_REACHED' as const,
+            summary: `${platform.identity?.name || 'EMPIRE+'} infrastructure revision ${pending.revision} is operational.`,
+            source: 'WEEK_PROCESSOR' as const,
+            metadata: {
+                revision: pending.revision,
+                configurationSignature: pending.loadTest.configurationSignature,
+            },
+        }];
+    const baselineConcurrentStreams = pending.baselineConcurrentStreams
+        ?? platform.capacity.baselineConcurrentStreams;
+    const burstConcurrentStreams = pending.burstConcurrentStreams
+        ?? platform.capacity.burstConcurrentStreams;
+    const technologyFloor = getInfrastructureTechnologyFloor(
+        baselineConcurrentStreams,
+        pending.reliabilityTarget,
+    );
+    const nextPlatform = compactOwnedStreamingPlatformForPersistence({
+        ...platform,
+        infrastructureStrategy: pending.strategy || platform.infrastructureStrategy,
+        infrastructureSetup: pending,
+        pendingInfrastructureSetup: null,
+        capacity: { baselineConcurrentStreams, burstConcurrentStreams },
+        technologyLevels: {
+            ...platform.technologyLevels,
+            DELIVERY_CAPACITY: Math.max(platform.technologyLevels.DELIVERY_CAPACITY, technologyFloor.delivery),
+            RELIABILITY: Math.max(platform.technologyLevels.RELIABILITY, technologyFloor.reliability),
+        },
+        milestoneKeys: Array.from(new Set([
+            ...platform.milestoneKeys,
+            `infrastructure-revision-${pending.revision}-operational`,
+        ])),
+        eventLedger,
+    }, player.id);
+    return {
+        changed: true,
+        player: { ...player, ownedStreamingPlatform: nextPlatform },
+        setup: pending,
     };
 };

@@ -11,6 +11,7 @@ import type {
     WorldStreamingCustomerSnapshot,
     WorldStreamingCustomerState,
     WorldStreamingPlatformOffer,
+    StreamingBillingPath,
 } from '../../types';
 import { createDeterministicId } from '../deterministicRandom';
 import { normalizeWorldAudienceEconomyState } from './worldAudienceCohorts';
@@ -21,8 +22,9 @@ import {
     normalizeWorldStreamingCompetitionState,
 } from './worldStreamingCompetition';
 import { getWorldStreamingOffers } from './worldStreamingOffers';
+import { STREAMING_ANNUAL_BILLING_SHARE } from '../streamingPricingEconomy';
 
-export const WORLD_STREAMING_CUSTOMER_SCHEMA_VERSION = 1 as const;
+export const WORLD_STREAMING_CUSTOMER_SCHEMA_VERSION = 2 as const;
 const MAX_SNAPSHOTS = 52;
 const MAX_RECENT_MOVEMENTS = 624;
 
@@ -101,6 +103,7 @@ const preparePlayer = (player: Player, absoluteWeek: number): Player => {
 interface DesiredCohort {
     countryId: string;
     cohortId: string;
+    billingPath: StreamingBillingPath;
     reachableHouseholds: number;
     targetSubscribingHouseholds: number;
     targetSubscriptions: number;
@@ -118,41 +121,37 @@ const createDesiredCohorts = (
         const countryOffers = (offers.byCountry[countryId] || [])
             .map(platformId => offerMap.get(platformId))
             .filter((offer): offer is WorldStreamingPlatformOffer => Boolean(offer));
-        return audience.cohorts.map(cohort => {
+        return audience.cohorts.flatMap(cohort => {
             const overlay = participation.cohorts.find(item => item.cohortId === cohort.id);
-            if (!overlay) return {
-                countryId,
-                cohortId: cohort.id,
-                reachableHouseholds: 0,
-                targetSubscribingHouseholds: 0,
-                targetSubscriptions: 0,
-                cells: [],
-            };
-            const allocation = allocateWorldStreamingCohort(countryId, cohort, overlay, countryOffers);
-            return {
-                countryId,
-                cohortId: cohort.id,
-                reachableHouseholds: allocation.reachableHouseholds,
-                targetSubscribingHouseholds: allocation.subscribingHouseholds,
-                targetSubscriptions: allocation.totalSubscriptions,
-                cells: allocation.allocations.map(row => ({
-                    platformId: row.offer.platformId,
-                    platformName: row.offer.name,
-                    planId: row.plan.id,
-                    planName: row.plan.name,
-                    paidAccounts: row.households,
-                    primaryHouseholds: row.primaryHouseholds,
-                    effectiveMonthlyPrice: row.plan.effectiveMonthlyPrice,
-                    monthlySubscriptionRevenue: round2(row.households * row.plan.effectiveMonthlyPrice),
-                    tenureNewAccounts: 0,
-                    tenureEstablishedAccounts: Math.round(row.households * .64),
-                    tenureLoyalAccounts: row.households - Math.round(row.households * .64),
-                    externalSharedHouseholds: 0,
-                    sharedActiveViewers: 0,
-                    piracyReach: 0,
-                    accessLoadAccounts: row.households,
-                })),
-            };
+            const allocation = overlay ? allocateWorldStreamingCohort(countryId, cohort, overlay, countryOffers) : null;
+            return (['MONTHLY', 'ANNUAL'] as const).map(billingPath => {
+                const path = allocation?.paths.find(row => row.billingPath === billingPath);
+                return {
+                    countryId,
+                    cohortId: cohort.id,
+                    billingPath,
+                    reachableHouseholds: path?.reachableHouseholds || 0,
+                    targetSubscribingHouseholds: path?.subscribingHouseholds || 0,
+                    targetSubscriptions: path?.totalSubscriptions || 0,
+                    cells: (path?.allocations || []).map(row => ({
+                        platformId: row.offer.platformId,
+                        platformName: row.offer.name,
+                        planId: row.plan.id,
+                        planName: row.plan.name,
+                        paidAccounts: row.households,
+                        primaryHouseholds: row.primaryHouseholds,
+                        effectiveMonthlyPrice: row.billingPrice,
+                        monthlySubscriptionRevenue: round2(row.households * row.billingPrice),
+                        tenureNewAccounts: 0,
+                        tenureEstablishedAccounts: Math.round(row.households * .64),
+                        tenureLoyalAccounts: row.households - Math.round(row.households * .64),
+                        externalSharedHouseholds: 0,
+                        sharedActiveViewers: 0,
+                        piracyReach: 0,
+                        accessLoadAccounts: row.households,
+                    })),
+                };
+            });
         });
     });
 };
@@ -183,6 +182,8 @@ const planSummaries = (cells: WorldStreamingCustomerPlanCell[]): WorldStreamingC
         if (current) {
             current.paidAccounts += cell.paidAccounts;
             current.monthlySubscriptionRevenue = round2(current.monthlySubscriptionRevenue + cell.monthlySubscriptionRevenue);
+            current.effectiveMonthlyPrice = current.paidAccounts > 0
+                ? round2(current.monthlySubscriptionRevenue / current.paidAccounts) : 0;
         } else rows.set(key, {
             planId: cell.planId,
             planName: cell.planName,
@@ -329,6 +330,7 @@ const createCountries = (
             const profiles = Math.min(population.population, Math.round(payingHouseholds * population.averageHouseholdSize * .9));
             return applyAccessPaths(player, countryId, {
                 cohortId: row.cohortId,
+                billingPath: row.billingPath,
                 reachableHouseholds: row.reachableHouseholds,
                 payingHouseholds,
                 profiles,
@@ -386,8 +388,11 @@ const createMovement = (
     fromPlanId: string | null,
     toPlanId: string | null,
     reasonId: WorldStreamingCustomerMovement['reasonId'],
+    billingPath: StreamingBillingPath,
 ): WorldStreamingCustomerMovement => ({
-    id: createDeterministicId('world-streaming-customer-movement', absoluteWeek, countryId, cohortId, kind, sourcePlatformId, destinationPlatformId, fromPlanId, toPlanId, households),
+    id: createDeterministicId('world-streaming-customer-movement', absoluteWeek, countryId, cohortId, billingPath, kind,
+        sourcePlatformId, destinationPlatformId, fromPlanId, toPlanId, households),
+    billingPath,
     absoluteWeek,
     countryId,
     cohortId,
@@ -472,7 +477,7 @@ const advanceCohort = (
         lapsed.households -= households;
         movements.push(createMovement(
             absoluteWeek, desired.countryId, desired.cohortId, 'REACTIVATE', households,
-            null, destination.platformId, lapsed.planId, destination.planId, 'RELEASE',
+            null, destination.platformId, lapsed.planId, destination.planId, 'RELEASE', desired.billingPath,
         ));
     });
 
@@ -485,7 +490,7 @@ const advanceCohort = (
         movements.push(createMovement(
             absoluteWeek, desired.countryId, desired.cohortId,
             after.effectiveMonthlyPrice >= before.effectiveMonthlyPrice ? 'UPGRADE' : 'DOWNGRADE',
-            moved, platformId, platformId, before.planId, after.planId, 'PLAN_VALUE',
+            moved, platformId, platformId, before.planId, after.planId, 'PLAN_VALUE', desired.billingPath,
         ));
     });
 
@@ -497,7 +502,7 @@ const advanceCohort = (
             destination.remaining -= households;
             movements.push(createMovement(
                 absoluteWeek, desired.countryId, desired.cohortId, 'SWITCH', households,
-                source.platformId, destination.platformId, source.planId, destination.planId, 'COMPETITOR',
+                source.platformId, destination.platformId, source.planId, destination.planId, 'COMPETITOR', desired.billingPath,
             ));
         });
     });
@@ -509,7 +514,7 @@ const advanceCohort = (
             source.platformId, null, source.planId, null,
             source.platformId === 'PLAYER' && (policy.sharingPosture === 'HOUSEHOLD_ONLY' || policy.enforcementInvestment === 'AGGRESSIVE')
                 ? 'SHARING_POLICY'
-                : target.has(source.platformId) ? 'PRICE' : 'CATALOGUE',
+                : target.has(source.platformId) ? 'PRICE' : 'CATALOGUE', desired.billingPath,
         ));
         const existing = lapsedCells.find(cell => cell.platformId === source.platformId && cell.planId === source.planId);
         if (existing) {
@@ -525,7 +530,7 @@ const advanceCohort = (
     destinations.filter(row => row.remaining > 0).forEach(destination => movements.push(createMovement(
         absoluteWeek, desired.countryId, desired.cohortId,
         prior.size > 0 ? 'ADD_SECONDARY' : 'JOIN', destination.remaining,
-        null, destination.platformId, null, destination.planId, 'PLAN_VALUE',
+        null, destination.platformId, null, destination.planId, 'PLAN_VALUE', desired.billingPath,
     )));
 
     const accounts = nextCells.reduce((sum, cell) => sum + cell.paidAccounts, 0);
@@ -537,6 +542,7 @@ const advanceCohort = (
     return {
         cohort: {
             cohortId: desired.cohortId,
+            billingPath: desired.billingPath,
             reachableHouseholds: desired.reachableHouseholds,
             payingHouseholds,
             profiles,
@@ -571,7 +577,7 @@ const advanceCountries = (
         const rows = desired.filter(item => item.countryId === countryId);
         const results = rows.map(row => advanceCohort(
             row,
-            previousCountry?.cohorts.find(cohort => cohort.cohortId === row.cohortId),
+            previousCountry?.cohorts.find(cohort => cohort.cohortId === row.cohortId && cohort.billingPath === row.billingPath),
             absoluteWeek,
             elapsedWeeks,
             population.averageHouseholdSize,
@@ -671,10 +677,10 @@ const createSnapshot = (absoluteWeek: number, global: WorldStreamingCustomerGlob
     playerMonthlySubscriptionRevenue: global.playerMonthlySubscriptionRevenue,
 });
 
-const structurallyValid = (input: unknown): input is WorldStreamingCustomerState => {
+const structurallyValid = (input: unknown, schemaVersion: 1 | 2 = WORLD_STREAMING_CUSTOMER_SCHEMA_VERSION): input is WorldStreamingCustomerState => {
     if (!input || typeof input !== 'object') return false;
     const state = input as Partial<WorldStreamingCustomerState>;
-    if (state.schemaVersion !== WORLD_STREAMING_CUSTOMER_SCHEMA_VERSION || !state.countries || !state.global || !Array.isArray(state.snapshots) || !Array.isArray(state.recentMovements)) return false;
+    if ((state as { schemaVersion?: number }).schemaVersion !== schemaVersion || !state.countries || !state.global || !Array.isArray(state.snapshots) || !Array.isArray(state.recentMovements)) return false;
     if (state.snapshots.length > MAX_SNAPSHOTS || state.recentMovements.length > MAX_RECENT_MOVEMENTS) return false;
     const countries = Object.values(state.countries);
     if (countries.length !== state.global.countryCount) return false;
@@ -682,12 +688,126 @@ const structurallyValid = (input: unknown): input is WorldStreamingCustomerState
     return countries.every(country => (
         country.startingPaidAccounts + country.joins + country.reactivations - country.cancellations === country.endingPaidAccounts
         && country.endingPaidAccounts === country.platformSummaries.reduce((sum, row) => sum + row.endingPaidAccounts, 0)
-        && country.cohorts.every(cohort => cohort.planCells.every(cell => (
+        && (schemaVersion === 1 || (
+            new Set(country.cohorts.map(cohort => `${cohort.cohortId}:${cohort.billingPath}`)).size === country.cohorts.length
+            && country.reachableHouseholds === country.cohorts.reduce((sum, cohort) => sum + cohort.reachableHouseholds, 0)
+            && country.endingPaidAccounts === country.cohorts.reduce((sum, cohort) => sum
+                + cohort.planCells.reduce((cellSum, cell) => cellSum + cell.paidAccounts, 0), 0)
+        ))
+        && country.cohorts.every(cohort => (schemaVersion === 1 || cohort.billingPath === 'MONTHLY' || cohort.billingPath === 'ANNUAL')
+            && cohort.planCells.every(cell => (
             cell.paidAccounts >= 0
             && cell.paidAccounts === cell.tenureNewAccounts + cell.tenureEstablishedAccounts + cell.tenureLoyalAccounts
             && Math.abs(cell.monthlySubscriptionRevenue - round2(cell.paidAccounts * cell.effectiveMonthlyPrice)) < .011
         )))
     ));
+};
+
+const annualCount = (value: number): number => Math.round(Math.max(0, value) * STREAMING_ANNUAL_BILLING_SHARE);
+
+/** Partition tenure without creating or losing any of its named account classes. */
+const annualTenureCounts = (values: number[], annualAccounts: number): number[] => {
+    const total = values.reduce((sum, value) => sum + value, 0);
+    if (!total) return values.map(() => 0);
+    const exact = values.map(value => value * annualAccounts / total);
+    const result = exact.map(value => Math.floor(value));
+    let remaining = annualAccounts - result.reduce((sum, value) => sum + value, 0);
+    exact.map((value, index) => ({ index, fraction: value - Math.floor(value) }))
+        .sort((left, right) => right.fraction - left.fraction || left.index - right.index)
+        .forEach(({ index }) => {
+            if (remaining > 0 && result[index] < values[index]) {
+                result[index] += 1;
+                remaining -= 1;
+            }
+        });
+    return result;
+};
+
+const migrateLegacyCustomerState = (
+    legacy: WorldStreamingCustomerState,
+    offers: ReturnType<typeof getWorldStreamingOffers>,
+): WorldStreamingCustomerState => {
+    const offerMap = new Map(offers.offers.map(offer => [offer.platformId, offer]));
+    const countries = Object.fromEntries(Object.entries(legacy.countries).map(([countryId, country]) => {
+        const cohorts = country.cohorts.flatMap(cohort => {
+            const annualReach = annualCount(cohort.reachableHouseholds);
+            const annualPaying = annualCount(cohort.payingHouseholds);
+            const rows = (['MONTHLY', 'ANNUAL'] as const).map(billingPath => {
+                const annual = billingPath === 'ANNUAL';
+                const split = (value: number): number => annual ? annualCount(value) : value - annualCount(value);
+                const planCells = cohort.planCells.flatMap(cell => {
+                    const annualAccounts = annualCount(cell.paidAccounts);
+                    const tenure = [cell.tenureNewAccounts, cell.tenureEstablishedAccounts, cell.tenureLoyalAccounts];
+                    const annualTenure = annualTenureCounts(tenure, annualAccounts);
+                    const paidAccounts = annual ? annualAccounts : cell.paidAccounts - annualAccounts;
+                    if (!paidAccounts) return [];
+                    const plan = offerMap.get(cell.platformId)?.plans.find(row => row.id === cell.planId);
+                    const effectiveMonthlyPrice = plan
+                        ? annual ? plan.annualBillingMonthlyPrice : plan.monthlyBillingPrice
+                        : cell.effectiveMonthlyPrice;
+                    return [{
+                        ...cell,
+                        paidAccounts,
+                        primaryHouseholds: split(cell.primaryHouseholds),
+                        effectiveMonthlyPrice,
+                        monthlySubscriptionRevenue: round2(paidAccounts * effectiveMonthlyPrice),
+                        tenureNewAccounts: annual ? annualTenure[0] : tenure[0] - annualTenure[0],
+                        tenureEstablishedAccounts: annual ? annualTenure[1] : tenure[1] - annualTenure[1],
+                        tenureLoyalAccounts: annual ? annualTenure[2] : tenure[2] - annualTenure[2],
+                        externalSharedHouseholds: split(cell.externalSharedHouseholds),
+                        sharedActiveViewers: split(cell.sharedActiveViewers),
+                        piracyReach: split(cell.piracyReach),
+                        accessLoadAccounts: split(cell.accessLoadAccounts),
+                    }];
+                });
+                return {
+                    ...cohort,
+                    billingPath,
+                    reachableHouseholds: annual ? annualReach : cohort.reachableHouseholds - annualReach,
+                    payingHouseholds: annual ? annualPaying : cohort.payingHouseholds - annualPaying,
+                    profiles: split(cohort.profiles),
+                    activeViewers: split(cohort.activeViewers),
+                    externalSharedHouseholds: split(cohort.externalSharedHouseholds),
+                    sharedActiveViewers: split(cohort.sharedActiveViewers),
+                    piracyReach: split(cohort.piracyReach),
+                    accessLoadAccounts: split(cohort.accessLoadAccounts),
+                    planCells,
+                    lapsedCells: cohort.lapsedCells.flatMap(cell => {
+                        const households = split(cell.households);
+                        return households ? [{ ...cell, households }] : [];
+                    }),
+                };
+            });
+            return rows;
+        });
+        const platformSummaries = country.platformSummaries.map(platform => {
+            const cells = cohorts.flatMap(cohort => cohort.planCells.filter(cell => cell.platformId === platform.platformId));
+            return {
+                ...platform,
+                monthlySubscriptionRevenue: round2(cells.reduce((sum, cell) => sum + cell.monthlySubscriptionRevenue, 0)),
+                planAllocations: planSummaries(cells),
+            };
+        });
+        return [countryId, {
+            ...country,
+            cohorts,
+            platformSummaries,
+            monthlySubscriptionRevenue: round2(platformSummaries.reduce((sum, row) => sum + row.monthlySubscriptionRevenue, 0)),
+        } satisfies WorldStreamingCustomerCountryState];
+    }));
+    const values = Object.values(countries);
+    const playerCells = values.flatMap(country => country.cohorts.flatMap(cohort => cohort.planCells.filter(cell => cell.platformId === 'PLAYER')));
+    return {
+        ...legacy,
+        schemaVersion: WORLD_STREAMING_CUSTOMER_SCHEMA_VERSION,
+        countries,
+        global: {
+            ...legacy.global,
+            monthlySubscriptionRevenue: round2(values.reduce((sum, country) => sum + country.monthlySubscriptionRevenue, 0)),
+            playerMonthlySubscriptionRevenue: round2(playerCells.reduce((sum, cell) => sum + cell.monthlySubscriptionRevenue, 0)),
+            playerPlanAllocations: planSummaries(playerCells),
+        },
+    };
 };
 
 export const createWorldStreamingCustomerState = (player: Player, absoluteWeek: number): WorldStreamingCustomerState => {
@@ -724,13 +844,16 @@ export const normalizeWorldStreamingCustomerState = (
     const offers = getWorldStreamingOffers(prepared, week);
     const policy = resolvePolicy(prepared, week);
     const sourceFingerprint = createDeterministicId('world-streaming-customers-source', week, prepared.world.worldStreamingCompetition!.sourceFingerprint, offers.fingerprint, policy.sharingPosture, policy.enforcementInvestment);
-    if (!structurallyValid(input)) return createWorldStreamingCustomerState(player, week);
+    const compatible = structurallyValid(input, 1)
+        ? migrateLegacyCustomerState(input, offers)
+        : input;
+    if (!structurallyValid(compatible)) return createWorldStreamingCustomerState(player, week);
     // A committed absolute week is immutable. Owned-platform processing updates subscriber metrics
     // after WE5 runs, which legitimately changes the offer fingerprint; treating that as a new
     // customer turn would reroll movement and tenure during save migration/reload.
-    if (input.lastProcessedAbsoluteWeek === week) return input;
+    if (compatible.lastProcessedAbsoluteWeek === week) return compatible;
     const desired = createDesiredCohorts(prepared, offers);
-    const advanced = advanceCountries(prepared, desired, input, week, offers, policy);
+    const advanced = advanceCountries(prepared, desired, compatible, week, offers, policy);
     const global = createGlobal(advanced.countries, offers.offers.some(offer => offer.isPlayer));
     const recentForWeek = advanced.movements
         .slice()
@@ -738,14 +861,14 @@ export const normalizeWorldStreamingCustomerState = (
         .slice(0, 12);
     return {
         schemaVersion: WORLD_STREAMING_CUSTOMER_SCHEMA_VERSION,
-        initializedAtAbsoluteWeek: input.initializedAtAbsoluteWeek,
+        initializedAtAbsoluteWeek: compatible.initializedAtAbsoluteWeek,
         lastProcessedAbsoluteWeek: week,
         sourceFingerprint,
         playerAccessPolicy: policy,
         countries: advanced.countries,
         global,
-        snapshots: [...input.snapshots, createSnapshot(week, global)].slice(-MAX_SNAPSHOTS),
-        recentMovements: [...input.recentMovements, ...recentForWeek].slice(-MAX_RECENT_MOVEMENTS),
+        snapshots: [...compatible.snapshots, createSnapshot(week, global)].slice(-MAX_SNAPSHOTS),
+        recentMovements: [...compatible.recentMovements, ...recentForWeek].slice(-MAX_RECENT_MOVEMENTS),
     };
 };
 

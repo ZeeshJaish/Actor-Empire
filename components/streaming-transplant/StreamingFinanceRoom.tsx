@@ -54,7 +54,7 @@ export function StreamingFinanceRoom({
   const data = useMemo(() => getStreamingStudioFinanceData(player, brandHex), [brandHex, player]);
 
   return (
-    <div className="streaming-hq-shell" style={shellStyle}>
+    <div className="streaming-hq-shell" data-epx-root style={shellStyle}>
       <StudioFinance
         data={data}
         initialTab={tabMap[initialTab]}

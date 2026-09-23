@@ -93,6 +93,8 @@ export interface TitleFinance {
   releasedLabel?: string;
   /** Seed for the generated poster. Falls back to the id. */
   posterSeed?: string;
+  /** Presentation-only artwork from the player's production record. */
+  poster?: import('../../../types').CustomPoster;
   subscriptionValue: number;
   advertising: number;
   licensing: number;

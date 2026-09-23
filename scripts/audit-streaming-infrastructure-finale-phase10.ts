@@ -7,6 +7,7 @@ import {
     type OwnedStreamingFacility,
     type OwnedStreamingInfrastructureIncident,
     type OwnedStreamingPlatformState,
+    type OwnedStreamingResearchProgram,
     type OwnedStreamingWeeklySnapshot,
     type Player,
     type StreamingFacilityType,
@@ -19,6 +20,7 @@ import {
     getStreamingInfrastructureChronicle,
     resolveStreamingInfrastructureProgressionTier,
 } from '../services/streamingInfrastructureProgression';
+import { chooseStreamingResearchIpStrategy } from '../services/streamingResearchLifecycle';
 
 const assert = (condition: unknown, message: string) => {
     if (!condition) throw new Error(message);
@@ -175,6 +177,61 @@ assert(chronicle.available && chronicle.history.length === 104, 'The HQ Chronicl
 assert(chronicle.causalExplanations.length === 4, 'Performance charts should explain condition, capacity, energy and economy causally.');
 assert(chronicle.balance.weeklyCost === 3_200_000 && chronicle.balance.energyPerRack > 0, 'The balance screen should expose canonical economy and physical energy values.');
 
+const patentCandidate: OwnedStreamingResearchProgram = {
+    id: 'phase10-patent-program',
+    idempotencyKey: 'phase10-patent-program',
+    definitionId: 'edge-orchestration',
+    title: 'Edge Orchestration',
+    category: 'NETWORK_INFRASTRUCTURE',
+    stage: 'AWAITING_IP',
+    buildMode: 'BALANCED',
+    ipStrategy: null,
+    researchCost: 7_500_000,
+    patentCost: 5_000_000,
+    installationCost: 24_000_000,
+    weeklyOperatingCost: 150_000,
+    licenseWeeklyCost: 210_000,
+    staffRequired: 8,
+    researchWeeks: 2,
+    prototypeWeeks: 1,
+    testWeeks: 1,
+    installationWeeks: 3,
+    startedAtAbsoluteWeek: 2_100,
+    stageStartedAtAbsoluteWeek: 2_104,
+    stageReadyAtAbsoluteWeek: 2_107,
+    installationTargetType: 'TECHNOLOGY_PROJECT',
+    installationTargetId: null,
+    installationTargetLabel: null,
+    rivalInterestPercent: 12,
+    completedAtAbsoluteWeek: null,
+};
+const patentPlayer: Player = {
+    ...fixture,
+    ownedStreamingPlatform: {
+        ...fixture.ownedStreamingPlatform,
+        researchPrograms: [patentCandidate],
+    },
+};
+const patentTreasuryBefore = patentPlayer.ownedStreamingPlatform.treasuryCash;
+const patented = chooseStreamingResearchIpStrategy(patentPlayer, patentCandidate.definitionId, 'PATENT');
+assert(patented.changed, 'Patent approval should commit as a player decision.');
+assert(
+    patented.player.ownedStreamingPlatform.researchPrograms[0]?.stage === 'READY_TO_INSTALL',
+    'Patent approval must leave installation as a separate decision.',
+);
+assert(
+    patented.player.ownedStreamingPlatform.technologyProjects.length === patentPlayer.ownedStreamingPlatform.technologyProjects.length,
+    'Patent approval must not fabricate an installed technology project.',
+);
+assert(
+    patented.player.ownedStreamingPlatform.cinematicQueue.some(event => event.type === 'PATENT_ANNOUNCEMENT'),
+    'Patent approval should queue its evidence-backed announcement.',
+);
+assert(
+    patented.player.ownedStreamingPlatform.treasuryCash === patentTreasuryBefore - patentCandidate.patentCost,
+    'Patent approval must charge the IP decision without charging installation.',
+);
+
 const serviceSource = readFileSync(resolve(process.cwd(), 'services/streamingInfrastructureProgression.ts'), 'utf8');
 const weeklySource = readFileSync(resolve(process.cwd(), 'services/streamingWeeklyLoop.ts'), 'utf8');
 const researchSource = readFileSync(resolve(process.cwd(), 'services/streamingResearchLifecycle.ts'), 'utf8');
@@ -189,7 +246,6 @@ for (const surface of ['Evolution', 'Performance', 'Cinema', 'Balance', 'CAUSAL 
     assert(componentSource.includes(surface), `The Infrastructure Chronicle should expose ${surface}.`);
 }
 assert(weeklySource.includes('commitStreamingInfrastructureProgressionWeek'), 'Progression must commit through the canonical weekly loop.');
-assert(researchSource.includes("type: 'PATENT_ANNOUNCEMENT'") && researchSource.includes("stage: 'READY_TO_INSTALL'"), 'Patent cinema must preserve research and installation as separate decisions.');
 assert(campusSource.includes("type: 'FACILITY_OPENING'"), 'Opening a constructed campus should queue the dedicated facility-opening scene.');
 /* The Chronicle is now opened from the Network Desk, gated on availability,
    rather than by a standalone button in the retired Tech room. */

@@ -178,7 +178,12 @@ export const advanceStreamingResearchStage = (
 ): OwnedStreamingResearchProgram => {
     const advanced = advanceStreamingResearchSchedule(program, absoluteWeek);
     if (advanced !== program) return advanced;
-    return program.stage === 'INSTALLING' && program.installationTargetType === 'FACILITY'
+    /* A facility install completes on its own schedule, and so does a
+       network-wide one: neither has anything left for the player to decide once
+       the work has started. Without NETWORK_FIBRE here a fibre generation
+       reached INSTALLING and stayed there for the rest of the career. */
+    return program.stage === 'INSTALLING'
+        && (program.installationTargetType === 'FACILITY' || program.installationTargetType === 'NETWORK_FIBRE')
         ? completeStreamingResearchInstallationSchedule(program, absoluteWeek)
         : program;
 };

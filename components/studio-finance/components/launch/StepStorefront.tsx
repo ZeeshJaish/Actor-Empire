@@ -8,7 +8,7 @@
    between empty wireframes.
    ========================================================================== */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { CustomPosterImage } from '../../../CustomPosterImage';
 import type { AnchorTitle, Approach } from '../../finance/launch';
 import { Poster } from '../Poster';
@@ -22,14 +22,45 @@ export function StepStorefront({ data, draft, patch, handlers }: StepProps) {
   const [previewId, setPreviewId] = useState(firstLayout);
   const preview = data.storefronts.find(option => option.id === previewId) || data.storefronts[0];
   const previewLock = preview ? data.capabilityLocks[`storefront:${preview.id}`] : undefined;
-  const saved = Boolean(preview && data.offer.saved && data.offer.storefrontId === preview.id);
   const applied = Boolean(preview && draft.storefrontId === preview.id);
 
-  const applyLayout = () => {
-    if (!preview || previewLock) return;
-    patch({ storefrontId: preview.id });
-    handlers.onSaveViewerOffer?.(preview.id);
+  const saveLayout = (option: Approach) => {
+    patch({ storefrontId: option.id });
+    handlers.onSaveViewerOffer?.(option.id);
   };
+
+  /* Choosing a layout saves it. A locked one is previewed only — it can be
+     looked at, never adopted — so the research button below is what it offers
+     instead. */
+  const chooseLayout = (optionId: string) => {
+    setPreviewId(optionId);
+    const option = data.storefronts.find(item => item.id === optionId);
+    if (!option) return;
+    if (data.capabilityLocks[`storefront:${option.id}`]) {
+      /* Same rule as the ident: reaching for a locked layout abandons the one
+         you had, so the stage reports that nothing available is chosen. */
+      if (draft.storefrontId) {
+        patch({ storefrontId: undefined });
+        handlers.onClearViewerOffer?.();
+      }
+      return;
+    }
+    saveLayout(option);
+  };
+
+  /* Reconcile a real choice the platform never recorded — never invent one. The
+     library opens with a layout previewed so there is something to look at, but
+     that preview is not a selection: only a layout the draft actually names is
+     written through, and only if it is unlocked. Arriving with nothing chosen
+     leaves the stage open, which is the honest report. */
+  useEffect(() => {
+    if (!draft.storefrontId) return;
+    const chosen = data.storefronts.find(option => option.id === draft.storefrontId);
+    if (!chosen || data.capabilityLocks[`storefront:${chosen.id}`]) return;
+    if (data.offer.saved && data.offer.storefrontId === chosen.id) return;
+    saveLayout(chosen);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (!preview) return null;
 
@@ -90,11 +121,15 @@ export function StepStorefront({ data, draft, patch, handlers }: StepProps) {
                   aria-selected={isPreview}
                   aria-label={`${option.name}${lock ? `, research preview: ${lock}` : ''}${isApplied ? ', applied' : ''}`}
                   className={`st-layout-pick${isPreview ? ' is-preview' : ''}${isApplied ? ' is-applied' : ''}${lock ? ' is-locked' : ''}`}
-                  onClick={() => setPreviewId(option.id)}
+                  onClick={() => chooseLayout(option.id)}
                 >
                   <LayoutGlyph composition={option.layout || 'hero'} layoutId={option.id} />
                   <span>
                     <b>{option.name}</b>
+                    {/* No reason here on purpose: thirteen tiles repeating
+                        "Product Experience 24" is noise, and the requirement is
+                        named once on the preview panel above. The tile only has
+                        to say the option is not available yet. */}
                     {lock
                       ? <ResearchLockMark reason={lock} compact />
                       : <em>{isApplied ? 'Applied' : 'Base layout'}</em>}
@@ -107,20 +142,16 @@ export function StepStorefront({ data, draft, patch, handlers }: StepProps) {
         <p className="st-library-note">Every option changes tile placement, scale and browsing rhythm only. Platform features are configured separately.</p>
       </section>
 
-      <button
-        type="button"
-        className={`sf-btn ${previewLock ? 'sf-btn--research' : 'sf-btn--primary'}`}
-        disabled={!previewLock && saved}
-        onClick={previewLock ? () => handlers.onOpenTechnology?.() : applyLayout}
-      >
-        {previewLock
-          ? `Research ${preview.name}`
-          : saved
-            ? 'Front page saved'
-            : applied
-              ? 'Save the front page'
-              : `Use ${preview.name}`}
-      </button>
+      {/* Only one button survives here, and only when it has something to do.
+          Choosing a layout saves it, so "Use <layout>" was asking the player to
+          confirm a choice they had already made — and until they did, the stage
+          reported that no storefront had been selected. What a locked layout
+          still needs is the way to unlock it. */}
+      {previewLock ? (
+        <button type="button" className="sf-btn sf-btn--research" onClick={() => handlers.onOpenTechnology?.()}>
+          Research {preview.name}
+        </button>
+      ) : null}
 
       <p className="lw-rule">This same saved layout becomes the subscriber home screen and remains available in the dashboard customizer after launch.</p>
     </>

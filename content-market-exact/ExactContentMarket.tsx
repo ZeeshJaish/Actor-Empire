@@ -95,7 +95,7 @@ const Gate: React.FC<{
         <div className={css.mkdoorart}>
           {mine.slice(0, 3).map((l, i) => (
             <span key={l.id} className={css.mkfan} style={{ ['--epx-mkwrap-i' as string]: String(i) }}>
-              <Poster id={l.id} title={l.title} genre={l.genre} hue={l.hue} size="sm" />
+              <Poster id={l.artId || l.id} title={l.title} genre={l.genre} hue={l.hue} poster={l.poster} size="sm" />
             </span>
           ))}
         </div>
@@ -120,7 +120,7 @@ const Gate: React.FC<{
       <button className={cx(css.mkdoor, css['mkd-market'])} onClick={() => onRoute('MARKET')}>
         <div className={cx(css.mkdoorart, css.mkwall)}>
           {buyable.slice(0, 6).map(l => (
-            <Poster key={l.id} id={l.id} title={l.title} genre={l.genre} hue={l.hue} size="xs" />
+            <Poster key={l.id} id={l.artId || l.id} title={l.title} genre={l.genre} hue={l.hue} poster={l.poster} size="xs" />
           ))}
         </div>
         <div className={css.mkdoortext}>
@@ -211,7 +211,7 @@ const Card: React.FC<{ lot: Lot; onOpen: (l: Lot) => void; wide?: boolean }> = (
   <button className={cx(css.mkcard, (wide ? css.wide : ''))} aria-label={`${lot.title} · ${lot.seller}`} onClick={() => onOpen(lot)}>
     {/* a collection gets a shelf on the card too, not a sheet with a badge */}
     {lot.rows ? <span className={css.mkcardbox}><Boxset lot={lot} /></span> : (
-      <Poster id={lot.id} title={lot.title} genre={lot.genre} hue={lot.hue} year={lot.year} size="md" />
+      <Poster id={lot.artId || lot.id} title={lot.title} genre={lot.genre} hue={lot.hue} poster={lot.poster} year={lot.year} size="md" />
     )}
     <div className={css.mkcardfoot}>
       <b className={lot.mode === 'STUDIO' ? css.mkfree : ''}>
@@ -253,7 +253,7 @@ const sortLots = (lots: Lot[], by: Sort): Lot[] => {
 const Row: React.FC<{ lot: Lot; onOpen: (l: Lot) => void }> = ({ lot, onOpen }) => (
   <button className={css.mkrow2} onClick={() => onOpen(lot)}>
     <span className={css.mkthumb}>
-      <Poster id={lot.id} title={lot.title} genre={lot.genre} hue={lot.hue} size="xs" />
+      <Poster id={lot.artId || lot.id} title={lot.title} genre={lot.genre} hue={lot.hue} poster={lot.poster} size="xs" />
     </span>
     <span className={css.mkrowmain}>
       <b>{lot.title}</b>
@@ -277,7 +277,8 @@ const PAGE = 16;
 
 const Market: React.FC<{
   st: MarketState; onOpen: (l: Lot) => void; onBack: () => void; initialQuery?: string; onQueryChange?: (query: string) => void;
-}> = ({ st, onOpen, onBack, initialQuery = '', onQueryChange }) => {
+  onCommission?: () => void;
+}> = ({ st, onOpen, onBack, initialQuery = '', onQueryChange, onCommission }) => {
   const CATALOGUE = useCatalogue();
   const [view, setView] = useState<string>('ALL');
   const [q, setQ] = useState(initialQuery);
@@ -410,6 +411,11 @@ const Market: React.FC<{
           {results.length === 0 && <p className={css.mkempty}>Nothing under that.</p>}
         </>
       ) : (
+        pool.length === 0 ? (
+          <Blank glyph="🎬" head="Nothing is listed yet"
+            body="Rival studios list a title once they have released it, and none has reached release yet. The market fills as the industry produces — until then, an Original is the fastest way to put something on the service."
+            action={onCommission ? { label: 'Commission an Original', onPress: onCommission } : undefined} />
+        ) :
         RAILS.map(r => {
           const lots = pool.filter(r.test);
           if (!lots.length) return null;
@@ -473,7 +479,17 @@ const Market: React.FC<{
 /* ============================================================
    FROM YOUR STUDIO
    ============================================================ */
-const Studio: React.FC<{ onBack: () => void; onTake: (l: Lot) => void }> = ({ onBack, onTake }) => {
+/* An empty hall still has to say why it is empty. */
+const Blank: React.FC<{ glyph: string; head: string; body: string; action?: { label: string; onPress: () => void } }> = ({ glyph, head, body, action }) => (
+  <div className={css.mkblank}>
+    <i aria-hidden="true">{glyph}</i>
+    <b>{head}</b>
+    <p>{body}</p>
+    {action ? <button type="button" onClick={action.onPress}>{action.label}</button> : null}
+  </div>
+);
+
+const Studio: React.FC<{ onBack: () => void; onTake: (l: Lot) => void; ownsStudio?: boolean; onCommission?: () => void }> = ({ onBack, onTake, ownsStudio, onCommission }) => {
   const CATALOGUE = useCatalogue();
   const mine = CATALOGUE.filter(l => l.mode === 'STUDIO');
   return (
@@ -485,10 +501,19 @@ const Studio: React.FC<{ onBack: () => void; onTake: (l: Lot) => void }> = ({ on
       </header>
       <p className={css.mklead}>Production ownership and streaming rights are separate things. Bringing a
         title across links only the markets your company can legally stream — it does not cost you a fee.</p>
+      {!mine.length ? (
+        ownsStudio
+          ? <Blank glyph="🎞" head="Your studio hasn't released anything yet"
+              body="A title becomes eligible the week it releases. Anything your production house has in development will appear here on its release week."
+              action={onCommission ? { label: 'Commission an Original', onPress: onCommission } : undefined} />
+          : <Blank glyph="🏛" head="You don't own a production house"
+              body="Titles your own company releases cross over here with no fee. You can buy a production house from Lifestyle → Business. Until then, license from the market."
+              action={onCommission ? { label: 'Commission an Original', onPress: onCommission } : undefined} />
+      ) : null}
       <div className={css.mkwallgrid}>
         {mine.map(l => (
           <button className={css.mkcard} key={l.id} aria-label={`${l.title} · ${l.seller}`} disabled={l.linked || Boolean(l.unavailableReason)} onClick={() => onTake(l)}>
-            <Poster id={l.id} title={l.title} genre={l.genre} hue={l.hue} year={l.year} size="md" />
+            <Poster id={l.artId || l.id} title={l.title} genre={l.genre} hue={l.hue} poster={l.poster} year={l.year} size="md" />
             <div className={css.mkcardfoot}><b className={css.mkfree}>NO FEE</b><span>ALL MKTS</span></div>
           </button>
         ))}
@@ -548,7 +573,7 @@ const Boxset: React.FC<{ lot: Lot; size?: 'sm' | 'lg' }> = ({ lot, size = 'sm' }
     <div className={cx(css.mkbox, (size === 'lg' ? css.lg : ''))}>
       {four.map(r => (
         <span className={css.mkboxcell} key={r.name}>
-          <Poster id={lot.id + r.name} title={r.name} genre={r.genre} hue={r.hue}
+          <Poster id={r.id} title={r.name} genre={r.genre} hue={r.hue} poster={r.poster}
             size={size === 'lg' ? 'sm' : 'xs'} />
         </span>
       ))}
@@ -615,7 +640,7 @@ const Detail: React.FC<{
           <Boxset lot={lot} size="lg" />
         ) : (
           <div className={css.mkoneframe}>
-            <Poster id={lot.id} title={lot.title} genre={lot.genre} hue={lot.hue} year={lot.year}
+            <Poster id={lot.artId || lot.id} title={lot.title} genre={lot.genre} hue={lot.hue} poster={lot.poster} year={lot.year}
               size="lg" />
           </div>
         )}
@@ -704,7 +729,7 @@ const Detail: React.FC<{
               {lot.rows.slice(0, visibleCollectionRows).map(r => (
                 <div className={css.mkmember} key={r.name}>
                   <span className={css.mkmemart}>
-                    <Poster id={lot.id + r.name} title={r.name} genre={r.genre} hue={r.hue} size="xs" />
+                    <Poster id={r.id} title={r.name} genre={r.genre} hue={r.hue} poster={r.poster} size="xs" />
                   </span>
                   <span className={css.mkmemmain}>
                     <b>{r.name}</b>
@@ -986,7 +1011,9 @@ export const ContentMarket: React.FC<{
   onQueryChange?: (query: string) => void;
   initialScene?: MarketScene;
   initialLotId?: string | null;
-}> = ({ brand, state, supplySummary, catalogue, onBack, onCommission, onAcquired, onOfferSent, onEnterRoom, onFollow, offerCount = 0, onOpenOffers, onNavigation, initialQuery = '', onQueryChange, initialScene = 'GATE', initialLotId = null }) => {
+  /** Distinguishes "no production house" from "a studio with nothing released". */
+  ownsStudio?: boolean;
+}> = ({ brand, state, supplySummary, catalogue, onBack, onCommission, ownsStudio, onAcquired, onOfferSent, onEnterRoom, onFollow, offerCount = 0, onOpenOffers, onNavigation, initialQuery = '', onQueryChange, initialScene = 'GATE', initialLotId = null }) => {
   const c = brandColor(brand);
   const [scene, setScene] = useState<MarketScene>(initialScene);
   const [back, setBack] = useState<MarketScene>(initialScene === 'STUDIO' ? 'STUDIO' : 'MARKET');
@@ -1017,7 +1044,7 @@ export const ContentMarket: React.FC<{
           {flash.lot && (
             <div className={css.mksignart}>
               {flash.lot.rows ? <Boxset lot={flash.lot} /> : (
-                <Poster id={flash.lot.id} title={flash.lot.title} genre={flash.lot.genre}
+                <Poster id={flash.lot.artId || flash.lot.id} title={flash.lot.title} genre={flash.lot.genre} poster={flash.lot.poster}
                   hue={flash.lot.hue} size="md" />
               )}
             </div>
@@ -1040,8 +1067,8 @@ export const ContentMarket: React.FC<{
         <Gate st={state} supplySummary={supplySummary} onBack={onBack} onCommission={onCommission}
           onRoute={r => navigate(r === 'STUDIO' ? 'STUDIO' : 'MARKET', null)} />
       )}
-      {scene === 'MARKET' && <Market st={state} initialQuery={initialQuery} onQueryChange={onQueryChange} onBack={() => navigate('GATE', null)} onOpen={l => open(l, 'MARKET')} />}
-      {scene === 'STUDIO' && <Studio onBack={() => navigate('GATE', null)} onTake={take} />}
+      {scene === 'MARKET' && <Market st={state} onCommission={onCommission} initialQuery={initialQuery} onQueryChange={onQueryChange} onBack={() => navigate('GATE', null)} onOpen={l => open(l, 'MARKET')} />}
+      {scene === 'STUDIO' && <Studio onBack={() => navigate('GATE', null)} onTake={take} ownsStudio={ownsStudio} onCommission={onCommission} />}
       {scene === 'DETAIL' && lot && (
         <Detail lot={lot} st={state} onBack={() => navigate(back, null)} onTake={take}
           onOffer={() => navigate('OFFER', lot)} offerCount={offerCount} onOffers={onOpenOffers}

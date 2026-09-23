@@ -12,7 +12,7 @@ import type { FinanceHealth, PeriodSummary, ResolvedCut } from '../finance/deriv
 import { periodPhrase, topEarners, whatChanged } from '../finance/derive';
 import { delta, money, pct, runwayLabel } from '../finance/format';
 import { CashFlowChart } from './CashFlowChart';
-import { Poster } from './Poster';
+import { StreamingTitleArt } from './StreamingTitleArt';
 import { Meter, useCountUp, type Tone } from './ui';
 import type { FinanceTab } from './StudioFinance';
 
@@ -141,7 +141,7 @@ export function SnapshotView({ data, cut, period, summary, health, onNavigate, o
           {earners.map((earner, i) => (
             <li key={earner.id}>
               <button type="button" className="sf-earner" onClick={() => onOpenTitle(earner.id)}>
-                <Poster seed={earner.posterSeed ?? earner.id} size={34} rank={i + 1} />
+                <StreamingTitleArt id={earner.posterSeed ?? earner.id} title={earner.name} poster={earner.poster} size={34} rank={i + 1} />
                 <span className="sf-earner-name">{earner.name}</span>
                 <span className="sf-earner-amount">{money(earner.amount)}</span>
               </button>

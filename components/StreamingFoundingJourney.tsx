@@ -35,6 +35,8 @@ import { cx } from './streaming-transplant/presentation/cx';
 
 type FoundingScene = 'WALL' | 'CASE' | 'WIZARD';
 
+export const getStreamingPostIncorporationDestination = (): 'HOME' => 'HOME';
+
 interface Props {
   player: Player;
   onUpdatePlayer?: (player: Player) => void;
@@ -245,7 +247,7 @@ export default function StreamingFoundingJourney({
     if (!result.changed) return;
 
     persist(result.player);
-    onOpenHeadquarters('FINANCE');
+    onOpenHeadquarters(getStreamingPostIncorporationDestination());
   };
 
   const liveBrand = brand.name.trim() ? brand : { ...brand, name: config.defaultName };

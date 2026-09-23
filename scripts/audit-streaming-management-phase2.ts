@@ -30,7 +30,7 @@ assert(normalized.priority === 'PREMIUM', 'Valid player priorities must survive 
 assert(normalized.maximumBudget === DEFAULT_STREAMING_MANAGEMENT_POLICY.maximumBudget, 'Non-finite budgets must use the safe default.');
 assert(normalized.preferredCityIds.join(',') === 'BOM,LA,NYC,LDN', 'Preferred cities must be unique, normalized and capped at four.');
 assert(normalized.requireApprovalForExpensiveChanges === false, 'Players must be able to disable approval prompts.');
-assert(normalized.approvalThreshold === 260_000, 'Approval thresholds must remain inside the supported range.');
+assert(normalized.approvalThreshold === 250_000, 'Approval thresholds must clamp to the canonical supported minimum.');
 
 const marketIds = ['US', 'IN', 'GB'];
 const markets = marketIds.flatMap(id => {

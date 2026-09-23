@@ -68,7 +68,12 @@ const scan = (path: string): string[] => {
     const extension = extname(path);
     if (extension && codeExtensions.has(extension)) return legacyPattern.test(readFileSync(path, 'utf8')) ? [path] : [];
     if (extension) return [];
-    return readdirSync(path, { withFileTypes: true }).flatMap(entry => scan(join(path, entry.name)));
+    return readdirSync(path, { withFileTypes: true }).flatMap(entry => {
+        if (entry.isDirectory()) return scan(join(path, entry.name));
+        if (!entry.isFile()) return [];
+        const child = join(path, entry.name);
+        return codeExtensions.has(extname(child)) ? scan(child) : [];
+    });
 };
 
 const legacySources = scanRoots.flatMap(scan);

@@ -58,7 +58,7 @@ const createIncorporatedPlayer = (): Player => {
     return funded.player;
 };
 
-assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 26, 'The current schema should retain Phase 5 infrastructure fields.');
+assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 27, 'The current schema should retain Phase 5 infrastructure fields and pending revisions.');
 assert(STREAMING_INFRASTRUCTURE_STRATEGIES.length === 3, 'Cloud, owned and hybrid strategies should all remain available.');
 assert(
     STREAMING_CAPACITY_PACKAGES.map(item => item.id).join(',') === 'STARTER,ESSENTIAL,GROWTH,PREMIERE',
@@ -74,18 +74,19 @@ const defaultDraft = createDefaultStreamingInfrastructureDraft(incorporated);
 assert(defaultDraft.strategy === 'HYBRID', 'An undecided foundation should receive the balanced Hybrid suggestion without locking the choice.');
 assert(defaultDraft.capacityPackageId === 'STARTER', 'A new company should begin with the affordable entry-level Starter Rack.');
 assert(defaultDraft.currentStep === 0, 'A fresh setup should begin at network design.');
-assert(defaultDraft.networkPlacements.length >= 1, 'Day-One Markets should produce at least one advisory network campus.');
-assert(defaultDraft.networkPlacements[0].cityId === 'LA', 'The strongest selected market should determine the advisory core city.');
-assert(defaultDraft.networkPlacements[0].role === 'CORE_ORIGIN', 'The advisory network should begin with exactly one core origin.');
-assert(defaultDraft.networkPlacements.reduce((sum, node) => sum + node.racks, 0) >= 2, 'The market recommendation should contain at least two editable racks.');
-assert(getStreamingInfrastructureForecast(incorporated, defaultDraft).reachLevel === 1, 'The opening load model should project the Regional reach earned by the selected Starter Rack.');
+assert(defaultDraft.networkPlacements.length === 0, 'A new company must choose its first network instead of receiving hidden placements.');
+const chosenDraft = {
+    ...defaultDraft,
+    networkPlacements: [{ cityId: 'LA', racks: 2, role: 'CORE_ORIGIN' as const }],
+};
+assert(getStreamingInfrastructureForecast(incorporated, chosenDraft).reachLevel === 1, 'The opening load model should project the Regional reach earned by the player-selected Starter Rack.');
 
 const cloudForecast = getStreamingInfrastructureForecast(incorporated, {
-    ...defaultDraft,
+    ...chosenDraft,
     strategy: 'CLOUD_FIRST',
 });
 const ownedForecast = getStreamingInfrastructureForecast(incorporated, {
-    ...defaultDraft,
+    ...chosenDraft,
     strategy: 'OWNED_INFRASTRUCTURE',
 });
 assert(cloudForecast.upfrontCost < ownedForecast.upfrontCost, 'Cloud-first should require less opening capital than owned infrastructure.');
@@ -94,11 +95,11 @@ assert(cloudForecast.burstConcurrentStreams > ownedForecast.burstConcurrentStrea
 assert(cloudForecast.buildWeeks <= ownedForecast.buildWeeks, 'Cloud-first must never take longer than an equivalent owned build.');
 
 const safeForecast = getStreamingInfrastructureForecast(incorporated, {
-    ...defaultDraft,
+    ...chosenDraft,
     rolloutPace: 'SAFE',
 });
 const rushedForecast = getStreamingInfrastructureForecast(incorporated, {
-    ...defaultDraft,
+    ...chosenDraft,
     rolloutPace: 'RUSHED',
 });
 assert(safeForecast.buildWeeks === rushedForecast.buildWeeks, 'A retired hidden pace value must not change construction time.');
@@ -108,7 +109,7 @@ assert(safeForecast.reliabilityTarget === rushedForecast.reliabilityTarget, 'A r
 assert(safeForecast.buildWeeks >= 4 && safeForecast.buildWeeks <= 15, 'Every infrastructure forecast must remain inside the disclosed 4–15 week range.');
 
 const nationalForecast = getStreamingInfrastructureForecast(incorporated, {
-    ...defaultDraft,
+    ...chosenDraft,
     capacityPackageId: 'GROWTH',
     networkPlacements: [
         { cityId: 'LA', racks: 20, role: 'CORE_ORIGIN' },
@@ -118,7 +119,7 @@ const nationalForecast = getStreamingInfrastructureForecast(incorporated, {
 });
 assert(nationalForecast.reachLevel === 2, 'A physically expanded network should project the National reach its real capacity earns.');
 const failureForecast = getStreamingInfrastructureForecast(incorporated, {
-    ...defaultDraft,
+    ...chosenDraft,
     strategy: 'OWNED_INFRASTRUCTURE',
     capacityPackageId: 'STARTER',
     rolloutPace: 'RUSHED',
@@ -133,7 +134,7 @@ assert(failureForecast.forecastLikelyConcurrentStreams < failureForecast.forecas
 const playerCashBeforeDraft = incorporated.money;
 const treasuryBeforeDraft = incorporated.ownedStreamingPlatform.treasuryCash;
 const saved = saveStreamingInfrastructureDraft(incorporated, {
-    ...defaultDraft,
+    ...chosenDraft,
     currentStep: 2,
     assistedPlanApproved: true,
     assistedPlanClass: 'GROWTH',
@@ -141,6 +142,10 @@ const saved = saveStreamingInfrastructureDraft(incorporated, {
 assert(saved.ownedStreamingPlatform.infrastructureSetupDraft?.currentStep === 2, 'The setup should persist interrupted-flow progress.');
 assert(saved.ownedStreamingPlatform.infrastructureSetupDraft?.assistedPlanApproved === true, 'An approved assisted plan must remain approved after persistence.');
 assert(saved.ownedStreamingPlatform.infrastructureSetupDraft?.assistedPlanClass === 'GROWTH', 'The approved assisted plan class must survive persistence.');
+assert(
+    (saved.ownedStreamingPlatform.infrastructureSetupDraft?.regionPlans?.length || 0) > 0,
+    'Saving an older facility drawing must derive durable regional intent.',
+);
 assert(saved.money === playerCashBeforeDraft, 'Saving infrastructure choices must not touch personal money.');
 assert(saved.ownedStreamingPlatform.treasuryCash === treasuryBeforeDraft, 'Saving infrastructure choices must not charge company treasury.');
 
@@ -193,6 +198,10 @@ assert(committed.player.ownedStreamingPlatform.infrastructureSetupDraft === null
 assert(committed.player.ownedStreamingPlatform.infrastructureSetup?.capacityPackageId === 'STARTER', 'The affordable Starter Rack should remain the canonical first setup.');
 assert(committed.player.ownedStreamingPlatform.infrastructureSetup?.networkPlacements[0]?.cityId === 'LA', 'The committed setup should retain the actual server city.');
 assert(committed.player.ownedStreamingPlatform.infrastructureSetup?.networkPlacements[0]?.racks >= 1, 'The committed setup should retain the actual rack count.');
+assert(
+    (committed.player.ownedStreamingPlatform.infrastructureSetup?.regionPlans?.length || 0) > 0,
+    'Commissioning must retain the canonical regional plan independently from facility placement.',
+);
 assert(committed.player.ownedStreamingPlatform.capacity.baselineConcurrentStreams === committed.forecast.baselineConcurrentStreams, 'Canonical capacity should match the approved forecast.');
 assert(committed.player.ownedStreamingPlatform.capacity.burstConcurrentStreams === committed.forecast.burstConcurrentStreams, 'Canonical burst capacity should match the load-tested setup.');
 assert(committed.player.ownedStreamingPlatform.subscriptionPrices.BASIC === defaultDraft.subscriptionPrices.BASIC, 'Approved Basic pricing should persist.');

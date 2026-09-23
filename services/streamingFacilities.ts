@@ -10,6 +10,7 @@ import type {
     StreamingFacilityType,
     StreamingNetworkNodeRole,
 } from '../types';
+import { getPlaceByListingId } from './streamingSitePlaces';
 import {
     normalizeStreamingRackGroups,
     projectFacilityNetworkRole,
@@ -23,6 +24,19 @@ export interface StreamingFacilityContract {
     capacityRacks: number;
     setupCost: number;
     weeklyLease: number;
+    /** Cooling the contract removes, per rack, before the room's own cooling
+        factor. It RISES with how much of the building you hold: a slice of
+        somebody's shared air handles less heat per rack than a hall you cool
+        yourself. It used to fall from 11 to 6, which — against a flat draw —
+        meant 174 of the 233 rooms in the catalogue ran out of cooling before
+        they ran out of floor space, always, whatever you put in them. */
+    /** Cooling the contract removes, per rack, before the room's own cooling
+        factor. It RISES with how much of the building you hold: a slice of
+        somebody's shared air handles less heat per rack than a hall you cool
+        yourself. It used to FALL, from 11 to 6 — which, against a flat per-rack
+        draw, meant 174 of the 233 rooms in the catalogue ran out of cooling
+        before they ran out of floor space, always, whatever you put in them.
+        That is a wall, not a ceiling you can plan against. */
     coolingKwPerRack: number;
     provisioningWeeks: number;
     playerSelectable: boolean;
@@ -38,7 +52,7 @@ export const STREAMING_FACILITY_CONTRACTS: StreamingFacilityContract[] = [
         capacityRacks: 4,
         setupCost: 70_000,
         weeklyLease: 62_000,
-        coolingKwPerRack: 7,
+        coolingKwPerRack: 11,
         provisioningWeeks: 1,
         playerSelectable: true,
         marketplaceVisible: true,
@@ -64,7 +78,7 @@ export const STREAMING_FACILITY_CONTRACTS: StreamingFacilityContract[] = [
         capacityRacks: 8,
         setupCost: 620_000,
         weeklyLease: 54_000,
-        coolingKwPerRack: 10,
+        coolingKwPerRack: 11,
         provisioningWeeks: 2,
         playerSelectable: true,
         marketplaceVisible: true,
@@ -77,7 +91,7 @@ export const STREAMING_FACILITY_CONTRACTS: StreamingFacilityContract[] = [
         capacityRacks: 16,
         setupCost: 1_650_000,
         weeklyLease: 126_000,
-        coolingKwPerRack: 9,
+        coolingKwPerRack: 12,
         provisioningWeeks: 3,
         playerSelectable: true,
         marketplaceVisible: true,
@@ -90,7 +104,7 @@ export const STREAMING_FACILITY_CONTRACTS: StreamingFacilityContract[] = [
         capacityRacks: 32,
         setupCost: 4_800_000,
         weeklyLease: 310_000,
-        coolingKwPerRack: 8,
+        coolingKwPerRack: 12,
         provisioningWeeks: 5,
         playerSelectable: true,
         marketplaceVisible: true,
@@ -103,7 +117,7 @@ export const STREAMING_FACILITY_CONTRACTS: StreamingFacilityContract[] = [
         capacityRacks: 96,
         setupCost: 38_000_000,
         weeklyLease: 180_000,
-        coolingKwPerRack: 6,
+        coolingKwPerRack: 13,
         provisioningWeeks: 18,
         playerSelectable: false,
         marketplaceVisible: true,
@@ -300,7 +314,22 @@ export const normalizeStreamingFacilityLease = (
     return {
         listingId,
         providerName,
-        rackPositions: Math.max(1, Math.min(base.capacityRacks, Math.round(finite(source.rackPositions, base.capacityRacks)))),
+        /* Bounded by the BUILDING, not by the contract type.
+
+           This clamped to `base.capacityRacks`, which is the contract's own
+           fixed size — the figure that used to decide how big a room was. Now
+           that a city offers real buildings of differing sizes, a four-rack
+           shared floor quoting under the cabinet contract was being rewritten
+           down to two racks the moment it was saved. The place the lease names
+           is the honest ceiling; the contract is the fallback for a listing id
+           no longer in the catalogue. */
+        rackPositions: (() => {
+            const place = getPlaceByListingId(listingId);
+            const ceiling = place
+                ? place.rackPositions + place.expansionRackPositions
+                : base.capacityRacks;
+            return Math.max(1, Math.min(ceiling, Math.round(finite(source.rackPositions, ceiling))));
+        })(),
         depositCost: Math.max(0, Math.round(finite(source.depositCost, 0))),
         setupCost: Math.max(0, Math.round(finite(source.setupCost, base.setupCost))),
         weeklyRent: Math.max(0, Math.round(finite(source.weeklyRent, base.weeklyLease))),
@@ -311,7 +340,25 @@ export const normalizeStreamingFacilityLease = (
         fibreGrade,
         contractWeeks: Math.max(1, Math.min(520, Math.round(finite(source.contractWeeks, 52)))),
         provisioningWeeks: Math.max(0, Math.min(104, Math.round(finite(source.provisioningWeeks, base.provisioningWeeks)))),
-        expansionRackPositions: Math.max(0, Math.min(96, Math.round(finite(source.expansionRackPositions, 0)))),
+        expansionRackPositions: Math.max(0, Math.min(256, Math.round(finite(source.expansionRackPositions, 0)))),
+        /* Absent on every save written before ownership existed, and RENTED is
+           the only thing those saves could have been. */
+        tenure: source.tenure === 'OWNED' || source.tenure === 'CLOUD' ? source.tenure : 'RENTED',
+        /* Left undefined when absent rather than defaulted to zero: zero is a
+           real week, and a lease that claims to have started at week zero is a
+           lease that expired long ago. Undefined reads as "never due". */
+        startedAtAbsoluteWeek: Number.isFinite(Number(source.startedAtAbsoluteWeek))
+            ? Math.max(0, Math.round(Number(source.startedAtAbsoluteWeek)))
+            : undefined,
+        purchasePrice: Number.isFinite(Number(source.purchasePrice))
+            ? Math.max(0, Math.round(Number(source.purchasePrice)))
+            : undefined,
+        ...(source.cloudProvider === 'ATLAS' || source.cloudProvider === 'NORTHWIND' || source.cloudProvider === 'MERIDIAN'
+            ? { cloudProvider: source.cloudProvider }
+            : source.tenure === 'CLOUD' ? { cloudProvider: 'ATLAS' as const } : {}),
+        ...(source.cloudExtendedCompute == null
+            ? {}
+            : { cloudExtendedCompute: Math.max(0, Math.round(finite(source.cloudExtendedCompute, 0))) }),
     };
 };
 

@@ -177,6 +177,9 @@
 .ocd-poster-art::before { content: ''; position: absolute; inset: 12px; border: 1px solid rgba(255,255,255,.14); border-radius: 50% 50% 4px 4px; transform: rotate(-11deg); }
 .ocd-poster-art i { position: relative; font-family: 'Anton', sans-serif; font-size: 3rem; font-style: normal; letter-spacing: -.06em; text-shadow: 0 12px 36px #000; }
 .ocd-poster-art em { position: absolute; left: 10px; bottom: 8px; color: rgba(255,255,255,.5); font-size: .52rem; font-style: normal; font-weight: 900; letter-spacing: .1em; }
+.ocd-poster-art.is-production::before { display: none; }
+.ocd-poster-art.is-production .sf-title-art { width: 100% !important; height: 100% !important; border-radius: 0; }
+.ocd-poster-art.is-production .sf-poster-rank { z-index: 3; font-size: .72rem; }
 .ocd-poster-copy { padding: 11px 11px 8px; display: grid; gap: 4px; }
 .ocd-poster-copy small { color: hsl(var(--ocd-hue), 80%, 75%); font-size: .47rem; font-weight: 850; letter-spacing: .08em; }
 .ocd-poster-copy strong { overflow: hidden; font-size: .82rem; text-overflow: ellipsis; white-space: nowrap; }

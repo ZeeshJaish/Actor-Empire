@@ -9,7 +9,7 @@
 
 import { useCallback, useMemo, useState } from 'react';
 import type { BuildStageId } from '../../finance/build';
-import { cityFor, constructionProgress, facilityRacks, facilityRoomLabel, gates, listingFor } from '../../finance/build';
+import { kitWords, cityFor, constructionProgress, facilityRacks, facilityRoomLabel, gates, listingFor } from '../../finance/build';
 import type { StageProps } from './BuildWizard';
 import { compactCount, money } from '../../finance/format';
 import { Cutscene } from '../cine/Cutscene';
@@ -28,8 +28,57 @@ export function StageLaunch({ data, draft, totals, plan, handlers, onJump }: Sta
     + definitionChecks.filter(check => check.complete).length;
   const requirementCount = list.length + definitionChecks.length;
   const readinessPercent = requirementCount > 0 ? readyCount / requirementCount * 100 : 0;
-  const finalProof = list.find(gate => gate.id === 'rehearsal');
-  const preparationGates = list.filter(gate => gate.id !== 'rehearsal');
+  /* A contract is with someone. The rooms were a flat list; they are grouped
+     under the provider whose contract executes, which is what a schedule to an
+     agreement actually looks like. */
+  const providers = useMemo(() => {
+    const groups = new Map<string, { provider: string; rooms: Array<{ id: string; label: string; racks: number; moveIn: number }>; racks: number; moveIn: number }>();
+    for (const facility of draft.facilities) {
+      const listing = listingFor(data, facility);
+      const provider = listing?.provider ?? 'Unnamed provider';
+      const group = groups.get(provider) ?? { provider, rooms: [], racks: 0, moveIn: 0 };
+      group.rooms.push({
+        id: facility.id,
+        label: facilityRoomLabel(data, draft.facilities, facility),
+        racks: facilityRacks(facility),
+        moveIn: listing?.moveIn ?? 0,
+      });
+      group.racks += facilityRacks(facility);
+      group.moveIn += listing?.moveIn ?? 0;
+      groups.set(provider, group);
+    }
+    return [...groups.values()].sort((left, right) => right.racks - left.racks);
+  }, [data, draft.facilities]);
+
+  /* One list of everything that must be true, whichever screen owns it — a
+     Build gate and a Define the Launch check are the same kind of thing to the
+     person about to sign, and they were in two sections counted separately. */
+  const items = useMemo(() => {
+    const all = [
+      ...list.map(gate => ({
+        id: gate.id,
+        label: gate.label,
+        value: gate.value,
+        ok: gate.ok,
+        proof: gate.id === 'rehearsal',
+        where: 'Open',
+        fix: () => onJump(gate.stage),
+      })),
+      ...definitionChecks.map(check => ({
+        id: `define:${check.id}`,
+        label: check.label,
+        value: check.detail,
+        ok: check.complete,
+        proof: false,
+        where: 'Fix',
+        fix: () => handlers.onOpenDefine?.(check.step),
+      })),
+    ];
+    /* The rehearsal is the last word on whether this works, so when it is open
+       it is the first thing to fix. */
+    const open = all.filter(item => !item.ok).sort((left, right) => Number(right.proof) - Number(left.proof));
+    return { open, cleared: all.filter(item => item.ok) };
+  }, [definitionChecks, handlers, list, onJump]);
   const commissionNow = plan.commissionNow ?? plan.total;
   const alreadyPaid = plan.lines
     .filter(line => line.timing === 'SETTLED')
@@ -94,8 +143,8 @@ export function StageLaunch({ data, draft, totals, plan, handlers, onJump }: Sta
           <b>{constructionLocked ? 'Construction underway' : 'Operational'}</b>
           <p>
             {constructionLocked && construction
-              ? `${totals.cities} cities and ${totals.racks} racks are being built. ${construction.remainingWeeks} ${construction.remainingWeeks === 1 ? 'week remains' : 'weeks remain'} until the network is operational.`
-              : `${totals.racks} racks across ${totals.cities} cities are operational.`}
+              ? `${kitWords(totals, ' and ')} across ${totals.cities} ${totals.cities === 1 ? 'city' : 'cities'} are being built. ${construction.remainingWeeks} ${construction.remainingWeeks === 1 ? 'week remains' : 'weeks remain'} until the network is operational.`
+              : `${kitWords(totals, ' and ')} across ${totals.cities} ${totals.cities === 1 ? 'city' : 'cities'} are operational.`}
           </p>
           <p className="bw-done-sub">
             This wizard is your Infrastructure screen from here — come back to add
@@ -117,7 +166,7 @@ export function StageLaunch({ data, draft, totals, plan, handlers, onJump }: Sta
         {/* Commissioning is not a dead end: the wizard is the Infrastructure
             screen from here, and a revision is just another drawing. */}
         <div className="lw-actions">
-          <button type="button" className="sf-btn sf-btn--ghost" disabled={constructionLocked} onClick={() => { setDone(false); onJump('sites'); }}>
+          <button type="button" className="sf-btn sf-btn--ghost" disabled={constructionLocked} onClick={() => { setDone(false); onJump('network'); }}>
             {constructionLocked ? 'Configuration locked' : 'Plan a revision'}
           </button>
           <button type="button" className="sf-btn sf-btn--primary" disabled={constructionLocked} onClick={() => handlers.onOpeningNight?.()}>
@@ -132,105 +181,160 @@ export function StageLaunch({ data, draft, totals, plan, handlers, onJump }: Sta
 
   return (
     <>
-      {/* --- one compact readiness board: six preparation gates and one final proof --- */}
-      <section className={blocked ? 'bw-launch-readiness is-blocked' : 'bw-launch-readiness'}>
-        <header className="bw-launch-readiness-head">
-          <span>
-            <p className="sf-eyebrow">Commissioning readiness</p>
-            <strong>{readyCount} of {requirementCount} ready</strong>
-          </span>
-          <b className={blocked ? 'is-blocked' : 'is-ready'}>
-            {blocked ? `${open.length + definitionOpen.length} open` : 'Ready'}
-          </b>
-        </header>
+      {/* --- everything that must be true before you sign --------------------
+          This was a board of six cards in two columns, mostly green, with the
+          Define the Launch blockers in a second section underneath. Fourteen
+          checks of which eleven are fine is eleven cards saying so and three
+          saying something. The open ones are the page now; the cleared ones are
+          one line you can open — the same rule the rehearsal screen learned. */}
+      <section id="bw-commission-guidance" className={blocked ? 'bw-sign is-blocked' : 'bw-sign'}>
+        <p className="kit-title">
+          <b>Before you sign</b>
+          <em>{readyCount} of {requirementCount} ready</em>
+        </p>
 
         <div
-          className="bw-launch-readiness-meter"
+          className="bw-sign-meter"
           role="progressbar"
           aria-label="Commissioning readiness"
           aria-valuemin={0}
           aria-valuemax={requirementCount}
           aria-valuenow={readyCount}
         >
-          <i style={{ width: `${readinessPercent}%` }} />
+          <i className={blocked ? '' : 'is-ready'} style={{ width: `${readinessPercent}%` }} />
         </div>
 
-        <ul className="bw-launch-gate-grid">
-          {preparationGates.map(gate => (
-            <li key={gate.id}>
-              <button type="button" className={gate.ok ? 'bw-launch-gate is-ok' : 'bw-launch-gate'} onClick={() => onJump(gate.stage)}>
-                <i aria-hidden="true">{gate.ok ? '✓' : '×'}</i>
-                <span><b>{gate.label}</b><em>{gate.value}</em></span>
-              </button>
-            </li>
-          ))}
-        </ul>
-
-        {finalProof && (
-          <button
-            type="button"
-            className={finalProof.ok ? 'bw-final-proof is-ok' : 'bw-final-proof'}
-            onClick={() => onJump(finalProof.stage)}
-          >
-            <span className="bw-final-proof-mark" aria-hidden="true">{finalProof.ok ? '✓' : '×'}</span>
-            <span><em>Final proof</em><b>{finalProof.label}</b><small>{finalProof.value}</small></span>
-            <i aria-hidden="true">→</i>
-          </button>
+        {items.open.length > 0 ? (
+          <>
+            <p className="bw-sign-head">Fix before commissioning<em>{items.open.length} open</em></p>
+            <ul className="bw-sign-list">
+              {items.open.map(item => (
+                <li key={item.id} className={item.proof ? 'is-proof' : undefined}>
+                  <button type="button" onClick={item.fix}>
+                    <i aria-hidden="true" />
+                    <span>
+                      <b>{item.proof ? `Final proof · ${item.label}` : item.label}</b>
+                      <em>{item.value}</em>
+                    </span>
+                    <s>{item.where} →</s>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : (
+          <p className="bw-sign-clear">Every check is current. This network is ready to sign.</p>
         )}
 
-        <p className="bw-launch-readiness-line">
-          {blocked ? 'Open a red item to finish the commissioning record.' : 'Every gate is current. This network is ready to sign.'}
-        </p>
+        {items.cleared.length > 0 && (
+          <details className="bw-sign-cleared">
+            <summary>
+              <b>{items.cleared.length} cleared</b>
+              <em>{items.cleared.slice(0, 3).map(item => item.label).join(', ')}{items.cleared.length > 3 ? ` and ${items.cleared.length - 3} more` : ''}</em>
+            </summary>
+            <ul className="bw-sign-list">
+              {items.cleared.map(item => (
+                <li key={item.id} className="is-ok">
+                  <button type="button" onClick={item.fix}>
+                    <i aria-hidden="true" />
+                    <span><b>{item.proof ? `Final proof · ${item.label}` : item.label}</b><em>{item.value}</em></span>
+                    <s>{item.where} →</s>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
       </section>
 
-      {definitionOpen.length > 0 && (
-        <section className="bw-launch-blockers" aria-label="Define the Launch blockers">
-          <header>
-            <span><p className="sf-eyebrow">Define the Launch</p><b>Fix before commissioning</b></span>
-            <em>{definitionOpen.length} open</em>
-          </header>
-          <ul>
-            {definitionOpen.map(check => (
-              <li key={check.id}>
-                <button type="button" onClick={() => handlers.onOpenDefine?.(check.step)}>
-                  <span><b>{check.label}</b><em>{check.detail}</em></span>
-                  <i aria-hidden="true">Fix →</i>
-                </button>
+      {/* --- the agreement --------------------------------------------------
+          This page asks whether this is the network you will pay for, so the
+          thing under that question should be the thing you are about to sign.
+          It was a card with a heading, a figure, a list of rooms and three cost
+          tiles — true, and shaped like nothing. A commissioning agreement has
+          parties, a schedule of what is acquired, a consideration, the terms
+          that take effect on execution, and a line to sign on. All five are
+          things this game already knows. */}
+      {data.marketPlanning?.editable === false && data.markets.length === 0 ? (
+        <section className="bw-market-no-quote">
+          <h2>No commissioning agreement yet</h2>
+          <p>File an opening market and draw its network before a room schedule or amount due can be quoted. Nothing can be signed from this preview.</p>
+        </section>
+      ) : <section className="bw-agreement">
+        <header className="bw-agreement-head">
+          <span>
+            <em>Commissioning agreement</em>
+            <b>{data.company.name}</b>
+          </span>
+          <s>Rev A</s>
+        </header>
+
+        <p className="bw-agreement-rule">
+          Schedule A · rooms commissioned
+          <em>
+            {draft.facilities.length} {draft.facilities.length === 1 ? 'room' : 'rooms'}
+            {providers.length > 0 && ` · ${providers.length} ${providers.length === 1 ? 'provider' : 'providers'}`}
+          </em>
+        </p>
+
+        {providers.length === 0 ? (
+          <p className="bw-agreement-empty">Nothing leased. There is no build to commission.</p>
+        ) : (
+          <ul className="bw-agreement-schedule">
+            {providers.map(group => (
+              <li key={group.provider}>
+                <details className="bw-agreement-provider">
+                  <summary className="bw-agreement-party">
+                    <b>{group.provider}</b>
+                    <em>{group.rooms.length} {group.rooms.length === 1 ? 'room' : 'rooms'} · {group.racks} racks · {money(group.moveIn)} room move-in</em>
+                  </summary>
+                  <ul>
+                    {group.rooms.map(room => (
+                      <li key={room.id}>
+                        <span>{room.label}</span>
+                        <s>{room.racks} {room.racks === 1 ? 'rack' : 'racks'}</s>
+                        <b>{room.moveIn > 0 ? money(room.moveIn) : 'Included'}</b>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
               </li>
             ))}
           </ul>
-        </section>
-      )}
+        )}
 
-      {/* --- what will be signed ---------------------------------------------- */}
-      <section className="bw-contract">
-        <header className="bw-contract-head">
-          <span><p className="sf-eyebrow">The contract</p><b>Rooms being commissioned</b></span>
-          <em>{draft.facilities.length} {draft.facilities.length === 1 ? 'room' : 'rooms'}</em>
-        </header>
-        <ul className="bw-contract-list">
-          {draft.facilities.map((facility) => {
-            const listing = listingFor(data, facility);
-            return (
-              <li key={facility.id}>
-                <span><b>{facilityRoomLabel(data, draft.facilities, facility)}</b><em>{listing?.name}</em></span>
-                <span><small>{facilityRacks(facility)} {facilityRacks(facility) === 1 ? 'rack' : 'racks'}</small><s>{(listing?.moveIn ?? 0) > 0 ? money(listing?.moveIn ?? 0) : 'Included'}</s></span>
-              </li>
-            );
-          })}
-          {draft.facilities.length === 0 && <li className="bw-contract-empty">Nothing leased. There is no build to commission.</li>}
+        <p className="bw-agreement-rule">Consideration</p>
+        <dl className="bw-agreement-money">
+          <div><dt>Plan total</dt><dd>{money(launchPlanTotal)}</dd></div>
+          <div><dt>Already paid</dt><dd className="sf-tone-good">−{money(alreadyPaid)}</dd></div>
+          {(plan.deferred ?? 0) > 0 && (
+            <div><dt>Held for opening night</dt><dd>{money(plan.deferred ?? 0)}</dd></div>
+          )}
+          <div className="is-due"><dt>Due on execution</dt><dd>{money(commissionNow)}</dd></div>
+        </dl>
+
+        <p className="bw-agreement-rule">On execution</p>
+        <ul className="bw-agreement-terms">
+          <li>Every room above is contracted and {money(commissionNow)} leaves the treasury, once.</li>
+          <li>
+            {totals.weeks > 0
+              ? `Construction begins. ${kitWords(totals, ' and ')} across ${totals.cities} ${totals.cities === 1 ? 'city' : 'cities'} are operational in ${totals.weeks} ${totals.weeks === 1 ? 'week' : 'weeks'}.`
+              : `${kitWords(totals, ' and ')} across ${totals.cities} ${totals.cities === 1 ? 'city' : 'cities'} are operational tonight.`}
+          </li>
+          {(plan.deferred ?? 0) > 0 && (
+            <li>{money(plan.deferred ?? 0)} stays reserved for opening night and is not charged now.</li>
+          )}
+          <li>The drawing becomes real infrastructure. A change after this is a revision, not an edit.</li>
         </ul>
 
-        <div className="bw-launch-costs" aria-label="Complete launch cost summary">
-          <span><em>Plan total</em><b>{money(launchPlanTotal)}</b></span>
-          <span><em>Already paid</em><b className="sf-tone-good">−{money(alreadyPaid)}</b></span>
-          <span className="is-due"><em>Due now</em><b>{money(commissionNow)}</b></span>
+        {/* The line you sign on. The name is the company's own signatory — the
+            same one the commissioning sequence puts on the document. */}
+        <div className="bw-agreement-sign">
+          <span className="bw-agreement-line" aria-hidden="true" />
+          <em>Signed for {data.company.name} by</em>
+          <b>{data.company.signatoryName ?? data.company.name}</b>
         </div>
-        {(plan.deferred ?? 0) > 0 && (
-          <div className="bw-launch-reserve"><span>Opening-night reserve</span><b>{money(plan.deferred ?? 0)}</b></div>
-        )}
-        <p className="bw-contract-note">Commissioning executes every room contract and turns this drawing into persistent infrastructure.</p>
-      </section>
+      </section>}
 
       {rolling && (
         <Cutscene
@@ -256,7 +360,7 @@ export function StageLaunch({ data, draft, totals, plan, handlers, onJump }: Sta
               </p>
               <div className="cine-figs">
                 <div><em>Cities</em><b>{totals.cities}</b></div>
-                <div><em>Racks</em><b>{totals.racks}</b></div>
+                <div><em>{totals.racks > 0 ? 'Racks' : 'Compute'}</em><b>{totals.racks > 0 ? totals.racks : totals.compute}</b></div>
                 <div><em>Released</em><b>{money(commissionNow)}</b></div>
                 <div><em>Can carry</em><b>{compactCount(totals.capacity)}</b></div>
               </div>

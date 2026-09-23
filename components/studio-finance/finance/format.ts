@@ -2,6 +2,7 @@
    different ways on two different rows. */
 
 const UNITS: Array<[number, string]> = [
+  [1_000_000_000_000, 'T'],
   [1_000_000_000, 'B'],
   [1_000_000, 'M'],
   [1_000, 'K'],
@@ -15,7 +16,7 @@ export function money(value: number, opts: { sign?: boolean } = {}): string {
     if (n >= size) {
       const scaled = n / size;
       const decimals = scaled >= 100 ? 0 : scaled >= 10 ? 1 : 2;
-      body = `$${trimZeros(scaled.toFixed(decimals))}${suffix}`;
+      body = `$${trimZeros(scaled.toFixed(decimals)).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}${suffix}`;
       break;
     }
   }
@@ -54,6 +55,7 @@ export function signedPct(value: number, decimals = 1): string {
 }
 
 export function compactCount(value: number): string {
+  if (value >= 1_000_000_000) return `${trimZeros((value / 1_000_000_000).toFixed(1))}B`;
   if (value >= 1_000_000) return `${trimZeros((value / 1_000_000).toFixed(1))}M`;
   if (value >= 1_000) return `${trimZeros((value / 1_000).toFixed(1))}K`;
   return String(Math.round(value));

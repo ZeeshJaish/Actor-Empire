@@ -246,7 +246,7 @@ assert.deepEqual(migratePlayerSave(migrated).world.worldStreamingCustomers, migr
 const gameLoopSource = readFileSync(resolve(process.cwd(), 'services/gameLoop.ts'), 'utf8');
 const competitionStage = gameLoopSource.indexOf("emitLoopStage('world_streaming_competition_done'");
 const customersStage = gameLoopSource.indexOf("emitLoopStage('world_streaming_customers_start'");
-const ownedStreamingStage = gameLoopSource.indexOf('const ownedStreamingResult = processOwnedStreamingPlatformWeek');
+const ownedStreamingStage = gameLoopSource.indexOf('ownedStreamingResult = processOwnedStreamingPlatformWeek(nextPlayer);');
 assert.ok(competitionStage >= 0 && customersStage > competitionStage && customersStage < ownedStreamingStage, 'WE5 advances after WE4 and before owned streaming economics');
 
 const corrupt = structuredClone(advanced) as any;

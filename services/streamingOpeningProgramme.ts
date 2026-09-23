@@ -9,14 +9,16 @@ import type {
 import { createDeterministicId } from './deterministicRandom';
 import { getAbsoluteWeek } from './legacyLogic';
 import { compactOwnedStreamingPlatformForPersistence, normalizeOwnedStreamingPlatformState } from './ownedStreamingPlatform';
-import { commitStreamingInfrastructureSetup, getStreamingInfrastructureForecast } from './streamingInfrastructure';
+import { commitStreamingInfrastructureSetup, getStreamingInfrastructureDraftFacilities, getStreamingInfrastructureForecast } from './streamingInfrastructure';
+import { deriveStreamingNetworkCoverage, formatStreamingCoveragePercent, STREAMING_SERVED_COVERAGE_SHARE } from './streamingNetworkCoverage';
 import {
     getStreamingLaunchDefinitionSignature,
     getStreamingLaunchProgramView,
     getStreamingOpeningMarketDecisionState,
     type StreamingLaunchDestination,
 } from './streamingLaunchProgram';
-import { beginStreamingMarketClearance, STREAMING_MARKET_FILING_ENERGY_PER_COUNTRY } from './streamingMarkets';
+import { beginStreamingMarketClearance } from './streamingMarkets';
+import { quoteStreamingMarketFilingEnergy } from './streamingMarketFilingQuote';
 import { reserveOwnedStreamingLaunchMarketing } from './streamingLaunchMarketingLifecycle';
 
 export type StreamingOpeningWorkstreamId =
@@ -132,6 +134,18 @@ export const getStreamingOpeningCommissionQuote = (
     const blockers = requiredMilestones.flatMap(id => launchView.milestones.find(item => item.id === id)?.complete
         ? [] : [`${id.toLowerCase().replaceAll('_', ' ')} is incomplete.`]);
     if (!decision.readyToCommission) blockers.push('An opening-market application needs player action.');
+    if (unfiled.length > 0) blockers.push('File every selected opening market in Market Clearance before commissioning.');
+    const coverage = deriveStreamingNetworkCoverage({
+        facilities: getStreamingInfrastructureDraftFacilities(draft),
+        openingCountryIds: decision.selectedCountryIds,
+        fibreState: platform.fibre,
+    });
+    const thinMarkets = coverage.countries.filter(country => country.grade !== 'SERVED');
+    if (coverage.countries.length !== new Set(decision.selectedCountryIds).size || thinMarkets.length > 0) {
+        const named = thinMarkets.slice(0, 2).map(country =>
+            `${country.countryId} ${formatStreamingCoveragePercent(country.coveredShare)}`).join(', ');
+        blockers.push(`Opening-market geographic coverage needs ${formatStreamingCoveragePercent(STREAMING_SERVED_COVERAGE_SHARE)} in every country${named ? `: ${named}${thinMarkets.length > 2 ? ` +${thinMarkets.length - 2} more` : ''}` : '.'}`);
+    }
     if (!rehearsal || rehearsal.configurationSignature !== forecast.configurationSignature || rehearsal.verdict === 'BROKE') {
         blockers.push('The exact infrastructure configuration has not passed rehearsal.');
     }
@@ -153,7 +167,7 @@ export const getStreamingOpeningCommissionQuote = (
         infrastructureDueNow: forecast.transactionCost,
         marketFilingDueNow,
         marketingReservation,
-        filingEnergy: unfiled.length * STREAMING_MARKET_FILING_ENERGY_PER_COUNTRY,
+        filingEnergy: quoteStreamingMarketFilingEnergy(unfiled.length),
         totalCashRequired: forecast.transactionCost + marketFilingDueNow + marketingReservation,
         ready: blockers.length === 0,
         blockers,
@@ -216,6 +230,10 @@ export const commissionStreamingOpeningProgramme = (
         rehearsalSignature: quote.rehearsalSignature!,
         openingCountryIds: [...new Set(input.openingCountryIds.map(id => id.trim().toUpperCase()).filter(Boolean))].sort(),
         marketingForecastSignature: quote.marketingForecastSignature,
+        infrastructureDueNow: quote.infrastructureDueNow,
+        marketFilingDueNow: quote.marketFilingDueNow,
+        marketingReservation: quote.marketingReservation,
+        totalCashRequired: quote.totalCashRequired,
         revision: 1,
     };
     const ledgerKey = `${quote.idempotencyKey}:commissioned`;
@@ -261,6 +279,10 @@ const legacyCommission = (player: Player): OwnedStreamingOpeningProgrammeCommiss
         rehearsalSignature,
         openingCountryIds: openingOperations(player).map(operation => operation.countryId!).sort(),
         marketingForecastSignature: marketingSignature,
+        infrastructureDueNow: setup.capitalInvested,
+        marketFilingDueNow: 0,
+        marketingReservation: platform.launchMarketingPlan?.budgetCeiling || 0,
+        totalCashRequired: setup.capitalInvested + (platform.launchMarketingPlan?.budgetCeiling || 0),
         revision: 1,
     };
 };

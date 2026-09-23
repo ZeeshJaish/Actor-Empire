@@ -1,0 +1,1253 @@
+/* ============================================================================
+   THE NETWORK PAGE
+
+   Three surfaces and nothing else: the map, the rail, the card. Every colour
+   below is a token or a transparency of one, and the only saturated colour on
+   the page is signal — a market you are opening in, ground you actually reach,
+   a machine that is running. Everything else is line work on near-black.
+
+   Two rules held throughout:
+     · No decorative gradient. Light on this page comes from something that is
+       lit — an LED, a served market, a live route — and is drawn as light,
+       falling off, not as a fill fading into another fill.
+     · Rarity is ownership. The six kinds of room ramp from cool grey to gold,
+       because gold in this design system means the thing is yours, and the
+       sixth kind is the one you own. It is not a rainbow of tiers.
+   ========================================================================== */
+
+.sf .bw-net {
+  /* --- the page's own names ---------------------------------------------- */
+  --net-reach: 52, 211, 153;       /* ground you actually reach */
+
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* ============================================================================
+   1 · THE MAP — pinned, and never leaves
+   ========================================================================== */
+
+/* --- tucked, while a room is open ------------------------------------------
+   The box stays pinned — that is the whole reason it is pinned, so the ground
+   moves up here while your thumb is on a stepper down there — but it stops
+   taking half the screen while you read a list of six duties. The readout
+   across its foot is the part that has to survive, and it does. */
+.sf .bw-net-map.is-tucked .bw-net-stage {
+  /* The stage carries the world's own aspect, so capping its HEIGHT made the
+     box shrink on both axes and left the right half of the strip black. The
+     tucked strip keeps the full width and crops the world vertically — which
+     is the right crop anyway: the readout across its foot is the part that has
+     to survive, and it sits at the bottom. */
+  height: 82px;
+  overflow: hidden;
+}
+.sf .bw-net-map {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  flex: none;
+  background: var(--sf-void);
+  transition: none;
+  /* The only shadow on the page: the map is a plate the rest slides under. */
+  box-shadow: 0 18px 28px -18px rgba(0, 0, 0, 0.95);
+}
+
+/* The frame's aspect is set from the atlas's own world box, so the world fills
+   it exactly. A fixed one either letterboxed a quarter of the frame in empty
+   paper or sliced Auckland off the end. */
+.sf .bw-net-stage {
+  position: relative;
+  max-height: 46vh;
+  overflow: hidden;
+  background: var(--sf-void);
+}
+
+.sf .bw-atlas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* Drag and pinch drive the camera, so the browser must not take the gesture
+     to scroll the page with. */
+  touch-action: none;
+  /* Three things on this map are tappable; everything else is scenery. Said
+     the other way round it does not hold: a coastal-shelf stroke is painted,
+     so it is a hit target by default, and a tap on the sea two hundred miles
+     off Brazil was being eaten by the glow around the coastline. The sea rect
+     lies under the whole frame, so every point still resolves to something. */
+  pointer-events: none;
+}
+.sf .bw-atlas-sea-hit,
+.sf .bw-atlas-hit path,
+.sf .bw-atlas-pin { pointer-events: auto; }
+
+/* --- the world -------------------------------------------------------------
+   This is the game's own map. The ocean, its vignette, the continental shelf,
+   the relief and the gloss are the shared atlas's, stop for stop — the same
+   sea Greenlight shows, not a dark approximation of it.
+
+   One thing is deliberately not carried over: its land. There the continents
+   are painted in six accents over a green-to-teal gradient, which answers
+   "which continent is this?" — a question nobody needs answered. Here land is
+   grey. A region you are not opening in has no colour at all, so that the two
+   colours on the map can each mean exactly one thing:
+
+     RED    a market you have chosen to open in
+     GREEN  ground you actually reach
+
+   Nothing else on this map is coloured, which is why those two read from a
+   glance at arm's length. */
+
+/* Latitude and longitude, barely there — enough to say this is a globe. */
+.sf .bw-atlas-grid { fill: none; stroke: #fff; stroke-opacity: 0.07; stroke-width: 1; }
+
+/* The continental shelf: three strokes of falling light around every landmass.
+   It is what makes a drawn map read as a map rather than as a chart of filled
+   shapes. */
+.sf .bw-atlas-shelf path {
+  fill: none;
+  stroke: #bae6fd;
+  stroke-opacity: var(--o, 0.1);
+}
+
+/* Land stands above the sea and casts down into it. */
+.sf .bw-atlas-relief { fill: #075985; fill-opacity: 0.28; }
+.sf .bw-atlas-relief.is-deep { fill: #082f49; fill-opacity: 0.18; }
+
+/* Every country's edge, drawn on the ground (#113). Without it the continents
+   you are not opening in were one undivided grey slab — Africa read as a hole
+   in the map rather than as forty countries you have not gone to yet. Faint
+   enough that a market's own red edge still stands out over it. */
+.sf .bw-atlas-coast {
+  fill: none;
+  stroke: #f8fbff;
+  stroke-opacity: 0.34;
+  stroke-width: 1.1;
+  stroke-linejoin: round;
+}
+
+.sf .bw-atlas-borders {
+  fill: none;
+  stroke: #0b1a2b;
+  stroke-opacity: 0.42;
+  stroke-width: 0.9;
+}
+
+/* --- the markets you are opening in ---------------------------------------
+   Red from the moment you choose them, and the same red afterwards. A market
+   is a promise you made, not a gauge of how it is going — how it is going is
+   the green over the top of it. */
+/* A market is a promise, drawn as one: held in a bright edge, washed rather
+   than flooded inside (#112). At 0.74 the fill was an alarm over the whole
+   country, so an America whose every city was served still read as failure
+   wherever a field had not reached. The edge says "mine"; the field over it
+   says how it is going. */
+.sf .bw-atlas-market {
+  fill: rgb(var(--sf-brand-on-rgb));
+  fill-opacity: 0.4;
+  transition: fill 620ms var(--sf-ease), stroke 620ms var(--sf-ease);
+  stroke: rgb(var(--sf-brand-on-rgb));
+  stroke-opacity: 0.95;
+  stroke-linejoin: round;
+}
+/* Every person in it served: the country itself goes green, so the ground
+   between the cities stops reading as unfinished when it is finished (#117).
+   Only at the end — under 100% the red stays and the fields do the talking. */
+.sf .bw-atlas-market.is-served {
+  fill: rgb(var(--net-reach));
+  fill-opacity: 0.5;
+  stroke: rgb(var(--net-reach));
+}
+
+/* --- reach: the fill that grows ------------------------------------------
+   Blurred, then contrast-crushed by the SVG filter, so separate rooms fuse
+   into one territory with a real edge instead of stacking as soft discs. */
+/* Over the markets, so a market turning green is the plainest possible
+   statement that it is being served. */
+.sf .bw-atlas-field { mix-blend-mode: normal; }
+
+/* The emission itself: a site radiating, unclipped, so a coastal room visibly
+   reaches out over the water. Light falling off, which is what it is. */
+.sf .bw-atlas-emit circle {
+  opacity: 0.22;
+  transition: r 520ms var(--sf-ease);
+}
+.sf .bw-atlas-emit circle.is-preview { opacity: 0.12; }
+/* Overlapping halos take the strongest rather than adding up (#112). */
+.sf .bw-atlas-halos { isolation: isolate; }
+.sf .bw-atlas-halos circle { mix-blend-mode: lighten; }
+
+/* The field (#109): the gradient is the shading, the element's opacity is
+   how much stands in the room. */
+.sf .bw-atlas-reach { transition: r 520ms var(--sf-ease), opacity 480ms var(--sf-ease); }
+/* The outer ring: ground inside reach but not served to the standard — the
+   band between the solid core and the dashed ring. Faint enough that the alpha
+   crush leaves a ragged edge rather than a second hard circle, but no fainter:
+   since the core stopped running to the full radius this band is most of the
+   field, and it has to read as ground you reach. */
+.sf .bw-atlas-edge {
+  fill: none;
+  stroke: #ffffff;
+  stroke-dasharray: 5 4;
+  animation: bw-atlas-creep 2.4s linear infinite;
+}
+@keyframes bw-atlas-creep { to { stroke-dashoffset: -18; } }
+
+/* --- the routes between your own sites ----------------------------------- */
+.sf .bw-atlas-route {
+  fill: none;
+  stroke: #ffffff;
+  stroke-opacity: 0.6;
+  stroke-linecap: round;
+}
+.sf .bw-atlas-route.is-planned {
+  stroke-opacity: 0.4;
+  stroke-dasharray: 3 4;
+}
+/* Traffic on the link (#111): short dashes crawling from room to room, so a
+   network reads as servers talking to each other rather than as decoration.
+   Each link starts at its own moment, or forty of them pulse in lockstep. */
+.sf .bw-atlas-traffic {
+  fill: none;
+  stroke: rgb(var(--net-reach));
+  stroke-opacity: 0.85;
+  stroke-linecap: round;
+  stroke-dasharray: 0.9 13;
+  animation: bw-atlas-traffic 2.6s linear infinite;
+  animation-delay: var(--delay, 0s);
+  pointer-events: none;
+}
+@keyframes bw-atlas-traffic { to { stroke-dashoffset: -27.8; } }
+
+/* --- the places ----------------------------------------------------------- */
+.sf .bw-atlas-pin-hit { fill: transparent; }
+/* --- the places -----------------------------------------------------------
+   These were a dark core inside a pale ring, which on a pale grey continent is
+   exactly how you draw a hole punched through it. A marker is the other way
+   round: a solid light head with a dark hairline holding it off the ground, so
+   it sits ON the map rather than through it. */
+.sf .bw-atlas-pin { cursor: pointer; }
+.sf .bw-atlas-pin-hit { fill: transparent; }
+.sf .bw-atlas-pin-dot {
+  fill: #eef4fb;
+  stroke: #07131f;
+  stroke-opacity: 0.85;
+  stroke-width: 1.4;
+  transition: fill var(--sf-fast) var(--sf-ease);
+}
+/* A place you are opening in wears the market's own colour. */
+.sf .bw-atlas-pin.is-market .bw-atlas-pin-dot { fill: #fff; }
+.sf .bw-atlas-pin.is-rec .bw-atlas-pin-dot { fill: var(--sf-warn-tint); }
+/* A site you hold wears its own colour — the same colour its row wears below,
+   which is how you tell one of your sites from another without a name on the
+   map. */
+.sf .bw-atlas-pin.is-held .bw-atlas-pin-dot {
+  fill: var(--tone, rgb(var(--net-reach)));
+  stroke: #06101c;
+  stroke-opacity: 1;
+  stroke-width: 1.8;
+}
+.sf .bw-atlas-pin.is-on .bw-atlas-pin-dot { stroke: #fff; stroke-width: 2.4; }
+.sf .bw-atlas-pin.is-on:not(.is-held) .bw-atlas-pin-dot { fill: #fff; stroke: #04140e; }
+.sf .bw-atlas-pin-ring {
+  fill: none;
+  stroke: var(--tone, rgb(var(--net-reach)));
+  stroke-opacity: 0.75;
+  stroke-width: 1.4;
+  /* An SVG element's `transform-origin: center` resolves against the VIEW BOX
+     unless the box is named, so this ring was scaling about the middle of the
+     world and sailing across the map from one corner to the other every 3.4
+     seconds (#113). Its own box, as the ping already had. */
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: bw-atlas-live 3.4s var(--sf-ease) infinite;
+}
+@keyframes bw-atlas-live {
+  0%   { transform: scale(0.72); opacity: 0.85; }
+  70%  { transform: scale(1.5);  opacity: 0; }
+  100% { transform: scale(1.5);  opacity: 0; }
+}
+
+/* The sea and the continents are tap targets, not decoration. */
+.sf .bw-atlas-sea-hit { cursor: zoom-out; }
+.sf .bw-atlas-hit path { fill: transparent; cursor: zoom-in; }
+
+.sf .bw-atlas-label {
+  fill: #eaf2fb;
+  font-family: var(--sf-font-ui);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  paint-order: stroke;
+  stroke: #06121f;
+  stroke-opacity: 0.92;
+  stroke-width: 3px;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+.sf .bw-atlas-label.is-on { fill: #fff; font-weight: 800; }
+
+/* --- where you are, over the picture -------------------------------------- */
+/* Where you are, over the picture. It was three full-size pills lying across
+   the top of a picture 180px tall — a third of the sky. It is one small chip
+   now, and it gives the map its corner back. */
+.sf .bw-net-crumb {
+  position: absolute;
+  z-index: 3;
+  inset: 9px auto auto 9px;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding: 2px;
+  border-radius: 999px;
+  background: rgba(4, 10, 18, 0.66);
+  border: 1px solid rgba(226, 240, 255, 0.16);
+  backdrop-filter: blur(8px);
+}
+
+/* The scale line that lived here is gone. It was a second reading across the
+   top of the map — "2608.4M people · 168.8K on the night · 0 yours" — competing
+   with the band at the bottom for the same job. The number it carried now sits
+   under the figure it qualifies, inside the band. */
+.sf .bw-net-crumb button {
+  border: 0;
+  background: none;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 999px;
+  color: rgba(226, 236, 248, 0.72);
+  font: 800 10px/1 var(--sf-font-ui);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition: color var(--sf-fast) var(--sf-ease), background var(--sf-fast) var(--sf-ease);
+}
+.sf .bw-net-crumb button:hover { color: #fff; }
+.sf .bw-net-crumb button.is-on {
+  color: var(--sf-fg-max);
+  background: rgba(var(--sf-brand-on-rgb), 0.9);
+}
+
+/* --- the reading, at the foot of the picture ------------------------------ */
+/* The reading is written ON the map, not on a panel laid over it. A panel —
+   even smoked glass — is a rectangle of the picture you cannot see, and this
+   picture is only 180px tall. So the two figures are map annotations, carried
+   by their own shadow the way the city labels are, and the gauge is the frame's
+   bottom edge rather than a bar inside a box. Nothing covers the sea. */
+.sf .bw-net-read {
+  position: absolute;
+  inset: auto 0 0 0;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  gap: 0 var(--sf-3);
+  padding: 0 12px 10px;
+  pointer-events: none;
+  /* A whisper, only over the last two centimetres, so a figure that lands on
+     a pale continent still has something behind it. */
+  background: linear-gradient(180deg, rgba(3, 9, 17, 0) 0%, rgba(3, 9, 17, 0.42) 70%, rgba(3, 9, 17, 0.6) 100%);
+}
+.sf .bw-net-read-side { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.sf .bw-net-read-side.is-end { justify-content: flex-end; text-align: right; }
+/* While a room is open in the drawer the figure includes it, so it has to say
+   it is a proposal rather than a fact — otherwise the number is a lie between
+   opening the card and signing for it. The map's own green does the saying. */
+.sf .bw-net-read-side.is-preview b { color: rgb(var(--net-reach)); }
+.sf .bw-net-read-side.is-preview em { color: rgba(var(--net-reach), 0.9); }
+.sf .bw-net-read-side b {
+  flex: none;
+  font: 400 var(--sf-t-5)/0.9 var(--sf-font-display);
+  color: var(--sf-fg-max);
+  font-feature-settings: 'tnum' 1;
+  text-shadow: 0 1px 2px rgba(2, 8, 16, 0.95), 0 0 10px rgba(2, 8, 16, 0.8);
+}
+.sf .bw-net-read-side em {
+  font: 700 var(--sf-t-1)/1.1 var(--sf-font-ui);
+  font-style: normal;
+  color: rgba(226, 236, 248, 0.82);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 2px rgba(2, 8, 16, 0.95), 0 0 8px rgba(2, 8, 16, 0.8);
+}
+/* The figure that answers the page gets the colour of its own verdict. */
+.sf .bw-net-read-side.is-end b { color: rgb(var(--net-reach)); }
+.sf .bw-net-read-side.is-end.is-short b { color: var(--sf-fg-max); }
+.sf .bw-net-read-side.is-end.is-short em { color: var(--sf-warn-tint); }
+
+/* The gauge IS the bottom edge of the frame. */
+.sf .bw-net-gauge {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 4px;
+  display: block;
+  background: rgba(3, 9, 17, 0.75);
+  overflow: hidden;
+}
+.sf .bw-net-gauge s {
+  position: absolute;
+  inset: 0 auto 0 0;
+  display: block;
+  background: rgb(var(--net-reach));
+  transition: width 520ms var(--sf-ease);
+}
+.sf .bw-net-gauge s[data-full] { background: var(--sf-good); }
+/* What the room in the open drawer would add, shown ahead of the bar. */
+.sf .bw-net-gauge u {
+  position: absolute;
+  inset: 0 auto 0 0;
+  display: block;
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(var(--sf-brand-on-rgb), 0.95) 0 3px,
+    rgba(var(--sf-brand-on-rgb), 0.4) 3px 6px
+  );
+  transition: width 220ms var(--sf-ease), left 220ms var(--sf-ease), background 220ms var(--sf-ease);
+}
+/* The stripe stayed brand red whatever it added up to, so a room that covered
+   the night drew a RED bar under text reading "would cover it" in green. Red is
+   the one people believe. It goes green the moment the total clears, which is
+   the rule the committed bar beside it has always followed. */
+.sf .bw-net-gauge u[data-full] {
+  background: repeating-linear-gradient(
+    90deg,
+    var(--sf-good) 0 3px,
+    color-mix(in srgb, var(--sf-good) 45%, transparent) 3px 6px
+  );
+}
+
+@keyframes bw-net-rise {
+  from { opacity: 0; transform: translateY(9px); }
+  to   { opacity: 1; transform: none; }
+}
+
+   
+  
+  
+  
+  
+    /* the ground is yours */
+
+/* --- the art: the hall, and how much of it is yours ---------------------- */
+/* 16:9, not the 20:9 letterbox it was. The drawing did not care about its own
+   shape; a photograph does — everything an image generator hands back is 3:2 or
+   4:3, and a 20:9 crop of that throws away two fifths of the picture. The
+   height that costs is taken back from the name block, which no longer carries
+   the term. */
+
+@keyframes bw-rc-breathe {
+  0%, 100% { opacity: 0.55; }
+  44%      { opacity: 1; }
+  62%      { opacity: 0.72; }
+}
+
+/* The term and the landlord, along the foot of the picture. This was the room's
+   "model" — Shared facility, Private room — which for two of the six kinds was
+   the banner's own words a second time, set in grey over the drawing where it
+   could not be read anyway. */
+/* The foot of the picture: the term on the left, the room's standing on the
+   right, in one row so neither can land on the other. */
+/* --- whose building, and for how long -------------------------------------- */
+
+/* --- the drawer, now that it is real estate only ---------------------------
+   What the building could reach, said once and large, and the way to take it.
+   What goes in it is the next stage. */
+.sf .bw-net-reach {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+}
+.sf .bw-net-reach b {
+  font: 700 26px/1 var(--sf-font-ui);
+  color: var(--sf-fg-max);
+  font-feature-settings: 'tnum' 1;
+  letter-spacing: -0.02em;
+}
+.sf .bw-net-reach em {
+  font: 500 var(--sf-t-2)/1.45 var(--sf-font-ui);
+  font-style: normal;
+  color: var(--sf-fg-3);
+}
+.sf .bw-net-reach-rule {
+  margin: var(--sf-2) 0 0;
+  padding: 7px 10px;
+  border-radius: var(--sf-r-chip);
+  background: var(--sf-void);
+  font: 600 var(--sf-t-1)/1.4 var(--sf-font-ui);
+  color: var(--sf-fg-4);
+}
+
+/* --- the potential ring --------------------------------------------------- */
+
+@keyframes bw-net-open {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* A colour per server. Three, not six: the duties are still underneath but a
+   player chooses hardware now, and the row, its figure and its segment of the
+   bar above all wear the same one. */
+.sf .bw-net-duty  { --duty: 148, 163, 184; }
+.sf .is-scout     { --duty: 120, 200, 170; }  /* cheap and cool */
+.sf .is-workhorse { --duty: 120, 190, 255; }  /* the rack everything is measured against */
+.sf .is-titan     { --duty: 255, 160, 70; }   /* dense, hot, expensive */
+
+.sf .bw-net-duties { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--sf-1); }
+.sf .bw-net-duty {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 5px 10px 6px;
+  border-radius: 10px;
+  background: var(--sf-surface);
+  border: 1px solid transparent;
+  transition: background var(--sf-fast) var(--sf-ease), border-color var(--sf-fast) var(--sf-ease);
+}
+/* A row with racks in it wears its own colour, not one shared "on" colour —
+   which is what makes the list and the bar above it obviously the same thing. */
+.sf .bw-net-duty.is-on {
+  background: rgba(var(--duty), 0.1);
+  border-color: rgba(var(--duty), 0.42);
+}
+
+.sf .bw-net-duty-top {
+  display: flex;
+  align-items: center;
+  gap: var(--sf-2);
+  min-width: 0;
+}
+.sf .bw-net-duty-top b {
+  flex: 1;
+  min-width: 0;
+  font: 700 var(--sf-t-3)/1.2 var(--sf-font-ui);
+  color: var(--sf-fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sf .bw-net-duty.is-on .bw-net-duty-top b { color: var(--sf-fg-max); }
+
+/* Which colour this duty is, on the row as well as in the bar. */
+.sf .bw-net-duty-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  background: rgba(var(--duty), 0.32);
+  transform: rotate(45deg);
+}
+/* The same three shapes the map draws (#114), so a counter and a dot are
+   plainly the same server: an arrowhead, a square, a six-sided slab. */
+.sf .bw-net-duty.is-scout .bw-net-duty-dot { border-radius: 0; clip-path: polygon(50% 0%, 100% 100%, 0% 100%); }
+.sf .bw-net-duty.is-workhorse .bw-net-duty-dot { border-radius: 1px; }
+.sf .bw-net-duty.is-titan .bw-net-duty-dot { border-radius: 0; clip-path: polygon(25% 3%, 75% 3%, 100% 50%, 75% 97%, 25% 97%, 0% 50%); }
+
+.sf .bw-net-duty.is-on .bw-net-duty-dot { background: rgb(var(--duty)); }
+
+/* The sentence gets the whole row. Sharing a line with the stepper left it
+   about 130px, so every duty on the screen read "Stores masters for the …". */
+/* What a duty is FOR, and the shape it trades, on the row you have actually put
+   racks in. Six of these at once cost 138px of a screen that has 470 — and five
+   of them describe a duty you have not chosen. The row you are deciding about
+   tells you; the rest stay one line. */
+.sf .bw-net-duty-foot { display: none; }
+.sf .bw-net-duty.is-on .bw-net-duty-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--sf-3);
+  min-width: 0;
+}
+.sf .bw-net-duty-foot em {
+  flex: 1;
+  min-width: 0;
+  font: 500 var(--sf-t-1)/1.35 var(--sf-font-ui);
+  font-style: normal;
+  color: var(--sf-fg-4);
+}
+.sf .bw-net-duty-price {
+  flex: none;
+  text-decoration: none;
+  font: 700 var(--sf-t-1)/1.35 var(--sf-font-ui);
+  color: var(--sf-fg-3);
+  font-feature-settings: 'tnum' 1;
+  white-space: nowrap;
+}
+.sf .bw-net-duty.is-on .bw-net-duty-price { color: rgb(var(--duty)); }
+
+/* --- what the room trades ---------------------------------------------------
+   Two hairlines under the name: how far this kind of room throws, and how well
+   it plays once it gets there. They pull against each other by design, so the
+   pair reads as a shape — long and rough, or short and clean — rather than as
+   two scores to maximise. Range wears the map's own green, so the bar and the
+   field on the map are obviously the same claim. */
+/* On the end of the sentence now rather than under it, so the row is two lines
+   instead of three and the pair still reads as one shape. *//* Swapped, so one colour means one thing everywhere.
+
+   Green was "how far" here and "ground you reach" on the map, while white was
+   "how smooth" here and "the edge of the field" there — two colours carrying
+   four meanings between two screens six inches apart. White is RANGE now,
+   matching the ring the map draws, and green is QUALITY, matching what is
+   actually served inside it. *//* Names the two bars once, so the pair under every room name is readable
+   without a hover the phone does not have. */.sf .bw-net-duty-set { display: flex; align-items: center; gap: var(--sf-1); }
+.sf .bw-net-duty-set button {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  cursor: pointer;
+  border-radius: 9px;
+  border: 1px solid var(--sf-line);
+  background: var(--sf-raised);
+  color: var(--sf-fg);
+  font: 700 var(--sf-t-4)/1 var(--sf-font-ui);
+  transition: background var(--sf-fast) var(--sf-ease), border-color var(--sf-fast) var(--sf-ease), color var(--sf-fast) var(--sf-ease);
+}
+.sf .bw-net-duty-set button:hover:not(:disabled) {
+  background: var(--sf-overlay);
+  border-color: var(--sf-line-strong);
+  color: var(--sf-fg-max);
+}
+.sf .bw-net-duty-set button:disabled { opacity: 0.32; cursor: not-allowed; }
+.sf .bw-net-duty-set b {
+  min-width: 22px;
+  text-align: center;
+  font: 400 var(--sf-t-5)/1 var(--sf-font-display);
+  color: var(--sf-fg-max);
+  font-feature-settings: 'tnum' 1;
+}
+/* Blank at zero rather than an em dash. Six "—" down the right of a list you
+   have not filled in yet is six pieces of furniture saying nothing. */
+.sf .bw-net-duty-carry:empty { display: none; }
+.sf .bw-net-duty-carry {
+  flex: none;
+  min-width: 46px;
+  text-align: right;
+  font: 700 var(--sf-t-3)/1 var(--sf-font-ui);
+  color: var(--sf-fg-4);
+  font-feature-settings: 'tnum' 1;
+}
+/* In the duty's own colour, so the figure, the row and the segment of the bar
+   above are visibly one thing. */
+.sf .bw-net-duty.is-on .bw-net-duty-carry { color: rgb(var(--duty)); }
+
+/* ============================================================================
+   6 · MOTION OFF
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .sf .bw-net-city,
+  .sf .bw-rc,
+  .sf .bw-net-drawer { animation: none; }
+  .sf .bw-rc-led,
+  .sf .bw-atlas-pin-ring { animation: none; }
+  .sf .bw-rc-led { opacity: 0.85; }
+  .sf .bw-rc-face::after { transition: none; }
+  .sf .bw-atlas-reach,
+  .sf .bw-net-gauge s { transition: none; }
+}
+
+/* ============================================================================
+   7 · FITTING THE PAGE INTO THE WIZARD SHELL
+
+   The shell lays every stage out inside `.lw-body` — 16px of gutter and a
+   staggered entrance. Neither suits this page: the map bleeds to the edges,
+   and a transformed ancestor is not a sticky one, so the stage's entry
+   animation would quietly un-pin the one thing the design is built around.
+   ========================================================================== */
+
+.sf .lw-body > .bw-net {
+  margin: calc(var(--sf-4) * -1) calc(var(--sf-4) * -1) 0;
+}
+.sf .lw-enter > .bw-net { animation: none; }
+
+/* The resilience line sits under the frame, the one thing that still does —
+   it is a sentence, and a sentence over a coastline is unreadable. */
+.sf .bw-net-map > .bw-place-risk {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sf-2);
+  margin: 0;
+  padding: 7px var(--sf-4);
+  background: var(--sf-void);
+  border-top: 1px solid var(--sf-line-hair);
+  border-bottom: 1px solid var(--sf-line);
+  font: 500 var(--sf-t-2)/1.35 var(--sf-font-ui);
+  color: var(--sf-fg-3);
+}
+.sf .bw-net-map > .bw-place-risk b { font-weight: 800; }
+.sf .bw-net-map > .bw-place-risk.is-good b { color: var(--sf-good); }
+.sf .bw-net-map > .bw-place-risk.is-warn b { color: var(--sf-warn); }
+.sf .bw-net-map > .bw-place-risk.is-bad b { color: var(--sf-bad); }
+.sf .bw-net-map > .bw-place-risk em { font-style: normal; color: var(--sf-fg-4); }
+
+/* With no verdict yet the frame is the whole box, so it needs its own edge. */
+.sf .bw-net-map { border-bottom: 1px solid var(--sf-line); }
+
+/* ============================================================================
+   8 · THE CHROME ABOVE THE MAP
+
+   The stage's own furniture — the title block and the stage track — stood 120px
+   tall above a picture 180px tall, so the first thing on the page was more
+   header than map. Two things were wrong with it rather than one:
+
+     · the track's progress line ran the full width while its four stops bunched
+       into the left third, so the line carried on past the last stop to the
+       edge of the screen and read as a rule that had come loose
+     · and the block it sits in was spaced for a page that opens on text
+
+   Scoped to `.bw` — the Launch wizard wears the same track and is not being
+   redrawn here.
+   ========================================================================== */
+
+.sf.bw .sf-head {
+  padding-top: max(var(--sf-3), env(safe-area-inset-top));
+  padding-bottom: 0;
+}
+.sf.bw .sf-head h1 { font-size: var(--sf-t-5); }
+
+/* The stops stay where they were — spreading them across the full width made
+   the band emptier, not tidier, and the track is shared navigation the player
+   already knows. Only the space around it is tightened. */
+.sf.bw .lw-track { padding: 10px var(--sf-4) 11px; }
+
+/* The band above the map. The shell lays a red haze across the top of every
+   Studio Finance screen — over a near-black page that reads as warmth, and over
+   a bright blue sea it reads as a smudge of a third colour that belongs to
+   neither. The Build's own chrome sits on a flat deep water instead, so the top
+   of the screen and the map under it are the same world. */
+.sf.bw .sf-head,
+.sf.bw .lw-track { position: relative; background: #0a1622; }
+.sf.bw .lw-track { box-shadow: 0 1px 0 rgba(226, 240, 255, 0.07); }
+
+.sf .bw-atlas-pin.is-peek .bw-atlas-pin-dot {
+  fill: #fff;
+  stroke: #04140e;
+  stroke-width: 2;
+}
+
+/* ============================================================================
+   THE CLOUD RING — one control, three figures, and a handle on the map
+   ============================================================================
+   A cloud region has no meters. It has how far — a slider whose stops are
+   whole compute — and three figures that read the ring it draws: how far,
+   who is inside, what it costs a week. Track, thumb and the handle on the
+   map all wear the reach green, so the slider and the ring are visibly one
+   value moved from two places. */
+.sf .sf-slider.bw-cloud-slider {
+  --sf-fill: 0%;
+  height: 4px;
+  margin: var(--sf-3) 0 var(--sf-2);
+  background:
+    linear-gradient(90deg,
+      rgb(var(--net-reach)) 0 var(--sf-fill),
+      var(--sf-line) var(--sf-fill) 100%);
+}
+.sf .sf-slider.bw-cloud-slider::-webkit-slider-thumb {
+  width: 22px; height: 22px;
+  background: rgb(var(--net-reach));
+  box-shadow: 0 0 0 1px rgb(var(--net-reach));
+}
+.sf .sf-slider.bw-cloud-slider::-moz-range-thumb {
+  width: 22px; height: 22px;
+  background: rgb(var(--net-reach));
+  box-shadow: 0 0 0 1px rgb(var(--net-reach));
+}
+.sf .sf-slider.bw-cloud-slider:disabled { opacity: 0.5; }
+
+.sf .bw-cloud-read {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sf-3);
+  margin: 0 0 var(--sf-2);
+  padding: 8px 10px;
+  border-radius: var(--sf-r-chip);
+  background: var(--sf-void);
+}
+.sf .bw-cloud-read span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.sf .bw-cloud-read span:last-child { text-align: right; }
+.sf .bw-cloud-read b {
+  font: 700 var(--sf-t-4)/1 var(--sf-font-ui);
+  color: var(--sf-fg-max);
+  font-feature-settings: 'tnum' 1;
+  white-space: nowrap;
+}
+.sf .bw-cloud-read em {
+  font: 600 var(--sf-t-1)/1 var(--sf-font-ui);
+  font-style: normal;
+  color: var(--sf-fg-5);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+/* Nothing bought yet: the figures are the ceiling, and read as one. */
+.sf .bw-cloud-read.is-max b { color: var(--sf-fg-3); }
+.sf .bw-cloud .bw-net-reach-rule { margin: 0; }
+
+/* ============================================================================
+   THE REGION BOARD (#103)
+   ============================================================================
+   One row per region you open in. Closed, a line: name, colour word, cost.
+   Open, the whole configuration: the served bar in two colours, your servers
+   as three counters, cloud as a provider and a slider, and where it all
+   landed behind one tap. Everything fits a phone one screen at a time. */
+.sf { --net-thin: 250, 204, 90; --net-cloud: 190, 205, 230; }
+
+.sf .bw-rg-title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sf-2);
+  margin: var(--sf-4) var(--sf-4) var(--sf-2);
+}
+.sf .bw-rg-title b { font: 700 var(--sf-t-3)/1 var(--sf-font-ui); color: var(--sf-fg-max); }
+.sf .bw-rg-title em { margin-left: auto; font: 600 var(--sf-t-1)/1 var(--sf-font-ui); font-style: normal; color: var(--sf-fg-5); letter-spacing: 0.05em; text-transform: uppercase; }
+
+.sf .bw-rg-empty {
+  margin: 0 var(--sf-4);
+  padding: var(--sf-4);
+  border-radius: var(--sf-r-card);
+  border: 1px dashed var(--sf-line);
+  display: flex; flex-direction: column; gap: 4px;
+}
+.sf .bw-rg-empty b { font: 700 var(--sf-t-3)/1.3 var(--sf-font-ui); color: var(--sf-fg-max); }
+.sf .bw-rg-empty em { font: 500 var(--sf-t-2)/1.45 var(--sf-font-ui); font-style: normal; color: var(--sf-fg-4); }
+
+.sf .bw-rg-list { list-style: none; margin: 0 var(--sf-4); padding: 0; display: flex; flex-direction: column; gap: var(--sf-2); }
+.sf .bw-rg-row {
+  border-radius: var(--sf-r-card);
+  border: 1px solid var(--sf-line);
+  background: var(--sf-surface);
+  overflow: hidden;
+}
+.sf .bw-rg-row.is-open { border-color: rgba(var(--sf-brand-on-rgb), 0.7); }
+/* The head is a three-column grid with two rows under it (#119): the region
+   and its night, the word, the price; then its own coverage, then the kit
+   standing in it. A closed row is now readable on its own — six regions can
+   be compared without opening one. */
+.sf .bw-rg-head {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  column-gap: var(--sf-3);
+  row-gap: 8px;
+  width: 100%;
+  padding: 11px 12px 12px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.sf .bw-rg-rail {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 2px;
+  height: 5px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(206, 218, 235, 0.09);
+}
+.sf .bw-rg-rail i { display: block; height: 100%; transition: width var(--sf-med) var(--sf-ease); }
+/* Open, the served bar right below says the same thing in more detail. */
+.sf .bw-rg-row.is-open .bw-rg-rail { display: none; }
+.sf .bw-rg-rail i.is-own { background: rgb(var(--net-reach)); }
+.sf .bw-rg-rail i.is-cloud { background: rgb(var(--net-cloud)); }
+.sf .bw-rg-mix {
+  grid-column: 1 / -1;
+  display: flex; align-items: center; flex-wrap: wrap; gap: 5px;
+  min-width: 0;
+}
+.sf .bw-rg-mix b {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 7px 2px 5px;
+  border-radius: 999px;
+  background: rgba(var(--duty, 206, 218, 235), 0.14);
+  font: 700 var(--sf-t-1)/1.5 var(--sf-font-ui);
+  color: var(--sf-fg-2);
+  font-feature-settings: 'tnum' 1;
+}
+.sf .bw-rg-mix b i {
+  width: 7px; height: 7px;
+  background: rgb(var(--duty, 206, 218, 235));
+}
+.sf .bw-rg-mix b.is-scout i { clip-path: polygon(50% 0%, 100% 100%, 0% 100%); }
+.sf .bw-rg-mix b.is-workhorse i { border-radius: 1px; }
+.sf .bw-rg-mix b.is-titan i { clip-path: polygon(25% 3%, 75% 3%, 100% 50%, 75% 97%, 25% 97%, 0% 50%); }
+.sf .bw-rg-mix b.is-cloud i { border-radius: 50%; }
+.sf .bw-rg-mix b s { text-decoration: none; font-weight: 500; color: var(--sf-fg-4); }
+.sf .bw-rg-mix em {
+  margin-left: auto;
+  font: 700 var(--sf-t-1)/1.5 var(--sf-font-ui);
+  font-style: normal;
+  color: var(--sf-fg-3);
+  font-feature-settings: 'tnum' 1;
+}
+.sf .bw-rg-mix > em:only-child { margin-left: 0; color: var(--sf-fg-5); font-weight: 500; }
+.sf .bw-rg-who { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.sf .bw-rg-who b { font: 700 var(--sf-t-3)/1.2 var(--sf-font-ui); color: var(--sf-fg-max); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sf .bw-rg-who em { font: 500 var(--sf-t-1)/1.3 var(--sf-font-ui); font-style: normal; color: var(--sf-fg-4); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sf .bw-rg-word {
+  display: inline-flex; align-items: center; gap: 6px;
+  font: 800 var(--sf-t-1)/1 var(--sf-font-ui);
+  letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--sf-fg-4);
+}
+.sf .bw-rg-word i { width: 8px; height: 8px; border-radius: 50%; background: var(--sf-fg-5); }
+.sf .bw-rg-row.is-good .bw-rg-word { color: var(--sf-good); }
+.sf .bw-rg-row.is-good .bw-rg-word i { background: var(--sf-good); box-shadow: 0 0 8px var(--sf-good); }
+.sf .bw-rg-row.is-warn .bw-rg-word { color: var(--sf-warn-tint); }
+.sf .bw-rg-row.is-warn .bw-rg-word i { background: var(--sf-warn-tint); }
+.sf .bw-rg-row.is-bad .bw-rg-word { color: var(--sf-bad-tint); }
+.sf .bw-rg-row.is-bad .bw-rg-word i { background: var(--sf-bad-tint); }
+.sf .bw-rg-cost { flex: none; display: flex; flex-direction: column; gap: 2px; text-align: right; }
+.sf .bw-rg-cost b { font: 700 var(--sf-t-3)/1 var(--sf-font-ui); color: var(--sf-fg-max); font-feature-settings: 'tnum' 1; }
+.sf .bw-rg-cost em { font: 600 var(--sf-t-1)/1 var(--sf-font-ui); font-style: normal; color: var(--sf-fg-5); }
+
+.sf .bw-rg-body { display: flex; flex-direction: column; gap: var(--sf-3); padding: 0 12px 12px; }
+
+/* The served bar. Two colours meeting at the split, grey for the rest. */
+.sf .bw-rg-served { display: flex; flex-direction: column; gap: 6px; }
+.sf .bw-rg-served-track {
+  display: flex; gap: 2px;
+  height: 12px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(206, 218, 235, 0.08);
+}
+.sf .bw-rg-served-track i { display: block; height: 100%; transition: width var(--sf-med) var(--sf-ease); }
+.sf .bw-rg-served-track i.is-own { background: rgb(var(--net-reach)); }
+.sf .bw-rg-served-track i.is-cloud { background: rgb(var(--net-cloud)); }
+.sf .bw-rg-served-read { display: flex; align-items: baseline; gap: var(--sf-2); }
+.sf .bw-rg-served-read b { font: 700 var(--sf-t-4)/1 var(--sf-font-ui); color: var(--sf-fg-max); font-feature-settings: 'tnum' 1; white-space: nowrap; }
+.sf .bw-rg-served-read em { font: 500 var(--sf-t-1)/1.3 var(--sf-font-ui); font-style: normal; color: var(--sf-fg-4); }
+
+.sf .bw-rg-block { display: flex; flex-direction: column; gap: var(--sf-2); }
+.sf .bw-rg-block-head { display: flex; align-items: baseline; gap: var(--sf-2); margin: 0; }
+.sf .bw-rg-block-head b { font: 700 var(--sf-t-3)/1 var(--sf-font-ui); color: var(--sf-fg-max); }
+.sf .bw-rg-block-head em { margin-left: auto; font: 600 var(--sf-t-1)/1 var(--sf-font-ui); font-style: normal; color: var(--sf-fg-4); letter-spacing: 0.05em; text-transform: uppercase; }
+.sf .bw-rg-landed { margin: 0; font: 600 var(--sf-t-1)/1.4 var(--sf-font-ui); color: var(--sf-fg-4); }
+
+/* The providers: three chips, one on, the ones not sold here greyed. */
+.sf .bw-rg-prov { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.sf .bw-rg-prov-btn {
+  display: flex; flex-direction: column; gap: 3px;
+  padding: 8px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--sf-line);
+  background: var(--sf-void);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+}
+.sf .bw-rg-prov-btn b { font: 700 var(--sf-t-1)/1.2 var(--sf-font-ui); color: var(--sf-fg-max); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sf .bw-rg-prov-btn em { font: 600 10px/1.2 var(--sf-font-ui); font-style: normal; color: var(--sf-fg-5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sf .bw-rg-prov-btn.is-on { border-color: rgb(var(--net-cloud)); background: rgba(var(--net-cloud), 0.12); }
+.sf .bw-rg-prov-btn.is-on b { color: rgb(var(--net-cloud)); }
+.sf .bw-rg-prov-btn:disabled { opacity: 0.45; cursor: default; }
+.sf .bw-rg .bw-cloud-read { margin: 0; }
+.sf .bw-rg .bw-net-reach-rule { margin: 0; }
+
+.sf .bw-rg-note {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: var(--sf-r-chip);
+  background: var(--sf-warn-wash);
+  border: 1px solid var(--sf-warn-line, var(--sf-line));
+  font: 600 var(--sf-t-1)/1.35 var(--sf-font-ui);
+  color: var(--sf-warn-tint);
+}
+
+/* Where they landed, behind one tap. */
+.sf .bw-rg-rooms { border-top: 1px solid var(--sf-line-hair); padding-top: var(--sf-2); }
+.sf .bw-rg-rooms summary { cursor: pointer; font: 700 var(--sf-t-1)/1.3 var(--sf-font-ui); color: var(--sf-fg-3); letter-spacing: 0.04em; text-transform: uppercase; }
+.sf .bw-rg-rooms ul { list-style: none; margin: var(--sf-2) 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.sf .bw-rg-rooms li { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sf-3); }
+.sf .bw-rg-rooms li span { display: flex; min-width: 0; flex-direction: column; gap: 1px; }
+.sf .bw-rg-rooms li b { font: 600 var(--sf-t-2)/1.3 var(--sf-font-ui); color: var(--sf-fg-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sf .bw-rg-rooms li em { font: 500 var(--sf-t-1)/1.3 var(--sf-font-ui); font-style: normal; color: var(--sf-fg-5); }
+.sf .bw-rg-rooms li strong { flex: none; font-family: var(--sf-font-num); font-size: var(--sf-t-1); font-variant-numeric: tabular-nums; color: var(--sf-fg-3); }
+.sf .bw-rg-rooms li.is-cloud b { color: rgb(var(--net-cloud)); }
+
+.sf .bw-rg-estate {
+  display: flex; flex-direction: column; gap: 2px;
+  margin: var(--sf-3) var(--sf-4) 0;
+  padding: 10px 12px;
+  border-radius: var(--sf-r-chip);
+  background: var(--sf-void);
+}
+.sf .bw-rg-estate b { font: 800 var(--sf-t-1)/1 var(--sf-font-ui); color: var(--sf-fg-5); letter-spacing: 0.06em; text-transform: uppercase; }
+.sf .bw-rg-estate em { font: 600 var(--sf-t-2)/1.4 var(--sf-font-ui); font-style: normal; color: var(--sf-fg-2); font-feature-settings: 'tnum' 1; }
+.sf .bw-rg-reset {
+  margin: var(--sf-3) var(--sf-4) 0;
+  padding: 8px 12px;
+  border-radius: var(--sf-r-chip);
+  border: 1px solid var(--sf-line);
+  background: transparent;
+  color: var(--sf-fg-4);
+  font: 600 var(--sf-t-1)/1 var(--sf-font-ui);
+  cursor: pointer;
+}
+
+/* The field, retinted (#103): the outer band is yellow — reached, not served
+   well — so the map reads green, yellow, red by distance, not by border. */
+
+/* --- the what-ifs (#104) ----------------------------------------------------
+   Three priced answers under the cloud block, each one tap to apply. A
+   sentence and a price, not a control: the control is tapping it. */
+.sf .bw-rg-whatifs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.sf .bw-rg-whatif {
+  display: flex; align-items: center; gap: var(--sf-3);
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--sf-line);
+  background: var(--sf-void);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.sf .bw-rg-whatif:active { background: var(--sf-surface); }
+.sf .bw-rg-whatif > span { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.sf .bw-rg-whatif b { font: 700 var(--sf-t-2)/1.25 var(--sf-font-ui); color: var(--sf-fg-max); }
+.sf .bw-rg-whatif em { font: 500 var(--sf-t-1)/1.35 var(--sf-font-ui); font-style: normal; color: var(--sf-fg-4); font-feature-settings: 'tnum' 1; }
+.sf .bw-rg-whatif i { flex: none; width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--sf-line); display: grid; place-items: center; font: 700 12px/1 var(--sf-font-ui); color: var(--sf-fg-4); font-style: normal; }
+.sf .bw-rg-whatif.is-cover i { border-color: rgb(var(--net-cloud)); color: rgb(var(--net-cloud)); }
+.sf .bw-rg-whatif.is-servers i { border-color: rgb(var(--net-reach)); color: rgb(var(--net-reach)); }
+
+/* --- what nothing here can serve (#106) ------------------------------------- */
+.sf .bw-rg-served-track .is-dead {
+  background: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.16) 0 3px, transparent 3px 7px);
+  margin-left: auto;
+}
+.sf .bw-rg-dead {
+  margin: 6px 0 0;
+  font: 500 var(--sf-t-4)/1.45 var(--sf-font-ui);
+  color: var(--sf-fg-4);
+}
+.sf .bw-rg-dead b { font-weight: 700; color: var(--sf-fg-2); }
+
+/* --- motion (#107): things arrive, meters read, words stamp ---------------
+   Nothing here decorates. A bar sweeps in because a meter is being read; a
+   figure rolls because it is settling; a word stamps because Thin became
+   Fair; a ring pings out from a city because a room just landed there and
+   the eye should go to it. All of it is off for anyone who asked their phone
+   for less motion. */
+@keyframes bw-rg-sweep {
+  from { clip-path: inset(0 100% 0 0 round 999px); }
+  to   { clip-path: inset(0 0 0 0 round 999px); }
+}
+.sf .bw-rg-served-track { animation: bw-rg-sweep 640ms var(--sf-ease) both; }
+@keyframes bw-rg-stamp {
+  0%   { transform: scale(1.32); filter: brightness(1.7); }
+  55%  { transform: scale(0.97); }
+  100% { transform: scale(1); filter: none; }
+}
+.sf .bw-rg-word { transform-origin: center; }
+.sf .bw-rg-word.is-stamp { animation: bw-rg-stamp 440ms var(--sf-ease); }
+@keyframes bw-rg-bump {
+  from { transform: translateY(-6px); opacity: 0.15; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+.sf .bw-net-duty-set b { animation: bw-rg-bump 220ms var(--sf-ease); }
+.sf .bw-atlas-ping {
+  fill: none;
+  stroke: rgb(var(--net-reach));
+  stroke-width: 1.6;
+  transform-box: fill-box;
+  transform-origin: center;
+  pointer-events: none;
+  animation: bw-atlas-ping 1.3s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+@keyframes bw-atlas-ping {
+  0%   { transform: scale(0.12); opacity: 0.95; }
+  100% { transform: scale(1.4); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sf .bw-rg-served-track,
+  .sf .bw-rg-word.is-stamp,
+  .sf .bw-net-duty-set b { animation: none; }
+  .sf .bw-atlas-ping { display: none; }
+}
+
+/* In a region the sentence names the region, which is too long to sit beside
+   the figure on a phone — so it sits under it (#107). */
+/* The left figure carries two lines under it: what it is, then who it is
+   drawn from (#115). */
+.sf .bw-net-read-side.is-scoped { flex-wrap: wrap; row-gap: 1px; align-items: baseline; }
+.sf .bw-net-read-side.is-scoped em { flex-basis: 100%; }
+.sf .bw-net-read-side.is-scoped em:not(.is-scope) { flex-basis: auto; }
+.sf .bw-net-read-side em.is-scope { color: rgba(226, 236, 248, 0.6); letter-spacing: 0.045em; }
+
+/* --- two ways in, done, clear, fewer (#108) --------------------------------- */
+.sf .bw-rg-whatif.is-trim i { border-color: var(--sf-warn-tint); color: var(--sf-warn-tint); }
+.sf .bw-rg-prov-btn em + em { color: var(--sf-fg-3); }
+.sf .bw-rg-foot { display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
+.sf .bw-rg-done {
+  padding: 12px 14px;
+  border-radius: var(--sf-r-chip);
+  border: 0;
+  background: rgb(var(--sf-brand-on-rgb));
+  color: var(--sf-brand-ink, #fff);
+  font: 700 var(--sf-t-2)/1 var(--sf-font-ui);
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+.sf .bw-rg-done:active { filter: brightness(0.92); }
+.sf .bw-rg-clear {
+  align-self: center;
+  padding: 8px 12px;
+  border: 0;
+  background: none;
+  color: var(--sf-fg-4);
+  font: 600 var(--sf-t-1)/1 var(--sf-font-ui);
+  cursor: pointer;
+}
+.sf .bw-rg-clear.is-armed { color: var(--sf-bad-tint); }
+
+@media (prefers-reduced-motion: reduce) {
+  .sf .bw-atlas-traffic { animation: none; stroke-opacity: 0.4; }
+}
+
+/* A continent you have not opened a market in, tapped (#111). */
+.sf .bw-rg-scouted {
+  margin: var(--sf-3) var(--sf-4) 0;
+  padding: 10px 12px;
+  border-radius: var(--sf-r-chip);
+  border: 1px solid var(--sf-line);
+  background: var(--sf-void);
+  display: flex; flex-direction: column; gap: 3px;
+}
+.sf .bw-rg-scouted b { font: 700 var(--sf-t-2)/1.3 var(--sf-font-ui); color: var(--sf-fg-max); }
+.sf .bw-rg-scouted em { font: 500 var(--sf-t-1)/1.4 var(--sf-font-ui); font-style: normal; color: var(--sf-fg-4); }
+
+/* A held place wears its server's shape rather than a dot (#114). */
+.sf .bw-atlas-pin-dot.is-scout,
+.sf .bw-atlas-pin-dot.is-workhorse,
+.sf .bw-atlas-pin-dot.is-titan { stroke-linejoin: round; }
+/* The second kind in the same city, on the first one's shoulder (#115). */
+.sf .bw-atlas-pin-mix {
+  fill: var(--tone, #fff);
+  stroke: #04140e;
+  stroke-width: 1;
+  stroke-linejoin: round;
+}
+
+/* --- the row, redesigned (#119) ------------------------------------------- */
+
+/* Who you are serving: a country per line, worst first, each with its own
+   share — a region at 86% used never to say which country was short. */
+.sf .bw-rg-countries { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.sf .bw-rg-countries li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 76px auto;
+  align-items: center;
+  gap: var(--sf-2);
+  padding: 6px 10px;
+  border-radius: 9px;
+  background: var(--sf-void);
+}
+.sf .bw-rg-country-who { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.sf .bw-rg-country-who b { font: 700 var(--sf-t-2)/1.25 var(--sf-font-ui); color: var(--sf-fg-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sf .bw-rg-country-who em { font: 500 10px/1.3 var(--sf-font-ui); font-style: normal; color: var(--sf-fg-5); }
+.sf .bw-rg-country-bar { height: 6px; border-radius: 999px; overflow: hidden; background: rgba(206, 218, 235, 0.1); }
+.sf .bw-rg-country-bar i { display: block; height: 100%; border-radius: 999px; transition: width var(--sf-med) var(--sf-ease); }
+.sf .bw-rg-countries li strong { font: 700 var(--sf-t-2)/1 var(--sf-font-ui); font-feature-settings: 'tnum' 1; min-width: 34px; text-align: right; }
+.sf .bw-rg-countries li.is-good .bw-rg-country-bar i { background: var(--sf-good); }
+.sf .bw-rg-countries li.is-good strong { color: var(--sf-good); }
+.sf .bw-rg-countries li.is-warn .bw-rg-country-bar i { background: var(--sf-warn-tint); }
+.sf .bw-rg-countries li.is-warn strong { color: var(--sf-warn-tint); }
+.sf .bw-rg-countries li.is-bad .bw-rg-country-bar i { background: var(--sf-bad-tint); }
+.sf .bw-rg-countries li.is-bad strong { color: var(--sf-bad-tint); }
+
+/* Three machines, three cards, side by side — a choice rather than a list of
+   rows. Each says what it reaches and what it costs before you buy one. */
+.sf .bw-rg-tiers {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.sf .bw-rg-tiers .bw-net-duty {
+  align-items: center;
+  gap: 4px;
+  padding: 10px 6px 9px;
+  text-align: center;
+}
+.sf .bw-rg-tiers .bw-net-duty > b {
+  font: 700 var(--sf-t-2)/1.15 var(--sf-font-ui);
+  color: var(--sf-fg);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+}
+.sf .bw-rg-tiers .bw-net-duty-dot { width: 11px; height: 11px; }
+.sf .bw-rg-tier-reach {
+  text-decoration: none;
+  font: 700 10px/1.2 var(--sf-font-ui);
+  color: rgb(var(--duty, 206, 218, 235));
+  letter-spacing: 0.02em;
+  font-feature-settings: 'tnum' 1;
+}
+.sf .bw-rg-tiers .bw-net-duty-set { margin: 2px 0 0; }
+.sf .bw-rg-tiers .bw-net-duty-price { text-decoration: none; font: 500 10px/1.2 var(--sf-font-ui); color: var(--sf-fg-5); }
+.sf .bw-rg-tiers .bw-net-duty-carry {
+  font: 600 10px/1.2 var(--sf-font-ui); font-style: normal;
+  color: var(--sf-fg-4); font-feature-settings: 'tnum' 1;
+}
+.sf .bw-rg-tier-line {
+  margin: 0;
+  font: 500 var(--sf-t-1)/1.45 var(--sf-font-ui);
+  color: var(--sf-fg-4);
+}
+
+/* S5: keep the buying controls reachable before a long country ledger. */
+.sf.bw .sf-head-titles p {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.sf.bw .lw-count { flex: none; white-space: nowrap; }
+.sf .bw-rg-countries-detail,
+.sf .bw-rg-alternatives { border-top: 1px solid var(--sf-line-hair); padding-top: 8px; }
+.sf .bw-rg-countries-detail > summary,
+.sf .bw-rg-alternatives > summary {
+  cursor: pointer;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 10px;
+  padding: 7px 2px;
+  color: var(--sf-fg-2);
+  font: 700 var(--sf-t-2)/1.3 var(--sf-font-ui);
+}
+.sf .bw-rg-countries-detail > summary span,
+.sf .bw-rg-alternatives > summary span { color: var(--sf-fg-4); font-size: var(--sf-t-1); font-weight: 500; }
+.sf .bw-rg-countries-detail > summary:focus-visible,
+.sf .bw-rg-alternatives > summary:focus-visible { outline: 2px solid var(--sf-brand-on); outline-offset: 3px; }
+.sf .bw-rg-countries-detail .bw-rg-countries { margin-top: 6px; }
+.sf .bw-rg-cover-quotes { display: grid; gap: 6px; margin: 7px 0; padding: 0; list-style: none; }
+.sf .bw-rg-cover-quotes li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 10px; font-size: var(--sf-t-1); }
+.sf .bw-rg-cover-quotes em { color: var(--sf-fg-4); font-style: normal; }
+.sf .bw-machine-mark { display: block; width: 22px; height: 22px; flex: none; color: rgb(var(--duty, 206, 218, 235)); }
+.sf .bw-rg-tiers .bw-machine-mark { width: 27px; height: 27px; }
+.sf .bw-rg-prov-btn { gap: 7px; padding: 10px; }
+.sf .bw-rg-prov-identity { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.sf .bw-rg-prov-btn b { font-size: var(--sf-t-2); white-space: normal; overflow: visible; }
+.sf .bw-rg-prov-spec { display: flex; flex-wrap: wrap; gap: 3px 10px; }
+.sf .bw-rg-prov-btn em { white-space: normal; overflow: visible; }
+.sf .bw-rg-prov-btn small { color: var(--sf-fg-4); font: 500 11px/1.35 var(--sf-font-ui); }
+@media (max-width: 520px) {
+  .sf .bw-rg-prov { grid-template-columns: 1fr; }
+  .sf .bw-rg-tiers .bw-net-duty { padding: 10px 4px; }
+  .sf .bw-rg-tiers .bw-net-duty > b { white-space: normal; overflow: visible; }
+}
+
+/* The build's price, on the line under the map (#120). */
+.sf .bw-place-risk s {
+  margin-left: auto;
+  text-decoration: none;
+  font: 600 var(--sf-t-1)/1.3 var(--sf-font-ui);
+  color: var(--sf-fg-4);
+  font-feature-settings: 'tnum' 1;
+  white-space: nowrap;
+}

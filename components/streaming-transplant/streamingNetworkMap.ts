@@ -32,7 +32,7 @@ const ROLE_RANK: Record<StreamingNetworkNodeRole, number> = {
   EDGE_CACHE: 1,
 };
 
-const ROLE_VARIANT: Record<StreamingNetworkNodeRole, NonNullable<RegionMapLocationPin['variant']>> = {
+export const ROLE_VARIANT: Record<StreamingNetworkNodeRole, NonNullable<RegionMapLocationPin['variant']>> = {
   CORE_ORIGIN: 'origin',
   REGIONAL_HUB: 'relay',
   EDGE_CACHE: 'cache',

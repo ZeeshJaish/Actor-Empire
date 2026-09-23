@@ -24,13 +24,33 @@ const assert = (condition: unknown, message: string) => {
 const first = getStreamingFacilityMarketplace('NYC');
 const repeated = getStreamingFacilityMarketplace('NYC');
 assert(JSON.stringify(first) === JSON.stringify(repeated), 'The city marketplace must be deterministic.');
-assert(first.length === 6, 'A major city should expose five lease formats and the future owned-campus path.');
+/* These three pinned the six-rung ladder: a fixed length of 6, the exact
+   CLOUD_ALLOCATION..OWNED_DATA_CENTRE order, and a research-locked campus in
+   last place. The ladder is what the places work removed — a city offers
+   BUILDINGS now, each with its own ceiling and fibre, and the owned campus is
+   not advertised at all until owning is a thing you can do. An assertion that
+   describes a design we deliberately replaced is not protecting anything, so
+   these are re-aimed at what must still hold. */
+assert(first.length >= 4, 'A major city must offer several distinct buildings, not one path.');
 assert(
-    first.map(listing => listing.facilityType).join(',')
-        === 'CLOUD_ALLOCATION,RENTED_CABINET,PRIVATE_CAGE,PRIVATE_SUITE,DEDICATED_DATA_HALL,OWNED_DATA_CENTRE',
-    'Marketplace listings must appear in the intended facility progression.',
+    new Set(first.map(listing => listing.facilityName)).size === first.length,
+    'Every building in a city must be a different building.',
 );
-assert(first.at(-1)?.status === 'RESEARCH_REQUIRED', 'Owned data centres must remain research-locked.');
+/* The rule that replaced the ladder, and the stronger one: you are never shown
+   a room you cannot take. The old marketplace advertised a 96-rack campus in
+   every city on earth and then refused it. */
+assert(
+    first.every(listing => listing.status !== 'RESEARCH_REQUIRED'),
+    'A listing on offer must be one the player can actually lease.',
+);
+assert(
+    first.every((listing, index) => index === 0 || listing.rackPositions >= first[index - 1].rackPositions),
+    'Buildings must read smallest first, so the list is a ladder of commitment.',
+);
+assert(
+    first.some(listing => listing.facilityType === 'CLOUD_ALLOCATION'),
+    'Taking no building at all must stay available everywhere.',
+);
 for (const listing of first) {
     assert(listing.listingId && listing.providerName, 'Every listing needs a stable identity and provider.');
     assert(listing.rackPositions > 0, 'Every listing needs a fixed physical rack limit.');

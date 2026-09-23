@@ -21,7 +21,8 @@ import {
 } from 'lucide-react';
 import { getPremiumCollectionGateForAsset, getPremiumProduct, hasPremiumAccessForAsset, PremiumProductId } from '../../services/premiumLogic';
 import { getPlayerLanguage, t } from '../../services/i18n';
-import { getRealEstateInvestorIdentity, getRealEstateMarketSnapshot, quoteRealEstateWeeklyRent } from '../../services/realEstateLogic';
+import { getRealEstateInvestorIdentity, getRealEstateMarketSnapshot, quoteRealEstateSale, quoteRealEstateWeeklyRent } from '../../services/realEstateLogic';
+import { REAL_ESTATE_DEALERS, getDealerStock, getRealEstateDealer } from '../../services/realEstateDealers';
 import { getLifestyleAssetImageInfo } from '../../services/lifestyleAssetImages';
 import { AssetShareModal } from './components/AssetShareModal';
 
@@ -82,6 +83,9 @@ export const LifestyleAssets: React.FC<LifestyleAssetsProps> = ({
     const [mode, setMode] = useState<AssetMode>('HUB');
     const [category, setCategory] = useState<AssetCategory>('PROPERTY');
     const [filter, setFilter] = useState<string>('ALL');
+    /* Which shop you walked into. Null means you are still choosing one — and
+       only property has dealers; vehicles and clothing keep their filter rail. */
+    const [dealerId, setDealerId] = useState<string | null>(null);
     const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
     const [pendingPremiumAssetId, setPendingPremiumAssetId] = useState<string | null>(null);
     const [sharePickerOpen, setSharePickerOpen] = useState(false);
@@ -109,7 +113,14 @@ export const LifestyleAssets: React.FC<LifestyleAssetsProps> = ({
 
     const categoryItems = (isMarket: boolean) => {
         let items: OwnedAsset[] = [];
-        if (category === 'PROPERTY') items = isMarket ? PROPERTY_CATALOG : ownedItems.filter(item => item.type === 'Property');
+        if (category === 'PROPERTY') {
+            /* In the shop you are looking at one dealer's stock, not the whole
+               catalogue. On the ownership desk you are looking at what you hold,
+               which no dealer has an opinion about. */
+            items = isMarket
+                ? (dealerId ? getDealerStock(dealerId) : PROPERTY_CATALOG)
+                : ownedItems.filter(item => item.type === 'Property');
+        }
         if (category === 'VEHICLE') {
             items = isMarket ? vehicleCatalog : ownedItems.filter(item => item.type === 'Vehicle');
             if (filter !== 'ALL') items = items.filter(item => item.type === 'Vehicle' && item.vehicleType === filter);
@@ -170,8 +181,48 @@ export const LifestyleAssets: React.FC<LifestyleAssetsProps> = ({
     const getAssetValue = (item: OwnedAsset) => {
         const state = getAssetState(item.id);
         if (item.type !== 'Property') return item.price;
-        return Math.max(item.price, Math.round(Number(state.currentValue || item.price)));
+        /* Was `Math.max(item.price, currentValue)`. The market model computes a
+           value that can fall to roughly half what you paid — it has a SLUMP in
+           it and a `lowerCap` to match — and this floor threw all of that away,
+           so a property could never be worth less than its purchase price and
+           the cycle was decoration. */
+        return Math.max(0, Math.round(Number(state.currentValue ?? item.price)));
     };
+
+    /* --- the ownership desk --------------------------------------------------
+       Flat while the list is short, grouped once it is not. Zeesh's rule, and
+       it is the right way round: imposing a hierarchy on three houses makes you
+       tap through folders to find the only thing you own.
+
+       Grouped by what the thing is FOR, not what type it is — where you live,
+       what earns, what sits idle — because that is how you think about holdings
+       and it survives owning nine of them. */
+    const GROUP_HOLDINGS_ABOVE = 6;
+
+    const holdingGroupOf = (item: OwnedAsset): string => {
+        if (item.type !== 'Property') return 'Other';
+        if (player.residenceId === item.id) return 'Where you live';
+        return getAssetState(item.id).rentalListed ? 'Earning rent' : 'Idle';
+    };
+
+    const groupHoldings = (items: OwnedAsset[]): Array<[string, OwnedAsset[]]> => {
+        const order = ['Where you live', 'Earning rent', 'Idle', 'Other'];
+        const buckets = new Map<string, OwnedAsset[]>();
+        items.forEach(item => {
+            const key = holdingGroupOf(item);
+            const held = buckets.get(key);
+            if (held) held.push(item); else buckets.set(key, [item]);
+        });
+        return order.filter(key => buckets.has(key)).map(key => [key, buckets.get(key)!]);
+    };
+
+    /* What you would actually bank, which is not the value: selling costs a
+       spread, and the spread is the market you are selling into. */
+    const getSaleQuote = (item: OwnedAsset) => (
+        item.type === 'Property'
+            ? quoteRealEstateSale(item, getAssetState(item.id), player)
+            : null
+    );
 
     const maintainCost = (item: OwnedAsset) => {
         if (item.type === 'Clothing') return 0;
@@ -235,6 +286,10 @@ export const LifestyleAssets: React.FC<LifestyleAssetsProps> = ({
             setSelectedAssetId(null);
         } else if (mode === 'MARKET') {
             setMode('DETAILS');
+            /* Leaving the shop forgets which dealer you were in, so coming back
+               starts at the choice rather than dropping you into whichever one
+               you happened to browse last. */
+            setDealerId(null);
         } else if (mode === 'DETAILS') {
             setMode('HUB');
         } else {
@@ -788,7 +843,7 @@ export const LifestyleAssets: React.FC<LifestyleAssetsProps> = ({
                     {categoryMeta.map(meta => {
                         const Icon = meta.icon;
                         return (
-                            <button key={meta.id} onClick={() => { setCategory(meta.id); setFilter('ALL'); setMode('DETAILS'); }} className="flex w-full items-center justify-between rounded-2xl border border-zinc-800 bg-zinc-950 p-4 transition-all hover:border-white/20">
+                            <button key={meta.id} onClick={() => { setCategory(meta.id); setFilter('ALL'); setDealerId(null); setMode('DETAILS'); }} className="flex w-full items-center justify-between rounded-2xl border border-zinc-800 bg-zinc-950 p-4 transition-all hover:border-white/20">
                                 <div className="flex items-center gap-4">
                                     <div className={`rounded-2xl border p-3 ${meta.tone}`}><Icon size={22}/></div>
                                     <div className="text-left">
@@ -886,6 +941,7 @@ export const LifestyleAssets: React.FC<LifestyleAssetsProps> = ({
         const state = getAssetState(item.id);
         const condition = Math.round(state.condition ?? 100);
         const assetValue = getAssetValue(item);
+        const saleQuote = getSaleQuote(item);
         const trend = Number(state.valueTrend || 0);
         const rentQuote = quoteWeeklyRent(item);
         const repairCost = maintainCost(item);
@@ -1014,9 +1070,18 @@ export const LifestyleAssets: React.FC<LifestyleAssetsProps> = ({
                     )}
                 </div>
 
+                {/* The sale was a flat half of value, which is a fine rather
+                    than a market. It is the market value less the cost of
+                    selling into this cycle now, and the line underneath says
+                    which cycle that is, so a player can decide to wait. */}
                 <button onClick={() => onSell(item.id)} className="w-full rounded-2xl border border-rose-500/20 bg-rose-500/10 py-4 text-sm font-black uppercase tracking-[0.18em] text-rose-200">
-                    {tr('lifestyle.sell')} • {moneyShort(assetValue * 0.5)}
+                    {tr('lifestyle.sell')} • {moneyShort(saleQuote ? saleQuote.saleProceeds : Math.round(assetValue * 0.5))}
                 </button>
+                {saleQuote && (
+                    <p className="mt-2 text-center text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-500">
+                        {saleQuote.cycleLabel} • {moneyShort(saleQuote.marketValue)} value, {Math.round(saleQuote.spread * 100)}% to sell now
+                    </p>
+                )}
             </div>
         );
     }
@@ -1044,14 +1109,66 @@ export const LifestyleAssets: React.FC<LifestyleAssetsProps> = ({
 
             {renderFilters()}
 
+            {/* --- which shop ------------------------------------------------
+                Property is the one category with dealers, and you pick one
+                before you see stock. They are shops, not tiers: nothing here is
+                locked, a dealer may carry a starter flat and a trophy on the
+                same page, and the same loft can sit on two lists the way a real
+                listing does. The catch a filter-with-a-name would have is the
+                two extra taps, so each one says what it is for. */}
+            {mode === 'MARKET' && category === 'PROPERTY' && !dealerId ? (
+                <div className="space-y-3">
+                    {REAL_ESTATE_DEALERS.map(dealer => {
+                        const stock = getDealerStock(dealer.id).filter(item => !player.assets.includes(item.id));
+                        return (
+                            <button
+                                key={dealer.id}
+                                onClick={() => setDealerId(dealer.id)}
+                                className="w-full rounded-3xl border border-zinc-800 bg-zinc-950 p-5 text-left"
+                            >
+                                <div className="flex items-center justify-between gap-3">
+                                    <div className="min-w-0">
+                                        <div className="truncate text-base font-black text-white">{dealer.name}</div>
+                                        <div className="mt-1 text-xs font-bold leading-relaxed text-zinc-500">{dealer.line}</div>
+                                    </div>
+                                    <ChevronRight className="shrink-0 text-zinc-600" size={20} />
+                                </div>
+                                <div className="mt-3 text-[10px] font-black uppercase tracking-[0.18em] text-zinc-600">
+                                    {stock.length} {stock.length === 1 ? 'listing' : 'listings'}
+                                    {stock.length > 0 ? ` • from ${moneyShort(Math.min(...stock.map(item => item.price)))}` : ''}
+                                </div>
+                            </button>
+                        );
+                    })}
+                </div>
+            ) : (
             <div className="space-y-3">
-                {listItems.map(item => mode === 'MARKET' ? renderMarketCard(item) : renderOwnedCard(item))}
+                {mode === 'MARKET' && category === 'PROPERTY' && dealerId && (
+                    <button
+                        onClick={() => setDealerId(null)}
+                        className="mb-1 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-zinc-500"
+                    >
+                        <ArrowLeft size={13} /> {getRealEstateDealer(dealerId)?.name}
+                    </button>
+                )}
+                {mode !== 'MARKET' && category === 'PROPERTY' && listItems.length > GROUP_HOLDINGS_ABOVE
+                    ? groupHoldings(listItems).map(([groupName, groupItems]) => (
+                        <div key={groupName} className="space-y-3">
+                            <div className="flex items-baseline justify-between px-1 pt-1">
+                                <span className="text-[10px] font-black uppercase tracking-[0.18em] text-zinc-500">{groupName}</span>
+                                <span className="text-[10px] font-bold text-zinc-600">{groupItems.length}</span>
+                            </div>
+                            {groupItems.map(item => renderOwnedCard(item))}
+                        </div>
+                    ))
+                    : listItems.map(item => mode === 'MARKET' ? renderMarketCard(item) : renderOwnedCard(item))}
                 {listItems.length === 0 && (
                     <div className="rounded-3xl border border-zinc-800 bg-zinc-950 p-8 text-center">
                         <div className="text-sm font-bold text-zinc-500">{tr('lifestyle.noItems')}</div>
                     </div>
                 )}
             </div>
+            )}
 
             <div className="rounded-3xl border border-zinc-800 bg-zinc-950/80 p-4 text-sm font-bold leading-relaxed text-zinc-500">
                 {rentedCount > 0 ? tr('lifestyle.rentalSummary', { count: rentedCount.toString(), amount: moneyShort(weeklyRental) }) : tr('lifestyle.assetSystemNote')}

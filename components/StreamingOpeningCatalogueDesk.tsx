@@ -25,6 +25,7 @@ import {
   type StreamingLocalizationDelivery,
 } from '../services/streamingOpeningCatalogue';
 import AccessibleDialog from './AccessibleDialog';
+import { StreamingTitleArt } from './studio-finance/components/StreamingTitleArt';
 import '../styles/streaming-opening-catalogue.css';
 import { CONTENT_AVAILABILITY_LABELS } from '../services/streamingContentAvailability';
 
@@ -66,6 +67,10 @@ export default function StreamingOpeningCatalogueDesk({
   const [delivery, setDelivery] = useState<StreamingLocalizationDelivery>('OUTSOURCE');
   const [feedback, setFeedback] = useState('');
   const selectedTitle = view.titles.find(title => title.projectId === selectedTitleId) || view.titles[0] || null;
+  const posterById = useMemo(() => new Map(
+    [...(player.pastProjects || []), ...player.businesses.flatMap(business => business.studioState?.scripts || [])]
+      .flatMap(source => source.customPoster ? [[String(source.id), source.customPoster] as const] : []),
+  ), [player]);
   const languages = useMemo(() => Array.from(new Set<string>(view.countries.flatMap(country => (
     country.languageDistribution.map(language => language.language)
   )))).filter(language => language.toLowerCase() !== 'english'), [view.countries]);
@@ -115,7 +120,7 @@ export default function StreamingOpeningCatalogueDesk({
         <div className="ocd-poster-rail">
           {view.titles.map((title, index) => (
             <button type="button" key={title.projectId} className="ocd-poster-card" onClick={() => { setSelectedTitleId(title.projectId); setTab('LANGUAGES'); }} style={{ ['--ocd-hue' as string]: hueFor(title.projectId) }}>
-              <span className="ocd-poster-art"><i>{title.title.slice(0, 2)}</i><em>{index + 1 < 10 ? `0${index + 1}` : index + 1}</em></span>
+              <span className="ocd-poster-art is-production"><StreamingTitleArt id={title.projectId} title={title.title} genre={title.genre} poster={posterById.get(title.projectId)} size={122} rank={index + 1} /></span>
               <span className="ocd-poster-copy"><small>{title.source} · {title.projectType}</small><strong>{title.title}</strong><em>{title.genre}</em></span>
               <span className={title.available ? 'is-ready' : 'is-risk'}>{title.available ? <ShieldCheck size={13} /> : <CircleAlert size={13} />}{CONTENT_AVAILABILITY_LABELS[title.availability]}</span>
             </button>

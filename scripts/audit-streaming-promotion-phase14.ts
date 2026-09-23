@@ -176,9 +176,9 @@ const draft: StreamingGrowthDraft = {
     artworkVariants: ['FACE_FORWARD', 'MYSTERY_HOOK'],
 };
 
-assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 26, 'The canonical foundation should retain Phase 14 growth actions in schema v25.');
+assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 27, 'The canonical foundation should retain Phase 14 growth actions in schema v27.');
 const migrated = normalizeOwnedStreamingPlatformState({ schemaVersion: 11 }, 'phase14-migration');
-assert(migrated.schemaVersion === 26 && migrated.growthActions.length === 0, 'Older saves should migrate without fabricating growth actions.');
+assert(migrated.schemaVersion === 27 && migrated.growthActions.length === 0, 'Older saves should migrate without fabricating growth actions.');
 
 const player = createFixture();
 const beforePreview = JSON.stringify(player.ownedStreamingPlatform);

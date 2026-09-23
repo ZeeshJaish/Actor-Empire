@@ -16,6 +16,7 @@ import type {
     OwnedStreamingMarketPolicySnapshot,
     OwnedStreamingServiceConfiguration,
     OwnedStreamingPricingConfiguration,
+    OwnedStreamingRegionNetworkPlan,
     OwnedStreamingTitleLanguageAsset,
     StreamingCostCommitmentCategory,
     StreamingCostCommitmentStatus,
@@ -36,6 +37,8 @@ import type {
     StreamingOriginalLocalizationPackage,
     StreamingServiceConfigurationSource,
     StreamingRevenueStreamId,
+    StreamingCloudProviderId,
+    StreamingServerTier,
     StreamingPricingPlanColorId,
     StreamingSoundIdentKey,
     StreamingTechnologyBranch,
@@ -45,6 +48,7 @@ const STREAMING_PLAN_COLOR_IDS: StreamingPricingPlanColorId[] = [
     'emerald', 'ocean', 'teal', 'rose', 'magenta', 'graphite',
 ];
 import {
+    STREAMING_DAY_ONE_REGION_ORDER,
     getStreamingDayOneMarket,
     getStreamingCountryMarketProfile,
     getStreamingMarketEntryProfile,
@@ -52,7 +56,11 @@ import {
 } from './streamingDayOneMarkets';
 import { normalizeStreamingStorefrontLayoutId } from './streamingStorefront';
 import { normalizeStreamingLanguageId } from './streamingLocalizationCapabilities';
-import { normalizeStreamingPricingConfiguration } from './streamingPricingEconomy';
+import {
+    STREAMING_MAXIMUM_ANNUAL_DISCOUNT,
+    STREAMING_MAXIMUM_INTRO_OFFER,
+    normalizeStreamingPricingConfiguration,
+} from './streamingPricingEconomy';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -130,6 +138,54 @@ const oneOf = <T extends string>(value: unknown, allowed: readonly T[], fallback
 const stringList = (value: unknown, limit = 80): string[] => Array.from(new Set(
     asArray(value).map(item => text(item, '', 100)).filter(Boolean),
 )).slice(0, limit);
+
+const STREAMING_SERVER_TIERS: StreamingServerTier[] = ['SCOUT', 'WORKHORSE', 'TITAN'];
+const STREAMING_CLOUD_PROVIDERS: StreamingCloudProviderId[] = ['ATLAS', 'NORTHWIND', 'MERIDIAN'];
+
+/**
+ * Canonicalizes player-authored region intent without deriving placement,
+ * changing money, or advancing time. Duplicate rows are merged in input order;
+ * the first valid provider is retained so repeated normalization is stable.
+ */
+export const normalizeStreamingRegionPlans = (value: unknown): OwnedStreamingRegionNetworkPlan[] => {
+    const byRegion = new Map<string, OwnedStreamingRegionNetworkPlan>();
+    for (const row of asArray(value)) {
+        const source = asRecord(row);
+        const regionId = text(source.regionId, '', 40).toUpperCase();
+        if (!STREAMING_DAY_ONE_REGION_ORDER.includes(regionId as (typeof STREAMING_DAY_ONE_REGION_ORDER)[number])) continue;
+        const counts = asRecord(source.serverCounts);
+        const incomingCounts = Object.fromEntries(STREAMING_SERVER_TIERS.map(tier => [
+            tier,
+            number(counts[tier], 0),
+        ])) as Record<StreamingServerTier, number>;
+        const provider = STREAMING_CLOUD_PROVIDERS.includes(source.cloudProvider as StreamingCloudProviderId)
+            ? source.cloudProvider as StreamingCloudProviderId
+            : null;
+        const cloudCompute = number(source.cloudCompute, 0);
+        const current = byRegion.get(regionId);
+        if (!current) {
+            byRegion.set(regionId, {
+                regionId,
+                serverCounts: incomingCounts,
+                cloudProvider: provider || (cloudCompute > 0 ? 'ATLAS' : null),
+                cloudCompute,
+            });
+            continue;
+        }
+        STREAMING_SERVER_TIERS.forEach(tier => {
+            current.serverCounts[tier] = Math.min(
+                Number.MAX_SAFE_INTEGER,
+                current.serverCounts[tier] + incomingCounts[tier],
+            );
+        });
+        current.cloudCompute = Math.min(Number.MAX_SAFE_INTEGER, current.cloudCompute + cloudCompute);
+        if (!current.cloudProvider) current.cloudProvider = provider || (current.cloudCompute > 0 ? 'ATLAS' : null);
+    }
+    return STREAMING_DAY_ONE_REGION_ORDER.flatMap(regionId => {
+        const plan = byRegion.get(regionId);
+        return plan ? [plan] : [];
+    });
+};
 
 const emptyCosts = (): OwnedStreamingMarketCostBreakdown => ({
     rights: 0,
@@ -460,8 +516,9 @@ const normalizePricingConfiguration = (root: UnknownRecord, source: UnknownRecor
             ? Array.from(new Set(asArray(pricing.streams).map(value => oneOf(value, REVENUE_STREAMS, 'subs'))))
             : ['subs'],
         plans: plans.length ? plans : fallbackPlans,
-        annualDiscount: number(pricing.annualDiscount, 15, 40),
-        introOffer: number(pricing.introOffer, 0, 60),
+        annualDiscount: number(pricing.annualDiscount, 15, STREAMING_MAXIMUM_ANNUAL_DISCOUNT),
+        introOffer: number(pricing.introOffer, 0, STREAMING_MAXIMUM_INTRO_OFFER),
+        introOfferPlanId: text(pricing.introOfferPlanId, '', 50) || undefined,
         ads: { minutesPerHour: number(ads.minutesPerHour, 4, 12), cpm: decimal(ads.cpm, 22, 100) },
         rentals: { rent: decimal(rentals.rent, 5.99, 50), buy: decimal(rentals.buy, 19.99, 100), windowWeeks: number(rentals.windowWeeks, 6, 52) },
         premium: { price: decimal(premium.price, 29.99, 100) },

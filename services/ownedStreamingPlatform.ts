@@ -55,6 +55,7 @@ import {
     type OwnedStreamingInfrastructurePhysicalSummary,
     type OwnedStreamingFacility,
     type OwnedStreamingNetworkPlacement,
+    type OwnedStreamingRegionNetworkPlan,
     type OwnedStreamingTechnologyProject,
     type OwnedStreamingResearchProgram,
     type OwnedStreamingCampusProject,
@@ -167,11 +168,15 @@ import {
     type StreamingFounderOfficeRole,
 } from '../types';
 import { normalizeStreamingInfrastructureManagementPolicy } from './streamingInfrastructureManagement';
-import { normalizeStreamingCanonicalFoundation } from './streamingCanonicalState';
+import {
+    normalizeStreamingCanonicalFoundation,
+    normalizeStreamingRegionPlans,
+} from './streamingCanonicalState';
 import { createDeterministicId } from './deterministicRandom';
 import { STREAMING_INCORPORATION_ECONOMY } from './streamingEconomy';
 import { cleanStreamingBrandMarkDataUrl } from './streamingBrandImage';
 import { normalizeStreamingDayOneMarketIds } from './streamingDayOneMarkets';
+import { STREAMING_ANNUAL_BILLING_SHARE } from './streamingPricingEconomy';
 import {
     aggregateStreamingFacilities,
     getStreamingFacilityContract,
@@ -185,6 +190,8 @@ import {
     normalizeStreamingRackGroups,
     projectFacilityNetworkRole,
 } from './streamingRackGroups';
+import { normalizeStreamingFibreState } from './streamingFibreLadder';
+import { getProductionLocation } from './productionLocations';
 
 export { OWNED_STREAMING_PLATFORM_SCHEMA_VERSION };
 export const OWNED_STREAMING_WEEKLY_HISTORY_LIMIT = 104;
@@ -2242,6 +2249,34 @@ const normalizeStreamingFacilities = (
     return migrated;
 };
 
+const deriveLegacyRegionPlans = (
+    facilities: OwnedStreamingFacility[],
+): OwnedStreamingRegionNetworkPlan[] => normalizeStreamingRegionPlans(
+    facilities.flatMap(facility => {
+        const regionId = getProductionLocation(facility.cityId)?.regionId;
+        if (!regionId) return [];
+        if (facility.type === 'CLOUD_ALLOCATION') {
+            return [{
+                regionId,
+                serverCounts: { SCOUT: 0, WORKHORSE: 0, TITAN: 0 },
+                cloudProvider: 'ATLAS',
+                cloudCompute: facility.installedRacks,
+            }];
+        }
+        const serverCounts = { SCOUT: 0, WORKHORSE: 0, TITAN: 0 };
+        for (const group of facility.rackGroups || []) {
+            const tier = group.serverTier || 'WORKHORSE';
+            serverCounts[tier] += group.rackCount;
+        }
+        return [{
+            regionId,
+            serverCounts,
+            cloudProvider: null,
+            cloudCompute: 0,
+        }];
+    }),
+);
+
 const normalizeLaunchRehearsalSnapshot = (
     value: unknown,
 ): OwnedStreamingLaunchRehearsalSnapshot | undefined => {
@@ -2309,6 +2344,9 @@ const normalizeInfrastructureSetupDraft = (
     const openingDemandSource = asRecord(source.openingDemandForecast);
     const networkPlacements = normalizeNetworkPlacements(source.networkPlacements);
     const facilities = normalizeStreamingFacilities(source.facilities, networkPlacements);
+    const regionPlans = Array.isArray(source.regionPlans)
+        ? normalizeStreamingRegionPlans(source.regionPlans)
+        : deriveLegacyRegionPlans(facilities);
     const openingDemandForecast = Object.keys(openingDemandSource).length > 0
         ? {
             low: Math.round(clamp(openingDemandSource.low, 0, Number.MAX_SAFE_INTEGER)),
@@ -2335,6 +2373,7 @@ const normalizeInfrastructureSetupDraft = (
         rolloutPace: isOneOf(source.rolloutPace, INFRASTRUCTURE_ROLLOUT_PACES, 'STANDARD'),
         subscriptionPrices: normalizeSubscriptionPrices(source.subscriptionPrices),
         networkPlacements: facilities.length ? aggregateStreamingFacilities(facilities) : networkPlacements,
+        regionPlans,
         facilities,
         managementPolicy,
         assistedPlanApproved,
@@ -2527,6 +2566,9 @@ const normalizeInfrastructureSetup = (
     if (!loadTest) return null;
     const networkPlacements = normalizeNetworkPlacements(source.networkPlacements);
     const facilities = normalizeStreamingFacilities(source.facilities, networkPlacements);
+    const regionPlans = Array.isArray(source.regionPlans)
+        ? normalizeStreamingRegionPlans(source.regionPlans)
+        : deriveLegacyRegionPlans(facilities);
     const physicalSource = asRecord(source.physicalSummary);
     const physicalSummary: OwnedStreamingInfrastructurePhysicalSummary | undefined = Object.keys(physicalSource).length
         ? {
@@ -2541,6 +2583,11 @@ const normalizeInfrastructureSetup = (
         }
         : undefined;
     return {
+        strategy: source.strategy === 'CLOUD_FIRST'
+            || source.strategy === 'OWNED_INFRASTRUCTURE'
+            || source.strategy === 'HYBRID'
+            ? source.strategy
+            : undefined,
         capacityPackageId: isOneOf(source.capacityPackageId, CAPACITY_PACKAGE_IDS, 'GROWTH'),
         rolloutPace: isOneOf(source.rolloutPace, INFRASTRUCTURE_ROLLOUT_PACES, 'STANDARD'),
         storageCapacityHours: Math.round(clamp(source.storageCapacityHours, 0, Number.MAX_SAFE_INTEGER)),
@@ -2550,9 +2597,16 @@ const normalizeInfrastructureSetup = (
         capitalInvested: Math.round(clamp(source.capitalInvested, 0, Number.MAX_SAFE_INTEGER)),
         technicalDebt: Math.round(clamp(source.technicalDebt, 0, 10_000)),
         networkPlacements: facilities.length ? aggregateStreamingFacilities(facilities) : networkPlacements,
+        regionPlans,
         facilities,
         managementPolicy: normalizeStreamingInfrastructureManagementPolicy(source.managementPolicy),
         physicalSummary,
+        baselineConcurrentStreams: source.baselineConcurrentStreams === undefined
+            ? undefined
+            : Math.round(clamp(source.baselineConcurrentStreams, 0, Number.MAX_SAFE_INTEGER)),
+        burstConcurrentStreams: source.burstConcurrentStreams === undefined
+            ? undefined
+            : Math.round(clamp(source.burstConcurrentStreams, 0, Number.MAX_SAFE_INTEGER)),
         readyAtAbsoluteWeek: Math.max(0, Math.round(clamp(source.readyAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
         revision: Math.max(1, Math.round(clamp(source.revision, 1, 10_000, 1))),
         committedAtAbsoluteWeek: Math.max(0, Math.round(clamp(source.committedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
@@ -3429,10 +3483,16 @@ const normalizeWeeklyOperations = (value: unknown): OwnedStreamingWeeklyOperatio
             const planId = cleanText(allocation.planId, '', 80);
             const planName = cleanText(allocation.planName, '', 80);
             if (!planId || !planName) return [];
+            const households = Math.round(clamp(allocation.households, 0, Number.MAX_SAFE_INTEGER));
+            const annualHouseholds = allocation.annualHouseholds === undefined
+                ? Math.round(households * STREAMING_ANNUAL_BILLING_SHARE)
+                : Math.round(clamp(allocation.annualHouseholds, 0, households));
             return [{
                 planId,
                 planName,
-                households: Math.round(clamp(allocation.households, 0, Number.MAX_SAFE_INTEGER)),
+                households,
+                monthlyHouseholds: households - annualHouseholds,
+                annualHouseholds,
                 effectiveMonthlyPrice: clamp(allocation.effectiveMonthlyPrice, 0, Number.MAX_SAFE_INTEGER),
                 monthlySubscriptionRevenue: clamp(allocation.monthlySubscriptionRevenue, 0, Number.MAX_SAFE_INTEGER),
             }];
@@ -3821,6 +3881,10 @@ const normalizeOpeningProgrammeCommission = (
         rehearsalSignature,
         openingCountryIds: normalizeStreamingDayOneMarketIds(source.openingCountryIds).sort(),
         marketingForecastSignature,
+        infrastructureDueNow: Math.round(clamp(source.infrastructureDueNow, 0, Number.MAX_SAFE_INTEGER)),
+        marketFilingDueNow: Math.round(clamp(source.marketFilingDueNow, 0, Number.MAX_SAFE_INTEGER)),
+        marketingReservation: Math.round(clamp(source.marketingReservation, 0, Number.MAX_SAFE_INTEGER)),
+        totalCashRequired: Math.round(clamp(source.totalCashRequired, 0, Number.MAX_SAFE_INTEGER)),
         revision: Math.max(1, Math.round(clamp(source.revision, 1, Number.MAX_SAFE_INTEGER, 1))),
     };
 };
@@ -3919,6 +3983,7 @@ export const normalizeOwnedStreamingPlatformState = (
         hqOnboarding: normalizeHqOnboarding(source.hqOnboarding),
         infrastructureSetupDraft: normalizeInfrastructureSetupDraft(source.infrastructureSetupDraft),
         infrastructureSetup: normalizeInfrastructureSetup(source.infrastructureSetup),
+        pendingInfrastructureSetup: normalizeInfrastructureSetup(source.pendingInfrastructureSetup),
         launchMarketingDraft: normalizeLaunchMarketingDraft(
             source.launchMarketingDraft,
             asRecord(source.infrastructureSetupDraft).campaign,
@@ -4004,6 +4069,10 @@ export const normalizeOwnedStreamingPlatformState = (
         launchCommit: normalizeLaunchCommit(source.launchCommit),
         subscriptionPrices: normalizeSubscriptionPrices(source.subscriptionPrices),
         founderOwnershipPercent,
+        fibre: normalizeStreamingFibreState(source.fibre),
+        serviceStandardFromWeek: Number.isFinite(Number(source.serviceStandardFromWeek))
+            ? Math.max(0, Math.round(Number(source.serviceStandardFromWeek)))
+            : undefined,
         treasuryCash: Math.round(clamp(source.treasuryCash, 0, Number.MAX_SAFE_INTEGER)),
         debtPrincipal,
         infrastructureStrategy: isOneOf(source.infrastructureStrategy, INFRASTRUCTURE_STRATEGIES, defaults.infrastructureStrategy),

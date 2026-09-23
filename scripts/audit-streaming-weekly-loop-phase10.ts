@@ -206,7 +206,7 @@ const createFixture = (): Player => {
 };
 
 const migrated = normalizeOwnedStreamingPlatformState({ schemaVersion: 8 }, 'phase10-migration');
-assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 26, 'Phase 10 records should survive the owned-streaming schema v25 migration.');
+assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 27, 'Phase 10 records should survive the owned-streaming schema v27 migration.');
 assert(migrated.weeklyDecisions.length === 0, 'Older saves should migrate with an empty weekly decision history.');
 assert(migrated.lastAcknowledgedWeeklyReportAbsoluteWeek === null, 'Older saves should not fabricate an acknowledged report.');
 

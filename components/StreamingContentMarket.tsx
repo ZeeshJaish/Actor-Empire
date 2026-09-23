@@ -5,6 +5,7 @@ import AccessibleDialog from './AccessibleDialog';
 import { type Brand, Mark } from './streaming-transplant/StreamingBrandVisuals';
 import { brandVars } from './streaming-transplant/presentation/brand';
 import { Poster } from './studio-finance/components/Poster';
+import { StreamingTitleArt } from './studio-finance/components/StreamingTitleArt';
 import { STREAMING_STARTER_CATALOG_PACKAGES } from '../services/streamingCatalog';
 import { getStreamingDayOneMarket } from '../services/streamingDayOneMarkets';
 import { establishContentMarketCatalogue, getContentMarketAuctionCollections, getContentMarketListings, getContentMarketCollections, getContentMarketOwnedTitles, getContentMarketFunds, getContentMarketSupplySummary,
@@ -30,6 +31,9 @@ interface Props {
     player: Player; brand: Brand; onUpdatePlayer: (player: Player) => void; onClose: () => void;
     onOpenFinance: () => void; onCommission: () => void; onReview: () => void;
     returnToLaunch?: boolean;
+    /** Opens straight onto a shelf, so "Bring from my studio" lands on the studio
+        vault rather than the general listings. */
+    initialTab?: Draft['tab'];
     onResumeLegacy?: () => void;
     onExistingNegotiations?: () => void;
     initialOfferId?: string;
@@ -132,12 +136,18 @@ function ContentMarketGate({ player, funds, listingPrices, owned, liveRooms, bra
     </AccessibleDialog>;
 }
 
-export default function StreamingContentMarket({ player, brand, onUpdatePlayer, onClose, onOpenFinance, onCommission, onReview, returnToLaunch, onResumeLegacy, onExistingNegotiations, initialOfferId, initialAuctionId }: Props) {
+export default function StreamingContentMarket({ player, brand, onUpdatePlayer, onClose, onOpenFinance, onCommission, onReview, returnToLaunch, initialTab, onResumeLegacy, onExistingNegotiations, initialOfferId, initialAuctionId }: Props) {
     const platform = player.ownedStreamingPlatform;
+    const posterById = useMemo(() => new Map(
+        [...(player.pastProjects || []), ...player.businesses.flatMap(business => business.studioState?.scripts || [])]
+            .flatMap(source => source.customPoster ? [[String(source.id), source.customPoster] as const] : []),
+    ), [player]);
     const [draft, setDraft] = useState<Draft>(() => initialAuctionId
         ? { ...(platform.contentMarketDraft || { search: '', ownedIds: [] }), tab: 'AUCTIONS', selectedId: initialAuctionId }
         : initialOfferId
         ? { ...(platform.contentMarketDraft || { search: '', ownedIds: [] }), tab: 'OFFERS', selectedId: initialOfferId }
+        : initialTab
+        ? { ...(platform.contentMarketDraft || { search: '', ownedIds: [] }), tab: initialTab, selectedId: null }
         : platform.contentMarketDraft || { tab: 'ALL', search: '', selectedId: null, ownedIds: platform.catalogSetupDraft?.selectedOwnedProjectIds || [] });
     const [feedback, setFeedback] = useState('');
     const [busy, setBusy] = useState(false);
@@ -153,6 +163,13 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
     const auctionListingIds = useMemo(() => new Set(auctionLots.filter(lot => lot.listingKind === 'TITLE').map(lot => lot.listingId)), [auctionLots]);
     const auctionCollectionIds = useMemo(() => new Set(getContentMarketAuctionCollections(player).map(collection => collection.id)), [player]);
     const owned = useMemo(() => getContentMarketOwnedTitles(player), [player]);
+    /* Three different reasons the studio shelf can be bare, and they need three
+       different answers: you own no production house, you own one that has not
+       released anything yet, or a search is hiding what you have. */
+    const ownsStudio = useMemo(
+        () => (player.businesses || []).some(business => business.type === 'PRODUCTION_HOUSE'),
+        [player.businesses],
+    );
     const selected = listings.find(o => o.id === draft.selectedId);
     const collection = collections.find(o => o.id === draft.selectedId);
     const auctionLot = auctionLots.find(lot => lot.id === draft.selectedId)
@@ -344,6 +361,7 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
         <ExactContentMarket
             key={draft.selectedId || 'root'}
             brand={brand}
+            ownsStudio={ownsStudio}
             state={{ treasury: platform.treasuryCash, committed: Math.max(0, platform.treasuryCash - funds), week: player.currentWeek, subs: platform.metrics.subscribers || 0 }}
             catalogue={exactLots}
             supplySummary={supplySummary}
@@ -386,7 +404,7 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
         <main className="cm-scroll">
             {feedback && <p className="cm-feedback" role="status">{feedback}</p>}
             {selectedOffer ? <>
-                <div className="cm-title"><Poster seed={selectedOffer.sourceProjectId} size={68} /><div><span className="cm-kicker">PRIVATE OFFER · V{selectedOffer.proposalVersion}</span><h1>{selectedOffer.title}</h1><p>{selectedOffer.sellerName}</p></div></div>
+                <div className="cm-title"><StreamingTitleArt id={selectedOffer.sourceProjectId} title={selectedOffer.title} poster={posterById.get(selectedOffer.sourceProjectId)} size={68} /><div><span className="cm-kicker">PRIVATE OFFER · V{selectedOffer.proposalVersion}</span><h1>{selectedOffer.title}</h1><p>{selectedOffer.sellerName}</p></div></div>
                 <div className={`cm-offer-status is-${(selectedOffer.responseStatus || 'AWAITING_RESPONSE').toLowerCase()}`}><Clock3 size={16} /><div><b>{statusLabel(selectedOffer)}</b><small>{selectedOffer.responseStatus === 'AWAITING_RESPONSE' ? 'Rights remain on the market until you sign.' : selectedOffer.responseReason}</small></div></div>
                 <dl className="cm-terms cm-terms-compact"><div><dt>Your upfront offer</dt><dd>{money(selectedOffer.minimumGuarantee)}</dd></div><div><dt>Markets</dt><dd>{countries(selectedOffer.countryIds)}</dd></div><div><dt>Duration</dt><dd>{selectedOffer.durationWeeks} weeks</dd></div><div><dt>Your revenue share</dt><dd>{selectedOffer.platformRevenueShare}%</dd></div><div><dt>Rights</dt><dd>{selectedOffer.exclusivity === 'EXCLUSIVE' ? 'Exclusive' : 'Shared'}</dd></div></dl>
                 {selectedOffer.responseStatus === 'SELLER_COUNTERED' && <div className="cm-counter-strip"><span>Owner revision</span><b>{money(selectedOffer.counterMinimumGuarantee || 0)} · {selectedOffer.counterPlatformRevenueShare}% to your platform</b></div>}
@@ -399,7 +417,7 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
                 </div>}
                 {funds < selectedOffer.minimumGuarantee && ['OPEN', 'COUNTERED', 'READY_TO_SIGN'].includes(selectedOffer.status) && <button className="cm-finance-link" onClick={() => leave(onOpenFinance)}>Available funds no longer cover this offer · Open Studio Finance <ChevronRight size={14} /></button>}
             </> : selectedUpcoming ? <>
-                <div className="cm-title"><Poster seed={selectedUpcoming.sourceProjectId} size={68} /><div><span className="cm-kicker">UPCOMING · {selectedUpcoming.publicInterest} INTEREST</span><h1>{selectedUpcoming.title}</h1><p>{selectedUpcoming.sellerName}</p></div></div>
+                <div className="cm-title"><StreamingTitleArt id={selectedUpcoming.sourceProjectId} title={selectedUpcoming.title} poster={posterById.get(selectedUpcoming.sourceProjectId)} size={68} /><div><span className="cm-kicker">UPCOMING · {selectedUpcoming.publicInterest} INTEREST</span><h1>{selectedUpcoming.title}</h1><p>{selectedUpcoming.sellerName}</p></div></div>
                 <p className="cm-note">This is a real production-linked sale, not a guaranteed hit. Public interest can change with production progress, marketing, delays, and release results.</p>
                 <dl className="cm-terms cm-terms-compact"><div><dt>Sale status</dt><dd>{selectedUpcoming.status.replaceAll('_', ' ')}</dd></div><div><dt>Bidding opens</dt><dd>Week {selectedUpcoming.opensAtAbsoluteWeek}</dd></div><div><dt>Expected availability</dt><dd>Week {selectedUpcoming.plannedAvailabilityAbsoluteWeek}</dd></div><div><dt>Markets</dt><dd>{countries(selectedUpcoming.countryIds)}</dd></div><div><dt>Opening level</dt><dd>{money(selectedUpcoming.minimumGuarantee)}</dd></div><div><dt>Public interest</dt><dd>{selectedUpcoming.publicInterestScore}/100</dd></div></dl>
                 <div className="cm-interest-drivers">{selectedUpcoming.publicInterestDrivers.map(driver => <span key={driver}>{driver}</span>)}</div>
@@ -409,7 +427,7 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
                 {selectedUpcoming.status === 'LOST' && <p className="cm-feedback">{selectedUpcoming.winnerName || 'Another platform'} won this rights window.</p>}
                 {selectedUpcoming.status === 'WITHDRAWN' && <p className="cm-feedback">The sale was withdrawn because the underlying production is no longer eligible.</p>}
             </> : auctionLot ? <>
-                <div className="cm-title"><Poster seed={auctionLot.sourceProjectId} size={68} /><div><span className="cm-kicker">LIVE AUCTION · {auctionLot.listingKind === 'CATALOGUE_PACKAGE' ? `${auctionLot.catalogueComponentIds?.length || 0} TITLES` : auctionLot.projectType}</span><h1>{auctionLot.title}</h1><p>{auctionLot.sellerName}</p></div></div>
+                <div className="cm-title"><StreamingTitleArt id={auctionLot.sourceProjectId} title={auctionLot.title} poster={posterById.get(auctionLot.sourceProjectId)} size={68} /><div><span className="cm-kicker">LIVE AUCTION · {auctionLot.listingKind === 'CATALOGUE_PACKAGE' ? `${auctionLot.catalogueComponentIds?.length || 0} TITLES` : auctionLot.projectType}</span><h1>{auctionLot.title}</h1><p>{auctionLot.sellerName}</p></div></div>
                 <p className="cm-note">The rights scope below is frozen for this room. You can compete with upfront money, seller backend, marketing support, and—when allowed—a future original.</p>
                 <dl className="cm-terms"><div><dt>Opening level</dt><dd>{money(auctionLot.minimumGuarantee)}</dd></div><div><dt>Markets</dt><dd>{countries(auctionLot.countryIds)}</dd></div><div><dt>Duration</dt><dd>{auctionLot.durationWeeks} weeks</dd></div><div><dt>Rights</dt><dd>{auctionLot.exclusivity === 'EXCLUSIVE' ? 'Exclusive' : 'Shared'} · {auctionLot.windowType === 'FIRST_WINDOW' ? 'First window' : 'Second window'}</dd></div><div><dt>Seller backend range</dt><dd>{auctionLot.allowedTerms.backendMinimum}–{auctionLot.allowedTerms.backendMaximum}%</dd></div><div><dt>Room clock</dt><dd>15 seconds · 45 second hard cap</dd></div></dl>
                 {auctionLot.notice && <p className="cm-feedback">{auctionLot.notice}</p>}
@@ -477,11 +495,21 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
                 <div className="cm-filters" aria-label="Content source">{(['ALL', 'MOVIE', 'SERIES', 'COLLECTIONS', 'OWNED'] as const).map(tab => <button key={tab} aria-pressed={draft.tab === tab} onClick={() => patch({ tab, selectedId: null, ...(tab === 'OWNED' ? { search: '' } : {}) })}>{({ ALL: 'All', MOVIE: 'Films', SERIES: 'Series', COLLECTIONS: 'Collections', OWNED: 'My studio' })[tab]}</button>)}</div>
                 {draft.tab === 'OWNED' ? <><div className="cm-section-heading cm-studio-heading"><span>YOUR STUDIO VAULT</span><b>Bring a release across</b><small>The title stays owned by your production company. Your platform only receives eligible streaming rights.</small></div><div className="cm-studio-shelf">{visibleOwned.map(t => <button className="cm-studio-card" key={t.id} disabled={t.linked || !!t.unavailableReason} aria-pressed={ownedIds.includes(t.id)} onClick={() => patch({ ownedIds: ownedIds.includes(t.id) ? ownedIds.filter(id => id !== t.id) : [...ownedIds, t.id] })}>
                     <span className="cm-studio-art"><ContentMarketOneSheet seed={t.id} title={t.title} genre={t.genre} />{ownedIds.includes(t.id) && <i><Check size={17} /></i>}</span><span className="cm-studio-copy"><strong>{t.title}</strong><small>{t.studioName} · {t.genre.replaceAll('_', ' ')}</small><em>{t.linked ? 'ALREADY IN CATALOGUE' : t.unavailableReason ? 'UNAVAILABLE' : 'AVAILABLE RIGHTS'}</em><span>{t.linked ? 'Already linked' : t.unavailableReason || countries(t.countryIds)}</span>{t.excludedCountryIds.length > 0 && <span>Except {countries(t.excludedCountryIds)}</span>}<b>NO INTERNAL FEE</b></span></button>)}</div>
-                    {!visibleOwned.length && <div className="cm-empty"><LibraryBig size={28} /><h2>No studio releases found</h2><p>Released titles from production houses you control appear here. You can also license content from the market.</p></div>}
+                    {!visibleOwned.length && <div className="cm-empty"><LibraryBig size={28} />
+                        {!ownsStudio
+                            ? <><h2>You don't own a production house</h2><p>Titles your own studio releases appear here, and cross over with no internal fee. You can buy a production house from Lifestyle &rarr; Business. Until then, license from the market or commission an Original above.</p></>
+                            : !owned.length
+                            ? <><h2>Your studio hasn't released anything yet</h2><p>A title becomes available the week it releases. Anything your production house has in development will appear here on its release week.</p></>
+                            : <><h2>No release matches that search</h2><p>Clear the search to see all {owned.length} {owned.length === 1 ? 'release' : 'releases'} from your studio.</p></>}
+                    </div>}
                     {ownedIds.length > 0 && <div className="cm-studio-action"><span><b>{ownedIds.length}</b> selected</span><button className="cm-primary" disabled={busy} onClick={() => accept(() => linkContentMarketOwnedTitles(player, ownedIds))}>Add {ownedIds.length} studio {ownedIds.length === 1 ? 'title' : 'titles'} · No internal fee</button></div>}
                 </> : <><div className="cm-market-grid">{visible.map(o => <button className="cm-row cm-market-card" key={o.id} onClick={() => patch({ selectedId: o.id })}><span className="cm-card-art"><ContentMarketOneSheet seed={o.title.id} title={o.title.title} genre={o.title.genre} /><em>LISTED NOW</em>{o.title.rating ? <b>{o.title.rating.toFixed(1)}</b> : null}</span><span className="cm-card-copy"><strong>{o.title.title}</strong><small>{o.sellerName}</small><span><b>{money(o.terms.minimumGuarantee)}</b><em>{o.title.projectType === 'SERIES' ? 'SERIES' : 'FILM'} · {o.countryIds.length} MARKETS</em></span></span></button>)}
                     {visibleCollections.map(o => <button className="cm-row cm-market-card" key={o.id} onClick={() => patch({ selectedId: o.id })}><span className="cm-card-art cm-card-collection"><ContentMarketOneSheet seed={o.package.id} title={o.package.name} genre="Mixed" /><em>COLLECTION</em><b>{o.rows.length}</b></span><span className="cm-card-copy"><strong>{o.package.name}</strong><small>{o.sellerName}</small><span><b>{money(o.totalGuarantee)}</b><em>{o.rows.length} TITLES · ONE DEAL</em></span></span></button>)}</div>
-                    {!visible.length && !visibleCollections.length && <div className="cm-empty"><Film size={28} /><h2>No matching listings</h2><p>Try another filter or return after more titles are released. Your studio and Original options remain above.</p></div>}</>}
+                    {!visible.length && !visibleCollections.length && <div className="cm-empty"><Film size={28} />
+                        {!listings.length && !collections.length
+                            ? <><h2>Nothing is listed yet</h2><p>Rival studios license their titles once they have released them, and none have reached release yet. The market fills as the industry produces. In the meantime you can commission an Original, or bring across a release of your own.</p></>
+                            : <><h2>No listing matches that filter</h2><p>{listings.length + collections.length} {listings.length + collections.length === 1 ? 'listing is' : 'listings are'} available under the other shelves. Clear the search or switch tab to see them.</p></>}
+                    </div>}</>}
                 {platform.starterCatalog && <label className="cm-strategy">Catalogue strategy<select value={platform.starterCatalog.packageId} onChange={e => onUpdatePlayer(saveContentMarketStrategy(player, e.target.value as any))}>{STREAMING_STARTER_CATALOG_PACKAGES.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}</select><small>A programming direction, with no purchase fee.</small></label>}
                 </>}
             </>}

@@ -89,9 +89,8 @@ const launchSummary: LinkedBudgetSummary = {
 const buildMarkup = renderToStaticMarkup(
   <BuildBudgetContent
     stages={[
-      { id: 'sites', label: 'Sites', done: true, detail: 'Settled' },
-      { id: 'plans', label: 'Plans', done: true, detail: 'Settled' },
-      { id: 'money', label: 'Money', done: false, detail: 'Needs attention' },
+      { id: 'network', label: 'Network', done: true, detail: 'Settled' },
+      { id: 'money', label: 'Money', done: true, detail: 'Settled' },
       { id: 'test', label: 'Test', done: false, detail: 'Not started' },
       { id: 'launch', label: 'Launch', done: false, detail: 'Not started' },
     ]}
@@ -110,7 +109,7 @@ const buildMarkup = renderToStaticMarkup(
   />,
 );
 assert.match(buildMarkup, /Build checklist/);
-assert.match(buildMarkup, /2\/5/);
+assert.match(buildMarkup, /2\/4/);
 assert.match(buildMarkup, /Infrastructure construction/);
 assert.match(buildMarkup, /Operating reserve/);
 assert.doesNotMatch(buildMarkup, /Market clearance already settled/);

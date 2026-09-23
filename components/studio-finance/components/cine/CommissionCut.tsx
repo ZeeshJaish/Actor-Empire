@@ -49,7 +49,9 @@ export function commissionBeats(
     {
       id: 'install', mark: '04', ms: 4400,
       title: 'Rack one, filled',
-      line: `Machine by machine, ${totals.racks} cabinets bolted to the floor, cabled at the back and powered from both sides.`,
+      line: totals.racks > 0
+        ? `Machine by machine, ${totals.racks} ${totals.racks === 1 ? 'cabinet' : 'cabinets'} bolted to the floor, cabled at the back and powered from both sides${totals.compute > 0 ? `; ${totals.compute} compute rented alongside, nothing to bolt` : ''}.`
+        : `Nothing to bolt: ${totals.compute} compute rented, running the moment the provider says so.`,
       scene: <InstallScene racks={totals.racks} />,
     },
     {
@@ -85,7 +87,7 @@ function Contract({ company, signatoryName, totals, total }: { company: string; 
 
           <ul className="cs-terms">
             <li><em>Sites</em><b>{totals.cities}</b></li>
-            <li><em>Cabinets</em><b>{totals.racks}</b></li>
+            <li><em>{totals.racks > 0 ? 'Cabinets' : 'Compute'}</em><b>{totals.racks > 0 ? totals.racks : totals.compute}</b></li>
             <li><em>Delivery</em><b>{totals.weeks > 0 ? `${totals.weeks} wks` : 'Now'}</b></li>
             <li><em>Consideration</em><b>{money(total)}</b></li>
           </ul>

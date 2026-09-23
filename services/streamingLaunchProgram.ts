@@ -442,6 +442,36 @@ export const removeStreamingCustomIdentAudio = (player: Player): StreamingLaunch
     return { player: { ...player, ownedStreamingPlatform: nextPlatform }, changed: true, reason: 'SAVED', shortfall: 0 };
 };
 
+/** Clear the active ident choice without refunding a commissioned package. */
+export const clearStreamingServiceIdent = (player: Player): StreamingLaunchConfigurationResult => {
+    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+    if (!platform.identity || platform.launchCommit) return { player, changed: false, reason: 'INVALID_STATE', shortfall: 0 };
+    if (!platform.serviceConfiguration.identPackageId && !platform.serviceConfiguration.soundIdentKey) {
+        return { player, changed: false, reason: 'SAVED', shortfall: 0 };
+    }
+    const nextPlatform = compactOwnedStreamingPlatformForPersistence({
+        ...platform,
+        serviceConfiguration: {
+            ...platform.serviceConfiguration,
+            source: 'UNCONFIGURED',
+            soundIdentKey: null,
+            identPackageId: null,
+            identDurationSeconds: 0,
+            customIdentAudio: null,
+            committedAtAbsoluteWeek: null,
+            revision: platform.serviceConfiguration.revision + 1,
+        },
+        launchProgram: {
+            ...platform.launchProgram,
+            status: 'PLANNING',
+            defineCurrentStep: 'IDENTITY',
+            serviceConfigurationCommittedAtAbsoluteWeek: null,
+            configurationRevision: platform.launchProgram.configurationRevision + 1,
+        },
+    }, player.id);
+    return { player: { ...player, ownedStreamingPlatform: nextPlatform }, changed: true, reason: 'SAVED', shortfall: 0 };
+};
+
 export const saveStreamingStorefrontPlan = (
     player: Player,
     input: { storefrontLayoutId: string; pricingApproach?: string },
@@ -469,6 +499,30 @@ export const saveStreamingStorefrontPlan = (
             ...platform.launchProgram,
             status: 'PLANNING',
             startedAtAbsoluteWeek: platform.launchProgram.startedAtAbsoluteWeek ?? absoluteWeek,
+            defineCurrentStep: 'STOREFRONT',
+            configurationRevision: platform.launchProgram.configurationRevision + 1,
+        },
+    }, player.id);
+    return { player: { ...player, ownedStreamingPlatform: nextPlatform }, changed: true, reason: 'SAVED', shortfall: 0 };
+};
+
+/** Clear the active storefront while preserving every paid or planned receipt. */
+export const clearStreamingStorefrontPlan = (player: Player): StreamingLaunchConfigurationResult => {
+    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+    if (!platform.identity || platform.launchCommit) return { player, changed: false, reason: 'INVALID_STATE', shortfall: 0 };
+    if (!platform.serviceConfiguration.storefrontLayoutId) {
+        return { player, changed: false, reason: 'SAVED', shortfall: 0 };
+    }
+    const nextPlatform = compactOwnedStreamingPlatformForPersistence({
+        ...platform,
+        serviceConfiguration: {
+            ...platform.serviceConfiguration,
+            storefrontLayoutId: null,
+            revision: platform.serviceConfiguration.revision + 1,
+        },
+        launchProgram: {
+            ...platform.launchProgram,
+            status: 'PLANNING',
             defineCurrentStep: 'STOREFRONT',
             configurationRevision: platform.launchProgram.configurationRevision + 1,
         },
@@ -722,7 +776,7 @@ export const getStreamingLaunchProgramView = (player: Player): StreamingLaunchPr
         {
             id: 'MARKET_CLEARANCES', trackId: 'DEFINE_LAUNCH', label: 'Clear the markets', shortLabel: 'Market clearance',
             description: 'Prepare every opening-country application and resolve any government request.',
-            destination: 'MARKET_CLEARANCE', complete: marketDecision.readyToCommission,
+            destination: 'MARKET_CLEARANCE', complete: marketDecision.reviewComplete,
             inProgress: marketDecision.readyToCommission && !marketsCleared,
             blocker: marketsChosen ? null : 'Choose at least one Opening Market before beginning clearance.',
         },

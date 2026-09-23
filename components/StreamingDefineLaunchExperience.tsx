@@ -13,9 +13,12 @@ import {
   STREAMING_DAY_ONE_MARKETS,
   STREAMING_DAY_ONE_REGION_LABELS,
   STREAMING_DAY_ONE_REGION_ORDER,
+  STREAMING_WORLD_MARKETS,
   getStreamingCountryMarketProfile,
   getStreamingMarketEntryProfile,
+  isAuthoredStreamingMarket,
 } from '../services/streamingDayOneMarkets';
+import { getStreamingMarketSubRegion } from '../services/streamingMarketSubRegions';
 import {
   beginStreamingMarketClearance,
   getStreamingMarketClearanceView,
@@ -28,6 +31,8 @@ import {
   getStreamingIdentPurchaseView,
   getStreamingLaunchProgramView,
   checkpointStreamingLaunchBlueprint,
+  clearStreamingServiceIdent,
+  clearStreamingStorefrontPlan,
   removeStreamingCustomIdentAudio,
   saveStreamingDefineLaunchDraft,
   saveStreamingLaunchBlueprint,
@@ -165,7 +170,7 @@ const mapClearanceOutcome = (outcome?: string | null, additionalPayment = 0): Cl
 const viewersPerStreamingHousehold = (growth: typeof STREAMING_DAY_ONE_MARKETS[number]['growth']) =>
   growth === 'FAST' ? 2.2 : growth === 'STEADY' ? 2.05 : 1.95;
 
-const buildCountry = (market: typeof STREAMING_DAY_ONE_MARKETS[number]): Country => {
+const buildCountry = (market: typeof STREAMING_WORLD_MARKETS[number]): Country => {
   const profile = getStreamingCountryMarketProfile(market.id);
   const entry = getStreamingMarketEntryProfile(market.id);
   const languages = profile?.languageDistribution.length
@@ -180,6 +185,9 @@ const buildCountry = (market: typeof STREAMING_DAY_ONE_MARKETS[number]): Country
     name: market.country,
     code: market.id,
     region: STREAMING_DAY_ONE_REGION_LABELS[market.regionId],
+    subRegionId: getStreamingMarketSubRegion(market.id)?.id,
+    subRegion: getStreamingMarketSubRegion(market.id)?.name,
+    authored: isAuthoredStreamingMarket(market.id),
     competition: market.competition,
     difficulty: market.launchDifficulty === 'EASY' ? 'LOW' : market.launchDifficulty === 'MODERATE' ? 'MODERATE' : 'HIGH',
     audience: market.streamingAudience,
@@ -311,7 +319,12 @@ const buildLaunchData = (player: Player): LaunchData => {
     worldAudienceEconomy,
     absoluteWeek,
   );
-  const countries = STREAMING_DAY_ONE_MARKETS.map(market => {
+  /* Every country in the world, not the twenty-four written by hand. Viewers
+     live everywhere, and a picker that offers a quarter of the map leaves the
+     rest grey — which reads as a decision the player made rather than a gap in
+     the catalogue. The authored twenty-four keep their written entries; the
+     rest are derived from the world registry the game already holds. */
+  const countries = STREAMING_WORLD_MARKETS.map(market => {
     const country = buildCountry(market);
     const audience = worldAudienceEconomy.countries[market.id];
     const participation = worldAudienceParticipation.countries[market.id];
@@ -341,13 +354,19 @@ const buildLaunchData = (player: Player): LaunchData => {
       stage: mapClearanceStage(view.stage),
       weeksRemaining: view.remainingWeeks ?? undefined,
       note: view.condition || (view.stage ? `${view.stageLabel}${view.remainingWeeks === null ? '' : ` · ${view.remainingWeeks} weeks remaining`}` : 'Not filed'),
+      /* A payment requirement, and nothing else. REAPPLY used to produce one of
+         these too, which rendered the amber box with a "Send it · 3E" button
+         wired to resolveStreamingMarketRequirement — a service that refuses any
+         operation not awaiting payment, so the button silently did nothing while
+         quoting a cost. A temporarily-rejected filing already has its own
+         "File again · 5E" button, and the note above it explains the cooling
+         period. This field now means one thing: money is owed. */
       requirement: view.actionRequired === 'PAY_REQUIREMENT'
         ? { label: view.condition || 'Additional government filing', cost: view.additionalPayment }
-        : view.actionRequired === 'REAPPLY' ? { label: 'File revised application' } : undefined,
+        : undefined,
     };
   });
-  const catalogue = buildCatalogue(player);
-  const linkedTitleIds = new Set(catalogue.anchors.map(title => title.id));
+  const catalogueBase = buildCatalogue(player);
   const posterSources = [
     ...(player.pastProjects || []),
     ...player.businesses.flatMap(business => business.studioState?.scripts || []),
@@ -357,6 +376,11 @@ const buildLaunchData = (player: Player): LaunchData => {
       ? [[String(source.id), source.customPoster] as const]
       : []),
   );
+  const catalogue = {
+    ...catalogueBase,
+    anchors: catalogueBase.anchors.map(title => ({ ...title, poster: posterById.get(title.id) })),
+  };
+  const linkedTitleIds = new Set(catalogue.anchors.map(title => title.id));
   const previewTitlePool = [
     ...catalogue.anchors.map(title => ({
       id: title.id,
@@ -407,16 +431,15 @@ const buildLaunchData = (player: Player): LaunchData => {
   const forecastAudience = selectedCountries.reduce((sum, country) => sum + country.audience, 0);
   const identPurchases = getStreamingIdentPurchaseView(player);
   const identPaidCost = identPurchases.totalPaid;
-  const isFreeIdentConfirmed = platform.serviceConfiguration.source === 'PLAYER_ACTION'
-    && platform.serviceConfiguration.identPackageId === 'STANDARD'
-    && platform.serviceConfiguration.committedAtAbsoluteWeek !== null;
-  const isPaidIdentConfirmed = Boolean(platform.serviceConfiguration.identPackageId)
-    && identPurchases.purchasedPackageIds.includes(platform.serviceConfiguration.identPackageId!)
-    && platform.serviceConfiguration.committedAtAbsoluteWeek !== null;
+  /* Selecting an ident completes the stage; a paid package is planned here and
+     settled at launch, so this asks whether a choice was made, not whether it
+     has been bought. What it costs and whether it is still outstanding is the
+     launch bill's job — see launchStageSummaries' paymentState. */
   const identCommissioned = Boolean(
-    platform.serviceConfiguration.identPackageId
+    platform.serviceConfiguration.source === 'PLAYER_ACTION'
+    && platform.serviceConfiguration.identPackageId
     && platform.serviceConfiguration.soundIdentKey
-    && (isFreeIdentConfirmed || isPaidIdentConfirmed),
+    && platform.serviceConfiguration.committedAtAbsoluteWeek !== null,
   );
   const blockers: LaunchBlocker[] = [];
   if (!opening.length) blockers.push({ id: 'markets', step: 'markets', text: 'Choose at least one Opening Market.', severity: 'block' });
@@ -655,7 +678,7 @@ function OpeningLaunchExperience(props: Props) {
         const result = resumeStreamingMarketClearance(currentPlayerRef.current, operation.id);
         if (result.changed) update(result.player);
       }}
-      onCommissionIdent={(soundId, packageId, customAudio) => {
+      onSelectIdent={(soundId, packageId, customAudio) => {
         const usesCustomAudio = soundId === 'custom' && Boolean(customAudio);
         const result = saveStreamingServiceIdent(currentPlayerRef.current, {
           soundIdentKey: usesCustomAudio ? 'PULSE' : soundId.toUpperCase() as StreamingSoundIdentKey,
@@ -664,6 +687,14 @@ function OpeningLaunchExperience(props: Props) {
         });
         if (result.changed) update(result.player);
         else if (result.reason === 'INSUFFICIENT_TREASURY') props.onOpenFinance();
+      }}
+      onClearIdent={() => {
+        const result = clearStreamingServiceIdent(currentPlayerRef.current);
+        if (result.changed) update(result.player);
+      }}
+      onClearViewerOffer={() => {
+        const result = clearStreamingStorefrontPlan(currentPlayerRef.current);
+        if (result.changed) update(result.player);
       }}
       onOpenTechnology={props.onOpenTechnology}
       onRemoveCustomIdentAudio={() => {

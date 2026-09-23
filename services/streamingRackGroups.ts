@@ -4,6 +4,7 @@ import type {
     StreamingNetworkNodeRole,
     StreamingRackDuty,
     StreamingRackDutyMigration,
+    StreamingServerTier,
 } from '../types';
 
 export interface StreamingRackDutyRule {
@@ -96,6 +97,14 @@ const validDuty = (value: unknown, fallback: StreamingRackDuty): StreamingRackDu
     STREAMING_RACK_DUTIES.some(rule => rule.id === value) ? value as StreamingRackDuty : fallback
 );
 
+const STREAMING_SERVER_TIERS: StreamingServerTier[] = ['SCOUT', 'WORKHORSE', 'TITAN'];
+
+export const normalizeStreamingServerTier = (value: unknown): StreamingServerTier => (
+    STREAMING_SERVER_TIERS.includes(value as StreamingServerTier)
+        ? value as StreamingServerTier
+        : 'WORKHORSE'
+);
+
 const normalizeMigration = (value: unknown, duty: StreamingRackDuty): StreamingRackDutyMigration | undefined => {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
     const source = value as Record<string, unknown>;
@@ -135,6 +144,7 @@ export const normalizeStreamingRackGroups = (
             name: String(source.name || `${getStreamingRackDutyRule(duty).name} ${index + 1}`).trim().slice(0, 48),
             rackCount,
             duty,
+            serverTier: normalizeStreamingServerTier(source.serverTier),
             migration: normalizeMigration(source.migration, duty),
         } satisfies OwnedStreamingRackGroup];
     });
@@ -145,6 +155,7 @@ export const normalizeStreamingRackGroups = (
             name: `${getStreamingRackDutyRule(duty).name} 1`,
             rackCount: wantedRacks,
             duty,
+            serverTier: 'WORKHORSE',
         }];
     }
     if (remaining > 0) groups[0] = { ...groups[0], rackCount: groups[0].rackCount + remaining };

@@ -13,6 +13,18 @@
 import type { CustomPoster, StreamingPricingPlanColorId } from '../../../types';
 import type { WorldStreamingLaunchPricingForecast } from '../../../services/worldEconomy/worldStreamingPricingForecast';
 import { calculateWorldStreamingCommercialRevenue } from '../../../services/worldEconomy/worldStreamingCommercialEconomy';
+import { compactCount, money } from './format';
+/* The one pricing model. A second, cruder one used to live in this file — 30%
+   of the annual discount and 25% of the intro, blended flat across every plan
+   for ever — and it disagreed with the canonical economy. It only ever ran when
+   the world forecast was absent, which made the disagreement quiet rather than
+   harmless. Both paths read the canonical model now. */
+import {
+  effectiveMonthlyStreamingPlanPrice,
+  STREAMING_ANNUAL_BILLING_SHARE,
+  streamingBillingPathPrice,
+  streamingIntroOfferAppliesTo,
+} from '../../../services/streamingPricingEconomy';
 
 export type LaunchStepId =
   | 'markets' | 'clearance' | 'ident'
@@ -80,6 +92,16 @@ export interface Country {
   name: string;
   code: string;
   region: string;
+  /** The bloc inside that region — the step between a continent and a country.
+      Six regions is the right shape for a map and the wrong shape for a list:
+      Europe holds forty-six countries and Africa fifty-four. */
+  subRegionId?: string;
+  subRegion?: string;
+  /** True when this market's entry was written by hand rather than derived from
+      the world registry. It is also the test for whether there is flag art and a
+      full dossier to show, so it decides which of the two cards this country
+      gets in the picker. */
+  authored?: boolean;
   flagSrc?: string;
   competition: Competition;
   difficulty: Difficulty;
@@ -285,6 +307,8 @@ export interface PricingSettings {
   annualDiscount: number;
   /** Percent off the first three months. */
   introOffer: number;
+  /** Which plan that offer is on. Undefined means all of them. */
+  introOfferPlanId?: string;
   ads: { minutesPerHour: number; cpm: number };
   rentals: { rent: number; buy: number; windowWeeks: number };
   premium: { price: number };
@@ -489,7 +513,11 @@ export interface LaunchHandlers {
   onBeginMarketEntry?: (countryIds: string[], plannedCountryIds?: string[]) => void;
   onSubmitRequirement?: (countryId: string) => void;
   onFileRevisedApplication?: (countryId: string) => void;
-  onCommissionIdent?: (soundId: string, packageId: string, customAudio?: IdentCustomAudio | null) => void;
+  onSelectIdent?: (soundId: string, packageId: string, customAudio?: IdentCustomAudio | null) => void;
+  /** Reaching for a locked option abandons the current choice: the stage ends
+      with nothing selected rather than silently keeping the previous pick. */
+  onClearIdent?: () => void;
+  onClearViewerOffer?: () => void;
   /** Research-gated identity previews lead to the canonical Technology Campus. */
   onOpenTechnology?: () => void;
   onRemoveCustomIdentAudio?: () => void;
@@ -691,6 +719,197 @@ export function launchStageSummaries(data: LaunchData, draft: LaunchDraft): Laun
   ];
 }
 
+/* --- the strip above the footer ------------------------------------------
+   Seven steps, one running total. A money rail used to sit at the top of every
+   screen saying what the studio held and what the plan would cost; it said the
+   same thing on all seven and nothing about the step you were actually on.
+   The strip says both — the step's own number and state, over the same money
+   and the same gauge the rail carried. */
+
+/** Structurally the kit's `StripView`; declared here so the domain module does
+    not have to import a component to describe its own summary. */
+export interface LaunchStripView {
+  subject: string;
+  value: number;
+  format: (value: number) => string;
+  unit?: string;
+  verdict?: { label: string; tone: 'good' | 'warn' | 'bad' | 'flat' };
+  gauge: { value: number; limit: number; label: string };
+}
+
+const whole = (value: number): string => String(Math.round(value));
+
+/** What the service would earn at the prices currently set. Passed in rather
+    than recomputed, because the forecast needs a handler only the wizard holds
+    and two models under one label is how a number starts disagreeing with
+    itself. */
+export interface LaunchEarnings { households: number; monthly: number; yearly: number; position: string }
+
+export function launchStepBar(
+  data: LaunchData,
+  draft: LaunchDraft,
+  stepId: LaunchStepId,
+  earnings?: LaunchEarnings | null,
+): LaunchStripView {
+  const planned = plannedTotal(data, draft);
+  const free = spendable({ ...data.treasury, planned });
+  const stage = launchStageSummaries(data, draft).find((row) => row.id === stepId);
+  const blockers = blockersFor(stepId, data);
+  const blocked = blockers.find((b) => b.severity === 'block');
+  const warned = blockers.find((b) => b.severity === 'warn');
+
+  /* The step's state in five words the Build wizard also uses, so a stage
+     there and a step here read the same. #52 put the blocker's own sentence
+     here instead — but that sentence is already on screen, in the blocker list
+     directly above the strip, and a pill is not the place for prose: *No
+     service ident has been commissioned.* wrapped the state three lines deep
+     and pushed the figure down with it. */
+  const verdict = blocked ? { label: 'Blocked', tone: 'bad' as const }
+    : warned ? { label: 'Needs a look', tone: 'warn' as const }
+      : stage?.done ? { label: 'Settled', tone: 'good' as const }
+        : { label: 'Still open', tone: 'flat' as const };
+
+  /* Money is a condition of every step, not a step of its own — the strip
+     carries it structurally, the same bar on all seven. What belongs to the
+     step is how far the step itself has got, which is what this reads out. */
+  const base = { subject: STEPS.find((step) => step.id === stepId)?.label ?? 'Plan', verdict };
+
+  const chosen = selectedCountries(data, draft);
+  const catalogue = data.catalogue;
+
+  if (stepId === 'markets') {
+    return {
+      ...base,
+      value: chosen.length,
+      format: whole,
+      unit: chosen.length === 1 ? 'market' : 'markets',
+      gauge: {
+        value: chosen.length,
+        limit: Math.max(1, data.countries.length),
+        label: `${chosen.length} of ${data.countries.length} markets chosen`,
+      },
+    };
+  }
+
+  if (stepId === 'clearance') {
+    const filed = chosen.filter((country) => {
+      const state = data.clearance.find((row) => row.countryId === country.id);
+      return state && state.outcome !== 'NOT_FILED';
+    });
+    const cost = (list: Country[]) => list.reduce((sum, c) => sum + c.rightsEstimate + c.complianceCost, 0);
+    const outstanding = cost(chosen) - cost(filed);
+    return {
+      ...base,
+      value: filed.length,
+      format: whole,
+      unit: 'filed',
+      gauge: {
+        value: filed.length,
+        limit: Math.max(1, chosen.length),
+        label: `${filed.length} of ${chosen.length} markets filed`,
+      },
+    };
+  }
+
+  if (stepId === 'ident') {
+    const pack = data.identPackages.find((item) => item.id === draft.packageId);
+    const sound = data.identSounds.find((item) => item.id === draft.soundId);
+    const owned = Boolean(pack && (pack.included || data.ident.purchasedPackageIds.includes(pack.id)));
+    return {
+      ...base,
+      value: pack ? pack.cost : 0,
+      format: money,
+      gauge: {
+        value: data.ident.commissioned ? 1 : 0,
+        limit: 1,
+        label: data.ident.commissioned ? 'Ident commissioned' : 'Ident not commissioned',
+      },
+    };
+  }
+
+  if (stepId === 'storefront') {
+    /* The front page arranges the catalogue, so the number that matters here
+       is how much there is to arrange. */
+    const approach = data.storefronts.find((item) => item.id === draft.storefrontId);
+    return {
+      ...base,
+      value: catalogue.titles,
+      format: whole,
+      unit: catalogue.titles === 1 ? 'title to arrange' : 'titles to arrange',
+      gauge: {
+        value: data.offer.saved ? 1 : 0,
+        limit: 1,
+        label: data.offer.saved && draft.storefrontId === data.offer.storefrontId
+          ? 'Front page saved'
+          : 'Front page not saved yet',
+      },
+    };
+  }
+
+  if (stepId === 'catalogue') {
+    return {
+      ...base,
+      value: catalogue.titles,
+      format: whole,
+      unit: catalogue.titles === 1 ? 'title' : 'titles',
+      gauge: {
+        value: Math.round(catalogue.readiness * 100),
+        limit: 100,
+        label: `${Math.round(catalogue.readiness * 100)}% ready for opening night`,
+      },
+    };
+  }
+
+  if (stepId === 'pricing') {
+    const pricing = draft.pricing ?? data.pricing;
+    const entry = pricing.plans.reduce<number | null>(
+      (low, plan) => (low === null || plan.monthly < low ? plan.monthly : low),
+      null,
+    );
+    /* The step's own figure is what the prices earn, not what the cheapest one
+       costs — the same monthly revenue the page prints at the end of itself. */
+    return {
+      ...base,
+      value: earnings ? earnings.monthly : entry ?? 0,
+      format: money,
+      /* Two characters, because the cell is the same width on every page and
+         "a month" spent three of them on being clipped. */
+      unit: '/mo',
+      gauge: {
+        value: pricing.plans.length,
+        limit: Math.max(1, pricing.plans.length),
+        /* The read on the prices. It was the last line of a panel at the foot
+           of the step; the panel repeated what the strip and the blueprint
+           already said, so it went, and this is the sentence worth keeping. */
+        label: earnings
+          ? `${compactCount(earnings.households)} households · ${money(earnings.yearly)} a year · ${earnings.position}`
+          : `${pricing.plans.length} ${pricing.plans.length === 1 ? 'plan' : 'plans'} priced across ${pricing.streams.length} ${pricing.streams.length === 1 ? 'stream' : 'streams'}`,
+      },
+    };
+  }
+
+  /* The blueprint is the page that judges the whole plan, so its verdict counts
+     what the whole plan still owes — the same blockers the page itself counts,
+     rather than only the ones filed against this last step. A summary page and
+     the strip under it saying different numbers is the worst of both. */
+  const blocking = data.blockers.filter((b) => b.severity === 'block').length;
+  return {
+    ...base,
+    verdict: blocking > 0
+      ? { label: `${blocking} thing${blocking === 1 ? '' : 's'} still blocking`, tone: 'bad' as const }
+      : data.blueprintSaved
+        ? { label: 'Ready to open', tone: 'good' as const }
+        : { label: 'Not saved yet', tone: 'warn' as const },
+    value: planned,
+    format: money,
+    gauge: {
+      value: launchStageSummaries(data, draft).filter((row) => row.done).length,
+      limit: 7,
+      label: `${launchStageSummaries(data, draft).filter((row) => row.done).length} of 7 steps settled`,
+    },
+  };
+}
+
 /** How much of a market no rival holds — the part worth opening for. */
 export function unclaimed(rivals: Share[]): number {
   return Math.max(0, 100 - rivals.reduce((sum, r) => sum + r.share, 0));
@@ -729,6 +948,8 @@ export interface PlanForecast {
   subscribers: number;
   revenuePerSubscriber: number;
   monthly: number;
+  monthlyBillingSubscribers: number;
+  annualBillingSubscribers: number;
 }
 
 export interface StreamForecast {
@@ -788,39 +1009,50 @@ export function forecastPricing(
 
   /* Who subscribes. The cheapest way in, measured against what rivals charge. */
   const entryPrice = plans.length > 0 ? Math.min(...plans.map((p) => p.monthly)) : 0;
+  const openingPriceByPlan = new Map(plans.map(plan => [plan.id, effectiveMonthlyStreamingPlanPrice(
+    plan.monthly, settings.annualDiscount, settings.introOffer, 0,
+    streamingIntroOfferAppliesTo(plan.id, settings.introOfferPlanId),
+  )]));
+  const openingEntryPrice = plans.length > 0 ? Math.min(...openingPriceByPlan.values()) : 0;
   const subReach = plans.length > 0
-    ? market.reachRate * Math.min(1.6, Math.max(0.35, (market.rivalAveragePrice / Math.max(1, entryPrice)) ** 0.55))
+    ? market.reachRate * Math.min(1.6, Math.max(0.35, (market.rivalAveragePrice / Math.max(1, openingEntryPrice)) ** 0.55))
     : 0;
   const cohortPlanSubscribers = new Map<string, number>();
+  const cohortPlanPathSubscribers = new Map<string, number>();
   const signalHouseholds = cohortSignals.reduce((total, cohort) => total + Math.max(0, cohort.households), 0);
   const signalScale = Math.min(1, addressable / Math.max(1, signalHouseholds));
   const cohortSubscribers = plans.length && cohortSignals.length
     ? cohortSignals.reduce((total, cohort) => {
       const budget = Math.max(.5, cohort.monthlyStreamingBudgetPerHousehold);
-      const eligible = plans.filter(plan => plan.monthly <= budget * 1.15);
-      if (!eligible.length) return total;
-      const candidates = eligible;
-      const planScores = candidates.map(plan => {
-        const priceFit = Math.max(.08, 1 - plan.monthly / Math.max(1, budget) * (.42 + cohort.priceSensitivityIndex / 260));
-        return { plan, score: Math.max(.01, planAppeal(plan) * priceFit) };
-      });
-      const bestAppeal = Math.max(0, ...candidates.map(planAppeal));
-      const demandRate = Math.min(.95, Math.max(.002,
-        market.reachRate * (
-          .42
-          + bestAppeal / 34
-          + cohort.entertainmentAppetiteIndex / 180
-          - cohort.piracyTendencyIndex / 310
-          + Math.min(.3, budget / Math.max(1, market.rivalAveragePrice) * .08)
-        ),
-      ));
-      const won = Math.max(0, cohort.households * signalScale * demandRate);
-      const scoreTotal = planScores.reduce((sum, row) => sum + row.score, 0) || 1;
-      planScores.forEach(row => cohortPlanSubscribers.set(
-        row.plan.id,
-        (cohortPlanSubscribers.get(row.plan.id) || 0) + won * row.score / scoreTotal,
-      ));
-      return total + won;
+      return total + (['MONTHLY', 'ANNUAL'] as const).reduce((pathTotal, billingPath) => {
+        const pathPrice = (plan: Plan) => streamingBillingPathPrice(plan.monthly,
+          settings.annualDiscount, settings.introOffer, 0, billingPath,
+          streamingIntroOfferAppliesTo(plan.id, settings.introOfferPlanId));
+        const candidates = plans.filter(plan => pathPrice(plan) <= budget * 1.15);
+        if (!candidates.length) return pathTotal;
+        const planScores = candidates.map(plan => {
+          const priceFit = Math.max(.08, 1 - pathPrice(plan) / Math.max(1, budget) * (.42 + cohort.priceSensitivityIndex / 260));
+          return { plan, score: Math.max(.01, planAppeal(plan) * priceFit) };
+        });
+        const bestAppeal = Math.max(0, ...candidates.map(planAppeal));
+        const demandRate = Math.min(.95, Math.max(.002,
+          market.reachRate * (
+            .42 + bestAppeal / 34 + cohort.entertainmentAppetiteIndex / 180
+            - cohort.piracyTendencyIndex / 310
+            + Math.min(.3, budget / Math.max(1, market.rivalAveragePrice) * .08)
+          ),
+        ));
+        const pathShare = billingPath === 'ANNUAL' ? STREAMING_ANNUAL_BILLING_SHARE : 1 - STREAMING_ANNUAL_BILLING_SHARE;
+        const won = Math.max(0, cohort.households * pathShare * signalScale * demandRate);
+        const scoreTotal = planScores.reduce((sum, row) => sum + row.score, 0) || 1;
+        planScores.forEach(row => {
+          const accounts = won * row.score / scoreTotal;
+          cohortPlanSubscribers.set(row.plan.id, (cohortPlanSubscribers.get(row.plan.id) || 0) + accounts);
+          const key = `${billingPath}:${row.plan.id}`;
+          cohortPlanPathSubscribers.set(key, (cohortPlanPathSubscribers.get(key) || 0) + accounts);
+        });
+        return pathTotal + won;
+      }, 0);
     }, 0)
     : addressable * subReach;
   const resolvedAddressable = worldForecast?.reachableHouseholds ?? addressable;
@@ -835,11 +1067,7 @@ export function forecastPricing(
     : 0;
   const households = subscribers + freeHouseholds;
 
-  const discountDrag = 1
-    - (settings.annualDiscount / 100) * 0.3
-    - (settings.introOffer / 100) * 0.25;
-
-  const pull = plans.map((plan) => ({ plan, weight: planAppeal(plan) / Math.max(1, plan.monthly) ** 0.9 }));
+  const pull = plans.map((plan) => ({ plan, weight: planAppeal(plan) / Math.max(1, openingPriceByPlan.get(plan.id) || 0) ** 0.9 }));
   const totalPull = pull.reduce((sum, p) => sum + p.weight, 0) || 1;
   const planRows: PlanForecast[] = pull.map(({ plan, weight }) => {
     const worldRow = worldForecast?.planAllocations.find(row => row.planId === plan.id);
@@ -849,16 +1077,33 @@ export function forecastPricing(
       subscribers: worldRow.households,
       revenuePerSubscriber: worldRow.households > 0 ? worldRow.monthlySubscriptionRevenue / worldRow.households : 0,
       monthly: worldRow.monthlySubscriptionRevenue,
+      monthlyBillingSubscribers: worldRow.monthlyHouseholds,
+      annualBillingSubscribers: worldRow.annualHouseholds,
     };
     const share = (weight / totalPull) * 100;
     const rawCohortSubscribers = cohortPlanSubscribers.get(plan.id);
     const cohortTotal = Array.from(cohortPlanSubscribers.values()).reduce((sum, value) => sum + value, 0);
-    const subs = rawCohortSubscribers === undefined || cohortTotal <= 0
-      ? subscribers * (share / 100)
-      : subscribers * rawCohortSubscribers / cohortTotal;
+    const subs = cohortSignals.length && cohortTotal > 0
+      ? subscribers * (rawCohortSubscribers || 0) / cohortTotal
+      : subscribers * (share / 100);
     const resolvedShare = subscribers > 0 ? subs / subscribers * 100 : 0;
-    const perSub = plan.monthly * discountDrag;
-    return { plan, share: resolvedShare, subscribers: subs, revenuePerSubscriber: perSub, monthly: subs * perSub };
+    /* What a household on this plan actually pays this month: the annual cohort
+       at its discount, the monthly cohort at the introductory one while the
+       thirteen weeks run. The wizard previews opening night, so the offer is
+       live — week nought. */
+    const monthlyRaw = cohortPlanPathSubscribers.get(`MONTHLY:${plan.id}`) || 0;
+    const annualRaw = cohortPlanPathSubscribers.get(`ANNUAL:${plan.id}`) || 0;
+    const pathTotal = monthlyRaw + annualRaw;
+    const annualBillingSubscribers = cohortSignals.length && pathTotal > 0
+      ? subs * annualRaw / pathTotal : subs * STREAMING_ANNUAL_BILLING_SHARE;
+    const monthlyBillingSubscribers = subs - annualBillingSubscribers;
+    const introApplies = streamingIntroOfferAppliesTo(plan.id, settings.introOfferPlanId);
+    const monthlyPrice = streamingBillingPathPrice(plan.monthly, settings.annualDiscount, settings.introOffer, 0, 'MONTHLY', introApplies);
+    const annualPrice = streamingBillingPathPrice(plan.monthly, settings.annualDiscount, settings.introOffer, 0, 'ANNUAL', introApplies);
+    const monthly = monthlyBillingSubscribers * monthlyPrice + annualBillingSubscribers * annualPrice;
+    return { plan, share: resolvedShare, subscribers: subs,
+      revenuePerSubscriber: subs > 0 ? Math.round(monthly / subs * 100) / 100 : 0,
+      monthly, monthlyBillingSubscribers, annualBillingSubscribers };
   });
 
   const streams: StreamForecast[] = [];
@@ -909,9 +1154,20 @@ export function forecastPricing(
 
   const monthlyRevenue = streams.reduce((sum, stream) => sum + stream.monthly, 0);
   const subscriptionMonthlyRevenue = streams.find(stream => stream.id === 'subs')?.monthly || 0;
+  /* A year is not twelve of this month: the introductory offer runs thirteen
+     weeks and then the price snaps back. The world forecast says so when it is
+     there, and the same canonical function says so when it is not. */
+  const fallbackFirstYearSubscriptions = planRows.reduce((sum, row) => {
+    const applies = streamingIntroOfferAppliesTo(row.plan.id, settings.introOfferPlanId);
+    const intro = streamingBillingPathPrice(row.plan.monthly, settings.annualDiscount, settings.introOffer, 0, 'MONTHLY', applies);
+    const mature = streamingBillingPathPrice(row.plan.monthly, settings.annualDiscount, settings.introOffer, 13, 'MONTHLY', applies);
+    const annual = streamingBillingPathPrice(row.plan.monthly, settings.annualDiscount, settings.introOffer, 0, 'ANNUAL', applies);
+    return sum + row.monthlyBillingSubscribers * (intro * 3 + mature * 9)
+      + row.annualBillingSubscribers * annual * 12;
+  }, 0);
   const yearlyRevenue = worldForecast
     ? worldForecast.firstYearSubscriptionRevenue + (monthlyRevenue - subscriptionMonthlyRevenue) * 12
-    : monthlyRevenue * 12;
+    : fallbackFirstYearSubscriptions + (monthlyRevenue - subscriptionMonthlyRevenue) * 12;
   const resolvedRivalPrice = worldForecast?.rivalMedianEntryPrice || market.rivalAveragePrice;
 
   return {

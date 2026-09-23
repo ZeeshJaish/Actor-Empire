@@ -272,11 +272,15 @@ export const createExactTemplateDraft = (
   };
 };
 
-const demandFor = (data: BuildData, draft: BuildDraft) => {
-  const services = serviceForecast(data, draft);
+export const openingNightDemand = (data: BuildData, services: ReturnType<typeof serviceForecast>) => {
   const likely = Math.max(0, finiteMoney(data.openingDemand?.likely ?? services.reduce((sum, service) => sum + service.peak, 0)));
   const high = Math.max(likely, finiteMoney(data.openingDemand?.high ?? likely * 1.55));
-  return { likely, high, services };
+  return { likely, high };
+};
+
+const demandFor = (data: BuildData, draft: BuildDraft) => {
+  const services = serviceForecast(data, draft);
+  return { ...openingNightDemand(data, services), services };
 };
 
 const quoteShape = (data: BuildData, draft: BuildDraft, racks: number, cities: number) => {

@@ -15,6 +15,7 @@ import { getStreamingCountryMarketProfile, normalizeStreamingDayOneMarketIds } f
 import { getAbsoluteWeek } from './legacyLogic';
 import { compactOwnedStreamingPlatformForPersistence, normalizeOwnedStreamingPlatformState } from './ownedStreamingPlatform';
 import { spendPlayerEnergy } from './premiumLogic';
+import { quoteStreamingMarketFilingEnergy } from './streamingMarketFilingQuote';
 import {
     activateStreamingMarketOperation,
     advanceStreamingMarketOperation,
@@ -28,7 +29,6 @@ import {
 /** Filing is a founder action, not a weekly chore. Government review then
     advances automatically with the game clock. Follow-up paperwork costs less
     attention than opening or reopening a complete country file. */
-export const STREAMING_MARKET_FILING_ENERGY_PER_COUNTRY = 5;
 export const STREAMING_MARKET_REQUIREMENT_ENERGY = 3;
 export const STREAMING_MARKET_REAPPLICATION_ENERGY = 5;
 
@@ -147,7 +147,7 @@ export const beginStreamingMarketClearance = (player: Player, countryIds: string
     const targets = platform.marketOperations.filter(operation => operation.entryKind === entryKind && Boolean(operation.countryId && selected.has(operation.countryId)) && ['PLANNED', 'AWAITING_FUNDING'].includes(operation.status) && operation.clearance?.outcome !== 'ADDITIONAL_REQUIREMENT');
     if (!platform.identity || !targets.length) return { player, changed: false, reason: platform.identity ? 'ALREADY_STARTED' : 'INVALID_STATE', shortfall: 0, amount: 0 };
     const amount = targets.reduce((sum, operation) => sum + operation.plannedCosts.total, 0);
-    const energyCost = targets.length * STREAMING_MARKET_FILING_ENERGY_PER_COUNTRY;
+    const energyCost = quoteStreamingMarketFilingEnergy(targets.length);
     if (player.energy.current < energyCost) {
         return { player, changed: false, reason: 'INSUFFICIENT_ENERGY', shortfall: energyCost - player.energy.current, amount, energyCost };
     }

@@ -12,6 +12,7 @@ import type { NetworkState } from './StreamingNetworkExperience';
 import type { AudienceState, RecObjective } from './StreamingAudienceExperience';
 import type { BoardroomState } from './StreamingBoardroomExperience';
 import type { AppState } from './StreamingViewerExperience';
+import { readNetworkSignals } from '../../services/streamingNetworkSignals';
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const hueOf = (key: string) => [...key].reduce((sum, character) => ((sum * 31) + character.charCodeAt(0)) % 360, 53);
@@ -94,11 +95,65 @@ export const createCanonicalNetworkState = (player: Player): NetworkState => {
       : platform.infrastructureSetup
         ? 'operational' as const
         : 'maintenance' as const;
+  /* --- where the rooms you built actually reach ---------------------------
+
+     This listed six services, one per rack duty, and went red for the duty
+     with no rooms — the right idea for a world where a player chose duties.
+     Since #99 nobody does; every room expands into all six, so that reading
+     could only ever fire by rounding, on a network too small to put a rack in
+     each. Three signals now, from the same reach model the Build wizard's map
+     is painted with: how much of your markets' audience is inside any ring,
+     how much of it is close enough for a smooth stream, and how many markets
+     fall between the two. That is geometry. The night's load is the video
+     delivery line beside them, from the weekly loop as before. */
+  const facilities = platform.infrastructureSetup?.facilities || [];
+  const hasNetwork = facilities.length > 0;
+  const signals = readNetworkSignals(
+    facilities.map(facility => ({ cityId: facility.cityId, racks: facility.installedRacks, listingId: facility.lease?.listingId })),
+    getOwnedPlatformPackageCountryIds(platform),
+    /* The ladder position and the standard's clock, as the wizard reads them. */
+    { fibre: platform.fibre, platformWeeks: Math.max(0, absoluteWeek - (platform.serviceStandardFromWeek ?? absoluteWeek)) },
+  );
+  type CompStatus = 'operational' | 'degraded' | 'outage' | 'maintenance';
+
+  /* Nothing commissioned yet is not the same as everything broken, and it is
+     certainly not ninety days of green. */
+  const unknownHistory = new Array(30).fill(3);
+  const historyFor = (componentStatus: CompStatus) => {
+    if (!hasNetwork) return unknownHistory;
+    if (componentStatus === 'operational') return history;
+    return history.map(day => Math.max(day, componentStatus === 'outage' ? 2 : 1));
+  };
+  /* A share graded the way a status page grades: nine in ten is operational,
+     six in ten is degraded, less than that is an outage. */
+  const gradeShare = (share: number): CompStatus => (
+    !hasNetwork ? 'maintenance' : share >= 0.9 ? 'operational' : share >= 0.6 ? 'degraded' : 'outage'
+  );
+  const reachStatus = gradeShare(signals.reached);
+  const servedStatus = gradeShare(signals.served);
+  const regionsStatus: CompStatus = !hasNetwork ? 'maintenance'
+    : signals.dark.length > 0 ? 'outage'
+      : signals.thin.length > 0 ? 'degraded'
+        : 'operational';
+  const crisisStatus = (crisis: boolean): CompStatus => (!hasNetwork ? 'maintenance' : crisis ? 'degraded' : status);
+  const playback = latest?.operations?.playbackSuccessRate
+    ?? platform.infrastructureSetup?.reliabilityTarget
+    ?? 99.9;
+  const marketsFine = signals.markets.length - signals.thin.length - signals.dark.length;
+
   const components = [
-    { id: 'DELIVERY', name: 'Video delivery network', status, uptime: latest?.operations?.playbackSuccessRate ?? platform.infrastructureSetup?.reliabilityTarget ?? 0, history },
-    { id: 'ACCOUNTS', name: 'Accounts and profiles', status: activeCrisis?.type === 'ACCOUNT_BREACH' ? 'degraded' as const : status === 'outage' ? 'degraded' as const : status, uptime: Math.max(0, (latest?.operations?.playbackSuccessRate ?? 99) - .08), history },
-    { id: 'RECOMMENDATIONS', name: 'Recommendations', status: activeCrisis?.type === 'RECOMMENDATION_BACKLASH' ? 'degraded' as const : 'operational' as const, uptime: 99.92, history },
-    { id: 'RIGHTS', name: 'Rights and publishing', status: activeCrisis?.type === 'RIGHTS_COMPLIANCE' ? 'degraded' as const : 'operational' as const, uptime: 99.96, history },
+    { id: 'REACH', name: 'Reach', status: reachStatus, uptime: signals.reached * 100, measure: 'of your markets reached', history: historyFor(reachStatus) },
+    { id: 'SERVED', name: 'Served well', status: servedStatus, uptime: signals.served * 100, measure: 'served to the standard', history: historyFor(servedStatus) },
+    {
+      id: 'REGIONS', name: 'Thin regions', status: regionsStatus,
+      uptime: signals.markets.length > 0 ? (marketsFine / signals.markets.length) * 100 : 0,
+      measure: `of markets served well · ${signals.thin.length} thin · ${signals.dark.length} dark`,
+      history: historyFor(regionsStatus),
+    },
+    { id: 'DELIVERY', name: 'Video delivery', status: hasNetwork ? status : 'maintenance' as const, uptime: hasNetwork ? playback : 0, history: hasNetwork ? history : unknownHistory },
+    { id: 'ACCOUNTS', name: 'Accounts and payments', status: crisisStatus(activeCrisis?.type === 'ACCOUNT_BREACH' || status === 'outage'), uptime: hasNetwork ? Math.max(0, playback - .08) : 0, history: historyFor(crisisStatus(activeCrisis?.type === 'ACCOUNT_BREACH')) },
+    { id: 'RECOMMENDATIONS', name: 'Recommendations', status: crisisStatus(activeCrisis?.type === 'RECOMMENDATION_BACKLASH'), uptime: hasNetwork ? 99.92 : 0, history: historyFor(crisisStatus(activeCrisis?.type === 'RECOMMENDATION_BACKLASH')) },
+    { id: 'RIGHTS', name: 'Rights and publishing', status: crisisStatus(activeCrisis?.type === 'RIGHTS_COMPLIANCE'), uptime: hasNetwork ? 99.96 : 0, history: historyFor(crisisStatus(activeCrisis?.type === 'RIGHTS_COMPLIANCE')) },
   ];
   const placements = platform.infrastructureSetup?.networkPlacements || [];
   const weightedRacks = placements.reduce((sum, placement) => (

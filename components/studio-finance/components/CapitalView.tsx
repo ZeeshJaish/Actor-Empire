@@ -14,7 +14,7 @@
    founder gives up, what it costs every week from now on.
    ========================================================================== */
 
-import { forwardRef, useMemo, useRef, useState, type ReactNode } from 'react';
+import { forwardRef, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { StudioFinanceData, StudioFinanceHandlers } from '../finance/types';
 import { ipoProgress } from '../finance/derive';
 import { money, pct } from '../finance/format';
@@ -264,16 +264,59 @@ const Route = forwardRef<HTMLLIElement, RouteProps>(function Route(
 
 /* --- founder injection ------------------------------------------------------- */
 
+/** The input is whole-dollar cash, not a percentage or a rounded slider step. */
+export function parseFounderCapitalAmount(raw: string, max: number): number | null {
+  const text = raw.trim().replace(/^\$/, '');
+  if (!/^(?:\d+|\d{1,3}(?:,\d{3})+)$/.test(text)) return null;
+  const digits = text.replaceAll(',', '');
+  const amount = Number(digits);
+  if (!Number.isFinite(amount) || !Number.isInteger(amount) || amount <= 0 || amount > max) return null;
+  // Player cash can exceed MAX_SAFE_INTEGER. Accept only whole-dollar values
+  // that survive the game's Number representation without changing digits.
+  return BigInt(amount) === BigInt(digits) ? amount : null;
+}
+
+const FOUNDER_SLIDER_TICKS = 1000;
+
+export function founderCapitalSliderAmount(max: number, position: number): number {
+  if (!Number.isFinite(max) || max <= 0 || !Number.isFinite(position)) return 0;
+  const tick = Math.max(0, Math.min(FOUNDER_SLIDER_TICKS, Math.round(position)));
+  return tick === FOUNDER_SLIDER_TICKS
+    ? Math.floor(max)
+    : Math.round((Math.floor(max) * tick) / FOUNDER_SLIDER_TICKS);
+}
+
+export function founderCapitalSliderPosition(amount: number, max: number): number {
+  if (!Number.isFinite(amount) || !Number.isFinite(max) || max <= 0) return 0;
+  return Math.round(Math.max(0, Math.min(1, amount / max)) * FOUNDER_SLIDER_TICKS);
+}
+
 function InjectionSheet({ open, data, onClose, onConfirm }: {
   open: boolean;
   data: StudioFinanceData;
   onClose: () => void;
   onConfirm: (amount: number) => void;
 }) {
-  const max = data.capital.founderPersonalCash;
-  const [amount, setAmount] = useState(() => roundStep(max * 0.25));
+  const max = Math.max(0, Math.floor(data.capital.founderPersonalCash));
+  const amountFor = (fraction: number) => max > 0
+    ? Math.min(max, Math.max(1, roundStep(max * fraction)))
+    : 0;
+  const [rawAmount, setRawAmount] = useState(() => String(amountFor(0.25)));
+  const wasOpen = useRef(open);
+  useEffect(() => {
+    if (open && !wasOpen.current) {
+      setRawAmount(String(amountFor(0.25)));
+    }
+    wasOpen.current = open;
+  }, [open, max]);
 
-  const capped = Math.min(amount, max);
+  const amount = parseFounderCapitalAmount(rawAmount, max);
+  const previewAmount = amount ?? 0;
+  const amountError = amount !== null || max <= 0 ? null
+    : /^\$?(?:\d+|\d{1,3}(?:,\d{3})+)$/.test(rawAmount.trim())
+      && Number(rawAmount.replaceAll(/[$,]/g, '')) > max
+      ? 'That exceeds your personal balance.'
+      : 'Enter a whole-dollar amount above $0.';
 
   return (
     <Sheet
@@ -285,34 +328,55 @@ function InjectionSheet({ open, data, onClose, onConfirm }: {
         <button
           type="button"
           className="sf-btn sf-btn--primary"
-          disabled={capped <= 0}
-          onClick={() => onConfirm(capped)}
+          disabled={amount === null}
+          onClick={() => { if (amount !== null) onConfirm(amount); }}
         >
-          Transfer {money(capped)}
+          {amount === null ? 'Enter a valid amount' : `Transfer ${money(amount)}`}
         </button>
       }
     >
-      <p className="sf-amount">{money(capped)}</p>
+      <input
+        className="sf-amount-input"
+        type="text"
+        inputMode="numeric"
+        autoComplete="off"
+        enterKeyHint="done"
+        spellCheck={false}
+        aria-label="Founder capital amount"
+        aria-invalid={amountError ? true : undefined}
+        aria-describedby="sf-founder-amount-help"
+        value={rawAmount}
+        onFocus={(event) => event.currentTarget.select()}
+        onChange={(event) => setRawAmount(event.target.value)}
+        onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }}
+      />
+      <p id="sf-founder-amount-help" className={amountError ? 'sf-amount-help is-error' : 'sf-amount-help'}>
+        {amountError || (amount !== null
+          ? `Exact transfer: $${amount.toLocaleString('en-US')} · tap to edit`
+          : 'No personal cash available to transfer.')}
+      </p>
       <input
         className="sf-slider"
         type="range"
         min={0}
-        max={Math.max(1, max)}
-        step={Math.max(1, roundStep(max / 40))}
-        value={capped}
-        onChange={(e) => setAmount(Number(e.target.value))}
+        max={FOUNDER_SLIDER_TICKS}
+        step={1}
+        value={founderCapitalSliderPosition(previewAmount, max)}
+        onChange={(e) => setRawAmount(String(founderCapitalSliderAmount(max, Number(e.target.value))))}
         aria-label="Injection amount"
+        aria-valuetext={money(previewAmount)}
+        disabled={max <= 0}
       />
       <div className="sf-quick">
         {[0.25, 0.5, 0.75, 1].map((f) => (
-          <button key={f} type="button" className="sf-chip" onClick={() => setAmount(roundStep(max * f))}>
+          <button key={f} type="button" className="sf-chip" onClick={() => setRawAmount(String(amountFor(f)))}>
             {f === 1 ? 'Max' : `${f * 100}%`}
           </button>
         ))}
       </div>
 
       <Preview
-        receives={capped}
+        receives={previewAmount}
         founderFrom={data.capital.ownership.find((o) => o.kind === 'founder')?.pct ?? 100}
         founderTo={data.capital.ownership.find((o) => o.kind === 'founder')?.pct ?? 100}
         weekly={0}
@@ -320,8 +384,8 @@ function InjectionSheet({ open, data, onClose, onConfirm }: {
       />
 
       <p className="sf-eyebrow sf-block-head">After the transfer</p>
-      <Row label="Your personal balance" value={money(max - capped)} tone={max - capped < max * 0.2 ? 'warn' : 'flat'} />
-      <Row label="Company cash" value={money(data.cash + capped)} tone="good" />
+      <Row label="Your personal balance" value={money(max - previewAmount)} tone={max - previewAmount < max * 0.2 ? 'warn' : 'flat'} />
+      <Row label="Company cash" value={money(data.cash + previewAmount)} tone="good" />
     </Sheet>
   );
 }
@@ -362,6 +426,6 @@ function Preview({ receives, founderFrom, founderTo, weekly, control }: {
 
 function roundStep(value: number): number {
   if (value <= 0) return 0;
-  const magnitude = 10 ** Math.max(4, Math.floor(Math.log10(value)) - 1);
+  const magnitude = 10 ** Math.max(0, Math.floor(Math.log10(value)) - 1);
   return Math.round(value / magnitude) * magnitude;
 }

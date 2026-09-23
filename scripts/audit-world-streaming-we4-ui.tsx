@@ -24,7 +24,13 @@ player.ownedStreamingPlatform.serviceConfiguration.pricing = {
     ],
 };
 const migrated = migratePlayerSave(player);
-const market = getStreamingAudienceMarket(migrated);
+const liveMarket = getStreamingAudienceMarket(migrated);
+assert.equal(liveMarket.payingHouseholds, migrated.world.worldStreamingCustomers!.global.payingHouseholds,
+    'a current customer ledger, when present, owns the live paying-household headline');
+const market = getStreamingAudienceMarket({
+    ...migrated,
+    world: { ...migrated.world, worldStreamingCustomers: undefined },
+});
 const state: AudienceState = {
     live: false, metrics: [], trend: [], trendLabel: 'Audience', chart: [], attribution: [], campaigns: [],
     objective: 'BALANCED', regions: [], market,

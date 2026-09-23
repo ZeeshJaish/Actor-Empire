@@ -1,0 +1,502 @@
+/* ============================================================================
+   THE KIT — styles for the family's shared parts.
+
+   Loads after tokens.css and studio-finance.css in both wizards. Everything in
+   here is a token; there is no colour that is not one. Anton is the display
+   face and it is a single weight, so nothing here asks for bold.
+   ========================================================================== */
+
+/* --- headline --------------------------------------------------------------
+   The stage's question, set large enough to be the first thing seen. It lives
+   at the top of the scrolling body rather than in the fixed chrome, so it
+   gives the stage a title without taking the viewport for the whole stage. */
+.kit-headline {
+  display: flex;
+  flex-direction: column;
+  /* The state sits on the question, not a paragraph away from it. */
+  gap: 10px;
+  /* A masthead: the rule under it is where the page's chrome ends and the
+     page's work begins. */
+  padding-bottom: var(--sf-3);
+  border-bottom: 1px solid var(--sf-line-hair);
+}
+/* Step on the left, state on the right, one line. */
+.kit-headline-top { display: flex; align-items: center; justify-content: space-between; gap: var(--sf-3); }
+.kit-step-mark { display: inline-flex; min-width: 0; align-items: baseline; gap: 5px; font-family: var(--sf-font-num); }
+.kit-step-mark b { flex: none; font-size: var(--sf-t-3); font-weight: 700; letter-spacing: 0.02em; color: var(--sf-fg-max); }
+.kit-step-mark > span { flex: none; font-size: var(--sf-t-1); color: var(--sf-fg-5); }
+.kit-step-mark em {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-left: 4px;
+  font-family: var(--sf-font-ui);
+  font-style: normal;
+  font-size: var(--sf-t-1);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--sf-fg-4);
+}
+.kit-headline h2 {
+  font-family: var(--sf-font-display);
+  font-weight: 400;
+  /* 28px is a lot of condensed capitals on a phone: three lines of shouting
+     before the first control. It gives way to the width it has. */
+  font-size: clamp(23px, 6.2vw, var(--sf-t-7));
+  line-height: 1.04;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--sf-fg-max);
+}
+/* A pill, not a band. Without a width of its own it stretched the tone wash
+   across the whole column and read as an alert bar. */
+.kit-state {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 10px 4px 8px;
+  border-radius: 999px;
+  background: var(--sf-raised);
+  font-size: var(--sf-t-1);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--sf-fg-4);
+}
+.kit-state i { flex: none; width: 7px; aspect-ratio: 1; border-radius: 50%; background: var(--sf-fg-5); }
+.kit-headline.is-good .kit-state { color: var(--sf-good); background: var(--sf-good-wash); }
+.kit-headline.is-good .kit-state i { background: var(--sf-good); }
+.kit-headline.is-warn .kit-state { color: var(--sf-warn); background: var(--sf-warn-wash); }
+.kit-headline.is-warn .kit-state i { background: var(--sf-warn); }
+.kit-headline.is-bad .kit-state { color: var(--sf-bad); background: var(--sf-bad-wash); }
+.kit-headline.is-bad .kit-state i { background: var(--sf-bad); }
+
+/* --- figure ---------------------------------------------------------------- */
+.kit-figure {
+  font-family: var(--sf-font-display);
+  font-weight: 400;
+  font-size: var(--sf-t-6);
+  line-height: 1;
+  letter-spacing: 0.01em;
+  color: var(--sf-fg-max);
+  font-variant-numeric: tabular-nums;
+}
+.kit-figure s { margin-left: 2px; text-decoration: none; font-family: var(--sf-font-ui); font-size: var(--sf-t-1); font-weight: 600; letter-spacing: 0.08em; color: var(--sf-fg-5); }
+
+/* --- hud -------------------------------------------------------------------
+   Figures in one strip, no card. The eye reads across it like an instrument
+   panel, which is what it is. */
+.kit-hud { display: flex; flex-direction: column; gap: var(--sf-3); }
+/* Labels and figures line up across the columns (#122). A label that wrapped
+   to two lines — PLANS ON SALE — pushed its own figure down while its
+   neighbours' stayed up, so a row of three read as a staircase. Subgrid puts
+   every label on one row and every figure on the next. */
+.kit-hud-figures {
+  display: grid;
+  grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  gap: 5px var(--sf-2);
+  padding-bottom: var(--sf-3);
+  border-bottom: 1px solid var(--sf-line-hair);
+}
+.kit-hud-figures > span {
+  display: grid;
+  grid-row: span 2;
+  grid-template-rows: subgrid;
+  align-content: start;
+  min-width: 0;
+}
+.kit-hud-figures em {
+  align-self: end;
+  font-style: normal;
+  font-size: var(--sf-t-1);
+  line-height: 1.25;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--sf-fg-5);
+}
+.kit-hud-figures .kit-figure { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* --- verdict --------------------------------------------------------------- */
+.kit-verdict { display: flex; align-items: center; flex-wrap: wrap; gap: 5px 9px; font-size: var(--sf-t-2); line-height: 1.4; color: var(--sf-fg-4); }
+.kit-verdict b {
+  flex: none;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: var(--sf-t-1);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.kit-verdict.is-good b { color: var(--sf-good); background: var(--sf-good-wash); }
+.kit-verdict.is-warn b { color: var(--sf-warn); background: var(--sf-warn-wash); }
+.kit-verdict.is-bad b { color: var(--sf-bad); background: var(--sf-bad-wash); }
+.kit-verdict.is-flat b { color: var(--sf-fg-3); background: var(--sf-raised); }
+.kit-verdict span { min-width: 0; }
+
+/* --- dial ------------------------------------------------------------------
+   One track, one thumb: moving between options is one continuous motion. The
+   thumb's width is a fraction of the track's padding box, so it lands exactly
+   over its segment at any width. */
+.kit-dial { display: flex; flex-direction: column; gap: var(--sf-2); }
+.kit-dial-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sf-3); }
+.kit-dial-head em { font-style: normal; font-size: var(--sf-t-1); font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--sf-fg-5); }
+.kit-dial-head b { font-size: var(--sf-t-1); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; color: var(--sf-brand-on); }
+.kit-dial-track {
+  position: relative;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  padding: 3px;
+  border-radius: var(--sf-r-chip);
+  background: var(--sf-canvas);
+}
+.kit-dial-thumb {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc((100% - 6px) / var(--kit-n));
+  transform: translateX(calc(var(--kit-i) * 100%));
+  border-radius: calc(var(--sf-r-chip) - 3px);
+  background: var(--sf-brand-wash);
+  box-shadow: inset 0 0 0 1px var(--sf-brand-line);
+  transition: transform var(--sf-med) var(--sf-ease);
+}
+/* `.sf button` zeroes padding at 0-1-1, so a bare class loses. */
+.sf .kit-dial-opt {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  min-height: 36px;
+  padding: 6px 8px;
+  text-align: center;
+  line-height: 1.2;
+  font-size: var(--sf-t-2);
+  font-weight: 600;
+  color: var(--sf-fg-4);
+  transition: color var(--sf-fast) var(--sf-ease);
+}
+.sf .kit-dial-opt.is-on { color: var(--sf-fg-max); }
+.kit-dial-why { font-size: var(--sf-t-2); line-height: 1.45; color: var(--sf-fg-3); }
+.kit-dial-effects { display: flex; flex-wrap: wrap; font-size: var(--sf-t-1); color: var(--sf-fg-5); }
+.kit-dial-effects span:not(:last-child)::after { content: '\00B7'; padding: 0 6px; opacity: 0.55; }
+
+/* --- tile ------------------------------------------------------------------
+   A decision as an object: solid surface, a picture, a name, one line. The
+   selected one lifts onto the brand wash and gets a hairline of brand. */
+.sf .kit-tile {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--sf-3);
+  width: 100%;
+  min-height: 64px;
+  padding: var(--sf-3);
+  border-radius: var(--sf-r-card);
+  background: var(--sf-raised);
+  text-align: left;
+  transition: background var(--sf-fast) var(--sf-ease), box-shadow var(--sf-fast) var(--sf-ease), transform var(--sf-fast) var(--sf-ease);
+}
+.sf .kit-tile:active { transform: scale(0.99); }
+.sf .kit-tile.is-on { background: var(--sf-brand-wash); box-shadow: inset 0 0 0 1px var(--sf-brand-line); }
+.sf .kit-tile:disabled { opacity: 0.45; cursor: not-allowed; }
+.kit-tile-art { display: grid; flex: none; place-items: center; width: 44px; height: 44px; border-radius: var(--sf-r-chip); background: var(--sf-surface); color: var(--sf-fg-2); }
+.kit-tile.is-on .kit-tile-art { color: var(--sf-brand-on); }
+.kit-tile-art svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.kit-tile-body { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 3px; }
+.kit-tile-body b { font-size: var(--sf-t-4); font-weight: 700; color: var(--sf-fg-max); }
+.kit-tile-body em { font-style: normal; font-size: var(--sf-t-2); line-height: 1.4; color: var(--sf-fg-4); }
+.kit-tile.is-on .kit-tile-body em { color: var(--sf-fg-3); }
+.kit-tile-badge { flex: none; font-family: var(--sf-font-display); font-weight: 400; font-size: var(--sf-t-5); letter-spacing: 0.02em; color: var(--sf-fg-max); }
+.kit-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sf-2); }
+.kit-tiles.is-one { grid-template-columns: 1fr; }
+
+/* --- bars ------------------------------------------------------------------ */
+.kit-bars { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sf-2); }
+.kit-bars > span { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.kit-bars em { font-style: normal; font-size: var(--sf-t-1); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--sf-fg-5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kit-bars s { text-decoration: none; font: 600 var(--sf-t-3)/1 var(--sf-font-num); color: var(--sf-fg-max); }
+.kit-bars i { display: block; height: 4px; overflow: hidden; border-radius: 2px; background: var(--sf-line); }
+.kit-bars i b { display: block; height: 100%; border-radius: inherit; background: var(--sf-fg-3); transition: width var(--sf-slow) var(--sf-ease); }
+.kit-bars .is-good i b { background: var(--sf-good); }
+.kit-bars .is-warn i b { background: var(--sf-warn); }
+.kit-bars .is-bad i b { background: var(--sf-bad); }
+
+/* --- presence -------------------------------------------------------------- */
+.kit-presence {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sf-3);
+  padding: var(--sf-5) var(--sf-4) var(--sf-4);
+  border-radius: var(--sf-r-card);
+  background: var(--sf-raised);
+  text-align: center;
+}
+.kit-presence p { max-width: 30ch; font-size: var(--sf-t-3); line-height: 1.45; color: var(--sf-fg-3); }
+.kit-presence .sf-btn { margin-top: var(--sf-1); }
+.kit-presence-team { display: flex; align-items: flex-end; gap: 6px; height: 46px; }
+.kit-engineer {
+  width: 36px;
+  height: 40px;
+  overflow: visible;
+  animation: kit-idle 3.2s var(--sf-ease) infinite;
+  animation-delay: calc(var(--i) * 420ms);
+}
+.kit-engineer:nth-child(2) { width: 40px; height: 44px; }
+.kit-engineer-body { fill: var(--sf-overlay); }
+.kit-engineer-head { fill: var(--sf-fg-5); }
+.kit-engineer-cap { fill: var(--sf-brand-on); }
+@keyframes kit-idle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+/* On the job: the idle becomes work, and a pulse beside the line says so. */
+.kit-presence.is-working .kit-engineer { animation-duration: .9s; }
+.kit-presence.is-working .kit-engineer:nth-child(2) { animation-delay: .15s; }
+.kit-presence.is-working .kit-engineer:nth-child(3) { animation-delay: .3s; }
+.kit-presence-pulse { display: inline-block; width: 8px; aspect-ratio: 1; margin: 0 8px -1px 0; border-radius: 50%; background: var(--sf-brand-on); animation: kit-pulse 1s var(--sf-ease) infinite; }
+@keyframes kit-pulse { 0%, 100% { opacity: .35; transform: scale(.8); } 50% { opacity: 1; transform: scale(1); } }
+
+/* --- slot ------------------------------------------------------------------
+   A word in a sentence that is also a control. Solid pill so it reads as a
+   button inside prose, with a caret that turns when its panel is open. */
+.kit-sentence { font-size: var(--sf-t-5); line-height: 1.7; color: var(--sf-fg-2); }
+.sf .kit-slot {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0 1px;
+  padding: 1px 9px 1px 10px;
+  border-radius: 999px;
+  background: var(--sf-brand-wash);
+  box-shadow: inset 0 0 0 1px var(--sf-brand-line);
+  color: var(--sf-fg-max);
+  font-weight: 700;
+  line-height: 1.5;
+  vertical-align: baseline;
+  transition: background var(--sf-fast) var(--sf-ease);
+}
+.sf .kit-slot.is-open { background: var(--sf-brand); color: var(--sf-brand-ink); box-shadow: none; }
+.kit-slot::after {
+  content: '';
+  width: 6px;
+  height: 6px;
+  margin-top: -3px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
+  opacity: 0.7;
+  transition: transform var(--sf-fast) var(--sf-ease);
+}
+.kit-slot.is-open::after { transform: rotate(225deg); margin-top: 3px; }
+.kit-slot-panel { padding: var(--sf-2) 0 0; animation: kit-panel-in 0.22s var(--sf-ease); }
+@keyframes kit-panel-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+
+/* --- chips -----------------------------------------------------------------
+   Quick picks for a figure — magnitudes, presets — so a billion is one tap. */
+.kit-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.sf .kit-chip {
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: var(--sf-raised);
+  color: var(--sf-fg-3);
+  font-family: var(--sf-font-num);
+  font-size: var(--sf-t-2);
+  font-weight: 600;
+  transition: background var(--sf-fast) var(--sf-ease), color var(--sf-fast) var(--sf-ease);
+}
+.sf .kit-chip.is-on { background: var(--sf-brand-wash); box-shadow: inset 0 0 0 1px var(--sf-brand-line); color: var(--sf-fg-max); }
+
+/* --- section title ---------------------------------------------------------
+   The one place a small label is still allowed: naming a list. Plain weight,
+   sentence case, no tracking — it is a title, not an eyebrow. */
+.kit-title { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sf-2); }
+.kit-title b { font-size: var(--sf-t-4); font-weight: 700; color: var(--sf-fg); }
+.kit-title em { font-style: normal; font-family: var(--sf-font-num); font-size: var(--sf-t-1); color: var(--sf-fg-5); }
+
+@media (max-width: 359px) {
+  .kit-hud-figures { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kit-headline h2 { font-size: var(--sf-t-6); }
+}
+
+/* --- figure tones ---------------------------------------------------------- */
+.kit-figure.is-good { color: var(--sf-good); }
+.kit-figure.is-warn { color: var(--sf-warn); }
+.kit-figure.is-bad { color: var(--sf-bad); }
+
+/* --- split -----------------------------------------------------------------
+   One whole as one bar, its parts solid. A limit is a line across it and what
+   lies beyond is dimmed: the whole is drawn in full, the line says how much
+   of it is covered. A swatch with the same tone names the part elsewhere. */
+.kit-split { display: flex; flex-direction: column; gap: 6px; }
+.kit-split-bar { position: relative; display: flex; gap: 2px; height: 14px; overflow: hidden; border-radius: 7px; background: var(--sf-canvas); }
+.kit-split-bar > b { display: block; flex: none; height: 100%; min-width: 2px; background: var(--sf-fg-5); transition: width var(--sf-slow) var(--sf-ease); }
+.kit-split-beyond { position: absolute; top: 0; right: 0; bottom: 0; border-left: 2px solid var(--sf-bad); background: var(--sf-void); opacity: 0.62; }
+.kit-split-limit { display: block; font-style: normal; font-size: var(--sf-t-1); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--sf-bad); }
+.kit-split-limit.is-late { text-align: right; }
+.kit-swatch { display: inline-block; flex: none; width: 10px; height: 10px; border-radius: 3px; background: var(--sf-fg-5); }
+.kit-split-bar > b.is-brand, .kit-swatch.is-brand { background: var(--sf-brand); }
+.kit-split-bar > b.is-gold, .kit-swatch.is-gold { background: var(--sf-gold); }
+.kit-split-bar > b.is-good, .kit-swatch.is-good { background: var(--sf-good); }
+.kit-split-bar > b.is-warn, .kit-swatch.is-warn { background: var(--sf-warn); }
+.kit-split-bar > b.is-bad, .kit-swatch.is-bad { background: var(--sf-bad); }
+
+/* --- step ------------------------------------------------------------------
+   Minus, the value, plus. Sized to the room composer's rack stepper so the
+   two read as one control. */
+.kit-step { display: inline-flex; flex: none; align-items: center; gap: 6px; }
+.kit-step > b { min-width: 40px; font-family: var(--sf-font-display); font-weight: 400; font-size: var(--sf-t-6); line-height: 1; letter-spacing: 0.01em; text-align: center; color: var(--sf-fg-max); font-variant-numeric: tabular-nums; }
+.sf .kit-step-btn { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--sf-raised); color: var(--sf-fg-max); font-size: var(--sf-t-5); font-weight: 600; line-height: 1; transition: background var(--sf-fast) var(--sf-ease), transform var(--sf-fast) var(--sf-ease); }
+.sf .kit-step-btn:active { transform: scale(0.92); }
+.sf .kit-step-btn[aria-disabled="true"],
+.sf .kit-step-btn:disabled { opacity: 0.3; }
+
+/* --- the strip above the footer ------------------------------------------
+   The pricing step's own grammar, moved to the bottom and given to every page:
+   a labelled figure, a bar, a labelled figure, a caret. It was a card, then a
+   four-row block, then an object with a mark and a filled button — each louder
+   than the thing it was summarising. One line now, and the rest one tap up. */
+.kit-strip {
+  position: relative;
+  margin: 0 var(--sf-3) var(--sf-2);
+  /* The platform's own colour holds the line, the way it does on the pricing
+     bar and the market rows this borrowed its shape from. */
+  border: 1px solid var(--sf-brand-line);
+  border-radius: var(--sf-r-card);
+  background: var(--sf-canvas);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.45);
+  transition: border-color var(--sf-med) var(--sf-ease);
+}
+.kit-strip.is-over { border-color: var(--sf-bad-line); }
+
+/* A grid, not a flex row: the bar is the same width on every page and the two
+   cells are always equal halves of what is left. As a flex row the bar took
+   whatever the two labels did not want, so Network's short subject gave it a
+   long bar and Market clearance's long one squeezed it to a stub — eleven
+   pages, eleven different bars. */
+.sf .kit-strip-face {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 26% minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sf-3);
+  width: 100%;
+  padding: 10px var(--sf-4);
+  text-align: left;
+}
+.kit-strip-cell { display: flex; min-width: 0; flex-direction: column; gap: 1px; overflow: hidden; }
+.kit-strip-cell.is-end { align-items: flex-end; }
+.kit-strip-cell em,
+.kit-strip-cell .kit-figure,
+.kit-strip-cell b { overflow: hidden; text-overflow: ellipsis; }
+.kit-strip-cell em {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-style: normal;
+  font-size: var(--sf-t-1);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--sf-fg-5);
+}
+/* The page's state is a dot — the smallest thing that can carry a colour. */
+.kit-strip-cell em i { flex: none; width: 6px; aspect-ratio: 1; border-radius: 50%; background: var(--sf-fg-5); }
+.kit-strip[data-tone='good'] .kit-strip-cell em i { background: var(--sf-good); }
+.kit-strip[data-tone='warn'] .kit-strip-cell em i { background: var(--sf-warn); }
+.kit-strip[data-tone='bad'] .kit-strip-cell em i { background: var(--sf-bad); }
+.kit-strip-cell .kit-figure,
+.kit-strip-cell b {
+  font-family: var(--sf-font-num);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--sf-t-5);
+  font-weight: 600;
+  letter-spacing: 0;
+  white-space: nowrap;
+  color: var(--sf-fg-max);
+}
+.kit-strip-cell .kit-figure s { margin-left: 3px; font-size: var(--sf-t-1); font-weight: 600; letter-spacing: 0.06em; }
+.kit-strip-cell b.is-short { color: var(--sf-bad-tint); }
+
+/* The bar is the budget: what the plan costs against what the studio can still
+   spend. Over the end of it, the overspend is hatched. */
+.kit-strip-bar {
+  display: flex;
+  gap: 2px;
+  height: 6px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--sf-line-hair);
+}
+.kit-strip-measure-wrap { display: flex; min-width: 0; flex-direction: column; gap: 5px; }
+.kit-strip-measure { color: var(--sf-fg-5); font: 700 10px/1.1 var(--sf-font-ui); letter-spacing: .05em; text-align: center; white-space: normal; }
+.kit-strip-bar i { display: block; height: 100%; transition: width var(--sf-med) var(--sf-ease); }
+.kit-strip-within { background: var(--sf-fg-4); }
+.kit-strip:not(.is-over) .kit-strip-within { background: var(--sf-brand-on); }
+.kit-strip.is-over .kit-strip-within { background: var(--sf-bad); }
+.kit-strip-past { background: repeating-linear-gradient(45deg, var(--sf-bad) 0 4px, var(--sf-bad-deep) 4px 8px); }
+.kit-strip-caret { flex: none; font-size: var(--sf-t-2); color: var(--sf-fg-4); }
+
+/* Opened, it reads out the rest and offers the two ways in. It grows upward,
+   over the page, so the line you tapped stays under your thumb. */
+.kit-strip-more {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: var(--sf-3) var(--sf-4);
+  border-bottom: 1px solid var(--sf-line-hair);
+}
+.kit-strip-read {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 3px 9px;
+  font-family: var(--sf-font-num);
+  font-size: var(--sf-t-1);
+  line-height: 1.5;
+  color: var(--sf-fg-4);
+}
+.kit-strip-read b {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  font-family: var(--sf-font-ui);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--sf-fg-3);
+}
+.kit-strip-read b i { flex: none; width: 6px; aspect-ratio: 1; border-radius: 50%; background: currentColor; }
+.kit-strip-read b.is-good { color: var(--sf-good); }
+.kit-strip-read b.is-warn { color: var(--sf-warn); }
+.kit-strip-read b.is-bad { color: var(--sf-bad); }
+.kit-strip-read span { min-width: 0; }
+
+.kit-strip-ways { display: flex; gap: 7px; }
+.sf .kit-strip-ways button {
+  flex: 1;
+  min-height: 34px;
+  padding: 0 var(--sf-3);
+  border: 1px solid var(--sf-line);
+  border-radius: var(--sf-r-chip);
+  background: var(--sf-raised);
+  font-size: var(--sf-t-1);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sf-fg-2);
+  transition: border-color var(--sf-fast) var(--sf-ease), background var(--sf-fast) var(--sf-ease);
+}
+.sf .kit-strip-ways button:hover { border-color: var(--sf-line-strong); color: var(--sf-fg-max); }
+.sf .kit-strip-ways button.is-primary { border-color: transparent; background: var(--sf-brand); color: var(--sf-brand-ink); }
+.sf .kit-strip-ways button.is-primary:hover { background: rgba(var(--sf-brand-rgb), 0.86); }
+/* Quiet until you hover it: undoing an hour of decisions should not look
+   like the obvious thing to press. */
+.sf .kit-strip-ways button.is-danger { flex: 0 1 auto; color: var(--sf-fg-4); }
+.sf .kit-strip-ways button.is-danger:hover { border-color: var(--sf-bad-line); color: var(--sf-bad-tint); }

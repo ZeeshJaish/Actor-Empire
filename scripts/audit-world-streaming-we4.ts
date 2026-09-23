@@ -139,7 +139,7 @@ assert.deepEqual(migratePlayerSave(migrated).world.worldStreamingCompetition, mi
 const gameLoopSource = readFileSync(resolve(process.cwd(), 'services/gameLoop.ts'), 'utf8');
 const competitionStage = gameLoopSource.indexOf("emitLoopStage('world_streaming_competition_start'");
 const industryDoneStage = gameLoopSource.indexOf("emitLoopStage('streaming_industry_done'");
-const ownedStreamingEconomy = gameLoopSource.indexOf('const ownedStreamingResult = processOwnedStreamingPlatformWeek');
+const ownedStreamingEconomy = gameLoopSource.indexOf('ownedStreamingResult = processOwnedStreamingPlatformWeek(nextPlayer);');
 assert.ok(industryDoneStage >= 0 && competitionStage > industryDoneStage && competitionStage < ownedStreamingEconomy, 'WE4 runs after AI industry progression and before owned streaming economics');
 
 const weeklyLoopSource = readFileSync(resolve(process.cwd(), 'services/streamingWeeklyLoop.ts'), 'utf8');

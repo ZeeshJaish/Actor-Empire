@@ -59,7 +59,7 @@ assert(
     getRecommendedStreamingCoreCityIds(['IN', 'ZA'], 2).join(',') === 'BOM,CPT',
     'The later Build should receive an editable cross-region city recommendation from the selected markets.',
 );
-assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 26, 'The fixed founding model should survive the current schema migration.');
+assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 27, 'The fixed founding model should survive the current schema migration.');
 assert(STREAMING_FOUNDING_STEP_COUNT === 3, 'Phase 3 should contain identity, promise, and fixed incorporation review.');
 assert(
     !validateStreamingFoundingDraft(defaultDraft, 500_000_000).valid,
@@ -354,7 +354,9 @@ assert(!transplantSource.includes("step === 'REGIONS'"), 'Day-One Markets must n
 assert(!journeySource.includes('createDefaultStreamingInfrastructureDraft'), 'Incorporation must not create an infrastructure draft automatically.');
 assert(!journeySource.includes('saveStreamingInfrastructureDraft'), 'Incorporation must not save infrastructure planning automatically.');
 assert(!journeySource.includes('<Activation'), 'The live founding handoff must not fake configured territories, devices, DRM, or an ident.');
-assert(journeySource.includes("onOpenHeadquarters('FINANCE')"), 'The completed filing should enter the unfunded pre-launch headquarters through Finance.');
+assert(journeySource.includes("getStreamingPostIncorporationDestination = (): 'HOME' => 'HOME'")
+    && journeySource.includes('onOpenHeadquarters(getStreamingPostIncorporationDestination())'),
+    'Incorporation should enter the platform dashboard; optional capital injection belongs to HQ onboarding.');
 assert(!transplantSource.includes('LAUNCH DATA CENTRE'), 'Founding must not purchase or limit a data-centre location.');
 assert(greenlightSource.includes('PRODUCTION_LOCATIONS_BY_CONTINENT'), 'Greenlight should use the same shared location catalog as streaming.');
 assert(npcSource.includes('STREAMING_EXECUTIVE_NPCS') && npcSource.includes("occupation: 'EXECUTIVE'"), 'Streaming executives should live in the canonical NPC database.');

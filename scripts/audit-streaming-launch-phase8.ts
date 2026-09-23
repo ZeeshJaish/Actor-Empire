@@ -220,7 +220,7 @@ const createFixture = (): Player => {
 };
 
 const migrated = normalizeOwnedStreamingPlatformState({ schemaVersion: 7 }, 'phase8-migration');
-assert(migrated.schemaVersion === 26 && migrated.launchCommit === null, 'Schema v7 saves should migrate with a safe empty launch commit.');
+assert(migrated.schemaVersion === 27 && migrated.launchCommit === null, 'Schema v7 saves should migrate with a safe empty launch commit.');
 
 const productionBlocked: Player = {
     ...createFixture(),

@@ -25,6 +25,8 @@
 import css from './OneSheet.module.css';
 import { cx } from './cx';
 import React from 'react';
+import type { CustomPoster } from '../types';
+import { CustomPosterImage } from '../components/CustomPosterImage';
 
 export type Motif = 'beam' | 'horizon' | 'door' | 'bloom' | 'grid' | 'arch' | 'stack' | 'orbit';
 
@@ -48,7 +50,8 @@ export const Poster: React.FC<{
   size?: 'xs' | 'sm' | 'md' | 'lg';
   /** a collection shows a fan of spines rather than one sheet */
   stack?: number;
-}> = ({ id, title, genre, hue, year, size = 'md', stack }) => {
+  poster?: CustomPoster;
+}> = ({ id, title, genre, hue, year, size = 'md', stack, poster }) => {
   const motif = motifFor(genre);
   /* deterministic wobble so two thrillers do not draw the same poster */
   const seed = [...id].reduce((a, ch) => a + ch.charCodeAt(0), 0);
@@ -65,7 +68,7 @@ export const Poster: React.FC<{
   if (cur) lines.push(cur);
   const shown = lines.slice(0, 3);
 
-  return (
+  const fallback = (
     <div className={cx(css.po, css['po-' + (size)])}>
       <svg className={css.poart} viewBox="0 0 100 150" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
         <defs>
@@ -177,6 +180,7 @@ export const Poster: React.FC<{
       {stack && stack > 1 && <span className={css.postack}>{stack}</span>}
     </div>
   );
+  return poster ? <CustomPosterImage poster={poster} alt="" className={cx(css.po, css['po-' + size])} fallback={fallback} /> : fallback;
 };
 
 /* ============================================================

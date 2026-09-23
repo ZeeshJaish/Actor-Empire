@@ -216,5 +216,9 @@ export const Boardroom = ({
     if (id === 'legacy') return onOpenLegacy?.();
   };
 
-  return <BoardroomHub data={data} onBack={onBack} onOpenSection={openSection} />;
+  return (
+    <div data-epx-root>
+      <BoardroomHub data={data} onBack={onBack} onOpenSection={openSection} />
+    </div>
+  );
 };

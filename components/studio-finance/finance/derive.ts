@@ -202,6 +202,7 @@ export interface Earner {
   name: string;
   amount: number;
   posterSeed?: string;
+  poster?: TitleFinance['poster'];
 }
 
 /** The strongest earning titles. Revenue streams are a different cut of the
@@ -215,6 +216,7 @@ export function topEarners(titles: TitleFinance[], count = 3): Earner[] {
       name: t.name,
       amount: titleTotals(t).gross,
       posterSeed: t.posterSeed ?? t.id,
+      poster: t.poster,
     }))
     .sort((a, b) => b.amount - a.amount)
     .slice(0, count);

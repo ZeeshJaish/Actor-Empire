@@ -67,6 +67,8 @@ import { getWorldStreamingPlayerOutcome } from './worldEconomy/worldStreamingCom
 import { getWorldStreamingPlayerCustomerOutcome } from './worldEconomy/worldStreamingCustomers';
 import { getWorldStreamingPlayerViewingOutcome } from './worldEconomy/worldStreamingViewing';
 import { processOwnedStreamingLaunchMarketingWeek } from './streamingLaunchMarketingLifecycle';
+import { fibreWeeklyHoldCost } from './streamingFibreLadder';
+import { completeDueStreamingInfrastructureExpansion } from './streamingInfrastructure';
 import {
     calculateStreamingFundingPressure,
     getStreamingBlendedMonthlyPrice,
@@ -421,7 +423,30 @@ export const processOwnedStreamingPlatformWeek = (
     player = privateOffers.player;
     const launchMarketing = processOwnedStreamingLaunchMarketingWeek(player);
     player = launchMarketing.player;
-    const normalizedPlatform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+    const infrastructureCompletion = completeDueStreamingInfrastructureExpansion(player);
+    player = infrastructureCompletion.player;
+    let normalizedPlatform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+
+    /* Start the service-standard clock the first week anyone looks.
+
+       The standard a market is graded against climbs with this number, and for
+       a platform founded this week it is the founding week either way. The
+       reason it is stamped rather than derived from the launch commit is the
+       career that is already twenty years deep: deriving it would regrade every
+       market it holds against two decades of drift it never lived through, and
+       take away ground the player earned under the old rules. Nobody loses
+       anything; the climb simply starts from here. */
+    if (normalizedPlatform.serviceStandardFromWeek === undefined) {
+        normalizedPlatform = { ...normalizedPlatform, serviceStandardFromWeek: absoluteWeek };
+        player = {
+            ...player,
+            ownedStreamingPlatform: {
+                ...player.ownedStreamingPlatform,
+                serviceStandardFromWeek: absoluteWeek,
+            },
+        };
+    }
+
     const launchCommit = normalizedPlatform.launchCommit;
     const weekKey = `owned-streaming-week:${absoluteWeek}`;
     if (
@@ -432,7 +457,10 @@ export const processOwnedStreamingPlatformWeek = (
     ) {
         return {
             player,
-            processed: auctionsChanged || privateOffers.resolvedOfferIds.length > 0 || launchMarketing.processed,
+            processed: auctionsChanged
+                || privateOffers.resolvedOfferIds.length > 0
+                || launchMarketing.processed
+                || infrastructureCompletion.changed,
             snapshot: null,
         };
     }
@@ -762,11 +790,17 @@ export const processOwnedStreamingPlatformWeek = (
         const perAccessAccount = policy === 'AGGRESSIVE' ? .025 : policy === 'STANDARD' ? .012 : .005;
         return fixed + worldCustomerOutcome.accessLoadAccounts * perAccessAccount;
     })()) : 0;
+    /* What the fibre costs to keep. Levels are bought once and held weekly, so
+       "how high can I afford to sit" is a live question rather than a number
+       you max out and forget. The generation itself carries no hold cost — that
+       is what the research program's own `weeklyOperatingCost` is for. */
+    const fibreHoldCost = roundMoney(fibreWeeklyHoldCost(platform.fibre));
     const marketCosts = calculateStreamingMarketOperatingCosts(platform, totalOperatingRevenue);
     const marketPolicyCost = roundMoney(marketCosts.marketPolicyCost);
     const marketOperatingCost = roundMoney(marketCosts.marketOperatingCost);
     const totalCashCost = roundMoney(
         partnerRevenueShareCost
+        + fibreHoldCost
         + infrastructureCost
         + leadershipCost
         + financingCost

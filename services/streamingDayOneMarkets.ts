@@ -1,5 +1,11 @@
 import { PRODUCTION_LOCATION_CATALOG } from './productionLocations';
+import { getStreamingMarketSubRegion } from './streamingMarketSubRegions';
+import {
+    WORLD_COUNTRY_DEFINITIONS,
+    type WorldCountryDefinition,
+} from './worldEconomy/worldCountryRegistry';
 import type {
+    WorldCountryDevelopmentProfile,
     OwnedStreamingCountryLanguageShare,
     OwnedStreamingCountryMarketProfile,
     OwnedStreamingMarketCostBreakdown,
@@ -232,7 +238,136 @@ export const STREAMING_DAY_ONE_MARKETS: StreamingDayOneMarket[] = [
     { id: 'NZ', country: 'New Zealand', regionId: 'OCEANIA', streamingAudience: 4_000_000, annualGrowthPercent: 4, growth: 'MATURE', openingRightsEstimate: 2_000_000, languages: ['English', 'Māori'], competition: 'BUSY', launchDifficulty: 'EASY', localizationNote: 'English launch; Māori support builds local trust.', marketNote: 'Small, stable audience that pairs naturally with Australia.', recommendedCityId: 'AKL', rivals: [netflix(28), prime(19), disney(14), apple(7)] },
 ];
 
-const MARKET_BY_ID = new Map(STREAMING_DAY_ONE_MARKETS.map(market => [market.id, market]));
+/* ============================================================================
+   THE REST OF THE WORLD
+
+   `STREAMING_DAY_ONE_MARKETS` is twenty-four countries, written by hand, and it
+   stays twenty-four: rights compatibility, the AI platforms' rosters, bidding
+   pools and catalogue packages all iterate it, and quietly growing it to a
+   hundred and ninety-seven would resize every one of them.
+
+   But viewers live in all of those countries, and a picker that offers
+   twenty-four of them has to leave the other 173 grey on a world map — which
+   reads as a decision the player made rather than a gap in the data.
+
+   So the world is derived, not authored. Every country in the world registry
+   that has no hand-written entry gets one built from what the registry already
+   knows about it — its population, its development profile, its languages —
+   and the twenty-four authored markets are laid over the top unchanged. One
+   catalogue, two tiers, no second registry to keep in sync.
+
+   What a derived market is NOT is a market with invented facts. Its audience
+   is its real population times the penetration its profile implies, calibrated
+   against the authored twenty-four; its rights cost is per-viewer at the same
+   rate its profile pays elsewhere. Nothing here asserts anything the registry
+   does not already say.
+   ========================================================================== */
+
+/** Calibrated off the authored twenty-four: share of a country's population
+    that subscribes to anything, by how developed the registry says it is. */
+const PROFILE_PENETRATION: Record<WorldCountryDevelopmentProfile, number> = {
+    ADVANCED: 0.68, DEVELOPED: 0.52, EMERGING: 0.26, LOW: 0.1,
+};
+/** Opening rights per viewer, same source: the authored markets pay between
+    $0.105 and $0.50 a head and the spread tracks the profile almost exactly. */
+const PROFILE_RIGHTS_PER_VIEWER: Record<WorldCountryDevelopmentProfile, number> = {
+    ADVANCED: 0.34, DEVELOPED: 0.24, EMERGING: 0.17, LOW: 0.12,
+};
+const PROFILE_GROWTH: Record<WorldCountryDevelopmentProfile, number> = {
+    ADVANCED: 3.2, DEVELOPED: 6.4, EMERGING: 11, LOW: 15,
+};
+const PROFILE_GROWTH_BAND: Record<WorldCountryDevelopmentProfile, StreamingMarketGrowth> = {
+    ADVANCED: 'MATURE', DEVELOPED: 'STEADY', EMERGING: 'FAST', LOW: 'FAST',
+};
+const PROFILE_LOCALIZATION: Record<WorldCountryDevelopmentProfile, string> = {
+    ADVANCED: 'Subtitles and dubs expected from day one.',
+    DEVELOPED: 'Subtitles expected; dubbing on the biggest titles.',
+    EMERGING: 'Subtitles carry most of the catalogue.',
+    LOW: 'Subtitles only, and a light catalogue to start.',
+};
+
+const derivedMarketNote = (
+    country: WorldCountryDefinition,
+    audience: number,
+): string => {
+    const size = audience >= 40_000_000 ? 'A large audience'
+        : audience >= 8_000_000 ? 'A mid-sized audience'
+            : audience >= 1_000_000 ? 'A small audience' : 'A very small audience';
+    const habit = country.developmentProfile === 'ADVANCED' ? 'already paying for several services'
+        : country.developmentProfile === 'DEVELOPED' ? 'used to paying for one or two services'
+            : country.developmentProfile === 'EMERGING' ? 'new to paying for streaming and growing fast'
+                : 'mostly watching on mobile, with little paid habit yet';
+    return `${size} ${habit}. ${country.languages.length > 1 ? `${country.languages.length} languages to serve.` : `${country.languages[0]}-speaking.`}`;
+};
+
+/** A light rival roster. The authored markets name who actually owns attention
+    there; a derived one can only say that the global services got here first,
+    and by how much its profile suggests. */
+const derivedRivals = (profile: WorldCountryDevelopmentProfile): StreamingMarketRival[] => (
+    profile === 'ADVANCED' ? [
+        { id: 'NETFLIX', name: 'Netflix', watchSharePercent: 31 },
+        { id: 'AMAZON_PRIME', name: 'Amazon Prime Video', watchSharePercent: 17 },
+        { id: 'DISNEY_PLUS', name: 'Disney+', watchSharePercent: 12 },
+    ] : profile === 'DEVELOPED' ? [
+        { id: 'NETFLIX', name: 'Netflix', watchSharePercent: 26 },
+        { id: 'AMAZON_PRIME', name: 'Amazon Prime Video', watchSharePercent: 11 },
+    ] : profile === 'EMERGING' ? [
+        { id: 'NETFLIX', name: 'Netflix', watchSharePercent: 17 },
+        { id: 'YOUTUBE', name: 'YouTube', watchSharePercent: 14 },
+    ] : [
+        { id: 'YOUTUBE', name: 'YouTube', watchSharePercent: 12 },
+    ]
+);
+
+const deriveMarket = (country: WorldCountryDefinition): StreamingDayOneMarket => {
+    const profile = country.developmentProfile;
+    const audience = Math.max(20_000, Math.round(country.baselinePopulation * PROFILE_PENETRATION[profile]));
+    const competition: StreamingMarketCompetition = profile === 'ADVANCED' ? 'BUSY'
+        : profile === 'DEVELOPED' && audience >= 20_000_000 ? 'BUSY' : 'OPEN';
+    /* Effort tracks the work, not the prize: a big country with many languages
+       is hard wherever it sits, a two-million-viewer island is not. */
+    const effort = (audience >= 40_000_000 ? 2 : audience >= 6_000_000 ? 1 : 0)
+        + (country.languages.length >= 3 ? 1 : 0)
+        + (profile === 'LOW' ? 1 : 0);
+    const launchDifficulty: StreamingMarketDifficulty = effort >= 3 ? 'HARD' : effort >= 1 ? 'MODERATE' : 'EASY';
+    return {
+        id: country.id,
+        country: country.name,
+        regionId: country.regionId as StreamingDayOneRegionId,
+        streamingAudience: audience,
+        annualGrowthPercent: PROFILE_GROWTH[profile],
+        growth: PROFILE_GROWTH_BAND[profile],
+        openingRightsEstimate: Math.round(audience * PROFILE_RIGHTS_PER_VIEWER[profile]),
+        languages: country.languages,
+        competition,
+        launchDifficulty,
+        localizationNote: PROFILE_LOCALIZATION[profile],
+        marketNote: derivedMarketNote(country, audience),
+        recommendedCityId: getStreamingMarketSubRegion(country.id)?.servedFromCityId || 'LDN',
+        rivals: derivedRivals(profile),
+    };
+};
+
+/** Every country in the world as a market: the twenty-four authored ones as
+    written, and the rest derived from the registry. This is what the opening
+    footprint picker offers. Iterating systems keep using
+    `STREAMING_DAY_ONE_MARKETS` and keep their current scale. */
+export const STREAMING_WORLD_MARKETS: StreamingDayOneMarket[] = (() => {
+    const authored = new Map(STREAMING_DAY_ONE_MARKETS.map(market => [market.id, market]));
+    return WORLD_COUNTRY_DEFINITIONS.map(country => authored.get(country.id) || deriveMarket(country));
+})();
+
+/** True when this market's entry was written by hand — which is also the test
+    for whether it has flag art, a rival roster and a real dossier to show. */
+export const isAuthoredStreamingMarket = (id: string): boolean => (
+    STREAMING_DAY_ONE_MARKETS.some(market => market.id === String(id || '').trim().toUpperCase())
+);
+
+/* Lookups answer for the whole world; iteration still answers for the twenty-
+   four. Everything a player can select flows through this map — saving a plan,
+   summarising a footprint, normalising ids off a save — so widening it here is
+   what makes the other 173 countries real rather than decorative. */
+const MARKET_BY_ID = new Map(STREAMING_WORLD_MARKETS.map(market => [market.id, market]));
 const VALID_CITY_IDS = new Set(PRODUCTION_LOCATION_CATALOG.map(city => city.id));
 
 export const normalizeStreamingDayOneMarketIds = (value: unknown, limit = 40): string[] => Array.from(new Set(

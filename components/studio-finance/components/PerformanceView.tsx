@@ -17,7 +17,7 @@ import type { ResolvedCut } from '../finance/derive';
 import { TITLE_STATUS_COPY, marketTotals, periodLabel, rankTitles, sourceShare } from '../finance/derive';
 import { compactCount, money, pct, signedPct } from '../finance/format';
 import { FlagField, flagAccent } from './FlagField';
-import { Poster } from './Poster';
+import { StreamingTitleArt } from './StreamingTitleArt';
 import { Segmented, Tag, TrendChip } from './ui';
 
 type Lens = 'titles' | 'sources' | 'markets';
@@ -86,7 +86,7 @@ export function PerformanceView({ cut, period, onOpenTitle, onOpenMarket }: Prop
               <li key={title.id}>
                 <button type="button" className="sf-title-card" onClick={() => onOpenTitle(title.id)}>
                   <span className="sf-title-rank">{i + 1}</span>
-                  <Poster seed={title.posterSeed ?? title.id} size={46} />
+                  <StreamingTitleArt id={title.posterSeed ?? title.id} title={title.name} genre={title.format} poster={title.poster} size={46} />
                   <span className="sf-title-body">
                     <span className="sf-title-line">
                       <span className="sf-title-name">{title.name}</span>

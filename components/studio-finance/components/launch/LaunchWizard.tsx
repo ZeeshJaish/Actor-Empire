@@ -15,11 +15,12 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { LaunchData, LaunchDraft, LaunchHandlers, LaunchStepId } from '../../finance/launch';
-import { STEPS, blockersFor, launchStageSummaries, plannedTotal, resolveLaunchDraftAfterDetour, selectedCountries, shortfall, spendable } from '../../finance/launch';
+import { STEPS, blockersFor, forecastPricing, launchStageSummaries, launchStepBar, plannedTotal, resolveLaunchDraftAfterDetour, selectedCountries, shortfall, spendable } from '../../finance/launch';
 import type { LinkedBudgetSummary } from '../../finance/budgetLinks';
 import { brandVars } from '../../finance/brand';
 import { money } from '../../finance/format';
-import { Row, Sheet, useCountUp } from '../ui';
+import { Row, Sheet } from '../ui';
+import { PlanStrip } from '../kit';
 import { LaunchBudgetContent } from '../BudgetSheets';
 import { StepMarkets } from './StepMarkets';
 import { StepClearance } from './StepClearance';
@@ -31,6 +32,7 @@ import { StepBlueprint } from './StepBlueprint';
 import '../../styles/tokens.css';
 import '../../styles/studio-finance.css';
 import '../../styles/launch.css';
+import '../../styles/kit.css';
 
 export interface LaunchWizardProps extends LaunchHandlers {
   data: LaunchData;
@@ -46,6 +48,11 @@ export function LaunchWizard({ data, initialStep = 'markets', initialDraft, init
   const [openSheet, setOpenSheet] = useState<'money' | 'plan' | null>(initialSheet ?? null);
   const [draft, setDraft] = useState<LaunchDraft>(() => resolveLaunchDraftAfterDetour({
       selectedCountryIds: data.selectedCountryIds,
+      /* No default selection. An unconfigured platform carries no ident, and the
+         wizard must not invent one: the step previews a kit so you can see what
+         it is, but nothing is chosen until the player chooses it. Seeding these
+         once made the stage complete itself on arrival, which reported a
+         decision nobody had taken. */
       soundId: data.ident.soundId,
       packageId: data.ident.packageId,
       customAudio: data.ident.customAudio,
@@ -75,14 +82,26 @@ export function LaunchWizard({ data, initialStep = 'markets', initialDraft, init
   const blockers = blockersFor(stepId, data);
   const stageRows = useMemo(() => launchStageSummaries(data, draft), [data, draft]);
 
-  /* The plan is the number that moves while the player works, so it counts
-     rather than jumping — the rail is the wizard's heartbeat. */
-  const plannedShown = useCountUp(planned, 420);
+  /* What the prices currently set would earn. Computed here, from the same
+     inputs and the same function the Pricing step uses, so the strip and the
+     page cannot print two different numbers under one label. */
+  const earnings = useMemo(() => {
+    const settings = draft.pricing ?? data.pricing;
+    const forecast = forecastPricing(
+      settings,
+      chosen.reduce((sum, country) => sum + country.addressableHouseholds, 0),
+      data.market,
+      chosen.flatMap((country) => country.pricingCohorts || []),
+      handlers.onForecastPricing?.(settings, chosen.map((country) => country.id)) ?? null,
+    );
+    return { households: forecast.households, monthly: forecast.monthlyRevenue, yearly: forecast.yearlyRevenue, position: forecast.position };
+  }, [data, draft.pricing, chosen, handlers.onForecastPricing]);
+
+  /* What the strip above the footer says on this step: the step's own number
+     and state, over the same plan-against-money bar on all seven. */
+  const bar = useMemo(() => launchStepBar(data, draft, stepId, earnings), [data, draft, stepId, earnings]);
 
   const scale = Math.max(1, free, planned);
-  const fill = (Math.min(planned, free) / scale) * 100;
-  const over = (Math.max(0, planned - free) / scale) * 100;
-  const budgetMark = (free / scale) * 100;
 
   const patch = (next: Partial<LaunchDraft>) => {
     const updated = { ...draft, ...next };
@@ -124,7 +143,14 @@ export function LaunchWizard({ data, initialStep = 'markets', initialDraft, init
           <i style={{ width: `${(index / (STEPS.length - 1)) * 100}%` }} />
         </span>
         {STEPS.map((s, i) => {
-          const state = i < index ? 'done' : i === index ? 'now' : 'ahead';
+          /* A tick means finished, not merely walked past. Moving on from a
+             stage that still owes something — a storefront previewed but never
+             saved because it is research-locked, say — leaves it open behind
+             you rather than ticking it. `blockersFor` is the same source the
+             stage itself uses to say what is outstanding, so the rail and the
+             stage can never disagree. */
+          const outstanding = i < index && blockersFor(s.id, data).length > 0;
+          const state = i < index ? (outstanding ? 'todo' : 'done') : i === index ? 'now' : 'ahead';
           const flagged = data.blockers.some((b) => b.step === s.id && b.severity === 'block');
           return (
             <button
@@ -143,51 +169,6 @@ export function LaunchWizard({ data, initialStep = 'markets', initialDraft, init
           );
         })}
       </nav>
-
-      {/* --- the money rail --------------------------------------------------
-          Studio money on the left, what the plan would cost on the right, and
-          a gauge between them with a mark where the money runs out. Over the
-          mark, the way out is attached to the problem. */}
-      <section className={gap > 0 ? 'lw-rail is-over' : 'lw-rail'}>
-        <div className="lw-rail-top">
-          <button type="button" className="lw-rail-cell" onClick={() => setOpenSheet('money')} aria-haspopup="dialog">
-            <em>Studio money</em>
-            <b>{money(free)}</b>
-          </button>
-          <button
-            type="button"
-            className="lw-rail-cell is-end lw-bill-toggle"
-            onClick={() => setOpenSheet('plan')}
-            aria-haspopup="dialog"
-          >
-            <span>
-              <em>Launch plan</em>
-              <svg className="lw-bill-chevron" viewBox="0 0 16 16" aria-hidden="true">
-                <path d="M3 10l5-5 5 5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </span>
-            <b className={gap > 0 ? 'sf-tone-bad' : undefined}>{money(plannedShown)}</b>
-          </button>
-        </div>
-
-        <div className="lw-gauge" role="img" aria-label={`Plan ${money(planned)} against ${money(free)} available`}>
-          <i className="lw-gauge-fill" style={{ width: `${fill}%` }} />
-          {over > 0 && <i className="lw-gauge-over" style={{ width: `${over}%` }} />}
-          <span className="lw-gauge-mark" style={{ left: `${budgetMark}%` }} aria-hidden="true" />
-        </div>
-
-        <div className="lw-rail-foot">
-          {gap > 0 ? (
-            <>
-              <span className="sf-tone-bad">{money(gap)} over what the studio holds</span>
-              <button type="button" className="lw-inject" onClick={() => setOpenSheet('money')}>Add money</button>
-            </>
-          ) : (
-            <span>{money(free - planned)} still unspent{treasury.committed > 0 ? ` · ${money(treasury.committed)} already committed` : ''}</span>
-          )}
-        </div>
-
-      </section>
 
       {/* Each step arrives rather than appearing. */}
       <div className="sf-scroll" key={stepId}>
@@ -210,6 +191,28 @@ export function LaunchWizard({ data, initialStep = 'markets', initialDraft, init
           ))}
         </ul>
       )}
+
+      {/* --- the plan, wherever you are ------------------------------------
+          This was a rail at the top of every step: studio money, what the plan
+          would cost, a gauge between them. It said the same thing on all seven
+          screens and nothing about the step you were on, and it sat furthest
+          from the thumb doing the work. Same money, same gauge, same two ways
+          in — and now it also says what this step amounts to. */}
+      <PlanStrip
+        view={bar}
+        page={stepId}
+        tone={bar.verdict ? bar.verdict.tone : 'flat'}
+        over={gap > 0}
+        money={gap > 0
+          ? { label: 'Short', value: money(gap), bad: true, spent: planned, of: free }
+          : { label: 'Money', value: money(free), spent: planned, of: free }}
+        ways={[
+          { label: 'The bill', onClick: () => setOpenSheet('plan') },
+          gap > 0
+            ? { label: 'Add money', primary: true, onClick: () => setOpenSheet('money') }
+            : { label: 'Money', onClick: () => setOpenSheet('money') },
+        ]}
+      />
 
       <footer className="lw-foot">
         <button type="button" className="sf-btn sf-btn--ghost" disabled={index === 0} onClick={() => go(index - 1)}>

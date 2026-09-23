@@ -54,7 +54,7 @@ const createIncorporatedPlayer = (): Player => {
     return result.player;
 };
 
-assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 26, 'The current schema should retain the Phase 4 lightweight onboarding record.');
+assert(OWNED_STREAMING_PLATFORM_SCHEMA_VERSION === 27, 'The current schema should retain the Phase 4 lightweight onboarding record.');
 assert(STREAMING_HQ_SECTIONS.map(section => section.id).join(',') === 'HOME,CONTENT,TECH,MARKET,COMPANY', 'HQ should expose the five locked sections in order.');
 assert(STREAMING_HQ_TOUR_STEPS.length === 5, 'The guided HQ orientation should have one contextual step per section.');
 
@@ -227,7 +227,7 @@ assert(
 );
 assert(
     componentSource.includes("id: 'AUDIENCE', label: 'AUDIENCE', sub: 'Opening markets & clearance'")
-        && componentSource.includes("id: 'CONTENT', label: 'CONTENT', sub: 'Catalogue, marketplace & Originals'")
+        && componentSource.includes("id: 'CONTENT', label: 'CONTENT', sub: 'Catalogue, Content Market & Originals'")
         && componentSource.includes("id: 'PLATFORM', label: 'PLATFORM', sub: 'Product, technology & delivery'")
         && componentSource.includes("id: 'BOARDROOM', label: 'BOARDROOM', sub: 'Treasury, capital & governance'"),
     'Each pre-launch Operation must expose its canonical responsibility.',

@@ -4,14 +4,9 @@
    A territory's flag as atmosphere behind its money. Two modes:
 
    · `src` given — the game's own flag artwork is used, untouched.
-   · nothing given — a field is CONSTRUCTED from the country code: real flags
-     are overwhelmingly bands, a canton, a cross or a disc, so a code-driven
-     construction in that country's real colours reads unmistakably as that
-     flag's family without claiming to be the flag itself.
-
-   That fallback is the point: the screen never ships broken artwork, never
-   waits on an asset pipeline, and never needs a file that will not survive a
-   handoff. Codes it does not know still get a plausible two-band field.
+   · playable country code — compact selectors use its actual flag from the
+     supplied atlas; wide market headers retain an atmospheric field.
+   · unknown code — a stable constructed field avoids broken artwork.
    ========================================================================== */
 
 import type { ReactElement } from 'react';
@@ -108,38 +103,43 @@ const FLAG_CELL = {
   artworkHeight: 60.913,
 } as const;
 
-/* The supplied Figma sheet is alphabetic but flattened. These coordinates are
-   the canonical markets currently supported by EMPIRE+. Keeping the mapping
-   here means every market surface reads the same artwork and unknown future
-   countries still receive the code-driven fallback below. */
-const FLAG_CELLS: Record<string, { row: number; column: number }> = {
-  AR: { row: 0, column: 9 },
-  AU: { row: 1, column: 2 },
-  BR: { row: 2, column: 9 },
-  CA: { row: 3, column: 7 },
-  CL: { row: 4, column: 3 },
-  CO: { row: 4, column: 5 },
-  EG: { row: 6, column: 1 },
-  FR: { row: 7, column: 4 },
-  DE: { row: 8, column: 0 },
-  IN: { row: 9, column: 8 },
-  ID: { row: 9, column: 9 },
-  IT: { row: 10, column: 5 },
-  JP: { row: 10, column: 8 },
-  KE: { row: 11, column: 2 },
-  MX: { row: 13, column: 8 },
-  NG: { row: 15, column: 6 },
-  NZ: { row: 15, column: 3 },
-  PH: { row: 17, column: 0 },
-  ZA: { row: 19, column: 7 },
-  KR: { row: 19, column: 9 },
-  ES: { row: 20, column: 1 },
-  TH: { row: 21, column: 1 },
-  TR: { row: 21, column: 7 },
-  GB: { row: 22, column: 3 },
-  UK: { row: 22, column: 3 },
-  US: { row: 22, column: 4 },
-};
+/* The supplied Figma sheet is an alphabetic, ten-column atlas. Keep its cell
+   order explicit: sorting the game's country names would shift cells because
+   the artwork also includes territories and a few regional flags. A dash is
+   an atlas cell that is not a playable country in the canonical registry. */
+const FLAG_ATLAS_ROWS = [
+  'AX AF AL DZ AD AO AI AQ AG AR',
+  'AM AW AU AT AZ BS BH BD BB --',
+  'BY BE BZ BJ BM BT BO BA BW BR',
+  'VG BN BG BF BI KH CM CA -- CV',
+  'KY CF TD CL CN CO KM CK CR HR',
+  'CU CW CY CZ CD DK DJ DM DO TL',
+  'EC EG SV -- GQ ER EE SZ ET --',
+  'FK FO FJ FI FR GF PF GA GM GE',
+  'DE GH GI GR GL GD GP GT GG GN',
+  'GW GY HT -- HN HK HU IS IN ID',
+  'IR IQ IE IM IL IT CI JM JP JE',
+  'JO KZ KE KI XK -- KW KG LA LV',
+  'LB LS LR LY LI LT LU MO MG MW',
+  'MY MV ML MT MH -- MR MU MX FM',
+  'MD MC MN ME MA MZ MM NA NR NP',
+  'NL -- NC NZ NI NE NG NU NF KP',
+  'MK NO OM PK PW PS PA PG PY PE',
+  'PH PL PT PR QA CG RO RU RW KN',
+  'LC VC WS SM ST SA -- SN RS SC',
+  'SL SG SX SK SI SB SO ZA -- KR',
+  'SS ES LK SD SR SE CH SY TW TJ',
+  'TZ TH TG TO TT TN TR TM TC TV',
+  'UG UA AE GB US VI UY UZ VU VA',
+  'VE VN -- EH YE ZM ZW',
+] as const;
+
+const FLAG_CELLS: Record<string, { row: number; column: number }> = Object.fromEntries(
+  FLAG_ATLAS_ROWS.flatMap((line, row) => line.split(' ').flatMap((code, column) =>
+    code === '--' ? [] : [[code, { row, column }]],
+  )),
+);
+FLAG_CELLS.UK = FLAG_CELLS.GB;
 
 /** The supplied Figma artwork without any market-card styling. Settings and
     streaming surfaces both use this primitive so a country never changes flag

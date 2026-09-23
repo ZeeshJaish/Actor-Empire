@@ -33,6 +33,13 @@ import {
     getStreamingLanguagePackageCapabilityId,
     type StreamingLocalizationCapabilityId,
 } from './streamingLocalizationCapabilities';
+import {
+    MAX_FIBRE_LEVEL,
+    STREAMING_FIBRE_GENERATIONS,
+    buyFibreLevels,
+    fibreLevelCost,
+    normalizeStreamingFibreState,
+} from './streamingFibreLadder';
 
 export interface StreamingResearchDefinition {
     id: string;
@@ -48,6 +55,8 @@ export interface StreamingResearchDefinition {
     mappedTechnologyId: string | null;
     mappedProductLineId: 'KIDS' | null;
     mappedLocalizationCapabilityId?: StreamingLocalizationCapabilityId | null;
+    /** For NETWORK_FIBRE research: the 0-based generation this unlocks. */
+    mappedFibreGeneration?: number;
     requiredRackDuty: StreamingRackDuty | null;
     researchCost: number;
     patentCost: number;
@@ -94,7 +103,82 @@ const research = (
     staffRequired, researchWeeks, prototypeWeeks, testWeeks, installationWeeks, accent,
 });
 
+/** A fibre generation. Every one of them is the same shape — network-wide,
+    no rack duty, no technology-campus branch — so they are spelled out once
+    here rather than repeating twelve identical arguments four times. */
+const fibreResearch = (
+    id: string,
+    generation: number,
+    title: string,
+    codename: string,
+    description: string,
+    gameplayChange: string,
+    researchCost: number,
+    patentCost: number,
+    installationCost: number,
+    weeklyOperatingCost: number,
+    licenseWeeklyCost: number,
+    staffRequired: number,
+    researchWeeks: number,
+    prototypeWeeks: number,
+    testWeeks: number,
+    installationWeeks: number,
+    accent: string,
+): StreamingResearchDefinition => ({
+    id,
+    category: 'NETWORK_INFRASTRUCTURE',
+    categoryLabel: 'Network Infrastructure',
+    title,
+    codename,
+    description,
+    unlockSummary: `${title} transponder programme`,
+    installationLocation: 'Every room on the network',
+    gameplayChange,
+    installTargetType: 'NETWORK_FIBRE',
+    mappedTechnologyId: null,
+    mappedProductLineId: null,
+    requiredRackDuty: null,
+    mappedFibreGeneration: generation,
+    researchCost,
+    patentCost,
+    installationCost,
+    weeklyOperatingCost,
+    licenseWeeklyCost,
+    staffRequired,
+    researchWeeks,
+    prototypeWeeks,
+    testWeeks,
+    installationWeeks,
+    accent,
+});
+
 export const STREAMING_RESEARCH_DEFINITIONS: StreamingResearchDefinition[] = [
+    /* --- the fibre ladder ---------------------------------------------------
+       Four projects, because G1 is what the landlord already ran into the
+       building and costs nothing. Each one lifts the whole network a
+       generation — see `streamingFibreLadder.ts` for what a generation is
+       worth and why a maxed one equals a fresh next one.
+
+       They rise steeply in cost and in weeks, because the ladder is meant to
+       span a career rather than a season, and because the levels underneath
+       each one are the cheaper answer while you save for the jump. */
+    fibreResearch('fibre-coherent-dwdm', 1, 'Coherent DWDM', 'SPECTRUM',
+        'Drive many colours of light down a strand nobody has to re-lay.',
+        '+10% reach across every room you hold, rented or owned',
+        6_000_000, 4_000_000, 14_000_000, 85_000, 120_000, 6, 2, 1, 1, 2, '#22d3ee'),
+    fibreResearch('fibre-hollow-core', 2, 'Hollow-core', 'AIRLINE',
+        'Send the signal through air rather than glass, and arrive sooner.',
+        '+10% reach again, on top of Coherent DWDM',
+        13_000_000, 7_500_000, 30_000_000, 160_000, 220_000, 10, 3, 1, 1, 3, '#38bdf8'),
+    fibreResearch('fibre-multi-band', 3, 'Multi-band amplified', 'WIDEBAND',
+        'Light the bands the incumbents left dark, and amplify end to end.',
+        '+9% reach again, on top of Hollow-core',
+        26_000_000, 14_000_000, 58_000_000, 280_000, 380_000, 15, 4, 2, 1, 4, '#818cf8'),
+    fibreResearch('fibre-photonic-mesh', 4, 'Photonic mesh', 'LIGHTHOUSE',
+        'Let the network route itself in light, without asking anyone.',
+        '+8% reach again, and the top of the ladder',
+        48_000_000, 24_000_000, 96_000_000, 450_000, 600_000, 22, 5, 2, 2, 5, '#a78bfa'),
+
     research('edge-orchestration', 'NETWORK_INFRASTRUCTURE', 'Network Infrastructure', 'Edge Orchestration', 'LATTICE R&D', 'Prototype traffic control that routes viewers across a national delivery mesh.', 'National Traffic Mesh installation blueprint', 'Technology Campus · Edge Grid Complex', '+1M normal and +2M burst streams after construction', 'TECHNOLOGY_PROJECT', 'delivery_capacity-2', null, null, 7_500_000, 5_000_000, 24_000_000, 150_000, 210_000, 8, 2, 1, 1, 3, '#22d3ee'),
     research('perceptual-compression', 'SERVERS_DELIVERY', 'Servers and Delivery', 'Perceptual Compression', 'PRISM R&D', 'Test a codec pipeline that spends bandwidth where viewers perceive the difference.', 'Premium Codec Pipeline installation blueprint', 'An ENCODING rack group', 'Higher playback quality at the same bandwidth after deployment', 'RACK_GROUP', 'playback_quality-2', null, 'ENCODING', 6_000_000, 4_200_000, 18_000_000, 120_000, 170_000, 7, 2, 1, 1, 3, '#818cf8'),
     research('immersion-cooling', 'COOLING_ENERGY', 'Cooling and Energy', 'Immersion Cooling', 'DEEPBLUE', 'Validate non-conductive cooling for high-density private infrastructure.', 'Immersion retrofit engineering package', 'A commissioned private cage, suite, hall or owned centre', 'More cooling headroom and lower weekly energy pressure at that facility', 'FACILITY', null, null, null, 9_000_000, 6_500_000, 28_000_000, 95_000, 145_000, 9, 3, 1, 1, 3, '#38bdf8'),
@@ -155,6 +239,21 @@ export const getStreamingResearchInstallationBlockers = (
     }
     if (definition.id === 'immersion-cooling' && !getImmersionCoolingCompatibleFacilities(platform).length) {
         blockers.push('Commission a compatible private facility first');
+    }
+    /* The ladder is a ladder. Without this a platform could buy the photonic
+       mesh on day one and skip three generations, which would break the one
+       balance the fibre system rests on — that a maxed generation is worth
+       exactly the next one at level zero. */
+    if (typeof definition.mappedFibreGeneration === 'number') {
+        const here = normalizeStreamingFibreState(platform.fibre).generation;
+        if (definition.mappedFibreGeneration <= here) {
+            blockers.push('Already running this generation or better');
+        } else if (definition.mappedFibreGeneration > here + 1) {
+            const previous = STREAMING_RESEARCH_DEFINITIONS.find(
+                item => item.mappedFibreGeneration === definition.mappedFibreGeneration! - 1,
+            );
+            blockers.push(`${previous?.title || 'The previous generation'} required first`);
+        }
     }
     if (definition.mappedLocalizationCapabilityId) {
         const capability = STREAMING_LOCALIZATION_CAPABILITY_DEFINITIONS.find(
@@ -247,6 +346,64 @@ export const startStreamingResearchProgram = (
     };
 };
 
+/** Buy levels within the generation you already hold.
+
+    Deliberately NOT a research program. The pipeline's stages — researching,
+    prototyping, testing, awaiting IP — describe inventing something, and a
+    level-forty-two tune-up is not an invention. It is the same node getting
+    faster because the benchmark improved, which is a purchase, not a discovery.
+    Bending the lifecycle around it would have made every stage meaningless for
+    a hundred repetitions.
+
+    Buys as many as the treasury can carry and reports what it actually bought,
+    so a player who asks for ten and can afford six is told six rather than
+    being refused. */
+export const buyStreamingFibreLevels = (
+    player: Player,
+    count: number,
+    absoluteWeek: number,
+): { player: Player; changed: boolean; levels: number; cost: number; reason?: string } => {
+    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+    const here = normalizeStreamingFibreState(platform.fibre);
+    if (here.level >= MAX_FIBRE_LEVEL) {
+        return { player, changed: false, levels: 0, cost: 0, reason: 'This generation is already tuned as far as it goes.' };
+    }
+    const wanted = Math.max(1, Math.round(count));
+    const bought = buyFibreLevels(here, wanted, platform.treasuryCash);
+    if (bought.levels === 0) {
+        return {
+            player,
+            changed: false,
+            levels: 0,
+            cost: 0,
+            reason: `The treasury cannot carry the next level (${fibreLevelCost(here.level).toLocaleString()}).`,
+        };
+    }
+    const key = `fibre-levels:${absoluteWeek}:${here.generation}:${here.level}:${bought.levels}`;
+    const ledger = ledgerEntry(
+        platform,
+        key,
+        absoluteWeek,
+        `Fibre tuned ${here.level} to ${bought.state.level} on ${STREAMING_FIBRE_GENERATIONS[here.generation].name}.`,
+        'PLAYER_ACTION',
+        { generation: here.generation, fromLevel: here.level, toLevel: bought.state.level, cost: bought.cost },
+    );
+    return {
+        player: {
+            ...player,
+            ownedStreamingPlatform: normalizeOwnedStreamingPlatformState({
+                ...platform,
+                fibre: bought.state,
+                treasuryCash: platform.treasuryCash - bought.cost,
+                eventLedger: [...platform.eventLedger, ledger],
+            }, player.id),
+        },
+        changed: true,
+        levels: bought.levels,
+        cost: bought.cost,
+    };
+};
+
 export const advanceDueStreamingResearchPrograms = (
     platformValue: OwnedStreamingPlatformState,
     absoluteWeek: number,
@@ -255,6 +412,7 @@ export const advanceDueStreamingResearchPrograms = (
     const ledgerEntries: OwnedStreamingLedgerEntry[] = [];
     let nextInfrastructureSetup = platformValue.infrastructureSetup;
     let nextCapabilities = platformValue.capabilities;
+    let nextFibre = normalizeStreamingFibreState(platformValue.fibre);
     const researchPrograms = platformValue.researchPrograms.map(program => {
         if (absoluteWeek < program.stageReadyAtAbsoluteWeek) return program;
         let advanced = advanceStreamingResearchStage(program, absoluteWeek);
@@ -285,6 +443,21 @@ export const advanceDueStreamingResearchPrograms = (
                     }),
             };
         }
+        if (nextStage === 'OPERATING' && program.installationTargetType === 'NETWORK_FIBRE') {
+            const definition = STREAMING_RESEARCH_DEFINITIONS.find(item => item.id === program.definitionId);
+            const generation = definition?.mappedFibreGeneration;
+            /* Only ever forwards. Finishing a generation you have already passed
+               — possible if two ran at once, or on a save that jumped ahead —
+               must not walk the ladder backwards and take reach away. The whole
+               point of this system is that nothing you own gets worse. */
+            if (typeof generation === 'number' && generation > nextFibre.generation) {
+                /* The level resets, because the level is progress within a
+                   generation and the new one starts at its own floor. Reach does
+                   not drop: a maxed generation is worth exactly the next one at
+                   level zero, which is what that equality is for. */
+                nextFibre = normalizeStreamingFibreState({ generation, level: 0 });
+            }
+        }
         if (nextStage === 'OPERATING' && program.installationTargetType === 'LOCALIZATION_CAPABILITY') {
             const definition = STREAMING_RESEARCH_DEFINITIONS.find(item => item.id === program.definitionId);
             const capabilityId = definition?.mappedLocalizationCapabilityId;
@@ -313,6 +486,7 @@ export const advanceDueStreamingResearchPrograms = (
             ...platformValue,
             infrastructureSetup: nextInfrastructureSetup,
             capabilities: nextCapabilities,
+            fibre: nextFibre,
             researchPrograms,
         },
         advancedPrograms,
@@ -399,6 +573,57 @@ export const installStreamingResearchInFacility = (
                     item,
                     facility.id,
                     `${facility.cityId} · ${facility.type.replaceAll('_', ' ')}`,
+                    absoluteWeek,
+                    absoluteWeek + Math.max(1, item.installationWeeks),
+                )),
+                eventLedger: [...platform.eventLedger, ledger],
+            }, player.id),
+        },
+        changed: true,
+    };
+};
+
+/** Begin rolling a finished fibre generation across the network.
+
+    Unlike the facility installs beside it there is nothing to pick: the whole
+    point of a generation is that it is your own kit on both ends of every link,
+    so it lands everywhere at once, rented rooms included. */
+export const installStreamingFibreGeneration = (
+    player: Player,
+    definitionId: string,
+): { player: Player; changed: boolean; reason?: string } => {
+    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+    const program = platform.researchPrograms.find(item => item.definitionId === definitionId);
+    const definition = STREAMING_RESEARCH_DEFINITIONS.find(item => item.id === definitionId);
+    if (!program || !definition || program.stage !== 'READY_TO_INSTALL' || definition.installTargetType !== 'NETWORK_FIBRE') {
+        return { player, changed: false, reason: 'This fibre rollout is not ready.' };
+    }
+    const blockers = getStreamingResearchInstallationBlockers(platform, definition);
+    if (blockers.length > 0) return { player, changed: false, reason: blockers[0] };
+    if (platform.treasuryCash < program.installationCost) {
+        return { player, changed: false, reason: 'The platform treasury cannot fund this rollout.' };
+    }
+    const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+    const roomCount = platform.infrastructureSetup?.facilities?.length || 0;
+    const key = `${program.idempotencyKey}:installation:network-fibre`;
+    const ledger = ledgerEntry(
+        platform,
+        key,
+        absoluteWeek,
+        `${program.title} rollout began across ${roomCount || 'every'} ${roomCount === 1 ? 'room' : 'rooms'}. Reach is unchanged until it completes.`,
+        'PLAYER_ACTION',
+        { definitionId, installationCost: program.installationCost, generation: definition.mappedFibreGeneration ?? null },
+    );
+    return {
+        player: {
+            ...player,
+            ownedStreamingPlatform: compactOwnedStreamingPlatformForPersistence({
+                ...platform,
+                treasuryCash: platform.treasuryCash - program.installationCost,
+                researchPrograms: platform.researchPrograms.map(item => item.id !== program.id ? item : beginStreamingResearchInstallation(
+                    item,
+                    null,
+                    'Every room on the network',
                     absoluteWeek,
                     absoluteWeek + Math.max(1, item.installationWeeks),
                 )),

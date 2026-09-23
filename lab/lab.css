@@ -1,0 +1,16 @@
+:root { color-scheme: dark; }
+html, body, #lab { height: 100%; margin: 0; background: #07090e; }
+.lab-root { display: flex; flex-direction: column; height: 100%; }
+.lab-bar {
+  display: flex; align-items: center; gap: 12px; flex: none;
+  padding: 8px 14px; background: #10131b; border-bottom: 1px solid rgba(206,218,235,.12);
+  font: 600 12px/1 'Archivo', system-ui, sans-serif; color: #c2c8d4;
+}
+.lab-bar b { color: #f7f5f1; letter-spacing: .04em; text-transform: uppercase; }
+.lab-bar em { font-style: normal; color: #79808f; }
+.lab-bar button {
+  margin-left: auto; padding: 6px 12px; border-radius: 10px; cursor: pointer;
+  border: 1px solid rgba(206,218,235,.2); background: #171d29; color: #e6e8ee; font: inherit;
+}
+.lab-frame { flex: 1; min-height: 0; display: flex; }
+.lab-frame > * { flex: 1; min-height: 0; }

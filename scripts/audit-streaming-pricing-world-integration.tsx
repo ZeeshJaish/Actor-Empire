@@ -9,12 +9,16 @@ import {
     getStreamingBlendedMonthlyPrice,
     getStreamingEntryPrice,
     normalizeStreamingPricingConfiguration,
+    streamingBillingPathPrice,
 } from '../services/streamingPricingEconomy';
-import { forecastWorldStreamingLaunchPricing } from '../services/worldEconomy/worldStreamingPricingForecast';
+import { forecastWorldStreamingBuildDemand, forecastWorldStreamingLaunchPricing } from '../services/worldEconomy/worldStreamingPricingForecast';
 import { getWorldStreamingOffers } from '../services/worldEconomy/worldStreamingOffers';
+import { createWorldStreamingCustomerState } from '../services/worldEconomy/worldStreamingCustomers';
+import { normalizeStreamingPlatformEcosystem } from '../services/streamingPlatformEcosystem';
 import { saveStreamingPricingPlan } from '../services/streamingLaunchProgram';
+import { saveOwnedStreamingLaunchMarketingDraft } from '../services/streamingLaunchMarketingLifecycle';
 import { forecastPricing, type PricingSettings } from '../components/studio-finance/finance/launch';
-import { PlanPriceEditorControl } from '../components/studio-finance/components/launch/StepPricing';
+import { PlanPriceEditorControl, PlanPricePaths } from '../components/studio-finance/components/launch/StepPricing';
 
 const basePricing: OwnedStreamingPricingConfiguration = {
     streams: ['subs', 'ads'],
@@ -69,6 +73,31 @@ player.ownedStreamingPlatform.identity = {
 player.ownedStreamingPlatform.technologyLevels.ADVERTISING_COMMERCE = 20;
 
 const normalForecast = forecastWorldStreamingLaunchPricing(player, basePricing, ['US', 'IN']);
+const targetedPricing: OwnedStreamingPricingConfiguration = {
+    ...basePricing,
+    annualDiscount: 0,
+    introOffer: 50,
+    introOfferPlanId: 'FAMILY',
+};
+const targetedForecast = forecastWorldStreamingLaunchPricing(player, targetedPricing, ['US', 'IN']);
+const deepPromotionForecast = forecastWorldStreamingLaunchPricing(player, { ...targetedPricing, introOffer: 90 }, ['US', 'IN']);
+const noPromotionForecast = forecastWorldStreamingLaunchPricing(player, { ...targetedPricing, introOffer: 0 }, ['US', 'IN']);
+assert.ok(
+    (deepPromotionForecast.planAllocations.find(row => row.planId === 'FAMILY')?.households || 0)
+        > (noPromotionForecast.planAllocations.find(row => row.planId === 'FAMILY')?.households || 0),
+    'an enabled Premiere promotion changes eligible cohort allocation rather than only the card price',
+);
+assert.equal(normalForecast.planAllocations.reduce((sum, row) => sum + row.households, 0), normalForecast.subscribers,
+    'plan allocations reconcile to total subscribers');
+assert.ok(targetedForecast.planAllocations.some(row => row.planId !== 'FAMILY' && row.households > 0),
+    'the targeted scenario includes untargeted subscribers so it can detect cross-plan discount leakage');
+const expectedTargetedFirstYear = targetedForecast.planAllocations.reduce((sum, row) => {
+    const list = targetedPricing.plans.find(plan => plan.id === row.planId)!.monthly;
+    return sum + row.monthlyHouseholds * (row.planId === 'FAMILY' ? 188.88 : 12 * list)
+        + row.annualHouseholds * 12 * list;
+}, 0);
+assert.ok(Math.abs(targetedForecast.firstYearSubscriptionRevenue - expectedTargetedFirstYear) < .02,
+    'a Premiere-only intro discount must not reduce untargeted plans in the first-year world forecast');
 const expensiveForecast = forecastWorldStreamingLaunchPricing(player, {
     ...basePricing,
     plans: basePricing.plans.map(plan => ({ ...plan, monthly: 78, ads: false })),
@@ -85,10 +114,28 @@ assert.ok(normalForecast.activeRivalCount > 4, 'launch pricing competes against 
 assert.ok(normalForecast.subscribers > expensiveForecast.subscribers, '$78-only pricing loses households in the canonical world economy');
 assert.ok(cheapForecast.subscribers > expensiveForecast.subscribers, 'a viable low entry plan converts more households than an unaffordable offer');
 assert.ok(allCheapForecast.subscribers > expensiveForecast.subscribers && allCheapForecast.monthlySubscriptionRevenue > 0, 'an all-cheap offer can win volume but does not create free subscription revenue');
+const normalBuildDemand = forecastWorldStreamingBuildDemand(player, basePricing, ['US', 'IN']);
+const expensiveBuildDemand = forecastWorldStreamingBuildDemand(player, {
+    ...basePricing,
+    plans: basePricing.plans.map(plan => ({ ...plan, monthly: 78, ads: false })),
+}, ['US', 'IN']);
+assert.equal(normalBuildDemand.forecastAccounts, normalForecast.subscribers,
+    'Build forecasts the same subscriber base as Define the Launch');
+assert.equal(Object.values(normalBuildDemand.byMarket).reduce((sum, count) => sum + count, 0), normalBuildDemand.likely,
+    'Build country demand reconciles to its likely total');
+assert.ok(normalBuildDemand.likely > expensiveBuildDemand.likely,
+    'Build opening demand reacts to the canonical offer becoming unaffordable');
+const marketingDraftPlayer = saveOwnedStreamingLaunchMarketingDraft(player, { budgetCeiling: 50_000_000 }).player;
+assert.equal(marketingDraftPlayer.ownedStreamingPlatform.treasuryCash, player.ownedStreamingPlatform.treasuryCash,
+    'editing a marketing draft does not spend company treasury');
+assert.deepEqual(forecastWorldStreamingBuildDemand(marketingDraftPlayer, basePricing, ['US', 'IN']), normalBuildDemand,
+    'a marketing draft does not secretly modify pre-campaign canonical demand');
 assert.deepEqual(normalForecast.planAllocations.map(row => row.planId), basePricing.plans.map(plan => plan.id), 'all custom plans remain represented in the forecast, including plans with zero current demand');
 normalForecast.planAllocations.filter(row => row.households > 0).forEach(row => {
-    const plan = basePricing.plans.find(item => item.id === row.planId)!;
-    assert.equal(row.effectiveMonthlyPrice, effectiveMonthlyStreamingPlanPrice(plan.monthly, basePricing.annualDiscount, basePricing.introOffer, 0), 'a pre-launch forecast starts the introductory window now');
+    assert.equal(row.monthlyHouseholds + row.annualHouseholds, row.households,
+        'a pre-launch plan has an exact monthly/annual buyer breakdown');
+    assert.equal(row.effectiveMonthlyPrice, Math.round(row.monthlySubscriptionRevenue / row.households * 100) / 100,
+        'the displayed opening average comes from the actual path-specific subscribers');
 });
 const legacyLivePlayer = structuredClone(player) as Player;
 legacyLivePlayer.ownedStreamingPlatform.lifecycle = 'ACTIVE';
@@ -97,6 +144,82 @@ legacyLivePlayer.ownedStreamingPlatform.serviceConfiguration.pricing = structure
 legacyLivePlayer.ownedStreamingPlatform.identity!.foundedAtAbsoluteWeek = Math.max(0, legacyLivePlayer.age * 52 + legacyLivePlayer.currentWeek - 30);
 const legacyLiveOffer = getWorldStreamingOffers(legacyLivePlayer, legacyLivePlayer.age * 52 + legacyLivePlayer.currentWeek).offers.find(offer => offer.isPlayer)!;
 assert.equal(legacyLiveOffer.plans[0].effectiveMonthlyPrice, effectiveMonthlyStreamingPlanPrice(basePricing.plans[0].monthly, basePricing.annualDiscount, basePricing.introOffer, 30), 'a migrated live platform without a launch receipt does not retain its introductory discount forever');
+const liveIntroPlayer = structuredClone(legacyLivePlayer) as Player;
+liveIntroPlayer.ownedStreamingPlatform.identity!.foundedAtAbsoluteWeek = liveIntroPlayer.age * 52 + liveIntroPlayer.currentWeek;
+liveIntroPlayer.ownedStreamingPlatform.serviceConfiguration.pricing = targetedPricing;
+liveIntroPlayer.ownedStreamingPlatform.metrics.subscribers = 100_000;
+const liveWeek = liveIntroPlayer.age * 52 + liveIntroPlayer.currentWeek;
+const liveIntroOffer = getWorldStreamingOffers(liveIntroPlayer, liveWeek).offers.find(offer => offer.isPlayer)!;
+const liveCustomers = createWorldStreamingCustomerState(liveIntroPlayer, liveWeek);
+const livePlayerCells = Object.values(liveCustomers.countries)
+    .flatMap(country => country.cohorts.flatMap(cohort => cohort.planCells.map(cell => ({ cell, billingPath: cohort.billingPath }))))
+    .filter(row => row.cell.platformId === 'PLAYER' && row.cell.paidAccounts > 0);
+assert.ok(livePlayerCells.length > 0, 'weekly customer pricing is tested on actual player accounts');
+livePlayerCells.forEach(({ cell, billingPath }) => {
+    const plan = liveIntroOffer.plans.find(item => item.id === cell.planId)!;
+    assert.equal(cell.effectiveMonthlyPrice, billingPath === 'MONTHLY' ? plan.monthlyBillingPrice : plan.annualBillingMonthlyPrice,
+        'weekly customer cells use their actual monthly or annual opening price');
+    assert.ok(Math.abs(cell.monthlySubscriptionRevenue - Math.round(cell.paidAccounts * cell.effectiveMonthlyPrice * 100) / 100) < .011,
+        'weekly customer subscription revenue is settled from those actual offer prices');
+});
+const aiOffers = getWorldStreamingOffers(player, player.age * 52 + player.currentWeek).offers.filter(offer => !offer.isPlayer);
+const aiEcosystem = normalizeStreamingPlatformEcosystem(player.world.streamingPlatformEcosystem, player.age * 52 + player.currentWeek);
+assert.ok(aiOffers.length > 0, 'the AI parity scenario includes actual rival offers');
+assert.ok(aiOffers.some(offer => offer.plans.length > 1 && offer.commercialConfiguration.introOfferPlanId),
+    'some multi-plan rivals target an introductory offer at one plan');
+assert.ok(aiOffers.some(offer => offer.plans.length > 1 && !offer.commercialConfiguration.introOfferPlanId),
+    'other multi-plan rivals retain a broad introductory offer');
+aiOffers.forEach(offer => {
+    assert.equal(offer.annualDiscountPercent, offer.commercialConfiguration.annualDiscount,
+        `${offer.platformId} must publish the annual discount used by its commercial configuration`);
+    assert.equal(offer.introOfferPercent, offer.commercialConfiguration.introOffer,
+        `${offer.platformId} must publish the intro discount used by its commercial configuration`);
+    offer.plans.forEach(plan => {
+        const operator = Object.values(aiEcosystem.operators).find(item => item.id === offer.platformId)!;
+        const introApplies = !offer.commercialConfiguration.introOfferPlanId
+            || offer.commercialConfiguration.introOfferPlanId === plan.id;
+        const weeksSinceStart = player.age * 52 + player.currentWeek - operator.foundedAtAbsoluteWeek;
+        assert.equal(plan.effectiveMonthlyPrice, effectiveMonthlyStreamingPlanPrice(
+            plan.monthlyPrice,
+            offer.commercialConfiguration.annualDiscount,
+            offer.commercialConfiguration.introOffer,
+            weeksSinceStart,
+            introApplies,
+        ), `${offer.platformId}/${plan.id} must be priced from its published strategy`);
+        assert.equal(plan.monthlyBillingPrice, streamingBillingPathPrice(
+            plan.monthlyPrice, offer.commercialConfiguration.annualDiscount,
+            offer.commercialConfiguration.introOffer, weeksSinceStart, 'MONTHLY', introApplies,
+        ), `${offer.platformId}/${plan.id} must offer the actual monthly path price`);
+        assert.equal(plan.annualBillingMonthlyPrice, streamingBillingPathPrice(
+            plan.monthlyPrice, offer.commercialConfiguration.annualDiscount,
+            offer.commercialConfiguration.introOffer, weeksSinceStart, 'ANNUAL', introApplies,
+        ), `${offer.platformId}/${plan.id} must offer the actual annual path price`);
+    });
+});
+const promotionalPlayer = structuredClone(player) as Player;
+promotionalPlayer.world.streamingPlatformEcosystem = structuredClone(aiEcosystem);
+const promotionalWeek = player.age * 52 + player.currentWeek;
+Object.values(promotionalPlayer.world.streamingPlatformEcosystem.operators).forEach(operator => {
+    operator.foundedAtAbsoluteWeek = promotionalWeek;
+});
+const promotionalOffers = getWorldStreamingOffers(promotionalPlayer, promotionalWeek).offers.filter(offer => !offer.isPlayer);
+const expiredOffers = getWorldStreamingOffers(promotionalPlayer, promotionalWeek + 13).offers.filter(offer => !offer.isPlayer);
+promotionalOffers.forEach(offer => {
+    const expired = expiredOffers.find(row => row.platformId === offer.platformId)!;
+    offer.plans.filter(plan => plan.monthlyPrice > 0).forEach(plan => {
+        const maturePrice = expired.plans.find(row => row.id === plan.id)!.effectiveMonthlyPrice;
+        const matureMonthlyPrice = expired.plans.find(row => row.id === plan.id)!.monthlyBillingPrice;
+        if (offer.commercialConfiguration.introOfferPlanId && offer.commercialConfiguration.introOfferPlanId !== plan.id) {
+            assert.equal(plan.effectiveMonthlyPrice, maturePrice,
+                `${offer.platformId}/${plan.id} is not discounted by an intro aimed at a different plan`);
+        } else {
+            assert.ok(plan.effectiveMonthlyPrice < maturePrice,
+                `${offer.platformId}/${plan.id} loses its applicable introductory discount after week 13`);
+            assert.ok(plan.monthlyBillingPrice < matureMonthlyPrice,
+                `${offer.platformId}/${plan.id} monthly billed buyers lose the introductory discount after week 13`);
+        }
+    });
+});
 
 const launchPanelForecast = forecastPricing(
     basePricing as PricingSettings,
@@ -106,8 +229,39 @@ const launchPanelForecast = forecastPricing(
     normalForecast,
 );
 assert.equal(launchPanelForecast.subscribers, normalForecast.subscribers, 'the wizard consumes canonical rival-aware subscriber demand');
-assert.equal(launchPanelForecast.streams.find(stream => stream.id === 'subs')?.monthly, normalForecast.monthlySubscriptionRevenue, 'wizard subscription revenue reconciles with the world forecast');
+assert.ok(Math.abs((launchPanelForecast.streams.find(stream => stream.id === 'subs')?.monthly || 0)
+    - normalForecast.monthlySubscriptionRevenue) < .01, 'wizard subscription revenue reconciles with the world forecast');
 assert.ok(Math.abs(launchPanelForecast.yearlyRevenue - launchPanelForecast.streams.filter(stream => stream.id !== 'subs').reduce((sum, stream) => sum + stream.monthly * 12, 0) - normalForecast.firstYearSubscriptionRevenue) < .01, 'the wizard models the 13-week introductory offer in first-year revenue');
+const localCohort = [{
+    households: 100_000,
+    monthlyStreamingBudgetPerHousehold: 9,
+    priceSensitivityIndex: 70,
+    entertainmentAppetiteIndex: 65,
+    piracyTendencyIndex: 20,
+}];
+const localMarket = { rivalAveragePrice: 12, reachRate: .3 };
+const localPricing: PricingSettings = {
+    ...basePricing,
+    streams: ['subs'],
+    plans: [basePricing.plans[0], basePricing.plans[1]],
+    annualDiscount: 0,
+    introOffer: 50,
+    introOfferPlanId: 'PREMIUM',
+};
+const localWithIntro = forecastPricing(localPricing, 100_000, localMarket, localCohort);
+const localWithoutIntro = forecastPricing({ ...localPricing, introOffer: 0 }, 100_000, localMarket, localCohort);
+assert.equal(localWithoutIntro.plans.find(row => row.plan.id === 'PREMIUM')?.subscribers, 0,
+    'an Off intro offer does not change plan eligibility');
+assert.ok((localWithIntro.plans.find(row => row.plan.id === 'PREMIUM')?.subscribers || 0) > 0,
+    'the local fallback admits a plan made affordable by its targeted intro offer');
+const monthlyOnlyLocal = forecastPricing({
+    ...basePricing, streams: ['subs'], plans: [basePricing.plans[2]],
+    annualDiscount: 0, introOffer: 50, introOfferPlanId: 'FAMILY',
+}, 100_000, localMarket, localCohort);
+assert.ok(monthlyOnlyLocal.subscribers > 0,
+    'local fallback admits monthly buyers at $8.99 even when the $11.96 blend exceeds the $9 budget');
+assert.equal(monthlyOnlyLocal.plans[0].revenuePerSubscriber, 8.99,
+    'annual buyers who cannot afford the path do not dilute actual monthly customer revenue');
 const normalCommercialForecast = forecastPricing(
     { ...basePricing, streams: ['daypass', 'premium', 'rentals', 'metered', 'patron', 'sponsor'] } as PricingSettings,
     1_000_000,
@@ -155,5 +309,36 @@ const priceControl = renderToStaticMarkup(React.createElement(PlanPriceEditorCon
 }));
 assert.match(priceControl, /type="number"/, 'the plan editor exposes direct numeric price entry');
 assert.match(priceControl, /inputMode="decimal"/, 'the direct price field uses a mobile decimal keyboard');
+const targetedPricePaths = renderToStaticMarkup(React.createElement(PlanPricePaths, {
+    plan: targetedPricing.plans[2],
+    settings: targetedPricing as PricingSettings,
+    share: 0,
+    cohorts: localCohort,
+}));
+assert.match(targetedPricePaths, /List price.*\$17\.99/s, 'the plan explains the price the player entered');
+assert.match(targetedPricePaths, /First three months.*\$8\.99/s, 'the plan explains its targeted monthly promo price');
+assert.match(targetedPricePaths, /Pay yearly.*\$17\.99/s, 'the plan keeps the annual path distinct when its discount is Off');
+assert.match(targetedPricePaths, /Opening blend.*\$11\.96/s, 'the plan explains the blended opening price');
+assert.match(targetedPricePaths, /Year one.*\$197\.79/s, 'the plan explains the first-year per-subscriber result');
+assert.match(targetedPricePaths, /0% projected share/, 'the breakdown ties the price path to its projected subscriber share');
+assert.match(targetedPricePaths, /Monthly path: 100% affordable\. Annual path: 0% affordable/,
+    'the plan explains that the monthly promotion is affordable even when the annual path is not');
+const untargetedPricePaths = renderToStaticMarkup(React.createElement(PlanPricePaths, {
+    plan: targetedPricing.plans[0], settings: targetedPricing as PricingSettings, share: 100, cohorts: localCohort,
+}));
+assert.match(untargetedPricePaths, /First three months.*\$7\.99.*not targeted/s,
+    'the untargeted Essential plan does not claim the Premiere promotion');
+assert.match(untargetedPricePaths, /Monthly path: 100% affordable\. Annual path: 100% affordable/,
+    'the comparison plan shows both billing paths as affordable');
+const freePricePaths = renderToStaticMarkup(React.createElement(PlanPricePaths, {
+    plan: { ...basePricing.plans[0], monthly: 0, ads: true },
+    settings: { ...basePricing, introOffer: 50, introOfferPlanId: 'BASIC' } as PricingSettings,
+    share: 12,
+    cohorts: localCohort,
+}));
+assert.match(freePricePaths, /Free ad-supported access/,
+    'a free advertising tier is explained as free, not as a yearly bill with a discount');
+assert.doesNotMatch(freePricePaths, /billed yearly/,
+    'the free tier is never presented as an annual-billing product');
 
-console.log(`Pricing/world integration: ${normalForecast.subscribers.toLocaleString()} normal subscribers vs ${expensiveForecast.subscribers.toLocaleString()} at $78; ${normalForecast.activeRivalCount} rivals.`);
+console.log(`Pricing/world integration: ${normalForecast.subscribers.toLocaleString()} normal subscribers, $${normalForecast.monthlySubscriptionRevenue.toFixed(2)}/mo and $${normalForecast.firstYearSubscriptionRevenue.toFixed(2)} first-year subscription revenue; ${expensiveForecast.subscribers.toLocaleString()} at $78; ${normalForecast.activeRivalCount} rivals; ${aiOffers.filter(offer => offer.commercialConfiguration.introOfferPlanId).length}/${aiOffers.length} AI offers target one plan.`);

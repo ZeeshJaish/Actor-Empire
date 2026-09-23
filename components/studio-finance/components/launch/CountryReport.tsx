@@ -72,6 +72,8 @@ export function CountryReport({ country }: { country: Country }) {
   const d = country.dossier;
   const open = unclaimed(country.rivals);
   const due = country.rightsEstimate + country.complianceCost;
+  const rightsShare = due > 0 ? (country.rightsEstimate / due) * 100 : 0;
+  const complianceShare = due > 0 ? (country.complianceCost / due) * 100 : 0;
   const weeks = Number.parseInt(d.approvalWeeks, 10) || 5;
   const paperwork = Array.from(new Set([...d.clearances, ...d.consumerRequirements]));
 
@@ -106,8 +108,8 @@ export function CountryReport({ country }: { country: Country }) {
           <b>{money(due)}</b>
         </header>
         <div className="cr-split" role="img" aria-label={`${money(country.rightsEstimate)} market access, ${money(country.complianceCost)} compliance`}>
-          <i className="is-rights" style={{ width: `${(country.rightsEstimate / due) * 100}%` }} />
-          <i className="is-comply" style={{ width: `${(country.complianceCost / due) * 100}%` }} />
+          <i className="is-rights" style={{ width: `${rightsShare}%` }} />
+          <i className="is-comply" style={{ width: `${complianceShare}%` }} />
         </div>
         <p className="cr-splitkey">
           <span><i className="is-rights" aria-hidden="true" />Market access {money(country.rightsEstimate)}</span>

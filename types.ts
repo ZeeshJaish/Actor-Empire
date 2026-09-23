@@ -3089,6 +3089,11 @@ export interface OwnedStreamingOpeningProgrammeCommission {
     rehearsalSignature: string;
     openingCountryIds: string[];
     marketingForecastSignature: string;
+    /** Accepted transaction terms, frozen with the signatures above. */
+    infrastructureDueNow: number;
+    marketFilingDueNow: number;
+    marketingReservation: number;
+    totalCashRequired: number;
     revision: number;
 }
 
@@ -3241,6 +3246,9 @@ export interface OwnedStreamingPricingConfiguration {
     plans: OwnedStreamingPricingPlan[];
     annualDiscount: number;
     introOffer: number;
+    /** The plan carrying the introductory offer. Older saves omitted this and
+        therefore retain the legacy all-plan behaviour. */
+    introOfferPlanId?: string;
     ads: { minutesPerHour: number; cpm: number };
     rentals: { rent: number; buy: number; windowWeeks: number };
     premium: { price: number };
@@ -4386,6 +4394,16 @@ export type StreamingRackDuty =
     | 'PLATFORM_SERVICES'
     | 'LIVE_EVENT'
     | 'SPECIALIZED';
+export type StreamingServerTier = 'SCOUT' | 'WORKHORSE' | 'TITAN';
+export type StreamingCloudProviderId = 'ATLAS' | 'NORTHWIND' | 'MERIDIAN';
+
+/** Player-authored regional intent, kept separate from system-derived facilities. */
+export interface OwnedStreamingRegionNetworkPlan {
+    regionId: string;
+    serverCounts: Record<StreamingServerTier, number>;
+    cloudProvider: StreamingCloudProviderId | null;
+    cloudCompute: number;
+}
 export type StreamingInfrastructureManagementMode = 'ASSISTED' | 'HANDS_ON';
 export type StreamingAssistedNetworkPriority = 'ECONOMY' | 'BALANCED' | 'RELIABLE' | 'PREMIUM';
 export type StreamingAssistedRiskTolerance = 'LOW' | 'MEDIUM' | 'HIGH';
@@ -4445,6 +4463,16 @@ export interface StreamingFacilityLeaseSnapshot {
     contractWeeks: number;
     provisioningWeeks: number;
     expansionRackPositions: number;
+    /** How this room is held. Missing on legacy saves, which normalize to rented. */
+    tenure?: 'CLOUD' | 'RENTED' | 'OWNED';
+    /** Cloud contract identity. Missing legacy cloud rooms use Atlas. */
+    cloudProvider?: StreamingCloudProviderId;
+    /** Compute purchased above the provider's normal regional ceiling. */
+    cloudExtendedCompute?: number;
+    /** Contract start for renewal math. Missing legacy values never auto-expire. */
+    startedAtAbsoluteWeek?: number;
+    /** Frozen amount paid when the building was purchased outright. */
+    purchasePrice?: number;
 }
 
 export interface OwnedStreamingNetworkPlacement {
@@ -4466,6 +4494,8 @@ export interface OwnedStreamingRackGroup {
     name: string;
     rackCount: number;
     duty: StreamingRackDuty;
+    /** Persistent player-facing machine class. Missing only on legacy saves. */
+    serverTier?: StreamingServerTier;
     /** Present while a draft is being rewired; finalized when the revision commissions. */
     migration?: StreamingRackDutyMigration;
 }
@@ -4512,6 +4542,8 @@ export interface OwnedStreamingInfrastructureSetupDraft {
     subscriptionPrices: Record<StreamingSubscriptionTierId, number>;
     /** Physical network plan. Founding chooses markets; Network Build owns these machines. */
     networkPlacements: OwnedStreamingNetworkPlacement[];
+    /** Region-first player intent. Facilities remain the deterministic placement projection. */
+    regionPlans?: OwnedStreamingRegionNetworkPlan[];
     /** Explicit spaces and their fixed rack limits. Optional for legacy saves. */
     facilities?: OwnedStreamingFacility[];
     /** Optional for legacy saves; normalized to a deterministic default. */
@@ -4597,6 +4629,8 @@ export interface OwnedStreamingLoadTestSnapshot {
 }
 
 export interface OwnedStreamingInfrastructureSetup {
+    /** Strategy frozen with this revision; absent only on pre-v27 saves. */
+    strategy?: Exclude<StreamingInfrastructureStrategy, 'UNDECIDED'>;
     capacityPackageId: StreamingCapacityPackageId;
     rolloutPace: StreamingInfrastructureRolloutPace;
     storageCapacityHours: number;
@@ -4606,12 +4640,17 @@ export interface OwnedStreamingInfrastructureSetup {
     capitalInvested: number;
     technicalDebt: number;
     networkPlacements: OwnedStreamingNetworkPlacement[];
+    /** Commissioned region-first intent retained independently from physical placement. */
+    regionPlans?: OwnedStreamingRegionNetworkPlan[];
     /** Commissioned spaces. Old saves are upgraded into deterministic legacy facilities. */
     facilities?: OwnedStreamingFacility[];
     /** Retained so players can switch workflows after launch without losing preferences. */
     managementPolicy?: StreamingInfrastructureManagementPolicy;
     /** Optional only for saves commissioned before physical infrastructure existed. */
     physicalSummary?: OwnedStreamingInfrastructurePhysicalSummary;
+    /** Frozen capacity of this revision; absent only on saves commissioned before Phase 6. */
+    baselineConcurrentStreams?: number;
+    burstConcurrentStreams?: number;
     readyAtAbsoluteWeek: number;
     revision: number;
     committedAtAbsoluteWeek: number;
@@ -4684,7 +4723,8 @@ export type StreamingResearchInstallTargetType =
     | 'RACK_GROUP'
     | 'PRODUCT_LINE'
     | 'LOCALIZATION_CAPABILITY'
-    | 'CONSTRUCTION_PROGRAM';
+    | 'CONSTRUCTION_PROGRAM'
+    | 'NETWORK_FIBRE';
 
 /** Research unlocks a real installation; it never grants the installation benefit itself. */
 export interface OwnedStreamingResearchProgram {
@@ -6450,6 +6490,8 @@ export interface OwnedStreamingPlatformState {
     hqOnboarding: OwnedStreamingHqOnboardingState;
     infrastructureSetupDraft: OwnedStreamingInfrastructureSetupDraft | null;
     infrastructureSetup: OwnedStreamingInfrastructureSetup | null;
+    /** A paid live-network change order that has not completed construction yet. */
+    pendingInfrastructureSetup: OwnedStreamingInfrastructureSetup | null;
     technologyProjects: OwnedStreamingTechnologyProject[];
     researchPrograms: OwnedStreamingResearchProgram[];
     campusProjects: OwnedStreamingCampusProject[];
@@ -6472,6 +6514,10 @@ export interface OwnedStreamingPlatformState {
     launchCommit: OwnedStreamingLaunchCommit | null;
     subscriptionPrices: Record<StreamingSubscriptionTierId, number>;
     founderOwnershipPercent: number;
+    /** Canonical network-wide fibre position. Optional for pre-ladder saves. */
+    fibre?: { generation: number; level: number };
+    /** Week from which the rising service standard is measured. */
+    serviceStandardFromWeek?: number;
     treasuryCash: number;
     debtPrincipal: number;
     infrastructureStrategy: StreamingInfrastructureStrategy;
@@ -6496,7 +6542,7 @@ export interface OwnedStreamingPlatformState {
     milestoneKeys: string[];
 }
 
-export const OWNED_STREAMING_PLATFORM_SCHEMA_VERSION = 26;
+export const OWNED_STREAMING_PLATFORM_SCHEMA_VERSION = 27;
 
 export const createInitialOwnedStreamingPlatformState = (playerId = ''): OwnedStreamingPlatformState => ({
     schemaVersion: OWNED_STREAMING_PLATFORM_SCHEMA_VERSION,
@@ -6674,6 +6720,7 @@ export const createInitialOwnedStreamingPlatformState = (playerId = ''): OwnedSt
     },
     infrastructureSetupDraft: null,
     infrastructureSetup: null,
+    pendingInfrastructureSetup: null,
     technologyProjects: [],
     researchPrograms: [],
     campusProjects: [],
@@ -9703,11 +9750,15 @@ export interface WorldAudienceParticipationState {
     snapshots: WorldAudienceParticipationSnapshot[];
 }
 
+export type StreamingBillingPath = 'MONTHLY' | 'ANNUAL';
+
 export interface WorldStreamingPlanOffer {
     id: string;
     name: string;
     monthlyPrice: number;
     effectiveMonthlyPrice: number;
+    monthlyBillingPrice: number;
+    annualBillingMonthlyPrice: number;
     featureIds: string[];
     ads: boolean;
     appealIndex: number;
@@ -9746,6 +9797,8 @@ export interface WorldStreamingPlanAllocation {
     planId: string;
     planName: string;
     households: number;
+    monthlyHouseholds: number;
+    annualHouseholds: number;
     effectiveMonthlyPrice: number;
     monthlySubscriptionRevenue: number;
 }
@@ -9870,6 +9923,7 @@ export interface WorldStreamingCustomerLapsedCell {
 
 export interface WorldStreamingCustomerCohortState {
     cohortId: string;
+    billingPath: StreamingBillingPath;
     reachableHouseholds: number;
     payingHouseholds: number;
     profiles: number;
@@ -9884,6 +9938,7 @@ export interface WorldStreamingCustomerCohortState {
 
 export interface WorldStreamingCustomerMovement {
     id: string;
+    billingPath?: StreamingBillingPath;
     absoluteWeek: number;
     countryId: string;
     cohortId: string;
@@ -10001,7 +10056,7 @@ export interface WorldStreamingCustomerSnapshot {
 }
 
 export interface WorldStreamingCustomerState {
-    schemaVersion: 1;
+    schemaVersion: 2;
     initializedAtAbsoluteWeek: number;
     lastProcessedAbsoluteWeek: number;
     sourceFingerprint: string;

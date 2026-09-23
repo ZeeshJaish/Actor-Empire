@@ -41,7 +41,8 @@ export default function StreamingOpeningProgramme({
   const focusRef = useRef<HTMLLIElement>(null);
   useEffect(() => {
     if (!focusId) return;
-    focusRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    focusRef.current?.scrollIntoView({ block: 'center', behavior: reduceMotion ? 'auto' : 'smooth' });
     focusRef.current?.focus({ preventScroll: true });
   }, [focusId]);
   const controller = view.workstreams.find(item => item.controlsDate) || null;
@@ -49,6 +50,9 @@ export default function StreamingOpeningProgramme({
   const openingLabel = ready
     ? 'Begin Opening Night'
     : `Opening Night · ${view.remainingWeeks} ${view.remainingWeeks === 1 ? 'week' : 'weeks'} remaining`;
+  const openingGateReason = controller
+    ? `${controller.label} is controlling the opening date. ${controller.remainingWeeks ?? view.remainingWeeks} ${controller.remainingWeeks === 1 ? 'week remains' : 'weeks remain'}.`
+    : 'Opening Night is waiting for the commissioned workstreams to finish.';
 
   return (
     <main className="sop" style={{ ['--sop-brand' as string]: `hsl(${brand.hue} ${brand.sat}% 58%)` }}>
@@ -74,7 +78,7 @@ export default function StreamingOpeningProgramme({
           <div><Clock3 aria-hidden="true" /><span><b>{controller.label}</b><small>{controller.detail}</small></span><strong>{controller.remainingWeeks ?? '—'} wk</strong></div>
         </section>
       ) : (
-        <section className="sop-controller is-ready"><p className="sop-eyebrow">All systems ready</p><div><Check /><span><b>Opening Night is cleared</b><small>The commissioned service can take its first viewers.</small></span></div></section>
+        <section className="sop-controller is-ready"><p className="sop-eyebrow">All systems ready</p><div><Check aria-hidden="true" /><span><b>Opening Night is cleared</b><small>The commissioned service can take its first viewers.</small></span></div></section>
       )}
 
       <section className="sop-workstreams">
@@ -100,8 +104,11 @@ export default function StreamingOpeningProgramme({
       </section>
 
       <footer className="sop-actions">
+        {!ready && <p id="sop-opening-gate-reason" role="status" className="sop-gate-reason">{openingGateReason}</p>}
         <button type="button" className="sop-plan" onClick={onOpenCommissionedPlan}>Commissioned plan</button>
-        <button type="button" className="sop-open" disabled={!ready} aria-disabled={!ready} onClick={onOpeningNight}>{openingLabel}</button>
+        <button type="button" className="sop-open" disabled={!ready} aria-disabled={!ready}
+          aria-describedby={!ready ? 'sop-opening-gate-reason' : undefined}
+          onClick={onOpeningNight}>{openingLabel}</button>
       </footer>
     </main>
   );

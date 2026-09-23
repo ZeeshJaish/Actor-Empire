@@ -125,13 +125,20 @@ const titleFormat = (player: Player, projectId: string, genre: string): TitleFin
     return project?.projectType === 'SERIES' ? 'SERIES' : 'FILM';
 };
 
-const titlesFrom = (model: StreamingFinanceRoomModel, player: Player): TitleFinance[] => (
-    model.titlePerformance.map((title) => ({
+const titlesFrom = (model: StreamingFinanceRoomModel, player: Player): TitleFinance[] => {
+    const posterById = new Map([
+        ...(player.pastProjects || []),
+        ...player.businesses.flatMap(business => business.studioState?.scripts || []),
+    ].flatMap(source => source.customPoster
+        ? [[String(source.id), source.customPoster] as const]
+        : []));
+    return model.titlePerformance.map((title) => ({
         id: title.projectId,
         name: title.title,
         format: titleFormat(player, title.projectId, title.genre),
         releasedLabel: `${title.source.replaceAll('_', ' ')} · ${title.genre}`,
         posterSeed: title.projectId,
+        poster: posterById.get(title.projectId),
         subscriptionValue: title.revenue,
         advertising: 0,
         licensing: 0,
@@ -139,8 +146,8 @@ const titlesFrom = (model: StreamingFinanceRoomModel, player: Player): TitleFina
         marketingCost: 0,
         infrastructureCost: 0,
         trend: model.revenueChangePercent ?? 0,
-    }))
-);
+    }));
+};
 
 const sourcesFrom = (model: StreamingFinanceRoomModel): RevenueSource[] => (
     model.revenueSlices.map((source) => ({ id: source.id, name: source.label, amount: source.amount }))

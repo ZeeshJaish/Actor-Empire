@@ -253,6 +253,11 @@ assert(!engineSource.includes('Math.random'), 'The canonical launch rehearsal mu
     assert(buildSource.includes(fragment), `The Phase 6 command sequence must expose ${fragment}.`);
 });
 assert(hqSource.includes('LEGACY MARKET FALLBACK') && hqSource.includes('getStreamingDayOneMarketsForRegion'), 'Pre-Day-One-Market saves must receive deterministic country evidence.');
-assert(styleSource.includes('.rhsequence') && styleSource.includes('overflow-x:auto') && styleSource.includes('prefers-reduced-motion'), 'The rehearsal sequence must retain narrow-mobile and reduced-motion support.');
+assert(
+    styleSource.includes('.rhrail')
+    && /@media\s*\(max-width:\s*360px\)/.test(styleSource)
+    && /@media\s*\(prefers-reduced-motion:\s*reduce\)/.test(styleSource),
+    'The rehearsal rail must retain narrow-mobile and reduced-motion support.',
+);
 
 console.log('EMPIRE+ Phase 6 viewer forecast and launch rehearsal audit passed.');

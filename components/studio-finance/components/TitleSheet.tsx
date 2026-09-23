@@ -3,7 +3,7 @@
 import type { TitleFinance } from '../finance/types';
 import { TITLE_STATUS_COPY, titleTotals } from '../finance/derive';
 import { money, pct, signedPct } from '../finance/format';
-import { Poster } from './Poster';
+import { StreamingTitleArt } from './StreamingTitleArt';
 import { Row, Sheet, Tag, TrendChip } from './ui';
 
 interface Props {
@@ -30,7 +30,7 @@ export function TitleSheet({ title, onClose, onOpenTitle }: Props) {
       )}
     >
       <div className="sf-sheet-hero">
-        <Poster seed={title.posterSeed ?? title.id} size={58} />
+        <StreamingTitleArt id={title.posterSeed ?? title.id} title={title.name} genre={title.format} poster={title.poster} size={58} />
         <div>
           <p className="sf-eyebrow">Lifetime profit</p>
           <p className={`sf-sheet-figure ${totals.net >= 0 ? 'sf-tone-good' : 'sf-tone-bad'}`}>{money(totals.net, { sign: true })}</p>

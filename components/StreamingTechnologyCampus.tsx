@@ -48,6 +48,8 @@ import {
   chooseStreamingResearchIpStrategy,
   getImmersionCoolingCompatibleFacilities,
   getStreamingResearchPortfolio,
+  buyStreamingFibreLevels,
+  installStreamingFibreGeneration,
   installStreamingLocalizationCapability,
   installStreamingResearchInFacility,
   startStreamingResearchProgram,
@@ -55,6 +57,15 @@ import {
 } from '../services/streamingResearchLifecycle';
 import StreamingVisualScene from './StreamingVisualScene';
 import '../styles/streaming-technology-campus.css';
+import {
+  MAX_FIBRE_LEVEL,
+  STREAMING_FIBRE_GENERATIONS,
+  fibreLevelRunCost,
+  fibreMultiplier,
+  fibreWeeklyHoldCost,
+  normalizeStreamingFibreState,
+  standardReadout,
+} from '../services/streamingFibreLadder';
 
 interface Props {
   player: Player;
@@ -271,6 +282,43 @@ export default function StreamingTechnologyCampus({
     onUpdatePlayer(result.player);
   };
 
+  /* Where the platform stands on the ladder, and what the next step off it
+     costs. All derived — the save carries two integers and a week. */
+  const fibreState = normalizeStreamingFibreState(player.ownedStreamingPlatform.fibre);
+  const fibreGeneration = STREAMING_FIBRE_GENERATIONS[fibreState.generation];
+  const fibreNow = fibreMultiplier(fibreState);
+  const fibreHold = fibreWeeklyHoldCost(fibreState);
+  const fibreOne = fibreLevelRunCost(fibreState.level, 1);
+  const fibreTen = fibreLevelRunCost(fibreState.level, 10);
+  const fibreStandard = standardReadout(Math.max(
+    0,
+    campus.absoluteWeek - (player.ownedStreamingPlatform.serviceStandardFromWeek ?? campus.absoluteWeek),
+  ));
+
+  const tuneFibre = (count: number) => {
+    const result = buyStreamingFibreLevels(player, count, campus.absoluteWeek);
+    if (!result.changed) {
+      dispatch({ type: 'FEEDBACK', feedback: result.reason || 'The fibre cannot be tuned further.' });
+      return;
+    }
+    onUpdatePlayer(result.player);
+    dispatch({
+      type: 'FEEDBACK',
+      feedback: `Fibre tuned ${result.levels} ${result.levels === 1 ? 'level' : 'levels'} for ${formatMoney(result.cost)}.`,
+    });
+  };
+
+  const rollOutFibre = () => {
+    if (!selectedResearch) return;
+    const result = installStreamingFibreGeneration(player, selectedResearch.definition.id);
+    if (!result.changed) {
+      dispatch({ type: 'FEEDBACK', feedback: result.reason || 'This fibre rollout cannot begin yet.' });
+      return;
+    }
+    onUpdatePlayer(result.player);
+    dispatch({ type: 'FEEDBACK', feedback: 'Fibre rollout under way. Reach is unchanged until it completes.' });
+  };
+
   const openResearchInstallation = (item: StreamingResearchProgramView) => {
     if (item.definition.mappedTechnologyId) {
       const target = campus.facilities.flatMap(facility => facility.nodes.map(node => ({ facility, node })))
@@ -310,6 +358,53 @@ export default function StreamingTechnologyCampus({
           <div><span>R&D PORTFOLIO</span><h2>Seven disciplines. Six accountable stages.</h2></div>
           <p>Research creates a tested possibility. IP clearance, installation capital and an exact operating target remain separate decisions.</p>
         </header>
+
+        {/* --- the fibre ladder ------------------------------------------------
+            A generation is a research project in the list below. The levels
+            underneath it are not: they are a purchase, made here, because the
+            six stages describe inventing something and this is the same node
+            getting faster. Both numbers are shown together because they are one
+            position, and because the standard beside them is the reason either
+            of them matters. */}
+        <div className="tech-fibre">
+          <div className="tech-fibre-where">
+            <span>NETWORK FIBRE</span>
+            <h3>{fibreGeneration.name}</h3>
+            <p>{fibreGeneration.line}</p>
+          </div>
+          <dl className="tech-fibre-read">
+            <div>
+              <dt>Tuning</dt>
+              <dd><b>{fibreState.level}</b><em>of {MAX_FIBRE_LEVEL}</em></dd>
+            </div>
+            <div>
+              <dt>Reach</dt>
+              <dd><b>×{fibreNow.toFixed(2)}</b><em>every room you hold</em></dd>
+            </div>
+            <div>
+              <dt>Expected of you</dt>
+              <dd><b>{fibreStandard.now.toFixed(2)}</b><em>{fibreStandard.atCeiling ? 'as high as it goes' : `${fibreStandard.inFiveYears.toFixed(2)} in five years`}</em></dd>
+            </div>
+            <div>
+              <dt>Held weekly</dt>
+              <dd><b>{formatMoney(fibreHold)}</b><em>{fibreState.level > 0 ? 'to stay tuned' : 'nothing to hold'}</em></dd>
+            </div>
+          </dl>
+          <div className="tech-fibre-buy">
+            {fibreState.level >= MAX_FIBRE_LEVEL ? (
+              <p className="tech-fibre-maxed">Tuned as far as this generation goes. The next one is in the list below.</p>
+            ) : (
+              <>
+                <button type="button" className="tech-research-primary" onClick={() => tuneFibre(1)}>
+                  <Wrench size={17} /> One level · {formatMoney(fibreOne.cost)}
+                </button>
+                <button type="button" onClick={() => tuneFibre(10)}>
+                  {fibreTen.levels === 10 ? 'Ten levels' : `${fibreTen.levels} levels`} · {formatMoney(fibreTen.cost)}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
         <div className="tech-research-layout">
           <div className="tech-research-catalog" aria-label="Research categories">
             {researchPortfolio.programs.map(item => (
@@ -384,6 +479,13 @@ export default function StreamingTechnologyCampus({
                 ) : definition.installTargetType === 'LOCALIZATION_CAPABILITY' ? (
                   <button type="button" className="tech-research-primary" disabled={Boolean(blockers.length)} onClick={installLocalizationCapability}>
                     <Wrench size={17} /> Install for {formatMoney(program.installationCost)}
+                  </button>
+                ) : definition.installTargetType === 'NETWORK_FIBRE' ? (
+                  /* Nothing to choose. A fibre generation is your own kit on
+                     both ends of every link, so it lands on every room at once,
+                     rented ones included. */
+                  <button type="button" className="tech-research-primary" disabled={Boolean(blockers.length)} onClick={rollOutFibre}>
+                    <Wrench size={17} /> Roll out across every room for {formatMoney(program.installationCost)}
                   </button>
                 ) : definition.installTargetType === 'CONSTRUCTION_PROGRAM' ? (
                   <button type="button" className="tech-research-primary" onClick={onOpenCampusConstruction}>

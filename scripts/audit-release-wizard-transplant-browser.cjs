@@ -82,7 +82,9 @@ const URL = process.env.RELEASE_WIZARD_FIXTURE_URL
     await page.waitForLoadState('networkidle');
     assert.equal(await page.getByText('WHERE IT OPENS', { exact: true }).count(), 1);
     assert.equal(await page.getByRole('img', { name: 'Interactive theatrical release map' }).count(), 1);
-    await page.locator('.region-map-hit-area').first().click();
+    const firstRegion = page.locator('.region-map-hit-area').first();
+    await firstRegion.focus();
+    await firstRegion.press('Enter');
     await page.getByRole('button', { name: 'Nova Circuit', exact: true }).click();
     assert.match(await page.getByText(/screens/).first().textContent() || '', /[0-9,]+ screens/);
     assert.equal(await page.getByRole('button', { name: 'CONTINUE' }).isEnabled(), true);
