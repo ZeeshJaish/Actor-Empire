@@ -370,7 +370,10 @@ export const isAuthoredStreamingMarket = (id: string): boolean => (
 const MARKET_BY_ID = new Map(STREAMING_WORLD_MARKETS.map(market => [market.id, market]));
 const VALID_CITY_IDS = new Set(PRODUCTION_LOCATION_CATALOG.map(city => city.id));
 
-export const normalizeStreamingDayOneMarketIds = (value: unknown, limit = 40): string[] => Array.from(new Set(
+export const normalizeStreamingDayOneMarketIds = (
+    value: unknown,
+    limit = WORLD_COUNTRY_DEFINITIONS.length,
+): string[] => Array.from(new Set(
     (Array.isArray(value) ? value : [])
         .map(item => String(item || '').trim().toUpperCase())
         .filter(id => MARKET_BY_ID.has(id)),

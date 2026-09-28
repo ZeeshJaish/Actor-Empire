@@ -54,6 +54,8 @@ const buildInheritedProjectDetails = (
         title: production.title,
         sourceScriptId: `inherited_script_${production.canonicalProjectId}`,
         writerName: production.writerName,
+        ...(production.writerId ? { writerId: production.writerId } : {}),
+        ...(talent?.talentParticipation ? { talentParticipation: talent.talentParticipation } : {}),
         writerSkill: production.writerSkill,
         isOriginal: true,
         type: production.projectType,

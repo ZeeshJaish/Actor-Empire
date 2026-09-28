@@ -37,7 +37,8 @@ export type StreamingRightsConflictCode =
     | 'SUBLICENSE_WINDOW_EXCEEDED'
     | 'SUBLICENSE_EXCLUSIVITY_EXCEEDED'
     | 'RELATED_IP_RESTRICTED'
-    | 'CHANGE_OF_CONTROL_CONSENT_REQUIRED';
+    | 'CHANGE_OF_CONTROL_CONSENT_REQUIRED'
+    | 'LEGACY_RIGHTS_UNRESOLVED';
 
 export interface StreamingRightsConflict {
     code: StreamingRightsConflictCode;
@@ -48,7 +49,7 @@ export interface StreamingRightsConflict {
 }
 
 export interface StreamingRightsCompatibilityInput {
-    world: Pick<WorldState, 'streamingRightsContracts'>;
+    world: Pick<WorldState, 'streamingRightsContracts' | 'legacyStreamingRightsHolds'>;
     sourceProjectId: string;
     buyerPlatformId: string | null;
     sellerPartyId?: string | null;
@@ -83,7 +84,7 @@ export interface StreamingRightsCompatibilityResult {
 /** Compatibility adapter retained for callers introduced before A3. */
 export interface StreamingRightsAvailabilityInput {
     player?: unknown;
-    world: Pick<WorldState, 'streamingRightsContracts'>;
+    world: Pick<WorldState, 'streamingRightsContracts' | 'legacyStreamingRightsHolds'>;
     sourceProjectId: string;
     buyerPlatformId: string | null;
     exclusivity: StreamingLicenseExclusivity;
@@ -105,7 +106,7 @@ export type StreamingRightsAvailabilityResult = StreamingRightsCompatibilityResu
 };
 
 export interface BuildStreamingBiddingRightsLotInput {
-    world: Pick<WorldState, 'streamingRightsContracts'>;
+    world: Pick<WorldState, 'streamingRightsContracts' | 'legacyStreamingRightsHolds'>;
     sourceProjectId: string;
     sellerPartyId: string;
     startsAtAbsoluteWeek: number;
@@ -225,6 +226,7 @@ const conflictDetail = (
     if (code === 'SOURCE_CONTRACT_MISSING') return 'The source contract is missing from the canonical ledger.';
     if (code === 'RELATED_IP_RESTRICTED') return 'A canonical related-IP grant controls these rights.';
     if (code === 'CHANGE_OF_CONTROL_CONSENT_REQUIRED') return 'The controlling contract requires consent before ownership changes.';
+    if (code === 'LEGACY_RIGHTS_UNRESOLVED') return 'An older streaming sale is recorded, but its buyer cannot be verified. These rights are held off the market.';
     return 'The requested territory does not contain a valid country snapshot.';
 };
 
@@ -330,6 +332,18 @@ export const resolveStreamingRightsCompatibility = (
         const result: Omit<StreamingRightsCompatibilityResult, 'summary'> = {
             status: 'RESTRICTED', available: false, requestedCountryIds: [], availableCountryIds: [],
             blockedCountryIds: [], compatibleWindowTypes: [], controllingContractIds: [],
+            conflicts: [conflict], earliestCompatibleStartWeek: null,
+        };
+        return { ...result, summary: summarize(result, registry) };
+    }
+
+    const legacyHold = input.world.legacyStreamingRightsHolds?.[input.sourceProjectId];
+    if (legacyHold?.sourceProjectId === input.sourceProjectId) {
+        const conflict = makeConflict('LEGACY_RIGHTS_UNRESOLVED', requestedCountryIds, []);
+        const result: Omit<StreamingRightsCompatibilityResult, 'summary'> = {
+            status: 'UNAVAILABLE', available: false, requestedCountryIds,
+            availableCountryIds: [], blockedCountryIds: [...requestedCountryIds],
+            compatibleWindowTypes: [], controllingContractIds: [],
             conflicts: [conflict], earliestCompatibleStartWeek: null,
         };
         return { ...result, summary: summarize(result, registry) };

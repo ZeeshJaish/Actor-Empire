@@ -1,7 +1,9 @@
 import type { Player, StreamingStarterCatalogPackageId } from '../types';
 import { getAbsoluteWeek } from './legacyLogic';
 import { compactOwnedStreamingPlatformForPersistence, normalizeOwnedStreamingPlatformState } from './ownedStreamingPlatform';
-import { getEligibleOwnedStreamingTitles, STREAMING_STARTER_CATALOG_PACKAGES } from './streamingCatalog';
+import { getEligibleOwnedStreamingTitles, getStreamingMarketCandidateCompatibility,
+    resolveStreamingCatalogTitle, STREAMING_STARTER_CATALOG_PACKAGES } from './streamingCatalog';
+import { getHistoricalCatalogueTitles } from './historicalCatalogue';
 import {
     createDefaultStreamingRightsTerms, getOwnedPlatformPackageCountryIds, getStreamingRightsOpportunities,
     getStreamingCataloguePackageOpportunities, openStreamingPrivateOffer, openStreamingRightsNegotiation, signStreamingRightsDeal,
@@ -45,7 +47,70 @@ export const getContentMarketListings = (player: Player) => {
         // The displayed contract snapshot is checked again on acceptance; no silently revised price/scope.
         const signature = JSON.stringify([o.id, terms, countryIds, source]);
         return { ...o, terms, countryIds, unavailableReason, signature, inheritedContract: source };
-    });
+    }).filter(listing => !listing.unavailableReason);
+};
+
+export type ContentMarketLibraryStatus = 'AVAILABLE' | 'HELD' | 'OWNED' | 'UNRESOLVED' | 'NOT_OFFERED';
+export interface ContentMarketLibrarySearchRow {
+    title: NonNullable<ReturnType<typeof resolveStreamingCatalogTitle>>;
+    status: ContentMarketLibraryStatus;
+    reason: string;
+    listingId: string | null;
+}
+
+/** Browses canonical titles without turning unavailable history into a purchasable offer. */
+export const searchContentMarketLibrary = (
+    player: Player,
+    options: {
+        query?: string;
+        projectType?: 'MOVIE' | 'SERIES';
+        genre?: string;
+        languageId?: string;
+        producerId?: string;
+        minimumQuality?: number;
+        releasedAfterYear?: number;
+        catalogueTier?: 'MARQUEE';
+        limit?: number;
+    } = {},
+): ContentMarketLibrarySearchRow[] => {
+    const query = (options.query || '').trim().toLocaleLowerCase();
+    const limit = Math.max(0, Math.min(100, Math.floor(options.limit ?? 30)));
+    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+    const ownedIds = new Set(platform.catalogProjectIds);
+    const ownedStudioIds = new Set((player.businesses || [])
+        .filter(business => business.type === 'PRODUCTION_HOUSE').map(business => business.id));
+    const listingById = new Map(getContentMarketListings(player)
+        .map(listing => [listing.title.id, listing.id]));
+    return getHistoricalCatalogueTitles(player)
+        .filter(title => !options.projectType || title.projectType === options.projectType)
+        .filter(title => !options.genre || title.genre === options.genre)
+        .filter(title => !options.languageId || title.originalLanguageId === options.languageId)
+        .filter(title => !options.producerId || title.studioId === options.producerId)
+        .filter(title => options.minimumQuality == null || title.quality >= options.minimumQuality)
+        .filter(title => options.releasedAfterYear == null || title.year >= options.releasedAfterYear)
+        .filter(title => !options.catalogueTier || title.catalogueTier === options.catalogueTier)
+        .filter(title => !query || [title.title, title.genre, title.originalLanguageId,
+            title.studioName, title.regionId, title.projectType]
+            .some(value => value.toLocaleLowerCase().includes(query)))
+        .sort((left, right) => right.rating - left.rating || left.id.localeCompare(right.id))
+        .slice(0, limit)
+        .map(source => {
+            const title = resolveStreamingCatalogTitle(player, source.id)!;
+            if (ownedIds.has(source.id) || ownedStudioIds.has(source.studioId)) {
+                return { title, status: 'OWNED' as const, reason: 'Already in your catalogue or studio library.', listingId: null };
+            }
+            if (player.world.legacyStreamingRightsHolds?.[source.id]) {
+                return { title, status: 'UNRESOLVED' as const, reason: 'Past streaming rights need reconciliation.', listingId: null };
+            }
+            const compatibility = getStreamingMarketCandidateCompatibility(player, title);
+            if (!compatibility.available) {
+                return { title, status: 'HELD' as const, reason: compatibility.summary, listingId: null };
+            }
+            const listingId = listingById.get(source.id) || null;
+            return { title, status: listingId ? 'AVAILABLE' as const : 'NOT_OFFERED' as const,
+                reason: listingId ? 'Available on the current market shelf.' : 'Rights may be free, but no direct listing is on this cycle’s shelf.',
+                listingId };
+        });
 };
 
 export interface ContentMarketAuctionAssignments {
@@ -59,12 +124,16 @@ export interface ContentMarketSupplySummary {
     collectionTitles: number;
     liveAuctions: number;
     totalCanonicalTitles: number;
+    sharedLibraryTitles: number;
     foundingBoost: boolean;
     nextRotationAbsoluteWeek: number;
 }
 
 /** One deterministic auction allocation shared by title and package inventory. */
-export const getContentMarketAuctionAssignments = (player: Player): ContentMarketAuctionAssignments => {
+export const getContentMarketAuctionAssignments = (
+    player: Player,
+    prepared?: { listings: ReturnType<typeof getContentMarketListings>; collections: ReturnType<typeof getContentMarketCollections> },
+): ContentMarketAuctionAssignments => {
     const profile = getStreamingMarketSupplyProfile(player);
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     const liveProjectIds = new Set(platform.buyerAuctionSessions
@@ -74,10 +143,10 @@ export const getContentMarketAuctionAssignments = (player: Player): ContentMarke
         .filter(session => session.status === 'LIVE')
         .map(session => session.lot.cataloguePackageId)
         .filter((id): id is string => Boolean(id)));
-    const listings = getContentMarketListings(player)
+    const listings = (prepared?.listings || getContentMarketListings(player))
         .filter(listing => !listing.unavailableReason && !listing.sourceLicenseId)
         .filter(listing => !liveProjectIds.has(listing.title.id));
-    const collections = getContentMarketCollections(player)
+    const collections = (prepared?.collections || getContentMarketCollections(player))
         .filter(collection => !livePackageIds.has(collection.id))
         .filter(collection => !collection.package.components.some(component => liveProjectIds.has(component.sourceProjectId)));
     const score = (kind: 'TITLE' | 'COLLECTION', id: string): number => hashDeterministicSeed([
@@ -129,22 +198,34 @@ export const submitContentMarketPrivateOffer = (
     ? { player, changed: false, reason: 'NOT_READY', detail: 'These rights are assigned to a live auction. Enter the auction room to compete.' }
     : openStreamingPrivateOffer(player, listingId, terms);
 
-export const getContentMarketCollections = (player: Player, includeReservedOpportunityId?: string) => getStreamingCataloguePackageOpportunities(player, {
-    includeReservedOpportunityId,
-}).map(o => ({
-    ...o, signature: JSON.stringify([o.id, o.totalGuarantee, o.rows]),
-}));
+export const getContentMarketCollections = (player: Player, includeReservedOpportunityId?: string) => {
+    const savedIds = player.world.streamingOpportunityMarket?.cycle === getStreamingMarketSupplyProfile(player).cycle
+        ? new Set([...player.world.streamingOpportunityMarket.collectionIds,
+            ...(Array.isArray(player.world.streamingOpportunityMarket.scoutedCollectionIds)
+                ? player.world.streamingOpportunityMarket.scoutedCollectionIds : [])])
+        : null;
+    return getStreamingCataloguePackageOpportunities(player, {
+        includeReservedOpportunityId,
+    }).filter(opportunity => !savedIds || savedIds.has(opportunity.id)
+        || opportunity.id === includeReservedOpportunityId).map(o => ({
+        ...o, signature: JSON.stringify([o.id, o.totalGuarantee, o.rows]),
+    }));
+};
 
 export const getContentMarketAuctionCollections = (player: Player) => {
     const assignments = getContentMarketAuctionAssignments(player);
     return getContentMarketCollections(player).filter(collection => assignments.collectionIds.has(collection.id));
 };
 
-export const getContentMarketSupplySummary = (player: Player): ContentMarketSupplySummary => {
+export const getContentMarketSupplySummary = (
+    player: Player,
+    prepared?: { listings: ReturnType<typeof getContentMarketListings>; collections: ReturnType<typeof getContentMarketCollections>;
+        assignments: ContentMarketAuctionAssignments; sharedLibraryTitles?: number },
+): ContentMarketSupplySummary => {
     const profile = getStreamingMarketSupplyProfile(player);
-    const listings = getContentMarketListings(player);
-    const collections = getContentMarketCollections(player);
-    const assignments = getContentMarketAuctionAssignments(player);
+    const listings = prepared?.listings || getContentMarketListings(player);
+    const collections = prepared?.collections || getContentMarketCollections(player);
+    const assignments = prepared?.assignments || getContentMarketAuctionAssignments(player, { listings, collections });
     const collectionTitleIds = new Set(collections.flatMap(collection => (
         collection.package.components.map(component => component.sourceProjectId)
     )));
@@ -158,6 +239,8 @@ export const getContentMarketSupplySummary = (player: Player): ContentMarketSupp
         collectionTitles: collectionTitleIds.size,
         liveAuctions: assignments.listingIds.size + assignments.collectionIds.size,
         totalCanonicalTitles: allTitleIds.size,
+        sharedLibraryTitles: player.world.historicalCatalogue
+            ? prepared?.sharedLibraryTitles ?? getHistoricalCatalogueTitles(player).length : allTitleIds.size,
         foundingBoost: profile.foundingBoost,
         nextRotationAbsoluteWeek: (profile.cycle + 1) * 3,
     };

@@ -8,6 +8,7 @@ import { NPCActor, NPCTier } from '../../../types';
 import { getDirectorTalent } from '../../../services/roleLogic';
 import { getPlayerLanguage, t } from '../../../services/i18n';
 import { getAbsoluteWeek, getInheritedStudioProjects } from '../../../services/legacyLogic';
+import { creditTalentUpfront } from '../../../services/talentCareer';
 
 
 import { DevelopmentLab, DevelopmentLabInitialTab } from './DevelopmentLab';
@@ -23,6 +24,7 @@ import { discardUnreleasedScript, renameStudioProjectTitle } from '../../../serv
 import { getProjectReleaseLabel, getProjectReleaseSortValue, getProjectReleaseTiming } from '../../../services/releaseTiming';
 import { getReleaseDisplayPhase } from '../../../services/releasePresentation';
 import { createContinuationScript, getContinuationEligibility, getContinuationScriptBaseline } from '../../../services/sequelFlow';
+import { suggestReturningBackendDemand } from '../../../services/talentParticipation';
 import { getStudioGroup } from '../../../services/studioGroup';
 import { getStudioGroupValuation } from '../../../services/studioGroupValuation';
 import { StudioGroupView } from './StudioGroupView';
@@ -656,6 +658,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                 id: details.directorId,
                 originalSalary: dirSalary,
                 newDemand: dirSalary * 1.2, // 20% bump
+                backendDemandPoints: suggestReturningBackendDemand('DIRECTOR', dirSalary, isInternallyControlledTalent(details.directorId)),
                 negotiated: isInternallyControlledTalent(details.directorId),
                 accepted: isInternallyControlledTalent(details.directorId),
                 attemptsLeft: isInternallyControlledTalent(details.directorId) ? 0 : 3
@@ -690,6 +693,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                         id: c.actorId,
                         originalSalary: originalSalary,
                         newDemand: originalSalary * 1.2, // 20% bump
+                        backendDemandPoints: suggestReturningBackendDemand(c.roleType === 'LEAD' ? 'LEAD_ACTOR' : 'SUPPORTING_ACTOR', originalSalary, isInternallyControlledTalent(c.actorId)),
                         negotiated: isInternallyControlledTalent(c.actorId),
                         accepted: isInternallyControlledTalent(c.actorId),
                         attemptsLeft: isInternallyControlledTalent(c.actorId) ? 0 : 3
@@ -849,6 +853,9 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
 
         // Update player
         const updatedPlayer = { ...player };
+        if (writer && writer.fee > 0) updatedPlayer.world = creditTalentUpfront(player.world, newScriptId,
+            [{ talentId: writer.id, talentName: writer.name, role: 'WRITER', amount: writer.fee }],
+            `sequel_writer:${newScriptId}`, getAbsoluteWeek(player.age, player.currentWeek)).world;
         updatedPlayer.businesses = updatedPlayer.businesses.map(b => b.id === studio.id ? updatedStudio : b);
         onUpdatePlayer(updatedPlayer);
         
@@ -1075,16 +1082,16 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                 <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 via-zinc-950 to-zinc-950"></div>
                 <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3"></div>
 
-                {/* Top Nav Bar (with pt-12 for mobile status bar) */}
-                <div className="relative flex items-center justify-between px-4 pt-12 pb-4">
-                    <div className="flex items-center gap-3">
-                        <button onClick={onBack} className="p-2 hover:bg-zinc-800/50 rounded-full text-zinc-400 hover:text-white transition-colors backdrop-blur-sm">
+                {/* Top Nav Bar */}
+                <div className="relative flex items-center justify-between px-4 pt-[max(3rem,env(safe-area-inset-top))] pb-4">
+                    <div className="flex min-w-0 items-center gap-3">
+                        <button onClick={onBack} aria-label="Back from studio dashboard" className="inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center hover:bg-zinc-800/50 rounded-full text-zinc-400 hover:text-white transition-colors backdrop-blur-sm">
                             <ArrowLeft size={20} />
                         </button>
-                        <div className="flex flex-col">
-                            <div className="flex items-center gap-2">
-                                <span className="font-serif font-black uppercase tracking-tight text-xl text-white drop-shadow-md">{studio.name}</span>
-                                <span className="text-[9px] bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded uppercase font-bold tracking-wider shadow-[0_0_10px_rgba(245,158,11,0.2)]">
+                        <div className="flex min-w-0 flex-col">
+                            <div className="flex flex-col items-start gap-1 min-[390px]:flex-row min-[390px]:items-center min-[390px]:gap-2">
+                                <span className="min-w-0 break-words font-serif font-black uppercase tracking-tight text-xl text-white drop-shadow-md">{studio.name}</span>
+                                <span className="shrink-0 text-[9px] bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded uppercase font-bold tracking-wider shadow-[0_0_10px_rgba(245,158,11,0.2)]">
                                     {getStudioSubtypeLabel(studio.subtype)}
                                 </span>
                             </div>
@@ -1206,7 +1213,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                             <h2 className="text-lg font-bold text-white tracking-tight">{tr('studio.pastProjects')}</h2>
                             <button
                                 onClick={() => setView('FILMOGRAPHY')}
-                                className="inline-flex items-center gap-1.5 rounded-full border border-zinc-700 bg-zinc-900/80 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-zinc-300 hover:border-amber-500/50 hover:text-amber-300 transition-colors"
+                                className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-zinc-700 bg-zinc-900/80 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-zinc-300 hover:border-amber-500/50 hover:text-amber-300 transition-colors"
                             >
                                 {tr('studio.seeMore')} <ChevronRight size={12} />
                             </button>
@@ -1237,7 +1244,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
 
                     <div className="relative overflow-hidden rounded-[24px] border-2 border-[#29251f] bg-[#0a0908] p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_10px_0_#020202,0_18px_32px_rgba(0,0,0,0.35)]">
                         <div className="pointer-events-none absolute inset-x-4 top-0 h-px bg-gradient-to-r from-transparent via-amber-200/25 to-transparent" />
-                        <div className="grid grid-cols-2 gap-2.5">
+                        <div className="grid grid-cols-1 gap-2.5 min-[390px]:grid-cols-2">
                         {/* Development Division */}
                         <StudioDivisionCard
                             title={tr('studio.devLab')}
@@ -1429,7 +1436,7 @@ const FinanceModal: React.FC<{
             <div className="bg-zinc-950 border border-zinc-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
                 <div className="p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-900">
                     <h3 className="font-bold text-white">{tr('services.business.productionFinance.modal.title')}</h3>
-                    <button onClick={onClose} className="text-zinc-400 hover:text-white"><ArrowLeft size={20} className="rotate-180" /></button>
+                    <button onClick={onClose} className="grid h-11 w-11 place-items-center rounded-full text-zinc-400 hover:text-white" aria-label="Close funds manager"><ArrowLeft size={20} className="rotate-180" /></button>
                 </div>
                 
                 <div className="p-6 space-y-6">
@@ -1636,9 +1643,9 @@ const StudioFinanceView: React.FC<{
             {/* HEADER */}
             <div className="relative pt-12 pb-6 px-6 bg-zinc-900/50 border-b border-white/5 backdrop-blur-xl shrink-0 z-20">
                 <div className="flex items-center justify-between mb-6">
-                    <button onClick={onBack} className="bg-black/40 hover:bg-black/60 p-2 rounded-full backdrop-blur-md transition-colors border border-white/5"><ArrowLeft size={18} /></button>
+                    <button onClick={onBack} className="grid h-11 w-11 shrink-0 place-items-center bg-black/40 hover:bg-black/60 rounded-full backdrop-blur-md transition-colors border border-white/5" aria-label="Back to studio dashboard"><ArrowLeft size={18} /></button>
                     <div className="flex gap-2">
-                        <button onClick={() => setShowFinanceModal(true)} className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 px-3 py-1.5 rounded-full text-[10px] font-bold border border-amber-500/20 transition-colors">{tr('services.business.productionFinance.header.manageFunds')}</button>
+                        <button onClick={() => setShowFinanceModal(true)} className="min-h-11 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 px-3 py-1.5 rounded-full text-[10px] font-bold border border-amber-500/20 transition-colors">{tr('services.business.productionFinance.header.manageFunds')}</button>
                     </div>
                 </div>
                 <div className="flex items-end justify-between">
@@ -1740,7 +1747,7 @@ const StudioFinanceView: React.FC<{
                 {/* Ledger */}
                 <div className="bg-zinc-900 border border-zinc-800 rounded-[2rem] overflow-hidden">
                     <div className="border-b border-zinc-800 bg-gradient-to-r from-zinc-900 via-zinc-950 to-zinc-900 px-6 py-5">
-                        <div className="flex items-start justify-between gap-4">
+                        <div className="flex flex-wrap items-start justify-between gap-4">
                             <div>
                                 <div className="flex items-center gap-2 mb-1">
                                     <WalletCards size={16} className="text-amber-400" />
@@ -1757,7 +1764,7 @@ const StudioFinanceView: React.FC<{
                                     <button
                                         key={option.id}
                                         onClick={() => setLedgerRange(option.id as '12W' | '52W' | 'ALL')}
-                                        className={`px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-colors ${
+                                        className={`min-h-11 min-w-11 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-colors ${
                                             ledgerRange === option.id ? 'bg-amber-500 text-black' : 'text-zinc-500 hover:text-white'
                                         }`}
                                     >
@@ -2012,17 +2019,17 @@ const StudioFilmographyView: React.FC<{
     const bestHit = [...evaluationProjects].sort((a, b) => getStudioArchiveRevenue(b) - getStudioArchiveRevenue(a))[0];
 
     return (
-        <div className="absolute inset-0 bg-[#050505] text-white flex flex-col font-sans overflow-hidden">
+        <div className="absolute inset-0 flex flex-col overflow-y-auto bg-[#050505] font-sans text-white">
             <div className="relative shrink-0 z-20 border-b border-zinc-800 bg-zinc-950/95 px-4 pt-12 pb-5 shadow-[0_18px_60px_rgba(0,0,0,0.35)]">
-                <div className="flex items-center justify-between gap-4">
-                    <button onClick={onBack} className="p-2 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white">
+                <div className="flex flex-wrap items-start gap-3">
+                    <button onClick={onBack} aria-label="Back to studio" className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-zinc-800 bg-zinc-900 text-zinc-300 hover:text-white">
                         <ArrowLeft size={20} />
                     </button>
                     <div className="min-w-0 flex-1">
                         <div className="text-[10px] font-black uppercase tracking-[0.24em] text-amber-400">{tr('studio.filmography.eyebrow')}</div>
-                        <h1 className="text-2xl font-black tracking-tight text-white leading-tight truncate">{tr('studio.filmography.title', { studio: studio.name })}</h1>
+                        <h1 className="break-words text-2xl font-black leading-tight tracking-tight text-white">{tr('studio.filmography.title', { studio: studio.name })}</h1>
                     </div>
-                    <div className="rounded-full border border-amber-500/20 bg-amber-500/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-amber-300">
+                    <div className="ml-auto shrink-0 rounded-full border border-amber-500/20 bg-amber-500/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-amber-300">
                         {tr('studio.filmography.titles', { count: evaluationProjects.length })}
                     </div>
                 </div>
@@ -2054,7 +2061,7 @@ const StudioFilmographyView: React.FC<{
                         <button
                             key={option.id}
                             onClick={() => setSortMode(option.id as FilmographySort)}
-                            className={`shrink-0 rounded-full px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-colors ${
+                            className={`min-h-11 shrink-0 rounded-full px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-colors ${
                                 sortMode === option.id ? 'bg-amber-500 text-black' : 'border border-zinc-800 bg-zinc-950 text-zinc-400 hover:text-white'
                             }`}
                         >
@@ -2074,7 +2081,7 @@ const StudioFilmographyView: React.FC<{
                         <button
                             key={option.id}
                             onClick={() => setFilterMode(option.id as FilmographyFilter)}
-                            className={`shrink-0 rounded-full px-3.5 py-2 text-[10px] font-black uppercase tracking-widest transition-colors ${
+                            className={`min-h-11 shrink-0 rounded-full px-3.5 py-2 text-[10px] font-black uppercase tracking-widest transition-colors ${
                                 filterMode === option.id ? 'bg-white text-black' : 'border border-zinc-800 bg-zinc-950 text-zinc-500 hover:text-zinc-200'
                             }`}
                         >
@@ -2084,7 +2091,7 @@ const StudioFilmographyView: React.FC<{
                 </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto custom-scrollbar px-4 py-4 pb-24">
+            <div className="shrink-0 px-4 py-4 pb-24">
                 {filteredProjects.length > 0 ? (
                     <div className="space-y-3">
                         {filteredProjects.map(project => (
@@ -2107,8 +2114,8 @@ const StudioFilmographyView: React.FC<{
 
 const FilmographyMetric = ({ label, value }: { label: string; value: string }) => (
     <div className="rounded-2xl border border-zinc-800 bg-black/35 px-3 py-3 min-w-0">
-        <div className="truncate text-[8px] font-black uppercase tracking-widest text-zinc-500">{label}</div>
-        <div className="mt-1 truncate text-sm font-black text-white">{value}</div>
+        <div className="break-words text-[8px] font-black uppercase leading-tight tracking-widest text-zinc-500">{label}</div>
+        <div className="mt-1 break-words text-sm font-black text-white">{value}</div>
     </div>
 );
 

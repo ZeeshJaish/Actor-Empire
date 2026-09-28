@@ -141,7 +141,7 @@ const marketHtml = renderToStaticMarkup(React.createElement(StreamingContentMark
     onCommission: () => undefined,
     onReview: () => undefined,
 }));
-assert.match(marketHtml, /Make private offer/, 'Listing detail must offer the delayed negotiation path');
+assert.match(marketHtml, /Negotiate rights/, 'Listing detail must offer the delayed negotiation path');
 assert.match(marketHtml, /data-content-market-design="zip-exact"/, 'The delayed negotiation path stays inside the approved ZIP market presentation');
 
 const resolveOfferAtDue = (minimumGuarantee: number) => {

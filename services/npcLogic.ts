@@ -10,6 +10,7 @@ import { MUSIC_ARTISTS } from './musicIndustry';
 import { INVESTOR_LEADERSHIP_POOL, PROJECT_INVESTORS, investorOwnerNpcId, investorOwnerNpcIdFromName } from './projectInvestors';
 import { CREW_PROFESSIONALS } from './crewMarket';
 import { STREAMING_EXECUTIVE_CANDIDATES } from './streamingCompany';
+import { WRITER_NPC_LIBRARY } from './writerNpcLibrary';
 export { getGenderedAvatar } from './npcAvatar';
 import { getGenderedAvatar } from './npcAvatar';
 
@@ -921,7 +922,7 @@ export const STREAMING_EXECUTIVE_NPCS: NPCActor[] = STREAMING_EXECUTIVE_CANDIDAT
 }));
 
 // GLOBAL DB (Initialized once in app)
-export const NPC_DATABASE = [...generateNPCs(), ...CREW_PROFESSIONALS, ...STREAMING_EXECUTIVE_NPCS];
+export const NPC_DATABASE = [...generateNPCs(), ...CREW_PROFESSIONALS, ...STREAMING_EXECUTIVE_NPCS, ...WRITER_NPC_LIBRARY];
 
 // --- TALENT AVAILABILITY LOGIC ---
 

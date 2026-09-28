@@ -14,6 +14,7 @@ import {
     createWorldStreamingViewingState,
     getWorldStreamingPlayerViewingOutcome,
 } from '../services/worldEconomy/worldStreamingViewing';
+import { normalizeWorldStreamingAudienceChoiceState } from '../services/worldEconomy/worldStreamingAudienceChoice';
 
 const pricing: OwnedStreamingPricingConfiguration = {
     streams: ['subs', 'ads', 'rentals'],
@@ -119,6 +120,10 @@ const run = () => {
         minimumGuarantee: 1_000_000, platformRevenueShare: 70, licensorRevenueShare: 30,
         signedAtAbsoluteWeek: week - 5, startsAtAbsoluteWeek: week - 4,
         expiresAtAbsoluteWeek: week + 48, status: 'ACTIVE',
+        accessGrant: {
+            schemaVersion: 1, modes: ['AD_SUPPORTED'], earlyWindowWeeks: 0,
+            purchaseFulfillment: 'NONE', source: 'EXPLICIT',
+        },
     }];
     player.ownedStreamingPlatform.launchSlate = {
         entries: [{
@@ -148,6 +153,7 @@ const run = () => {
     const playerOffer = getWorldStreamingOffers(player, week).offers.find(offer => offer.isPlayer);
     assert.ok(playerOffer);
     const customers = createWorldStreamingCustomerState(player, week);
+    const audienceChoice = normalizeWorldStreamingAudienceChoiceState(undefined, player, week);
     const allocations = Object.values(customers.countries)
         .flatMap(country => country.cohorts.flatMap(cohort => cohort.planCells))
         .filter(cell => cell.platformId === 'PLAYER' && cell.paidAccounts > 0);
@@ -158,14 +164,14 @@ const run = () => {
         return sum + (plan?.ads ? cell.paidAccounts : 0);
     }, 0);
     assert.equal(playerOffer.plans[0].id, 'OPEN_ACCESS');
-    assert.ok(openAccessAccounts > 0, 'the ad-only player receives synthetic free-access customer accounts');
+    assert.equal(openAccessAccounts, 0, 'C4 no longer treats free access as a paid customer account');
     assert.equal(adAccountsMatchedByCurrentViewing, 0,
         'current WE6 ad eligibility finds no saved plan matching synthetic OPEN_ACCESS');
     player.world.worldStreamingCustomers = customers;
     const viewing = getWorldStreamingPlayerViewingOutcome(createWorldStreamingViewingState(player, week));
     assert.ok(viewing && viewing.totalHoursViewed > 0, 'the ad-only baseline delivers a licensed title');
-    assert.equal(viewing.revenue.advertisingRevenue, 0,
-        'current ad-only live settlement misses delivered ad hours despite free-access viewers');
+    assert.ok(viewing.revenue.advertisingRevenue > 0,
+        'C4 live settlement pays for eligible delivered free-ad viewing');
 
     const forecastPlayer = structuredClone(player);
     forecastPlayer.ownedStreamingPlatform.lifecycle = 'FOUNDING';
@@ -202,6 +208,10 @@ const run = () => {
         cataloguePower: 90, prestige: 91, absoluteWeek: 2_500, foundedAtAbsoluteWeek: 1,
     });
     assert.ok(generatedAi.streams.includes('subs'));
+    assert.equal(forecastRows.find(row => row.model === 'ads')?.subscribers, 0,
+        'a free-ad launch must no longer forecast free users as subscribers');
+    assert.equal(forecastRows.find(row => row.model === 'rentals')?.subscribers, 0,
+        'a store-led launch must no longer forecast browsers as subscribers');
 
     return {
         fixedInput: { adEligibleHours: input.adEligibleHours, viewingAccounts: input.viewingAccounts },
@@ -211,7 +221,16 @@ const run = () => {
         adOnlyLiveAccounts: {
             openAccessAccounts, adAccountsMatchedByCurrentViewing,
             deliveredHours: viewing.totalHoursViewed,
+            freeViewingAccounts: viewing.accessMix.freeViewingAccounts || 0,
             advertisingRevenue: viewing.revenue.advertisingRevenue,
+            countryRevenue: viewing.titlePerformance.flatMap(title => title.countryPerformance.map(country => ({
+                countryId: country.countryId,
+                freeViewingAccounts: country.accessMix.freeViewingAccounts || 0,
+                adRevenue: country.revenue.advertisingRevenue,
+                primarySubscriptions: audienceChoice.countries[country.countryId]?.primarySubscriptions || 0,
+                freeAdHouseholds: audienceChoice.countries[country.countryId]?.freeAdHouseholds || 0,
+                playerFreeAdHouseholds: audienceChoice.countries[country.countryId]?.playerFreeAdHouseholds || 0,
+            }))),
         },
         forecastRows,
         aiCoreModels,

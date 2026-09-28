@@ -10,7 +10,7 @@
  *   · colour-coded attribute tiles, one hue per stat
  *   · the week's feed, then the age-up action
  *
- * - Self-contained: no external CSS, no icon library, no fonts, no images.
+ * - Visual styling is local; responsive column geometry comes from the neutral layout core.
  * - Every class is namespaced `ae-` and scoped under `.ae-root`.
  * - All values are props with sensible defaults, so it renders standalone.
  *
@@ -39,6 +39,12 @@
  */
 
 import React from "react";
+import { ResponsiveGrid, STAT_GROUP_POLICY } from "../../ui-layout";
+
+const HOME_CONDITION_POLICY = {
+  gapPx: 8,
+  variants: [{ columns: 4, minItemWidthPx: 1 }],
+} as const;
 
 /* ========================================================================== */
 /* Types                                                                      */
@@ -270,10 +276,9 @@ const CSS = `
   min-width:0;
   font-size:var(--name-size,23px);font-weight:750;letter-spacing:-.03em;line-height:1.14;
   overflow-wrap:anywhere;
-  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
 }
 .ae-icb{
-  width:34px;height:34px;flex:none;display:grid;place-items:center;
+  width:44px;height:44px;flex:none;display:grid;place-items:center;
   color:var(--dim);background:transparent;
   transition:color .18s ease,background .18s ease;
 }
@@ -347,8 +352,8 @@ const CSS = `
 /* ---------- attribute tiles ---------- */
 .ae-sec{margin-top:11px;}
 .ae-slab{margin-bottom:7px;font-size:9px;font-weight:800;letter-spacing:.2em;color:var(--faint);}
-.ae-tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
-.ae-tiles--pair>.ae-tile{grid-column:span 2;}
+.ae-tiles{min-width:0;}
+.ae-tiles--pair[data-layout-columns="4"]>.ae-tile{grid-column:span 2;}
 .ae-tile{
   position:relative;overflow:hidden;padding:9px 10px 9px;border-radius:15px;
   background:color-mix(in srgb,var(--c) 10%,var(--card));
@@ -356,7 +361,8 @@ const CSS = `
 }
 .ae-tile-top{display:flex;align-items:center;gap:6px;margin-bottom:5px;}
 .ae-tile-top>svg{color:var(--c);flex:none;}
-.ae-tile-n{font-size:7.5px;font-weight:800;letter-spacing:.1em;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ae-tile-n{font-size:9.5px;font-weight:800;letter-spacing:.06em;line-height:1.2;color:var(--dim);overflow-wrap:anywhere;}
+.ae-tiles--condition .ae-tile-n{font-size:8.5px;letter-spacing:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .ae-tile-v{margin-left:auto;font-size:17px;font-weight:750;letter-spacing:-.035em;line-height:1;color:var(--ink);}
 .ae-tile-v em{font-style:normal;font-size:9px;font-weight:700;color:var(--ghost);margin-left:2px;letter-spacing:0;}
 .ae-tile-bar{position:relative;height:2px;margin-top:6px;border-radius:2px;background:var(--sunk);overflow:hidden;}
@@ -470,7 +476,7 @@ const CSS = `
   .ae-port{width:92px;height:92px;border-radius:21px;}
   .ae-port-edge{border-radius:21px;}
   .ae-top{gap:12px;}
-  .ae-tile-n{font-size:7px;letter-spacing:.06em;}
+  .ae-tile-n{font-size:9px;letter-spacing:.04em;}
 }
 @media (max-width:360px){
   .ae-res-v{font-size:19px;}
@@ -499,7 +505,7 @@ const CSS = `
 .ae-sheet-eyebrow{display:flex;align-items:center;gap:6px;font-size:8.5px;font-weight:800;letter-spacing:.2em;color:var(--gold);}
 .ae-sheet-title{margin-top:7px;font-size:21px;font-weight:800;letter-spacing:.005em;text-transform:uppercase;line-height:1.05;}
 .ae-sheet-x{
-  margin-left:auto;flex:none;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;
+  margin-left:auto;flex:none;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;
   color:var(--dim);background:rgba(255,255,255,.045);box-shadow:inset 0 0 0 1px var(--line);
   transition:color .15s ease;
 }
@@ -953,7 +959,10 @@ export default function ActorEmpireHome({
             style={cssVar("--d", 0.12 + si * 0.03 + "s")}
           >
             <p className="ae-slab">{sec.label}</p>
-            <div className={"ae-tiles" + (sec.tiles.length === 2 ? " ae-tiles--pair" : "")}>
+            <ResponsiveGrid
+              policy={sec.tiles.length === 4 ? HOME_CONDITION_POLICY : STAT_GROUP_POLICY}
+              className={"ae-tiles" + (sec.tiles.length === 4 ? " ae-tiles--condition" : " ae-tiles--pair")}
+            >
               {sec.tiles.map((tile) => (
                 <div className="ae-tile" key={tile.key} style={cssVar("--c", tile.color)}>
                   <div className="ae-tile-top">
@@ -969,7 +978,7 @@ export default function ActorEmpireHome({
                   </div>
                 </div>
               ))}
-            </div>
+            </ResponsiveGrid>
           </section>
         ))}
 
@@ -1006,7 +1015,7 @@ export default function ActorEmpireHome({
       {/* ---------------- energy ledger ---------------- */}
       <div className={"ae-sheet-wrap" + (ledgerOpen ? " is-open" : "")}>
         <div className="ae-scrim" onClick={() => setLedgerOpen(false)} />
-        <div className="ae-sheet" role="dialog" aria-modal="true" aria-label="Energy ledger">
+        <div className="ae-sheet ae-shell-sheet" role="dialog" aria-modal="true" aria-label="Energy ledger">
           <span className="ae-grip" />
 
           <div className="ae-sheet-top">

@@ -1641,6 +1641,37 @@
 .hq-giga-campus-launcher strong { font-size: 13px; }
 .hq-giga-campus-launcher:focus-visible { outline: 3px solid #ffc29b; outline-offset: 3px; }
 
+/* A saved launch is a receipt, never a second go/no-go decision. These are
+   the immutable launch-commit facts, deliberately distinct from the playable
+   premiere simulation and its uncommitted crowd estimates. */
+.hq-launch-receipt {
+  position: fixed;
+  z-index: 120;
+  inset: 0;
+  overflow-y: auto;
+  padding: max(22px, env(safe-area-inset-top)) 20px max(28px, env(safe-area-inset-bottom));
+  background: radial-gradient(circle at 85% 10%, #185344 0, transparent 42%), #070c12;
+  color: #f7fbfa;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+.hq-launch-receipt * { box-sizing: border-box; }
+.hq-launch-receipt-inner { width: min(100%, 560px); min-height: 100%; margin: auto; display: flex; flex-direction: column; }
+.hq-launch-receipt-back { align-self: flex-start; min-height: 44px; padding: 0 12px; border: 1px solid #36534c; border-radius: 12px; background: #13231f; color: #cfe9de; font: inherit; font-weight: 700; }
+.hq-launch-receipt-eyebrow { display: block; margin-top: clamp(48px, 12vh, 110px); color: #74e6b4; font-size: 11px; font-weight: 850; letter-spacing: .18em; text-transform: uppercase; }
+.hq-launch-receipt h1 { margin: 12px 0 0; font-family: Anton, Impact, sans-serif; font-size: clamp(44px, 10vw, 70px); font-weight: 400; line-height: 1.05; letter-spacing: -.015em; }
+.hq-launch-receipt p { max-width: 46ch; margin: 17px 0 0; color: #acbeb8; font-size: 14px; line-height: 1.55; }
+.hq-launch-receipt-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; margin: 30px 0; }
+.hq-launch-receipt-facts div { min-width: 0; padding: 16px; border: 1px solid #29443a; border-radius: 14px; background: #111b1a; }
+.hq-launch-receipt-facts dt { color: #8da99c; font-size: 10px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
+.hq-launch-receipt-facts dd { margin: 8px 0 0; overflow-wrap: anywhere; color: #f7fbfa; font-size: clamp(16px, 4vw, 22px); font-weight: 800; font-variant-numeric: tabular-nums; }
+.hq-launch-receipt-open { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; min-height: 52px; margin-top: auto; border: 0; border-radius: 14px; background: #54d69a; color: #06150f; font: inherit; font-size: 15px; font-weight: 900; }
+.hq-launch-receipt :is(button):focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+
+@media (max-width: 359px) {
+  .hq-launch-receipt-facts { grid-template-columns: 1fr; }
+  .hq-launch-receipt-eyebrow { margin-top: 35px; }
+}
+
 @media (max-width: 520px) {
   .hq-giga-campus-launcher {
     right: 10px;

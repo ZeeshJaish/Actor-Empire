@@ -641,7 +641,7 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                 <div className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[url('https://grainy-gradients.vercel.app/noise.svg')]"></div>
                 <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/10"></div>
                 <div className="relative z-10 w-full h-full flex flex-col justify-center gap-4">
-                    <h3 className="text-3xl font-black uppercase tracking-tighter text-white drop-shadow-[0_4px_8px_rgba(0,0,0,0.5)] leading-none mb-2">
+                    <h3 className="mb-2 hidden text-3xl font-black uppercase leading-none tracking-tighter text-white drop-shadow-[0_4px_8px_rgba(0,0,0,0.5)] lg:block">
                         {displayTitle}
                     </h3>
                 </div>
@@ -736,7 +736,7 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                         
                         {/* Hero Section (Left on Desktop, Top on Mobile) */}
                         <div className="w-full lg:w-[400px] lg:h-full lg:sticky lg:top-0 shrink-0">
-                            <div className="relative aspect-[3/4] lg:aspect-auto lg:h-full overflow-hidden">
+                            <div className="relative h-[min(80dvh,26rem)] overflow-hidden lg:h-full">
                                 {renderPosterPreview()}
                                 
                                 {/* Overlay Gradient */}
@@ -769,11 +769,11 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                 </div>
 
                                 {/* Title Overlay for Mobile */}
-                                <div className="absolute bottom-10 left-8 right-8 z-20 lg:hidden">
-                                    <h1 className="text-5xl font-serif italic text-white leading-none tracking-tight drop-shadow-2xl mb-2" style={{ fontFamily: "'Playfair Display', serif" }}>
+                                <div className="absolute bottom-6 left-6 right-6 z-20 lg:hidden">
+                                    <h1 className="mb-2 break-words font-serif text-[clamp(1.75rem,8vw,3rem)] italic leading-tight tracking-tight text-white drop-shadow-2xl" style={{ fontFamily: "'Playfair Display', serif" }}>
                                         {displayTitle}
                                     </h1>
-                                    <div className="flex items-center gap-3 text-xs font-bold text-zinc-400 uppercase tracking-widest">
+                                    <div className="flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-400">
                                         <span>{isSeriesProject ? tr('projectDashboard.type.originalSeries') : tr('projectDashboard.type.featureFilm')}</span>
                                         <span className="w-1 h-1 bg-zinc-600 rounded-full"></span>
                                         <span>{resolvedProjectGenre}</span>
@@ -787,7 +787,7 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                         <button
                                             type="button"
                                             onClick={() => setIsRenamingTitle(true)}
-                                            className="mt-4 inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/40 px-3 py-2 text-[10px] font-black uppercase tracking-[0.16em] text-white backdrop-blur-md transition-colors hover:border-amber-400/60 hover:text-amber-300"
+                                            className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-full border border-white/20 bg-black/40 px-3 py-2 text-[10px] font-black uppercase tracking-[0.16em] text-white backdrop-blur-md transition-colors hover:border-amber-400/60 hover:text-amber-300"
                                         >
                                             <Edit3 size={13} />
                                             {tr('projectDashboard.action.editWorkingTitle')}
@@ -829,7 +829,7 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                     <button
                                         type="button"
                                         onClick={() => setIsRenamingTitle(true)}
-                                        className="mt-5 inline-flex items-center gap-2 rounded-full border border-zinc-700 bg-zinc-900 px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.18em] text-zinc-300 transition-colors hover:border-amber-500/50 hover:bg-amber-500/10 hover:text-amber-300"
+                                        className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-full border border-zinc-700 bg-zinc-900 px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.18em] text-zinc-300 transition-colors hover:border-amber-500/50 hover:bg-amber-500/10 hover:text-amber-300"
                                     >
                                         <Edit3 size={14} />
                                         {tr('projectDashboard.action.editWorkingTitle')}

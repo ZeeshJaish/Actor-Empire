@@ -11,6 +11,7 @@ import { createCanonicalBuildData } from '../services/streamingCanonicalBuildDat
 import { getStreamingBuildMarketAccess } from '../services/streamingBuildMarketAccess';
 import { BuildWizard } from '../components/studio-finance/components/build/BuildWizard';
 import { getStreamingPostIncorporationDestination } from '../components/StreamingFoundingJourney';
+import { WORLD_COUNTRY_DEFINITIONS } from '../services/worldEconomy/worldCountryRegistry';
 
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
 const founder = (): Player => {
@@ -80,6 +81,48 @@ test('only a filed opening country unlocks planning; exited and unfiled remain o
   us.status = 'EXITED';
   assert.equal(getStreamingBuildMarketAccess(actionRequired).editable, false);
   assert.deepEqual(getStreamingBuildMarketAccess(actionRequired).countryIds, []);
+});
+
+test('a whole-region filing survives planning and immediately unlocks every filed country in Build', () => {
+  const asiaIds = WORLD_COUNTRY_DEFINITIONS
+    .filter(country => country.regionId === 'ASIA')
+    .map(country => country.id);
+  assert.ok(asiaIds.length > 40, 'The regression fixture must cross the former silent 40-country cutoff.');
+  const rich = founder();
+  rich.ownedStreamingPlatform.treasuryCash = 5_000_000_000_000;
+  rich.energy = { ...rich.energy, current: 100, max: 100 };
+
+  const planned = saveStreamingMarketPlan(rich, asiaIds);
+  assert.equal(planned.reason, 'SAVED');
+  assert.deepEqual(
+    planned.player.ownedStreamingPlatform.marketOperations
+      .filter(operation => operation.entryKind === 'OPENING' && operation.countryId)
+      .map(operation => operation.countryId)
+      .sort(),
+    [...asiaIds].sort(),
+    'Add all must not silently discard countries after the fortieth market.',
+  );
+
+  const filed = beginStreamingMarketClearance(planned.player, asiaIds);
+  assert.equal(filed.reason, 'STARTED', 'File all must act on the complete saved region.');
+  assert.deepEqual(
+    [...getStreamingBuildMarketAccess(filed.player).countryIds].sort(),
+    [...asiaIds].sort(),
+    'Every filed country must be visible in Build while government review is still running.',
+  );
+});
+
+test('a worldwide market plan survives save normalization without dropping countries', () => {
+  const countryIds = WORLD_COUNTRY_DEFINITIONS.map(country => country.id);
+  const planned = saveStreamingMarketPlan(founder(), countryIds);
+  assert.equal(planned.reason, 'SAVED');
+  assert.deepEqual(
+    planned.player.ownedStreamingPlatform.marketOperations
+      .filter(operation => operation.entryKind === 'OPENING' && operation.countryId)
+      .map(operation => operation.countryId)
+      .sort(),
+    [...countryIds].sort(),
+  );
 });
 
 test('approved and reloaded filing remains editable, while a saved network drawing survives', () => {

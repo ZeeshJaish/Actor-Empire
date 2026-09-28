@@ -5,8 +5,12 @@ import { normalizePlatformAiState } from './platformAi/platformAiState';
 import { normalizeStudioAiState } from './studioAi/studioAiState';
 
 export const SAVE_INTEGRITY_FORMAT_VERSION = 1;
+// This versions the digest projection, not the IndexedDB generation envelope.
+// Never change an issued projection in place: add a new schema and retain its
+// exact verifier so careers can skip any number of app releases safely.
+export const SAVE_INTEGRITY_DIGEST_SCHEMA_VERSION = 2;
 
-export type SaveIntegrityReason = 'AUTOSAVE' | 'PROCESS_WEEK' | 'MIGRATION' | 'IMPORT' | 'MANUAL';
+export type SaveIntegrityReason = 'AUTOSAVE' | 'PROCESS_WEEK' | 'LIFE_EVENT_RESOLUTION' | 'MIGRATION' | 'IMPORT' | 'MANUAL';
 
 export interface SaveIdentityFingerprint {
     count: number;
@@ -14,6 +18,7 @@ export interface SaveIdentityFingerprint {
 }
 
 export interface SaveProtectedState {
+    archiveRootDigest?: string;
     money: number;
     stats: string;
     commitments: SaveIdentityFingerprint;
@@ -32,6 +37,8 @@ export interface SaveProtectedState {
     universes: SaveIdentityFingerprint;
     activeProductions: SaveIdentityFingerprint;
     activeRights: SaveIdentityFingerprint;
+    legacyStreamingRightsHolds?: SaveIdentityFingerprint;
+    historicalCatalogue?: string;
     studioCompanies: SaveIdentityFingerprint;
     studioCompanyState: string;
     industryIntelligenceState?: string;
@@ -46,6 +53,8 @@ export interface SaveProtectedState {
 
 export interface SaveIntegrityManifest {
     formatVersion: typeof SAVE_INTEGRITY_FORMAT_VERSION;
+    /** Absent on signatures written before protected-field projections were versioned. */
+    digestSchemaVersion?: number;
     saveMigrationVersion: number;
     playerId: string;
     playerName: string;
@@ -246,6 +255,32 @@ const worldEconomyState = (player: Player): string => {
         world?.worldAudienceEconomy,
         world?.worldAudienceParticipation,
         world?.worldStreamingCompetition,
+        world?.worldStreamingAudienceChoice,
+        world?.worldStreamingCustomers,
+        world?.worldStreamingViewing,
+        world?.worldStreamingPlatformEconomy,
+    ];
+    return stableHash(states.map(state => state ? ({
+        schemaVersion: state.schemaVersion,
+        lastProcessedAbsoluteWeek: state.lastProcessedAbsoluteWeek,
+        sourceFingerprint: 'sourceFingerprint' in state ? state.sourceFingerprint : undefined,
+        global: state.global,
+        countries: 'entitlements' in state ? state.countries : undefined,
+        platforms: 'entitlements' in state ? state.platforms : undefined,
+        entitlements: 'entitlements' in state ? state.entitlements : undefined,
+    }) : null));
+};
+
+// Saves signed before audience choice became protected used this seven-state
+// projection. Recompute it from the payload during verification; never trust
+// the stored manifest's old digest without checking the underlying state.
+const worldEconomyStateBeforeAudienceChoice = (player: Player): string => {
+    const world = player.world;
+    const states = [
+        world?.worldPopulation,
+        world?.worldAudienceEconomy,
+        world?.worldAudienceParticipation,
+        world?.worldStreamingCompetition,
         world?.worldStreamingCustomers,
         world?.worldStreamingViewing,
         world?.worldStreamingPlatformEconomy,
@@ -309,6 +344,9 @@ const createProtectedState = (player: Player): SaveProtectedState => {
     const stats = player.stats && typeof player.stats === 'object' ? player.stats as unknown as Record<string, unknown> : {};
 
     return {
+        ...(typeof player.flags?.careerArchiveRootDigest === 'string'
+            ? { archiveRootDigest: player.flags.careerArchiveRootDigest }
+            : {}),
         money: finiteNumber(player.money),
         stats: stableHash(stats),
         commitments: fingerprintArray(player.commitments, 'commitment'),
@@ -338,6 +376,15 @@ const createProtectedState = (player: Player): SaveProtectedState => {
             'streaming-right',
             contract => cleanText(contract.status).toUpperCase() === 'ACTIVE',
         ),
+        ...(Object.keys(player.world?.legacyStreamingRightsHolds || {}).length > 0 ? {
+            legacyStreamingRightsHolds: fingerprintRecord(
+                player.world?.legacyStreamingRightsHolds,
+                'legacy-streaming-rights-hold',
+            ),
+        } : {}),
+        ...(player.world?.historicalCatalogue ? {
+            historicalCatalogue: stableHash(player.world.historicalCatalogue),
+        } : {}),
         studioCompanies: fingerprintRecord(player.world?.studios, 'studio-company'),
         studioCompanyState: studioCompanyState(player),
         industryIntelligenceState: industryIntelligenceState(player),
@@ -368,6 +415,7 @@ export const createSaveIntegrityManifest = (
 ): SaveIntegrityManifest => {
     const core = {
         formatVersion: SAVE_INTEGRITY_FORMAT_VERSION,
+        digestSchemaVersion: SAVE_INTEGRITY_DIGEST_SCHEMA_VERSION,
         saveMigrationVersion: Math.max(0, Math.round(finiteNumber(player.flags?.saveMigrationVersion) || 0)),
         playerId: cleanText(player.id),
         playerName: cleanText(player.name),
@@ -416,6 +464,17 @@ export const compareProtectedSaveState = (before: Player, after: Player): Protec
     compareFingerprint('universes', left.universes, right.universes, violations);
     compareFingerprint('activeProductions', left.activeProductions, right.activeProductions, violations);
     compareFingerprint('activeRights', left.activeRights, right.activeRights, violations);
+    if (left.legacyStreamingRightsHolds || right.legacyStreamingRightsHolds) {
+        compareFingerprint(
+            'legacy streaming rights holds',
+            left.legacyStreamingRightsHolds || fingerprintRecord({}, 'legacy-streaming-rights-hold'),
+            right.legacyStreamingRightsHolds || fingerprintRecord({}, 'legacy-streaming-rights-hold'),
+            violations,
+        );
+    }
+    if (left.historicalCatalogue !== right.historicalCatalogue) {
+        violations.push('historical catalogue recipe changed');
+    }
     compareFingerprint('studio companies', left.studioCompanies, right.studioCompanies, violations);
     if (left.studioCompanyState !== right.studioCompanyState) violations.push('studio company state changed');
     if (left.industryIntelligenceState !== right.industryIntelligenceState) violations.push('industry intelligence state changed');
@@ -444,8 +503,19 @@ export const verifySaveIntegrity = (
         .forEach(path => violations.push(`${path} is not finite`));
     if (manifest.formatVersion !== SAVE_INTEGRITY_FORMAT_VERSION) violations.push('integrity format is unsupported');
     const rebuilt = createSaveIntegrityManifest(player, manifest.reason, manifest.createdAt, manifest.needsRecoveryCheckpoint === true);
-    if (rebuilt.digest !== manifest.digest) {
+    if (manifest.digestSchemaVersion === SAVE_INTEGRITY_DIGEST_SCHEMA_VERSION) {
+        if (rebuilt.digest !== manifest.digest) violations.push('integrity digest does not match save payload');
+    } else if (manifest.digestSchemaVersion === undefined) {
+        // Unversioned v1 was shipped with several protected-field projections.
+        // Only the three known optional additions may be absent; derive every
+        // protected value from the player, never from the stored manifest.
         const legacyProtected = { ...rebuilt.protected } as Partial<SaveProtectedState>;
+        const storedProtected = manifest.protected && typeof manifest.protected === 'object'
+            ? manifest.protected as Partial<SaveProtectedState>
+            : {};
+        for (const field of ['archiveRootDigest', 'legacyStreamingRightsHolds', 'historicalCatalogue'] as const) {
+            if (!Object.prototype.hasOwnProperty.call(storedProtected, field)) delete legacyProtected[field];
+        }
         const digestForLegacyProtected = (protectedState: Partial<SaveProtectedState>): string => stableHash(manifestDigestSource({
             formatVersion: rebuilt.formatVersion,
             saveMigrationVersion: rebuilt.saveMigrationVersion,
@@ -457,13 +527,21 @@ export const verifySaveIntegrity = (
             needsRecoveryCheckpoint: rebuilt.needsRecoveryCheckpoint,
             protected: protectedState as SaveProtectedState,
         }));
+        const currentV1Digest = digestForLegacyProtected(legacyProtected);
+        legacyProtected.worldEconomy = worldEconomyStateBeforeAudienceChoice(player);
+        const preAudienceChoiceDigest = digestForLegacyProtected(legacyProtected);
         delete legacyProtected.worldEconomy;
-        const digestWithoutWorldEconomy = digestForLegacyProtected(legacyProtected);
+        const preWorldEconomyDigest = digestForLegacyProtected(legacyProtected);
         delete legacyProtected.industryIntelligenceState;
-        const legacyDigest = digestForLegacyProtected(legacyProtected);
-        if (digestWithoutWorldEconomy !== manifest.digest && legacyDigest !== manifest.digest) {
+        const earliestV1Digest = digestForLegacyProtected(legacyProtected);
+        if (currentV1Digest !== manifest.digest
+            && preAudienceChoiceDigest !== manifest.digest
+            && preWorldEconomyDigest !== manifest.digest
+            && earliestV1Digest !== manifest.digest) {
             violations.push('integrity digest does not match save payload');
         }
+    } else {
+        violations.push('integrity digest schema is unsupported');
     }
     return violations.length ? { ok: false, violations } : { ok: true };
 };

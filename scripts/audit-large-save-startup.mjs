@@ -5,9 +5,9 @@ const storage = readFileSync('services/storage.ts', 'utf8');
 const startMenu = readFileSync('views/StartMenu.tsx', 'utf8');
 const root = readFileSync('index.tsx', 'utf8');
 
-const startupStart = app.indexOf('// Check for saved game on initial mount & Init Ads');
+const startupStart = app.indexOf('const runStartupInitialization = useCallback');
 const selectionStart = app.indexOf('const handleSelectSlot = async');
-const startupEnd = app.indexOf('if (isInitializing || safeBootRequested) return;', startupStart);
+const startupEnd = app.indexOf('useEffect(() => {\n    void runStartupInitialization();', startupStart);
 const startupSource = app.slice(startupStart, startupEnd);
 const selectionSource = app.slice(selectionStart, app.indexOf('const handleDeleteSlot', selectionStart));
 
@@ -15,7 +15,7 @@ const checks = [
   [storage, 'export type SaveSlotSummary', 'Storage exposes lightweight slot summaries.'],
   [storage, 'export const listGameDataKeys', 'Storage can list occupied slots without loading saves.'],
   [storage, 'export const createDeferredSaveSlotSummary', 'Storage can represent a career without parsing its full save.'],
-  [app, 'const indexedDbKeys = new Set(await listGameDataKeys())', 'Startup lists keys before reading full saves.'],
+  [startupSource, 'new Set(await listGameDataKeysStrict())', 'Startup lists keys before reading full saves.'],
   [app, "cachedSummary || createDeferredSaveSlotSummary(saveKey, 'indexeddb')", 'Startup uses a cached or deferred summary.'],
   [app, 'if (!existingSave && saveSlotSummaries[slot])', 'The selected slot is loaded lazily.'],
   [selectionSource, 'const verifiedLoad = await loadVerifiedGameData(storageKey)', 'The full IndexedDB save is read and verified only after slot selection.'],
@@ -24,8 +24,12 @@ const checks = [
   [app, 'suppressNextAutosaveRef.current = true', 'A committed week suppresses the duplicate autosave.'],
   [startMenu, 'Record<number, SaveSlotSummary | null>', 'The start menu consumes summaries instead of full players.'],
   [root, 'class RootRecoveryBoundary', 'Root rendering has a visible recovery screen.'],
-  [root, 'Open Safe Menu', 'The recovery screen offers a lightweight restart.'],
+  [root, 'Restart Game', 'The recovery screen offers a clean restart.'],
 ];
+
+if (/Open Safe Menu|Continue Offline/i.test(root)) {
+  failures.push([root, 'Retry and Restart Game only', 'Root recovery must not expose an offline or safe-menu bypass.']);
+}
 
 const failures = checks.filter(([source, snippet]) => !source.includes(snippet));
 if (startupSource.includes('loadGameData(')) {

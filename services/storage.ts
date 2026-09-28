@@ -1,6 +1,8 @@
 
 import { addBreadcrumb, markTraceAction, recordNonFatal, startPerformanceTrace, stopPerformanceTrace } from './firebaseService';
 import type { Player } from '../types';
+import type { CareerArchiveChunk, CareerArchiveChunkRef, CareerArchiveDomain, CareerArchiveRoot } from './careerArchive';
+import { readCareerArchivePage, readVerifiedCareerArchiveChunk, stageCareerArchiveChunks, verifyCareerArchiveRootChunks, type CareerArchivePageCursor } from './careerArchiveStore';
 import { verifySaveIntegrity, type SaveIntegrityManifest } from './saveIntegrity';
 import { waitForIndexedDbOpen, waitForIndexedDbTransaction } from './indexedDbResilience';
 import {
@@ -9,14 +11,17 @@ import {
   saveVerifiedGameData as saveVerifiedGeneration,
   stageVerifiedGameDataBatch as stageVerifiedGenerationBatch,
   promoteStagedGameDataBatch as promoteStagedGenerationBatch,
+  discardStagedGameDataBatch as discardStagedGenerationBatch,
   deleteSaveGenerationFamily,
   type PromoteSaveGenerationInput,
   type PromoteSaveGenerationBatchInput,
   type RecoverSaveGenerationInput,
   type SaveGenerationStore,
   type StoredSaveGeneration,
+  type StoredArchiveRoot,
   type VerifiedGameLoad,
   type VerifiedSaveBatchEntry,
+  type StagedSaveBatch,
 } from './saveGenerations';
 
 const DB_NAME = 'ActorEmpireDB';
@@ -171,11 +176,12 @@ const promoteIndexedDbGeneration = async ({ keys, retainPrevious }: PromoteSaveG
     const store = transaction.objectStore(STORE_NAME);
     let current: unknown = null;
     let currentManifest: unknown = null;
+    let currentArchiveRoot: StoredArchiveRoot | null = null;
     let candidate: StoredSaveGeneration | null = null;
     let completedReads = 0;
     const promoteAfterReads = () => {
       completedReads += 1;
-      if (completedReads !== 3) return;
+      if (completedReads !== 4) return;
       if (!candidate || !verifySaveIntegrity(candidate.player, candidate.manifest).ok) {
         transaction.abort();
         return;
@@ -192,10 +198,18 @@ const promoteIndexedDbGeneration = async ({ keys, retainPrevious }: PromoteSaveG
           player: current as Player,
           manifest: currentManifest as SaveIntegrityManifest,
           needsRecoveryCheckpoint: false,
+          ...(currentArchiveRoot?.root ? { archiveRoot: currentArchiveRoot.root } : {}),
         } satisfies StoredSaveGeneration, keys.previous);
       }
       store.put(candidate.player, keys.current);
       store.put(candidate.manifest, keys.integrity);
+      if (candidate.archiveRoot) {
+        store.put({
+          kind: 'ACTOR_EMPIRE_ARCHIVE_ROOT',
+          root: candidate.archiveRoot,
+          manifestDigest: candidate.manifest.digest,
+        } satisfies StoredArchiveRoot, keys.archiveRoot);
+      } else store.delete(keys.archiveRoot);
       store.delete(keys.candidate);
     };
     const currentRequest = store.get(keys.current);
@@ -204,6 +218,8 @@ const promoteIndexedDbGeneration = async ({ keys, retainPrevious }: PromoteSaveG
     integrityRequest.onsuccess = () => { currentManifest = (integrityRequest.result as unknown) ?? null; promoteAfterReads(); };
     const candidateRequest = store.get(keys.candidate);
     candidateRequest.onsuccess = () => { candidate = (candidateRequest.result as StoredSaveGeneration | undefined) ?? null; promoteAfterReads(); };
+    const rootRequest = store.get(keys.archiveRoot);
+    rootRequest.onsuccess = () => { currentArchiveRoot = (rootRequest.result as StoredArchiveRoot | undefined) ?? null; promoteAfterReads(); };
     await waitForIndexedDbTransaction(transaction, { operation: `promote verified save ${keys.current}` });
   } finally {
     db.close();
@@ -217,18 +233,26 @@ const recoverIndexedDbGeneration = async ({ keys }: RecoverSaveGenerationInput):
     const store = transaction.objectStore(STORE_NAME);
     let current: unknown = null;
     let currentManifest: unknown = null;
+    let currentArchiveRoot: unknown = null;
     let previous: StoredSaveGeneration | null = null;
     let completedReads = 0;
     const recoverAfterReads = () => {
       completedReads += 1;
-      if (completedReads !== 3) return;
+      if (completedReads !== 4) return;
       if (!previous) {
         transaction.abort();
         return;
       }
-      store.put({ player: current, manifest: currentManifest, quarantinedAt: Date.now() }, keys.quarantine);
+      store.put({ player: current, manifest: currentManifest, archiveRoot: currentArchiveRoot, quarantinedAt: Date.now() }, keys.quarantine);
       store.put(previous.player, keys.current);
       store.put(previous.manifest, keys.integrity);
+      if (previous.archiveRoot) {
+        store.put({
+          kind: 'ACTOR_EMPIRE_ARCHIVE_ROOT',
+          root: previous.archiveRoot,
+          manifestDigest: previous.manifest.digest,
+        } satisfies StoredArchiveRoot, keys.archiveRoot);
+      } else store.delete(keys.archiveRoot);
     };
     const currentRequest = store.get(keys.current);
     currentRequest.onsuccess = () => { current = currentRequest.result ?? null; recoverAfterReads(); };
@@ -236,6 +260,8 @@ const recoverIndexedDbGeneration = async ({ keys }: RecoverSaveGenerationInput):
     integrityRequest.onsuccess = () => { currentManifest = integrityRequest.result ?? null; recoverAfterReads(); };
     const previousRequest = store.get(keys.previous);
     previousRequest.onsuccess = () => { previous = previousRequest.result ?? null; recoverAfterReads(); };
+    const rootRequest = store.get(keys.archiveRoot);
+    rootRequest.onsuccess = () => { currentArchiveRoot = rootRequest.result ?? null; recoverAfterReads(); };
     await waitForIndexedDbTransaction(transaction, { operation: `recover verified save ${keys.current}` });
   } finally {
     db.close();
@@ -252,8 +278,9 @@ const promoteIndexedDbGenerationBatch = async ({ keys }: PromoteSaveGenerationBa
       candidate: null as StoredSaveGeneration | null,
       current: null as Player | null,
       integrity: null as SaveIntegrityManifest | null,
+      archiveRoot: null as StoredArchiveRoot | null,
     }));
-    let pendingReads = snapshots.length * 3;
+    let pendingReads = snapshots.length * 4;
     let abortedForValidation = false;
     const finishRead = () => {
       pendingReads -= 1;
@@ -273,10 +300,18 @@ const promoteIndexedDbGenerationBatch = async ({ keys }: PromoteSaveGenerationBa
             player: snapshot.current,
             manifest: snapshot.integrity,
             needsRecoveryCheckpoint: false,
+            ...(snapshot.archiveRoot?.root ? { archiveRoot: snapshot.archiveRoot.root } : {}),
           } satisfies StoredSaveGeneration, snapshot.keys.previous);
         }
         store.put(snapshot.candidate!.player, snapshot.keys.current);
         store.put(snapshot.candidate!.manifest, snapshot.keys.integrity);
+        if (snapshot.candidate!.archiveRoot) {
+          store.put({
+            kind: 'ACTOR_EMPIRE_ARCHIVE_ROOT',
+            root: snapshot.candidate!.archiveRoot!,
+            manifestDigest: snapshot.candidate!.manifest.digest,
+          } satisfies StoredArchiveRoot, snapshot.keys.archiveRoot);
+        } else store.delete(snapshot.keys.archiveRoot);
         store.delete(snapshot.keys.candidate);
       }
     };
@@ -287,6 +322,8 @@ const promoteIndexedDbGenerationBatch = async ({ keys }: PromoteSaveGenerationBa
       currentRequest.onsuccess = () => { snapshot.current = currentRequest.result ?? null; finishRead(); };
       const integrityRequest = store.get(snapshot.keys.integrity);
       integrityRequest.onsuccess = () => { snapshot.integrity = integrityRequest.result ?? null; finishRead(); };
+      const rootRequest = store.get(snapshot.keys.archiveRoot);
+      rootRequest.onsuccess = () => { snapshot.archiveRoot = rootRequest.result ?? null; finishRead(); };
     });
     await waitForIndexedDbTransaction(transaction, {
       operation: 'promote staged save batch',
@@ -308,11 +345,48 @@ const indexedDbGenerationStore: SaveGenerationStore = {
   promoteGenerationBatch: promoteIndexedDbGenerationBatch,
 };
 
+/** Narrow key-value surface for transfer staging; public save keys cannot be written here. */
+export const careerArchiveTransferStore = {
+  read: async (key: string) => {
+    if (!/^actorEmpireSave_[1-3]__archive_chunk__[0-9a-f]{64}$/.test(key)) {
+      throw new Error('Transfer attempted to read a non-archive key.');
+    }
+    return readGameRecord(key);
+  },
+  write: async (key: string, value: unknown) => {
+    if (!/^actorEmpireSave_[1-3]__archive_chunk__[0-9a-f]{64}$/.test(key)) {
+      throw new Error('Transfer attempted to write a non-archive key.');
+    }
+    await writeGameRecord(key, value);
+  },
+};
+
+export const stageVerifiedCareerArchiveChunks = async (
+  slotKey: string,
+  chunks: CareerArchiveChunk[],
+): Promise<void> => stageCareerArchiveChunks(indexedDbGenerationStore, slotKey, chunks);
+
+export const verifyVerifiedCareerArchiveRoot = async (root: CareerArchiveRoot): Promise<boolean> => (
+  verifyCareerArchiveRootChunks(indexedDbGenerationStore, root)
+);
+
+export const loadCareerArchivePage = async (
+  root: CareerArchiveRoot,
+  domain: CareerArchiveDomain,
+  pageSize: number,
+  cursor: CareerArchivePageCursor | null = null,
+) => readCareerArchivePage(indexedDbGenerationStore, root, domain, pageSize, cursor);
+
+export const loadVerifiedCareerArchiveChunk = async (
+  root: CareerArchiveRoot,
+  reference: CareerArchiveChunkRef,
+) => readVerifiedCareerArchiveChunk(indexedDbGenerationStore, root, reference);
+
 export const saveVerifiedGameData = async (
   key: string,
   player: Player,
   manifest: SaveIntegrityManifest,
-  options: { retainPrevious?: boolean; needsRecoveryCheckpoint?: boolean } = {},
+  options: { retainPrevious?: boolean; needsRecoveryCheckpoint?: boolean; archiveRoot?: CareerArchiveRoot } = {},
 ): Promise<void> => saveVerifiedGeneration(indexedDbGenerationStore, key, player, manifest, options);
 
 export const loadVerifiedGameData = async (key: string): Promise<VerifiedGameLoad> => (
@@ -327,6 +401,18 @@ export const replaceAllVerifiedGameData = async (entries: VerifiedSaveBatchEntry
   const staged = await stageVerifiedGenerationBatch(indexedDbGenerationStore, entries);
   await promoteStagedGenerationBatch(indexedDbGenerationStore, staged);
 };
+
+export const stageVerifiedGameDataReplacement = async (
+  entries: VerifiedSaveBatchEntry[],
+): Promise<StagedSaveBatch> => stageVerifiedGenerationBatch(indexedDbGenerationStore, entries);
+
+export const promoteStagedVerifiedGameDataReplacement = async (
+  batch: StagedSaveBatch,
+): Promise<void> => promoteStagedGenerationBatch(indexedDbGenerationStore, batch);
+
+export const discardStagedVerifiedGameDataReplacement = async (
+  batch: StagedSaveBatch,
+): Promise<void> => discardStagedGenerationBatch(indexedDbGenerationStore, batch);
 
 export const deleteVerifiedGameData = async (key: string): Promise<void> => {
   await deleteSaveGenerationFamily(indexedDbGenerationStore, key);
@@ -429,17 +515,21 @@ export const deleteGameData = async (key: string): Promise<void> => {
   }
 };
 
+export const listGameDataKeysStrict = async (): Promise<string[]> => {
+  const db = await openDB();
+  try {
+    const transaction = db.transaction(STORE_NAME, 'readonly');
+    const request = transaction.objectStore(STORE_NAME).getAllKeys();
+    await waitForIndexedDbTransaction(transaction, { operation: 'list game save keys' });
+    return request.result.map(key => String(key));
+  } finally {
+    db.close();
+  }
+};
+
 export const listGameDataKeys = async (): Promise<string[]> => {
   try {
-    const db = await openDB();
-    try {
-      const transaction = db.transaction(STORE_NAME, 'readonly');
-      const request = transaction.objectStore(STORE_NAME).getAllKeys();
-      await waitForIndexedDbTransaction(transaction, { operation: 'list game save keys' });
-      return request.result.map(key => String(key));
-    } finally {
-      db.close();
-    }
+    return await listGameDataKeysStrict();
   } catch (error) {
     recordNonFatal(error, 'indexeddb_list_keys_failed');
     return [];

@@ -13,9 +13,10 @@
      planning is genuinely free.
    ========================================================================== */
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import type { LaunchData, LaunchDraft, LaunchHandlers, LaunchStepId } from '../../finance/launch';
-import { STEPS, blockersFor, forecastPricing, launchStageSummaries, launchStepBar, plannedTotal, resolveLaunchDraftAfterDetour, selectedCountries, shortfall, spendable } from '../../finance/launch';
+import React, { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import type { LaunchData, LaunchDraft, LaunchHandlers, LaunchStepId, PricingForecast } from '../../finance/launch';
+import type { WorldStreamingLaunchPricingForecast } from '../../../../services/worldEconomy/worldStreamingPricingForecast';
+import { STEPS, blockersFor, forecastPricing, launchStageSummaries, launchStepBar, plannedTotal, previewMonthlyAtCurrentAudience, resolveLaunchDraftAfterDetour, selectedCountries, shortfall, spendable, type PricingSettings } from '../../finance/launch';
 import type { LinkedBudgetSummary } from '../../finance/budgetLinks';
 import { brandVars } from '../../finance/brand';
 import { money } from '../../finance/format';
@@ -41,11 +42,16 @@ export interface LaunchWizardProps extends LaunchHandlers {
   initialSheet?: 'money' | 'plan' | null;
   buildBudgetSummary?: LinkedBudgetSummary;
   onDraftChange?: (draft: LaunchDraft) => void;
+  /** World changes invalidate a preview; ordinary draft autosaves do not. */
+  forecastWorldState?: unknown;
+  forecastContextKey?: string;
 }
 
-export function LaunchWizard({ data, initialStep = 'markets', initialDraft, initialSheet, buildBudgetSummary, onDraftChange, ...handlers }: LaunchWizardProps) {
+export function LaunchWizard({ data, initialStep = 'markets', initialDraft, initialSheet, buildBudgetSummary, onDraftChange,
+  forecastWorldState, forecastContextKey, ...handlers }: LaunchWizardProps) {
   const [stepId, setStepId] = useState<LaunchStepId>(initialStep);
   const [openSheet, setOpenSheet] = useState<'money' | 'plan' | null>(initialSheet ?? null);
+  const [pricingGesture, setPricingGesture] = useState<{ settings: PricingSettings; active: boolean } | null>(null);
   const [draft, setDraft] = useState<LaunchDraft>(() => resolveLaunchDraftAfterDetour({
       selectedCountryIds: data.selectedCountryIds,
       /* No default selection. An unconfigured platform carries no ident, and the
@@ -60,6 +66,7 @@ export function LaunchWizard({ data, initialStep = 'markets', initialDraft, init
       pricing: data.pricing,
     }, initialDraft));
   const initialAutosaveSent = useRef(false);
+  const trackRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     if (initialAutosaveSent.current) return;
@@ -72,6 +79,23 @@ export function LaunchWizard({ data, initialStep = 'markets', initialDraft, init
 
   const brand = useMemo(() => brandVars(data.company.brandHex), [data.company.brandHex]);
   const index = Math.max(0, STEPS.findIndex((s) => s.id === stepId));
+  useEffect(() => {
+    const track = trackRef.current;
+    const active = track?.querySelector<HTMLElement>('.lw-stop.is-now');
+    if (!track || !active) return;
+    const alignActive = () => {
+      track.scrollLeft = active.offsetLeft - (track.clientWidth - active.clientWidth) / 2;
+    };
+    alignActive();
+    window.addEventListener('resize', alignActive);
+    const observer = new ResizeObserver(alignActive);
+    observer.observe(track);
+    observer.observe(active);
+    return () => {
+      window.removeEventListener('resize', alignActive);
+      observer.disconnect();
+    };
+  }, [index]);
   const step = STEPS[index];
 
   const planned = useMemo(() => plannedTotal(data, draft), [data, draft]);
@@ -82,24 +106,54 @@ export function LaunchWizard({ data, initialStep = 'markets', initialDraft, init
   const blockers = blockersFor(stepId, data);
   const stageRows = useMemo(() => launchStageSummaries(data, draft), [data, draft]);
 
-  /* What the prices currently set would earn. Computed here, from the same
-     inputs and the same function the Pricing step uses, so the strip and the
-     page cannot print two different numbers under one label. */
-  const earnings = useMemo(() => {
-    const settings = draft.pricing ?? data.pricing;
-    const forecast = forecastPricing(
-      settings,
+  /* One pricing preview belongs to the wizard, not each step. The page, strip
+     and blueprint consume the same world result for a given edit. */
+  const pricingSettings = draft.pricing ?? data.pricing;
+  const pricingCountryKey = chosen.map(country => country.id).join('|');
+  const pricingCountryIds = useMemo(() => pricingCountryKey ? pricingCountryKey.split('|') : [], [pricingCountryKey]);
+  const forecastHandlerRef = useRef(handlers.onForecastPricing);
+  forecastHandlerRef.current = handlers.onForecastPricing;
+  const forecastInput = useMemo(() => ({ settings: pricingSettings, countryIds: pricingCountryIds }),
+    [pricingSettings, pricingCountryIds, forecastWorldState, forecastContextKey]);
+  const deferredForecastInput = useDeferredValue(forecastInput);
+  const forecastUpdating = deferredForecastInput !== forecastInput;
+  const pricingWorldForecast = useMemo(() =>
+    deferredForecastInput.settings.commercialOffers?.coreModelSelected === false
+      ? null : forecastHandlerRef.current?.(deferredForecastInput.settings, deferredForecastInput.countryIds) ?? null,
+    [deferredForecastInput],
+  );
+  const pricingForecast = useMemo(() =>
+    deferredForecastInput.settings.commercialOffers?.coreModelSelected === false ? null : forecastPricing(
+      deferredForecastInput.settings,
       chosen.reduce((sum, country) => sum + country.addressableHouseholds, 0),
       data.market,
-      chosen.flatMap((country) => country.pricingCohorts || []),
-      handlers.onForecastPricing?.(settings, chosen.map((country) => country.id)) ?? null,
-    );
-    return { households: forecast.households, monthly: forecast.monthlyRevenue, yearly: forecast.yearlyRevenue, position: forecast.position };
-  }, [data, draft.pricing, chosen, handlers.onForecastPricing]);
+      chosen.flatMap(country => country.pricingCohorts || []),
+      pricingWorldForecast,
+    ), [deferredForecastInput, chosen, data.market, pricingWorldForecast],
+  );
+  useEffect(() => {
+    if (pricingGesture && !pricingGesture.active && !forecastUpdating
+      && deferredForecastInput.settings === pricingSettings) setPricingGesture(null);
+  }, [pricingGesture, forecastUpdating, deferredForecastInput.settings, pricingSettings]);
+  const gestureMonthly = pricingGesture && pricingForecast
+    ? previewMonthlyAtCurrentAudience(pricingForecast, pricingGesture.settings) : null;
+  const pricingPreview = useMemo(() => ({ forecast: forecastUpdating ? null : pricingForecast,
+    worldForecast: forecastUpdating ? null : pricingWorldForecast, updating: forecastUpdating }),
+    [pricingForecast, pricingWorldForecast, forecastUpdating]);
+  const earnings = pricingForecast ? { households: pricingForecast.households,
+    monthly: gestureMonthly ?? pricingForecast.monthlyRevenue, yearly: pricingForecast.yearlyRevenue,
+    position: pricingForecast.position } : undefined;
 
   /* What the strip above the footer says on this step: the step's own number
      and state, over the same plan-against-money bar on all seven. */
-  const bar = useMemo(() => launchStepBar(data, draft, stepId, earnings), [data, draft, stepId, earnings]);
+  const bar = useMemo(() => {
+    const next = launchStepBar(data, draft, stepId, earnings);
+    return stepId === 'pricing' && (pricingGesture || forecastUpdating)
+      ? { ...next, subject: pricingGesture?.active ? 'Pricing · preview' : 'Pricing · settling',
+        gauge: { ...next.gauge, label: pricingGesture
+          ? 'At the last settled audience; full market forecast follows when you release.'
+          : 'Calculating the full market forecast.' } } : next;
+  }, [data, draft, stepId, earnings, forecastUpdating, pricingGesture]);
 
   const scale = Math.max(1, free, planned);
 
@@ -113,12 +167,15 @@ export function LaunchWizard({ data, initialStep = 'markets', initialDraft, init
   };
   const selectStep = (next: LaunchStepId) => {
     setOpenSheet(null);
+    setPricingGesture(null);
     setStepId(next);
     handlers.onStepChange?.(next);
   };
   const go = (to: number) => selectStep(STEPS[Math.max(0, Math.min(STEPS.length - 1, to))].id);
 
-  const shared = { data, draft, patch, chosen, treasury, free, gap, handlers };
+  const shared = { data, draft, patch, chosen, treasury, free, gap, handlers, pricingPreview,
+    onPricingGesture: (settings: PricingSettings | null) => setPricingGesture(current => settings
+      ? { settings, active: true } : current ? { ...current, active: false } : null) };
 
   return (
     <div className="sf lw" style={brand as React.CSSProperties}>
@@ -138,7 +195,7 @@ export function LaunchWizard({ data, initialStep = 'markets', initialDraft, init
           its own glyph, and the stop you are on opens into a pill that names
           itself — which is how seven steps fit on a phone without a second
           line of text underneath doing the naming. */}
-      <nav className="lw-track" aria-label="Launch steps">
+      <nav ref={trackRef} className="lw-track" aria-label="Launch steps">
         <span className="lw-track-line" aria-hidden="true">
           <i style={{ width: `${(index / (STEPS.length - 1)) * 100}%` }} />
         </span>
@@ -198,7 +255,7 @@ export function LaunchWizard({ data, initialStep = 'markets', initialDraft, init
           screens and nothing about the step you were on, and it sat furthest
           from the thumb doing the work. Same money, same gauge, same two ways
           in — and now it also says what this step amounts to. */}
-      <PlanStrip
+      {!(stepId === 'pricing' && (draft.pricing ?? data.pricing).commercialOffers?.coreModelSelected === false) && <PlanStrip
         view={bar}
         page={stepId}
         tone={bar.verdict ? bar.verdict.tone : 'flat'}
@@ -212,7 +269,7 @@ export function LaunchWizard({ data, initialStep = 'markets', initialDraft, init
             ? { label: 'Add money', primary: true, onClick: () => setOpenSheet('money') }
             : { label: 'Money', onClick: () => setOpenSheet('money') },
         ]}
-      />
+      />}
 
       <footer className="lw-foot">
         <button type="button" className="sf-btn sf-btn--ghost" disabled={index === 0} onClick={() => go(index - 1)}>
@@ -221,9 +278,11 @@ export function LaunchWizard({ data, initialStep = 'markets', initialDraft, init
         <button
           type="button"
           className="sf-btn sf-btn--primary"
+          disabled={stepId === 'pricing' && (draft.pricing ?? data.pricing).commercialOffers?.coreModelSelected === false}
           onClick={() => (index === STEPS.length - 1 ? handlers.onOpenBuildPlatform?.() : go(index + 1))}
         >
-          {index === STEPS.length - 1 ? 'Open Build the Platform' : `Next · ${STEPS[index + 1].label}`}
+          {stepId === 'pricing' && (draft.pricing ?? data.pricing).commercialOffers?.coreModelSelected === false
+            ? 'Choose an offer' : index === STEPS.length - 1 ? 'Open Build the Platform' : `Next · ${STEPS[index + 1].label}`}
         </button>
       </footer>
 
@@ -339,4 +398,10 @@ export interface StepProps {
   free: number;
   gap: number;
   handlers: LaunchHandlers;
+  onPricingGesture?: (settings: PricingSettings | null) => void;
+  pricingPreview?: {
+    forecast: PricingForecast | null;
+    worldForecast: WorldStreamingLaunchPricingForecast | null;
+    updating: boolean;
+  };
 }

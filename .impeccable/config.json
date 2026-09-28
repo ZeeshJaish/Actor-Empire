@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "ai-color-palette",
+        "value": "*",
+        "files": [
+          "views/lifestyle/business/components/GreenlightNegotiationModal.tsx"
+        ],
+        "createdAt": "2026-09-27T15:46:58.461Z",
+        "reason": "Existing Greenlight negotiation uses purple as the returning-talent accent in HEAD and adjacent cast/talent selector; this phase preserved that incumbent visual identity."
+      }
+    ]
+  }
+}

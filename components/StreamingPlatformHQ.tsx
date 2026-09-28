@@ -26,6 +26,7 @@ import StreamingOriginalCommissioning from './StreamingOriginalCommissioning';
 import StreamingSlatePlanner from './StreamingSlatePlanner';
 import StreamingViewerMode from './StreamingViewerMode';
 import StreamingLaunchAftermathPanel from './StreamingLaunchAftermathPanel';
+import StreamingLaunchReceipt from './StreamingLaunchReceipt';
 import StreamingWeeklyCeoLoop from './StreamingWeeklyCeoLoop';
 import StreamingQuarterSeasonCycle from './StreamingQuarterSeasonCycle';
 import StreamingAnalyticsCenter from './StreamingAnalyticsCenter';
@@ -74,12 +75,7 @@ import {
   type RunResult as StreamingBuildRunResult,
 } from './streaming-transplant/StreamingBuildoutExperience';
 import StreamingBuildExperience from './streaming-transplant/StreamingBuildWizardExperience';
-import {
-  PricingDesk as StreamingPricingExperience,
-  derivePricing as deriveStreamingPricing,
-  type Capabilities as StreamingPricingCapabilities,
-  type PricingSel as StreamingPricingSelection,
-} from './streaming-transplant/StreamingPricingExperience';
+import { summarizeStreamingBuildPricing } from '../services/streamingCommercialOffers';
 import StreamingFinanceRoom from './streaming-transplant/StreamingFinanceRoom';
 import StreamingContentMarket from './StreamingContentMarket';
 import { establishContentMarketCatalogue } from '../services/streamingContentMarket';
@@ -149,7 +145,6 @@ import {
   getStreamingLaunchBudgetView,
   getStreamingLaunchDefinitionSignature,
   getStreamingLaunchProgramView,
-  saveStreamingStorefrontPlan,
   type StreamingLaunchDestination,
 } from '../services/streamingLaunchProgram';
 import { resolveLinkedBudgetDestination } from './studio-finance/finance/budgetLinks';
@@ -369,11 +364,14 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
   const [showOpeningProgramme, setShowOpeningProgramme] = useState(false);
   const [openingProgrammeFocus, setOpeningProgrammeFocus] = useState<StreamingOpeningProgrammeFocus>('OVERVIEW');
   const [buildInitialSheet, setBuildInitialSheet] = useState<'money' | 'build' | undefined>(undefined);
-  const [showCinematicPricing, setShowCinematicPricing] = useState(false);
   const [showFinanceRoom, setShowFinanceRoom] = useState(initialDestination === 'FINANCE');
   const [financeInitialTab, setFinanceInitialTab] = useState<'SNAPSHOT' | 'CAPITAL'>('SNAPSHOT');
   const [financeInitialCapitalView, setFinanceInitialCapitalView] = useState<'DESK' | 'INJECT' | 'EQUITY'>('DESK');
   const [showCinematicPremiere, setShowCinematicPremiere] = useState(Boolean(pendingLaunchReveal));
+  /* A launch committed in this mounted session can finish its cinematic. A
+     queued reveal reopened from a save must show immutable launch facts, not
+     send an already-live platform through the pre-launch gate again. */
+  const [premiereStartedHere, setPremiereStartedHere] = useState(false);
   const [showCinematicStock, setShowCinematicStock] = useState(false);
   const [buildRunResult, setBuildRunResult] = useState<StreamingBuildRunResult | null>(null);
 
@@ -465,16 +463,6 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
     doctrine: 'STANDARD',
     campaign: 'NONE',
   }));
-  const [pricingSelection, setPricingSelection] = useState<StreamingPricingSelection>(() => ({
-    model: 'SUBS',
-    on: { FREE: false, BASIC: true, STANDARD: true, PREMIUM: true },
-    price: {
-      FREE: 0,
-      BASIC: initialInfrastructureDraft.subscriptionPrices.BASIC,
-      STANDARD: initialInfrastructureDraft.subscriptionPrices.PREMIUM,
-      PREMIUM: initialInfrastructureDraft.subscriptionPrices.FAMILY,
-    },
-  }));
 
   const commandDeckBrand = useMemo<StreamingTransplantBrand>(() => {
     const primary = colorTone(identity.primaryColor);
@@ -531,8 +519,12 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
     const performanceByProject = new Map(latestPerformance.map(item => [item.projectId, item]));
     const mostWatched = [...latestPerformance].sort((a, b) => b.viewingAccounts - a.viewingAccounts)[0];
     const activeRegions = platform.competitiveWorld.regionalLaunches.filter(region => region.status === 'ACTIVE').length;
-    const currentCapacity = Math.max(0, platform.capacity.baselineConcurrentStreams);
     const isPreLaunch = platform.lifecycle === 'FOUNDING' && !platform.launchCommit;
+    const countryOperations = platform.marketOperations.filter(operation => operation.scope === 'COUNTRY');
+    const committedCountries = new Set(countryOperations
+      .filter(operation => operation.status === 'ACTIVE' || (isPreLaunch && operation.status === 'READY'))
+      .map(operation => operation.countryId));
+    const currentCapacity = Math.max(0, platform.capacity.baselineConcurrentStreams);
     const openingMarkets = platform.marketOperations.filter(operation => (
       operation.scope === 'COUNTRY'
       && operation.entryKind === 'OPENING'
@@ -595,7 +587,9 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
         rating: clamp(title.rating ?? ((performance?.satisfactionScore ?? 72) / 10), 0, 10),
         views: performance?.viewingAccounts ?? 0,
         completion: clamp(Math.round(completion), 0, 100),
-        expiresIn: license ? Math.max(0, license.expiresAtAbsoluteWeek - absoluteWeek) : undefined,
+        expiresIn: license && license.windowType !== 'PERMANENT'
+          ? Math.max(0, license.expiresAtAbsoluteWeek - absoluteWeek) : undefined,
+        perpetualLicense: license?.windowType === 'PERMANENT',
         hue: stableHue(projectId),
       } satisfies StreamingCommandServiceTitle;
     }).filter(Boolean) as StreamingCommandServiceTitle[];
@@ -649,7 +643,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
       live: platform.lifecycle === 'ACTIVE',
       built: Boolean(platform.infrastructureSetup),
       tier: snapshot.reachLabel.toUpperCase(),
-      territories: Math.max(1, activeRegions + 1),
+      territories: countryOperations.length ? committedCountries.size : Math.max(1, activeRegions + 1),
       reachLevel: snapshot.reachLevel,
       subscribers: platform.metrics.subscribers,
       subsDelta: platform.metrics.netSubscriberMovement,
@@ -783,15 +777,8 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
   const cinematicAudienceState = useMemo(() => createCanonicalAudienceState(player), [player]);
   const cinematicBoardroomState = useMemo(() => createCanonicalBoardroomState(player), [player]);
   const cinematicViewerState = useMemo(() => createCanonicalViewerState(player), [player]);
-  const pricingCapabilities = useMemo<StreamingPricingCapabilities>(() => ({
-    adserver: platform.technologyLevels.ADVERTISING_COMMERCE >= 1,
-    profiles: platform.technologyLevels.PRODUCT_EXPERIENCE >= 1,
-    uhd: platform.technologyLevels.PLAYBACK_QUALITY >= 2,
-  }), [platform.technologyLevels]);
-  const pricingDerived = useMemo(
-    () => deriveStreamingPricing(pricingSelection, pricingCapabilities),
-    [pricingCapabilities, pricingSelection],
-  );
+  const buildPricing = useMemo(() => summarizeStreamingBuildPricing(platform.serviceConfiguration.pricing),
+    [platform.serviceConfiguration.pricing]);
   const buildWorldDemand = useMemo(() => forecastWorldStreamingBuildDemand(
     player,
     platform.serviceConfiguration.pricing,
@@ -856,11 +843,11 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
     marketPlanning: { editable: buildMarketAccess.editable, reason: buildMarketAccess.reason },
     recommendedPlacements: getSuggestedStreamingNetworkPlacements(
       buildMarkets.map(market => market.id),
-      pricingDerived.reachMul,
+      1,
       buildWorldDemand.likely,
     ),
     homeCityId: buildSelection.placements[0]?.cityId || null,
-    audienceMul: pricingDerived.reachMul,
+    audienceMul: 1,
     openingDemandForecast: {
       low: buildWorldDemand.low,
       likely: buildWorldDemand.likely,
@@ -881,7 +868,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
     debtWeekly: (platform.finance.loans || [])
       .filter(loan => loan.status === 'ACTIVE')
       .reduce((sum, loan) => sum + loan.outstandingPrincipal * loan.weeklyInterestRate, 0),
-  }), [buildAbsoluteWeek, buildMarketAccess, buildMarkets, buildSelection.placements, buildWorldDemand, hasExplicitBuildMarkets, launchProgram, platform, player.world.worldAudienceEconomy, player.world.worldPopulation, pricingDerived.reachMul, visualRegions]);
+  }), [buildAbsoluteWeek, buildMarketAccess, buildMarkets, buildSelection.placements, buildWorldDemand, hasExplicitBuildMarkets, launchProgram, platform, player.world.worldAudienceEconomy, player.world.worldPopulation, visualRegions]);
   const buildDerived = useMemo(
     () => deriveStreamingBuild(buildSelection, buildInputs),
     [buildInputs, buildSelection],
@@ -892,7 +879,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
     buildWeeks: Math.max(1, buildDerived.weeks),
     availableTreasury: platform.treasuryCash,
     protectedOperatingCash: Math.max(0, buildDerived.weekly * 12),
-    hasSellablePlan: pricingDerived.sellable.length > 0,
+    hasSellablePlan: buildPricing.sellable > 0,
     hasFlagshipOriginal: platform.originalCommissions.some(original => (
       ['DELIVERED', 'RELEASED'].includes(getStreamingOriginalLiveStatus(player, original))
     )),
@@ -938,7 +925,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
         reason: 'Enable commerce partnerships or research Advertising Commerce.',
       },
     },
-  }), [buildAbsoluteWeek, buildDerived.weeks, buildDerived.weekly, buildMarkets, buildWorldDemand.byMarket, identity.slug, platform, player, pricingDerived.sellable.length]);
+  }), [buildAbsoluteWeek, buildDerived.weeks, buildDerived.weekly, buildMarkets, buildWorldDemand.byMarket, buildPricing.sellable, identity.slug, platform, player]);
   const launchMarketing = useMemo(() => {
     const draft = platform.launchMarketingDraft!;
     return {
@@ -1147,9 +1134,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
         high: selectionDerived.demandTotal('SURGE'),
       },
       subscriptionPrices: {
-        BASIC: pricingSelection.price.BASIC,
-        PREMIUM: pricingSelection.price.STANDARD,
-        FAMILY: pricingSelection.price.PREMIUM,
+        ...platform.subscriptionPrices,
       },
       lastLaunchRehearsal: preserveRehearsal
         ? platform.infrastructureSetupDraft?.lastLaunchRehearsal
@@ -1279,24 +1264,6 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
     return { ok: true, message, next: 'BACK' as const };
   };
 
-  const persistPricingBlueprint = (selection: StreamingPricingSelection) => {
-    setPricingSelection(selection);
-    if (!onUpdatePlayer || platform.lifecycle !== 'FOUNDING') return;
-    const withStorefront = saveStreamingStorefrontPlan(player, {
-      storefrontLayoutId: platform.serviceConfiguration.storefrontLayoutId || 'CINEMA',
-      pricingApproach: selection.model,
-    }).player;
-    const draft = canonicalInfrastructureDraft();
-    persist(saveStreamingInfrastructureDraft(withStorefront, {
-      ...draft,
-      subscriptionPrices: {
-        BASIC: selection.price.BASIC,
-        PREMIUM: selection.price.STANDARD,
-        FAMILY: selection.price.PREMIUM,
-      },
-    }));
-  };
-
   const injectFinanceCapital = (amount: number) => {
     if (!onUpdatePlayer) return { ok: false, message: 'The company save is not available.' };
     const result = contributeStreamingFounderCapital(
@@ -1358,11 +1325,18 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
       return { ok: false, message } as const;
     }
     buildCommittedPlayerRef.current = null;
+    setPremiereStartedHere(true);
     persist(result.player);
     return { ok: true } as const;
   };
 
-  const openCinematicPremiere = () => setShowCinematicPremiere(true);
+  const openCinematicPremiere = () => {
+    setShowOpeningProgramme(false);
+    setShowCinematicBuild(false);
+    setShowDefineLaunch(false);
+    setPremiereStartedHere(false);
+    setShowCinematicPremiere(true);
+  };
 
   const selectSection = (section: StreamingHqSection) => {
     setActiveSection(section);
@@ -1441,6 +1415,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
 
   const finishPremiereNight = (status: 'VIEWED' | 'DISMISSED' = 'VIEWED') => {
     setShowCinematicPremiere(false);
+    setPremiereStartedHere(false);
     if (!pendingLaunchReveal) return;
     persist({
       ...player,
@@ -1633,7 +1608,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
               <h2>{platform.launchCommit.openingOriginalTitle} opened the signal.</h2>
               <p>{platform.launchCommit.initialSubscribers.toLocaleString()} committed opening subscribers • {platform.launchCommit.playbackSuccessRate.toFixed(2)}% playback success.</p>
             </div>
-            <button type="button" onClick={() => setShowCinematicPremiere(true)}><Play size={16} /> Replay premiere</button>
+            <button type="button" onClick={() => { setPremiereStartedHere(false); setShowCinematicPremiere(true); }}><Play size={16} /> View opening record</button>
           </section>
         ) : null}
 
@@ -1949,7 +1924,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
   };
 
   if (openingProgramme.commissioned && !platform.launchCommit
-    && (showOpeningProgramme || showCinematicBuild || showDefineLaunch || showCinematicPricing)) {
+    && (showOpeningProgramme || showCinematicBuild || showDefineLaunch)) {
     return (
       <StreamingOpeningProgramme
         brand={commandDeckBrand}
@@ -1959,7 +1934,6 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
           setShowOpeningProgramme(false);
           setShowCinematicBuild(false);
           setShowDefineLaunch(false);
-          setShowCinematicPricing(false);
         }}
         onOpenCommissionedPlan={() => setOpeningProgrammeFocus('INFRASTRUCTURE')}
         onResolveClearance={(operationId) => {
@@ -2011,8 +1985,8 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
           setShowCinematicBuild(true);
         }}
         onOpenPricing={() => {
-          setShowDefineLaunch(false);
-          setShowCinematicPricing(true);
+          setDefineLaunchMode('OPENING');
+          setDefineLaunchInitialStep('PRICING');
         }}
         onOpenTechnology={() => {
           setShowDefineLaunch(false);
@@ -2025,7 +1999,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
     );
   }
 
-  if (showCinematicBuild && !showCinematicPricing && !showFinanceRoom) {
+  if (showCinematicBuild && !showFinanceRoom) {
     return (
       <StreamingBuildExperience
         brand={commandDeckBrand}
@@ -2075,17 +2049,11 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
         onChange={updateBuildSelection}
         onBack={() => setShowCinematicBuild(false)}
         pricing={{
-          label: platform.serviceConfiguration.pricing.streams.includes('ads')
-            ? platform.serviceConfiguration.pricing.streams.includes('subs') ? 'Subscription + adverts' : 'Ad-supported'
-            : 'Subscription',
-          arpu: platform.serviceConfiguration.pricing.plans.length
-            ? `$${(platform.serviceConfiguration.pricing.plans.reduce((sum, plan) => sum + plan.monthly, 0) / platform.serviceConfiguration.pricing.plans.length).toFixed(2)}`
-            : 'PENDING',
-          reach: platform.serviceConfiguration.pricingApproach ? 'DEFINED' : 'PENDING',
-          problems: platform.serviceConfiguration.pricingApproach ? 0 : 1,
-          sellable: platform.serviceConfiguration.pricing.streams.includes('subs')
-            ? platform.serviceConfiguration.pricing.plans.length
-            : platform.serviceConfiguration.pricing.streams.length,
+          label: buildPricing.label,
+          arpu: buildPricing.priceLabel,
+          reach: buildPricing.sellable > 0 ? 'DEFINED' : 'PENDING',
+          problems: buildPricing.sellable > 0 ? 0 : 1,
+          sellable: buildPricing.sellable,
         }}
         onOpenPricing={() => {
           setShowCinematicBuild(false);
@@ -2101,20 +2069,6 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
             .reduce((sum, action) => sum + action.amount, 0),
         }}
         onRaise={() => openFinanceRoom('CAPITAL', 'INJECT')}
-      />
-    );
-  }
-
-  if (showCinematicPricing) {
-    return (
-      <StreamingPricingExperience
-        brand={commandDeckBrand}
-        sel={pricingSelection}
-        caps={pricingCapabilities}
-        ceiling={buildDerived.ceiling}
-        expectedLikely={buildDerived.demandTotal('LIKELY')}
-        onChange={persistPricingBlueprint}
-        onClose={() => setShowCinematicPricing(false)}
       />
     );
   }
@@ -2159,11 +2113,21 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
   }
 
   if (showCinematicPremiere) {
+    if (platform.launchCommit && !premiereStartedHere) {
+      return (
+        <StreamingLaunchReceipt
+          platformName={identity.name}
+          commit={platform.launchCommit}
+          onBack={() => finishPremiereNight('DISMISSED')}
+          onOpen={() => finishPremiereNight()}
+        />
+      );
+    }
     return (
       <StreamingPremiereExperience
         brand={commandDeckBrand}
         inputs={cinematicPremiereInputs}
-        onBack={() => setShowCinematicPremiere(false)}
+        onBack={() => { setPremiereStartedHere(false); setShowCinematicPremiere(false); }}
         onLaunch={commitCinematicLaunch}
         onDone={() => pendingLaunchReveal ? finishPremiereNight() : setShowCinematicPremiere(false)}
       />

@@ -50,6 +50,13 @@ export interface NetworkMapBoxProps {
   boxRef?: React.Ref<HTMLDivElement>;
 }
 
+/** Keep the animated headline and its animated remainder on the same frame.
+    Mixing a rolling expected total with the final shortfall briefly made the
+    map display two different answers to the same subtraction. */
+export const displayedNetworkShortfall = (expectedShown: number, coveredShown: number): number => (
+  Math.max(0, expectedShown - coveredShown)
+);
+
 export function NetworkMapBox({
   data, draft, totals, services, regionId, cityId,
   previewCityId, previewRacks = 0, previewCapacity = 0, focusCityId,
@@ -113,6 +120,9 @@ export function NetworkMapBox({
      reads as a mistake, one that settles reads as a meter. */
   const expectedShown = useCountUp(expected);
   const coveredShown = useCountUp(covered);
+  const displayedShort = displayedNetworkShortfall(expectedShown, coveredShown);
+  const buildCostShown = useCountUp(totals.buildCost, { duration: 260 });
+  const weeklyCostShown = useCountUp(totals.weeklyCost, { duration: 260 });
 
   const pct = Math.round(share * 100);
 
@@ -201,8 +211,8 @@ export function NetworkMapBox({
           >
             <b>{coverageAvailable ? compactCount(Math.round(coveredShown)) : '—'}</b>
             <em>{!coverageAvailable ? 'Coverage unavailable' : previewing
-              ? (short > 0 ? `${compactCount(short)} still short` : 'would serve it all')
-              : (short > 0 ? `${compactCount(short)} short` : 'served')}</em>
+              ? (short > 0 ? `${compactCount(displayedShort)} still short` : 'would serve it all')
+              : (short > 0 ? `${compactCount(displayedShort)} gap` : 'served')}</em>
           </span>
         </div>
       </div>
@@ -219,7 +229,7 @@ export function NetworkMapBox({
               figures on the map are a matched pair — the night, and how much
               of it you serve — so the money goes on the line under them
               rather than in among them. */}
-          <s>{money(totals.buildCost)} once · {money(totals.weeklyCost)}/wk</s>
+          <s>{money(buildCostShown)} once · {money(weeklyCostShown)}/wk</s>
         </p>
       )}
     </div>

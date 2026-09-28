@@ -10,11 +10,11 @@
    ========================================================================== */
 
 import React, { useEffect, useMemo, useState } from 'react';
-import type { BuildData, BuildDraft, BuildHandlers, BuildStageId } from '../../finance/build';
+import type { BuildData, BuildDraft, BuildHandlers, BuildStageId, BuildTotals } from '../../finance/build';
 import {
   BUILD_STAGES, CLOUD_WEEKLY_PER_RACK, OPEN_TIERS, REDUNDANCY_COPY, SERVER_TIERS, STAGE_STATE_COPY,
-  buildTotals, constructionProgress, gates, headerLine, infrastructureMoneyPlan, listingFor, moneyPlan,
-  rackBuildCost, rehearsalStale, serviceForecast, stageStates,
+  buildTotals, constructionProgress, gates, infrastructureMoneyPlan, listingFor, moneyPlan,
+  rackBuildCost, rehearsalStale, serviceForecast, stageStates, totalRacks,
 } from '../../finance/build';
 import { openingNightDemand, type BuildTeamProposal } from '../../finance/buildPlanner';
 import type { LinkedBudgetSummary } from '../../finance/budgetLinks';
@@ -28,6 +28,7 @@ import { facilitiesIn, openingRegions } from '../../finance/placer';
 import { StageMoney } from './StageMoney';
 import { StageTest } from './StageTest';
 import { StageLaunch } from './StageLaunch';
+import { useCountUp } from './motion';
 import '../../styles/tokens.css';
 import '../../styles/studio-finance.css';
 import '../../styles/launch.css';
@@ -85,6 +86,27 @@ export function buildDraftHasWork(data: BuildData, draft: BuildDraft, pendingPro
   const blank = blankDraft(data, draft.mode);
   return (Object.keys(blank) as Array<keyof BuildDraft>)
     .some((key) => JSON.stringify(draft[key] ?? null) !== JSON.stringify(blank[key] ?? null));
+}
+
+function BuildHeaderLine({ data, totals }: { data: BuildData; totals: BuildTotals }) {
+  const shownRacks = useCountUp(totals.racks, { duration: 260 });
+  const shownCompute = useCountUp(totals.compute ?? 0, { duration: 260 });
+  const shownWeeks = useCountUp(totals.weeks, { duration: 260 });
+  const drawn = totals.racks + (totals.compute ?? 0);
+  const standing = totalRacks(data.existing);
+  if (!data.commissioned && drawn === 0) return <>Nothing exists yet</>;
+  const kit = <>
+    {drawn === 0 && 'nothing'}
+    {totals.racks > 0 && <>{Math.round(shownRacks)} {totals.racks === 1 ? 'rack' : 'racks'}</>}
+    {totals.racks > 0 && (totals.compute ?? 0) > 0 && ' · '}
+    {(totals.compute ?? 0) > 0 && <>{Math.round(shownCompute)} compute</>}
+  </>;
+  if (data.commissioned) return standing === drawn
+    ? <>Infrastructure · {kit} standing</>
+    : <>{standing} racks standing · {kit} drawn</>;
+  return <>{kit} · {totals.weeks > 0
+    ? <>{Math.round(shownWeeks)} {totals.weeks === 1 ? 'week' : 'weeks'} to build</>
+    : 'ready on the night'}</>;
 }
 
 export function BuildWizard({ data, initialStage = 'network', initialDraft, initialSheet, launchBudgetSummary, onDraftChange, ...handlers }: BuildWizardProps) {
@@ -312,7 +334,7 @@ export function BuildWizard({ data, initialStage = 'network', initialDraft, init
         </button>
         <div className="sf-head-titles">
           <h1>The Build</h1>
-          <p>{headerLine(data, draft)}</p>
+          <p><BuildHeaderLine data={data} totals={totals} /></p>
         </div>
         <span className="lw-count">{index + 1}<i>/{BUILD_STAGES.length}</i></span>
       </header>

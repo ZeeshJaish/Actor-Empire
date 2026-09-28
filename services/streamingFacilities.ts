@@ -325,6 +325,13 @@ export const normalizeStreamingFacilityLease = (
            no longer in the catalogue. */
         rackPositions: (() => {
             const place = getPlaceByListingId(listingId);
+            // Cloud compute is a provider allocation, not rack space inside
+            // the named point of presence. The allocation may exceed that
+            // site's physical rack catalogue without losing paid capacity on
+            // save/reopen. Physical leases still use their building ceiling.
+            if (source.tenure === 'CLOUD' && type === 'CLOUD_ALLOCATION') {
+                return Math.max(1, Math.min(384, Math.round(finite(source.rackPositions, base.capacityRacks))));
+            }
             const ceiling = place
                 ? place.rackPositions + place.expansionRackPositions
                 : base.capacityRacks;

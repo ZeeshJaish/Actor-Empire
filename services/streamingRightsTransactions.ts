@@ -15,6 +15,7 @@ import type {
     StreamingRightsTransactionStatus,
     StreamingRightsWindowType,
     StreamingRightsContract,
+    StreamingRightsAccessGrant,
     WorldState,
 } from '../types';
 import { STREAMING_RIGHTS_TRANSACTION_SCHEMA_VERSION } from '../types';
@@ -26,6 +27,7 @@ import {
 } from './streamingRightsCore';
 import { resolveStreamingRightsCompatibility } from './streamingRightsCompatibility';
 import { appendPlatformAiDecisions } from './platformAi/platformAiState';
+import { intersectStreamingRightsAccessGrants, normalizeStreamingRightsAccessGrant } from './streamingRightsAccessGrant';
 
 const PARTY_TYPES = new Set<StreamingRightsContractPartyType>([
     'PLAYER_STUDIO', 'NPC_STUDIO', 'PLAYER_PLATFORM', 'AI_PLATFORM',
@@ -171,6 +173,7 @@ export interface SettleStreamingRightsTransferInput {
     groupId?: string | null;
     buyerPaymentAlreadyCaptured?: boolean;
     successorContractId?: string;
+    requestedAccessGrant?: StreamingRightsAccessGrant;
 }
 
 export interface SettleStreamingRightsSublicenseInput {
@@ -187,6 +190,7 @@ export interface SettleStreamingRightsSublicenseInput {
     absoluteWeek: number;
     idempotencyKey: string;
     successorContractId?: string;
+    requestedAccessGrant?: StreamingRightsAccessGrant;
     controllerAtCommitment: {
         seller: StreamingRightsTransactionController;
         buyer: StreamingRightsTransactionController;
@@ -526,6 +530,16 @@ export const settleStreamingRightsTransfer = (
         transferredToContractId: null,
         transferredAtAbsoluteWeek: null,
         status: 'ACTIVE',
+        accessGrant: intersectStreamingRightsAccessGrants(
+            normalizeStreamingRightsAccessGrant(source.accessGrant) || {
+                schemaVersion: 1, modes: [], earlyWindowWeeks: 0,
+                purchaseFulfillment: 'NONE', source: 'LEGACY_SNAPSHOT',
+            },
+            normalizeStreamingRightsAccessGrant(input.requestedAccessGrant)
+                || normalizeStreamingRightsAccessGrant(source.accessGrant)
+                || { schemaVersion: 1, modes: [], earlyWindowWeeks: 0,
+                    purchaseFulfillment: 'NONE', source: 'LEGACY_SNAPSHOT' },
+        ),
     };
     const closedSource: StreamingRightsContract = {
         ...source,
@@ -738,6 +752,16 @@ export const settleStreamingRightsSublicense = (
         renewalOption: false,
         sublicensingAllowed: false,
         changeOfControl: 'NONE',
+        accessGrant: intersectStreamingRightsAccessGrants(
+            normalizeStreamingRightsAccessGrant(source.accessGrant) || {
+                schemaVersion: 1, modes: [], earlyWindowWeeks: 0,
+                purchaseFulfillment: 'NONE', source: 'LEGACY_SNAPSHOT',
+            },
+            normalizeStreamingRightsAccessGrant(input.requestedAccessGrant)
+                || normalizeStreamingRightsAccessGrant(source.accessGrant)
+                || { schemaVersion: 1, modes: [], earlyWindowWeeks: 0,
+                    purchaseFulfillment: 'NONE', source: 'LEGACY_SNAPSHOT' },
+        ),
     };
     const transaction = normalizeStreamingRightsTransaction({
         schemaVersion: STREAMING_RIGHTS_TRANSACTION_SCHEMA_VERSION,

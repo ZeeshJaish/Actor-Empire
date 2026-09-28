@@ -4,6 +4,7 @@ import { STREAMING_MARKET_SUB_REGIONS } from '../services/streamingMarketSubRegi
 import { WORLD_COUNTRY_DEFINITIONS } from '../services/worldEconomy/worldCountryRegistry';
 import { buildStreamingGroupMarketMap } from '../components/studio-finance/finance/groupMarketMap';
 import { summarize, type Country } from '../components/studio-finance/finance/launch';
+import { normalizeStreamingDayOneMarketIds } from '../services/streamingDayOneMarkets';
 
 test('all six regions and 197 markets appear in exactly one group', () => {
   assert.equal(STREAMING_MARKET_SUB_REGIONS.length, 24);
@@ -11,6 +12,11 @@ test('all six regions and 197 markets appear in exactly one group', () => {
   assert.equal(ids.length, WORLD_COUNTRY_DEFINITIONS.length);
   assert.equal(new Set(ids).size, ids.length);
   assert.equal(new Set(STREAMING_MARKET_SUB_REGIONS.map(group => group.regionId)).size, 6);
+});
+
+test('market selection normalization preserves every world country by default', () => {
+  const ids = WORLD_COUNTRY_DEFINITIONS.map(country => country.id);
+  assert.deepEqual(normalizeStreamingDayOneMarketIds(ids), ids);
 });
 
 test('every group market has a finite map position, shape or marker, and a visible viewport', () => {

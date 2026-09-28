@@ -44,7 +44,11 @@ const world = {
     npcVentures: { [active.id]: active, [closed.id]: closed },
 } as unknown as WorldState;
 
+const originalWorld = JSON.stringify(world);
+const originalStudios = world.studios;
 const synced = syncNpcVenturesToStudios(world, 1_250);
+assert.equal(JSON.stringify(world), originalWorld, 'studio synchronization must not mutate the previous world');
+assert.notEqual(synced.studios, originalStudios, 'studio synchronization must own its studio map');
 assert.equal(synced.studios?.[active.id]?.ai?.origin, 'GENERATED');
 assert.equal(synced.studios?.[closed.id]?.ai?.status, 'CLOSED', 'closed companies must remain in history rather than being deleted');
 assert.equal(synced.studios?.[closed.id]?.ai?.legacyVenture?.closureReason, 'Financing collapsed');

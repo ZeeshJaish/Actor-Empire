@@ -1355,6 +1355,7 @@ export const resolveStreamingRightsRenewal = (
         changeOfControl: source.changeOfControl,
         cancellationPenalty: source.cancellationPenalty,
         renewedFromLicenseId: source.id,
+        accessGrant: source.accessGrant,
     });
     const replacement = createStreamingRightsContractFromLicense({
         license,

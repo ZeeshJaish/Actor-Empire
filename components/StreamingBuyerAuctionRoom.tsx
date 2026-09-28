@@ -40,6 +40,13 @@ export default function StreamingBuyerAuctionRoom({ player, session, onUpdatePla
     const [marketing, setMarketing] = useState(session.lot.allowedTerms.marketingMaximum);
     const [futureGreenlight, setFutureGreenlight] = useState(session.lot.allowedTerms.futureGreenlightAllowed);
     const [feedback, setFeedback] = useState('');
+    const [submittingBid, setSubmittingBid] = useState(false);
+    const bidFrame = useRef<number | null>(null);
+    const bidTimer = useRef<number | null>(null);
+    useEffect(() => () => {
+        if (bidFrame.current !== null) cancelAnimationFrame(bidFrame.current);
+        if (bidTimer.current !== null) clearTimeout(bidTimer.current);
+    }, []);
     const [termsOpen, setTermsOpen] = useState(false);
     const [expandedBidId, setExpandedBidId] = useState<string | null>(null);
 
@@ -64,11 +71,20 @@ export default function StreamingBuyerAuctionRoom({ player, session, onUpdatePla
         .sort((left, right) => right.sellerValue - left.sellerValue), [session.bids]);
 
     const placeBid = () => {
-        const result = placeStreamingBuyerAuctionBid(player, session.id, previewTerms, Date.now());
-        if (result.changed) {
-            onUpdatePlayer(result.player);
-            setFeedback(result.session?.leaderBidId === result.session?.playerBidId ? 'Your complete contract leads the room.' : 'Offer submitted. The seller is weighing every term.');
-        } else setFeedback(result.detail || 'This offer could not be submitted.');
+        if (submittingBid || !canBid) return;
+        const clickedAt = Date.now();
+        const termsAtClick = { ...previewTerms };
+        setSubmittingBid(true);
+        bidFrame.current = requestAnimationFrame(() => {
+            bidTimer.current = window.setTimeout(() => {
+                const result = placeStreamingBuyerAuctionBid(playerRef.current, session.id, termsAtClick, clickedAt);
+                if (result.changed) {
+                    updateRef.current(result.player);
+                    setFeedback(result.session?.leaderBidId === result.session?.playerBidId ? 'Your complete contract leads the room.' : 'Offer submitted. The seller is weighing every term.');
+                } else setFeedback(result.detail || 'This offer could not be submitted.');
+                setSubmittingBid(false);
+            }, 0);
+        });
     };
     const withdraw = () => {
         const result = withdrawStreamingBuyerAuctionBid(player, session.id);
@@ -183,8 +199,8 @@ export default function StreamingBuyerAuctionRoom({ player, session, onUpdatePla
                     <b className={guaranteedExposure > funds ? css.mkover : ''}>{money(upfront)}</b>
                     <button className={css.mkstep} type="button" onClick={() => setUpfront(upfront + session.lot.minimumBidIncrement)}>+</button>
                 </div>
-                <button className={cx(css.mkbid, !canBid ? css.dead : '')} type="button" disabled={!canBid} onClick={placeBid}>
-                    {guaranteedExposure > funds ? `SHORT BY ${money(guaranteedExposure - funds)}` : `${playerBid ? 'REVISE' : 'TABLE'} ${money(guaranteedExposure)}`}
+                <button className={cx(css.mkbid, !canBid ? css.dead : '')} type="button" disabled={!canBid || submittingBid} aria-busy={submittingBid} onClick={placeBid}>
+                    {submittingBid ? 'SUBMITTING BID…' : guaranteedExposure > funds ? `SHORT BY ${money(guaranteedExposure - funds)}` : `${playerBid ? 'REVISE' : 'TABLE'} ${money(guaranteedExposure)}`}
                 </button>
             </section>
 

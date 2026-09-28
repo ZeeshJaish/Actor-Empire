@@ -94,7 +94,13 @@ assert(repaired.facility.physical?.lastMaintenanceAbsoluteWeek === 42, 'Repairs 
 assert(getStreamingFacilityPhysicalUpgradeCost(repaired.facility) > 0, 'Repair upgrades must remain visible as draft capital.');
 
 const incorporated = createIncorporatedPlayer();
-const canonicalDraft = createDefaultStreamingInfrastructureDraft(incorporated);
+// New careers now begin with an intentionally empty Build drawing. This
+// physical-system audit explicitly selects a room before testing its envelope.
+const canonicalDraft = {
+    ...createDefaultStreamingInfrastructureDraft(incorporated),
+    networkPlacements: [{ cityId: facility.cityId, racks: facility.installedRacks, role: 'CORE_ORIGIN' as const }],
+    facilities: [facility],
+};
 const canonicalFacilities = canonicalDraft.facilities?.length
     ? canonicalDraft.facilities
     : migratePlacementsToStreamingFacilities(canonicalDraft.networkPlacements);

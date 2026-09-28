@@ -117,11 +117,10 @@ const beyond = placeRegion(data, blank(), na.id, { servers: emptySetup().servers
 const beyondRooms = beyond.draft.facilities.filter(room => room.tenure === 'CLOUD');
 assert.equal(beyondRooms.reduce((sum, room) => sum + computeRacks(room), 0), ceiling + 5, 'Past the ceiling is still sold.');
 assert.equal(beyondRooms.reduce((sum, room) => sum + (room.cloudExtended ?? 0), 0), 5, 'Five units are marked as extended.');
-const extendedRoom = beyondRooms.find(room => (room.cloudExtended ?? 0) > 0)!;
 assert.equal(
-  cloudWeeklyCost(extendedRoom),
-  Math.round((computeRacks(extendedRoom) - 5) * CLOUD_WEEKLY_PER_RACK + 5 * CLOUD_WEEKLY_PER_RACK * CLOUD_EXTENSION_PREMIUM),
-  'And billed at the step-up.',
+  beyondRooms.reduce((sum, room) => sum + cloudWeeklyCost(room), 0),
+  Math.round(ceiling * CLOUD_WEEKLY_PER_RACK + 5 * CLOUD_WEEKLY_PER_RACK * CLOUD_EXTENSION_PREMIUM),
+  'Distributed above-ceiling compute is billed at the step-up.',
 );
 assert.match(beyond.note ?? '', /above Atlas Compute/, 'The board is told.');
 assert.ok(cloudCeilingOf(data, na, 'MERIDIAN') < ceiling, 'Meridian sells smaller plans.');

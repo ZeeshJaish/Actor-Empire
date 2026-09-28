@@ -5,6 +5,7 @@ import {
     getRegulatorPressureState,
     processRegulatorPressure,
 } from '../services/regulatorPressure';
+import { getLifeEventResolutionContractViolations, materializePlayerLifeEventImpacts, resolveLifeEventChoice } from '../services/lifeEventResolver';
 
 const assert = (condition: unknown, message: string) => {
     if (!condition) throw new Error(message);
@@ -149,6 +150,13 @@ assert(event.data.lifeEvent.options.length >= 3, 'Regulator popup should offer m
 assert(event.data.lifeEvent.options.some((option: any) => option.isGolden), 'Regulator popup should include a golden safest option.');
 const choiceResult = event.data.lifeEvent.options[0].impact(processed);
 assert(choiceResult.updatedPlayer.flags.regulatorPressureState.lastRegulatorChoiceWeek === 140, 'Choosing regulator option should stamp the choice week.');
+const preparedRegulator = materializePlayerLifeEventImpacts(processed, { strict: true });
+assert(getLifeEventResolutionContractViolations(preparedRegulator).length === 0, 'Regulator choices must persist with registered resolvers.');
+const reloadedRegulatorPlayer = JSON.parse(JSON.stringify(preparedRegulator)) as Player;
+const reloadedRegulatorEvent = reloadedRegulatorPlayer.pendingEvents!.find(item => item.data?.regulatorPressureEventType)!;
+const reloadedRegulatorLifeEvent = reloadedRegulatorEvent.data.lifeEvent;
+const reloadedRegulatorResult = resolveLifeEventChoice(reloadedRegulatorPlayer, reloadedRegulatorEvent, reloadedRegulatorLifeEvent, reloadedRegulatorLifeEvent.options[0], 0);
+assert(reloadedRegulatorResult?.updatedPlayer.flags.regulatorPressureState.lastRegulatorChoiceWeek === 140, 'Regulator choice must retain its exact effect after reload.');
 
 const blockedOffer = submitOpeningOffer({
     player: processed,

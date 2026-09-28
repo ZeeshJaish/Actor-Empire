@@ -51,7 +51,9 @@ const shouldShowPushPrompt = (status: FirebasePushStatus, showMenu: boolean) => 
   if (status.state === 'ready' || status.state === 'denied' || status.state === 'web_skipped' || status.state === 'prompting' || status.state === 'checking') {
     return false;
   }
-  if (status.state !== 'not_requested' || (status.receive !== 'prompt' && status.receive !== 'prompt-with-rationale')) {
+  const canAsk = status.state === 'not_requested' && (status.receive === 'prompt' || status.receive === 'prompt-with-rationale');
+  const canRetry = status.state === 'failed' && status.receive === 'granted';
+  if (!canAsk && !canRetry) {
     return false;
   }
   const dismissedAt = readPushPromptDismissedAt();
@@ -84,7 +86,7 @@ export const StartMenu: React.FC<StartMenuProps> = ({ saveSlots, onSelectSlot, o
   const showPushPrompt = shouldShowPushPrompt(pushStatus, true) && !isPushPromptDismissed;
 
   const dismissPushPrompt = (action: 'not_now' | 'enabled' | 'blocked' | 'checking' | 'failed') => {
-    writePushPromptDismissedAt();
+    if (action === 'not_now' || action === 'enabled' || action === 'blocked') writePushPromptDismissedAt();
     setIsPushPromptDismissed(true);
     trackGameEvent('push_start_prompt_dismissed', { action });
   };
@@ -102,8 +104,6 @@ export const StartMenu: React.FC<StartMenuProps> = ({ saveSlots, onSelectSlot, o
       dismissPushPrompt('blocked');
     } else if (status.state === 'checking') {
       dismissPushPrompt('checking');
-    } else if (status.state === 'failed') {
-      dismissPushPrompt('failed');
     }
   };
 
@@ -142,7 +142,9 @@ export const StartMenu: React.FC<StartMenuProps> = ({ saveSlots, onSelectSlot, o
                                 </button>
                             </div>
                             <p className="mt-2 text-sm font-bold leading-relaxed text-zinc-400">
-                                Get casting invites, project results, offers, and major world events. You can turn this off in system settings.
+                                {pushStatus.state === 'failed'
+                                  ? 'Notification setup did not finish. Try again when your connection is available.'
+                                  : 'Get casting invites, project results, offers, and major world events. You can turn this off in system settings.'}
                             </p>
                             <div className="mt-4 grid grid-cols-[1fr_auto] gap-2">
                                 <button
@@ -151,7 +153,7 @@ export const StartMenu: React.FC<StartMenuProps> = ({ saveSlots, onSelectSlot, o
                                     disabled={isEnablingPush}
                                     className="rounded-2xl bg-white px-4 py-3 text-sm font-black uppercase tracking-[0.18em] text-black transition-all hover:bg-emerald-100 active:scale-[0.98] disabled:opacity-60"
                                 >
-                                    {isEnablingPush ? 'Opening' : 'Allow Updates'}
+                                    {isEnablingPush ? 'Opening' : pushStatus.state === 'failed' ? 'Retry Setup' : 'Allow Updates'}
                                 </button>
                                 <button
                                     type="button"

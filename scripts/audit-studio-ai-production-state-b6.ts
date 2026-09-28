@@ -143,6 +143,23 @@ const registry = normalizeIndustryProductions({
 }, 60);
 
 assert.equal(registry.independent.source, 'STUDIO_INDEPENDENT');
+const namedWriterProduction = normalizeIndustryProductions({ named: {
+    ...registry.independent, id: 'named', canonicalProjectId: 'named_project', writerSource: 'NPC_WRITER',
+    writerId: 'writer_npc_mira_sen', writerName: 'Mira Sen',
+    studioAiExecution: { ...registry.independent.studioAiExecution, talentSelected: true,
+        talent: { leadActorId: 'lead', leadActorName: 'Lead', directorId: 'director', directorName: 'Director',
+            writerId: 'writer_npc_mira_sen', writerName: 'Mira Sen', packageScore: 80, estimatedCostMillions: 4,
+            upfrontFeesMillions: { actor: 2, director: 1, writer: 1 },
+            talentParticipation: { schemaVersion: 1, contracts: [{ contractId: 'writer', role: 'WRITER', roleId: 'writer',
+                talentId: 'writer_npc_mira_sen', talentName: 'Mira Sen', upfrontFee: 1_000_000, backendPoints: 1,
+                receiptsBasis: 'STUDIO_COLLECTED_TITLE_RECEIPTS' }], processedReceiptKeys: ['release:1'], lastSettledAbsoluteWeek: 55 },
+        },
+    },
+} }, 60).named;
+assert.equal(namedWriterProduction.writerId, 'writer_npc_mira_sen', 'Migration must retain an NPC writer ID.');
+assert.equal(namedWriterProduction.studioAiExecution?.talent?.upfrontFeesMillions?.writer, 1);
+assert.deepEqual(namedWriterProduction.studioAiExecution?.talent?.talentParticipation?.processedReceiptKeys, ['release:1'],
+    'Migration must retain paid receipt keys to prevent duplicate backend.');
 assert.equal(registry.independent.studioAiExecution?.slateCommitmentId, 'commitment_1');
 assert.equal(registry.commission.source, 'PLATFORM_COMMISSION');
 assert.deepEqual(registry.commission.aiExecution, platformExecution);

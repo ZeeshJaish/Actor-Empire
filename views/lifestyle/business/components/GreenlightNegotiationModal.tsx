@@ -7,6 +7,8 @@ interface GreenlightNegotiationModalProps {
     negotiation: GreenlightNegotiationState;
     counterOfferInput: string;
     onCounterOfferInputChange: (value: string) => void;
+    counterBackendPoints: number;
+    onCounterBackendPointsChange: (points: number) => void;
     onAcceptDemand: () => void;
     onSubmitCounterOffer: () => void;
     onWalkAway: () => void;
@@ -18,6 +20,8 @@ export const GreenlightNegotiationModal: React.FC<GreenlightNegotiationModalProp
     negotiation,
     counterOfferInput,
     onCounterOfferInputChange,
+    counterBackendPoints,
+    onCounterBackendPointsChange,
     onAcceptDemand,
     onSubmitCounterOffer,
     onWalkAway,
@@ -36,7 +40,7 @@ export const GreenlightNegotiationModal: React.FC<GreenlightNegotiationModalProp
             <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-8 relative">
                 <div className="flex items-center gap-5">
                     <div className="relative">
-                        <img src={negotiation.talentImage} alt={negotiation.talentName} className="w-20 h-20 rounded-2xl border-2 border-purple-500/30 object-cover shadow-xl" referrerPolicy="no-referrer" />
+                        {negotiation.talentImage ? <img src={negotiation.talentImage} alt={negotiation.talentName} className="w-20 h-20 rounded-2xl border-2 border-purple-500/30 object-cover shadow-xl" referrerPolicy="no-referrer" /> : <div className="w-20 h-20 rounded-2xl border-2 border-purple-500/30 bg-purple-500/10 flex items-center justify-center text-2xl font-black text-purple-200">{negotiation.talentName.charAt(0)}</div>}
                         <div className="absolute -bottom-2 -right-2 bg-purple-500 text-black text-[8px] font-black px-2 py-1 rounded-md uppercase tracking-tighter">Returning</div>
                     </div>
                     <div>
@@ -52,11 +56,19 @@ export const GreenlightNegotiationModal: React.FC<GreenlightNegotiationModalProp
                     </div>
                     <div className="bg-purple-500/5 p-5 rounded-3xl border border-purple-500/20 relative overflow-hidden">
                         <div className="absolute top-0 right-0 px-3 py-1 bg-purple-500/20 text-purple-300 text-[9px] font-black rounded-bl-xl">
-                            +{Math.round(((negotiation.currentDemand - negotiation.originalSalary) / negotiation.originalSalary) * 100)}%
+                            {negotiation.originalSalary > 0
+                                ? `+${Math.round(((negotiation.currentDemand - negotiation.originalSalary) / negotiation.originalSalary) * 100)}%`
+                                : 'New fee'}
                         </div>
                         <div className="text-[9px] font-black text-purple-400 uppercase tracking-widest mb-2">New Demand</div>
                         <div className="text-xl font-mono text-purple-300 font-bold">{formatMoney(negotiation.currentDemand)}</div>
                     </div>
+                </div>
+
+                <div className="rounded-2xl border border-purple-500/20 bg-purple-500/5 p-4">
+                    <div className="text-[10px] font-black uppercase tracking-widest text-purple-300">Requested backend</div>
+                    <div className="mt-1 font-mono text-lg font-black text-white">{negotiation.backendDemandPoints}% backend</div>
+                    <p className="mt-1 text-[11px] leading-relaxed text-zinc-400">Separate from the upfront salary; applies only to future positive studio-collected title receipts.</p>
                 </div>
 
                 <div className="space-y-4">
@@ -78,6 +90,15 @@ export const GreenlightNegotiationModal: React.FC<GreenlightNegotiationModalProp
                     </div>
                 </div>
 
+                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                    <div className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Backend points in your counter-offer</div>
+                    <div className="mt-3 flex items-center gap-3">
+                        <button type="button" aria-label="Decrease counter-offer backend points" disabled={counterBackendPoints <= 0} onClick={() => onCounterBackendPointsChange(counterBackendPoints - 1)} className="h-10 w-10 rounded-lg border border-white/10 bg-zinc-900 text-white disabled:opacity-35">−</button>
+                        <span aria-live="polite" className="min-w-12 text-center font-mono text-lg font-black text-emerald-300">{counterBackendPoints}%</span>
+                        <button type="button" aria-label="Increase counter-offer backend points" disabled={counterBackendPoints >= 3} onClick={() => onCounterBackendPointsChange(counterBackendPoints + 1)} className="h-10 w-10 rounded-lg border border-white/10 bg-zinc-900 text-white disabled:opacity-35">+</button>
+                    </div>
+                </div>
+
                 <div className="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-4 flex items-start gap-4">
                     <AlertTriangle size={20} className="text-amber-500 shrink-0" />
                     <div className="text-xs text-amber-200/70 leading-relaxed">
@@ -87,7 +108,7 @@ export const GreenlightNegotiationModal: React.FC<GreenlightNegotiationModalProp
 
                 <div className="space-y-3 pt-2">
                     <button type="button" onClick={onAcceptDemand} className="w-full py-4 bg-white/5 hover:bg-white/10 text-white font-black uppercase tracking-widest rounded-2xl transition-all border border-white/10 active:scale-95">
-                        Accept Demand ({formatMoney(negotiation.currentDemand)})
+                        Accept Demand ({formatMoney(negotiation.currentDemand)} + {negotiation.backendDemandPoints}% backend)
                     </button>
                     <button type="button" onClick={onSubmitCounterOffer} className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-black font-black uppercase tracking-widest rounded-2xl transition-all shadow-lg shadow-emerald-500/20 active:scale-95">
                         Send Counter-Offer

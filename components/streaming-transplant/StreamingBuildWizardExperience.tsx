@@ -396,7 +396,13 @@ export const buildSelectionFromDraft = (
   const facilities = draft.facilities.flatMap(draftFacility => {
     const baseFacility = selectBaseFacility(draftFacility, originalFacilities, marketContextByCityId[draftFacility.cityId], source);
     if (!baseFacility) return [];
-    const fittedGroups = fitRackGroupsToLimit(draftFacility.groups, getStreamingFacilityCapacity(baseFacility));
+    // A cloud listing names a point of presence and a standard-rate tier, not
+    // a physical rack floor. Above-tier compute is still paid virtual capacity;
+    // fitting it to that listing silently billed units the canonical network
+    // could not use. Physical server rooms keep their hard rack limit.
+    const fittedGroups = draftFacility.tenure === 'CLOUD'
+      ? draftFacility.groups
+      : fitRackGroupsToLimit(draftFacility.groups, getStreamingFacilityCapacity(baseFacility));
     const rackGroups: OwnedStreamingRackGroup[] = fittedGroups
       .filter(group => group.racks > 0)
       .map(group => ({
@@ -415,17 +421,37 @@ export const buildSelectionFromDraft = (
       role: projectFacilityNetworkRole(rackGroups),
     };
     if (draftFacility.tenure === 'CLOUD' && next.lease) {
+      const previous = originalFacilities.find(facility => facility.id === draftFacility.id);
+      const cloudLease = {
+        ...next.lease,
+        tenure: 'CLOUD' as const,
+        rackPositions: Math.max(next.lease.rackPositions, next.installedRacks),
+        weeklyRent: cloudWeeklyCost(draftFacility),
+        depositCost: 0,
+        setupCost: 0,
+        cloudProvider: draftFacility.provider,
+        cloudExtendedCompute: draftFacility.cloudExtended,
+      };
+      const targetPhysical = getDefaultStreamingFacilityPhysical('CLOUD_ALLOCATION', next.installedRacks, cloudLease);
+      const previousDefault = previous?.lease
+        ? getDefaultStreamingFacilityPhysical('CLOUD_ALLOCATION', previous.installedRacks, previous.lease)
+        : null;
+      const previousPhysical = previous?.physical;
+      const grow = (key: 'powerContractKw' | 'backupPowerKw' | 'coolingCapacityKw' | 'bandwidthMbps' | 'burstBandwidthMbps') =>
+        previousPhysical && previousDefault
+          ? Math.max(targetPhysical[key], previousPhysical[key] + Math.max(0, targetPhysical[key] - previousDefault[key]))
+          : targetPhysical[key];
       next = {
         ...next,
-        lease: {
-          ...next.lease,
-          tenure: 'CLOUD',
-          weeklyRent: cloudWeeklyCost(draftFacility),
-          depositCost: 0,
-          setupCost: 0,
-          cloudProvider: draftFacility.provider,
-          cloudExtendedCompute: draftFacility.cloudExtended,
-        },
+        lease: cloudLease,
+        physical: previousPhysical ? {
+          ...previousPhysical,
+          powerContractKw: grow('powerContractKw'),
+          backupPowerKw: grow('backupPowerKw'),
+          coolingCapacityKw: grow('coolingCapacityKw'),
+          bandwidthMbps: grow('bandwidthMbps'),
+          burstBandwidthMbps: grow('burstBandwidthMbps'),
+        } : targetPhysical,
       };
     }
     draft.repairIds.forEach(repairId => {

@@ -22,6 +22,7 @@ export const getCanonicalWorldEconomyDigest = (player: Player): object => ({
     worldAudienceEconomy: player.world.worldAudienceEconomy,
     worldAudienceParticipation: player.world.worldAudienceParticipation,
     worldStreamingCompetition: player.world.worldStreamingCompetition,
+    worldStreamingAudienceChoice: player.world.worldStreamingAudienceChoice,
     worldStreamingCustomers: player.world.worldStreamingCustomers,
     worldStreamingViewing: player.world.worldStreamingViewing,
     worldStreamingPlatformEconomy: player.world.worldStreamingPlatformEconomy,

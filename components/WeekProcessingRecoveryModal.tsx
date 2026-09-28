@@ -31,7 +31,7 @@ export const WeekProcessingRecoveryModal: React.FC<WeekProcessingRecoveryModalPr
             role="dialog"
             aria-modal="true"
             aria-labelledby="week-recovery-title"
-            className="relative w-full max-w-sm overflow-hidden rounded-[2rem] border border-orange-300/20 bg-[#12100e] shadow-[0_28px_100px_rgba(0,0,0,0.78)]"
+            className="relative w-full max-w-sm max-h-[calc(100dvh-2.5rem)] overflow-y-auto rounded-[2rem] border border-orange-300/20 bg-[#12100e] shadow-[0_28px_100px_rgba(0,0,0,0.78)]"
         >
             <div className="h-1 bg-gradient-to-r from-orange-600 via-amber-300 to-emerald-400" />
             <div className="p-6">
@@ -81,12 +81,12 @@ export const WeekProcessingRecoveryModal: React.FC<WeekProcessingRecoveryModalPr
                         <RefreshCw size={18} />
                         Retry Week
                     </button>
-                    <div className="grid grid-cols-2 gap-2.5">
+                    <div className="grid gap-2.5" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 144px), 1fr))' }}>
                         <button
                             type="button"
                             disabled={isExporting}
                             onClick={onExportBackup}
-                            className="flex items-center justify-center gap-2 rounded-2xl border border-white/10 px-3 py-3 text-[10px] font-black uppercase tracking-[0.12em] text-zinc-300 transition-colors hover:bg-white/5 hover:text-white disabled:cursor-wait disabled:opacity-50"
+                            className="flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-white/10 px-3 py-3 text-[10px] font-black uppercase tracking-[0.12em] text-zinc-300 transition-colors hover:bg-white/5 hover:text-white disabled:cursor-wait disabled:opacity-50"
                         >
                             <Download size={15} />
                             {isExporting ? 'Exporting…' : 'Export Backup'}
@@ -94,7 +94,7 @@ export const WeekProcessingRecoveryModal: React.FC<WeekProcessingRecoveryModalPr
                         <button
                             type="button"
                             onClick={onReturnToMenu}
-                            className="flex items-center justify-center gap-2 rounded-2xl border border-white/10 px-3 py-3 text-[10px] font-black uppercase tracking-[0.12em] text-zinc-300 transition-colors hover:bg-white/5 hover:text-white"
+                            className="flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-white/10 px-3 py-3 text-[10px] font-black uppercase tracking-[0.12em] text-zinc-300 transition-colors hover:bg-white/5 hover:text-white"
                         >
                             <House size={15} />
                             Return to Menu

@@ -1,20 +1,35 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Player, ScheduledEvent } from '../types';
 import { AlertTriangle, Film, ChevronRight, Activity, Clapperboard, PlayCircle, Loader2 } from 'lucide-react';
 import { motion } from 'motion/react';
-import { showAd } from '../services/adLogic';
+import { requestRewardedAd } from '../services/rewardedAdCoordinator';
+import { classifyRewardedAdFailure } from '../services/rewardedAdExperience';
 import { getPlayerLanguage, t } from '../services/i18n';
 import { LocalizedTextVars } from '../types';
+import {
+    beginPendingRewardAd,
+    clearPendingRewardAd,
+    getRecoverableRewardedAdReceipt,
+    markPendingRewardAdGranted,
+    markPendingRewardAdReady,
+    markPendingRewardAdVerifiedSave,
+    readPendingRewardAd,
+    recordPendingRewardAdStep,
+    RewardedAdPersistenceError,
+    type PendingRewardAdReceipt,
+} from '../services/rewardedAdRecovery';
 
 interface ProductionCrisisModalProps {
     player: Player;
     event: ScheduledEvent;
-    onChoice: (choiceIndex: number) => void;
+    saveSlot: number;
+    onChoice: (choiceIndex: number, rewardReceiptId?: string) => Promise<void>;
 }
 
-export const ProductionCrisisModal: React.FC<ProductionCrisisModalProps> = ({ player, event, onChoice }) => {
+export const ProductionCrisisModal: React.FC<ProductionCrisisModalProps> = ({ player, event, saveSlot, onChoice }) => {
     const [isProcessingAd, setIsProcessingAd] = useState(false);
     const [resolveError, setResolveError] = useState('');
+    const restoredReceiptRef = useRef<string | null>(null);
     const { options = [], projectId } = event.data || {};
     const project = player.commitments.find(c => c.id === projectId);
     const language = getPlayerLanguage(player);
@@ -23,12 +38,63 @@ export const ProductionCrisisModal: React.FC<ProductionCrisisModalProps> = ({ pl
     const eventVars = event.data?.textVars as LocalizedTextVars | undefined;
     const title = localizeText(event.title, event.data?.titleKey, eventVars);
     const description = localizeText(event.description || '', event.data?.descriptionKey, eventVars);
+    const getRewardedAdError = (reason?: Parameters<typeof classifyRewardedAdFailure>[0]) => {
+        const kind = classifyRewardedAdFailure(reason);
+        if (kind === 'DISMISSED') return tr('app.ads.failure.dismissedSubtext');
+        if (kind === 'BUSY') return tr('app.ads.failure.busySubtext');
+        if (kind === 'OFFLINE') return tr('app.ads.failure.offlineSubtext');
+        if (kind === 'NO_FILL') return tr('app.ads.failure.noFillSubtext');
+        return tr('app.ads.failure.unavailableSubtext');
+    };
+
+    const finishChoice = async (choiceIndex: number, receipt?: PendingRewardAdReceipt) => {
+        await onChoice(choiceIndex, receipt?.id);
+        if (!receipt) return;
+        const durableReceipt = readPendingRewardAd();
+        if (durableReceipt?.id === receipt.id) {
+            try {
+                const verified = markPendingRewardAdVerifiedSave(durableReceipt);
+                markPendingRewardAdGranted(verified);
+            } catch {
+                // The verified player grant marker remains the durable source of truth.
+            }
+            clearPendingRewardAd(receipt.id);
+        }
+    };
+
+    useEffect(() => {
+        if (restoredReceiptRef.current || !Array.isArray(options)) return;
+        for (const opt of options) {
+            if (!opt?.isGolden) continue;
+            const contextId = `${event.id}:${opt.index}`;
+            const receipt = getRecoverableRewardedAdReceipt({
+                playerId: String(player.id || player.name),
+                saveSlot,
+                placement: 'PRODUCTION_CRISIS_OPTION',
+                contextId,
+            });
+            if (!receipt) continue;
+            restoredReceiptRef.current = receipt.id;
+            setIsProcessingAd(true);
+            void finishChoice(opt.index, receipt)
+                .catch(error => {
+                    console.error('Production event recovery failed:', error);
+                    restoredReceiptRef.current = null;
+                    setResolveError(tr('production.modal.errorClose'));
+                })
+                .finally(() => setIsProcessingAd(false));
+            break;
+        }
+    }, [event.id, options, player.id, player.name, saveSlot]);
 
     if (!project) {
         const handleDismissMissingProject = () => {
             setResolveError('');
             try {
-                onChoice(0);
+                void onChoice(0).catch(error => {
+                    console.error('Production event recovery failed:', error);
+                    setResolveError(tr('production.modal.errorSkip'));
+                });
             } catch (error) {
                 console.error('Production event recovery failed:', error);
                 setResolveError(tr('production.modal.errorSkip'));
@@ -37,7 +103,7 @@ export const ProductionCrisisModal: React.FC<ProductionCrisisModalProps> = ({ pl
 
         return (
             <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-                <div className="w-full max-w-sm bg-zinc-900 border border-zinc-800 rounded-3xl shadow-2xl p-5">
+                <div className="w-full max-w-sm max-h-[calc(100dvh-2rem)] overflow-y-auto bg-zinc-900 border border-zinc-800 rounded-3xl shadow-2xl p-5">
                     <div className="text-[10px] font-black uppercase tracking-[0.24em] text-amber-400 mb-2">{tr('production.modal.recovery.eyebrow')}</div>
                     <h3 className="text-2xl font-black text-white leading-tight mb-3">{tr('production.modal.recovery.title')}</h3>
                     <p className="text-sm text-zinc-400 leading-relaxed mb-5">
@@ -60,24 +126,71 @@ export const ProductionCrisisModal: React.FC<ProductionCrisisModalProps> = ({ pl
         setResolveError('');
         if (opt.isGolden) {
             setIsProcessingAd(true);
+            let rewardReceipt: PendingRewardAdReceipt | undefined;
             try {
-                const result = await showAd('REWARDED_BAILOUT');
-                if (result.success) {
+                const contextId = `${event.id}:${opt.index}`;
+                rewardReceipt = getRecoverableRewardedAdReceipt({
+                    playerId: String(player.id || player.name),
+                    saveSlot,
+                    placement: 'PRODUCTION_CRISIS_OPTION',
+                    contextId,
+                }) || undefined;
+                if (!rewardReceipt) {
+                    const interrupted = readPendingRewardAd();
+                    if (
+                        interrupted
+                        && interrupted.playerId === String(player.id || player.name)
+                        && interrupted.saveSlot === saveSlot
+                        && interrupted.placement === 'PRODUCTION_CRISIS_OPTION'
+                        && interrupted.contextId === contextId
+                        && interrupted.status === 'IN_PROGRESS'
+                    ) {
+                        clearPendingRewardAd(interrupted.id);
+                    }
+                    rewardReceipt = beginPendingRewardAd({
+                        playerId: String(player.id || player.name),
+                        saveSlot,
+                        type: 'REWARDED_BAILOUT',
+                        placement: 'PRODUCTION_CRISIS_OPTION',
+                        contextId,
+                        stepsRequired: 1,
+                    });
+                    const result = await requestRewardedAd({
+                        type: 'REWARDED_BAILOUT',
+                        placement: 'PRODUCTION_CRISIS_OPTION',
+                        contextId,
+                    });
+                    if (!result.success) {
+                        clearPendingRewardAd(rewardReceipt.id);
+                        setResolveError(getRewardedAdError(result.reason));
+                        return;
+                    }
                     try {
-                        onChoice(opt.index);
+                        rewardReceipt = recordPendingRewardAdStep(rewardReceipt, {
+                            stepId: result.requestId,
+                            stepNumber: 1,
+                        });
+                        rewardReceipt = markPendingRewardAdReady(rewardReceipt);
                     } catch (error) {
-                        console.error('Production event choice failed:', error);
-                        setResolveError(tr('production.modal.errorClose'));
+                        const advancedReceipt = error instanceof RewardedAdPersistenceError ? error.receipt : undefined;
+                        if (!advancedReceipt) throw error;
+                        rewardReceipt = advancedReceipt.completedSteps === advancedReceipt.stepsRequired
+                            ? { ...advancedReceipt, status: 'READY_TO_GRANT', remainingStep: null }
+                            : advancedReceipt;
                     }
                 }
+                await finishChoice(opt.index, rewardReceipt);
             } catch (error) {
                 console.error("Ad failed:", error);
+                setResolveError(rewardReceipt?.status === 'READY_TO_GRANT'
+                    ? tr('production.modal.errorClose')
+                    : getRewardedAdError('ERROR'));
             } finally {
                 setIsProcessingAd(false);
             }
         } else {
             try {
-                onChoice(opt.index);
+                await finishChoice(opt.index);
             } catch (error) {
                 console.error('Production event choice failed:', error);
                 setResolveError(tr('production.modal.errorClose'));
@@ -97,7 +210,7 @@ export const ProductionCrisisModal: React.FC<ProductionCrisisModalProps> = ({ pl
                 initial={{ scale: 0.9, opacity: 0, y: 20 }}
                 animate={{ scale: 1, opacity: 1, y: 0 }}
                 transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                className={`w-full max-w-md bg-[#0a0a0a] rounded-3xl overflow-hidden border border-${themeColor}-900/50 shadow-[0_0_50px_rgba(${isDirectorDecision ? '6,182,212' : '220,38,38'},0.15)] relative`}
+                className={`w-full max-w-md max-h-[calc(100dvh-2rem)] min-h-0 flex flex-col bg-[#0a0a0a] rounded-3xl overflow-hidden border border-${themeColor}-900/50 shadow-[0_0_50px_rgba(${isDirectorDecision ? '6,182,212' : '220,38,38'},0.15)] relative`}
             >
                 {isProcessingAd && (
                     <div className="absolute inset-0 z-[210] bg-black/90 flex flex-col items-center justify-center p-6 text-center">
@@ -111,7 +224,7 @@ export const ProductionCrisisModal: React.FC<ProductionCrisisModalProps> = ({ pl
                 <div className={`h-2 w-full bg-gradient-to-r ${accentGradient}`} />
                 
                 {/* Header */}
-                <div className="p-6 pb-4 border-b border-white/5 relative overflow-hidden">
+                <div className="p-6 pb-4 border-b border-white/5 relative overflow-hidden shrink-0">
                     <div className={`absolute -right-4 -top-4 text-${themeColor}-500/10`}>
                         {isDirectorDecision ? <Clapperboard size={120} /> : <AlertTriangle size={120} />}
                     </div>
@@ -136,7 +249,7 @@ export const ProductionCrisisModal: React.FC<ProductionCrisisModalProps> = ({ pl
                 </div>
 
                 {/* Body */}
-                <div className="p-6 pt-4">
+                <div className="p-6 pt-4 min-h-0 overflow-y-auto custom-scrollbar">
                     <div className={`bg-${themeColor}-950/20 border border-${themeColor}-900/30 rounded-2xl p-4 mb-6 relative`}>
                         {/* Decorative quotes */}
                         <div className={`absolute -top-3 -left-2 text-4xl text-${themeColor}-500/20 font-serif`}>"</div>

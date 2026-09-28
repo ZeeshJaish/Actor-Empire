@@ -20,6 +20,9 @@ import {
     registerStreamingRightsContract,
 } from './streamingRightsCore';
 import { selectStreamingMarketTitles } from './streamingMarketSupply';
+import { getHistoricalCatalogueTitles, resolveHistoricalCatalogueTitle } from './historicalCatalogue';
+import { normalizeStreamingDayOneMarketIds } from './streamingDayOneMarkets';
+import { resolveStreamingRightsCompatibility } from './streamingRightsCompatibility';
 
 export interface StreamingCatalogTitle {
     id: string;
@@ -32,6 +35,12 @@ export interface StreamingCatalogTitle {
     studioId: string;
     studioName: string;
     source: 'OWNED_LIBRARY' | 'EXTERNAL_MARKET';
+    originalLanguageId?: string;
+    regionId?: string;
+    quality?: number;
+    reach?: number;
+    prestige?: number;
+    catalogueTier?: 'MARQUEE';
 }
 
 export interface StreamingLicenseQuote {
@@ -210,9 +219,11 @@ export const getStreamingLicenseCandidatePool = (player: Player): StreamingCatal
         normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id).catalogProjectIds,
     );
     const ownedTitleIds = new Set(getEligibleOwnedStreamingTitles(player).map(project => project.id));
-    const candidates = [
+    const legacyCandidates = [
         ...(player.world?.projects || [])
             .filter(project => (
+                (!project.marketOpportunityId || project.marketPremiereAtAbsoluteWeek != null)
+                &&
                 Boolean(String(project.id || '').trim())
                 && Boolean(String(project.title || '').trim())
                 && Boolean(String(project.studioId || '').trim())
@@ -225,6 +236,28 @@ export const getStreamingLicenseCandidatePool = (player: Player): StreamingCatal
                 project?.id && project.title && project.studioId,
             )),
     ];
+    const candidates: StreamingCatalogTitle[] = player.world?.historicalCatalogue
+        ? getHistoricalCatalogueTitles(player)
+            .filter(title => !ownedStudioNames.has(title.studioId))
+            .map(title => ({
+                id: title.id,
+                title: title.title,
+                projectType: title.projectType,
+                genre: title.genre,
+                rating: title.rating,
+                releaseYear: title.year,
+                gross: title.boxOffice || null,
+                studioId: title.studioId,
+                studioName: title.studioName,
+                source: 'EXTERNAL_MARKET',
+                originalLanguageId: title.originalLanguageId,
+                regionId: title.regionId,
+                quality: title.quality,
+                reach: title.reach,
+                prestige: title.prestige,
+                catalogueTier: title.catalogueTier,
+            }))
+        : legacyCandidates;
     const byId = new Map<string, StreamingCatalogTitle>();
     candidates.forEach(project => {
         if (!existingCatalogIds.has(project.id) && !ownedTitleIds.has(project.id)) byId.set(project.id, project);
@@ -237,7 +270,39 @@ export const getStreamingLicenseCandidatePool = (player: Player): StreamingCatal
 };
 
 export const getStreamingLicenseOpportunities = (player: Player): StreamingCatalogTitle[] => {
-    return selectStreamingMarketTitles(player, getStreamingLicenseCandidatePool(player));
+    return selectStreamingMarketTitles(player, getStreamingLicenseCandidatePool(player)
+        .filter(title => getStreamingMarketCandidateCompatibility(player, title).available));
+};
+
+/** The exact default inbound scope used before a title joins the rotating direct shelf. */
+export const getStreamingMarketCandidateCompatibility = (
+    player: Player,
+    title: StreamingCatalogTitle,
+) => {
+    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+    const activeCountries = normalizeStreamingDayOneMarketIds((platform.marketOperations || [])
+        .filter(operation => operation.scope === 'COUNTRY' && operation.countryId
+            && operation.status !== 'EXITED'
+            && (operation.status === 'ACTIVE' || operation.entryKind === 'OPENING'))
+        .map(operation => operation.countryId!));
+    const countryIds = (activeCountries.length ? activeCountries
+        : normalizeStreamingDayOneMarketIds(platform.identity?.dayOneMarketIds || []).length
+            ? normalizeStreamingDayOneMarketIds(platform.identity?.dayOneMarketIds || [])
+            : ['US', 'CA', 'MX']).slice().sort();
+    const territory: StreamingLicenseTerritory = (title.rating || 0) >= 8 ? 'GLOBAL' : 'MULTI_REGION';
+    const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+    return resolveStreamingRightsCompatibility({
+        world: player.world,
+        sourceProjectId: title.id,
+        buyerPlatformId: null,
+        sellerPartyId: title.studioId,
+        territory,
+        countryIds: territory === 'GLOBAL' ? [] : countryIds,
+        startsAtAbsoluteWeek: absoluteWeek,
+        expiresAtAbsoluteWeek: absoluteWeek + 104,
+        windowType: 'FIRST_WINDOW',
+        exclusivity: 'NON_EXCLUSIVE',
+    });
 };
 
 export const resolveStreamingCatalogTitle = (
@@ -270,7 +335,7 @@ export const resolveStreamingCatalogTitle = (
             player.ownedStreamingPlatform,
             player.id,
         ).catalogLicenses.find(item => item.sourceProjectId === projectId);
-        return license ? {
+        if (license) return {
             id: license.sourceProjectId,
             title: license.titleAtSigning,
             projectType: license.projectType || 'MOVIE',
@@ -281,6 +346,26 @@ export const resolveStreamingCatalogTitle = (
             studioId: license.licensorName,
             studioName: license.licensorName,
             source: 'EXTERNAL_MARKET' as const,
+        };
+        const historical = resolveHistoricalCatalogueTitle(player, projectId);
+        return historical ? {
+            id: historical.id,
+            title: historical.title,
+            projectType: historical.projectType,
+            genre: historical.genre,
+            rating: historical.rating,
+            releaseYear: historical.year,
+            gross: historical.boxOffice,
+            studioId: historical.studioId,
+            studioName: historical.studioName,
+            originalLanguageId: historical.originalLanguageId,
+            regionId: historical.regionId,
+            quality: historical.quality,
+            reach: historical.reach,
+            prestige: historical.prestige,
+            catalogueTier: historical.catalogueTier,
+            source: ownedStudioNames.has(historical.studioId)
+                ? 'OWNED_LIBRARY' as const : 'EXTERNAL_MARKET' as const,
         } : null;
         })()
     );
@@ -291,15 +376,25 @@ export const getStreamingLicenseQuote = (
     territory: StreamingLicenseTerritory,
     durationWeeks: number,
     exclusivity: StreamingLicenseExclusivity,
+    pricingVersion: 1 | 2 = 1,
 ): StreamingLicenseQuote => {
     const territoryMultiplier = STREAMING_LICENSE_TERRITORIES.find(item => item.id === territory)?.multiplier || 1;
     const durationMultiplier = durationWeeks >= 156 ? 1.32 : durationWeeks >= 104 ? 1 : 0.72;
     const exclusivityMultiplier = exclusivity === 'EXCLUSIVE' ? 1.55 : 1;
-    const performanceBase = Math.max(
-        3_000_000,
-        Math.min(90_000_000, (title.gross || 45_000_000) * 0.045 + (title.rating || 6.5) * 550_000),
+    const signal = (value: number | null | undefined, fallback: number): number => (
+        value == null || !Number.isFinite(Number(value)) ? fallback : Number(value)
     );
-    const suggestedGuarantee = roundMoney(performanceBase * territoryMultiplier * durationMultiplier * exclusivityMultiplier);
+    const performanceBase = pricingVersion === 2
+        ? (title.projectType === 'SERIES' ? 15_000_000 : 9_000_000)
+            + clamp(signal(title.gross, 45_000_000) * 0.085, 0, 80_000_000)
+            + clamp((signal(title.quality, signal(title.rating, 6.5) * 10) - 50) * 300_000, 0, 15_000_000)
+            + clamp(signal(title.reach, 50) * 120_000, 0, 12_000_000)
+            + clamp(signal(title.prestige, 50) * 60_000, 0, 6_000_000)
+        : Math.max(3_000_000,
+            Math.min(90_000_000, (title.gross || 45_000_000) * 0.045 + (title.rating || 6.5) * 550_000));
+    const suggestedGuarantee = roundMoney(Math.min(pricingVersion === 2 ? 600_000_000 : Number.MAX_SAFE_INTEGER,
+        performanceBase * territoryMultiplier * durationMultiplier
+        * exclusivityMultiplier * (title.catalogueTier === 'MARQUEE' ? (pricingVersion === 2 ? 1.75 : 2) : 1)));
     return {
         suggestedGuarantee,
         minimumGuarantee: roundMoney(suggestedGuarantee * 0.62),

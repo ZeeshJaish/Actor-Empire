@@ -20,6 +20,7 @@ import {
     getContentMarketCollections,
     getContentMarketFunds,
     getContentMarketListings,
+    type ContentMarketAuctionAssignments,
 } from './streamingContentMarket';
 import {
     getOwnedPlatformPackageCountryIds,
@@ -125,11 +126,21 @@ const sellerPriorities = (seed: string): StreamingBuyerAuctionLot['sellerPriorit
     };
 };
 
-export const getStreamingBuyerAuctionLots = (player: Player): StreamingBuyerAuctionLot[] => {
+export const getStreamingBuyerAuctionLots = (
+    player: Player,
+    prepared?: { listings: ReturnType<typeof getContentMarketListings>; collections: ReturnType<typeof getContentMarketCollections>;
+        assignments: ContentMarketAuctionAssignments },
+): StreamingBuyerAuctionLot[] => {
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     const exactPlatformMarkets = getOwnedPlatformPackageCountryIds(platform);
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
-    const titleLots = getContentMarketAuctionListings(player).map(listing => {
+    const auctionListings = prepared
+        ? prepared.listings.filter(listing => prepared.assignments.listingIds.has(listing.id))
+        : getContentMarketAuctionListings(player);
+    const auctionCollections = prepared
+        ? prepared.collections.filter(collection => prepared.assignments.collectionIds.has(collection.id))
+        : getContentMarketAuctionCollections(player);
+    const titleLots = auctionListings.map(listing => {
         const referenceValue = Math.max(1_000_000, Number(listing.rivalBidAmount || listing.terms.minimumGuarantee));
         const countryIds = listing.countryIds.length ? [...listing.countryIds].sort() : [...exactPlatformMarkets].sort();
         const excludedCountryIds = exactPlatformMarkets.filter(id => !countryIds.includes(id));
@@ -176,7 +187,7 @@ export const getStreamingBuyerAuctionLots = (player: Player): StreamingBuyerAuct
             catalogueComponentIds: [],
         };
     });
-    const packageLots = getContentMarketAuctionCollections(player).map(collection => {
+    const packageLots = auctionCollections.map(collection => {
         const referenceValue = Math.max(3_000_000, collection.totalGuarantee);
         const id = createDeterministicId('streaming_buyer_auction_lot', collection.id, getStreamingMarketCycle(absoluteWeek));
         const componentIds = collection.rows.map(row => row.componentProjectId).sort();

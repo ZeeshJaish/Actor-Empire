@@ -31,7 +31,7 @@ import css from './ContentMarket.module.css';
 import { cx } from './cx';
 import { Poster } from './Poster';
 import type { Brand } from '../components/streaming-transplant/StreamingBrandVisuals';
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Lot, Offer, Terms, Basis, Availability, Territory,
   verdictOf, offerFrom, reachOf,
@@ -53,16 +53,63 @@ export interface MarketState {
 
 export interface MarketSupplySummary {
   totalCanonicalTitles: number;
+  sharedLibraryTitles?: number;
   liveAuctions: number;
   foundingBoost: boolean;
   nextRotationAbsoluteWeek: number;
 }
 
+export interface PaidScoutView {
+  price: number;
+  count: number;
+  shortfall: number;
+  weeksUntilFree: number;
+  onScout: () => { changed: boolean; detail: string };
+}
+
+export interface SharedLibraryFilters {
+  projectType: '' | 'MOVIE' | 'SERIES';
+  genre: string;
+  languageId: string;
+  producerId: string;
+  minimumQuality: number;
+  releaseYears: number;
+  marqueeOnly: boolean;
+}
+
+export interface SharedLibraryResult {
+  id: string;
+  title: string;
+  studioName: string;
+  year: number;
+  genre: string;
+  languageId: string;
+  quality: number;
+  rating: number | null;
+  marquee: boolean;
+  status: 'AVAILABLE' | 'HELD' | 'OWNED' | 'UNRESOLVED' | 'NOT_OFFERED';
+  reason: string;
+  lotId: string | null;
+}
+
+export interface SharedLibraryOptions {
+  genres: string[];
+  languages: string[];
+  producers: Array<{ id: string; name: string }>;
+}
+
 /* ── money ── */
 const money = (n: number) => {
-  if (Math.abs(n) >= 1_000_000) return `$${(n / 1_000_000).toFixed(n % 1_000_000 === 0 ? 0 : 1)}M`;
-  if (Math.abs(n) >= 1_000) return `$${Math.round(n / 1_000)}K`;
-  return `$${Math.round(n)}`;
+  const sign = n < 0 ? '-' : '';
+  const amount = Math.abs(Number.isFinite(n) ? n : 0);
+  const tier = amount >= 1_000_000_000_000 ? [1_000_000_000_000, 'T'] as const
+    : amount >= 1_000_000_000 ? [1_000_000_000, 'B'] as const
+    : amount >= 1_000_000 ? [1_000_000, 'M'] as const
+    : amount >= 1_000 ? [1_000, 'K'] as const : null;
+  if (!tier) return `${sign}$${Math.round(amount)}`;
+  const precision = tier[0] >= 1_000_000 ? 2 : 0;
+  const scaled = (amount / tier[0]).toFixed(precision);
+  return `${sign}$${precision ? scaled.replace(/\.?0+$/, '') : scaled}${tier[1]}`;
 };
 const exact = (n: number) => '$' + Math.round(n).toLocaleString('en-US');
 const count = (n: number) => n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M`
@@ -126,7 +173,7 @@ const Gate: React.FC<{
         <div className={css.mkdoortext}>
           <b>THE MARKET</b>
           <span>License released titles and collections, or compete for announced rights in a room.</span>
-          <em>{supplySummary?.totalCanonicalTitles ?? buyable.length} TITLES · {supplySummary?.liveAuctions ?? rooms.length} LIVE</em>
+          <em>{supplySummary?.sharedLibraryTitles ?? supplySummary?.totalCanonicalTitles ?? buyable.length} TITLES · {supplySummary?.liveAuctions ?? rooms.length} LIVE</em>
         </div>
       </button>
     </div>
@@ -156,7 +203,7 @@ const Power: React.FC<{ st: MarketState }> = ({ st }) => {
         <em><b>{within}</b> of {listed.length} within reach</em>
       </div>
 
-      <b className={css.mkpwbig}>{exact(free)}</b>
+      <b className={css.mkpwbig}>{money(free)}</b>
 
       {/* one track, split. The old bar just repeated the number. */}
       <div className={css.mkpwtrack}>
@@ -186,9 +233,9 @@ const Power: React.FC<{ st: MarketState }> = ({ st }) => {
    ============================================================ */
 /** what a lot's availability means, in the order urgency actually runs */
 const AVAIL: Record<Availability, { label: string; tone: string; note: string }> = {
-  LIVE:    { label: 'IN THE ROOM', tone: 'live', note: 'bidding now' },
+  LIVE:    { label: 'LIVE BIDDING', tone: 'live', note: 'bidding now' },
   CLOSING: { label: 'CLOSING', tone: 'closing', note: 'the listing is about to lapse' },
-  OPEN:    { label: 'OPEN', tone: 'open', note: 'buy whenever you like' },
+  OPEN:    { label: 'FIXED-PRICE LICENCE', tone: 'open', note: 'licence at the listed terms' },
   OPENS:   { label: 'OPENS SOON', tone: 'soon', note: 'a room is scheduled' },
   PRESALE: { label: 'PRE-SALE', tone: 'soon', note: 'sold before delivery' },
   WATCH:   { label: 'ANNOUNCED', tone: 'watch', note: 'nothing to do yet' },
@@ -208,18 +255,23 @@ const Chip: React.FC<{ lot: Lot }> = ({ lot }) => {
 
 /* one card, used by every rail and by the grid */
 const Card: React.FC<{ lot: Lot; onOpen: (l: Lot) => void; wide?: boolean }> = ({ lot, onOpen, wide }) => (
-  <button className={cx(css.mkcard, (wide ? css.wide : ''))} aria-label={`${lot.title} · ${lot.seller}`} onClick={() => onOpen(lot)}>
-    {/* a collection gets a shelf on the card too, not a sheet with a badge */}
-    {lot.rows ? <span className={css.mkcardbox}><Boxset lot={lot} /></span> : (
-      <Poster id={lot.artId || lot.id} title={lot.title} genre={lot.genre} hue={lot.hue} poster={lot.poster} year={lot.year} size="md" />
-    )}
+  <button className={cx(css.mkcard, (wide ? css.wide : ''))} aria-label={`${lot.title} · ${AVAIL[lot.avail].label} · ${lot.seller}`} onClick={() => onOpen(lot)}>
+    <span className={css.mkcardart}>
+      {/* A collection gets a shelf on the card too, not a sheet with a badge. */}
+      {lot.rows ? <span className={css.mkcardbox}><Boxset lot={lot} /></span> : (
+        <Poster id={lot.artId || lot.id} title={lot.title} genre={lot.genre} hue={lot.hue} poster={lot.poster} year={lot.year} size="md" />
+      )}
+      <span className={css.mkcardflags}>
+        <Chip lot={lot} />
+        {lot.prior && <span className={css.mkrate}>{lot.prior.rating.toFixed(1)}</span>}
+        {lot.marquee && <span className={css.mklibrarymarquee}>MARQUEE</span>}
+      </span>
+    </span>
     <div className={css.mkcardfoot}>
       <b className={lot.mode === 'STUDIO' ? css.mkfree : ''}>
-        {lot.listed ? money(lot.listed.mg) : lot.mode === 'STUDIO' ? 'NO FEE' : 'ROOM'}</b>
+        {lot.listed ? money(lot.listed.mg) : lot.mode === 'STUDIO' ? 'NO FEE' : lot.mode === 'AUCTION' ? 'LIVE BID' : 'COMING SOON'}</b>
       <span>{reachOf(lot.terr)}%</span>
     </div>
-    <div className={css.mkcardav}><Chip lot={lot} /></div>
-    {lot.prior && <span className={css.mkrate}>{lot.prior.rating.toFixed(1)}</span>}
   </button>
 );
 
@@ -260,7 +312,7 @@ const Row: React.FC<{ lot: Lot; onOpen: (l: Lot) => void }> = ({ lot, onOpen }) 
       <em>{lot.seller} · {lot.year} · {lot.genre}</em>
     </span>
     <span className={css.mkrowend}>
-      <b>{lot.listed ? money(lot.listed.mg) : 'ROOM'}</b>
+      <b>{lot.listed ? money(lot.listed.mg) : lot.mode === 'AUCTION' ? 'LIVE BID' : 'COMING SOON'}</b>
       <em>{reachOf(lot.terr)}%{lot.prior ? ` · ${lot.prior.rating.toFixed(1)}` : ''}</em>
     </span>
   </button>
@@ -278,7 +330,11 @@ const PAGE = 16;
 const Market: React.FC<{
   st: MarketState; onOpen: (l: Lot) => void; onBack: () => void; initialQuery?: string; onQueryChange?: (query: string) => void;
   onCommission?: () => void;
-}> = ({ st, onOpen, onBack, initialQuery = '', onQueryChange, onCommission }) => {
+  searchLibrary?: (query: string, filters: SharedLibraryFilters) => SharedLibraryResult[];
+  libraryOptions?: SharedLibraryOptions;
+  firstLook?: { protectedTitles: number; weeksRemaining: number } | null;
+  paidScout?: PaidScoutView;
+}> = ({ st, onOpen, onBack, initialQuery = '', onQueryChange, onCommission, searchLibrary, libraryOptions, firstLook, paidScout }) => {
   const CATALOGUE = useCatalogue();
   const [view, setView] = useState<string>('ALL');
   const [q, setQ] = useState(initialQuery);
@@ -289,6 +345,15 @@ const Market: React.FC<{
   const [fFormat, setFFormat] = useState<string[]>([]);
   const [fGenre, setFGenre] = useState<string[]>([]);
   const [fPath, setFPath] = useState<string[]>([]);
+  const [libraryType, setLibraryType] = useState<SharedLibraryFilters['projectType']>('');
+  const [libraryGenre, setLibraryGenre] = useState('');
+  const [libraryLanguage, setLibraryLanguage] = useState('');
+  const [libraryProducer, setLibraryProducer] = useState('');
+  const [libraryQuality, setLibraryQuality] = useState(0);
+  const [libraryYears, setLibraryYears] = useState(0);
+  const [libraryMarquee, setLibraryMarquee] = useState(false);
+  const [confirmScout, setConfirmScout] = useState(false);
+  const [scoutFeedback, setScoutFeedback] = useState('');
 
   const pool = useMemo(() => CATALOGUE.filter(l => l.mode !== 'STUDIO'), [CATALOGUE]);
   const genres = useMemo(() => [...new Set(pool.map(l => l.genre))].sort(), [pool]);
@@ -305,21 +370,38 @@ const Market: React.FC<{
 
   /* every rail is a named predicate, so "see all" can reuse it exactly */
   const RAILS: { key: string; title: string; note: string; test: (l: Lot) => boolean }[] = [
-    { key: 'LIVE', title: 'In the room now', note: 'bidding is open', test: l => l.avail === 'LIVE' },
+    { key: 'LIVE', title: 'Live bidding', note: 'Place a competing rights bid', test: l => l.avail === 'LIVE' },
     { key: 'CLOSING', title: 'Closing this week', note: 'these lapse if nobody moves', test: l => l.avail === 'CLOSING' },
-    { key: 'HEAT', title: 'Everyone is talking about these', note: 'highest public interest', test: l => l.heat >= 60 },
-    { key: 'PROVEN', title: 'Already proven', note: 'they had a run, and the numbers are public', test: l => !!l.prior?.boxOffice },
+    { key: 'HEAT', title: 'Hot now', note: 'Highest public interest', test: l => l.heat >= 60 },
+    { key: 'PROVEN', title: 'Box-office proven', note: 'Released films with public results', test: l => !!l.prior?.boxOffice },
     { key: 'PACKS', title: 'Whole libraries', note: 'one signature, many titles', test: l => l.format === 'COLLECTION' },
     { key: 'CHEAP', title: 'Under $1.5M', note: 'volume for a thin week', test: l => !!l.listed && l.listed.mg <= 1_500_000 },
     { key: 'OPENS', title: 'Not yet, but soon', note: 'follow one and you will be told', test: l => l.avail === 'OPENS' || l.avail === 'WATCH' },
   ];
+  const seenRailIds = new Set<string>();
+  const railPreviews = RAILS.map(rail => {
+    const all = pool.filter(rail.test);
+    const preview = all.filter(lot => !seenRailIds.has(lot.id)).slice(0, RAIL_CAP);
+    preview.forEach(lot => seenRailIds.add(lot.id));
+    return { rail, all, preview };
+  }).filter(item => item.preview.length > 0);
 
   const testOf = (key: string) => RAILS.find(r => r.key === key)?.test
     ?? ((l: Lot) => l.avail === key);
 
-  const filtersOn = fFormat.length + fGenre.length + fPath.length;
+  const filtersOn = fFormat.length + fGenre.length + fPath.length
+    + Number(Boolean(libraryType)) + Number(Boolean(libraryGenre)) + Number(Boolean(libraryLanguage))
+    + Number(Boolean(libraryProducer)) + Number(Boolean(libraryQuality))
+    + Number(Boolean(libraryYears)) + Number(libraryMarquee);
   const search = q.trim().toLowerCase();
   const narrowed = !!search || view !== 'ALL' || filtersOn > 0;
+  const libraryActive = Boolean(searchLibrary && (search || libraryType || libraryGenre || libraryLanguage
+    || libraryProducer || libraryQuality || libraryYears || libraryMarquee));
+  const libraryResults = useMemo(() => libraryActive && searchLibrary
+    ? searchLibrary(q, { projectType: libraryType, genre: libraryGenre, languageId: libraryLanguage,
+      producerId: libraryProducer, minimumQuality: libraryQuality, releaseYears: libraryYears,
+      marqueeOnly: libraryMarquee }) : [], [libraryActive, searchLibrary, q, libraryType, libraryGenre,
+      libraryLanguage, libraryProducer, libraryQuality, libraryYears, libraryMarquee]);
 
   const results = useMemo(() => {
     if (!narrowed && !dense) return [];
@@ -338,7 +420,9 @@ const Market: React.FC<{
 
   const toggle = (list: string[], set: (v: string[]) => void, v: string) =>
     set(list.includes(v) ? list.filter(x => x !== v) : [...list, v]);
-  const clearAll = () => { setQ(''); setView('ALL'); setFFormat([]); setFGenre([]); setFPath([]); };
+  const clearAll = () => { setQ(''); onQueryChange?.(''); setView('ALL'); setFFormat([]); setFGenre([]); setFPath([]);
+    setLibraryType(''); setLibraryGenre(''); setLibraryLanguage(''); setLibraryProducer('');
+    setLibraryQuality(0); setLibraryYears(0); setLibraryMarquee(false); };
 
   return (
     <div className={css.mk} data-content-market-design="zip-exact" data-content-market-scene="market">
@@ -350,14 +434,31 @@ const Market: React.FC<{
 
       <Power st={st} />
 
+      {paidScout && <section className={css.mkscout} aria-label="Private content scouting">
+        <div><b>PRIVATE SCOUTING</b><p>Find up to 25 new offers for your platform. Public listings and signed deals stay put.</p>
+          <small>Scout #{paidScout.count + 1} this cycle · free rotation in {paidScout.weeksUntilFree} {paidScout.weeksUntilFree === 1 ? 'week' : 'weeks'}</small></div>
+        <button type="button" disabled={paidScout.shortfall > 0} onClick={() => setConfirmScout(true)}>Scout {money(paidScout.price)}</button>
+        {paidScout.shortfall > 0 && <small role="status">Platform funds short by {money(paidScout.shortfall)}.</small>}
+        {confirmScout && <div className={css.mkscoutconfirm} role="group" aria-label="Confirm private scouting">
+          <p>Spend {money(paidScout.price)} from your streaming treasury? This replaces only your previous unsigned private scouting shelf.</p>
+          <div><button type="button" onClick={() => { const result = paidScout.onScout(); setScoutFeedback(result.detail); setConfirmScout(false); }}>Confirm scout</button>
+            <button type="button" onClick={() => setConfirmScout(false)}>Cancel</button></div>
+        </div>}
+        {scoutFeedback && <small role="status">{scoutFeedback}</small>}
+      </section>}
+
+      {firstLook && <div className={css.mklibrarygrace}><b>FIRST LOOK</b><span>{firstLook.protectedTitles} titles protected from new rival bids · up to {firstLook.weeksRemaining} {firstLook.weeksRemaining === 1 ? 'week' : 'weeks'} left</span><small>Normal licence prices apply. Protection ends at 25 playable titles.</small></div>}
+
+      <p className={css.mklegend}><b>Fixed-price licence</b> means sign at the listed rights terms. <b>Live bidding</b> means rivals can compete. <b>Marquee</b> marks a premium title, not a buying method.</p>
+
       <div className={css.mksearch}>
         <input value={q} onChange={e => { setQ(e.target.value); onQueryChange?.(e.target.value); }}
-          placeholder="Title, seller, genre, or what it is about" aria-label="Search the market" />
+          placeholder="Search all released titles, producers, or genres" aria-label="Search the market" />
       </div>
 
       <div className={css.mklenses}>
-        {([['ALL', 'Everything'], ['LIVE', 'In the room'], ['CLOSING', 'Closing'],
-        ['OPEN', 'Open'], ['OPENS', 'Opening soon'], ['PACKS', 'Collections'],
+        {([['ALL', 'Everything'], ['LIVE', 'Live bidding'], ['CLOSING', 'Closing'],
+        ['OPEN', 'Fixed-price'], ['OPENS', 'Opening soon'], ['PACKS', 'Collections'],
         ['PROVEN', 'Proven'], ['WATCH', 'Announced']] as [string, string][]).map(([k, label]) => {
           const n = k === 'ALL' ? pool.length : counts[k] ?? 0;
           if (n === 0) return null;
@@ -387,7 +488,24 @@ const Market: React.FC<{
       {/* Density is a view mode, not a filter modifier. It used to apply only
           inside a narrowed result, so pressing it on the rails screen did
           nothing at all — the control looked broken because it was. */}
-      {narrowed || dense ? (
+      {libraryActive ? (
+        <section className={css.mklibrary} aria-label="Shared library search results">
+          <div className={css.mkresulthead}><b>{libraryResults.length} shared-library results</b><button onClick={clearAll}>Clear</button></div>
+          <p>Search covers released titles worldwide. Only a current, rights-valid offer opens a deal.</p>
+          <div className={css.mklist}>{libraryResults.map(row => {
+            const offer = row.lotId ? CATALOGUE.find(lot => lot.id === row.lotId) : null;
+            return <button type="button" key={row.id} className={css.mklibraryrow} disabled={!offer}
+              onClick={() => offer && onOpen(offer)}>
+              <span className={css.mkthumb}><Poster id={row.id} title={row.title} genre={row.genre} size="xs" /></span>
+              <span className={css.mkrowmain}><b>{row.title}</b><em>{row.studioName} · {row.year} · {row.genre} · {row.languageId}</em>
+                <em>{row.marquee ? 'MARQUEE · ' : ''}Quality {row.quality} · Rated {row.rating?.toFixed(1) ?? '—'}</em>
+                <em className={css.mklibraryreason}>{offer?.mode === 'AUCTION' ? 'LIVE BIDDING' : row.status.replaceAll('_', ' ')} · {offer?.mode === 'AUCTION' ? 'Enter live bid' : row.reason}</em></span>
+              {offer && <span aria-hidden="true">→</span>}
+            </button>;
+          })}</div>
+          {!libraryResults.length && <p className={css.mkempty}>No titles match. Try a broader search or fewer filters.</p>}
+        </section>
+      ) : narrowed || dense ? (
         <>
           <div className={css.mkresulthead}>
             <b>{results.length} title{results.length === 1 ? '' : 's'}</b>
@@ -413,24 +531,22 @@ const Market: React.FC<{
       ) : (
         pool.length === 0 ? (
           <Blank glyph="🎬" head="Nothing is listed yet"
-            body="Rival studios list a title once they have released it, and none has reached release yet. The market fills as the industry produces — until then, an Original is the fastest way to put something on the service."
+            body="No rights-valid lots are open this cycle. Search the shared library to inspect titles and rights status, or check again when the market rotates."
             action={onCommission ? { label: 'Commission an Original', onPress: onCommission } : undefined} />
         ) :
-        RAILS.map(r => {
-          const lots = pool.filter(r.test);
-          if (!lots.length) return null;
-          const over = lots.length - RAIL_CAP;
+        railPreviews.map(({ rail: r, all, preview }) => {
+          const over = all.length - preview.length;
           return (
             <section className={css.mkrail} key={r.key}>
               <div className={css.mkrailhead}>
-                <b>{r.title}<em>{lots.length}</em></b>
+                <b>{r.title}<em>{all.length}</em></b>
                 <span>{r.note}</span>
               </div>
               <div className={css.mkrailrun}>
-                {lots.slice(0, RAIL_CAP).map(l => <Card key={l.id} lot={l} onOpen={onOpen} wide />)}
+                {preview.map(l => <Card key={l.id} lot={l} onOpen={onOpen} wide />)}
                 {over > 0 && (
                   <button className={css.mkseeall} onClick={() => setView(r.key)}>
-                    <b>See all</b><i>{lots.length}</i><em>→</em>
+                    <b>See all</b><i>{all.length}</i><em>→</em>
                   </button>
                 )}
               </div>
@@ -466,7 +582,17 @@ const Market: React.FC<{
                   onClick={() => toggle(fPath, setFPath, pth)}>{PATH_LABEL[pth]}</button>
               ))}
             </div>
-            <button className={css.mkfclear} onClick={() => { setFFormat([]); setFGenre([]); setFPath([]); }}>
+            {searchLibrary && <><span className={css.mkflabel}>SHARED LIBRARY · INCLUDING UNSHELVED TITLES</span>
+              <div className={css.mklibraryfilters}>
+                <select aria-label="Library format" value={libraryType} onChange={e => setLibraryType(e.target.value as SharedLibraryFilters['projectType'])}><option value="">Films and series</option><option value="MOVIE">Films</option><option value="SERIES">Series</option></select>
+                <select aria-label="Library genre" value={libraryGenre} onChange={e => setLibraryGenre(e.target.value)}><option value="">All genres</option>{libraryOptions?.genres.map(genre => <option key={genre} value={genre}>{genre.replaceAll('_', ' ')}</option>)}</select>
+                <select aria-label="Library language" value={libraryLanguage} onChange={e => setLibraryLanguage(e.target.value)}><option value="">All languages</option>{libraryOptions?.languages.map(language => <option key={language} value={language}>{language.replaceAll('_', ' ')}</option>)}</select>
+                <select aria-label="Library producer" value={libraryProducer} onChange={e => setLibraryProducer(e.target.value)}><option value="">All producers</option>{libraryOptions?.producers.map(producer => <option key={producer.id} value={producer.id}>{producer.name}</option>)}</select>
+                <select aria-label="Library release age" value={libraryYears} onChange={e => setLibraryYears(Number(e.target.value))}><option value={0}>Any release year</option><option value={5}>Last 5 game years</option><option value={10}>Last 10 game years</option></select>
+                <select aria-label="Library minimum quality" value={libraryQuality} onChange={e => setLibraryQuality(Number(e.target.value))}><option value={0}>Any quality</option><option value={80}>Quality 80+</option><option value={90}>Quality 90+</option></select>
+                <button type="button" aria-pressed={libraryMarquee} onClick={() => setLibraryMarquee(value => !value)}>Marquee only</button>
+              </div></>}
+            <button className={css.mkfclear} onClick={clearAll}>
               Clear all filters
             </button>
           </div>
@@ -619,6 +745,20 @@ const Detail: React.FC<{
 }> = ({ lot, st, onBack, onTake, onOffer, onRoom, offerCount = 0, onOffers }) => {
   const [face, setFace] = useState<Face>(lot.rows ? 'TITLES' : 'RIGHTS');
   const [visibleCollectionRows, setVisibleCollectionRows] = useState(12);
+  const [openingBid, setOpeningBid] = useState(false);
+  const bidFrame = useRef<number | null>(null);
+  const bidTimer = useRef<number | null>(null);
+  useEffect(() => () => {
+    if (bidFrame.current !== null) cancelAnimationFrame(bidFrame.current);
+    if (bidTimer.current !== null) clearTimeout(bidTimer.current);
+  }, []);
+  const enterLiveBid = () => {
+    if (openingBid) return;
+    setOpeningBid(true);
+    bidFrame.current = requestAnimationFrame(() => {
+      bidTimer.current = window.setTimeout(() => { onRoom(lot); setOpeningBid(false); }, 0);
+    });
+  };
   const free = lot.terr.filter(t => t.status === 'FREE');
   const held = lot.terr.filter(t => t.status !== 'FREE');
   const power = st.treasury - st.committed;
@@ -683,14 +823,14 @@ const Detail: React.FC<{
           ) : (
             <p className={css.mkunproven}>
               <b>No public record.</b> Nothing has been released, so there is nothing to check.
-              You are buying the package, not the performance.
+              You are licensing the package, not buying its IP or its future performance.
             </p>
           )}
         </div>
 
         {/* one statement, not four identical boxes */}
         <div className={css.mkask}>
-          <span>{lot.listed ? 'THE ASK' : 'DECIDED IN THE ROOM'}</span>
+          <span>{lot.listed ? 'LICENCE GUARANTEE' : 'SET BY LIVE BIDDING'}</span>
           <b>{lot.listed ? money(lot.listed.mg) : 'NO PRICE'}</b>
           <div className={css.mkfacts}>
             {lot.rows ? (
@@ -708,6 +848,14 @@ const Detail: React.FC<{
             )}
           </div>
         </div>
+        {lot.listed && <div className={css.mkdealsummary} aria-label="Rights terms before signing">
+          <span><b>TERM</b>{termLabel(lot.listed.termWeeks)}</span>
+          <span><b>TERRITORIES</b>{lot.listed.scope}</span>
+          <span><b>EXCLUSIVITY</b>{lot.listed.excl === 'EXCLUSIVE' ? 'Exclusive' : 'Shared'}</span>
+          <span><b>GUARANTEE</b>{money(lot.listed.mg)}</span>
+          <span><b>SELLER BACKEND</b>{lot.listed.backendPct ? `${lot.listed.backendPct}%` : 'None'}</span>
+          <small>This is a streaming-rights licence; film IP remains with its rights holder.</small>
+        </div>}
 
         <div className={css.mkfaces}>
           {((lot.rows ? ['TITLES', 'RIGHTS', 'TERMS'] : ['RIGHTS', 'TERMS', 'HEAT']) as Face[]).map(f => (
@@ -826,7 +974,7 @@ const Detail: React.FC<{
           </>
         )}
         {face === 'TERMS' && !lot.listed && (
-          <p className={css.mknote}>No published terms. This one is decided in the room.</p>
+          <p className={css.mknote}>No fixed-price terms. The rights package is decided through live bidding.</p>
         )}
 
         {face === 'HEAT' && (
@@ -843,13 +991,13 @@ const Detail: React.FC<{
           <>
             <button className={cx(css.mksign, (afford ? '' : css.dead))} disabled={!afford}
               onClick={() => afford && onTake(lot)}>
-              {afford ? `BUY · ${money(lot.listed!.mg)}` : `SHORT BY ${money(lot.listed!.mg - power)}`}
+              {afford ? `LICENSE · ${money(lot.listed!.mg)}` : `SHORT BY ${money(lot.listed!.mg - power)}`}
             </button>
-            <button className={css.mkmark} aria-label="Make private offer" onClick={() => onOffer(lot)}>OFFER</button>
+            {lot.sourceKind !== 'OPPORTUNITY' && <button className={css.mkmark} aria-label="Negotiate rights" onClick={() => onOffer(lot)}>NEGOTIATE RIGHTS</button>}
             {offerCount > 0 && <button className={css.mkmark} onClick={onOffers}>YOUR OFFERS · {offerCount}</button>}
           </>
         )}
-        {lot.mode === 'AUCTION' && <button className={cx(css.mksign, css.mklivebtn)} onClick={() => onRoom(lot)}>ENTER THE ROOM</button>}
+        {lot.mode === 'AUCTION' && <button className={cx(css.mksign, css.mklivebtn)} disabled={openingBid} aria-busy={openingBid} onClick={enterLiveBid}>{openingBid ? 'OPENING LIVE BID…' : 'ENTER LIVE BID'}</button>}
         {lot.mode === 'STUDIO' && <button className={css.mksign} onClick={() => onTake(lot)}>BRING IT ACROSS</button>}
         {lot.mode === 'UPCOMING' && <button className={css.mkmark} onClick={() => onTake(lot)}>FOLLOW THIS SALE</button>}
       </div>
@@ -1009,11 +1157,15 @@ export const ContentMarket: React.FC<{
   onNavigation?: (scene: MarketScene, lotId: string | null) => void;
   initialQuery?: string;
   onQueryChange?: (query: string) => void;
+  searchLibrary?: (query: string, filters: SharedLibraryFilters) => SharedLibraryResult[];
+  libraryOptions?: SharedLibraryOptions;
+  firstLook?: { protectedTitles: number; weeksRemaining: number } | null;
+  paidScout?: PaidScoutView;
   initialScene?: MarketScene;
   initialLotId?: string | null;
   /** Distinguishes "no production house" from "a studio with nothing released". */
   ownsStudio?: boolean;
-}> = ({ brand, state, supplySummary, catalogue, onBack, onCommission, ownsStudio, onAcquired, onOfferSent, onEnterRoom, onFollow, offerCount = 0, onOpenOffers, onNavigation, initialQuery = '', onQueryChange, initialScene = 'GATE', initialLotId = null }) => {
+}> = ({ brand, state, supplySummary, catalogue, onBack, onCommission, ownsStudio, onAcquired, onOfferSent, onEnterRoom, onFollow, offerCount = 0, onOpenOffers, onNavigation, initialQuery = '', onQueryChange, searchLibrary, libraryOptions, firstLook, paidScout, initialScene = 'GATE', initialLotId = null }) => {
   const c = brandColor(brand);
   const [scene, setScene] = useState<MarketScene>(initialScene);
   const [back, setBack] = useState<MarketScene>(initialScene === 'STUDIO' ? 'STUDIO' : 'MARKET');
@@ -1067,7 +1219,9 @@ export const ContentMarket: React.FC<{
         <Gate st={state} supplySummary={supplySummary} onBack={onBack} onCommission={onCommission}
           onRoute={r => navigate(r === 'STUDIO' ? 'STUDIO' : 'MARKET', null)} />
       )}
-      {scene === 'MARKET' && <Market st={state} onCommission={onCommission} initialQuery={initialQuery} onQueryChange={onQueryChange} onBack={() => navigate('GATE', null)} onOpen={l => open(l, 'MARKET')} />}
+      {scene === 'MARKET' && <Market st={state} onCommission={onCommission} initialQuery={initialQuery} onQueryChange={onQueryChange}
+        searchLibrary={searchLibrary} libraryOptions={libraryOptions} firstLook={firstLook} paidScout={paidScout}
+        onBack={() => navigate('GATE', null)} onOpen={l => open(l, 'MARKET')} />}
       {scene === 'STUDIO' && <Studio onBack={() => navigate('GATE', null)} onTake={take} ownsStudio={ownsStudio} onCommission={onCommission} />}
       {scene === 'DETAIL' && lot && (
         <Detail lot={lot} st={state} onBack={() => navigate(back, null)} onTake={take}

@@ -579,11 +579,19 @@ assert(
     'Expired rights projections must not protect an unbounded terminal platform slate through a reference cycle.',
 );
 const restoredExpiredHistoryPlayer = migratePlayerSave(structuredClone(compactedExpiredHistoryPlayer));
-assert.deepEqual(
-    restoredExpiredHistoryPlayer.world.streamingRightsContracts,
-    compactedExpiredHistoryPlayer.world.streamingRightsContracts,
-    'Loading a canonical compacted save must not re-import pruned terminal platform projections.',
+const withoutC2Grant = (registry: typeof compactedRightsHistory) => Object.fromEntries(
+    Object.entries(registry).map(([id, contract]) => {
+        const { accessGrant: _accessGrant, ...unchangedContract } = contract;
+        return [id, unchangedContract];
+    }),
 );
+assert.deepEqual(
+    withoutC2Grant(restoredExpiredHistoryPlayer.world.streamingRightsContracts!),
+    withoutC2Grant(compactedExpiredHistoryPlayer.world.streamingRightsContracts!),
+    'Loading a canonical compacted save must not re-import pruned terminal projections or alter non-grant rights terms.',
+);
+assert(Object.values(restoredExpiredHistoryPlayer.world.streamingRightsContracts!).every(contract => contract.accessGrant?.schemaVersion === 1),
+    'C2 may add only a bounded access grant to old compacted contracts.');
 
 const staleProjectionFixture = structuredClone(transferFixture);
 const staleProjectionContracts = Object.fromEntries(Array.from({ length: 12 }, (_, index) => {
@@ -625,8 +633,8 @@ assert.equal(
     'Older terminal contracts should fall outside the canonical bounded-history window.',
 );
 assert.deepEqual(
-    migratePlayerSave(structuredClone(compactedStaleProjectionPlayer)).world.streamingRightsContracts,
-    compactedStaleProjectionPlayer.world.streamingRightsContracts,
+    withoutC2Grant(migratePlayerSave(structuredClone(compactedStaleProjectionPlayer)).world.streamingRightsContracts!),
+    withoutC2Grant(compactedStaleProjectionPlayer.world.streamingRightsContracts!),
     'Canonical save loading must not resurrect terminal local projections that canonical compaction pruned.',
 );
 

@@ -158,7 +158,10 @@ const updateTalentWindowsForHandoff = (
 ): WorldState['talentBookings'] => (world.talentBookings || []).map(booking => {
     if (booking.projectId !== production.canonicalProjectId || booking.status !== 'BOOKED') return booking;
     const started = Math.round(calendar.startedAbsoluteWeek ?? production.createdAtAbsoluteWeek);
-    return booking.role === 'ACTOR'
+    return booking.role === 'WRITER'
+        ? { ...booking, startAbsoluteWeek: started,
+            endAbsoluteWeek: started + Math.max(1, calendar.preProductionWeeks) - 1 }
+        : booking.role === 'ACTOR'
         ? {
             ...booking,
             startAbsoluteWeek: started + calendar.preProductionWeeks,

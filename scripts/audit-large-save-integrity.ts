@@ -46,9 +46,9 @@ assert.equal(prepared.oversizedLegacy, true);
 assert.equal(prepared.retainPrevious, false);
 assert.equal(prepared.needsRecoveryCheckpoint, true);
 assert.equal(prepared.manifest.needsRecoveryCheckpoint, true);
-assert.deepEqual(prepared.player.pastProjects.map(project => project.id), ['protected-project-a', 'protected-project-b']);
-assert.equal(prepared.player.money, 2_000_000_000);
-assert.ok(prepared.player.news.length <= 80, 'Routine news may be bounded without violating protected state.');
+assert.deepEqual(prepared.persistedPlayer.pastProjects.map(project => project.id), ['protected-project-a', 'protected-project-b']);
+assert.equal(prepared.persistedPlayer.money, 2_000_000_000);
+assert.ok(prepared.persistedPlayer.news.length <= 80, 'Routine news may be bounded without violating protected state.');
 
 const externallyCompactedLargeLegacy = prepareVerifiedPlayerForPersistence(structuredClone(INITIAL_PLAYER) as Player, 'MIGRATION', {
     currentIsUnverified: true,

@@ -355,7 +355,7 @@ const DossierScene: React.FC<{
   return (
     <div className="sa-scene sa-dossier">
       <div className="sa-topbar">
-        <button className="sa-backbtn" onClick={onClose}>←</button>
+        <button className="sa-backbtn" aria-label="Back to Forbes" onClick={onClose}>←</button>
         <div className="sa-topbar-mid">
           <div className="sa-kicker">The Deal Room</div>
           <div className="sa-scene-title">Target Dossier</div>
@@ -531,7 +531,7 @@ const WarRoomScene: React.FC<{
   return (
     <div className="sa-scene sa-warroom">
       <div className="sa-topbar">
-        <button className="sa-backbtn" onClick={onBack}>←</button>
+        <button className="sa-backbtn" aria-label="Back to acquisition dossier" onClick={onBack}>←</button>
         <div className="sa-topbar-mid">
           <div className="sa-kicker">The Deal Room</div>
           <div className="sa-scene-title">The War Room</div>
@@ -1027,7 +1027,7 @@ const ClosingScene: React.FC<{
   return (
     <div className="sa-scene sa-closing">
       <div className="sa-topbar">
-        <button className="sa-backbtn" onClick={onBack}>←</button>
+        <button className="sa-backbtn" aria-label="Back to board decision" onClick={onBack}>←</button>
         <div className="sa-topbar-mid">
           <div className="sa-kicker">Closing Packet</div>
           <div className="sa-scene-title">Stamp Every Document</div>
@@ -1128,7 +1128,7 @@ const SigningScene: React.FC<{
   return (
     <div className={`sa-scene sa-signing${shake ? ' shake' : ''}`}>
       <div className="sa-topbar">
-        <button className="sa-backbtn" onClick={onBack}>←</button>
+        <button className="sa-backbtn" aria-label="Back to closing review" onClick={onBack}>←</button>
         <div className="sa-topbar-mid">
           <div className="sa-kicker">{cfg.transactionOutcome === 'CONTROL' ? 'Public Control Ceremony' : cfg.transactionOutcome === 'MINORITY_STAKE' ? 'Equity Closing Ceremony' : 'Studio Takeover Ceremony'}</div>
           <div className="sa-scene-title serif">{cfg.studioName}</div>
@@ -1540,15 +1540,15 @@ const STYLE = `
 .sa-devnav button.cur{background:var(--gold);color:#000}
 
 /* chrome */
-.sa-topbar{display:flex;align-items:center;gap:10px;padding:20px 16px 10px;z-index:5}
-.sa-backbtn{width:40px;height:40px;border-radius:14px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);font-size:17px;display:flex;align-items:center;justify-content:center}
+.sa-topbar{display:flex;align-items:center;gap:10px;padding:max(20px,env(safe-area-inset-top)) 16px 10px;z-index:5}
+.sa-backbtn{width:44px;height:44px;flex-shrink:0;border-radius:14px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);font-size:17px;display:flex;align-items:center;justify-content:center}
 .sa-topbar-mid{flex:1;text-align:center}
-.sa-kicker{font-size:9px;font-weight:900;letter-spacing:.42em;text-transform:uppercase;color:var(--gold)}
+.sa-kicker{font-size:10px;font-weight:900;letter-spacing:.3em;text-transform:uppercase;color:var(--gold)}
 .sa-scene-title{font-size:20px;font-weight:900;letter-spacing:-.01em;margin-top:4px}
 .sa-scene-title.serif{font-family:var(--serif);font-style:italic}
 .sa-scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:8px 16px 120px}
 .sa-scroll.center{display:flex;flex-direction:column;align-items:center;text-align:center}
-.sa-foot{position:absolute;left:0;right:0;bottom:0;padding:14px 16px 22px;display:flex;gap:10px;background:linear-gradient(transparent,#050506 45%);z-index:20}
+.sa-foot{position:absolute;left:0;right:0;bottom:0;padding:14px 16px max(22px,env(safe-area-inset-bottom));display:flex;gap:10px;background:linear-gradient(transparent,#050506 45%);z-index:20}
 .sa-btn{flex:1;padding:15px 14px;border-radius:16px;font-size:12px;font-weight:900;letter-spacing:.05em;display:flex;align-items:center;justify-content:center;gap:8px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.13);transition:transform .12s}
 .sa-btn:active{transform:scale(.97)}
 .sa-btn.gold{background:linear-gradient(160deg,#ffd76a,var(--gold-deep));color:#1a1102;border:none;box-shadow:0 12px 34px rgba(240,180,41,.25)}
@@ -1617,7 +1617,7 @@ const STYLE = `
 .sa-blindwarn{margin-top:10px;text-align:center;font-size:10px;font-weight:800;color:#ff9640;background:rgba(140,70,10,.14);border:1px solid rgba(255,150,64,.3);border-radius:10px;padding:9px 12px}
 /* diligence sheet + scan */
 .sa-veil{position:absolute;inset:0;z-index:60;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);animation:sa-in .2s}
-.sa-sheet{position:absolute;left:0;right:0;bottom:0;background:#15130f;border-radius:24px 24px 0 0;border-top:1px solid rgba(240,180,41,.3);padding:10px 16px 28px;display:flex;flex-direction:column;gap:9px;animation:sa-sheetup .3s cubic-bezier(.2,1,.3,1)}
+.sa-sheet{position:absolute;left:0;right:0;bottom:0;max-height:calc(100dvh - 16px);overflow-y:auto;background:#15130f;border-radius:24px 24px 0 0;border-top:1px solid rgba(240,180,41,.3);padding:10px 16px max(28px,env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:9px;animation:sa-sheetup .3s cubic-bezier(.2,1,.3,1)}
 @keyframes sa-sheetup{from{transform:translateY(50%)}to{transform:none}}
 .sa-sheet-grip{width:42px;height:5px;border-radius:3px;background:#2c2a24;margin:2px auto 8px}
 .sa-sheet-title{font-size:15px;font-weight:900;text-align:center;margin-bottom:6px}
@@ -1674,7 +1674,7 @@ const STYLE = `
 .sa-dial-amt b{display:block;font-size:31px;font-family:ui-monospace,Menlo,monospace;font-weight:800;color:#ffd76a;letter-spacing:-.02em}
 .sa-dial-amt span{font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;color:#8a857b;font-weight:800}
 .sa-presets{display:flex;gap:6px;margin-top:8px}
-.sa-presets button{flex:1;font-size:9px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;color:#c9c2b2;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:999px;padding:9px 4px;text-align:center}
+.sa-presets button{flex:1;min-height:44px;font-size:11px;font-weight:900;letter-spacing:.02em;text-transform:uppercase;color:#c9c2b2;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:999px;padding:9px 4px;text-align:center}
 .sa-presets button:active{background:rgba(240,180,41,.2)}
 .sa-gauge{margin:14px auto 0;text-align:center;max-width:230px}
 .sa-gauge svg{width:100%;display:block}
@@ -1811,36 +1811,36 @@ const STYLE = `
 .sa-meter-pips i{flex:1;height:6px;border-radius:4px;background:rgba(255,255,255,.08);transition:.4s}
 .sa-meter-pips i.on{background:linear-gradient(90deg,#ffd76a,var(--gold))}
 .sa-meter{display:flex;align-items:center;gap:10px;border:1px solid rgba(240,180,41,.3);background:rgba(255,255,255,.03);border-radius:12px;padding:9px 12px}
-.sa-meter span{font-size:8px;font-weight:900;letter-spacing:.2em;color:#b9a05a}
+.sa-meter span{font-size:10px;font-weight:900;letter-spacing:.12em;color:#b9a05a}
 .sa-meter-track{flex:1;height:8px;border-radius:5px;background:rgba(0,0,0,.4);overflow:hidden}
 .sa-meter-track div{height:100%;border-radius:5px;background:linear-gradient(90deg,#ffd76a,var(--gold));transition:width .6s cubic-bezier(.3,1,.4,1)}
 .sa-meter b{font-size:11px;font-family:ui-monospace,Menlo,monospace;color:#ffd76a}
 .sa-contract{background:var(--paper);color:#221a08;border-radius:14px;padding:18px;margin-top:8px;box-shadow:0 18px 44px rgba(0,0,0,.55);animation:sa-pagein .45s cubic-bezier(.2,1,.3,1) both}
 @keyframes sa-pagein{from{opacity:0;transform:translateX(46px) rotate(.6deg)}to{opacity:1;transform:none}}
-.sa-contract-eyebrow{font-size:8px;font-weight:900;letter-spacing:.22em;text-transform:uppercase;color:#7a5c1c;border-bottom:2px solid #221a08;padding-bottom:8px}
+.sa-contract-eyebrow{font-size:10px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:#7a5c1c;border-bottom:2px solid #221a08;padding-bottom:8px;overflow-wrap:anywhere}
 .sa-contract-body{font-size:12.5px;line-height:1.55;font-weight:600;padding:12px 0}
 .sa-contract-rows{display:flex;flex-direction:column;gap:7px}
 .sa-contract-row{display:flex;justify-content:space-between;align-items:center;background:rgba(58,44,16,.08);border:1px solid rgba(58,44,16,.18);border-radius:10px;padding:11px 13px}
-.sa-contract-row span{font-size:9px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:#6b5320}
+.sa-contract-row span{font-size:10px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:#6b5320}
 .sa-contract-row b{font-size:13px;font-family:ui-monospace,Menlo,monospace}
 .sa-contract-clauses{display:flex;flex-direction:column;gap:7px}
 .sa-bound{background:rgba(29,107,63,.12);border:1px solid rgba(29,107,63,.35);color:#1d6b3f;border-radius:10px;padding:11px 13px;font-size:11.5px;font-weight:900;letter-spacing:.06em;text-transform:uppercase}
 .sa-reqrow{display:flex;gap:6px;margin-bottom:12px}
 .sa-req{flex:1;text-align:center;border:1px solid rgba(143,21,36,.4);background:rgba(143,21,36,.08);border-radius:10px;padding:8px 4px}
-.sa-req span{display:block;font-size:7px;font-weight:900;letter-spacing:.18em;text-transform:uppercase;color:#8a7648}
-.sa-req b{font-size:10.5px;color:#8f1524}
+.sa-req span{display:block;font-size:10px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#8a7648}
+.sa-req b{font-size:11px;color:#8f1524}
 .sa-req.ok{border-color:rgba(29,107,63,.35);background:rgba(29,107,63,.1)}
 .sa-req.ok b{color:#1d6b3f}
 .sa-signline{position:relative;width:100%;min-height:96px;border:2px dashed #8a7648;border-radius:12px;background:rgba(29,107,63,.05);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px;transition:border-color .2s,background .2s,transform .2s}
 .sa-signline:active:not(:disabled){transform:scale(.985)}
 .sa-signline:disabled{cursor:wait}
-.sa-signline .hint{font-family:var(--serif);font-style:italic;font-size:24px;color:#6b5320;animation:sa-blink 1.8s infinite}
+.sa-signline .hint{font-family:var(--serif);font-style:italic;font-size:24px;color:#6b5320}
 .sa-cursive{font-family:"Snell Roundhand","Savoye LET","Segoe Script","Brush Script MT","Dancing Script",cursive;
   font-size:36px;font-weight:700;color:#122a18;line-height:1;transform:rotate(-3deg);padding:6px 4px 2px;
   text-shadow:0 0 1px rgba(18,42,24,.4);animation:sa-write 1.15s .1s cubic-bezier(.3,.6,.4,1) both;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @keyframes sa-write{0%{clip-path:inset(-20% 100% -20% 0);opacity:1}100%{clip-path:inset(-20% -8% -20% 0)}}
 .sa-signline .line{width:82%;height:2px;background:#221a08;margin-top:4px}
-.sa-signline .who{font-size:8.5px;font-weight:900;letter-spacing:.18em;text-transform:uppercase;color:#6b5320;margin-top:6px}
+.sa-signline .who{font-size:10px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#6b5320;margin-top:6px;overflow-wrap:anywhere}
 .sa-signline.signed{border-style:solid;border-color:#1d6b3f}
 .sa-signline.writing{border-style:solid;border-color:#c68a12;background:rgba(240,180,41,.08)}
 .sa-signing-status{margin-top:10px;text-align:center;font-size:9px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:#7a5c1c;animation:sa-blink .9s infinite}

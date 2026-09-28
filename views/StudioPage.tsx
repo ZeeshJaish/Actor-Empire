@@ -197,8 +197,8 @@ export const StudioPage: React.FC<StudioPageProps> = ({ player, studioId, onUpda
     return (
         <div className="fixed inset-0 z-[60] flex min-h-[100dvh] flex-col overflow-hidden bg-[#050505] px-5 pt-[max(1.5rem,env(safe-area-inset-top))] text-white animate-in fade-in duration-500">
             {/* Header */}
-            <div className="flex items-center justify-between mb-6">
-                <div>
+            <div className="flex items-center justify-between gap-3 mb-6">
+                <div className="min-w-0">
                     <h1 className="text-3xl font-black text-white uppercase tracking-tighter italic">Talent Management</h1>
                     <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest">{studio?.name || 'Studio'} · Roster</p>
                 </div>
@@ -206,7 +206,7 @@ export const StudioPage: React.FC<StudioPageProps> = ({ player, studioId, onUpda
                     type="button"
                     onClick={onBack}
                     aria-label={`Back to ${studio?.name || 'studio'}`}
-                    className="flex h-11 w-11 touch-manipulation items-center justify-center rounded-full bg-zinc-900 transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+                    className="flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-full bg-zinc-900 transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
                 >
                     <X size={20} />
                 </button>
@@ -216,13 +216,13 @@ export const StudioPage: React.FC<StudioPageProps> = ({ player, studioId, onUpda
             <div className="flex gap-2 mb-6 p-1 bg-zinc-900 rounded-2xl">
                 <button 
                     onClick={() => setActiveTab('ROSTER')}
-                    className={`flex-1 py-3 rounded-xl text-xs font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${activeTab === 'ROSTER' ? 'bg-amber-500 text-black' : 'text-zinc-500 hover:text-white'}`}
+                    className={`flex-1 min-h-11 py-3 rounded-xl text-xs font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${activeTab === 'ROSTER' ? 'bg-amber-500 text-black' : 'text-zinc-500 hover:text-white'}`}
                 >
                     <Users size={16} /> Roster ({signedContracts.length})
                 </button>
                 <button 
                     onClick={() => setActiveTab('MARKET')}
-                    className={`flex-1 py-3 rounded-xl text-xs font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${activeTab === 'MARKET' ? 'bg-amber-500 text-black' : 'text-zinc-500 hover:text-white'}`}
+                    className={`flex-1 min-h-11 py-3 rounded-xl text-xs font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${activeTab === 'MARKET' ? 'bg-amber-500 text-black' : 'text-zinc-500 hover:text-white'}`}
                 >
                     <Star size={16} /> Market
                 </button>
@@ -236,7 +236,7 @@ export const StudioPage: React.FC<StudioPageProps> = ({ player, studioId, onUpda
                             <div className="text-center py-12 bg-zinc-900/50 rounded-3xl border border-dashed border-zinc-800">
                                 <Users size={48} className="mx-auto text-zinc-700 mb-4" />
                                 <p className="text-zinc-500 font-bold uppercase tracking-widest text-xs">No talent signed yet</p>
-                                <button onClick={() => setActiveTab('MARKET')} className="mt-4 text-amber-500 text-xs font-bold uppercase hover:underline">Browse the Market</button>
+                                <button onClick={() => setActiveTab('MARKET')} className="mt-4 min-h-11 px-3 text-amber-500 text-xs font-bold uppercase hover:underline">Browse the Market</button>
                             </div>
                         ) : (
                             signedContracts.map(contract => {
@@ -308,7 +308,7 @@ export const StudioPage: React.FC<StudioPageProps> = ({ player, studioId, onUpda
                                         setOfferAmountStr('');
                                         setNegotiationDuration(3);
                                     }}
-                                    className="px-4 py-2 bg-white text-black text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-amber-500 transition-all"
+                                    className="min-h-11 px-4 py-2 bg-white text-black text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-amber-500 transition-all"
                                 >
                                     Deal
                                 </button>

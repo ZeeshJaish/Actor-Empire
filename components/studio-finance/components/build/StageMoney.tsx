@@ -588,7 +588,7 @@ export function StageMoney({ data, draft: build, totals, plan, handlers }: Stage
         <p className="kit-title"><b>Commercial setup</b><button type="button" className="bw-money-jump" onClick={() => handlers.onEditPricing?.()}>Edit pricing →</button></p>
         <p className="bw-money-model">{data.pricing.model}</p>
         <Hud items={[
-          { label: 'Plans on sale', value: <Figure value={data.pricing.plans} format={whole} /> },
+          { label: 'Ways to watch', value: <Figure value={data.pricing.plans} format={whole} /> },
           { label: 'A household', value: <Figure value={data.pricing.arpu} format={moneyPrecise} /> },
           { label: 'Forecast reach', value: <Figure value={data.pricing.reach} format={compactCount} /> },
         ]} />

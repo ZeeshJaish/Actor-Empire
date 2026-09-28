@@ -744,7 +744,7 @@ export const PremiereNight: React.FC<{
 
                 <div className={css.pressstats}>
                   <div><span>PEAK</span><b>{conc(result.peak)}</b></div>
-                  <div><span>SUBSCRIBERS</span><b>{conc(result.subsGained)}</b></div>
+                  <div><span>ACCOUNTS</span><b>{conc(result.subsGained)}</b></div>
                   <div><span>LOST</span><b className={result.subsLost ? css.bad : ''}>{result.subsLost ? conc(result.subsLost) : '—'}</b></div>
                   <div><span>FAILED</span><b className={result.failedPct ? css.bad : ''}>{result.failedPct}%</b></div>
                 </div>

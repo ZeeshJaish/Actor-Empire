@@ -1,0 +1,70 @@
+.ae-performance-root {
+  --ae-perf-glass-blur: 8px;
+  --ae-perf-heavy-blur: 24px;
+  --ae-perf-shadow-opacity: 1;
+  --ae-perf-animation-density: 1;
+  --ae-perf-animation-iterations: infinite;
+  --ae-perf-background-motion: 1;
+  --ae-perf-particle-density: 1;
+  --ae-perf-image-dpr: 3;
+}
+
+[data-ae-perf-blur='off'] .glass-card,
+[data-ae-perf-blur='off'] [class*='backdrop-blur'] {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+[data-ae-perf-blur='off'] .glass-card {
+  background: rgba(20, 20, 23, 0.96);
+}
+
+[data-ae-perf-blur='off'] [class*='blur-'] {
+  filter: none !important;
+}
+
+[data-ae-perf-blur='reduced'] .glass-card,
+[data-ae-perf-blur='reduced'] [class*='backdrop-blur'] {
+  backdrop-filter: blur(var(--ae-perf-glass-blur)) !important;
+  -webkit-backdrop-filter: blur(var(--ae-perf-glass-blur)) !important;
+}
+
+[data-ae-perf-shadows='reduced'] .ae-perf-heavy-shadow {
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.34) !important;
+}
+
+[data-ae-perf-shadows='off'] .ae-perf-heavy-shadow {
+  box-shadow: none !important;
+}
+
+[data-ae-perf-animation-density='reduced'] .ae-perf-decorative-motion,
+[data-ae-perf-animation-density='minimal'] .ae-perf-decorative-motion {
+  animation-iteration-count: var(--ae-perf-animation-iterations) !important;
+}
+
+[data-ae-perf-animation-density='minimal'] .ae-perf-decorative-motion {
+  animation: none !important;
+  transition: none !important;
+}
+
+[data-ae-perf-background-motion='paused'] .ae-perf-background-motion {
+  animation-play-state: paused !important;
+}
+
+[data-ae-perf-particle-density='reduced'] .ae-perf-particle:nth-child(even),
+[data-ae-perf-particle-density='off'] .ae-perf-particle {
+  display: none !important;
+}
+
+[data-ae-perf-shadows='reduced'] .genre-lab-card {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28) !important;
+}
+
+[data-ae-perf-shadows='off'] .genre-lab-card {
+  box-shadow: none !important;
+}
+
+[data-ae-perf-animation-density='reduced'] .genre-lab-progress,
+[data-ae-perf-animation-density='minimal'] .genre-lab-progress {
+  transition-duration: 120ms !important;
+}

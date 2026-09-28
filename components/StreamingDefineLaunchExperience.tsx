@@ -283,9 +283,7 @@ const buildCapabilityLocks = (player: Player): Record<string, string> => {
     const reason = getStreamingStorefrontLockReason(platform, layout.id);
     if (reason) locks[`storefront:${layout.id}`] = reason;
   });
-  lock('stream:ads', tech.ADVERTISING_COMMERCE < 20 && !active.has('FREE'), 'Commerce level 20 or EMPIRE+ Free');
   lock('stream:sponsor', tech.ADVERTISING_COMMERCE < 20 && !active.has('FREE'), 'Commerce level 20 or EMPIRE+ Free');
-  lock('stream:rentals', !active.has('STORE'), 'EMPIRE+ Store');
   lock('stream:premium', !active.has('STORE'), 'EMPIRE+ Store');
   lock('stream:daypass', !active.has('LIVE'), 'EMPIRE+ Live');
   lock('stream:metered', tech.ADVERTISING_COMMERCE < 60 || tech.PRODUCT_EXPERIENCE < 50, 'Commerce 60 and Product Experience 50');
@@ -446,11 +444,11 @@ const buildLaunchData = (player: Player): LaunchData => {
   if (!identCommissioned) blockers.push({ id: 'ident', step: 'ident', text: 'No service ident has been commissioned.', severity: 'warn' });
   if (!platform.serviceConfiguration.storefrontLayoutId) blockers.push({ id: 'storefront', step: 'storefront', text: 'The storefront has not been selected.', severity: 'warn' });
   if (!platform.starterCatalog || !catalogue.titles) blockers.push({ id: 'catalogue', step: 'catalogue', text: 'Opening night still needs a real catalogue.', severity: 'block' });
-  if (!platform.serviceConfiguration.pricingApproach) blockers.push({ id: 'pricing', step: 'pricing', text: 'No commercial offer has been saved.', severity: 'warn' });
+  if (!platform.serviceConfiguration.pricingApproach || platform.serviceConfiguration.pricing.commercialOffers?.coreModelSelected === false) blockers.push({ id: 'pricing', step: 'pricing', text: 'Choose a commercial offer to configure pricing.', severity: 'warn' });
   return {
     company: {
       name: platform.identity?.name || 'EMPIRE+',
-      week: absoluteWeek,
+      week: player.currentWeek,
       brandHex: platform.identity?.primaryColor,
       markId: platform.identity?.visualMarkId || MARK_FROM_LOGO[platform.identity?.logoKey || 'FRAME_PLAY'],
       logoSrc: platform.identity?.customMarkDataUrl || undefined,
@@ -623,7 +621,7 @@ function OpeningLaunchExperience(props: Props) {
 
     const currentPricing = next.ownedStreamingPlatform.serviceConfiguration.pricing;
     const currentPricingApproach = next.ownedStreamingPlatform.serviceConfiguration.pricingApproach;
-    if (persisted.pricing.streams.length
+    if (persisted.pricing.commercialOffers?.coreModelSelected !== false && persisted.pricing.streams.length
       && (!persisted.pricing.streams.includes('subs') || persisted.pricing.plans.length > 0)
       && (currentPricingApproach !== 'CUSTOM' || JSON.stringify(persisted.pricing) !== JSON.stringify(currentPricing))) {
       const pricingResult = saveStreamingPricingPlan(next, persisted.pricing);
@@ -641,9 +639,26 @@ function OpeningLaunchExperience(props: Props) {
     persistDraft(restoredDraft);
   }, [restoredDraftKey]);
 
+  // Pricing autosave replaces the platform object, but does not change the
+  // audience/rights context. A value signature keeps that world forecast warm
+  // until a relevant market, catalogue, technology or world-week change.
+  const forecastContextKey = JSON.stringify({
+    playerId: props.player.id, age: props.player.age, week: props.player.currentWeek,
+    identity: platform.identity,
+    markets: platform.marketOperations,
+    licenses: platform.catalogLicenses,
+    catalogProjectIds: platform.catalogProjectIds,
+    starterCatalog: platform.starterCatalog,
+    technology: platform.technologyLevels,
+    products: platform.productLines,
+    storefront: platform.serviceConfiguration.storefrontLayoutId,
+  });
+
   return (
     <LaunchWizard
       data={data}
+      forecastWorldState={props.player.world}
+      forecastContextKey={forecastContextKey}
       initialStep={STEP_FROM_CANONICAL[currentStep] || 'markets'}
       initialDraft={restoredDraft}
       initialSheet={props.initialSheet}

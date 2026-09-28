@@ -376,7 +376,7 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                     }
                     selectedMessage ? setSelectedMessage(null) : onBack();
                 }}
-                className="flex shrink-0 items-center gap-1 font-medium text-slate-600 hover:text-slate-900"
+                className="flex min-h-11 shrink-0 items-center gap-1 font-medium text-slate-600 hover:text-slate-900"
             >
                 <ArrowLeft size={20} /> {outsideInvestmentReview ? 'Summary' : selectedMessage ? tr('messages.inbox') : tr('messages.home')}
             </button>

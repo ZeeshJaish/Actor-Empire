@@ -44,6 +44,8 @@ import {
 } from './streamingFacilities';
 import { normalizeStreamingInfrastructureManagementPolicy } from './streamingInfrastructureManagement';
 import { normalizeStreamingRegionPlans } from './streamingCanonicalState';
+import { quoteStreamingNetworkPlan } from './streamingNetworkQuote';
+import { STREAMING_SERVER_SITES } from './streamingServerSites';
 import {
     getStreamingFacilityPhysicalView,
     getStreamingNetworkPhysicalSummary,
@@ -72,7 +74,10 @@ const NETWORK_RACK_WEEKLY = 90_000;
 const sanitizeNetworkPlacements = (
     placements: OwnedStreamingNetworkPlacement[] | null | undefined,
 ): OwnedStreamingNetworkPlacement[] => {
-    const validCities = new Set(PRODUCTION_LOCATION_CATALOG.map(item => item.id));
+    const validCities = new Set([
+        ...PRODUCTION_LOCATION_CATALOG.map(item => item.id),
+        ...STREAMING_SERVER_SITES.map(item => item.id),
+    ]);
     const seen = new Set<string>();
     let hasCore = false;
     const sanitized = (placements || []).flatMap((item, index) => {
@@ -89,7 +94,7 @@ const sanitizeNetworkPlacements = (
             racks: Math.max(1, Math.min(96, Math.round(Number(item.racks) || 1))),
             role,
         }];
-    }).slice(0, PRODUCTION_LOCATION_CATALOG.length);
+    }).slice(0, validCities.size);
     if (sanitized.length && !sanitized.some(item => item.role === 'CORE_ORIGIN')) {
         sanitized[0] = { ...sanitized[0], role: 'CORE_ORIGIN' };
     }
@@ -606,6 +611,17 @@ const getConfigurationValues = (
         ? sanitizeNetworkPlacements(aggregateStreamingFacilities(facilities))
         : sanitizeNetworkPlacements(draft.networkPlacements);
     if (network.length) {
+        // Region-plan builds display the canonical network quote in Build.
+        // Commissioning must use that same quote, including cloud as weekly
+        // rental rather than charging its virtual capacity as owned racks.
+        const canonicalFacilities = draft.facilities?.length
+            && (!draft.networkPlacements.length
+                || networkSignature(aggregateStreamingFacilities(draft.facilities))
+                    === networkSignature(draft.networkPlacements))
+            ? draft.facilities : facilities;
+        const canonicalQuote = canonicalFacilities.length && draft.regionPlans?.length
+            ? quoteStreamingNetworkPlan({ facilities: canonicalFacilities, regionPlans: draft.regionPlans }).totals
+            : null;
         const dutyGroups = facilities.flatMap(facility => normalizeStreamingRackGroups(
             facility.rackGroups,
             facility.id,
@@ -665,10 +681,11 @@ const getConfigurationValues = (
             : network.reduce((sum, item) => (
                 sum + item.racks * NETWORK_RACK_WEEKLY * cityCost(item.cityId) * NETWORK_ROLE_RULES[item.role].weekly
             ), 0);
-        const weeklyOperatingCost = roundMoney(
+        const legacyWeeklyOperatingCost = roundMoney(
             (rackWeekly + facilityWeekly) * strategy.weekly
             + physicalSummary.weeklyOperatingCost,
         );
+        const weeklyOperatingCost = canonicalQuote?.weeklyTotal ?? legacyWeeklyOperatingCost;
         const distributionBonus = Math.min(0.24, Math.max(0, network.length - 1) * 0.04);
         const biggestCampus = network.reduce((max, item) => Math.max(max, item.racks), 0);
         const extraRooms = Math.max(0, facilities.length - network.length);
@@ -695,7 +712,7 @@ const getConfigurationValues = (
                 90,
                 99.999,
             ) * 1_000) / 1_000,
-            upfrontCost: roundMoney(
+            upfrontCost: canonicalQuote?.dueNow ?? roundMoney(
                 (rackCapex + facilitySetup) * strategy.upfront
                 + physicalSummary.upgradeCapitalCost,
             ),

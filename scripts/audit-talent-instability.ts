@@ -1,5 +1,6 @@
 import { INITIAL_PLAYER, type Business, type Player } from '../types';
 import { processTalentInstability } from '../services/talentInstability';
+import { getLifeEventResolutionContractViolations, materializePlayerLifeEventImpacts, resolveLifeEventChoice } from '../services/lifeEventResolver';
 
 const assert = (condition: unknown, message: string) => {
     if (!condition) throw new Error(message);
@@ -143,6 +144,14 @@ const safeChoice = event.data.lifeEvent.options.find((option: any) => option.id 
 assert(safeChoice, 'Talent instability popup should include a retention package path.');
 const safeResult = safeChoice.impact(processed);
 assert(safeResult.updatedPlayer.flags.talentInstabilityState.retentionShieldWeeksRemaining > 0, 'Retention package should create a temporary shield.');
+const preparedTalent = materializePlayerLifeEventImpacts(processed, { strict: true });
+assert(getLifeEventResolutionContractViolations(preparedTalent).length === 0, 'Talent instability choices must persist with registered resolvers.');
+const reloadedTalentPlayer = JSON.parse(JSON.stringify(preparedTalent)) as Player;
+const reloadedTalentEvent = reloadedTalentPlayer.pendingEvents!.find(item => item.data?.talentInstabilityEventType)!;
+const reloadedTalentLifeEvent = reloadedTalentEvent.data.lifeEvent;
+const reloadedSafeChoice = reloadedTalentLifeEvent.options.find((option: any) => option.id === 'RETENTION_PACKAGE');
+const reloadedSafeResult = resolveLifeEventChoice(reloadedTalentPlayer, reloadedTalentEvent, reloadedTalentLifeEvent, reloadedSafeChoice, 0);
+assert(reloadedSafeResult?.updatedPlayer.flags.talentInstabilityState.retentionShieldWeeksRemaining > 0, 'Talent retention choice must retain its exact effect after reload.');
 
 const second = processTalentInstability(processed);
 assert((second.pendingEvents || []).filter(event => event.data?.talentInstabilityEventType).length === 1, 'Same-week processing should not duplicate talent instability events.');

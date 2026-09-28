@@ -262,7 +262,7 @@ export const StudioGroupView: React.FC<StudioGroupViewProps> = ({ player, onBack
             <div className="relative overflow-hidden border-b border-[#29251f] bg-[#0b0907] px-4 pb-4 pt-12">
                 <div className="absolute -right-16 -top-24 h-64 w-64 rounded-full bg-amber-400/10 blur-3xl" />
                 <div className="relative flex items-center gap-3">
-                    <button type="button" onClick={onBack} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-zinc-400">
+                    <button type="button" onClick={onBack} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-zinc-400" aria-label="Back to studio dashboard">
                         <ArrowLeft size={19} />
                     </button>
                     <div>

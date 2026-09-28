@@ -85,6 +85,7 @@
   color: var(--sf-fg-2);
   transition: border-color var(--sf-fast) var(--sf-ease), color var(--sf-fast) var(--sf-ease);
 }
+.sf.lw .sf-head > .sf-icon-btn { width: 44px; height: 44px; }
 .sf .sf-icon-btn svg { width: 14px; height: 14px; }
 .sf .sf-icon-btn:hover { border-color: var(--sf-line-strong); color: var(--sf-fg-max); }
 

@@ -414,7 +414,7 @@ const CountryPicker: React.FC<{
                         <button
                             key={country.id}
                             onClick={() => onSelect(country.id)}
-                            className={`shrink-0 rounded-full border px-4 py-2 text-xs font-black transition-all ${isSelected ? 'border-emerald-300 bg-emerald-400 text-black' : 'border-zinc-800 bg-zinc-950 text-zinc-400'}`}
+                            className={`min-h-11 shrink-0 rounded-full border px-4 py-2 text-xs font-black transition-all ${isSelected ? 'border-emerald-300 bg-emerald-400 text-black' : 'border-zinc-800 bg-zinc-950 text-zinc-400'}`}
                         >
                             {getChoiceLabel(country, language)}
                         </button>
@@ -1448,7 +1448,7 @@ const TripDurationPicker: React.FC<{
                     <button
                         key={preset}
                         onClick={() => onChange(preset)}
-                        className={`rounded-2xl border px-3 py-2 text-xs font-black transition-all ${safeDays === preset ? 'border-emerald-400 bg-emerald-400 text-black' : 'border-zinc-800 bg-zinc-950 text-zinc-400'}`}
+                        className={`min-h-11 rounded-2xl border px-3 py-2 text-xs font-black transition-all ${safeDays === preset ? 'border-emerald-400 bg-emerald-400 text-black' : 'border-zinc-800 bg-zinc-950 text-zinc-400'}`}
                     >
                         {preset}d
                     </button>
@@ -2216,7 +2216,7 @@ export const LifestyleActivities: React.FC<LifestyleActivitiesProps> = ({ player
                     <button
                         key={filter.id}
                         onClick={() => setCategory(filter.id)}
-                        className={`shrink-0 rounded-full border px-4 py-2 text-xs font-black uppercase tracking-widest transition-all ${category === filter.id ? 'border-emerald-400 bg-emerald-400 text-black' : 'border-zinc-800 bg-zinc-950 text-zinc-400'}`}
+                        className={`min-h-11 shrink-0 rounded-full border px-4 py-2 text-xs font-black uppercase tracking-widest transition-all ${category === filter.id ? 'border-emerald-400 bg-emerald-400 text-black' : 'border-zinc-800 bg-zinc-950 text-zinc-400'}`}
                     >
                         {t(language, filter.labelKey)}
                     </button>
@@ -2260,8 +2260,8 @@ export const LifestyleActivities: React.FC<LifestyleActivitiesProps> = ({ player
                                     </div>
                                 </div>
 
-                                <div className="mt-5 grid grid-cols-3 gap-2">
-                                    <div className="rounded-2xl bg-black/35 p-3">
+                                <div className="mt-5 grid grid-cols-3 gap-2 max-[359px]:grid-cols-2">
+                                    <div className="rounded-2xl bg-black/35 p-3 max-[359px]:col-span-2">
 	                                        <div className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-zinc-500"><WalletCards size={12} /> {tr('activities.cost')}</div>
                                         <div className={`mt-1 truncate text-xl font-black ${canAfford ? 'text-white' : 'text-rose-300'}`}>{formatMoney(quote.totalCost)}</div>
                                     </div>

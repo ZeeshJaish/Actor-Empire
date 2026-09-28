@@ -1,52 +1,96 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { INITIAL_PLAYER, Player, Page, Commitment, PressInteraction, SocialEvent, ActorSkills, AdType, Relationship, ProjectDetails, ActiveRelease, PastProject, StreamingState, PregnancyCarrier, ScheduledEvent, SponsorshipOffer } from './types';
 import { BottomNav } from './components/BottomNav';
+import './components/layout-adapters/actorEmpireShell.css';
+import { isKeyboardOccludingViewport } from './components/layout-adapters/shellGeometry';
 import { NewPlayerTutorialOverlay } from './components/NewPlayerTutorialOverlay';
 import { ProductionCrisisModal } from './components/ProductionCrisisModal';
-import { LifeEventModal } from './components/LifeEventModal';
+import { LifeEventModal, type LifeEventChoiceCommit } from './components/LifeEventModal';
 import { StockControlEventModal } from './components/StockControlEventModal';
 import { SaveRecoveryModal } from './components/SaveRecoveryModal';
 import { WeekProcessingRecoveryModal } from './components/WeekProcessingRecoveryModal';
+import { SaveTransferProgressOverlay } from './components/SaveTransferProgressOverlay';
+import { DebtRecoveryModal } from './components/DebtRecoveryModal';
+import { GameToast } from './components/GameToast';
+import { RewardSaveRetryDialog } from './components/RewardSaveRetryDialog';
 import { applyCrisisImpact } from './services/productionService';
-import { HomePage } from './views/HomePage';
-import { CareerPage } from './views/CareerPage';
-import { ImprovePage } from './views/ImprovePage';
-import { SocialPage } from './views/SocialPage';
-import { LifestylePage } from './views/LifestylePage';
-import { MobilePage } from './views/mobile/MobilePage';
-import { SettingsPage } from './views/SettingsPage';
-import { StorePage } from './views/StorePage';
 import { StartMenu } from './views/StartMenu';
-import { CreationMenu } from './views/CreationMenu';
-import { DeathScreen } from './views/DeathScreen';
-import { RedCarpetEvent } from './views/RedCarpetEvent';
-import { PressConferenceEvent } from './views/PressConferenceEvent';
-import { ActorEmpireIntroStyle, ActorEmpireLoadingScreen } from './components/ActorEmpireIntro';
+import { ActorEmpireIntroStyle, ActorEmpireLoadingScreen, ActorEmpireCareerOpeningScreen } from './components/ActorEmpireIntro';
 import ZedburyStudiosIntro from './components/ZedburyStudiosIntro';
 import type { NewCareerData } from './components/types';
-import { processGameWeek } from './services/gameLoop';
-import { generateAuditions, generatePartTimeJobs, rewardGenreExperience } from './services/roleLogic';
+import { generateAuditions, generatePartTimeJobs } from './services/roleLogic';
 import { generateWeeklyFeed, calculateInteraction, getGenderedAvatar } from './services/npcLogic';
 import { getRandomAgents, getRandomManagers, getRandomTrainers, getRandomStylists, getRandomTherapists, getRandomPublicists, getRandomWellness, sanitizeTeamPools } from './services/teamLogic';
 import { createBusiness, normalizeStudioState } from './services/businessLogic';
-import { CheckCircle, Heart, ShieldAlert, AlertTriangle, PlayCircle, Skull, Briefcase, Baby, ChevronRight } from 'lucide-react';
+import { CheckCircle, Heart, ShieldAlert, PlayCircle, Baby, ChevronRight } from 'lucide-react';
 import { useGameActions } from './hooks/useGameActions';
 import { PROPERTY_CATALOG, CAR_CATALOG, MOTORCYCLE_CATALOG, BOAT_CATALOG, AIRCRAFT_CATALOG, CLOTHING_CATALOG } from './services/lifestyleLogic';
-import { showAd, initAds } from './services/adLogic';
+import { showAd, startRewardedAdPreloading, setOptionalRewardedAdPreloadingSuspended } from './services/adLogic';
+import { requestRewardedAd } from './services/rewardedAdCoordinator';
+import { subscribeRewardedAdDiagnostics } from './services/rewardedAdDiagnostics';
+import {
+  beginWellnessAdAttempt,
+  classifyRewardedAdFailure,
+  createWellnessRewardAdState,
+  expireWellnessRewardAdState,
+  restoreWellnessRewardAdState,
+  settleWellnessAdAttempt,
+} from './services/rewardedAdExperience';
 import {
   beginPendingRewardAd,
   clearPendingRewardAd,
   markPendingRewardAdReady,
+  pausePendingRewardAdContinuation,
   readPendingRewardAd,
   recordPendingRewardAdStep,
+  RewardedAdPersistenceError,
+  setPendingRewardAdContinuationExpiry,
   type PendingRewardAdReceipt,
 } from './services/rewardedAdRecovery';
+import {
+  attachRewardedAdGrantProof,
+  runRewardedAdGrantTransaction,
+  type RewardedAdGrantOutcome,
+} from './services/rewardedAdGrantTransaction';
 import { ensureTrackingPermission } from './services/trackingService';
-import { createDeferredSaveSlotSummary, createSaveSlotSummary, deleteVerifiedGameData, getGameSaveSummary, listGameDataKeys, loadVerifiedGameData, recoverPreviousGameData, saveVerifiedGameData, writeGameSaveSummary, type SaveSlotSummary } from './services/storage';
+import { createDeferredSaveSlotSummary, createSaveSlotSummary, deleteVerifiedGameData, getGameSaveSummary, listGameDataKeysStrict, loadVerifiedGameData, recoverPreviousGameData, saveVerifiedGameData, writeGameSaveSummary, type SaveSlotSummary } from './services/storage';
+import { IndexedDbOperationError } from './services/indexedDbResilience';
+import {
+  beginStartupAttempt,
+  beginStartupRetry,
+  completeStartupTask,
+  createStartupState,
+  failStartupTask,
+  recoverStartupTask,
+  startStartupTask,
+  timeoutStartupTask,
+  type StartupState,
+  type StartupTaskId,
+} from './services/startupCoordinator';
+import { prepareCriticalStartupAssets } from './services/startupCriticalPackage';
+import {
+  getReadyGameScreens,
+  loadAllGameScreens,
+  type GameScreens,
+} from './services/startupHomeScreen';
+import { getStartupPresentation } from './services/startupPresentation';
+import {
+  createStartupBackgroundScheduler,
+  type StartupBackgroundTask,
+} from './services/startupBackgroundPreparation';
+import { createStartupExecutionLock } from './services/startupExecutionLock';
+import { advanceStartupFailureCount } from './services/startupSafeMode';
+import {
+  installStartupDiagnosticSink,
+  recordStartupCheckpoint,
+  setStartupDiagnosticContext,
+} from './services/startupDiagnostics';
+import { readNativeStartupRecoveryState } from './services/nativeStartupRecovery';
 import { buildLegacyStudioInheritance, createBloodlineSnapshot, getAbsoluteWeek, getLegacyInheritancePreview, getRelationshipAge, inferStreamingStartWeekAbsolute, inheritActorSkills, LEGACY_MIN_PLAYABLE_AGE } from './services/legacyLogic';
 import { handoffOwnedStreamingPlatformToHeir } from './services/streamingLegacy';
-import { applyPremiumPurchase, getRequiredPremiumProductForAsset, hasNoAds, isNonConsumablePremiumProduct, PremiumProductId, restoreWeeklyEnergy, spendPlayerEnergy, syncEnergyDisplay, syncWeeklyEnergyForCommitments } from './services/premiumLogic';
+import { applyPremiumPurchase, getRequiredPremiumProductForAsset, hasNoAds, isNonConsumablePremiumProduct, PremiumProductId, spendPlayerEnergy, syncEnergyDisplay, syncWeeklyEnergyForCommitments } from './services/premiumLogic';
 import { purchasePremiumProduct, restorePremiumPurchases, startIOSPurchaseUpdatesListener, type IOSPurchaseUpdate } from './services/iapService';
 import { sanitizeAwardRecords } from './services/awardLogic';
 import { RoleType } from './types';
@@ -61,17 +105,82 @@ import { executeStockTrade } from './services/stockLogic';
 import { migratePlayerSave } from './services/saveMigration';
 import { prepareExternalPlayerUpdateForUi, prepareProcessedWeekForUi } from './services/playerUiState';
 import { applyIndustryMediaCampaignParticipation } from './services/industryWorld';
-import { yieldForWeekProcessingPaint } from './services/weekProcessingScheduler';
+import { yieldForWeekProcessingPaint, yieldToMainThread } from './services/weekProcessingScheduler';
 import { describeWeekProcessingFailure } from './services/weekProcessingRecovery';
 import { checkpointNativeMemoryPressure } from './services/nativeMemoryCheckpoint';
+import { autosaveDelayAfterPressure, createSaveOperationQueue } from './services/saveOperationQueue';
+import { clearGeneratedAvatarCache } from './services/npcAvatar';
+import {
+  acknowledgeIOSLongSessionReport,
+  chooseIOSRendererRecoverySlot,
+  getIOSLongSessionPlayerCounts,
+  isIOSRendererRecoveryLoadVerified,
+  notifyIOSLongSessionCheckpoint,
+  readIOSLongSessionDiagnostics,
+  toIOSLongSessionTelemetry,
+  tryIOSRendererRecoveryOpen,
+  type IOSLongSessionNativeState,
+} from './services/iosLongSessionDiagnostics';
+import {
+  readAndroidDeviceCapabilities,
+  toDeviceCapabilityTelemetry,
+} from './services/nativeDeviceCapabilities';
 import { exportSignedSaveArchive, importSignedSaveArchiveFromFile } from './services/saveTransfer';
+import {
+  createDelayedSaveTransferProgressPresenter,
+  isSaveTransferCancelledError,
+  type SaveTransferProgress,
+  type SaveTransferProgressPresenter,
+} from './services/saveTransferExperience';
+import {
+  createSaveTransferOperationLock,
+  type SaveTransferOperationLease,
+  type SaveTransferOperationLock,
+} from './services/saveTransferSafety';
 import { grantMigrationCarePackageIfEligible, MIGRATION_CARE_PACKAGE_CASH, MIGRATION_CARE_PACKAGE_ENERGY } from './services/migrationCarePackage';
 import { externalizeCustomPostersInPlayer } from './services/customPosterMedia';
-import { compactPlayerForPersistence } from './services/saveCompaction';
 import { prepareLocalStorageMirror } from './services/saveMirror';
 import { estimateSaveJsonBytes, prepareVerifiedPlayerForPersistence } from './services/savePreparation';
+import { commitLifeEventResolutionTransaction } from './services/lifeEventResolutionTransaction';
+import {
+  startStartupPerformanceMeasurement,
+  toStartupPerformanceTelemetry,
+  type StartupPerformanceMeasurement,
+} from './services/startupPerformance';
+import {
+  createStartupCalibrationCoordinator,
+  toStartupCalibrationTelemetry,
+  type AndroidStartupCalibration,
+  type StartupCalibrationCoordinator,
+} from './services/startupCalibration';
+import { resolvePerformanceCapabilities } from './services/performanceCapabilities';
+import { PerformanceCapabilitiesRoot } from './components/PerformanceCapabilitiesRoot';
+import { PerformanceOptimizedNotice } from './components/PerformanceOptimizedNotice';
+import {
+  PERFORMANCE_NOTICE_VERSION,
+  normalizePerformanceSettings,
+  type PerformancePreference,
+} from './services/performancePreferences';
+import {
+  advanceAdaptivePerformance,
+  createAdaptivePerformanceState,
+  type AdaptivePerformanceDecision,
+  type AdaptivePerformanceInput,
+  type AdaptivePerformancePlatform,
+} from './services/adaptivePerformanceController';
+import { startRuntimePerformanceMonitor } from './services/runtimePerformanceMonitor';
+import {
+  collectDueDeviceValidationCheckpoints,
+  createDeviceValidationSession,
+  recordDeviceValidationDecision,
+  recordDeviceValidationHealthWindow,
+  recordDeviceValidationNativeSnapshot,
+  setDeviceValidationSessionActive,
+  toDeviceValidationTelemetry,
+  type DeviceValidationSession,
+} from './services/deviceValidation';
 import type { SaveIntegrityReason } from './services/saveIntegrity';
-import { buildAvailableNewPlayerTutorialState, writeNewPlayerTutorialState, type NewPlayerTutorialState } from './services/newPlayerTutorial';
+import { buildAvailableNewPlayerTutorialState, shouldShowNewPlayerTutorial, writeNewPlayerTutorialState, type NewPlayerTutorialState } from './services/newPlayerTutorial';
 import { acceptOutsideProducerInvestmentOffer, counterOutsideProducerInvestmentOffer } from './services/outsideProductions';
 import { PHASE_ONE_ENERGY_COSTS } from './services/energyCosts';
 import { getPlayerLanguage, isSupportedGameLanguage, t } from './services/i18n';
@@ -87,15 +196,73 @@ import {
   recordFlowFailure,
   recordNonFatal,
   setCrashContext,
+  setCrashKey,
   setCurrentGameScreen,
   startPerformanceTrace,
   stopPerformanceTrace,
   trackGameEvent,
+  trackGameEventConfirmed,
 } from './services/firebaseService';
+
+const CareerPage: GameScreens['CareerPage'] = props => {
+  const Component = getReadyGameScreens().CareerPage;
+  return <Component {...props} />;
+};
+const HomePage: GameScreens['HomePage'] = props => {
+  const Component = getReadyGameScreens().HomePage;
+  return <Component {...props} />;
+};
+const CreationMenu: GameScreens['CreationMenu'] = props => {
+  const Component = getReadyGameScreens().CreationMenu;
+  return <Component {...props} />;
+};
+const DeathScreen: GameScreens['DeathScreen'] = props => {
+  const Component = getReadyGameScreens().DeathScreen;
+  return <Component {...props} />;
+};
+const RedCarpetEvent: GameScreens['RedCarpetEvent'] = props => {
+  const Component = getReadyGameScreens().RedCarpetEvent;
+  return <Component {...props} />;
+};
+const PressConferenceEvent: GameScreens['PressConferenceEvent'] = props => {
+  const Component = getReadyGameScreens().PressConferenceEvent;
+  return <Component {...props} />;
+};
+const ImprovePage: GameScreens['ImprovePage'] = props => {
+  const Component = getReadyGameScreens().ImprovePage;
+  return <Component {...props} />;
+};
+const SocialPage: GameScreens['SocialPage'] = props => {
+  const Component = getReadyGameScreens().SocialPage;
+  return <Component {...props} />;
+};
+const LifestylePage: GameScreens['LifestylePage'] = props => {
+  const Component = getReadyGameScreens().LifestylePage;
+  return <Component {...props} />;
+};
+const MobilePage: GameScreens['MobilePage'] = props => {
+  const Component = getReadyGameScreens().MobilePage;
+  return <Component {...props} />;
+};
+const SettingsPage: GameScreens['SettingsPage'] = props => {
+  const Component = getReadyGameScreens().SettingsPage;
+  return <Component {...props} />;
+};
+const StorePage: GameScreens['StorePage'] = props => {
+  const Component = getReadyGameScreens().StorePage;
+  return <Component {...props} />;
+};
 
 type GameStatus = 'START_MENU' | 'CREATION' | 'PLAYING' | 'DEATH_SCREEN';
 const LOCAL_STORAGE_SAVE_MIRROR_BUDGET_BYTES = 600_000;
+const IOS_MEMORY_WARNING_AUTOSAVE_COOLDOWN_MS = 30_000;
 const SAFE_BOOT_SESSION_KEY = 'actorEmpire.safeBootOnce';
+const AUTOMATIC_PERFORMANCE_APPLICATION_ENABLED = import.meta.env.VITE_ADAPTIVE_PERFORMANCE_APPLY === 'true';
+
+const getAdaptivePerformancePlatform = (): AdaptivePerformancePlatform => {
+  if (!Capacitor.isNativePlatform()) return 'WEB';
+  return Capacitor.getPlatform() === 'android' ? 'ANDROID' : 'IOS';
+};
 type PendingBabyNaming = {
   partnerId: string;
   partnerName: string;
@@ -156,15 +323,12 @@ const PLAYTIME_FLUSH_INTERVAL_MS = 60_000;
    is needed between the two. */
 const STARTUP_STUDIO_BUMPER_EXIT_MS = 1150;
 const STARTUP_STUDIO_BUMPER_MS = STARTUP_STUDIO_BUMPER_EXIT_MS + 320;
-const STARTUP_LOADING_MIN_MS = 8600;
-const STARTUP_LOADING_LINE_KEYS = [
-  'startup.loadingLine.actors',
-  'startup.loadingLine.cinema',
-  'startup.loadingLine.casting',
-  'startup.loadingLine.lights',
-  'startup.loadingLine.redCarpet',
-  'startup.loadingLine.saves',
-];
+const STARTUP_SLOW_NOTICE_MS = 6_000;
+
+const createMountedStartupState = (): StartupState => {
+  const started = beginStartupAttempt(createStartupState());
+  return completeStartupTask(started, 'APP_CORE', started.attemptId);
+};
 
 const dedupeAwards = <T extends { type: string; year: number; category: string; projectId: string; outcome: 'WON' | 'NOMINATED' }>(awards: T[] = []): T[] => {
   return sanitizeAwardRecords(awards);
@@ -467,8 +631,22 @@ class GameErrorBoundary extends React.Component<GameErrorBoundaryProps, GameErro
     }
 }
 
-export const App: React.FC = () => {
+export const App: React.FC<{ startupStudioIntroHandled?: boolean }> = ({ startupStudioIntroHandled = false }) => {
   const [player, setPlayer] = useState<Player>(() => migratePlayerSave(INITIAL_PLAYER));
+  const [adaptivePerformancePlatform] = useState<AdaptivePerformancePlatform>(getAdaptivePerformancePlatform);
+  const [startupCalibration, setStartupCalibration] = useState<AndroidStartupCalibration | null>(null);
+  const [adaptivePerformance, setAdaptivePerformance] = useState(() => createAdaptivePerformanceState({
+    preference: normalizePerformanceSettings(
+      INITIAL_PLAYER.settings.performance,
+      INITIAL_PLAYER.settings.smoothMode,
+    ).preference,
+    platform: getAdaptivePerformancePlatform(),
+    startupCalibration: null,
+    automaticApplicationEnabled: AUTOMATIC_PERFORMANCE_APPLICATION_ENABLED,
+    nowMs: Date.now(),
+  }));
+  const [iosPressureConstrained, setIOSPressureConstrained] = useState(false);
+  const [iosSaveCooldownEpoch, setIOSSaveCooldownEpoch] = useState(0);
   const [activePage, setActivePage] = useState<Page>(Page.HOME);
   const [lifestyleInitialView, setLifestyleInitialView] = useState<'MAIN' | 'ASSETS' | 'ACTIVITIES' | 'BUSINESS' | 'PRODUCTION_WIZARD' | 'PRODUCTION_GAME' | 'STREAMING_PLATFORM' | 'STREAMING_FINANCE' | null>(null);
   const [rightsMarketOpportunityId, setRightsMarketOpportunityId] = useState<string | null>(null);
@@ -491,7 +669,7 @@ export const App: React.FC = () => {
   const [saveSlotSummaries, setSaveSlotSummaries] = useState<Record<number, SaveSlotSummary | null>>({ 1: null, 2: null, 3: null });
   const [currentSlot, setCurrentSlot] = useState<number | null>(null);
   const [isInitializing, setIsInitializing] = useState(true); // Loading state for async storage
-  const [safeBootRequested] = useState(() => {
+  const [safeBootRequested, setSafeBootRequested] = useState(() => {
       try {
           const requested = sessionStorage.getItem(SAFE_BOOT_SESSION_KEY) === '1';
           if (requested) sessionStorage.removeItem(SAFE_BOOT_SESSION_KEY);
@@ -500,11 +678,25 @@ export const App: React.FC = () => {
           return false;
       }
   });
-  const [startupStudioBumperElapsed, setStartupStudioBumperElapsed] = useState(false);
+  const [startupStudioBumperElapsed, setStartupStudioBumperElapsed] = useState(startupStudioIntroHandled);
   const [startupStudioBumperExiting, setStartupStudioBumperExiting] = useState(false);
-  const [startupMinimumElapsed, setStartupMinimumElapsed] = useState(false);
-  const [startupLoadingLineIndex, setStartupLoadingLineIndex] = useState(0);
-  const [startupLoadingProgress, setStartupLoadingProgress] = useState(0);
+  const [startupState, setStartupState] = useState<StartupState>(createMountedStartupState);
+  const [iosRecoveryReport, setIOSRecoveryReport] = useState<IOSLongSessionNativeState | null>(null);
+  const [iosRecoveryReadComplete, setIOSRecoveryReadComplete] = useState(false);
+  const [iosRecoveryRestoreComplete, setIOSRecoveryRestoreComplete] = useState(false);
+  const iosRecoveryAttemptedRef = useRef(false);
+  const [startupTakingLonger, setStartupTakingLonger] = useState(false);
+  const [isStartupRetrying, setIsStartupRetrying] = useState(false);
+  const startupAttemptIdRef = useRef(1);
+  const startupExecutionLockRef = useRef<ReturnType<typeof createStartupExecutionLock> | null>(null);
+  const startupRuntimeContextRef = useRef<{ indexedDbKeys: Set<string> | null }>({ indexedDbKeys: null });
+  const startupFailureCountsRef = useRef<Partial<Record<StartupTaskId, number>>>({});
+  if (!startupExecutionLockRef.current) {
+      startupExecutionLockRef.current = createStartupExecutionLock();
+  }
+  const [startupBackgroundScheduler] = useState(() => createStartupBackgroundScheduler({
+      onTaskError: (taskId, error) => recordNonFatal(error, 'startup_background_preparation_failed', { task: taskId }),
+  }));
 
   // UI States
   const [toastMessage, setToastMessage] = useState<{title: string, subtext: string} | null>(null);
@@ -516,9 +708,12 @@ export const App: React.FC = () => {
   const [pendingBabyNaming, setPendingBabyNaming] = useState<PendingBabyNaming | null>(null);
   const [pendingMedicalPrompt, setPendingMedicalPrompt] = useState<PendingMedicalPrompt | null>(null);
   const [pendingSaveRecovery, setPendingSaveRecovery] = useState<PendingSaveRecovery | null>(null);
+  const [careerOpening, setCareerOpening] = useState<{ status: string; supportingMessage: string } | null>(null);
   const [isRecoveringSave, setIsRecoveringSave] = useState(false);
   const [pendingWeekProcessingFailure, setPendingWeekProcessingFailure] = useState<PendingWeekProcessingFailure | null>(null);
   const [isExportingWeekBackup, setIsExportingWeekBackup] = useState(false);
+  const [isSaveTransferActive, setIsSaveTransferActive] = useState(false);
+  const [saveTransferProgress, setSaveTransferProgress] = useState<SaveTransferProgress | null>(null);
   const [babyFirstNameInput, setBabyFirstNameInput] = useState('');
   const [babySurnameChoice, setBabySurnameChoice] = useState('');
   const [deathScreenPreviewPlayer, setDeathScreenPreviewPlayer] = useState<Player | null>(null);
@@ -526,7 +721,9 @@ export const App: React.FC = () => {
   const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
   const latestChangelogEntry = getLatestChangelogEntry();
   const previousChangelogEntries = CHANGELOG_ENTRIES.filter(entry => entry.version !== latestChangelogEntry.version);
-  const isStartupLoadingVisible = isInitializing || !startupMinimumElapsed;
+  const isStartupLoadingVisible = !startupStudioBumperElapsed
+    || isInitializing
+    || startupState.outcome !== 'READY';
   const isUiOverhaulSurface = gameStatus === 'PLAYING'
     && (
       activePage === Page.HOME
@@ -545,15 +742,508 @@ export const App: React.FC = () => {
   const [isShowingAd, setIsShowingAd] = useState(false);
   const [adStep, setAdStep] = useState(0);
   const [adTotalSteps, setAdTotalSteps] = useState(1);
+  const [wellnessRewardAd, setWellnessRewardAd] = useState(createWellnessRewardAdState);
+  const [wellnessAdNowMs, setWellnessAdNowMs] = useState(() => Date.now());
+  const [pendingRewardSaveRetry, setPendingRewardSaveRetry] = useState<PendingRewardAdReceipt | null>(null);
+  const [isRetryingRewardSave, setIsRetryingRewardSave] = useState(false);
+  const playerPerformanceSettings = normalizePerformanceSettings(
+    player.settings?.performance,
+    player.settings?.smoothMode,
+  );
+  const isAdaptiveMonitoringEligible = gameStatus === 'PLAYING'
+    && !isProcessing
+    && !isShowingAd
+    && isBottomNavVisible
+    && !isFullBleedMobileSurface
+    && !shouldShowNewPlayerTutorial(player)
+    && !activePressEvent
+    && !showProtectionPrompt
+    && !activeSocialEvent
+    && !pendingBabyNaming
+    && !pendingMedicalPrompt
+    && !pendingSaveRecovery
+    && !isRecoveringSave
+    && !pendingWeekProcessingFailure
+    && !showDebtModal
+    && !showWhatsNewModal
+    && !player.pendingEvent
+    && !(player.pendingEvents?.length);
+  const isAdaptiveSafeBoundary = isAdaptiveMonitoringEligible
+    && activePage === Page.HOME
+    && isBottomNavVisible
+    && !isFullBleedMobileSurface;
   const autosaveTimerRef = useRef<number | null>(null);
+  const shellRef = useRef<HTMLDivElement>(null);
+  const saveOperationQueueRef = useRef(createSaveOperationQueue());
+  const verifiedCheckpointSlotsRef = useRef<Set<number>>(new Set());
+  const iosPressureConstrainedRef = useRef(false);
+  const iosSaveCooldownUntilRef = useRef(0);
+  const iosPressureHealthyWindowsRef = useRef(0);
   const purchaseUpdateHandlerRef = useRef<(update: IOSPurchaseUpdate) => void>(() => {});
   const playerRef = useRef(player);
   const rewardAdGrantInFlightRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const shell = shellRef.current;
+    const viewport = window.visualViewport;
+    if (!shell || !viewport) return;
+    const update = () => {
+      const keyboardOpen = isKeyboardOccludingViewport(window.innerHeight, viewport.height);
+      shell.dataset.keyboardOpen = String(keyboardOpen);
+      if (keyboardOpen) shell.style.setProperty('--ae-visible-viewport-height', `${Math.max(1, Math.round(viewport.height))}px`);
+      else shell.style.removeProperty('--ae-visible-viewport-height');
+    };
+    update();
+    viewport.addEventListener('resize', update);
+    window.addEventListener('resize', update);
+    return () => {
+      viewport.removeEventListener('resize', update);
+      window.removeEventListener('resize', update);
+    };
+  }, [gameStatus, isStartupLoadingVisible]);
+  const rewardAdFlowInFlightRef = useRef(false);
   const activePlayStartedAtRef = useRef<number | null>(null);
+  const startupPerformanceMeasurementRef = useRef<StartupPerformanceMeasurement | null>(null);
+  const startupPerformanceReportedRef = useRef(false);
+  const startupFirstScreenReportedRef = useRef(false);
+  const startupCalibrationCoordinatorRef = useRef<StartupCalibrationCoordinator | null>(null);
+  const adaptiveSafeBoundaryRef = useRef(false);
+  const adaptiveMonitorEligibleRef = useRef(false);
+  const adaptivePerformanceRef = useRef(adaptivePerformance);
+  const deviceValidationSessionRef = useRef<DeviceValidationSession | null>(null);
+  const saveTransferOperationLockRef = useRef<SaveTransferOperationLock | null>(null);
+  const saveTransferAbortRef = useRef<AbortController | null>(null);
+  const saveTransferProgressPresenterRef = useRef<SaveTransferProgressPresenter | null>(null);
+  if (!saveTransferOperationLockRef.current) {
+    saveTransferOperationLockRef.current = createSaveTransferOperationLock();
+  }
+  useEffect(() => {
+    const uninstallSink = installStartupDiagnosticSink(event => {
+      trackGameEvent('startup_checkpoint', {
+        checkpoint: event.checkpoint,
+        duration_ms: event.durationMs,
+        online: event.online,
+        android_version: event.androidVersion || 'unavailable',
+        webview_version: event.webViewVersion || 'unavailable',
+        memory_class_mb: event.memoryClassMb || 0,
+        failed_task: event.failedTask || '',
+        failure_code: event.failureCode || '',
+        renderer_restart_count: event.rendererRestartCount || 0,
+      });
+      addBreadcrumb(`startup:${event.checkpoint}`, {
+        duration_ms: event.durationMs,
+        failed_task: event.failedTask || '',
+        failure_code: event.failureCode || '',
+      });
+    });
+
+    let cancelled = false;
+    void readNativeStartupRecoveryState().then(state => {
+      if (cancelled || !state.available) return;
+      setStartupDiagnosticContext({
+        appVersion: state.appVersion || APP_DISPLAY_VERSION,
+        androidVersion: state.androidVersion,
+        webViewVersion: state.webViewVersion,
+        memoryClassMb: state.memoryClassMb,
+        rendererRestartCount: state.rendererRestartCount,
+      });
+      if (state.safeModeRecommended) setSafeBootRequested(true);
+      trackGameEvent('startup_native_recovery_state', {
+        safe_mode_recommended: state.safeModeRecommended,
+        consecutive_failures: state.consecutiveStartupFailures,
+        renderer_restart_count: state.rendererRestartCount,
+        last_checkpoint: state.lastCheckpoint || 'unavailable',
+        last_failed_task: state.lastFailedTask || '',
+        last_failure_code: state.lastFailureCode || '',
+      });
+    });
+
+    return () => {
+      cancelled = true;
+      uninstallSink();
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    window.requestAnimationFrame(() => {
+      if (!cancelled) recordStartupCheckpoint('zedbury_visible');
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => () => {
+    saveTransferAbortRef.current?.abort();
+    saveTransferProgressPresenterRef.current?.finish();
+  }, []);
+  adaptiveSafeBoundaryRef.current = isAdaptiveSafeBoundary;
+  adaptiveMonitorEligibleRef.current = isAdaptiveMonitoringEligible;
+  adaptivePerformanceRef.current = adaptivePerformance;
+
+  const emitDueDeviceValidationCheckpoints = useCallback((nowMs: number) => {
+    const activeSession = deviceValidationSessionRef.current;
+    if (!activeSession) return;
+    const result = collectDueDeviceValidationCheckpoints(activeSession, nowMs);
+    deviceValidationSessionRef.current = result.state;
+    result.summaries.forEach(summary => {
+      trackGameEvent('device_validation_checkpoint', toDeviceValidationTelemetry(summary));
+      addBreadcrumb('device_validation:checkpoint', {
+        minutes: summary.checkpointMinutes,
+        status: summary.status,
+        current_level: summary.currentAppliedLevel,
+        full_quality_maintained: summary.fullQualityMaintained,
+      });
+    });
+  }, []);
+
+  const recordAdaptivePerformanceDecisions = useCallback((
+    decisions: AdaptivePerformanceDecision[],
+  ) => {
+    const nowMs = Date.now();
+    decisions.forEach(decision => {
+      const activeSession = deviceValidationSessionRef.current;
+      if (activeSession) {
+        deviceValidationSessionRef.current = recordDeviceValidationDecision(
+          activeSession,
+          decision,
+          nowMs,
+        );
+      }
+      trackGameEvent('adaptive_performance_decision', {
+        decision: decision.type.toLowerCase(),
+        from_level: decision.from.toLowerCase(),
+        to_level: decision.to.toLowerCase(),
+        reason: decision.reason.toLowerCase(),
+        shadow_mode: decision.shadowMode,
+      });
+      addBreadcrumb(`adaptive_performance:${decision.type.toLowerCase()}`, {
+        from: decision.from,
+        to: decision.to,
+        reason: decision.reason,
+        shadow_mode: decision.shadowMode,
+      });
+    });
+    emitDueDeviceValidationCheckpoints(nowMs);
+  }, [emitDueDeviceValidationCheckpoints]);
+
+  const dispatchAdaptivePerformance = useCallback((input: AdaptivePerformanceInput) => {
+    const previous = adaptivePerformanceRef.current;
+    const result = advanceAdaptivePerformance(previous, input);
+    adaptivePerformanceRef.current = result.state;
+    setAdaptivePerformance(result.state);
+    recordAdaptivePerformanceDecisions(result.decisions);
+    if (previous.platform === 'IOS' && iosPressureConstrainedRef.current && result.decisions.some(decision => (
+      decision.type === 'APPLIED' && decision.reason === 'RUNTIME_RECOVERY' && decision.to === 'FULL'
+    ))) {
+      setIOSPressureConstrained(false);
+      iosPressureConstrainedRef.current = false;
+      setOptionalRewardedAdPreloadingSuspended(false);
+      void startRewardedAdPreloading().catch(() => undefined);
+    }
+  }, [recordAdaptivePerformanceDecisions]);
+
+  useEffect(() => subscribeRewardedAdDiagnostics(event => {
+    const { name, requestId, type, placement, contextId, rewardSessionId, ...details } = event;
+    trackGameEvent(name, {
+      request_id: requestId || 'NONE',
+      reward_type: type || 'UNKNOWN',
+      placement: placement || 'UNKNOWN',
+      context_id: contextId || 'NONE',
+      reward_session_id: rewardSessionId || 'NONE',
+      ...details,
+    });
+  }), []);
 
   useEffect(() => {
       playerRef.current = player;
   }, [player]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void readIOSLongSessionDiagnostics().then(async state => {
+      if (!cancelled) {
+        if (state.reportPending && state.previousTerminationKind === 'WEB_CONTENT_TERMINATED') {
+          setIOSRecoveryReport(state);
+        }
+        setIOSRecoveryReadComplete(true);
+      }
+      if (cancelled || !state.available) return;
+      const telemetry = toIOSLongSessionTelemetry(state);
+      Object.entries(telemetry).forEach(([key, value]) => {
+        setCrashKey(`ios_long_session_${key}`, value);
+      });
+      addBreadcrumb('ios_long_session:native_state_loaded', telemetry);
+      if (!state.reportPending || !state.reportId) return;
+
+      const delivered = await trackGameEventConfirmed('ios_previous_session_termination', telemetry);
+      if (cancelled || !delivered) return;
+      await acknowledgeIOSLongSessionReport(state.reportId).catch(error => {
+        recordNonFatal(error, 'ios_long_session_report_ack_failed', {
+          report_id: state.reportId,
+        });
+      });
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+      const nowMs = Date.now();
+      const receipt = readPendingRewardAd(nowMs);
+      const matchesCurrentPlayer = !!receipt
+          && receipt.playerId === String(player.id || player.name)
+          && receipt.saveSlot === currentSlot;
+      let restoredState = matchesCurrentPlayer && receipt?.type === 'REWARDED_STATS'
+          ? restoreWellnessRewardAdState(receipt, nowMs)
+          : createWellnessRewardAdState();
+      if (
+          receipt
+          && matchesCurrentPlayer
+          && receipt.continuationRemainingMs !== undefined
+          && restoredState.retryExpiresAt !== undefined
+      ) {
+          try {
+              setPendingRewardAdContinuationExpiry(receipt, restoredState.retryExpiresAt, nowMs);
+          } catch (error) {
+              recordNonFatal(error, 'reward_ad_continuation_restore_failed', {
+                  reward_type: receipt.type,
+                  save_slot: receipt.saveSlot,
+              });
+          }
+      }
+      setWellnessRewardAd(restoredState);
+      setWellnessAdNowMs(nowMs);
+  }, [currentSlot, player.id]);
+
+  useEffect(() => {
+      if (wellnessRewardAd.status !== 'RETRY_AD_2' || wellnessRewardAd.retryExpiresAt === undefined) return;
+
+      const updateClock = () => {
+          const nowMs = Date.now();
+          setWellnessAdNowMs(nowMs);
+          if (nowMs < wellnessRewardAd.retryExpiresAt!) return;
+          clearPendingRewardAd(wellnessRewardAd.sessionId);
+          setWellnessRewardAd(previous => expireWellnessRewardAdState(previous, nowMs));
+          setToastMessage({
+              title: tr('app.ads.wellness.expiredTitle'),
+              subtext: tr('app.ads.wellness.expiredSubtext'),
+          });
+      };
+
+      updateClock();
+      const intervalId = window.setInterval(updateClock, 1_000);
+      return () => window.clearInterval(intervalId);
+  }, [wellnessRewardAd.retryExpiresAt, wellnessRewardAd.status]);
+
+  useEffect(() => {
+    const previous = adaptivePerformanceRef.current;
+    if (previous.preference === playerPerformanceSettings.preference) return;
+    if (playerPerformanceSettings.preference === 'AUTOMATIC') {
+      const next = createAdaptivePerformanceState({
+        preference: 'AUTOMATIC',
+        platform: adaptivePerformancePlatform,
+        startupCalibration,
+        automaticApplicationEnabled: AUTOMATIC_PERFORMANCE_APPLICATION_ENABLED,
+        nowMs: Date.now(),
+      });
+      adaptivePerformanceRef.current = next;
+      setAdaptivePerformance(next);
+      recordAdaptivePerformanceDecisions([{
+        type: 'APPLIED',
+        from: previous.appliedLevel,
+        to: next.appliedLevel,
+        reason: 'PLAYER_OVERRIDE',
+        shadowMode: next.shadowMode,
+      }]);
+      return;
+    }
+    const result = advanceAdaptivePerformance(previous, {
+      kind: 'PREFERENCE_CHANGED',
+      preference: playerPerformanceSettings.preference,
+      nowMs: Date.now(),
+    });
+    adaptivePerformanceRef.current = result.state;
+    setAdaptivePerformance(result.state);
+    recordAdaptivePerformanceDecisions(result.decisions);
+  }, [
+    adaptivePerformancePlatform,
+    playerPerformanceSettings.preference,
+    recordAdaptivePerformanceDecisions,
+    startupCalibration,
+  ]);
+
+  useEffect(() => {
+    if (!isAdaptiveSafeBoundary) return;
+    dispatchAdaptivePerformance({ kind: 'SAFE_BOUNDARY', nowMs: Date.now() });
+  }, [dispatchAdaptivePerformance, isAdaptiveSafeBoundary]);
+
+  useEffect(() => {
+    if (adaptivePerformancePlatform === 'WEB' || gameStatus !== 'PLAYING') return;
+
+    const nowMs = Date.now();
+    deviceValidationSessionRef.current = createDeviceValidationSession({
+      platform: adaptivePerformancePlatform,
+      preference: normalizePerformanceSettings(
+        playerRef.current.settings?.performance,
+        playerRef.current.settings?.smoothMode,
+      ).preference,
+      initialAppliedLevel: adaptivePerformanceRef.current.appliedLevel,
+      nowMs,
+    });
+
+    const updateVisibility = () => {
+      const activeSession = deviceValidationSessionRef.current;
+      if (!activeSession) return;
+      const observedAtMs = Date.now();
+      deviceValidationSessionRef.current = setDeviceValidationSessionActive(
+        activeSession,
+        document.visibilityState === 'visible',
+        observedAtMs,
+      );
+      emitDueDeviceValidationCheckpoints(observedAtMs);
+    };
+
+    updateVisibility();
+    document.addEventListener('visibilitychange', updateVisibility);
+    const interval = window.setInterval(
+      () => emitDueDeviceValidationCheckpoints(Date.now()),
+      60_000,
+    );
+
+    return () => {
+      document.removeEventListener('visibilitychange', updateVisibility);
+      window.clearInterval(interval);
+      emitDueDeviceValidationCheckpoints(Date.now());
+      deviceValidationSessionRef.current = null;
+    };
+  }, [adaptivePerformancePlatform, emitDueDeviceValidationCheckpoints, gameStatus]);
+
+  useEffect(() => {
+    if (
+      adaptivePerformancePlatform === 'WEB'
+      || (playerPerformanceSettings.preference !== 'AUTOMATIC'
+        && !(adaptivePerformancePlatform === 'IOS' && iosPressureConstrained))
+      || gameStatus !== 'PLAYING'
+    ) return;
+
+    const monitor = startRuntimePerformanceMonitor({
+      isEligible: () => (
+        adaptiveMonitorEligibleRef.current
+        && typeof document !== 'undefined'
+        && document.visibilityState === 'visible'
+      ),
+      onWindow: windowResult => {
+        const observedAtMs = Date.now();
+        const activeSession = deviceValidationSessionRef.current;
+        if (activeSession) {
+          deviceValidationSessionRef.current = recordDeviceValidationHealthWindow(
+            activeSession,
+            windowResult,
+            observedAtMs,
+          );
+          emitDueDeviceValidationCheckpoints(observedAtMs);
+        }
+        trackGameEvent('adaptive_performance_health_window', {
+          health: windowResult.health.toLowerCase(),
+          reason: windowResult.reason.toLowerCase(),
+          frame_samples: windowResult.frameSampleCount,
+          frame_p95_ms: windowResult.frameP95Ms,
+          slow_frame_ratio_pct: Math.round(windowResult.slowFrameRatio * 10_000) / 100,
+          long_task_ratio_pct: Math.round(windowResult.longTaskBlockedRatio * 10_000) / 100,
+        });
+        if (adaptivePerformancePlatform === 'IOS' && iosPressureConstrainedRef.current
+          && playerPerformanceSettings.preference !== 'AUTOMATIC') {
+          iosPressureHealthyWindowsRef.current = windowResult.health === 'HEALTHY'
+            ? iosPressureHealthyWindowsRef.current + 1 : 0;
+          if (iosPressureHealthyWindowsRef.current >= 6) {
+            iosPressureConstrainedRef.current = false;
+            setIOSPressureConstrained(false);
+            setOptionalRewardedAdPreloadingSuspended(false);
+            void startRewardedAdPreloading().catch(() => undefined);
+          }
+        }
+        if (playerPerformanceSettings.preference === 'AUTOMATIC'
+          && adaptivePerformancePlatform !== 'WEB') {
+          dispatchAdaptivePerformance({
+            kind: 'HEALTH_WINDOW',
+            health: windowResult.health,
+            nowMs: observedAtMs,
+            safeBoundary: adaptiveSafeBoundaryRef.current,
+          });
+        }
+      },
+    });
+    return () => monitor.stop();
+  }, [
+    adaptivePerformancePlatform,
+    dispatchAdaptivePerformance,
+    emitDueDeviceValidationCheckpoints,
+    gameStatus,
+    iosPressureConstrained,
+    playerPerformanceSettings.preference,
+  ]);
+
+  useEffect(() => {
+    if (
+      adaptivePerformancePlatform !== 'ANDROID'
+      || playerPerformanceSettings.preference !== 'AUTOMATIC'
+      || gameStatus !== 'PLAYING'
+    ) return;
+
+    let cancelled = false;
+    let reading = false;
+    const pollNativePressure = async () => {
+      if (reading || cancelled || document.visibilityState !== 'visible') return;
+      reading = true;
+      try {
+        const result = await readAndroidDeviceCapabilities();
+        if (cancelled || result.status !== 'AVAILABLE') return;
+        const { snapshot } = result;
+        const observedAtMs = Date.now();
+        const activeSession = deviceValidationSessionRef.current;
+        if (activeSession) {
+          deviceValidationSessionRef.current = recordDeviceValidationNativeSnapshot(
+            activeSession,
+            snapshot,
+            observedAtMs,
+          );
+          emitDueDeviceValidationCheckpoints(observedAtMs);
+        }
+        trackGameEvent('adaptive_performance_native_pressure', {
+          low_memory: snapshot.lowMemory,
+          available_memory_pct: Math.round(snapshot.availableMemoryRatio * 100),
+          thermal_status: snapshot.thermalStatus ?? -1,
+        });
+        if (snapshot.lowMemory || (snapshot.thermalStatus ?? 0) >= 4) {
+          dispatchAdaptivePerformance({
+            kind: 'MEMORY_PRESSURE',
+            nowMs: observedAtMs,
+            safeBoundary: adaptiveSafeBoundaryRef.current,
+          });
+        } else if ((snapshot.thermalStatus ?? 0) >= 3) {
+          dispatchAdaptivePerformance({
+            kind: 'HEALTH_WINDOW',
+            health: 'UNHEALTHY',
+            nowMs: observedAtMs,
+            safeBoundary: adaptiveSafeBoundaryRef.current,
+          });
+        }
+      } finally {
+        reading = false;
+      }
+    };
+
+    const interval = window.setInterval(() => void pollNativePressure(), 120_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [
+    adaptivePerformancePlatform,
+    dispatchAdaptivePerformance,
+    emitDueDeviceValidationCheckpoints,
+    gameStatus,
+    playerPerformanceSettings.preference,
+  ]);
 
   useEffect(() => {
       const persistStorage = navigator.storage?.persist;
@@ -584,55 +1274,140 @@ export const App: React.FC = () => {
   };
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setStartupMinimumElapsed(true), STARTUP_LOADING_MIN_MS);
-    return () => window.clearTimeout(timer);
+    const coordinator = createStartupCalibrationCoordinator((result) => {
+      setStartupCalibration(result);
+      const performanceSettings = normalizePerformanceSettings(
+        playerRef.current.settings?.performance,
+        playerRef.current.settings?.smoothMode,
+      );
+      const nextAdaptiveState = createAdaptivePerformanceState({
+        preference: performanceSettings.preference,
+        platform: adaptivePerformancePlatform,
+        startupCalibration: result,
+        automaticApplicationEnabled: AUTOMATIC_PERFORMANCE_APPLICATION_ENABLED,
+        nowMs: Date.now(),
+      });
+      adaptivePerformanceRef.current = nextAdaptiveState;
+      setAdaptivePerformance(nextAdaptiveState);
+      trackGameEvent('startup_calibration_result', toStartupCalibrationTelemetry(result));
+      trackGameEvent('adaptive_performance_startup_decision', {
+        platform: adaptivePerformancePlatform.toLowerCase(),
+        preference: performanceSettings.preference.toLowerCase(),
+        recommended_level: nextAdaptiveState.recommendedLevel.toLowerCase(),
+        applied_level: nextAdaptiveState.appliedLevel.toLowerCase(),
+        shadow_mode: nextAdaptiveState.shadowMode,
+      });
+      addBreadcrumb('startup_calibration:complete', {
+        recommendation: result.recommendation,
+        confidence: result.confidence,
+        primary_reason: result.primaryReason,
+      });
+      setCrashKey('startup_calibration_recommendation', result.recommendation);
+      setCrashKey('startup_calibration_confidence', result.confidence);
+      setCrashKey('startup_calibration_reason', result.primaryReason);
+    });
+    startupCalibrationCoordinatorRef.current = coordinator;
+
+    return () => {
+      coordinator.cancel();
+      if (startupCalibrationCoordinatorRef.current === coordinator) {
+        startupCalibrationCoordinatorRef.current = null;
+      }
+    };
+  }, [adaptivePerformancePlatform]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void readAndroidDeviceCapabilities().then((result) => {
+      if (cancelled) return;
+      startupCalibrationCoordinatorRef.current?.submitDeviceCapabilities(result);
+
+      if (result.status !== 'AVAILABLE') {
+        if (result.reason !== 'NOT_ANDROID') {
+          trackGameEvent('device_capability_unavailable', { reason: result.reason });
+          addBreadcrumb('device_capabilities:unavailable', { reason: result.reason });
+        }
+        return;
+      }
+
+      const { snapshot } = result;
+      setStartupDiagnosticContext({
+        androidVersion: snapshot.androidRelease,
+        webViewVersion: snapshot.webViewVersion,
+        memoryClassMb: snapshot.memoryClassMb,
+      });
+      trackGameEvent('device_capability_baseline', toDeviceCapabilityTelemetry(snapshot));
+      addBreadcrumb('device_capabilities:ready', {
+        low_ram: snapshot.isLowRamDevice,
+        memory_class_mb: snapshot.memoryClassMb,
+        thermal_status: snapshot.thermalStatusLabel || 'UNAVAILABLE',
+        webview_major: snapshot.webViewMajor || 0,
+      });
+      setCrashKey('device_low_ram', snapshot.isLowRamDevice);
+      setCrashKey('device_memory_class_mb', snapshot.memoryClassMb);
+      setCrashKey('device_thermal_status', snapshot.thermalStatusLabel || 'UNAVAILABLE');
+      setCrashKey('device_webview_major', snapshot.webViewMajor || 0);
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
+    const measurement = startStartupPerformanceMeasurement();
+    startupPerformanceMeasurementRef.current = measurement;
+    return () => {
+      measurement.cancel();
+      if (startupPerformanceMeasurementRef.current === measurement) {
+        startupPerformanceMeasurementRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isStartupLoadingVisible || startupPerformanceReportedRef.current) return;
+    const measurement = startupPerformanceMeasurementRef.current;
+    if (!measurement) return;
+
+    const summary = measurement.complete();
+    startupPerformanceReportedRef.current = true;
+    startupCalibrationCoordinatorRef.current?.submitPerformance(summary);
+    const telemetry = toStartupPerformanceTelemetry(summary);
+    trackGameEvent('startup_performance_baseline', {
+      measurement_scope: 'react_loading_shell',
+      ...telemetry,
+    });
+    addBreadcrumb('startup_performance:complete', {
+      startup_ms: summary.startupDurationMs,
+      frame_p95_ms: summary.frameP95Ms,
+      long_tasks: summary.longTaskCount,
+    });
+  }, [isStartupLoadingVisible]);
+
+  useEffect(() => {
+    if (isStartupLoadingVisible || startupFirstScreenReportedRef.current) return;
+    startupFirstScreenReportedRef.current = true;
+    recordStartupCheckpoint('first_screen_ready');
+  }, [isStartupLoadingVisible]);
+
+  useEffect(() => {
+    if (startupStudioIntroHandled) return;
     const exitTimer = window.setTimeout(() => setStartupStudioBumperExiting(true), STARTUP_STUDIO_BUMPER_EXIT_MS);
     const timer = window.setTimeout(() => setStartupStudioBumperElapsed(true), STARTUP_STUDIO_BUMPER_MS);
     return () => {
       window.clearTimeout(exitTimer);
       window.clearTimeout(timer);
     };
-  }, []);
+  }, [startupStudioIntroHandled]);
 
   useEffect(() => {
-    if (!isStartupLoadingVisible) return;
-    const interval = window.setInterval(() => {
-      setStartupLoadingLineIndex(prev => (prev + 1) % STARTUP_LOADING_LINE_KEYS.length);
-    }, 420);
-    return () => window.clearInterval(interval);
-  }, [isStartupLoadingVisible]);
+    setStartupTakingLonger(false);
+    if (startupState.outcome !== 'RUNNING') return;
+    const timer = window.setTimeout(() => setStartupTakingLonger(true), STARTUP_SLOW_NOTICE_MS);
+    return () => window.clearTimeout(timer);
+  }, [startupState.attemptId, startupState.outcome]);
 
-  useEffect(() => {
-    if (!isStartupLoadingVisible) {
-      setStartupLoadingProgress(100);
-      return;
-    }
-
-    if (!startupStudioBumperElapsed) {
-      setStartupLoadingProgress(0);
-      return;
-    }
-
-    const startedAt = performance.now();
-    const duration = Math.max(1400, STARTUP_LOADING_MIN_MS - STARTUP_STUDIO_BUMPER_MS - 260);
-    let frame = 0;
-
-    const tick = (now: number) => {
-      const elapsed = now - startedAt;
-      const ratio = Math.min(0.985, elapsed / duration);
-      const eased = 1 - Math.pow(1 - ratio, 1.45);
-      setStartupLoadingProgress(Math.min(99, Math.round(eased * 100)));
-      frame = requestAnimationFrame(tick);
-    };
-
-    frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
-  }, [isStartupLoadingVisible, startupStudioBumperElapsed]);
-
-  const preparePlayerForPersistence = (nextPlayer: Player): Player => compactPlayerForPersistence(nextPlayer);
   const writeLocalStorageMirror = (slot: number, playerToSave: Player) => {
       const slotKey = `actorEmpireSave_${slot}`;
       const metadataKey = `${slotKey}_meta`;
@@ -692,7 +1467,7 @@ export const App: React.FC = () => {
 
       return options.filter((option, index, arr) => arr.findIndex(other => other.value === option.value) === index);
   };
-  const persistSlotSave = async (
+  const persistSlotSave = (
       slot: number,
       nextPlayer: Player,
       options: {
@@ -703,7 +1478,13 @@ export const App: React.FC = () => {
           sourceByteEstimate?: number;
       } = {}
   ): Promise<Player> => {
+    const saveOperation = async (): Promise<Player> => {
+      if (options.reason === 'AUTOSAVE' && Date.now() < iosSaveCooldownUntilRef.current) {
+          return nextPlayer;
+      }
       if (options.weekDiagnostic) {
+          options.weekDiagnostic.onStage?.('persist_prepare_boundary');
+          await yieldToMainThread();
           options.weekDiagnostic.onStage?.('persist_prepare_start');
           markWeekProcessingStage('persist_prepare_start', nextPlayer, {
               run_id: options.weekDiagnostic.runId,
@@ -731,7 +1512,7 @@ export const App: React.FC = () => {
           });
           return nextPlayer;
       }
-      const playerToSave = prepared.player;
+      const playerToSave = prepared.persistedPlayer;
       if (options.weekDiagnostic) {
           options.weekDiagnostic.onStage?.('persist_prepare_done');
           markWeekProcessingStage('persist_prepare_done', playerToSave, {
@@ -739,6 +1520,8 @@ export const App: React.FC = () => {
               screen: options.weekDiagnostic.screen,
               save_slot: slot,
           });
+          options.weekDiagnostic.onStage?.('indexeddb_write_boundary');
+          await yieldToMainThread();
           options.weekDiagnostic.onStage?.('indexeddb_write_start');
           markWeekProcessingStage('indexeddb_write_start', playerToSave, {
               run_id: options.weekDiagnostic.runId,
@@ -765,6 +1548,7 @@ export const App: React.FC = () => {
           });
           return nextPlayer;
       }
+      verifiedCheckpointSlotsRef.current.add(slot);
       setSaveSlotSummaries(prev => ({ ...prev, [slot]: createSaveSlotSummary(playerToSave) }));
       if (prepared.needsRecoveryCheckpoint) {
           setToastMessage({
@@ -781,17 +1565,25 @@ export const App: React.FC = () => {
           });
       }
 
-      const writeLocalMirror = () => {
-          writeLocalStorageMirror(slot, playerToSave);
-      };
-
-      const requestIdleCallback = (globalThis as any).requestIdleCallback as ((cb: () => void, options?: { timeout?: number }) => void) | undefined;
-      if (requestIdleCallback) {
-          requestIdleCallback(writeLocalMirror, { timeout: 1800 });
+      if (adaptivePerformancePlatform === 'IOS') {
+          // A deferred full mirror retains the whole persisted career in its
+          // closure and later creates a second JSON string on the WebView heap.
+          // IndexedDB generations are authoritative; keep only a tiny summary.
+          writeGameSaveSummary(`actorEmpireSave_${slot}`, playerToSave);
       } else {
-          globalThis.setTimeout(writeLocalMirror, 0);
+          const writeLocalMirror = () => writeLocalStorageMirror(slot, playerToSave);
+          const requestIdleCallback = (globalThis as any).requestIdleCallback as ((cb: () => void, options?: { timeout?: number }) => void) | undefined;
+          if (requestIdleCallback) {
+              requestIdleCallback(writeLocalMirror, { timeout: 1800 });
+          } else {
+              globalThis.setTimeout(writeLocalMirror, 0);
+          }
       }
-      return playerToSave;
+      return prepared.runtimePlayer;
+    };
+    return options.reason === 'AUTOSAVE'
+      ? saveOperationQueueRef.current.runLatest(`slot:${slot}`, saveOperation, () => nextPlayer)
+      : saveOperationQueueRef.current.run(saveOperation);
   };
   const syncPermanentPremiumEntitlementsToSavedSlots = async (productIds: PremiumProductId[]) => {
       const entitlementProductIds = rememberPremiumEntitlements(productIds);
@@ -824,14 +1616,14 @@ export const App: React.FC = () => {
       nextPlayer: Player,
       weekDiagnostic?: { runId: string; screen: string; onStage?: (stage: string) => void },
   ): Promise<Player> => {
-      if (!currentSlot) return preparePlayerForPersistence(nextPlayer);
-      const playerToSave = await persistSlotSave(currentSlot, nextPlayer, {
+      if (!currentSlot) return nextPlayer;
+      const runtimePlayer = await persistSlotSave(currentSlot, nextPlayer, {
           rethrow: true,
           weekDiagnostic,
           reason: 'PROCESS_WEEK',
       });
-      setSaveSlots(prev => ({ ...prev, [currentSlot]: playerToSave }));
-      return playerToSave;
+      setSaveSlots(prev => ({ ...prev, [currentSlot]: runtimePlayer }));
+      return runtimePlayer;
   };
 
   const prepareLoadedPlayerSave = async (
@@ -1093,103 +1885,284 @@ export const App: React.FC = () => {
       setBabySurnameChoice('');
   };
 
-  // Check for saved game on initial mount & Init Ads
-  useEffect(() => {
-    const init = async () => {
-        try {
-            const summaries: Record<number, SaveSlotSummary | null> = { 1: null, 2: null, 3: null };
+  const runStartupInitialization = useCallback(async (retryTaskId?: StartupTaskId) => {
+    const executionLock = startupExecutionLockRef.current!;
+    const lease = executionLock.tryAcquire();
+    if (!lease) return;
 
-            // Startup must never hydrate or migrate a full career. Existing saves
-            // receive a tiny deferred card and are opened only after player selection.
-            const indexedDbKeys = new Set(await listGameDataKeys());
-            for (let i = 1; i <= 3; i++) {
-                const saveKey = `actorEmpireSave_${i}`;
-                if (!indexedDbKeys.has(saveKey)) continue;
-                const cachedSummary = getGameSaveSummary(saveKey);
-                summaries[i] = cachedSummary || createDeferredSaveSlotSummary(saveKey, 'indexeddb');
-            }
+    const isRetry = retryTaskId !== undefined;
+    const attemptId = isRetry ? startupAttemptIdRef.current + 1 : startupAttemptIdRef.current;
+    startupAttemptIdRef.current = attemptId;
+    let activeTaskId: StartupTaskId = retryTaskId || 'CRITICAL_ASSETS';
 
-            // Legacy saves are also represented without parsing them on boot. They
-            // migrate into the normal per-slot IndexedDB key only after selection.
-            const hasAnySave = Object.values(summaries).some(s => s !== null);
-            if (!hasAnySave) {
-                if (indexedDbKeys.has('actorEmpireSave')) {
-                    summaries[1] = createDeferredSaveSlotSummary('actorEmpireSave', 'indexeddb');
-                } else {
-                    const localStorageKeys = new Set<string>();
-                    try {
-                        for (let index = 0; index < localStorage.length; index += 1) {
-                            const key = localStorage.key(index);
-                            if (key) localStorageKeys.add(key);
-                        }
-                    } catch {
-                        // Local storage is a legacy fallback only.
-                    }
+    if (isRetry) {
+      setIsStartupRetrying(true);
+      setStartupState(previous => beginStartupRetry(previous));
+    }
+    setIsInitializing(true);
 
-                    for (let i = 1; i <= 3; i++) {
-                        const key = `actorEmpireSave_${i}`;
-                        if (localStorageKeys.has(key)) {
-                            summaries[i] = createDeferredSaveSlotSummary(key, 'localstorage');
-                        }
-                    }
-                    if (!Object.values(summaries).some(s => s !== null) && localStorageKeys.has('actorEmpireSave')) {
-                        summaries[1] = createDeferredSaveSlotSummary('actorEmpireSave', 'localstorage');
-                    }
-                }
-            }
-
-            setSaveSlotSummaries(summaries);
-        } catch (e) {
-            console.error("Init failed", e);
-            recordNonFatal(e, 'app_init_failed');
-        } finally {
-            setIsInitializing(false);
-        }
+    const runTask = async (taskId: StartupTaskId, operation: () => Promise<void>) => {
+      activeTaskId = taskId;
+      setStartupState(previous => startStartupTask(previous, taskId, attemptId));
+      await operation();
+      if (startupAttemptIdRef.current !== attemptId) return false;
+      setStartupState(previous => taskId === retryTaskId
+        ? recoverStartupTask(previous, taskId, attemptId)
+        : completeStartupTask(previous, taskId, attemptId));
+      startupFailureCountsRef.current[taskId] = 0;
+      return true;
     };
-    init();
+
+    const taskOrder: StartupTaskId[] = [
+      'CRITICAL_ASSETS',
+      'STORAGE',
+      'SAVE_SUMMARIES',
+      'HOME_SCREEN',
+      'FIRST_SCREEN',
+    ];
+    const firstTaskIndex = Math.max(0, taskOrder.indexOf(activeTaskId));
+    const shouldRun = (taskId: StartupTaskId) => taskOrder.indexOf(taskId) >= firstTaskIndex;
+
+    try {
+      if (shouldRun('CRITICAL_ASSETS')) {
+        const completed = await runTask('CRITICAL_ASSETS', prepareCriticalStartupAssets);
+        if (!completed) return;
+      }
+
+      if (shouldRun('STORAGE')) {
+        const completed = await runTask('STORAGE', async () => {
+          recordStartupCheckpoint('storage_started');
+          // Every call owns and closes its IndexedDB connection. A delayed open
+          // from an earlier timeout is also closed by waitForIndexedDbOpen.
+          startupRuntimeContextRef.current.indexedDbKeys = new Set(await listGameDataKeysStrict());
+          recordStartupCheckpoint('storage_ready');
+        });
+        if (!completed) return;
+      }
+
+      if (shouldRun('SAVE_SUMMARIES')) {
+        const completed = await runTask('SAVE_SUMMARIES', async () => {
+          const indexedDbKeys = startupRuntimeContextRef.current.indexedDbKeys;
+          if (!indexedDbKeys) throw new Error('Startup storage context is unavailable.');
+
+          const summaries: Record<number, SaveSlotSummary | null> = { 1: null, 2: null, 3: null };
+          for (let i = 1; i <= 3; i++) {
+            const saveKey = `actorEmpireSave_${i}`;
+            if (!indexedDbKeys.has(saveKey)) continue;
+            const cachedSummary = getGameSaveSummary(saveKey);
+            summaries[i] = cachedSummary || createDeferredSaveSlotSummary(saveKey, 'indexeddb');
+          }
+
+          // Legacy saves receive a lightweight card and migrate only after selection.
+          const hasAnySave = Object.values(summaries).some(summary => summary !== null);
+          if (!hasAnySave) {
+            if (indexedDbKeys.has('actorEmpireSave')) {
+              summaries[1] = createDeferredSaveSlotSummary('actorEmpireSave', 'indexeddb');
+            } else {
+              const localStorageKeys = new Set<string>();
+              try {
+                for (let index = 0; index < localStorage.length; index += 1) {
+                  const key = localStorage.key(index);
+                  if (key) localStorageKeys.add(key);
+                }
+              } catch {
+                // Local storage is a legacy fallback only.
+              }
+
+              for (let i = 1; i <= 3; i++) {
+                const key = `actorEmpireSave_${i}`;
+                if (localStorageKeys.has(key)) {
+                  summaries[i] = createDeferredSaveSlotSummary(key, 'localstorage');
+                }
+              }
+              if (!Object.values(summaries).some(summary => summary !== null) && localStorageKeys.has('actorEmpireSave')) {
+                summaries[1] = createDeferredSaveSlotSummary('actorEmpireSave', 'localstorage');
+              }
+            }
+          }
+          setSaveSlotSummaries(summaries);
+          recordStartupCheckpoint('save_summaries_ready');
+        });
+        if (!completed) return;
+      }
+
+      if (shouldRun('HOME_SCREEN')) {
+        const completed = await runTask('HOME_SCREEN', async () => {
+          // All player-visible screen modules are ready before the menu opens.
+          // Weekly simulation and optional telemetry remain on demand.
+          await loadAllGameScreens();
+        });
+        if (!completed) return;
+      }
+
+      if (shouldRun('FIRST_SCREEN')) {
+        const completed = await runTask('FIRST_SCREEN', async () => {
+          // Give React one paint opportunity before revealing the menu.
+          await yieldToMainThread();
+        });
+        if (!completed) return;
+      }
+
+      setIsInitializing(false);
+    } catch (error) {
+      if (startupAttemptIdRef.current !== attemptId) return;
+      const timedOut = error instanceof IndexedDbOperationError && error.code === 'TIMEOUT';
+      const storageFailure = activeTaskId === 'STORAGE' || activeTaskId === 'SAVE_SUMMARIES';
+      const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+      const failureKind = storageFailure
+        ? 'STORAGE'
+        : offline
+          ? 'NETWORK'
+          : activeTaskId === 'CRITICAL_ASSETS' || activeTaskId === 'HOME_SCREEN'
+            ? 'ASSET'
+            : 'APP';
+      const message = storageFailure
+        ? timedOut
+          ? 'Device storage took too long to respond. Your careers were not changed.'
+          : 'Actor Empire could not access saved careers on this device. Your careers were not changed.'
+        : offline
+          ? 'A network issue interrupted startup.'
+          : `Startup task ${activeTaskId} could not be completed.`;
+      const failureCode = timedOut
+        ? `${activeTaskId.toLowerCase()}_timeout`
+        : `${failureKind.toLowerCase()}_startup_failed`;
+      recordStartupCheckpoint('startup_failed', {
+        failedTask: activeTaskId,
+        failureCode,
+      });
+      recordStartupCheckpoint('recovery_opened', {
+        failedTask: activeTaskId,
+        failureCode,
+      });
+      setStartupState(previous => timedOut
+        ? timeoutStartupTask(previous, activeTaskId, attemptId, message, failureKind)
+        : failStartupTask(previous, activeTaskId, attemptId, message, failureKind));
+
+      const failureDecision = advanceStartupFailureCount(
+        startupFailureCountsRef.current[activeTaskId] || 0,
+        activeTaskId,
+      );
+      startupFailureCountsRef.current[activeTaskId] = failureDecision.count;
+      if (failureDecision.shouldArmSafeMode) {
+        setSafeBootRequested(true);
+        try {
+          sessionStorage.setItem(SAFE_BOOT_SESSION_KEY, '1');
+        } catch {
+          // Safe mode still applies to this mounted session.
+        }
+      }
+
+      recordNonFatal(error, 'app_startup_task_failed', {
+        task: activeTaskId,
+        attempt: attemptId,
+        timed_out: timedOut,
+        retry: isRetry,
+        failure_count: failureDecision.count,
+        safe_mode_armed: failureDecision.shouldArmSafeMode,
+      });
+    } finally {
+      executionLock.release(lease);
+      if (isRetry) setIsStartupRetrying(false);
+    }
   }, []);
 
   useEffect(() => {
-    if (isInitializing || safeBootRequested) return;
-    let cancelled = false;
-    const initializeNativeServices = async () => {
-      try {
+    void runStartupInitialization();
+  }, [runStartupInitialization]);
+
+  useEffect(() => {
+    return () => startupBackgroundScheduler.dispose();
+  }, [startupBackgroundScheduler]);
+
+  useEffect(() => {
+    startupBackgroundScheduler.cancelPending();
+    if (isInitializing || safeBootRequested || startupState.outcome !== 'READY' || iosPressureConstrained) return;
+
+    const optionalOnlineServices: StartupBackgroundTask = {
+      id: 'optional-online-services',
+      prepare: async () => {
         await ensureTrackingPermission();
-        if (!cancelled) await initAds();
-      } catch (error) {
-        recordNonFatal(error, 'native_services_init_failed');
-      }
+        await startRewardedAdPreloading();
+      },
     };
-    void initializeNativeServices();
-    return () => {
-      cancelled = true;
-    };
-  }, [isInitializing, safeBootRequested]);
+
+    if (gameStatus === 'START_MENU' || (gameStatus === 'PLAYING' && activePage === Page.HOME)) {
+      startupBackgroundScheduler.enqueue([optionalOnlineServices]);
+    }
+
+    return () => startupBackgroundScheduler.cancelPending();
+  }, [
+    activePage,
+    gameStatus,
+    isInitializing,
+    iosPressureConstrained,
+    safeBootRequested,
+    startupBackgroundScheduler,
+    startupState.outcome,
+  ]);
 
   useEffect(() => {
     markTraceAction('app_runtime_ready', { flow: 'app_lifecycle' });
+    const publishLifecycleCheckpoint = (
+      checkpoint: 'runtime_ready' | 'backgrounded' | 'foregrounded' | 'page_hidden' | 'page_shown' | 'memory_warning',
+    ) => {
+      const currentPlayer = playerRef.current;
+      void notifyIOSLongSessionCheckpoint({
+        checkpoint,
+        occurredAtMs: Date.now(),
+        age: currentPlayer?.age,
+        week: currentPlayer?.currentWeek,
+        saveSlot: currentSlot ?? undefined,
+        screen: Page[activePage] || String(activePage),
+        ...getIOSLongSessionPlayerCounts(currentPlayer),
+      }).catch(() => undefined);
+    };
+    publishLifecycleCheckpoint('runtime_ready');
     const handleVisibility = () => {
+      publishLifecycleCheckpoint(document.visibilityState === 'hidden' ? 'backgrounded' : 'foregrounded');
       markTraceAction(document.visibilityState === 'hidden' ? 'app_backgrounded' : 'app_foregrounded', {
         flow: 'app_lifecycle',
         last_screen: Page[activePage] || String(activePage),
         save_slot: currentSlot,
       });
     };
-    const handlePageHide = () => markTraceAction('app_page_hidden', {
-      flow: 'app_lifecycle',
-      last_screen: Page[activePage] || String(activePage),
-      save_slot: currentSlot,
-    });
-    const handlePageShow = () => markTraceAction('app_page_shown', {
-      flow: 'app_lifecycle',
-      last_screen: Page[activePage] || String(activePage),
-      save_slot: currentSlot,
-    });
+    const handlePageHide = () => {
+      publishLifecycleCheckpoint('page_hidden');
+      markTraceAction('app_page_hidden', {
+        flow: 'app_lifecycle',
+        last_screen: Page[activePage] || String(activePage),
+        save_slot: currentSlot,
+      });
+    };
+    const handlePageShow = () => {
+      publishLifecycleCheckpoint('page_shown');
+      markTraceAction('app_page_shown', {
+        flow: 'app_lifecycle',
+        last_screen: Page[activePage] || String(activePage),
+        save_slot: currentSlot,
+      });
+    };
     document.addEventListener('visibilitychange', handleVisibility);
     window.addEventListener('pagehide', handlePageHide);
     window.addEventListener('pageshow', handlePageShow);
     const handleMemoryWarning = (event: Event) => {
       const detail = event instanceof CustomEvent ? event.detail : {};
+      if (adaptivePerformancePlatform === 'IOS') {
+        iosPressureConstrainedRef.current = true;
+        iosSaveCooldownUntilRef.current = Date.now() + IOS_MEMORY_WARNING_AUTOSAVE_COOLDOWN_MS;
+        setIOSSaveCooldownEpoch(previous => previous + 1);
+        iosPressureHealthyWindowsRef.current = 0;
+        setIOSPressureConstrained(true);
+        startupBackgroundScheduler.cancelPending();
+        clearGeneratedAvatarCache();
+        setOptionalRewardedAdPreloadingSuspended(true);
+      }
+      publishLifecycleCheckpoint('memory_warning');
+      dispatchAdaptivePerformance({
+        kind: 'MEMORY_PRESSURE',
+        nowMs: Date.now(),
+        safeBoundary: adaptiveSafeBoundaryRef.current,
+      });
       markTraceAction('native_memory_warning', {
         flow: 'app_lifecycle',
         last_screen: Page[activePage] || String(activePage),
@@ -1201,42 +2174,33 @@ export const App: React.FC = () => {
         last_screen: Page[activePage] || String(activePage),
         save_slot: currentSlot,
       });
-      void checkpointNativeMemoryPressure({
+      const result = checkpointNativeMemoryPressure({
         isPlaying: gameStatus === 'PLAYING',
         currentSlot,
         isWeekProcessing: weekProcessingLockRef.current,
-        getCommittedPlayer: () => playerRef.current,
+        isSaveTransferActive: saveTransferOperationLockRef.current?.isActive() === true,
+        hasVerifiedCheckpoint: slot => verifiedCheckpointSlotsRef.current.has(slot),
         cancelPendingAutosave: () => {
           if (autosaveTimerRef.current) {
             window.clearTimeout(autosaveTimerRef.current);
             autosaveTimerRef.current = null;
           }
+          if (currentSlot !== null) {
+            saveOperationQueueRef.current.cancelPendingOptional(`slot:${currentSlot}`);
+          }
         },
-        persistCommittedPlayer: async (slot, committedPlayer) => {
-          const savedPlayer = await persistSlotSave(slot, committedPlayer, {
-            rethrow: true,
-            reason: 'AUTOSAVE',
-          });
-          setSaveSlots(prev => ({ ...prev, [slot]: savedPlayer }));
-        },
-      }).then(result => {
-        markTraceAction(
-          result.status === 'SAVED'
-            ? 'native_memory_checkpoint_saved'
-            : 'native_memory_checkpoint_skipped',
-          {
-            flow: 'app_lifecycle',
-            save_slot: currentSlot,
-            checkpoint_status: result.status,
-            checkpoint_reason: result.status === 'SKIPPED' ? result.reason : undefined,
-          },
-        );
-      }).catch(error => {
-        recordNonFatal(error, 'native_memory_checkpoint_failed', {
-          save_slot: currentSlot,
-          last_screen: Page[activePage] || String(activePage),
-        });
       });
+      markTraceAction(
+        result.status === 'READY'
+          ? 'native_memory_checkpoint_ready'
+          : 'native_memory_checkpoint_skipped',
+        {
+          flow: 'app_lifecycle',
+          save_slot: currentSlot,
+          checkpoint_status: result.status,
+          checkpoint_reason: result.status === 'SKIPPED' ? result.reason : undefined,
+        },
+      );
     };
     window.addEventListener('actor-empire-memory-warning', handleMemoryWarning);
     return () => {
@@ -1245,7 +2209,7 @@ export const App: React.FC = () => {
       window.removeEventListener('pageshow', handlePageShow);
       window.removeEventListener('actor-empire-memory-warning', handleMemoryWarning);
     };
-  }, [activePage, currentSlot, gameStatus]);
+  }, [activePage, adaptivePerformancePlatform, currentSlot, dispatchAdaptivePerformance, gameStatus, startupBackgroundScheduler]);
 
   // Auto-save logic
   useEffect(() => {
@@ -1254,17 +2218,24 @@ export const App: React.FC = () => {
         autosaveTimerRef.current = null;
     }
 
-    if (gameStatus !== 'PLAYING' || !currentSlot) return;
+    if (gameStatus !== 'PLAYING' || !currentSlot || isSaveTransferActive) return;
     if (suppressNextAutosaveRef.current) {
         suppressNextAutosaveRef.current = false;
         return;
     }
 
+    const autosaveDelayMs = adaptivePerformancePlatform === 'IOS'
+      ? autosaveDelayAfterPressure(AUTOSAVE_DEBOUNCE_MS, Date.now(), iosSaveCooldownUntilRef.current)
+      : AUTOSAVE_DEBOUNCE_MS;
     autosaveTimerRef.current = window.setTimeout(() => {
+        if (saveTransferOperationLockRef.current?.isActive()) {
+          autosaveTimerRef.current = null;
+          return;
+        }
         setSaveSlots(prev => ({ ...prev, [currentSlot]: player }));
-        void persistSlotSave(currentSlot, player);
+        void persistSlotSave(currentSlot, player, { reason: 'AUTOSAVE' });
         autosaveTimerRef.current = null;
-    }, AUTOSAVE_DEBOUNCE_MS);
+    }, autosaveDelayMs);
 
     return () => {
         if (autosaveTimerRef.current) {
@@ -1272,7 +2243,7 @@ export const App: React.FC = () => {
             autosaveTimerRef.current = null;
         }
     };
-  }, [player, gameStatus, currentSlot]);
+  }, [player, gameStatus, currentSlot, isSaveTransferActive, adaptivePerformancePlatform, iosSaveCooldownEpoch]);
 
   useEffect(() => {
     if (gameStatus !== 'PLAYING' || !currentSlot) {
@@ -1328,11 +2299,16 @@ export const App: React.FC = () => {
     };
   }, [gameStatus, currentSlot]);
 
-  const handleSelectSlot = async (slot: number) => {
+  const handleSelectSlot = async (slot: number, options: { requireVerified?: boolean } = {}) => {
+    startupBackgroundScheduler.cancelPending();
+    const openingExistingCareer = Boolean(saveSlots[slot] || saveSlotSummaries[slot]);
+    if (openingExistingCareer) {
+        setCareerOpening({ status: 'Verifying career', supportingMessage: 'Checking your saved story before the next scene begins.' });
+        await yieldToMainThread();
+    }
     setCurrentSlot(slot);
     let existingSave = saveSlots[slot];
     if (!existingSave && saveSlotSummaries[slot]) {
-        setIsInitializing(true);
         markTraceAction('selected_save_load_started', { flow: 'save_select', save_slot: slot });
         try {
             const summary = saveSlotSummaries[slot];
@@ -1343,6 +2319,7 @@ export const App: React.FC = () => {
             let needsRecoveryCheckpoint = false;
             let sourceByteEstimate: number | undefined;
             if (storageKind === 'localstorage') {
+                if (options.requireVerified) throw new Error('This career needs manual verification from the start menu. It was not changed.');
                 const raw = localStorage.getItem(storageKey);
                 savedData = raw ? JSON.parse(raw) as Player : null;
             } else {
@@ -1355,17 +2332,26 @@ export const App: React.FC = () => {
                         violations: verifiedLoad.violations,
                     });
                     setCurrentSlot(null);
+                    setCareerOpening(null);
                     return;
                 }
                 if (verifiedLoad.status === 'UNRECOVERABLE') {
                     throw new Error('This career and its recovery generation could not be verified. Import a signed backup before deleting anything.');
                 }
                 if (verifiedLoad.status === 'MISSING') throw new Error(`Save slot ${slot} could not be loaded.`);
+                if (options.requireVerified && !isIOSRendererRecoveryLoadVerified(verifiedLoad.status)) {
+                    throw new Error('Automatic recovery could not verify this career. Open it manually from the start menu.');
+                }
                 savedData = verifiedLoad.player;
+                if (verifiedLoad.status === 'CURRENT' && storageKey === `actorEmpireSave_${slot}`) {
+                    verifiedCheckpointSlotsRef.current.add(slot);
+                }
                 currentIsUnverified = verifiedLoad.status === 'LEGACY_UNVERIFIED';
                 needsRecoveryCheckpoint = verifiedLoad.status === 'CURRENT' && verifiedLoad.needsRecoveryCheckpoint;
             }
             if (!savedData) throw new Error(`Save slot ${slot} could not be loaded.`);
+            setCareerOpening({ status: 'Preparing your story', supportingMessage: 'Bringing your cast, projects and career history into the game.' });
+            await yieldToMainThread();
             if (currentIsUnverified) sourceByteEstimate = estimateSaveJsonBytes(savedData);
             const source = storageKind === 'localstorage'
                 ? (storageKey === 'actorEmpireSave' ? 'legacy-single-localstorage' : 'legacy-localstorage')
@@ -1375,6 +2361,8 @@ export const App: React.FC = () => {
             setSaveSlots(prev => ({ ...prev, [slot]: prepared.player }));
             setSaveSlotSummaries(prev => ({ ...prev, [slot]: createSaveSlotSummary(prepared.player) }));
             if (currentIsUnverified || prepared.shouldPersist || source !== 'indexeddb-slot') {
+                setCareerOpening({ status: 'Securing your career', supportingMessage: 'Safely updating this career before it opens.' });
+                await yieldToMainThread();
                 await persistSlotSave(slot, prepared.player, {
                     rethrow: true,
                     reason: 'MIGRATION',
@@ -1397,6 +2385,7 @@ export const App: React.FC = () => {
         } catch (error) {
             recordNonFatal(error, 'selected_save_load_failed', { save_slot: slot });
             setCurrentSlot(null);
+            setCareerOpening(null);
             setToastMessage({
                 title: 'Save Could Not Open',
                 subtext: error instanceof Error
@@ -1404,11 +2393,11 @@ export const App: React.FC = () => {
                     : 'Your save was left untouched. Please try opening this slot again.',
             });
             return;
-        } finally {
-            setIsInitializing(false);
         }
     }
     if (existingSave) {
+        setCareerOpening({ status: 'Setting the scene', supportingMessage: 'Your career is ready. Opening the studio now.' });
+        await yieldToMainThread();
         recoverInterruptedWeekProcessingTrace(existingSave, { saveSlot: slot, screen: 'START_MENU' });
         setSaveSlots(prev => ({ ...prev, [slot]: existingSave }));
         // prepareLoadedPlayerSave already ran the complete save migration. Avoid
@@ -1417,12 +2406,50 @@ export const App: React.FC = () => {
         setPlayer(existingSave);
         setSkipStartMenuIntro(false);
         setGameStatus('PLAYING');
+        setCareerOpening(null);
     } else {
         setPlayer(migratePlayerSave(INITIAL_PLAYER));
         setSkipStartMenuIntro(false);
         setGameStatus('CREATION');
     }
   };
+
+  useEffect(() => {
+    if (!iosRecoveryReadComplete || !iosRecoveryReport || startupState.outcome !== 'READY'
+      || iosRecoveryAttemptedRef.current) return;
+    iosRecoveryAttemptedRef.current = true;
+    const slot = chooseIOSRendererRecoverySlot(iosRecoveryReport, {
+      1: Boolean(saveSlots[1] || saveSlotSummaries[1]),
+      2: Boolean(saveSlots[2] || saveSlotSummaries[2]),
+      3: Boolean(saveSlots[3] || saveSlotSummaries[3]),
+    });
+    if (slot === null) {
+      setIOSRecoveryRestoreComplete(true);
+      return;
+    }
+    void tryIOSRendererRecoveryOpen(slot, selected => handleSelectSlot(selected, { requireVerified: true }))
+      .then(result => {
+        if (result.ok === true) return;
+        recordNonFatal(result.error, 'ios_renderer_recovery_open_failed', { save_slot: slot });
+        setToastMessage({
+          title: 'Career Recovery Needs Attention',
+          subtext: 'Your saved career was not changed. Please open it from the start menu.',
+        });
+      })
+      .finally(() => setIOSRecoveryRestoreComplete(true));
+  }, [iosRecoveryReadComplete, iosRecoveryReport, startupState.outcome, saveSlots, saveSlotSummaries]);
+
+  useEffect(() => {
+    if (adaptivePerformancePlatform !== 'IOS' || !iosRecoveryReadComplete
+      || startupState.outcome !== 'READY' || isStartupLoadingVisible
+      || (iosRecoveryReport && !iosRecoveryRestoreComplete)) return;
+    const frame = window.requestAnimationFrame(() => {
+      void notifyIOSLongSessionCheckpoint({ checkpoint: 'startup_ready', occurredAtMs: Date.now() })
+        .catch(() => undefined);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [adaptivePerformancePlatform, iosRecoveryReadComplete, iosRecoveryReport,
+    iosRecoveryRestoreComplete, isStartupLoadingVisible, startupState.outcome]);
 
   const handleRecoverSave = async () => {
     if (!pendingSaveRecovery || isRecoveringSave) return;
@@ -1470,11 +2497,67 @@ export const App: React.FC = () => {
         localStorage.removeItem('actorEmpireSave');
         localStorage.removeItem('actorEmpireSave_meta');
     }
+    verifiedCheckpointSlotsRef.current.delete(slot);
     setSaveSlots(prev => ({ ...prev, [slot]: null }));
     setSaveSlotSummaries(prev => ({ ...prev, [slot]: null }));
   };
 
+  const beginSaveTransferExperience = (direction: 'EXPORT' | 'IMPORT') => {
+    const controller = new AbortController();
+    const presenter = createDelayedSaveTransferProgressPresenter({
+      onChange: setSaveTransferProgress,
+    });
+    saveTransferAbortRef.current = controller;
+    saveTransferProgressPresenterRef.current = presenter;
+    presenter.update({
+      direction,
+      stage: direction === 'EXPORT' ? 'PREPARING' : 'WAITING_FOR_FILE',
+      message: direction === 'EXPORT' ? 'Preparing save records...' : 'Choose the Actor Empire transfer file.',
+      cancelable: true,
+    });
+    return { controller, presenter };
+  };
+
+  const finishSaveTransferExperience = (
+    controller: AbortController,
+    presenter: SaveTransferProgressPresenter,
+  ) => {
+    presenter.finish();
+    if (saveTransferAbortRef.current === controller) saveTransferAbortRef.current = null;
+    if (saveTransferProgressPresenterRef.current === presenter) saveTransferProgressPresenterRef.current = null;
+  };
+
+  const handleCancelSaveTransfer = () => {
+    const controller = saveTransferAbortRef.current;
+    if (!controller || controller.signal.aborted) return;
+    controller.abort();
+    setSaveTransferProgress(progress => progress ? {
+      ...progress,
+      stage: 'CANCELLING',
+      message: 'Stopping at a safe boundary and removing temporary transfer data...',
+      cancelable: false,
+    } : progress);
+  };
+
   const handleExportGameData = async (options: { skipCurrentSnapshot?: boolean } = {}) => {
+    if (weekProcessingLockRef.current || isProcessing) {
+      setToastMessage({
+        title: 'Finish Processing First',
+        subtext: 'Save transfer will be available as soon as the current week finishes safely.',
+      });
+      return;
+    }
+    const transferLock = saveTransferOperationLockRef.current!;
+    const lease: SaveTransferOperationLease | null = transferLock.tryAcquire('EXPORT');
+    if (!lease) {
+      setToastMessage({
+        title: 'Transfer Already Running',
+        subtext: 'Please let the current save transfer finish before starting another.',
+      });
+      return;
+    }
+    setIsSaveTransferActive(true);
+    const experience = beginSaveTransferExperience('EXPORT');
     try {
       if (!options.skipCurrentSnapshot && gameStatus === 'PLAYING' && currentSlot) {
         const playerToSave = await persistSlotSave(currentSlot, player, { rethrow: true, reason: 'MANUAL' });
@@ -1483,19 +2566,29 @@ export const App: React.FC = () => {
         setSaveSlotSummaries(prev => ({ ...prev, [currentSlot]: createSaveSlotSummary(playerToSave) }));
       }
 
-      const result = await exportSignedSaveArchive();
+      const result = await exportSignedSaveArchive({
+        signal: experience.controller.signal,
+        onProgress: experience.presenter.update,
+        onDiagnostic: telemetry => trackGameEvent('save_transfer_safety', telemetry),
+      });
       setToastMessage({
         title: 'Save Export Ready',
         subtext: `${result.saveSlots} save slot${result.saveSlots === 1 ? '' : 's'} signed for transfer.`,
       });
       return result;
     } catch (error) {
-      recordNonFatal(error, 'save_transfer_export_failed', { save_slot: currentSlot });
+      if (!isSaveTransferCancelledError(error)) {
+        recordNonFatal(error, 'save_transfer_export_failed', { save_slot: currentSlot });
+      }
       setToastMessage({
-        title: 'Export Failed',
+        title: isSaveTransferCancelledError(error) ? 'Export Cancelled' : 'Export Failed',
         subtext: error instanceof Error ? error.message : 'Could not create the save transfer file.',
       });
       throw error;
+    } finally {
+      finishSaveTransferExperience(experience.controller, experience.presenter);
+      transferLock.release(lease);
+      setIsSaveTransferActive(false);
     }
   };
 
@@ -1503,12 +2596,30 @@ export const App: React.FC = () => {
     const confirmed = window.confirm('Importing a transfer file will replace the local Play Store saves on this device. Continue?');
     if (!confirmed) return;
 
+    if (weekProcessingLockRef.current || isProcessing) {
+      setToastMessage({
+        title: 'Finish Processing First',
+        subtext: 'Import will be available as soon as the current week finishes safely.',
+      });
+      return;
+    }
+    const transferLock = saveTransferOperationLockRef.current!;
+    const lease: SaveTransferOperationLease | null = transferLock.tryAcquire('IMPORT');
+    if (!lease) {
+      setToastMessage({
+        title: 'Transfer Already Running',
+        subtext: 'Please let the current save transfer finish before starting another.',
+      });
+      return;
+    }
+    setIsSaveTransferActive(true);
+    const experience = beginSaveTransferExperience('IMPORT');
+
     try {
       const result = await importSignedSaveArchiveFromFile({
-        onProgress: progress => setToastMessage({
-          title: 'Importing Save',
-          subtext: progress.message,
-        }),
+        signal: experience.controller.signal,
+        onProgress: experience.presenter.update,
+        onDiagnostic: telemetry => trackGameEvent('save_transfer_safety', telemetry),
       });
       setToastMessage({
         title: result.carePackageGranted ? 'Save Imported + Care Package' : 'Save Imported',
@@ -1519,12 +2630,18 @@ export const App: React.FC = () => {
       window.setTimeout(() => window.location.reload(), 1200);
       return result;
     } catch (error) {
-      recordNonFatal(error, 'save_transfer_import_failed', { save_slot: currentSlot });
+      if (!isSaveTransferCancelledError(error)) {
+        recordNonFatal(error, 'save_transfer_import_failed', { save_slot: currentSlot });
+      }
       setToastMessage({
-        title: 'Import Blocked',
+        title: isSaveTransferCancelledError(error) ? 'Import Cancelled' : 'Import Blocked',
         subtext: error instanceof Error ? error.message : 'That transfer file could not be imported.',
       });
       throw error;
+    } finally {
+      finishSaveTransferExperience(experience.controller, experience.presenter);
+      transferLock.release(lease);
+      setIsSaveTransferActive(false);
     }
   };
 
@@ -1581,7 +2698,11 @@ export const App: React.FC = () => {
               ...(safePlayer.settings && typeof safePlayer.settings === 'object' ? safePlayer.settings : {})
           };
           safePlayer.settings.language = isSupportedGameLanguage(safePlayer.settings.language) ? safePlayer.settings.language : 'en';
-          safePlayer.settings.smoothMode = safePlayer.settings.smoothMode === true;
+          safePlayer.settings.performance = normalizePerformanceSettings(
+              safePlayer.settings.performance,
+              safePlayer.settings.smoothMode,
+          );
+          safePlayer.settings.smoothMode = safePlayer.settings.performance.preference === 'PERFORMANCE';
 
           if (!safePlayer.writerStats) {
               safePlayer.writerStats = { creativity: 0, dialogue: 0, structure: 0, pacing: 0 };
@@ -1915,6 +3036,13 @@ export const App: React.FC = () => {
 
   const handleNextWeek = async () => {
     const now = Date.now();
+    if (saveTransferOperationLockRef.current?.isActive()) {
+      setToastMessage({
+        title: 'Save Transfer Running',
+        subtext: 'The next week will be available when the current transfer finishes safely.',
+      });
+      return;
+    }
     if (weekProcessingLockRef.current || isProcessing) {
       markWeekProcessingStage('input_rejected_busy', player, {
         status: 'running',
@@ -1992,6 +3120,9 @@ export const App: React.FC = () => {
             screen: activePageName,
             save_slot: currentSlot,
         });
+        // The full simulation is intentionally outside the startup package.
+        // It is loaded only when the player actually advances a week.
+        const { processGameWeek } = await import('./services/gameLoop');
         const { player: newPlayerState, triggerAd } = await processGameWeek(player, {
             onStage: (stage, context) => {
                 activeWeekStageRef.current = `loop_${stage}`;
@@ -2105,15 +3236,15 @@ export const App: React.FC = () => {
         });
 
         activeWeekStageRef.current = 'persist_prepare_start';
-        const persistedPlayerState = await persistCurrentSlotSnapshot(syncedPlayerState, {
+        const runtimePlayerState = await persistCurrentSlotSnapshot(syncedPlayerState, {
             runId: weekRunId,
             screen: activePageName,
             onStage: stage => { activeWeekStageRef.current = stage; },
         });
-        syncedPlayerState = persistedPlayerState;
+        syncedPlayerState = runtimePlayerState;
         activeWeekStageRef.current = 'commit_verified_week';
         suppressNextAutosaveRef.current = true;
-        commitProcessedWeekPlayer(persistedPlayerState);
+        commitProcessedWeekPlayer(runtimePlayerState);
         addBreadcrumb('process_week:persisted', {
             age: syncedPlayerState.age,
             week: syncedPlayerState.currentWeek,
@@ -2313,8 +3444,55 @@ export const App: React.FC = () => {
       setActiveSocialEvent(null);
   };
 
-  // --- REWARDED AD SYSTEM (FIXED FOR MULTI-STEP) ---
+  const showRewardedAdFailure = (
+      reason?: Parameters<typeof classifyRewardedAdFailure>[0],
+      wellnessStepOneSaved = false,
+  ) => {
+      const kind = classifyRewardedAdFailure(reason);
+      if (kind === 'BUSY') {
+          setToastMessage({
+              title: tr('app.ads.failure.busyTitle'),
+              subtext: tr('app.ads.failure.busySubtext'),
+          });
+          return;
+      }
+      if (kind === 'DISMISSED') {
+          setToastMessage({
+              title: tr('app.ads.failure.dismissedTitle'),
+              subtext: wellnessStepOneSaved
+                  ? tr('app.ads.wellness.stepOneSavedDismissed')
+                  : tr('app.ads.failure.dismissedSubtext'),
+          });
+          return;
+      }
+      if (kind === 'OFFLINE' || kind === 'NO_FILL') {
+          setToastMessage({
+              title: tr(kind === 'OFFLINE' ? 'app.ads.failure.offlineTitle' : 'app.ads.failure.noFillTitle'),
+              subtext: wellnessStepOneSaved
+                  ? tr('app.ads.wellness.stepOneSavedUnavailable')
+                  : tr(kind === 'OFFLINE' ? 'app.ads.failure.offlineSubtext' : 'app.ads.failure.noFillSubtext'),
+          });
+          return;
+      }
+      setToastMessage({
+          title: tr('app.ads.failure.unavailableTitle'),
+          subtext: wellnessStepOneSaved
+              ? tr('app.ads.wellness.stepOneSavedUnavailable')
+              : tr('app.ads.failure.unavailableSubtext'),
+      });
+  };
+
+  const receiptFromPersistenceError = (
+      error: unknown,
+  ): PendingRewardAdReceipt | null => (
+      error instanceof RewardedAdPersistenceError && error.receipt
+          ? error.receipt
+          : null
+  );
+
+  // --- REWARDED AD SYSTEM ---
   const handleTriggerRewardAd = async (type: AdType, data?: any) => {
+      if (type === 'INTERSTITIAL') return;
       if (type === 'REWARDED_BAILOUT' && (player.flags?.bailoutAdsUsedThisWeek || 0) >= 2) {
           setToastMessage({
               title: tr('app.rewards.bailoutLimitTitle'),
@@ -2322,162 +3500,362 @@ export const App: React.FC = () => {
           });
           return;
       }
-
-      const steps = (type === 'REWARDED_STATS') ? 2 : 1;
       if (!currentSlot) {
-          setToastMessage({
-              title: tr('app.rewards.cancelledTitle'),
-              subtext: tr('app.rewards.cancelledSubtext')
-          });
+          showRewardedAdFailure('UNAVAILABLE');
           return;
       }
-      let pendingReceipt: PendingRewardAdReceipt = beginPendingRewardAd({
-          playerId: String(player.id || player.name),
-          saveSlot: currentSlot,
-          type,
-          data,
-          stepsRequired: steps,
-      });
-      const noAdsOwner = hasNoAds(player);
-      trackGameEvent('reward_ad_requested', {
-          reward_type: type,
-          no_ads_owner: noAdsOwner,
-          steps,
-      });
-      setAdTotalSteps(steps);
-      setAdStep(1);
-      setIsShowingAd(true);
 
-      let successCount = 0;
+      if (rewardAdFlowInFlightRef.current) {
+          showRewardedAdFailure('BUSY');
+          return;
+      }
 
-      try {
-          for (let i = 1; i <= steps; i++) {
-              setAdStep(i);
-
-              // BUFFER: If this is the 2nd (or later) ad, wait 1.5s to let the ad engine reset
-              // This prevents "Ad Not Ready" errors or UI hangs
-              if (i > 1) {
-                  await new Promise(resolve => setTimeout(resolve, 1500));
-              }
-
-              const result = await showAd(type);
-              trackGameEvent('reward_ad_result', {
-                  reward_type: type,
-                  no_ads_owner: noAdsOwner,
-                  success: result.success,
-                  reason: result.reason || 'NONE',
-                  step: i,
+      if (type === 'REWARDED_STATS') {
+          const nowMs = Date.now();
+          const activeWellnessState = expireWellnessRewardAdState(wellnessRewardAd, nowMs);
+          if (activeWellnessState !== wellnessRewardAd) {
+              setWellnessRewardAd(activeWellnessState);
+              setWellnessAdNowMs(nowMs);
+              setToastMessage({
+                  title: tr('app.ads.wellness.expiredTitle'),
+                  subtext: tr('app.ads.wellness.expiredSubtext'),
               });
+              return;
+          }
 
-              if (result.success) {
-                  successCount++;
-                  pendingReceipt = recordPendingRewardAdStep(pendingReceipt, successCount);
-              } else {
-                  // If user cancels or ad fails, break loop
-                  break;
+          let pendingReceipt = readPendingRewardAd(nowMs);
+          const receiptMatchesSession = !!pendingReceipt
+              && pendingReceipt.id === activeWellnessState.sessionId
+              && pendingReceipt.playerId === String(player.id || player.name)
+              && pendingReceipt.saveSlot === currentSlot
+              && pendingReceipt.type === 'REWARDED_STATS'
+              && pendingReceipt.status === 'IN_PROGRESS';
+
+          if (activeWellnessState.completedSteps === 1 && !receiptMatchesSession) {
+              setWellnessRewardAd(createWellnessRewardAdState());
+              showRewardedAdFailure('UNAVAILABLE');
+              return;
+          }
+
+          if (activeWellnessState.completedSteps === 0) {
+              if (pendingReceipt?.status === 'GRANTED') {
+                  clearPendingRewardAd(pendingReceipt.id);
+                  pendingReceipt = null;
               }
-
-              // Tiny buffer after closing ad before updating UI or next step
-              await new Promise(resolve => setTimeout(resolve, 500));
-          }
-      } catch (error) {
-          console.error("Ad sequence error:", error);
-      } finally {
-          // CRITICAL FIX: This ensures the overlay ALWAYS closes, even if code crashes or hangs
-          setIsShowingAd(false);
-      }
-
-      if (successCount === steps) {
-          pendingReceipt = markPendingRewardAdReady(pendingReceipt);
-          handleAdComplete(type, data, pendingReceipt.id);
-      } else {
-          clearPendingRewardAd(pendingReceipt.id);
-          setToastMessage({
-              title: tr('app.rewards.cancelledTitle'),
-              subtext: tr('app.rewards.cancelledSubtext')
-          });
-      }
-  };
-
-  const handleAdComplete = (type: AdType, data?: any, receiptId?: string) => {
-      let toastTitle = tr('app.rewards.receivedTitle');
-      let toastSub = "";
-      if (receiptId) rewardAdGrantInFlightRef.current.add(receiptId);
-
-      handleGenericUpdate(prev => {
-          const p = JSON.parse(JSON.stringify(prev)) as Player;
-          if (!p.flags) p.flags = {};
-          const grantedRewardAdIds = Array.isArray(p.flags.grantedRewardAdIds)
-              ? p.flags.grantedRewardAdIds as string[]
-              : [];
-          if (receiptId && grantedRewardAdIds.includes(receiptId)) {
-              clearPendingRewardAd(receiptId);
-              rewardAdGrantInFlightRef.current.delete(receiptId);
-              return p;
-          }
-          if (receiptId) {
-              p.flags.grantedRewardAdIds = [...grantedRewardAdIds, receiptId].slice(-80);
-          }
-
-          if (type === 'REWARDED_CASH') {
-              p.money += 5000;
-              toastSub = tr('app.rewards.cashSubtext');
-          }
-          else if (type === 'REWARDED_BAILOUT') {
-              const bailoutAdsUsedThisWeek = p.flags?.bailoutAdsUsedThisWeek || 0;
-              const currentDebt = Math.abs(p.money < 0 ? p.money : 0);
-              const bailoutAmount = bailoutAdsUsedThisWeek === 0
-                  ? Math.floor(currentDebt * 0.20) + 5000
-                  : Math.floor(currentDebt * 0.10) + 2500;
-
-              p.money += bailoutAmount;
-              p.flags.bailoutAdsUsedThisWeek = bailoutAdsUsedThisWeek + 1;
-              toastSub = tr('app.rewards.bailoutSubtext', { amount: bailoutAmount.toLocaleString() });
-
-              // Close debt modal if we are back in green
-              if (p.money >= 0) {
-                  setShowDebtModal(false);
+              if (pendingReceipt?.status === 'IN_PROGRESS' && pendingReceipt.completedSteps === 0) {
+                  clearPendingRewardAd(pendingReceipt.id);
+                  pendingReceipt = null;
+              }
+              if (pendingReceipt) {
+                  setPendingRewardSaveRetry(pendingReceipt);
+                  setToastMessage({
+                      title: tr('app.ads.save.pendingTitle'),
+                      subtext: tr('app.ads.save.pendingSubtext'),
+                  });
+                  return;
+              }
+              try {
+                  pendingReceipt = beginPendingRewardAd({
+                      playerId: String(player.id || player.name),
+                      saveSlot: currentSlot,
+                      type,
+                      placement: 'STORE_REWARD',
+                      contextId: `${currentSlot}:${type}`,
+                      data,
+                      stepsRequired: 2,
+                      nowMs,
+                  });
+              } catch (error) {
+                  recordNonFatal(error, 'reward_ad_session_persist_failed', {
+                      reward_type: type,
+                      save_slot: currentSlot,
+                  });
+                  setToastMessage({
+                      title: tr('app.ads.save.unavailableTitle'),
+                      subtext: tr('app.ads.save.unavailableSubtext'),
+                  });
+                  return;
               }
           }
-          else if (type === 'REWARDED_ENERGY') {
-              restoreWeeklyEnergy(p, 25);
-              toastSub = tr('app.rewards.energySubtext', { amount: '25' });
+
+          if (!pendingReceipt) {
+              showRewardedAdFailure('UNAVAILABLE');
+              return;
           }
-          else if (type === 'REWARDED_STATS') {
-              p.stats.health = Math.max(90, p.stats.health);
-              p.stats.happiness = Math.max(90, p.stats.happiness);
-              p.stats.looks = Math.max(90, p.stats.looks);
-              p.stats.body = Math.max(90, p.stats.body);
-              toastSub = tr('app.rewards.wellnessSubtext');
+          if (activeWellnessState.status === 'RETRY_AD_2') {
+              try {
+                  pendingReceipt = pausePendingRewardAdContinuation(pendingReceipt, nowMs);
+              } catch (error) {
+                  const pausedReceipt = receiptFromPersistenceError(error);
+                  if (pausedReceipt) pendingReceipt = pausedReceipt;
+                  recordNonFatal(error, 'reward_ad_continuation_pause_failed', {
+                      reward_type: type,
+                      save_slot: currentSlot,
+                  });
+              }
           }
-          else if (type === 'REWARDED_SKILL' && data) {
-              const skillKey = data as keyof ActorSkills;
-              p.stats.skills[skillKey] = Math.min(100, p.stats.skills[skillKey] + 10);
-              toastSub = tr('app.rewards.skillSubtext', { amount: '10', skill: String(skillKey) });
-          }
-          else if (type === 'REWARDED_GENRE' && data) {
-              rewardGenreExperience(p, data, 10);
-              toastSub = tr('app.rewards.genreSubtext', { amount: '10', genre: String(data) });
+          const attempt = beginWellnessAdAttempt({
+              ...activeWellnessState,
+              sessionId: pendingReceipt.id,
+          }, nowMs);
+          if (attempt.step === null || !attempt.state.attemptId) {
+              showRewardedAdFailure('BUSY');
+              return;
           }
 
-          setToastMessage({ title: toastTitle, subtext: toastSub });
-          if (receiptId && currentSlot) {
-              void persistSlotSave(currentSlot, p, { rethrow: true })
-                  .then(savedPlayer => {
-                      setSaveSlots(previous => ({ ...previous, [currentSlot]: savedPlayer }));
-                      clearPendingRewardAd(receiptId);
-                      rewardAdGrantInFlightRef.current.delete(receiptId);
-                  })
-                  .catch(error => {
-                      rewardAdGrantInFlightRef.current.delete(receiptId);
-                      recordNonFatal(error, 'reward_ad_grant_persist_failed', {
+          const step = attempt.step;
+          const attemptId = attempt.state.attemptId;
+          rewardAdFlowInFlightRef.current = true;
+          setWellnessRewardAd(attempt.state);
+          setWellnessAdNowMs(Date.now());
+          setAdTotalSteps(2);
+          setAdStep(step);
+          setIsShowingAd(true);
+          try {
+              const result = await requestRewardedAd({
+                  type,
+                  placement: 'STORE_REWARD',
+                  contextId: `${currentSlot}:${type}:${attempt.state.sessionId}:${step}`,
+              });
+              const settled = settleWellnessAdAttempt(attempt.state, attemptId, result, Date.now());
+              setWellnessRewardAd(settled);
+              setWellnessAdNowMs(Date.now());
+              if (!result.success) {
+                  if (step === 2 && settled.retryExpiresAt !== undefined) {
+                      try {
+                          pendingReceipt = setPendingRewardAdContinuationExpiry(
+                              pendingReceipt,
+                              settled.retryExpiresAt,
+                              Date.now(),
+                          );
+                      } catch (error) {
+                          const advancedReceipt = receiptFromPersistenceError(error);
+                          if (advancedReceipt) pendingReceipt = advancedReceipt;
+                          recordNonFatal(error, 'reward_ad_continuation_persist_failed', {
+                              reward_type: type,
+                              save_slot: currentSlot,
+                          });
+                      }
+                  } else if (step === 1) {
+                      clearPendingRewardAd(pendingReceipt.id);
+                  }
+                  showRewardedAdFailure(result.reason, step === 2);
+                  return;
+              }
+
+              try {
+                  pendingReceipt = recordPendingRewardAdStep(pendingReceipt, {
+                      stepId: result.requestId,
+                      stepNumber: step,
+                      nowMs: Date.now(),
+                  });
+              } catch (error) {
+                  const advancedReceipt = receiptFromPersistenceError(error);
+                  if (!advancedReceipt) throw error;
+                  pendingReceipt = advancedReceipt;
+                  recordNonFatal(error, 'reward_ad_step_persist_failed', {
+                      reward_type: type,
+                      save_slot: currentSlot,
+                      step,
+                  });
+              }
+
+              if (step === 1) {
+                  setToastMessage({
+                      title: tr('app.ads.wellness.stepOneCompleteTitle'),
+                      subtext: tr('app.ads.wellness.stepOneCompleteSubtext'),
+                  });
+                  return;
+              }
+
+              try {
+                  pendingReceipt = markPendingRewardAdReady(pendingReceipt);
+              } catch (error) {
+                  const advancedReceipt = receiptFromPersistenceError(error);
+                  if (!advancedReceipt) throw error;
+                  pendingReceipt = advancedReceipt;
+              }
+              setIsShowingAd(false);
+              await handleAdComplete(pendingReceipt);
+          } catch (error) {
+              console.error('Wellness rewarded-ad attempt failed:', error);
+              const failedState = settleWellnessAdAttempt(
+                  attempt.state,
+                  attemptId,
+                  { success: false, reason: 'ERROR', stage: 'COORDINATOR' },
+                  Date.now(),
+              );
+              setWellnessRewardAd(failedState);
+              setWellnessAdNowMs(Date.now());
+              if (step === 1) clearPendingRewardAd(pendingReceipt.id);
+              if (step === 2 && failedState.retryExpiresAt !== undefined) {
+                  try {
+                      setPendingRewardAdContinuationExpiry(pendingReceipt, failedState.retryExpiresAt);
+                  } catch (persistenceError) {
+                      recordNonFatal(persistenceError, 'reward_ad_continuation_persist_failed', {
                           reward_type: type,
                           save_slot: currentSlot,
                       });
-                  });
+                  }
+              }
+              showRewardedAdFailure('ERROR', step === 2);
+          } finally {
+              rewardAdFlowInFlightRef.current = false;
+              setIsShowingAd(false);
           }
-          return p;
-      });
+          return;
+      }
+
+      rewardAdFlowInFlightRef.current = true;
+      let pendingReceipt: PendingRewardAdReceipt;
+      try {
+          pendingReceipt = beginPendingRewardAd({
+              playerId: String(player.id || player.name),
+              saveSlot: currentSlot,
+              type,
+              placement: type === 'REWARDED_BAILOUT' ? 'DEBT_BAILOUT' : 'STORE_REWARD',
+              contextId: `${currentSlot}:${type}`,
+              data,
+              stepsRequired: 1,
+          });
+      } catch (error) {
+          rewardAdFlowInFlightRef.current = false;
+          recordNonFatal(error, 'reward_ad_session_persist_failed', {
+              reward_type: type,
+              save_slot: currentSlot,
+          });
+          setToastMessage({
+              title: tr('app.ads.save.unavailableTitle'),
+              subtext: tr('app.ads.save.unavailableSubtext'),
+          });
+          return;
+      }
+      setAdTotalSteps(1);
+      setAdStep(1);
+      setIsShowingAd(true);
+
+      try {
+          const result = await requestRewardedAd({
+              type,
+              placement: type === 'REWARDED_BAILOUT' ? 'DEBT_BAILOUT' : 'STORE_REWARD',
+              contextId: `${currentSlot}:${type}:1`,
+          });
+          if (!result.success) {
+              clearPendingRewardAd(pendingReceipt.id);
+              showRewardedAdFailure(result.reason);
+              return;
+          }
+
+          try {
+              pendingReceipt = recordPendingRewardAdStep(pendingReceipt, {
+                  stepId: result.requestId,
+                  stepNumber: 1,
+              });
+              pendingReceipt = markPendingRewardAdReady(pendingReceipt);
+          } catch (error) {
+              const advancedReceipt = receiptFromPersistenceError(error);
+              if (!advancedReceipt) throw error;
+              pendingReceipt = advancedReceipt.completedSteps === advancedReceipt.stepsRequired
+                  ? { ...advancedReceipt, status: 'READY_TO_GRANT', remainingStep: null }
+                  : advancedReceipt;
+              recordNonFatal(error, 'reward_ad_step_persist_failed', {
+                  reward_type: type,
+                  save_slot: currentSlot,
+                  step: 1,
+              });
+          }
+          setIsShowingAd(false);
+          await handleAdComplete(pendingReceipt);
+      } catch (error) {
+          console.error('Rewarded-ad attempt failed:', error);
+          clearPendingRewardAd(pendingReceipt.id);
+          showRewardedAdFailure('ERROR');
+      } finally {
+          rewardAdFlowInFlightRef.current = false;
+          setIsShowingAd(false);
+      }
+  };
+
+  const getRewardedAdOutcomeSubtext = (outcome: RewardedAdGrantOutcome): string => {
+      if (outcome.kind === 'CASH') return tr('app.rewards.cashSubtext');
+      if (outcome.kind === 'BAILOUT') return tr('app.rewards.bailoutSubtext', { amount: outcome.amount.toLocaleString() });
+      if (outcome.kind === 'ENERGY') return tr('app.rewards.energySubtext', { amount: String(outcome.amount) });
+      if (outcome.kind === 'WELLNESS') return tr('app.rewards.wellnessSubtext');
+      if (outcome.kind === 'SKILL') return tr('app.rewards.skillSubtext', { amount: String(outcome.amount), skill: outcome.skill });
+      return tr('app.rewards.genreSubtext', { amount: String(outcome.amount), genre: outcome.genre });
+  };
+
+  const handleAdComplete = async (receipt: PendingRewardAdReceipt) => {
+      if (rewardAdGrantInFlightRef.current.has(receipt.id)) return;
+      if (receipt.playerId !== String(playerRef.current.id || playerRef.current.name)) return;
+
+      rewardAdGrantInFlightRef.current.add(receipt.id);
+      setPendingRewardSaveRetry(receipt);
+      setIsRetryingRewardSave(true);
+      try {
+          const result = await runRewardedAdGrantTransaction({
+              receipt,
+              player: playerRef.current,
+              persist: candidate => persistSlotSave(receipt.saveSlot, candidate, {
+                  rethrow: true,
+                  reason: 'AUTOSAVE',
+              }),
+          });
+
+          if (result.status === 'SAVE_FAILED') {
+              setPendingRewardSaveRetry(result.receipt);
+              setToastMessage({
+                  title: tr('app.ads.save.failedTitle'),
+                  subtext: tr('app.ads.save.failedSubtext'),
+              });
+              recordNonFatal(result.error, 'reward_ad_grant_persist_failed', {
+                  reward_type: receipt.type,
+                  save_slot: receipt.saveSlot,
+                  grant_attempts: result.receipt.grantAttempts,
+              });
+              return;
+          }
+          if (result.status === 'NOT_READY') return;
+
+          playerRef.current = result.player;
+          setPlayer(result.player);
+          setSaveSlots(previous => ({ ...previous, [receipt.saveSlot]: result.player }));
+          if (receipt.type === 'REWARDED_BAILOUT' && result.player.money >= 0) {
+              setShowDebtModal(false);
+          }
+          if (receipt.type === 'REWARDED_STATS') {
+              setWellnessRewardAd(createWellnessRewardAdState());
+              setWellnessAdNowMs(Date.now());
+          }
+          trackGameEvent('reward_ad_persisted', {
+              reward_type: receipt.type,
+              reward_session_id: receipt.id,
+              status: result.status,
+              grant_attempts: result.receipt.grantAttempts,
+          });
+          clearPendingRewardAd(receipt.id);
+          setPendingRewardSaveRetry(null);
+          setToastMessage({
+              title: result.status === 'ALREADY_GRANTED'
+                  ? tr('app.ads.save.recoveredTitle')
+                  : tr('app.rewards.receivedTitle'),
+              subtext: result.outcome
+                  ? getRewardedAdOutcomeSubtext(result.outcome)
+                  : tr('app.ads.save.recoveredSubtext'),
+          });
+      } finally {
+          rewardAdGrantInFlightRef.current.delete(receipt.id);
+          setIsRetryingRewardSave(false);
+      }
+  };
+
+  const handleRetryPendingRewardSave = async () => {
+      const receipt = readPendingRewardAd() || pendingRewardSaveRetry;
+      if (!receipt) {
+          setPendingRewardSaveRetry(null);
+          return;
+      }
+      await handleAdComplete(receipt);
   };
 
   useEffect(() => {
@@ -2486,15 +3864,44 @@ export const App: React.FC = () => {
       if (!pendingReceipt) return;
       if (rewardAdGrantInFlightRef.current.has(pendingReceipt.id)) return;
       if (pendingReceipt.playerId !== String(player.id || player.name) || pendingReceipt.saveSlot !== currentSlot) {
+          return;
+      }
+      if (pendingReceipt.status === 'GRANTED') {
           clearPendingRewardAd(pendingReceipt.id);
           return;
       }
-      if (pendingReceipt.status === 'READY_TO_GRANT' && pendingReceipt.completedSteps === pendingReceipt.stepsRequired) {
+      if (
+          pendingReceipt.placement === 'LIFE_EVENT_OPTION'
+          || pendingReceipt.placement === 'PRODUCTION_CRISIS_OPTION'
+      ) {
+          const persistedGrantIds = player.flags?.grantedRewardAdIds;
+          if (Array.isArray(persistedGrantIds) && persistedGrantIds.includes(pendingReceipt.id)) {
+              clearPendingRewardAd(pendingReceipt.id);
+          }
+          // Storyline receipts are consumed only by their matching modal and must
+          // never be interpreted as the cash bailout reward that shares their ad type.
+          return;
+      }
+      if (
+          (pendingReceipt.status === 'READY_TO_GRANT' || pendingReceipt.status === 'VERIFIED_SAVE')
+          && pendingReceipt.completedSteps === pendingReceipt.stepsRequired
+      ) {
           trackGameEvent('reward_ad_recovered', {
               reward_type: pendingReceipt.type,
               completed_steps: pendingReceipt.completedSteps,
           });
-          handleAdComplete(pendingReceipt.type, pendingReceipt.data, pendingReceipt.id);
+          void handleAdComplete(pendingReceipt);
+          return;
+      }
+      if (pendingReceipt.type === 'REWARDED_STATS' && pendingReceipt.completedSteps === 1) {
+          setWellnessRewardAd(restoreWellnessRewardAdState(pendingReceipt, Date.now()));
+          setWellnessAdNowMs(Date.now());
+          trackGameEvent('reward_ad_resumed', {
+              reward_type: pendingReceipt.type,
+              completed_steps: pendingReceipt.completedSteps,
+              remaining_step: pendingReceipt.remainingStep,
+              reward_session_id: pendingReceipt.id,
+          });
           return;
       }
 
@@ -2722,6 +4129,7 @@ export const App: React.FC = () => {
   };
 
   const handleStartGameFromIntro = (data: NewCareerData, slot: number) => {
+      startupBackgroundScheduler.cancelPending();
       const name = data.stageName.trim() || 'Rising Star';
       const introGender = data.gender === 'Female' ? 'FEMALE' : data.gender === 'Non-Binary' ? 'NON_BINARY' : 'MALE';
       const rawHandle = data.handle.trim() || name.toLowerCase().replace(/\s+/g, '');
@@ -2970,6 +4378,115 @@ export const App: React.FC = () => {
       }
   };
 
+  const resolveProductionCrisisTransactionally = async (
+      event: ScheduledEvent,
+      choiceIndex: number,
+      rewardReceiptId?: string,
+  ): Promise<void> => {
+      if (!currentSlot) throw new Error('A save slot is required to resolve a production event.');
+      const sourcePlayer = playerRef.current;
+      try {
+          const { updatedPlayer, log } = applyCrisisImpact(sourcePlayer, event, choiceIndex);
+          const sourceQueue = Array.isArray(sourcePlayer.pendingEvents) ? sourcePlayer.pendingEvents : [];
+          const updatedQueue = Array.isArray(updatedPlayer.pendingEvents) ? updatedPlayer.pendingEvents : sourceQueue;
+          const queueToFilter = sourceQueue.length > 0 ? sourceQueue : updatedQueue;
+          const nextLogs = [{
+              week: updatedPlayer.currentWeek ?? sourcePlayer.currentWeek,
+              year: updatedPlayer.age ?? sourcePlayer.age,
+              message: log || tr('app.eventRecovery.resolvedLog'),
+              type: 'neutral' as const,
+          }, ...(updatedPlayer.logs || sourcePlayer.logs || [])].slice(0, 50);
+          const unresolvedCandidate: Player = {
+              ...updatedPlayer,
+              pendingEvents: queueToFilter.filter(queuedEvent => queuedEvent?.id !== event.id),
+              logs: nextLogs,
+          };
+          const candidate = rewardReceiptId
+              ? attachRewardedAdGrantProof(unresolvedCandidate, rewardReceiptId)
+              : unresolvedCandidate;
+          const persisted = await persistSlotSave(currentSlot, candidate, {
+              rethrow: true,
+              reason: 'AUTOSAVE',
+          });
+          const committedPlayer = prepareExternalPlayerUpdateForUi(persisted);
+          playerRef.current = committedPlayer;
+          suppressNextAutosaveRef.current = true;
+          setSaveSlots(previous => ({ ...previous, [currentSlot]: committedPlayer }));
+          setPlayer(committedPlayer);
+          trackGameEvent('production_crisis_resolution_committed', {
+              event_id: event.id,
+              choice_index: choiceIndex,
+              reward_session_id: rewardReceiptId || 'NONE',
+          });
+          if (rewardReceiptId) {
+              trackGameEvent('reward_ad_persisted', {
+                  placement: 'PRODUCTION_CRISIS_OPTION',
+                  reward_session_id: rewardReceiptId,
+              });
+          }
+      } catch (error) {
+          recordNonFatal(error, 'production_crisis_resolution_save_failed', {
+              event_id: event.id,
+              choice_index: choiceIndex,
+              reward_session_id: rewardReceiptId || 'NONE',
+          });
+          throw error;
+      }
+  };
+
+  const resolveLifeEventTransactionally = async (
+      event: ScheduledEvent,
+      choice: LifeEventChoiceCommit,
+  ): Promise<void> => {
+      if (!currentSlot) throw new Error('A save slot is required to resolve a life event.');
+      const sourcePlayer = playerRef.current;
+      try {
+          const result = await commitLifeEventResolutionTransaction({
+              sourcePlayer,
+              proposedPlayer: choice.rewardReceiptId
+                  ? attachRewardedAdGrantProof(choice.updatedPlayer, choice.rewardReceiptId)
+                  : choice.updatedPlayer,
+              event,
+              optionId: choice.optionId,
+              impactId: choice.impactId,
+              resolutionSeed: choice.resolutionSeed,
+              resolutionKind: choice.resolutionKind,
+              log: choice.log,
+              persist: candidate => persistSlotSave(currentSlot, candidate, {
+                  rethrow: true,
+                  reason: 'LIFE_EVENT_RESOLUTION',
+              }),
+          });
+          const committedPlayer = prepareExternalPlayerUpdateForUi(result.player);
+          playerRef.current = committedPlayer;
+          suppressNextAutosaveRef.current = true;
+          setSaveSlots(prev => ({ ...prev, [currentSlot]: committedPlayer }));
+          setPlayer(committedPlayer);
+          trackGameEvent('life_event_resolution_committed', {
+              event_id: event.id,
+              option_id: choice.optionId,
+              impact_id: choice.impactId || 'NONE',
+              resolution_kind: choice.resolutionKind,
+              duplicate_prevented: result.status === 'ALREADY_COMMITTED',
+          });
+          if (choice.rewardReceiptId) {
+              trackGameEvent('reward_ad_persisted', {
+                  placement: 'LIFE_EVENT_OPTION',
+                  reward_session_id: choice.rewardReceiptId,
+                  duplicate_prevented: result.status === 'ALREADY_COMMITTED',
+              });
+          }
+      } catch (error) {
+          recordNonFatal(error, 'life_event_resolution_save_failed', {
+              event_id: event.id,
+              option_id: choice.optionId,
+              impact_id: choice.impactId || 'NONE',
+              resolution_kind: choice.resolutionKind,
+          });
+          throw error;
+      }
+  };
+
   const openStockControlAcquisitionDesk = (event: ScheduledEvent) => {
       const relatedStudioId = event?.data?.relatedStudioId;
       const companyName = event?.data?.companyName || tr('app.stockControl.defaultStudio');
@@ -3023,6 +4540,7 @@ export const App: React.FC = () => {
   const handleRestartCareer = async () => {
     if (currentSlot) {
         await deleteVerifiedGameData(`actorEmpireSave_${currentSlot}`);
+        verifiedCheckpointSlotsRef.current.delete(currentSlot);
         setSaveSlots(prev => ({ ...prev, [currentSlot]: null }));
         setPlayer(INITIAL_PLAYER);
         setGameStatus('CREATION');
@@ -3048,8 +4566,14 @@ export const App: React.FC = () => {
       });
   };
 
+  const handleNavigateToPage = (page: Page) => {
+      setActivePage(page);
+  };
+
   if (isStartupLoadingVisible) {
-      const loadingLineKey = STARTUP_LOADING_LINE_KEYS[startupLoadingLineIndex % STARTUP_LOADING_LINE_KEYS.length];
+      const startupPresentation = getStartupPresentation(startupState, {
+          takingLonger: startupTakingLonger,
+      });
       const showStudioBumper = !startupStudioBumperElapsed;
       return (
           <div className="relative h-screen overflow-hidden bg-[#050505] text-white">
@@ -3058,39 +4582,97 @@ export const App: React.FC = () => {
                   <ZedburyStudiosIntro state={startupStudioBumperExiting ? 'on exit' : 'on'} />
               ) : (
                   <ActorEmpireLoadingScreen
-                      progress={startupLoadingProgress}
-                      status={tr(loadingLineKey)}
+                      progress={startupState.outcome === 'READY' ? 100 : startupState.progress}
+                      status={startupPresentation.status}
+                      supportingMessage={startupPresentation.supportingMessage}
+                      errorTitle={startupPresentation.failure?.title}
+                      error={startupPresentation.failure?.message}
+                      primaryActionLabel={startupPresentation.failure?.primaryActionLabel}
+                      secondaryActionLabel={startupPresentation.failure?.secondaryActionLabel}
+                      onPrimaryAction={startupState.failure ? () => {
+                          if (startupState.failure?.taskId === 'HOME_SCREEN') {
+                              // Browsers cache failed module imports for this document. A fresh
+                              // document is required to retry screen code without touching saves.
+                              window.location.reload();
+                          } else {
+                              void runStartupInitialization(startupState.failure.taskId);
+                          }
+                      } : undefined}
+                      onSecondaryAction={startupPresentation.failure ? () => window.location.reload() : undefined}
+                      isPrimaryActionBusy={isStartupRetrying}
                   />
               )}
           </div>
       );
   }
 
+  if (careerOpening) {
+      return (
+          <div className="h-screen overflow-hidden bg-[#040404] text-white">
+              <ActorEmpireIntroStyle />
+              <ActorEmpireCareerOpeningScreen {...careerOpening} />
+          </div>
+      );
+  }
+
   if (gameStatus === 'DEATH_SCREEN') {
       return (
-          <DeathScreen
-              player={player}
-              onContinueAsChild={handleContinueAsChild}
-              onStartNewGame={handleRestartCareer}
-          />
+              <DeathScreen
+                  player={player}
+                  onContinueAsChild={handleContinueAsChild}
+                  onStartNewGame={handleRestartCareer}
+              />
       );
   }
 
   if (deathScreenPreviewPlayer) {
       return (
-          <DeathScreen
-              player={deathScreenPreviewPlayer}
-              onContinueAsChild={() => setDeathScreenPreviewPlayer(null)}
-              onStartNewGame={() => setDeathScreenPreviewPlayer(null)}
-              isPreview
-              onClosePreview={() => setDeathScreenPreviewPlayer(null)}
-          />
+              <DeathScreen
+                  player={deathScreenPreviewPlayer}
+                  onContinueAsChild={() => setDeathScreenPreviewPlayer(null)}
+                  onStartNewGame={() => setDeathScreenPreviewPlayer(null)}
+                  isPreview
+                  onClosePreview={() => setDeathScreenPreviewPlayer(null)}
+              />
       );
   }
 
+  const performanceCapabilities = resolvePerformanceCapabilities({
+      profile: adaptivePerformance.appliedLevel,
+      preserveImageQuality: adaptivePerformancePlatform === 'IOS'
+        && playerPerformanceSettings.preference === 'AUTOMATIC',
+  });
+  const shouldShowPerformanceOptimizedNotice = gameStatus === 'PLAYING'
+      && playerPerformanceSettings.preference === 'AUTOMATIC'
+      && adaptivePerformance.appliedLevel !== 'FULL'
+      && playerPerformanceSettings.noticeVersion < PERFORMANCE_NOTICE_VERSION
+      && isAdaptiveSafeBoundary;
+
+  const updatePerformancePreferenceFromNotice = (preference: PerformancePreference) => {
+      setPlayer(previous => ({
+          ...previous,
+          settings: {
+              ...previous.settings,
+              performance: {
+                  ...normalizePerformanceSettings(
+                      previous.settings?.performance,
+                      previous.settings?.smoothMode,
+                  ),
+                  preference,
+                  noticeVersion: PERFORMANCE_NOTICE_VERSION,
+              },
+              smoothMode: preference === 'PERFORMANCE',
+          },
+      }));
+      trackGameEvent('performance_notice_action', {
+          preference: preference.toLowerCase(),
+          applied_level: adaptivePerformance.appliedLevel.toLowerCase(),
+      });
+  };
+
   return (
     <GameErrorBoundary onRecover={handleRecoverToMenu}>
-    <div className="h-screen bg-black text-white font-sans selection:bg-amber-500 selection:text-black">
+    <div ref={shellRef} className="ae-game-shell bg-black text-white font-sans selection:bg-amber-500 selection:text-black" data-shell-nav-visible={gameStatus === 'PLAYING' && isBottomNavVisible ? 'true' : 'false'}>
       <div className="fixed inset-0 z-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/30 via-zinc-950 to-zinc-950 pointer-events-none" />
 
       {pendingSaveRecovery && (
@@ -3139,88 +4721,28 @@ export const App: React.FC = () => {
           </div>
       )}
 
-      {/* DEBT / GAME OVER MODAL */}
-      {showDebtModal && (
-          <div className="fixed inset-0 z-[250] bg-red-950/80 backdrop-blur-md flex items-center justify-center p-6 animate-in zoom-in-95 duration-300">
-              <div className="bg-zinc-900 border-2 border-red-500/50 rounded-3xl w-full max-w-sm p-6 shadow-2xl text-center relative overflow-hidden">
-
-                  {/* Visuals */}
-                  <div className="absolute top-0 left-0 w-full h-1 bg-red-500 animate-pulse"></div>
-                  <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-500/30">
-                      {(player.flags.weeksInDebt || 0) >= 8 ? <Skull size={40} className="text-red-500" /> : <AlertTriangle size={40} className="text-red-500" />}
-                  </div>
-
-                  {/* Status Check */}
-                  {(player.flags.weeksInDebt || 0) >= 8 ? (
-                      // GAME OVER STATE
-                      <>
-	                          <h2 className="text-3xl font-black text-white mb-2 uppercase tracking-tight">{tr('app.debt.ruinTitle')}</h2>
-	                          <p className="text-red-400 text-sm mb-6 leading-relaxed font-bold">
-	                              {tr('app.debt.ruinSubtext')}
-	                          </p>
-	                          <div className="bg-black/60 rounded-xl p-4 mb-6 border border-red-900">
-	                              <div className="text-xs text-zinc-500 uppercase font-bold mb-1">{tr('app.debt.finalDebt')}</div>
-	                              <div className="text-2xl font-mono font-bold text-red-500">-${Math.abs(player.money).toLocaleString()}</div>
-	                          </div>
-                          <button
-                              onClick={handleRestartCareer}
-                              className="w-full py-4 bg-white text-black font-bold rounded-xl hover:bg-zinc-200 transition-colors shadow-lg"
-                          >
-	                              {tr('app.debt.restartCareer')}
-                          </button>
-                      </>
-                  ) : (
-                      // WARNING STATE
-                      <>
-	                          <h2 className="text-2xl font-black text-white mb-2 uppercase tracking-tight">{tr('app.debt.warningTitle')}</h2>
-	                          <p className="text-zinc-400 text-sm mb-6 leading-relaxed">
-	                              {tr('app.debt.warningPrefix')} <span className="text-white font-bold">{tr('app.debt.weeksToRecover', { weeks: 8 - (player.flags.weeksInDebt || 0) })}</span> {tr('app.debt.warningSuffix')}
-	                          </p>
-
-                          <div className="bg-black/40 rounded-xl p-4 mb-6 border border-zinc-800">
-                              <div className="flex justify-between items-center text-xs text-zinc-500 uppercase font-bold mb-2">
-	                                  <span>{tr('app.debt.currentDebt')}</span>
-	                                  <span>{tr('app.debt.runway')}</span>
-                              </div>
-                              <div className="flex justify-between items-center">
-                                  <span className="text-xl font-mono font-bold text-red-500">-${Math.abs(player.money).toLocaleString()}</span>
-	                                  <span className="text-white font-bold">{tr('app.debt.weeks', { weeks: 8 - (player.flags.weeksInDebt || 0) })}</span>
-                              </div>
-                          </div>
-
-                          <div className="space-y-3">
-                              {/* Bailout Option - Calculates ~20% of current debt + 5k */}
-                              <button
-                                  onClick={() => handleTriggerRewardAd('REWARDED_BAILOUT')}
-                                  disabled={(player.flags.bailoutAdsUsedThisWeek || 0) >= 2}
-                                  className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-800 disabled:text-zinc-500 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2 shadow-lg"
-                              >
-	                                  <PlayCircle size={18}/> {tr('app.debt.getBailout', { amount: (((player.flags.bailoutAdsUsedThisWeek || 0) === 0 ? Math.floor(Math.abs(player.money) * 0.20) + 5000 : Math.floor(Math.abs(player.money) * 0.10) + 2500)).toLocaleString() })}
-	                              </button>
-	                              <div className="text-[11px] text-zinc-500">
-	                                  {tr('app.debt.bailoutAdsUsed', { count: player.flags.bailoutAdsUsedThisWeek || 0 })}
-	                              </div>
-
-                              {/* Continue Option */}
-                              <button
-                                  onClick={() => setShowDebtModal(false)}
-                                  className="w-full py-3 bg-zinc-800 text-zinc-300 font-bold rounded-xl hover:bg-zinc-700 transition-colors flex items-center justify-center gap-2"
-                              >
-	                                  <Briefcase size={16}/> {tr('app.debt.manageFinances')}
-                              </button>
-                          </div>
-                      </>
-                  )}
-              </div>
-          </div>
+      {pendingRewardSaveRetry && !isRetryingRewardSave && !isShowingAd && (
+          <RewardSaveRetryDialog
+              title={tr('app.ads.save.failedTitle')}
+              explanation={tr('app.ads.save.retryExplanation')}
+              retryLabel={tr('app.ads.save.retryButton')}
+              noMoreAdsLabel={tr('app.ads.save.noMoreAds')}
+              onRetry={() => void handleRetryPendingRewardSave()}
+          />
       )}
 
-	      {toastMessage && (
-	          <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[60] bg-zinc-900 border border-zinc-700 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4 animate-in slide-in-from-top fade-in duration-300 min-w-[300px]">
-	              <div className="bg-emerald-500 rounded-full p-1"><CheckCircle size={20} className="text-black" strokeWidth={3}/></div>
-	              <div><div className="font-bold text-sm">{toastMessage.title}</div><div className="text-xs text-zinc-400">{toastMessage.subtext}</div></div>
-	          </div>
-	      )}
+      {/* DEBT / GAME OVER MODAL */}
+      {showDebtModal && (
+          <DebtRecoveryModal
+              player={player}
+              tr={tr}
+              onRestartCareer={handleRestartCareer}
+              onBailout={() => handleTriggerRewardAd('REWARDED_BAILOUT')}
+              onManageFinances={() => setShowDebtModal(false)}
+          />
+      )}
+
+	      {toastMessage && <GameToast title={toastMessage.title} subtext={toastMessage.subtext} />}
 
 	      {pendingMedicalPrompt && gameStatus === 'PLAYING' && (
 	          <div className="fixed inset-0 z-[155] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm animate-in fade-in duration-200">
@@ -3292,17 +4814,20 @@ export const App: React.FC = () => {
 	          </div>
 	      )}
 
-	      {player.pendingEvent && (player.pendingEvent.type === 'AWARD_CEREMONY' || player.pendingEvent.type === 'PREMIERE') && (<RedCarpetEvent player={player} event={player.pendingEvent} onComplete={handleEventComplete} />)}
+	      {player.pendingEvent && (player.pendingEvent.type === 'AWARD_CEREMONY' || player.pendingEvent.type === 'PREMIERE') && (
+              <RedCarpetEvent player={player} event={player.pendingEvent} onComplete={handleEventComplete} />
+      )}
       {player.pendingEvents && player.pendingEvents.length > 0 && (player.pendingEvents[0].type === 'PRODUCTION_CRISIS' || player.pendingEvents[0].type === 'DIRECTOR_DECISION') && (
           <ProductionCrisisModal
               key={player.pendingEvents[0].id}
               player={player}
               event={player.pendingEvents[0]}
-              onChoice={(idx) => {
-                  const currentEvent = player.pendingEvents![0];
-                  const { updatedPlayer, log } = applyCrisisImpact(player, currentEvent, idx);
-                  resolveQueuedEventSafely(player, updatedPlayer, currentEvent.id, log);
-              }}
+              saveSlot={currentSlot!}
+              onChoice={(idx, rewardReceiptId) => resolveProductionCrisisTransactionally(
+                  player.pendingEvents![0],
+                  idx,
+                  rewardReceiptId,
+              )}
           />
       )}
 
@@ -3325,13 +4850,13 @@ export const App: React.FC = () => {
               key={player.pendingEvents[0].id}
               player={player}
               event={player.pendingEvents[0]}
-              onChoice={(updatedPlayer, log) => {
-                  const resolvedEventId = player.pendingEvents?.[0]?.id;
-                  resolveQueuedEventSafely(player, updatedPlayer, resolvedEventId, log);
-              }}
+              saveSlot={currentSlot!}
+              onChoice={choice => resolveLifeEventTransactionally(player.pendingEvents![0], choice)}
           />
       )}
-      {activePressEvent && (<PressConferenceEvent player={player} projectName={activePressEvent.project.name} questions={activePressEvent.questions} onComplete={handlePressConferenceComplete} onClose={() => setActivePressEvent(null)} />)}
+      {activePressEvent && (
+              <PressConferenceEvent player={player} projectName={activePressEvent.project.name} questions={activePressEvent.questions} onComplete={handlePressConferenceComplete} onClose={() => setActivePressEvent(null)} />
+      )}
 
       {showProtectionPrompt && (
           <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-200">
@@ -3451,7 +4976,7 @@ export const App: React.FC = () => {
 
       {showWhatsNewModal && gameStatus === 'PLAYING' && (
           <div className="fixed inset-0 z-[140] bg-black/85 backdrop-blur-md overflow-y-auto custom-scrollbar px-3 py-5 sm:p-6 animate-in fade-in duration-200">
-              <div className="bg-zinc-900 border border-zinc-700 rounded-3xl w-full max-w-xl mx-auto max-h-[calc(100dvh-2.5rem)] sm:max-h-[calc(100dvh-3rem)] shadow-2xl flex flex-col relative overflow-hidden">
+              <div className="ae-shell-dialog bg-zinc-900 border border-zinc-700 rounded-3xl w-full max-w-xl mx-auto shadow-2xl flex flex-col relative overflow-hidden">
                   <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500 via-orange-500 to-pink-500"></div>
                   <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar p-5 pb-4 sm:p-7">
                       <div className="mb-5">
@@ -3551,7 +5076,29 @@ export const App: React.FC = () => {
           </div>
       )}
 
-      <div className={`${isFullBleedMobileSurface ? 'w-screen max-w-none' : isUiOverhaulSurface ? 'w-full max-w-md mx-auto' : 'max-w-md mx-auto border-x border-white/5 pt-safe-top shadow-2xl'} h-screen relative z-10 ${isUiOverhaulSurface ? 'bg-[#070605]' : 'bg-zinc-950/80'} flex flex-col ${player?.settings?.smoothMode ? 'smooth-mode' : ''}`}>
+      {saveTransferProgress && (
+          <SaveTransferProgressOverlay
+              progress={saveTransferProgress}
+              onCancel={handleCancelSaveTransfer}
+          />
+      )}
+
+      <PerformanceCapabilitiesRoot
+        capabilities={performanceCapabilities}
+        className={`${isFullBleedMobileSurface ? 'w-screen max-w-none' : isUiOverhaulSurface ? 'w-full max-w-md mx-auto' : 'max-w-md mx-auto border-x border-white/5 pt-safe-top shadow-2xl'} h-full min-h-0 relative z-10 ${isUiOverhaulSurface ? 'bg-[#070605]' : 'bg-zinc-950/80'} flex flex-col`}
+      >
+        {shouldShowPerformanceOptimizedNotice && (
+            <PerformanceOptimizedNotice
+                title={tr('settings.performanceNotice.title')}
+                message={tr('settings.performanceNotice.message')}
+                automaticLabel={tr('settings.performanceNotice.keepAutomatic')}
+                cinematicLabel={tr('settings.performanceNotice.useCinematic')}
+                performanceLabel={tr('settings.performanceNotice.usePerformance')}
+                onKeepAutomatic={() => updatePerformancePreferenceFromNotice('AUTOMATIC')}
+                onUseCinematic={() => updatePerformancePreferenceFromNotice('CINEMATIC')}
+                onUsePerformance={() => updatePerformancePreferenceFromNotice('PERFORMANCE')}
+            />
+        )}
         {gameStatus === 'START_MENU' && (
             <StartMenu
                 saveSlots={saveSlotSummaries}
@@ -3562,11 +5109,13 @@ export const App: React.FC = () => {
                 skipIntro={skipStartMenuIntro}
             />
         )}
-        {gameStatus === 'CREATION' && <CreationMenu onStartGame={handleStartGame} />}
+        {gameStatus === 'CREATION' && (
+                <CreationMenu onStartGame={handleStartGame} />
+        )}
         {gameStatus === 'PLAYING' && (
             <>
-                <div className={`${isFullBleedMobileSurface ? 'flex-1 overflow-hidden p-0' : isUiOverhaulSurface ? 'min-h-0 flex-1 overflow-hidden pb-nav-safe' : `flex-1 px-5 pt-5 pb-nav-safe overflow-y-auto custom-scrollbar ${player.money < 0 ? 'pt-8' : ''}`}`}>
-                    {activePage === Page.HOME && (<HomePage player={player} onNextWeek={handleNextWeek} isProcessing={isProcessing} onUpdatePlayer={handleUpdatePlayer} setPage={setActivePage} onOpenProductionHouseCheat={() => { setLifestyleInitialView('PRODUCTION_GAME'); setActivePage(Page.LIFESTYLE); }} onOpenPlatformCommissionCheat={() => { setInitialMobileAppMode('MESSAGES'); setActivePage(Page.MOBILE); }} onOpenStudioAcquisitionCheat={(studioId) => { setInitialForbesStudioId(studioId); setActivePage(Page.MOBILE); }} onOpenBoxOfficeCheat={() => { setInitialMobileAppMode('BOXOFFICE'); setActivePage(Page.MOBILE); }} onQueueBabyNamingCheat={handleQueueBabyNamingCheat} onOpenDeathSummaryPreview={handleOpenDeathSummaryPreview} onShowWhatsNewCheat={handleShowWhatsNewCheat} />)}
+                <div className={`ae-game-content ${isFullBleedMobileSurface ? 'ae-game-content--immersive flex-1 overflow-hidden p-0' : isUiOverhaulSurface ? 'min-h-0 flex-1 overflow-hidden' : `flex-1 px-5 pt-5 overflow-y-auto custom-scrollbar ${player.money < 0 ? 'pt-8' : ''}`}`}>
+                    {activePage === Page.HOME && (<HomePage player={player} onNextWeek={handleNextWeek} isProcessing={isProcessing} onUpdatePlayer={handleUpdatePlayer} setPage={handleNavigateToPage} onOpenProductionHouseCheat={() => { setLifestyleInitialView('PRODUCTION_GAME'); handleNavigateToPage(Page.LIFESTYLE); }} onOpenPlatformCommissionCheat={() => { setInitialMobileAppMode('MESSAGES'); handleNavigateToPage(Page.MOBILE); }} onOpenStudioAcquisitionCheat={(studioId) => { setInitialForbesStudioId(studioId); handleNavigateToPage(Page.MOBILE); }} onOpenBoxOfficeCheat={() => { setInitialMobileAppMode('BOXOFFICE'); handleNavigateToPage(Page.MOBILE); }} onQueueBabyNamingCheat={handleQueueBabyNamingCheat} onOpenDeathSummaryPreview={handleOpenDeathSummaryPreview} onShowWhatsNewCheat={handleShowWhatsNewCheat} />)}
                     {activePage === Page.CAREER && (<CareerPage player={player} onQuitJob={handleQuitJob} onRehearse={handleRehearse} onOwnedProductionFocus={handleOwnedProductionFocus} />)}
                     {activePage === Page.IMPROVE && (<ImprovePage player={player} onTrain={()=>{}} onEnroll={(c)=>handleGenericUpdate(p=>{ const previousCommitments = p.commitments; const next: Player = { ...p, energy: { ...p.energy }, flags: { ...p.flags }, money: p.money- (c.upfrontCost||0), commitments: [...p.commitments, {...c, id: `c_${Date.now()}`, weeksCompleted:0}] }; syncWeeklyEnergyForCommitments(next, previousCommitments); return next; })} onCancel={(id)=>handleGenericUpdate(p=>{ const previousCommitments = p.commitments; const next: Player = { ...p, energy: { ...p.energy }, flags: { ...p.flags }, commitments: p.commitments.filter(c=>c.id!==id)}; syncWeeklyEnergyForCommitments(next, previousCommitments); return next; })} onPerformAction={handleImproveAction} />)}
                     {activePage === Page.SOCIAL && (<SocialPage player={player} onInteract={handleSocialInteract} onContinueAsChild={handleContinueAsChild} />)}
@@ -4067,6 +5616,8 @@ export const App: React.FC = () => {
                             player={player}
                             onBack={() => setActivePage(Page.HOME)}
                             onWatchAd={handleTriggerRewardAd}
+                            wellnessRewardAd={wellnessRewardAd}
+                            wellnessAdNowMs={wellnessAdNowMs}
                             onPremiumPurchase={handlePremiumPurchase}
                             onRestorePurchases={handleRestorePurchases}
                         />
@@ -4076,14 +5627,14 @@ export const App: React.FC = () => {
                     <BottomNav
                         player={player}
                         activePage={activePage}
-                        setPage={setActivePage}
+                        setPage={handleNavigateToPage}
                         unreadMessages={player.inbox?.filter(message => !message.isRead).length || 0}
                     />
                 )}
                 <NewPlayerTutorialOverlay
                     player={player}
                     activePage={activePage}
-                    setPage={setActivePage}
+                    setPage={handleNavigateToPage}
                     onOpenMobileAppMode={(mode) => {
                         if (mode === 'MESSAGES') {
                             setInitialMobileAppMode('MESSAGES');
@@ -4094,7 +5645,7 @@ export const App: React.FC = () => {
                 />
             </>
         )}
-      </div>
+      </PerformanceCapabilitiesRoot>
     </div>
     </GameErrorBoundary>
   );

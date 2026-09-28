@@ -110,7 +110,7 @@ export const FacilitiesView: React.FC<FacilitiesViewProps> = ({ player, studio, 
             <div className="shrink-0 z-50 bg-zinc-950 border-b border-zinc-800 px-4 py-4">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <button onClick={onBack} className="w-10 h-10 bg-zinc-900 rounded-full flex items-center justify-center hover:bg-zinc-800 transition-colors">
+                        <button onClick={onBack} className="w-11 h-11 shrink-0 bg-zinc-900 rounded-full flex items-center justify-center hover:bg-zinc-800 transition-colors" aria-label="Back to studio dashboard">
                             <ArrowLeft size={20} />
                         </button>
                         <div className="min-w-0">
@@ -155,13 +155,13 @@ export const FacilitiesView: React.FC<FacilitiesViewProps> = ({ player, studio, 
                 <div className="flex gap-2 mb-6 p-1 bg-zinc-900 rounded-lg">
                     <button 
                         onClick={() => setActiveTab('DEPARTMENTS')}
-                        className={`flex-1 py-2 text-sm font-bold rounded-md transition-colors ${activeTab === 'DEPARTMENTS' ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                        className={`flex-1 min-h-11 py-2 text-sm font-bold rounded-md transition-colors ${activeTab === 'DEPARTMENTS' ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
                     >
                         Departments
                     </button>
                     <button 
                         onClick={() => setActiveTab('EQUIPMENT')}
-                        className={`flex-1 py-2 text-sm font-bold rounded-md transition-colors ${activeTab === 'EQUIPMENT' ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                        className={`flex-1 min-h-11 py-2 text-sm font-bold rounded-md transition-colors ${activeTab === 'EQUIPMENT' ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
                     >
                         Equipment
                     </button>
@@ -223,7 +223,7 @@ export const FacilitiesView: React.FC<FacilitiesViewProps> = ({ player, studio, 
                                 <button 
                                     onClick={() => handleUpgrade(item.id, activeTab === 'DEPARTMENTS')}
                                     disabled={isMax || !canAfford}
-                                    className={`px-4 py-2 shrink-0 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-all ${
+                                    className={`min-h-11 px-4 py-2 shrink-0 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-all ${
                                         isMax ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed' 
                                         : canAfford ? 'bg-emerald-600 hover:bg-emerald-500 text-white' 
                                         : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'

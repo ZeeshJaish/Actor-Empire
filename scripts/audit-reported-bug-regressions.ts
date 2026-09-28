@@ -87,9 +87,13 @@ let rewardReceipt = beginPendingRewardAd({
     playerId: 'qa_player',
     saveSlot: 1,
     type: 'REWARDED_ENERGY',
+    placement: 'STORE_REWARD',
     stepsRequired: 1,
 });
-rewardReceipt = recordPendingRewardAdStep(rewardReceipt, 1);
+rewardReceipt = recordPendingRewardAdStep(rewardReceipt, {
+    stepId: 'reported-bug-regression-ad-1',
+    stepNumber: 1,
+});
 rewardReceipt = markPendingRewardAdReady(rewardReceipt);
 assert(readPendingRewardAd()?.status === 'READY_TO_GRANT', 'Completed ad receipt should survive interruption until its grant is persisted.');
 clearPendingRewardAd(rewardReceipt.id);

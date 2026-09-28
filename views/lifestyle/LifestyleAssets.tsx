@@ -782,18 +782,18 @@ export const LifestyleAssets: React.FC<LifestyleAssetsProps> = ({
     if (mode === 'HUB') {
         return (
             <div className="space-y-4 pb-24 animate-in slide-in-from-right duration-300">
-                <div className="flex items-center justify-between gap-4">
-                    <div className="flex min-w-0 items-center gap-4">
-                        <button onClick={onBack} className="rounded-2xl border border-zinc-800 bg-zinc-950 p-3 text-white"><ArrowLeft size={20}/></button>
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div className="flex min-w-0 items-center gap-4 max-[359px]:w-full">
+                        <button onClick={onBack} className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-zinc-800 bg-zinc-950 text-white" aria-label="Back to Lifestyle"><ArrowLeft size={20}/></button>
                         <div className="min-w-0">
                             <div className="text-[10px] font-black uppercase tracking-[0.24em] text-emerald-300">{tr('lifestyle.ownershipDesk')}</div>
-                            <h2 className="truncate text-3xl font-black text-white">{tr('lifestyle.myAssets')}</h2>
+                            <h2 className="text-3xl font-black leading-tight text-white">{tr('lifestyle.myAssets')}</h2>
                         </div>
                     </div>
                     <button
                         onClick={openPortfolioShare}
                         disabled={ownedItems.length === 0}
-                        className="flex shrink-0 items-center gap-2 rounded-2xl border border-emerald-300/20 bg-emerald-300/10 px-4 py-3 text-xs font-black uppercase tracking-[0.14em] text-emerald-200 disabled:opacity-40"
+                        className="flex min-h-11 shrink-0 items-center gap-2 rounded-2xl border border-emerald-300/20 bg-emerald-300/10 px-4 py-3 text-xs font-black uppercase tracking-[0.14em] text-emerald-200 disabled:opacity-40 max-[359px]:ml-auto"
                     >
                         <Share2 size={15} /> Share
                     </button>
@@ -1090,16 +1090,16 @@ export const LifestyleAssets: React.FC<LifestyleAssetsProps> = ({
 
     return (
         <div className="space-y-4 pb-24 animate-in slide-in-from-right duration-300">
-            <div className="flex items-center justify-between gap-4">
-                <div className="flex min-w-0 items-center gap-4">
-                    <button onClick={backFromCurrent} className="rounded-2xl border border-zinc-800 bg-zinc-950 p-3 text-white"><ArrowLeft size={20}/></button>
+            <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex min-w-0 items-center gap-4 max-[359px]:w-full">
+                    <button onClick={backFromCurrent} className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-zinc-800 bg-zinc-950 text-white" aria-label="Back within Assets"><ArrowLeft size={20}/></button>
                     <div className="min-w-0">
                         <div className="text-[10px] font-black uppercase tracking-[0.24em] text-zinc-500">{mode === 'MARKET' ? tr('lifestyle.market') : tr('lifestyle.ownershipDesk')}</div>
-                        <h2 className="truncate text-2xl font-black text-white">{mode === 'MARKET' ? tr('lifestyle.shop') : trFallback(`lifestyle.category.${category}`, category)}</h2>
+                        <h2 className="text-2xl font-black leading-tight text-white">{mode === 'MARKET' ? tr('lifestyle.shop') : trFallback(`lifestyle.category.${category}`, category)}</h2>
                     </div>
                 </div>
                 {mode === 'DETAILS' && (
-                    <button onClick={() => setMode('MARKET')} className="flex shrink-0 items-center gap-2 rounded-2xl bg-white px-4 py-3 text-xs font-black text-black">
+                    <button onClick={() => setMode('MARKET')} className="flex min-h-11 shrink-0 items-center gap-2 rounded-2xl bg-white px-4 py-3 text-xs font-black text-black max-[359px]:ml-auto">
                         <ShoppingBag size={14}/> {tr('lifestyle.shop')}
                     </button>
                 )}

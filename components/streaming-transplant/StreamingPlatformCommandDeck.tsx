@@ -57,6 +57,7 @@ export interface ServiceTitle {
   completion: number;        // 0-100
   /** licensed titles only — weeks until the window closes */
   expiresIn?: number;
+  perpetualLicense?: boolean;
   hue: number;
 }
 
@@ -388,7 +389,7 @@ export const PlatformHQ: React.FC<{
                   {/* the slot is always rendered so every card's footer aligns */}
                   <div className={cx(css.expiry, (t.expiresIn === undefined ? ' owned' : t.expiresIn <= 4 ? css.soon : ''))}>
                     {t.expiresIn === undefined
-                      ? 'OWNED IN PERPETUITY'
+                      ? t.perpetualLicense ? 'PERPETUAL LICENCE' : 'OWNED IN PERPETUITY'
                       : `EXPIRES IN ${t.expiresIn} WEEK${t.expiresIn === 1 ? '' : 'S'}`}
                   </div>
                 </div>

@@ -15,31 +15,36 @@
    The page opens empty. Nothing is drafted for you.
    ========================================================================== */
 
-import React, { useEffect, useMemo, useRef, useState, type Key } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, type Key } from 'react';
 import type { CloudProviderId, Facility, ServerTier } from '../../finance/build';
 import {
   CLOUD_PROVIDERS, CLOUD_PROVIDER_IDS, CLOUD_WEEKLY_PER_RACK, OPEN_TIERS, SERVER_TIERS, cloudProviderServes,
-  cloudWeeklyCost, computeRacks, facilityRacks, listingFor, rackBuildCost, tierCapacity, tierReachKm, tiersOf,
+  cloudWeeklyCost, computeRacks, facilityRacks, listingFor, rackBuildCost, tierCapacity, tiersOf,
 } from '../../finance/build';
 import {
   canAddServer, cloudCeilingOf, coverWithCloud, emptySetup, facilitiesIn, openingRegions, placeRegion, regionReport,
-  regionsOf, serverCeilingOf, whatIfsFor, type RegionReport, type RegionSetup, type WhatIf,
+  regionsOf, regionalCloudMaximum, serverCeilingOf, whatIfsFor, type RegionReport, type RegionSetup, type WhatIf,
 } from '../../finance/placer';
 import { compactCount, money, pct } from '../../finance/format';
-import { fibreMultiplier } from '../../../../services/streamingFibreLadder';
 import type { StageProps } from './BuildWizard';
 import { NetworkMapBox } from './NetworkMapBox';
 import { CloudMark, ServerMark } from './BuildMachineMarks';
+import { createCloudDragScheduler } from './cloudDrag';
 import { useCountUp } from './motion';
 
 const share = (part: number, whole: number): number => (whole > 0 ? Math.min(1, part / whole) : 0);
 
-/** A reach, short enough for a card: "1,000 km", "300 km". */
-const compactKm = (km: number): string => (km >= 1000 ? `${(km / 1000).toFixed(1)}k km` : `${km} km`);
+const SERVER_COVERAGE: Record<ServerTier, string> = {
+  SCOUT: 'Local', WORKHORSE: 'Regional', TITAN: 'Wide-area',
+};
+const CLOUD_POSITION: Record<CloudProviderId, string> = {
+  ATLAS: 'GLOBAL', NORTHWIND: 'VALUE', MERIDIAN: 'EDGE',
+};
 
 export function RegionBoard({ data, draft, patch, totals, services, onStartOver }: StageProps) {
   const boardRef = useRef<HTMLDivElement>(null);
   const [tucked, setTucked] = useState(false);
+  const [cloudDragging, setCloudDragging] = useState(false);
   useEffect(() => {
     const scroll = boardRef.current?.closest('.sf-scroll');
     if (!scroll) return undefined;
@@ -60,6 +65,13 @@ export function RegionBoard({ data, draft, patch, totals, services, onStartOver 
   const [openId, setOpenId] = useState<string | null>(() => (
     regions.find(region => facilitiesIn(data, draft, region.id).length > 0)?.id ?? regions[0]?.id ?? null
   ));
+  const hadOpeningRegions = useRef(regions.length > 0);
+  useEffect(() => {
+    if (!hadOpeningRegions.current && regions.length > 0) {
+      setOpenId(regions.find(region => facilitiesIn(data, draft, region.id).length > 0)?.id ?? regions[0].id);
+    }
+    hadOpeningRegions.current = regions.length > 0;
+  }, [data, draft, regions]);
   const [note, setNote] = useState<{ regionId: string; text: string } | null>(null);
   /* Tapping a continent you are not opening in used to do nothing at all: the
      map reported the tap, the board found no row for it and quietly fell back
@@ -70,7 +82,7 @@ export function RegionBoard({ data, draft, patch, totals, services, onStartOver 
      phone nothing appeared to happen and the player went looking for the row
      by hand (#116). The row comes to you now. */
   const rowRefs = useRef(new Map<string, HTMLLIElement>());
-  const selectRegion = (id: string) => {
+  const selectRegion = useCallback((id: string) => {
     if (!openIds.has(id)) {
       setScouted(regionsOf(data).find(region => region.id === id)?.name ?? null);
       return;
@@ -80,12 +92,15 @@ export function RegionBoard({ data, draft, patch, totals, services, onStartOver 
     window.requestAnimationFrame(() => {
       rowRefs.current.get(id)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     });
-  };
+  }, [data, openIds]);
+  const showWorld = useCallback(() => { setScouted(null); setOpenId(null); }, []);
+  const showRegion = useCallback(() => undefined, []);
   const reports = useMemo(
     () => regions.map(region => regionReport(data, draft, services, region)),
     [data, draft, regions, services],
   );
   const open = reports.find(report => report.region.id === openId);
+  const shownWeekly = useCountUp(totals.weeklyCost, { duration: 260 });
 
   /* One write path. A setup goes to the placer; what comes back is the draft
      with that region redrawn, and one line if something could not be placed. */
@@ -100,7 +115,7 @@ export function RegionBoard({ data, draft, patch, totals, services, onStartOver 
   const nextUnset = (afterId: string) => regions.find(region => region.id !== afterId && facilitiesIn(data, draft, region.id).length === 0);
 
   return (
-    <div ref={boardRef} className="bw-net bw-rg">
+    <div ref={boardRef} className={cloudDragging ? 'bw-net bw-rg is-cloud-dragging' : 'bw-net bw-rg'}>
       <NetworkMapBox
         data={data}
         draft={draft}
@@ -109,9 +124,13 @@ export function RegionBoard({ data, draft, patch, totals, services, onStartOver 
         tucked={tucked}
         regionId={open?.region.id}
         onSelectRegion={selectRegion}
-        onShowWorld={() => { setScouted(null); setOpenId(null); }}
-        onShowRegion={() => undefined}
+        onShowWorld={showWorld}
+        onShowRegion={showRegion}
       />
+      <p className="bw-rg-footprint-note">
+        Green is network reach, even in unopened countries. Only entered markets count toward viewers and revenue.
+        A service gap can remain where signal quality or capacity is short.
+      </p>
 
       {scouted && (
         <p className="bw-rg-scouted" role="status">
@@ -144,6 +163,7 @@ export function RegionBoard({ data, draft, patch, totals, services, onStartOver 
             rowRef={element => { if (element) rowRefs.current.set(report.region.id, element); else rowRefs.current.delete(report.region.id); }}
             onToggle={() => setOpenId(report.region.id === openId ? null : report.region.id)}
             onWrite={setup => write(report.region.id, setup)}
+            onCloudGesture={setCloudDragging}
             nextName={nextUnset(report.region.id)?.name}
             onDone={() => setOpenId(nextUnset(report.region.id)?.id ?? null)}
           />
@@ -155,7 +175,7 @@ export function RegionBoard({ data, draft, patch, totals, services, onStartOver 
       {draft.facilities.length > 0 && (
         <p className="bw-rg-estate">
           <b>Every week, once it runs</b>
-          <em>{money(totals.weeklyCost)} · {totals.energy} MWh · {totals.water} m³ · {totals.weeks} weeks to build</em>
+          <em>{money(shownWeekly)} · {totals.energy} MWh · {totals.water} m³ · {totals.weeks} weeks to build</em>
         </p>
       )}
       {onStartOver && draft.facilities.length > 0 && (
@@ -167,7 +187,7 @@ export function RegionBoard({ data, draft, patch, totals, services, onStartOver 
 
 /* --- one region ----------------------------------------------------------------- */
 
-function RegionRow({ data, draft, report, open, note, onToggle, onWrite, nextName, onDone, rowRef }: {
+function RegionRow({ data, draft, report, open, note, onToggle, onWrite, onCloudGesture, nextName, onDone, rowRef }: {
   /* No `@types/react` in this project, so a value-based element rejects `key`.
      Declaring it is the house workaround. */
   key?: Key;
@@ -178,6 +198,7 @@ function RegionRow({ data, draft, report, open, note, onToggle, onWrite, nextNam
   note?: string;
   onToggle: () => void;
   onWrite: (setup: RegionSetup) => void;
+  onCloudGesture: (dragging: boolean) => void;
   rowRef?: (element: HTMLLIElement | null) => void;
   /** The next region nothing is set in, if any — where Done goes. */
   nextName?: string;
@@ -198,11 +219,46 @@ function RegionRow({ data, draft, report, open, note, onToggle, onWrite, nextNam
   const providerId: CloudProviderId = setup.cloud.compute > 0 ? setup.cloud.provider : (picked ?? setup.cloud.provider);
   const provider = CLOUD_PROVIDERS[providerId];
   const cloudCeiling = cloudCeilingOf(data, region, providerId);
-  const sliderMax = cloudCeiling > 0 ? cloudCeiling + Math.ceil(cloudCeiling * 0.5) : 0;
+  const fullRegionCompute = useMemo(() => regionalCloudMaximum(data, region, providerId, draft), [data, region, providerId, draft]);
+  // The one slider ends at physical regional coverage. Keep an older saved
+  // purchase inside the range even if its compute exceeds today's target.
+  const sliderMax = fullRegionCompute > 0
+    ? Math.max(fullRegionCompute, setup.cloud.compute)
+    : 0;
   const ownServed = Math.max(0, served - cloudServed);
   const set = (next: Partial<RegionSetup>) => onWrite({ ...setup, ...next });
+  const [cloudDraft, setCloudDraft] = useState(setup.cloud.compute);
+  const draggingCloud = useRef(false);
+  const applyCloudRef = useRef<(compute: number) => void>(() => undefined);
+  applyCloudRef.current = compute => set({ cloud: { provider: providerId, compute } });
+  const cloudScheduler = useRef<ReturnType<typeof createCloudDragScheduler> | null>(null);
+  if (!cloudScheduler.current) cloudScheduler.current = createCloudDragScheduler(compute => applyCloudRef.current(compute));
+  useEffect(() => {
+    if (!draggingCloud.current) setCloudDraft(setup.cloud.compute);
+  }, [setup.cloud.compute]);
+  useEffect(() => () => cloudScheduler.current?.cancel(), []);
+  const changeCloud = (compute: number) => {
+    if (!Number.isFinite(compute)) return;
+    draggingCloud.current = true;
+    onCloudGesture(true);
+    setCloudDraft(compute);
+    cloudScheduler.current?.change(compute);
+  };
+  const finishCloud = (compute: number) => {
+    if (!Number.isFinite(compute)) return;
+    setCloudDraft(compute);
+    cloudScheduler.current?.finish(compute);
+    draggingCloud.current = false;
+    onCloudGesture(false);
+  };
+  const shownCloudCompute = useCountUp(cloudDraft, { duration: 190 });
+  const shownCloudCities = useCountUp(cloudRooms.length, { duration: 230 });
+  const shownCloudWeekly = useCountUp(cloudWeekly, { duration: 260 });
   const setTier = (tier: ServerTier, value: number) => set({ servers: { ...setup.servers, [tier]: Math.max(0, value) } });
   const pickProvider = (id: CloudProviderId) => {
+    cloudScheduler.current?.cancel();
+    draggingCloud.current = false;
+    onCloudGesture(false);
     setPicked(id);
     if (setup.cloud.compute > 0) set({ cloud: { provider: id, compute: setup.cloud.compute } });
   };
@@ -223,7 +279,6 @@ function RegionRow({ data, draft, report, open, note, onToggle, onWrite, nextNam
   /* The line under the three cards describes the one you are leaning on, so
      the character of what you are buying is always on the page (#119). */
   const leaning = OPEN_TIERS.reduce((best, tier) => (setup.servers[tier] > setup.servers[best] ? tier : best), 'WORKHORSE' as ServerTier);
-  const fibre = fibreMultiplier(data.fibre);
   /* Clearing a region is two taps, three seconds apart at most, so a thumb
      on the wrong button costs nothing. Built rooms stay: the placer never
      moves what is already standing. */
@@ -272,8 +327,8 @@ function RegionRow({ data, draft, report, open, note, onToggle, onWrite, nextNam
   );
   /* The head's figures roll to their new value rather than jump (#107), and
      the word stamps when it changes — Thin to Fair is a moment. */
-  const weeklyShown = useCountUp(weekly);
-  const onceShown = useCountUp(once);
+  const weeklyShown = useCountUp(weekly, { duration: 260 });
+  const onceShown = useCountUp(once, { duration: 260 });
   const lastWord = useRef(word);
   const [stamp, setStamp] = useState(false);
   useEffect(() => {
@@ -357,7 +412,8 @@ function RegionRow({ data, draft, report, open, note, onToggle, onWrite, nextNam
                   <li key={tier} className={count > 0 ? `bw-net-duty is-on is-${tier.toLowerCase()}` : `bw-net-duty is-${tier.toLowerCase()}`}>
                     <ServerMark tier={tier} />
                     <b>{spec.name}</b>
-                    <s className="bw-rg-tier-reach">{compactKm(tierReachKm(tier, 1, fibre))}</s>
+                    <s className="bw-rg-tier-reach">{compactCount(tierCapacity(tier, 1))}<small>viewers per rack</small></s>
+                    <span className="bw-rg-tier-coverage">{SERVER_COVERAGE[tier]} coverage</span>
                     <span className="bw-net-duty-set">
                       <button type="button" disabled={count === 0} onClick={() => setTier(tier, count - 1)} aria-label={`One fewer ${spec.name} in ${region.name}`}>−</button>
                       <b key={count} aria-live="polite">{count}</b>
@@ -393,40 +449,55 @@ function RegionRow({ data, draft, report, open, note, onToggle, onWrite, nextNam
                   <button
                     key={id}
                     type="button"
-                    className={id === providerId ? 'bw-rg-prov-btn is-on' : 'bw-rg-prov-btn'}
+                    className={id === providerId ? `bw-rg-prov-btn is-on is-${id.toLowerCase()}` : `bw-rg-prov-btn is-${id.toLowerCase()}`}
+                    data-cloud-provider-card={id}
                     disabled={!here}
                     aria-pressed={id === providerId}
                     onClick={() => pickProvider(id)}
                   >
-                    <span className="bw-rg-prov-identity"><CloudMark provider={id} /><b>{candidate.name}</b></span>
-                    <span className="bw-rg-prov-spec">
-                      <em>{here ? `${candidate.reach.toFixed(1)}× reach` : 'Not sold here'}</em>
-                      <em>{here ? `${cloudCeilingOf(data, region, id)} plan ceiling` : 'No plan'}</em>
-                      <em>{here ? `${money(Math.round(CLOUD_WEEKLY_PER_RACK * candidate.rate))}/wk each` : 'Unavailable'}</em>
-                    </span>
-                    <small>{candidate.line}</small>
+                    <span className="bw-rg-prov-crest"><CloudMark provider={id} /><em>{CLOUD_POSITION[id]}</em></span>
+                    <b>{candidate.name}</b>
+                    <strong>{here ? `${candidate.reach.toFixed(1)}×` : '—'}<small>reach</small></strong>
+                    <span className="bw-rg-prov-ceiling">{here ? `${cloudCeilingOf(data, region, id)} plan ceiling` : 'No plan'}</span>
+                    <span className="bw-rg-prov-rate">{here ? `${money(Math.round(CLOUD_WEEKLY_PER_RACK * candidate.rate))}/wk` : 'Not sold here'}</span>
                   </button>
                 );
               })}
             </div>
+            <p className="bw-rg-prov-detail" data-cloud-provider-detail={providerId}>
+              <b>{provider.name}</b>
+              <span>{cloudCeiling} compute at the standard rate · {provider.line}</span>
+            </p>
             <input
               type="range"
               className="sf-slider bw-cloud-slider"
               min={0}
               max={sliderMax}
               step={1}
-              value={Math.min(sliderMax, setup.cloud.compute)}
+              value={Math.min(sliderMax, cloudDraft)}
               disabled={sliderMax === 0}
               aria-label={`Cloud compute in ${region.name}`}
-              aria-valuetext={setup.cloud.compute > 0 ? `${setup.cloud.compute} compute, ${money(cloudWeekly)} a week` : 'Nothing bought yet'}
-              style={{ ['--sf-fill' as string]: `${sliderMax > 0 ? Math.round((Math.min(sliderMax, setup.cloud.compute) / sliderMax) * 100) : 0}%` }}
-              onChange={event => set({ cloud: { provider: providerId, compute: Number(event.currentTarget.value) } })}
+              aria-valuetext={cloudDraft > 0 ? `${cloudDraft} compute selected${draggingCloud.current ? ', map preview updating' : `, ${money(cloudWeekly)} a week`}` : 'Nothing bought yet'}
+              style={{ ['--sf-fill' as string]: `${sliderMax > 0 ? Math.round((Math.min(sliderMax, cloudDraft) / sliderMax) * 100) : 0}%` }}
+              onChange={event => changeCloud(Number(event.currentTarget.value))}
+              onPointerUp={event => finishCloud(Number(event.currentTarget.value))}
+              onPointerCancel={event => finishCloud(Number(event.currentTarget.value))}
+              onTouchEnd={event => finishCloud(Number(event.currentTarget.value))}
+              onKeyUp={event => {
+                if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key))
+                  finishCloud(Number(event.currentTarget.value));
+              }}
+              onBlur={event => { if (draggingCloud.current) finishCloud(Number(event.currentTarget.value)); }}
             />
             <p className="bw-cloud-read">
-              <span><b>{setup.cloud.compute}</b><em>compute</em></span>
-              <span><b>{cloudRooms.length}</b><em>{cloudRooms.length === 1 ? 'city' : 'cities'}</em></span>
-              <span><b>{money(cloudWeekly)}</b><em>a week</em></span>
+              <span><b>{Math.round(shownCloudCompute)}</b><em>compute</em></span>
+              <span><b>{Math.round(shownCloudCities)}</b><em>{cloudRooms.length === 1 ? 'city' : 'cities'}</em></span>
+              <span><b>{money(shownCloudWeekly)}</b><em>a week</em></span>
             </p>
+            {sliderMax > 0 && <p className="bw-cloud-footprint">
+              <span>{cloudDraft >= fullRegionCompute ? 'Full regional signal target' : `Full regional signal target · ${fullRegionCompute} compute`}</span>
+              <small>Physical reach includes unopened countries. Only entered markets can earn viewers or revenue.</small>
+            </p>}
             {/* One line, not a paragraph (#119): who carries it, and the one
                 thing that is unusual about this plan if anything is. */}
             <p className="bw-rg-tier-line">

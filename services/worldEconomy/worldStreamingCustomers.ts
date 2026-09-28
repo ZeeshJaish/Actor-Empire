@@ -22,7 +22,9 @@ import {
     normalizeWorldStreamingCompetitionState,
 } from './worldStreamingCompetition';
 import { getWorldStreamingOffers } from './worldStreamingOffers';
+import { allocateStreamingAudienceChoice } from './worldStreamingAudienceChoice';
 import { STREAMING_ANNUAL_BILLING_SHARE } from '../streamingPricingEconomy';
+import { deriveStreamingNetworkCoverage } from '../streamingNetworkCoverage';
 
 export const WORLD_STREAMING_CUSTOMER_SCHEMA_VERSION = 2 as const;
 const MAX_SNAPSHOTS = 52;
@@ -107,6 +109,7 @@ interface DesiredCohort {
     reachableHouseholds: number;
     targetSubscribingHouseholds: number;
     targetSubscriptions: number;
+    playerUnconstrainedSubscriptions: number;
     cells: WorldStreamingCustomerPlanCell[];
 }
 
@@ -115,33 +118,60 @@ const createDesiredCohorts = (
     offers: ReturnType<typeof getWorldStreamingOffers>,
 ): DesiredCohort[] => {
     const offerMap = new Map(offers.offers.map(offer => [offer.platformId, offer]));
+    const facilities = player.ownedStreamingPlatform.infrastructureSetup?.facilities;
+    const playerCoverage = facilities?.length
+        ? new Map(deriveStreamingNetworkCoverage({
+            facilities,
+            openingCountryIds: offers.offers.find(offer => offer.platformId === 'PLAYER')?.activeCountryIds || [],
+            fibreState: player.ownedStreamingPlatform.fibre,
+        }).countries.map(country => [country.countryId, country.coveredShare]))
+        : null;
     return Object.keys(player.world.worldAudienceEconomy!.countries).sort().flatMap(countryId => {
         const audience = player.world.worldAudienceEconomy!.countries[countryId];
         const participation = player.world.worldAudienceParticipation!.countries[countryId];
         const countryOffers = (offers.byCountry[countryId] || [])
             .map(platformId => offerMap.get(platformId))
             .filter((offer): offer is WorldStreamingPlatformOffer => Boolean(offer));
+        const paidOffers = countryOffers.map(offer => ({
+            ...offer,
+            plans: offer.commercialConfiguration.streams.includes('subs')
+                ? offer.plans.filter(plan => plan.monthlyPrice > 0 && plan.monthlyBillingPrice > 0
+                    && plan.annualBillingMonthlyPrice > 0)
+                : [],
+        })).filter(offer => offer.plans.length > 0);
         return audience.cohorts.flatMap(cohort => {
             const overlay = participation.cohorts.find(item => item.cohortId === cohort.id);
-            const allocation = overlay ? allocateWorldStreamingCohort(countryId, cohort, overlay, countryOffers) : null;
+            const allocation = overlay ? allocateWorldStreamingCohort(countryId, cohort, overlay, paidOffers) : null;
+            const choice = overlay ? allocateStreamingAudienceChoice(countryId, cohort, overlay, countryOffers) : null;
             return (['MONTHLY', 'ANNUAL'] as const).map(billingPath => {
                 const path = allocation?.paths.find(row => row.billingPath === billingPath);
+                const chosen = choice?.allocations.filter(row => row.kind === 'SUBSCRIPTION'
+                    && row.billingPath === billingPath) || [];
+                const playerReach = playerCoverage ? clamp(playerCoverage.get(countryId) || 0, 0, 1) : 1;
+                const reachableChoices = chosen.map(row => row.platformId === 'PLAYER' ? {
+                    ...row,
+                    households: Math.round(row.households * playerReach),
+                    primaryHouseholds: Math.round(row.primaryHouseholds * playerReach),
+                    monthlySpend: round2(row.monthlySpend * playerReach),
+                } : row).filter(row => row.households > 0);
                 return {
                     countryId,
                     cohortId: cohort.id,
                     billingPath,
                     reachableHouseholds: path?.reachableHouseholds || 0,
-                    targetSubscribingHouseholds: path?.subscribingHouseholds || 0,
-                    targetSubscriptions: path?.totalSubscriptions || 0,
-                    cells: (path?.allocations || []).map(row => ({
-                        platformId: row.offer.platformId,
-                        platformName: row.offer.name,
-                        planId: row.plan.id,
-                        planName: row.plan.name,
+                    targetSubscribingHouseholds: reachableChoices.reduce((sum, row) => sum + row.primaryHouseholds, 0),
+                    targetSubscriptions: reachableChoices.reduce((sum, row) => sum + row.households, 0),
+                    playerUnconstrainedSubscriptions: chosen.filter(row => row.platformId === 'PLAYER')
+                        .reduce((sum, row) => sum + row.households, 0),
+                    cells: reachableChoices.map(row => ({
+                        platformId: row.platformId,
+                        platformName: offerMap.get(row.platformId)?.name || row.platformId,
+                        planId: row.planId!,
+                        planName: offerMap.get(row.platformId)?.plans.find(plan => plan.id === row.planId)?.name || row.planId!,
                         paidAccounts: row.households,
                         primaryHouseholds: row.primaryHouseholds,
-                        effectiveMonthlyPrice: row.billingPrice,
-                        monthlySubscriptionRevenue: round2(row.households * row.billingPrice),
+                        effectiveMonthlyPrice: row.households > 0 ? round2(row.monthlySpend / row.households) : 0,
+                        monthlySubscriptionRevenue: row.monthlySpend,
                         tenureNewAccounts: 0,
                         tenureEstablishedAccounts: Math.round(row.households * .64),
                         tenureLoyalAccounts: row.households - Math.round(row.households * .64),
@@ -161,7 +191,12 @@ const scalePlayerSeed = (cohorts: DesiredCohort[], playerSubscribers: number): v
         .filter(cell => cell.platformId === 'PLAYER')
         .map(cell => ({ cohort, cell })));
     if (!playerCells.length) return;
-    const counts = distributeInteger(playerSubscribers, playerCells.map(row => row.cell.paidAccounts));
+    const unconstrained = cohorts.reduce((sum, cohort) => sum + cohort.playerUnconstrainedSubscriptions, 0);
+    const reachable = playerCells.reduce((sum, row) => sum + row.cell.paidAccounts, 0);
+    const seededReachableSubscribers = unconstrained > 0
+        ? Math.round(playerSubscribers * clamp(reachable / unconstrained, 0, 1))
+        : 0;
+    const counts = distributeInteger(seededReachableSubscribers, playerCells.map(row => row.cell.paidAccounts));
     playerCells.forEach((row, index) => {
         const original = Math.max(1, row.cell.paidAccounts);
         const next = counts[index];
@@ -428,7 +463,9 @@ const advanceCohort = (
             ? (policy.sharingPosture === 'HOUSEHOLD_ONLY' ? .004 : 0)
                 + (policy.enforcementInvestment === 'AGGRESSIVE' ? .004 : 0)
             : 0;
-        const ending = Math.max(0, starting + Math.round((goal - starting) * convergence) - Math.round(starting * policyCancellationRate * Math.max(1, elapsedWeeks)));
+        const ending = platformId === 'PLAYER' && !wanted
+            ? 0 // No deliverable player offer: cancel rather than bill through a multi-week tail.
+            : Math.max(0, starting + Math.round((goal - starting) * convergence) - Math.round(starting * policyCancellationRate * Math.max(1, elapsedWeeks)));
         if (!ending) return;
         const template = wanted || before!;
         const gained = Math.max(0, ending - starting);
@@ -838,11 +875,18 @@ export const normalizeWorldStreamingCustomerState = (
     input: unknown,
     player: Player,
     absoluteWeek: number,
+    diagnostics: { onStage?: (stage: string) => void; preparedWorld?: boolean } = {},
 ): WorldStreamingCustomerState => {
+    const markStage = (stage: string) => diagnostics.onStage?.(stage);
     const week = Math.max(0, Math.round(Number(absoluteWeek) || 0));
-    const prepared = preparePlayer(player, week);
+    // Downstream weekly systems may request the state again after WE5 has
+    // already committed it. Validate the immutable current-week snapshot
+    // before rebuilding world offers and allocation inputs.
+    if (structurallyValid(input) && input.lastProcessedAbsoluteWeek === week) return input;
+    const prepared = diagnostics.preparedWorld ? player : preparePlayer(player, week);
     const offers = getWorldStreamingOffers(prepared, week);
     const policy = resolvePolicy(prepared, week);
+    markStage('inputs_ready');
     const sourceFingerprint = createDeterministicId('world-streaming-customers-source', week, prepared.world.worldStreamingCompetition!.sourceFingerprint, offers.fingerprint, policy.sharingPosture, policy.enforcementInvestment);
     const compatible = structurallyValid(input, 1)
         ? migrateLegacyCustomerState(input, offers)
@@ -853,8 +897,11 @@ export const normalizeWorldStreamingCustomerState = (
     // customer turn would reroll movement and tenure during save migration/reload.
     if (compatible.lastProcessedAbsoluteWeek === week) return compatible;
     const desired = createDesiredCohorts(prepared, offers);
+    markStage('desired_ready');
     const advanced = advanceCountries(prepared, desired, compatible, week, offers, policy);
+    markStage('countries_advanced');
     const global = createGlobal(advanced.countries, offers.offers.some(offer => offer.isPlayer));
+    markStage('global_ready');
     const recentForWeek = advanced.movements
         .slice()
         .sort((left, right) => right.households - left.households || left.id.localeCompare(right.id))

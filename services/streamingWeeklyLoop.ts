@@ -11,6 +11,9 @@ import type {
 } from '../types';
 import { createDeterministicId, createDeterministicRng } from './deterministicRandom';
 import { getAbsoluteWeek } from './legacyLogic';
+import { getStreamingMarketCycle } from './streamingMarketSupply';
+import { processHistoricalMarketRivalWeek } from './historicalMarketRivals';
+import { advanceStreamingOpportunityMarket, processRivalBrokeredOpportunityWeek } from './streamingOpportunityMarket';
 import {
     compactOwnedStreamingPlatformForPersistence,
     normalizeOwnedStreamingPlatformState,
@@ -404,7 +407,7 @@ const buildNextWeekHook = (
         return `${nextEntry.title} arrives in ${Math.max(1, nextEntry.launchWeek - programWeek)} program week${nextEntry.launchWeek - programWeek === 1 ? '' : 's'}.`;
     }
     const expiring = platform.catalogLicenses
-        .filter(license => license.status === 'ACTIVE')
+        .filter(license => license.status === 'ACTIVE' && license.windowType !== 'PERMANENT')
         .sort((left, right) => left.expiresAtAbsoluteWeek - right.expiresAtAbsoluteWeek)[0];
     if (expiring) return `${expiring.titleAtSigning} is the next catalog right approaching expiry.`;
     return 'The opening slate has no later premiere; content-gap pressure will rise next week.';
@@ -413,6 +416,24 @@ const buildNextWeekHook = (
 export const processOwnedStreamingPlatformWeek = (
     player: Player,
 ): { player: Player; processed: boolean; snapshot: OwnedStreamingWeeklySnapshot | null } => {
+    // A legacy career keeps every quote on its current three-week shelf. The
+    // next rotation is the first one that may use the new value model.
+    if (['FOUNDING', 'ACTIVE'].includes(player.ownedStreamingPlatform.lifecycle)
+        && !player.ownedStreamingPlatform.marketQuotePolicy) {
+        player = {
+            ...player,
+            ownedStreamingPlatform: {
+                ...player.ownedStreamingPlatform,
+                marketQuotePolicy: {
+                    version: 2,
+                    effectiveCycle: getStreamingMarketCycle(getAbsoluteWeek(player.age, player.currentWeek)) + 1,
+                },
+            },
+        };
+    }
+    player = advanceStreamingOpportunityMarket(player);
+    player = processRivalBrokeredOpportunityWeek(player, getAbsoluteWeek(player.age, player.currentWeek));
+    player = processHistoricalMarketRivalWeek(player);
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
     const auctionSessionSnapshot = player.ownedStreamingPlatform.buyerAuctionSessions
         .map(session => `${session.id}:${session.status}`).join('|');
@@ -1345,6 +1366,7 @@ export const processOwnedStreamingPlatformWeek = (
                     + worldViewingOutcome.revenue.rentalRevenue
                     + worldViewingOutcome.revenue.purchaseRevenue
                     + worldViewingOutcome.revenue.dayPassRevenue
+                    + (worldViewingOutcome.revenue.oneHourPassRevenue || 0)
                     + worldViewingOutcome.revenue.meteredRevenue
                     + worldViewingOutcome.revenue.patronRevenue
                 : undefined,

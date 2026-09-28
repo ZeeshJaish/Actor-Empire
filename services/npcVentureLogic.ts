@@ -235,18 +235,18 @@ const createVentureProject = (
 };
 
 export const syncNpcVenturesToStudios = (world: WorldState, absoluteWeek = Math.max(0, world.npcVentureLastProcessedAbsoluteWeek || 0)): WorldState => {
-    if (!world.npcVentures) world.npcVentures = {};
-    if (!world.studios) world.studios = {};
+    const npcVentures = world.npcVentures || {};
+    const studios = { ...(world.studios || {}) };
 
-    Object.values(world.npcVentures).forEach(venture => {
-        world.studios![venture.id] = migrateNpcVentureToStudio(
+    Object.values(npcVentures).forEach(venture => {
+        studios[venture.id] = migrateNpcVentureToStudio(
             venture,
-            world.studios![venture.id],
+            studios[venture.id],
             absoluteWeek,
         );
     });
 
-    return world;
+    return { ...world, npcVentures, studios };
 };
 
 export const processNpcVentures = (player: Player, world: WorldState): { world: WorldState; news: NewsItem[]; logs: string[] } => {

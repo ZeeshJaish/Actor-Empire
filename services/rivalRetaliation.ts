@@ -278,6 +278,19 @@ const makeChoiceImpact = (
     return { updatedPlayer, log, logKey, effects };
 };
 
+export const resolveLegacyRivalRetaliationChoice = (
+    player: Player,
+    optionId: string,
+): LifeEventImpactResult | null => {
+    const modeByOption: Record<string, 'QUIET' | 'PUBLIC' | 'GOLDEN'> = {
+        QUIET_BACKCHANNEL: 'QUIET',
+        PUBLIC_COUNTERMOVE: 'PUBLIC',
+        GOLDEN_DEAL_DEFENSE: 'GOLDEN',
+    };
+    const mode = modeByOption[optionId];
+    return mode ? makeChoiceImpact(mode)(player) : null;
+};
+
 const getRivalRetaliationEventType = (state: RivalRetaliationState): RivalRetaliationEventType | null => {
     if (state.activeCounterBidCount > 0 && state.retaliationScore >= 58) return 'RIVAL_COUNTER_BID';
     if (state.defensiveAllianceCount > 0 && state.retaliationScore >= 62) return 'DEFENSIVE_ALLIANCE';

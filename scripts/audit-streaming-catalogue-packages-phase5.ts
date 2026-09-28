@@ -369,6 +369,10 @@ selectedPackageOffer.componentTerms!.forEach(row => {
     assert.equal(contract.cataloguePackageId, createdPackage.package!.id);
     assert.equal(contract.biddingSessionId, acceptedPackageRoom.id);
     assert.equal(contract.sourceOfferId, selectedPackageOffer.id);
+    assert.ok(contract.accessGrant?.modes.includes('SUBSCRIPTION'),
+        'a newly signed AI catalogue package must freeze a playable subscription grant immediately');
+    assert.equal(contract.accessGrant?.purchaseFulfillment, 'NONE',
+        'a finite package window cannot silently promise permanent purchases');
 });
 assert.deepEqual(
     signing.player.world.platforms!.NETFLIX.ai!.rightsContracts

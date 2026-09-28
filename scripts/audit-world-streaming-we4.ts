@@ -61,7 +61,10 @@ assert.equal(JSON.stringify(player), before, 'reading the offer registry does no
 
 const aiOffers = offers.offers.filter((offer: any) => !offer.isPlayer);
 assert.ok(aiOffers.length >= 30, 'every seeded global and regional operator receives an offer without a top-four cap');
-assert.ok(aiOffers.every((offer: any) => offer.plans.length >= 1 && offer.plans.length <= 4), 'AI operators expose bounded concrete plan choices');
+assert.ok(aiOffers.every((offer: any) => offer.commercialConfiguration.streams.includes('subs')
+    ? offer.plans.length >= 1 && offer.plans.length <= 4
+    : offer.plans.length === 0),
+    'AI subscriptions expose bounded concrete plans; ad- and store-only operators do not invent memberships');
 assert.ok(aiOffers.every((offer: any) => {
     const freePlans = offer.plans.filter((plan: any) => plan.monthlyPrice === 0);
     return freePlans.length === 0 || (

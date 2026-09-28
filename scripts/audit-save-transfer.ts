@@ -557,7 +557,8 @@ assert(
 
 const appSource = readFileSync('App.tsx', 'utf8');
 assert(
-  appSource.includes('const persistedPlayerState = await persistCurrentSlotSnapshot(syncedPlayerState, {'),
+  appSource.includes('const runtimePlayerState = await persistCurrentSlotSnapshot(syncedPlayerState, {')
+    && appSource.includes('commitProcessedWeekPlayer(runtimePlayerState);'),
   'Week advance should await persistence before showing the processed week.'
 );
 assert(

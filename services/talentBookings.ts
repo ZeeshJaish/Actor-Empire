@@ -10,7 +10,7 @@ import type {
 import { normalizeProductionCalendar } from './productionCalendar';
 
 const VIRTUAL_TALENT_IDS = new Set(['PLAYER_SELF', 'STUDIO_STAFF', 'UNKNOWN']);
-const BOOKING_ROLES = new Set<IndustryTalentBookingRole>(['ACTOR', 'DIRECTOR']);
+const BOOKING_ROLES = new Set<IndustryTalentBookingRole>(['ACTOR', 'DIRECTOR', 'WRITER']);
 const BOOKING_OWNERS = new Set<IndustryTalentBookingOwner>(['PLAYER_COMMITMENT', 'INDUSTRY_PRODUCTION']);
 const BOOKING_STATUSES = new Set<IndustryTalentBooking['status']>(['BOOKED', 'CANCELLED', 'RELEASED']);
 
@@ -130,6 +130,7 @@ export interface ReserveProjectTalentBookingsInput {
     productionCalendar: ProductionCalendar;
     actorIds: readonly (string | null | undefined)[];
     directorIds: readonly (string | null | undefined)[];
+    writerIds?: readonly (string | null | undefined)[];
     /** Phase 3 records NPC workload but does not treat overlapping projects as a hard block. */
     allowOverlaps?: boolean;
 }
@@ -159,6 +160,8 @@ export const reserveProjectTalentBookings = (
     const requests = [
         ...uniqueRealIds(input.actorIds).map(npcId => ({ role: 'ACTOR' as const, npcId, start: actorStart, end: actorEnd })),
         ...uniqueRealIds(input.directorIds).map(npcId => ({ role: 'DIRECTOR' as const, npcId, start: started, end: directorEnd })),
+        ...uniqueRealIds(input.writerIds || []).map(npcId => ({ role: 'WRITER' as const, npcId,
+            start: started, end: started + Math.max(1, calendar.preProductionWeeks) - 1 })),
     ];
     const conflicts = input.allowOverlaps ? [] : requests.flatMap(request => getTalentConflicts(bookings, {
         npcId: request.npcId,

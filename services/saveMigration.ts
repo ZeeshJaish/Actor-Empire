@@ -39,6 +39,10 @@ import {
     reconcilePlatformAiExternalCommitmentObligations,
 } from './platformAi/platformAiExternalCommitments';
 import { migrateStreamingRightsContractRegistry } from './streamingRightsCore';
+import { reconcileLegacyStreamingRights } from './legacyStreamingRights';
+import { initializeHistoricalCatalogue } from './historicalCatalogue';
+import { initializeHistoricalMarketPacing } from './historicalMarketRivals';
+import { advanceStreamingOpportunityMarket } from './streamingOpportunityMarket';
 import { normalizeWorldStudioAiForSave } from './studioAi';
 import { normalizeStreamingBiddingSessionRegistry } from './streamingBidding';
 import { normalizeStreamingRoyaltySettlementRegistry } from './streamingContractSettlement';
@@ -56,12 +60,14 @@ import { normalizeWorldAudienceEconomyState } from './worldEconomy/worldAudience
 import { normalizeWorldAudienceParticipationState } from './worldEconomy/worldAudienceParticipation';
 import { normalizeWorldPopulationState } from './worldEconomy/worldPopulation';
 import { normalizeWorldStreamingCompetitionState } from './worldEconomy/worldStreamingCompetition';
+import { normalizeWorldStreamingAudienceChoiceState } from './worldEconomy/worldStreamingAudienceChoice';
 import { normalizeWorldStreamingCustomerState } from './worldEconomy/worldStreamingCustomers';
 import { normalizeWorldStreamingViewingState } from './worldEconomy/worldStreamingViewing';
 import { normalizeWorldStreamingPlatformEconomyState } from './worldEconomy/worldStreamingPlatformEconomy';
 import { createWorldEconomyHealthSummary } from './worldEconomy/worldEconomyIntegrity';
+import { normalizePerformanceSettings } from './performancePreferences';
 
-export const SAVE_MIGRATION_VERSION = 47;
+export const SAVE_MIGRATION_VERSION = 50;
 const RUNAWAY_STOCK_CASH_CEILING = 10_000_000_000_000;
 const ACQUISITION_RIVAL_BID_MAX_ROUNDS = 3;
 
@@ -1103,6 +1109,10 @@ export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
         migratedWorldPopulation,
         migratedAbsoluteWeek,
     );
+    const performanceSettings = normalizePerformanceSettings(
+        (input as Partial<Player>)?.settings?.performance,
+        (input as Partial<Player>)?.settings?.smoothMode,
+    );
     const playerWithStocks: Player = {
         ...base,
         id: String(base.id || INITIAL_PLAYER.id),
@@ -1111,6 +1121,11 @@ export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
         totalPlayTimeMs: Math.max(0, Math.min(Number.MAX_SAFE_INTEGER, Math.round(Number(base.totalPlayTimeMs || 0)))),
         currentWeek: migratedCurrentWeek,
         money: normalizeMigratedCash(base.money, repairRunawayStockCash),
+        settings: {
+            ...base.settings,
+            performance: performanceSettings,
+            smoothMode: performanceSettings.preference === 'PERFORMANCE',
+        },
         world: {
             ...base.world,
             platformAiCatalogueDistressDeals: normalizePlatformAiCatalogueDistressDeals(
@@ -1259,7 +1274,10 @@ export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
             ),
         },
     };
-    const playerWithStreamingContracts = migrateStreamingRightsContractRegistry(playerWithNormalizedPlatformAi);
+    const playerWithStreamingContracts = reconcileLegacyStreamingRights(
+        migrateStreamingRightsContractRegistry(playerWithNormalizedPlatformAi),
+        input,
+    );
     const playerWithStreamingRightsCalendar: Player = {
         ...playerWithStreamingContracts,
         streamingRightsManagement: normalizeStreamingRightsManagementState(
@@ -1303,6 +1321,11 @@ export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
         ...playerWithWorldStreamingCompetition,
         world: {
             ...playerWithWorldStreamingCompetition.world,
+            worldStreamingAudienceChoice: normalizeWorldStreamingAudienceChoiceState(
+                base.world?.worldStreamingAudienceChoice,
+                playerWithWorldStreamingCompetition,
+                migratedAbsoluteWeek,
+            ),
             worldStreamingCustomers: normalizeWorldStreamingCustomerState(
                 base.world?.worldStreamingCustomers,
                 playerWithWorldStreamingCompetition,
@@ -1360,7 +1383,7 @@ export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
         && business.config?.productionType !== 'Acquired Studio'
     )) || productionHouses[0];
 
-    if (!parentStudio) return repairedPlayer;
+    if (!parentStudio) return advanceStreamingOpportunityMarket(initializeHistoricalMarketPacing(initializeHistoricalCatalogue(repairedPlayer, input)));
 
     const reconciledRoster = mergeParentStudioTalentRosters(
         parentStudio.id,
@@ -1368,7 +1391,7 @@ export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
         parentStudio.studioState?.talentRoster as any,
     );
 
-    return {
+    return advanceStreamingOpportunityMarket(initializeHistoricalMarketPacing(initializeHistoricalCatalogue({
         ...repairedPlayer,
         studio: {
             ...repairedPlayer.studio,
@@ -1384,5 +1407,5 @@ export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
                 }
                 : business
         )),
-    };
+    }, input)));
 };

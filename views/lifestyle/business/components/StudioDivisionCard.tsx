@@ -73,7 +73,7 @@ export const StudioDivisionCard: React.FC<StudioDivisionCardProps> = ({
             onClick={locked ? undefined : onClick}
             disabled={locked}
             aria-label={ariaLabel || title}
-            className={`division-command-card control-key group relative min-h-[88px] w-full touch-manipulation rounded-[16px] border-2 bg-[#11100f] p-2 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_5px_0_#030303] transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200 active:translate-y-[3px] active:shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_2px_0_#030303] ${wide ? 'col-span-2 min-h-[92px] p-2.5' : ''} ${locked ? 'cursor-not-allowed border-white/[0.06] opacity-45' : `cursor-pointer ${tone.frame} hover:bg-[#171512]`}`}
+            className={`division-command-card control-key group relative min-h-[104px] w-full touch-manipulation rounded-[16px] border-2 bg-[#11100f] p-2 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_5px_0_#030303] transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200 active:translate-y-[3px] active:shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_2px_0_#030303] ${wide ? 'col-span-1 min-h-[112px] p-2.5 min-[390px]:col-span-2' : ''} ${locked ? 'cursor-not-allowed border-white/[0.06] opacity-45' : `cursor-pointer ${tone.frame} hover:bg-[#171512]`}`}
         >
             <span className={`status-light absolute right-2.5 top-2.5 h-1.5 w-1.5 rounded-full ${tone.light}`} />
             <div className={`relative flex h-full items-center gap-2 pr-1 ${wide ? 'pr-3 sm:gap-4' : ''}`}>
@@ -82,15 +82,15 @@ export const StudioDivisionCard: React.FC<StudioDivisionCardProps> = ({
                 </div>
 
                 <div className="min-w-0 flex-1">
-                    {eyebrow ? <div className="mb-1 text-[7px] font-black uppercase tracking-[0.22em] text-amber-300">{eyebrow}</div> : null}
-                    <div className={`${wide ? 'text-[12px]' : 'text-[8px]'} break-words font-black uppercase leading-[1.05] text-white`}>{title}</div>
-                    <div className={`mt-1 ${wide ? 'text-[6px]' : 'text-[5px]'} break-words font-black uppercase leading-tight tracking-[0.12em] text-zinc-500`}>{subtitle}</div>
+                    {eyebrow ? <div className="mb-1 text-[10px] font-black uppercase tracking-[0.12em] text-amber-300">{eyebrow}</div> : null}
+                    <div className={`${wide ? 'text-[14px]' : 'text-[11px]'} break-words font-black uppercase leading-[1.1] text-white`}>{title}</div>
+                    <div className="mt-1 break-words text-[10px] font-bold uppercase leading-snug tracking-[0.02em] text-zinc-400">{subtitle}</div>
                     {!locked && stats.length > 0 ? (
                         <div className={`mt-2 flex min-w-0 items-center gap-2 ${wide ? 'justify-between' : ''}`}>
                             {stats.slice(0, wide ? 2 : 1).map((stat, index) => (
                                 <div key={stat.label} className={`min-w-0 ${wide && index > 0 ? 'text-right' : ''}`}>
-                                    <span className="block truncate text-[5px] font-black uppercase tracking-[0.12em] text-zinc-600">{stat.label}</span>
-                                    <span className={`mt-0.5 block truncate font-mono text-[9px] font-black ${tone.stat}`}>{stat.value}</span>
+                                    <span className="block break-words text-[10px] font-black uppercase tracking-[0.04em] text-zinc-400">{stat.label}</span>
+                                    <span className={`mt-0.5 block break-words font-mono text-[12px] font-black ${tone.stat}`}>{stat.value}</span>
                                 </div>
                             ))}
                         </div>

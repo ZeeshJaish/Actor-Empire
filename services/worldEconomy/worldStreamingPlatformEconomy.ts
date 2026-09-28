@@ -122,23 +122,31 @@ const buildState = (
         rowsByPlatform.set(row.platformId, [...(rowsByPlatform.get(row.platformId) || []), { ...row, countryId: country.countryId }]);
     }));
 
-    const platforms = Object.fromEntries([...rowsByPlatform.entries()].sort(([left], [right]) => left.localeCompare(right)).map(([platformId, rows]) => {
+    const platformIds = new Set([...rowsByPlatform.keys(), ...Object.keys(viewing.platforms)]);
+    const platforms = Object.fromEntries([...platformIds].sort().map(platformId => {
+        const rows = rowsByPlatform.get(platformId) || [];
         const merged = mergeCustomerRows(rows);
         const platformViewing = viewing.platforms[platformId];
         const policy = resolveWorldStreamingPlatformCostPolicyFromState(prepared, platformId, ecosystem);
         const weeklySubscriptionRevenue = round2(merged.monthlySubscriptionRevenue / 4.33);
         const weeklyIncrementalRevenue = round2(platformViewing?.revenue.totalIncrementalRevenue || 0);
         const weeklyRevenue = round2(weeklySubscriptionRevenue + weeklyIncrementalRevenue);
-        const countryEconomy = rows.map(row => ({
-            countryId: row.countryId,
-            endingPaidAccounts: row.endingPaidAccounts,
-            payingHouseholds: row.payingHouseholds,
-            monthlySubscriptionRevenue: row.monthlySubscriptionRevenue,
-            viewingAccounts: viewing.countries[row.countryId]?.platformPerformance?.[platformId]?.totalViewingAccounts || 0,
-            hoursViewed: viewing.countries[row.countryId]?.platformPerformance?.[platformId]?.totalHoursViewed || 0,
-            joinAccounts: row.joins + row.reactivations,
-            cancellationAccounts: row.cancellations,
-        })).sort((left, right) => right.endingPaidAccounts - left.endingPaidAccounts || left.countryId.localeCompare(right.countryId));
+        const countryIds = new Set([...rows.map(row => row.countryId),
+            ...Object.keys(viewing.countries).filter(countryId => Boolean(viewing.countries[countryId]
+                .platformPerformance?.[platformId]))]);
+        const countryEconomy = [...countryIds].map(countryId => {
+            const row = rows.find(item => item.countryId === countryId);
+            return {
+                countryId,
+                endingPaidAccounts: row?.endingPaidAccounts || 0,
+                payingHouseholds: row?.payingHouseholds || 0,
+                monthlySubscriptionRevenue: row?.monthlySubscriptionRevenue || 0,
+                viewingAccounts: viewing.countries[countryId]?.platformPerformance?.[platformId]?.totalViewingAccounts || 0,
+                hoursViewed: viewing.countries[countryId]?.platformPerformance?.[platformId]?.totalHoursViewed || 0,
+                joinAccounts: (row?.joins || 0) + (row?.reactivations || 0),
+                cancellationAccounts: row?.cancellations || 0,
+            };
+        }).sort((left, right) => right.endingPaidAccounts - left.endingPaidAccounts || left.countryId.localeCompare(right.countryId));
         const standardWeeklyOperatingCost = round2(
             merged.accessLoadAccounts * .035
             + (platformViewing?.totalHoursViewed || 0) * .0015
@@ -149,7 +157,7 @@ const buildState = (
         const audienceMovement = merged.joins + merged.reactivations - merged.cancellations;
         const summary: WorldStreamingPlatformEconomySummary = {
             platformId,
-            platformName: rows[0]?.platformName || platformId,
+            platformName: rows[0]?.platformName || platformViewing?.platformName || platformId,
             controller: policy.controller,
             endingPaidAccounts: merged.endingPaidAccounts,
             payingHouseholds: merged.payingHouseholds,

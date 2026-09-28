@@ -174,9 +174,15 @@ const createFixture = (): Player => {
         name: 'Launch Founder',
         age: 43,
         currentWeek: 8,
+        businesses: [{
+            id: 'producer-studio', name: 'Red Horizon Pictures', type: 'PRODUCTION_HOUSE',
+            subtype: 'MAJOR_STUDIO', logo: 'RH', color: '#735cff', foundedWeek: 1,
+            balance: 200_000_000, isActive: true, config: {} as any, stats: {} as any,
+            staff: [], products: [], hiringPool: [], lastHiringRefreshWeek: 0, history: [],
+        }],
         pastProjects: [
-            { id: 'catalog-drama', name: 'Glass City', projectType: 'MOVIE', genre: 'DRAMA' } as any,
-            { id: 'catalog-comedy', name: 'After Hours', projectType: 'MOVIE', genre: 'COMEDY' } as any,
+            { id: 'catalog-drama', name: 'Glass City', studioId: 'producer-studio', projectType: 'MOVIE', genre: 'DRAMA' } as any,
+            { id: 'catalog-comedy', name: 'After Hours', studioId: 'producer-studio', projectType: 'MOVIE', genre: 'COMEDY' } as any,
         ],
         commitments: [{
             id: 'original-project',

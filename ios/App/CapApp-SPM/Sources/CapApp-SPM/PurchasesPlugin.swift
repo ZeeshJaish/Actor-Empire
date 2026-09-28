@@ -1,6 +1,7 @@
 import Foundation
 import Capacitor
 import StoreKit
+import FirebaseAnalytics
 
 @objc(PurchasesPlugin)
 public class PurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
@@ -12,6 +13,22 @@ public class PurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "restorePurchases", returnType: CAPPluginReturnPromise)
     ]
     private var transactionUpdatesTask: Task<Void, Never>?
+    private let loggedTransactionIdsKey = "actor_empire_logged_storekit_transactions_v1"
+    private let maxLoggedTransactionIds = 2048
+
+    @MainActor
+    private func logVerifiedPurchase(_ transaction: Transaction) {
+        let transactionId = String(transaction.id)
+        var loggedIds = UserDefaults.standard.stringArray(forKey: loggedTransactionIdsKey) ?? []
+        guard !loggedIds.contains(transactionId) else { return }
+
+        Analytics.logTransaction(transaction)
+        loggedIds.append(transactionId)
+        if loggedIds.count > maxLoggedTransactionIds {
+            loggedIds.removeFirst(loggedIds.count - maxLoggedTransactionIds)
+        }
+        UserDefaults.standard.set(loggedIds, forKey: loggedTransactionIdsKey)
+    }
 
     public override func load() {
         super.load()
@@ -44,6 +61,7 @@ public class PurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
     private func handleTransactionUpdate(_ verification: VerificationResult<Transaction>) async {
         switch verification {
         case .verified(let transaction):
+            await logVerifiedPurchase(transaction)
             await notifyPurchaseCompleted(productId: transaction.productID, transactionId: transaction.id)
             await transaction.finish()
         case .unverified(_, let error):
@@ -102,6 +120,7 @@ public class PurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
                 case .success(let verification):
                     switch verification {
                     case .verified(let transaction):
+                        await self.logVerifiedPurchase(transaction)
                         await transaction.finish()
                         call.resolve([
                             "productId": productId,

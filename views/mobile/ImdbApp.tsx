@@ -1219,8 +1219,8 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
 	     return (
         <div className="absolute inset-0 bg-zinc-950 flex flex-col z-50 text-white animate-in slide-in-from-right duration-300">
             <div className="bg-zinc-900 p-4 pt-12 pb-3 shadow-lg flex items-center gap-3 border-b border-zinc-800">
-                <button onClick={() => setSelectedProject(null)} className="p-1 rounded-full hover:bg-white/10"><ArrowLeft size={20}/></button>
-                <div className="flex-1 truncate font-bold text-lg">{selectedProject.name}</div>
+                <button onClick={() => setSelectedProject(null)} aria-label="Back to credits" className="grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-white/10"><ArrowLeft size={20}/></button>
+                <div className="min-w-0 flex-1 break-words font-bold text-lg leading-tight">{selectedProject.name}</div>
                 <div className="bg-yellow-400 text-black px-2 py-1 rounded font-black text-xs">IMDb</div>
             </div>
 
@@ -1625,7 +1625,7 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
   return (
     <div className="absolute inset-0 bg-zinc-950 flex flex-col z-40 text-white animate-in slide-in-from-right duration-300">
         <div className="bg-yellow-400 p-4 pt-12 pb-3 shadow-lg flex items-center justify-between shrink-0 text-black">
-            <button onClick={onBack} className="p-1 rounded-full hover:bg-black/10"><ArrowLeft size={20}/></button>
+            <button onClick={onBack} className="grid h-11 w-11 place-items-center rounded-full hover:bg-black/10" aria-label="Back to phone"><ArrowLeft size={20}/></button>
             <div className="font-black tracking-tighter text-xl bg-black text-yellow-400 px-2 rounded">IMDb</div>
             <div className="w-8"></div>
         </div>
@@ -1747,7 +1747,7 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                              )}
                          </div>
                      )}
-                     <div className="flex items-center justify-between mb-4">
+                     <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                          <h3 className="text-yellow-400 font-bold uppercase tracking-widest text-xs flex items-center gap-2">
                             {tr('imdb.profile.filmography')} <span className="bg-zinc-700 text-white px-1.5 py-0.5 rounded-full text-[10px]">{filteredCredits.length}</span>
                          </h3>
@@ -1757,7 +1757,7 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                                  <button 
                                     key={type}
                                     onClick={() => setCreditFilter(type)}
-                                    className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all ${creditFilter === type ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                    className={`min-h-11 min-w-11 rounded-md px-3 py-1 text-[11px] font-bold transition-all ${creditFilter === type ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
                                  >
                                      {getCreditFilterLabel(type)}
                                  </button>

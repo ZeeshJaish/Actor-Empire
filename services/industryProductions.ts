@@ -99,7 +99,7 @@ const normalizeAiExecution = (
         leadActorName: nullableString(candidate.leadActorName),
         directorId: nullableString(candidate.directorId),
         directorName: nullableString(candidate.directorName),
-        writerId: null,
+        writerId: nullableString(candidate.writerId),
         writerName: nullableString(candidate.writerName),
         finalQuality: candidate.finalQuality === null || candidate.finalQuality === undefined
             ? null
@@ -206,8 +206,8 @@ const normalizeIndustryProduction = (value: unknown, maxAbsoluteWeek: number): I
         talentBookingIds: [...new Set(Array.isArray(candidate.talentBookingIds)
             ? candidate.talentBookingIds.filter((talentId): talentId is string => typeof talentId === 'string' && Boolean(talentId.trim()))
             : [])].sort(),
-        writerSource: 'IN_HOUSE_TEAM',
-        writerId: null,
+        writerSource: candidate.writerSource === 'NPC_WRITER' && nullableString(candidate.writerId) ? 'NPC_WRITER' : 'IN_HOUSE_TEAM',
+        writerId: candidate.writerSource === 'NPC_WRITER' ? nullableString(candidate.writerId) : null,
         writerName: typeof candidate.writerName === 'string' && candidate.writerName.trim()
             ? candidate.writerName.trim()
             : `${producerStudioId} Story Department`,

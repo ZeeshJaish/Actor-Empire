@@ -66,8 +66,8 @@ export const GreenlightHeader: React.FC<GreenlightHeaderProps> = ({
     return (
         <div className="relative shrink-0 z-20 bg-emerald-950/40 backdrop-blur-2xl border-b border-emerald-500/20 shadow-2xl">
             <div className="max-w-5xl mx-auto w-full px-4 pt-safe-top pb-6">
-                <div className="flex items-center justify-between gap-2 sm:gap-4 mb-6">
-                    <button type="button" onClick={onBack} className="p-2 sm:p-2.5 bg-zinc-900/80 hover:bg-zinc-800 rounded-xl text-zinc-400 hover:text-white transition-all border border-zinc-800 shadow-lg group shrink-0">
+                <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4 mb-6">
+                    <button type="button" onClick={onBack} className="grid h-11 w-11 shrink-0 place-items-center bg-zinc-900/80 hover:bg-zinc-800 rounded-xl text-zinc-400 hover:text-white transition-all border border-zinc-800 shadow-lg group" aria-label="Back to studio dashboard">
                         <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform sm:w-5 sm:h-5" />
                     </button>
 
@@ -83,7 +83,7 @@ export const GreenlightHeader: React.FC<GreenlightHeaderProps> = ({
                         </div>
                     </div>
 
-                    <div className="flex items-center shrink-0 gap-2">
+                    <div className="flex w-full min-w-0 items-center justify-between gap-2 sm:w-auto sm:shrink-0" data-greenlight-metrics>
                         <div className="bg-black/60 px-3 py-2 sm:px-4 sm:py-3 rounded-2xl border border-amber-500/20 backdrop-blur-xl flex flex-col items-center justify-center shadow-2xl h-full">
                             <span className="text-[7px] sm:text-[8px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-1">Buzz</span>
                             <div className="flex items-center gap-1">
@@ -97,7 +97,7 @@ export const GreenlightHeader: React.FC<GreenlightHeaderProps> = ({
                             </div>
                         </div>
 
-                        <div className="bg-black/60 px-3 py-2 sm:px-5 sm:py-3 rounded-2xl border border-emerald-500/20 backdrop-blur-xl flex flex-col items-end shadow-2xl min-w-[110px] sm:min-w-[160px]">
+                        <div className="bg-black/60 px-3 py-2 sm:px-5 sm:py-3 rounded-2xl border border-emerald-500/20 backdrop-blur-xl flex flex-col items-end shadow-2xl min-w-[110px] sm:min-w-[160px]" data-greenlight-budget>
                             <div className="flex flex-col items-end mb-1 sm:mb-2">
                                 <div className="flex items-center gap-1 group/budget relative">
                                     <span className="text-[7px] sm:text-[8px] font-black uppercase tracking-[0.2em] text-zinc-500">{platformCommissionBudget ? 'Production Package' : 'Est. Budget'}</span>

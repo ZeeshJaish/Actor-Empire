@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   BadgeCheck,
@@ -66,6 +66,25 @@ export default function StreamingOpeningCatalogueDesk({
   const [selectedTitleId, setSelectedTitleId] = useState(view.titles[0]?.projectId || '');
   const [delivery, setDelivery] = useState<StreamingLocalizationDelivery>('OUTSOURCE');
   const [feedback, setFeedback] = useState('');
+  const [openingMarket, setOpeningMarket] = useState(false);
+  const marketFrame = useRef<number | null>(null);
+  const marketTimer = useRef<number | null>(null);
+  useEffect(() => () => {
+    if (marketFrame.current !== null) cancelAnimationFrame(marketFrame.current);
+    if (marketTimer.current !== null) clearTimeout(marketTimer.current);
+  }, []);
+  const openMarket = () => {
+    if (!onOpenRightsMarket || openingMarket) return;
+    setOpeningMarket(true);
+    // Let the button acknowledge the tap in one real paint before the market
+    // snapshot's synchronous build. No minimum-duration loading scene.
+    marketFrame.current = requestAnimationFrame(() => {
+      marketTimer.current = window.setTimeout(() => {
+        setOpeningMarket(false);
+        onOpenRightsMarket();
+      }, 0);
+    });
+  };
   const selectedTitle = view.titles.find(title => title.projectId === selectedTitleId) || view.titles[0] || null;
   const posterById = useMemo(() => new Map(
     [...(player.pastProjects || []), ...player.businesses.flatMap(business => business.studioState?.scripts || [])]
@@ -116,7 +135,7 @@ export default function StreamingOpeningCatalogueDesk({
       </section>
 
       <section className="ocd-section">
-        <header><div><span>OPENING SHELF</span><h2>{view.titles.filter(title => title.available).length} available · {view.titles.length} acquired</h2></div><button type="button" onClick={onOpenRightsMarket}>+ ADD CONTENT</button></header>
+        <header><div><span>OPENING SHELF</span><h2>{view.titles.filter(title => title.available).length} available · {view.titles.length} acquired</h2></div><button type="button" disabled={openingMarket} aria-busy={openingMarket} onClick={openMarket}>{openingMarket ? 'OPENING MARKET…' : '+ ADD CONTENT'}</button></header>
         <div className="ocd-poster-rail">
           {view.titles.map((title, index) => (
             <button type="button" key={title.projectId} className="ocd-poster-card" onClick={() => { setSelectedTitleId(title.projectId); setTab('LANGUAGES'); }} style={{ ['--ocd-hue' as string]: hueFor(title.projectId) }}>
@@ -129,7 +148,7 @@ export default function StreamingOpeningCatalogueDesk({
       </section>
 
       <section className="ocd-command-pair">
-        <button type="button" onClick={onOpenRightsMarket}><LockKeyhole size={21} /><span><small>CONTENT MARKET</small><b>Add Content</b><em>Browse titles, collections, and studio imports</em></span><ChevronRight size={18} /></button>
+        <button type="button" disabled={openingMarket} aria-busy={openingMarket} onClick={openMarket}><LockKeyhole size={21} /><span><small>CONTENT MARKET</small><b>{openingMarket ? 'Opening market…' : 'Add Content'}</b><em>Browse titles, collections, and studio imports</em></span><ChevronRight size={18} /></button>
         <button type="button" onClick={onOpenSlate}><Clapperboard size={21} /><span><small>PROGRAMMING</small><b>Arrange the launch slate</b><em>Place titles across the first twelve weeks</em></span><ChevronRight size={18} /></button>
       </section>
     </>
@@ -155,7 +174,7 @@ export default function StreamingOpeningCatalogueDesk({
               </div>
               <div className="ocd-reach"><span><i style={{ width: `${country.projectedAudienceReachPercent}%` }} /></span><b>{country.projectedAudienceReachPercent}% projected reach</b></div>
               <footer><Languages size={15} /><span>{country.languageDistribution.map(language => `${language.language} ${language.audiencePercent}%`).join(' · ')}</span></footer>
-              {country.missingRightsTitles.length ? <p>Unavailable here: {country.missingRightsTitles.join(', ')}</p> : null}
+              {country.missingRightsDetails.length ? <p>Unavailable here: {country.missingRightsDetails.join(' · ')}</p> : null}
             </article>
           ))}
         </div>

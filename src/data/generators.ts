@@ -1,6 +1,7 @@
 import { Writer, Script, Genre, WriterTier, ProjectType, ProjectFormat, ScriptSubjectType } from '../../types';
 import { ALL_GENRES, PROJECT_FORMATS } from '../../services/genreCatalog';
 import { getScriptMarketDemand } from '../../services/marketTrends';
+import { WRITER_NPC_LIBRARY } from '../../services/writerNpcLibrary';
 
 const FIRST_NAMES = ['John', 'Jane', 'Alex', 'Sarah', 'Michael', 'Emily', 'David', 'Jessica', 'Chris', 'Amanda', 'Robert', 'Ashley', 'William', 'Brittany', 'James', 'Megan', 'Joseph', 'Samantha', 'Charles', 'Lauren', 'Thomas', 'Kayla', 'Daniel', 'Brianna', 'Matthew', 'Rachel', 'Anthony', 'Victoria', 'Mark', 'Morgan', 'Paul', 'Taylor', 'Steven', 'Haley', 'Andrew', 'Alexis', 'Kenneth', 'Sydney', 'Joshua', 'Chloe', 'Kevin', 'Alyssa', 'Brian', 'Hannah', 'George', 'Madison', 'Edward', 'Jasmine', 'Ronald', 'Destiny'];
 const LAST_NAMES = ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis', 'Rodriguez', 'Martinez', 'Hernandez', 'Lopez', 'Gonzalez', 'Wilson', 'Anderson', 'Thomas', 'Taylor', 'Moore', 'Jackson', 'Martin', 'Lee', 'Perez', 'Thompson', 'White', 'Harris', 'Sanchez', 'Clark', 'Ramirez', 'Lewis', 'Robinson', 'Walker', 'Young', 'Allen', 'King', 'Wright', 'Scott', 'Torres', 'Nguyen', 'Hill', 'Flores', 'Green', 'Adams', 'Nelson', 'Baker', 'Hall', 'Rivera', 'Campbell', 'Mitchell', 'Carter', 'Roberts'];
@@ -185,71 +186,23 @@ export const generateProceduralLogline = (): string => {
     return `${p} ${i} and ${g}, ${t}.`;
 };
 
-const FAMOUS_WRITERS = [
-    { name: 'Quentin Tarantino', skill: 98, tier: 'A_LIST' as WriterTier, stats: { creativity: 99, dialogue: 100, structure: 85, pacing: 92 } },
-    { name: 'Aaron Sorkin', skill: 97, tier: 'A_LIST' as WriterTier, stats: { creativity: 85, dialogue: 100, structure: 95, pacing: 98 } },
-    { name: 'Christopher Nolan', skill: 96, tier: 'A_LIST' as WriterTier, stats: { creativity: 98, dialogue: 80, structure: 100, pacing: 95 } },
-    { name: 'Greta Gerwig', skill: 94, tier: 'A_LIST' as WriterTier, stats: { creativity: 95, dialogue: 98, structure: 90, pacing: 92 } },
-    { name: 'Jordan Peele', skill: 92, tier: 'A_LIST' as WriterTier, stats: { creativity: 98, dialogue: 90, structure: 88, pacing: 90 } },
-    { name: 'Phoebe Waller-Bridge', skill: 95, tier: 'A_LIST' as WriterTier, stats: { creativity: 96, dialogue: 99, structure: 92, pacing: 96 } },
-    { name: 'Charlie Kaufman', skill: 93, tier: 'A_LIST' as WriterTier, stats: { creativity: 100, dialogue: 90, structure: 75, pacing: 70 } },
-    { name: 'Bong Joon-ho', skill: 96, tier: 'A_LIST' as WriterTier, stats: { creativity: 97, dialogue: 92, structure: 98, pacing: 95 } },
-    { name: 'Martin Scorsese', skill: 95, tier: 'A_LIST' as WriterTier, stats: { creativity: 90, dialogue: 95, structure: 95, pacing: 98 } },
-    { name: 'Steven Spielberg', skill: 94, tier: 'A_LIST' as WriterTier, stats: { creativity: 92, dialogue: 88, structure: 98, pacing: 96 } },
-    { name: 'Wes Anderson', skill: 93, tier: 'A_LIST' as WriterTier, stats: { creativity: 98, dialogue: 90, structure: 95, pacing: 92 } },
-    { name: 'Sofia Coppola', skill: 91, tier: 'A_LIST' as WriterTier, stats: { creativity: 90, dialogue: 85, structure: 88, pacing: 85 } },
-    { name: 'Paul Thomas Anderson', skill: 96, tier: 'A_LIST' as WriterTier, stats: { creativity: 95, dialogue: 96, structure: 92, pacing: 90 } },
-    { name: 'David Fincher', skill: 94, tier: 'A_LIST' as WriterTier, stats: { creativity: 90, dialogue: 92, structure: 98, pacing: 100 } },
-    { name: 'Shonda Rhimes', skill: 92, tier: 'A_LIST' as WriterTier, stats: { creativity: 88, dialogue: 98, structure: 95, pacing: 96 } },
-    { name: 'Ryan Murphy', skill: 90, tier: 'A_LIST' as WriterTier, stats: { creativity: 95, dialogue: 90, structure: 85, pacing: 92 } },
-    { name: 'Tina Fey', skill: 89, tier: 'A_LIST' as WriterTier, stats: { creativity: 90, dialogue: 98, structure: 88, pacing: 95 } },
-    { name: 'Donald Glover', skill: 93, tier: 'A_LIST' as WriterTier, stats: { creativity: 98, dialogue: 92, structure: 85, pacing: 90 } },
-    { name: 'Taika Waititi', skill: 91, tier: 'A_LIST' as WriterTier, stats: { creativity: 95, dialogue: 95, structure: 80, pacing: 92 } },
-    { name: 'Guillermo del Toro', skill: 95, tier: 'A_LIST' as WriterTier, stats: { creativity: 100, dialogue: 85, structure: 90, pacing: 88 } },
-    { name: 'Alfonso Cuarón', skill: 94, tier: 'A_LIST' as WriterTier, stats: { creativity: 92, dialogue: 88, structure: 96, pacing: 94 } },
-    { name: 'Chloe Zhao', skill: 92, tier: 'A_LIST' as WriterTier, stats: { creativity: 90, dialogue: 85, structure: 92, pacing: 80 } },
-    { name: 'Emerald Fennell', skill: 90, tier: 'A_LIST' as WriterTier, stats: { creativity: 92, dialogue: 95, structure: 85, pacing: 88 } },
-    { name: 'Damien Chazelle', skill: 93, tier: 'A_LIST' as WriterTier, stats: { creativity: 90, dialogue: 88, structure: 98, pacing: 95 } },
-    { name: 'Taylor Sheridan', skill: 89, tier: 'A_LIST' as WriterTier, stats: { creativity: 85, dialogue: 92, structure: 95, pacing: 92 } },
-    { name: 'Noah Baumbach', skill: 91, tier: 'A_LIST' as WriterTier, stats: { creativity: 88, dialogue: 98, structure: 85, pacing: 82 } },
-    { name: 'Spike Lee', skill: 94, tier: 'A_LIST' as WriterTier, stats: { creativity: 95, dialogue: 95, structure: 90, pacing: 92 } },
-    { name: 'M. Night Shyamalan', skill: 88, tier: 'A_LIST' as WriterTier, stats: { creativity: 98, dialogue: 80, structure: 85, pacing: 88 } },
-    { name: 'James Gunn', skill: 92, tier: 'A_LIST' as WriterTier, stats: { creativity: 95, dialogue: 95, structure: 90, pacing: 96 } },
-    { name: 'Rian Johnson', skill: 91, tier: 'A_LIST' as WriterTier, stats: { creativity: 92, dialogue: 90, structure: 95, pacing: 94 } },
-    { name: 'Denis Villeneuve', skill: 95, tier: 'A_LIST' as WriterTier, stats: { creativity: 94, dialogue: 85, structure: 98, pacing: 92 } },
-    { name: 'Hayao Miyazaki', skill: 99, tier: 'A_LIST' as WriterTier, stats: { creativity: 100, dialogue: 90, structure: 95, pacing: 90 } },
-    { name: 'James Cameron', skill: 93, tier: 'A_LIST' as WriterTier, stats: { creativity: 95, dialogue: 80, structure: 98, pacing: 98 } },
-    { name: 'George Lucas', skill: 90, tier: 'A_LIST' as WriterTier, stats: { creativity: 98, dialogue: 75, structure: 90, pacing: 85 } },
-    { name: 'Francis Ford Coppola', skill: 96, tier: 'A_LIST' as WriterTier, stats: { creativity: 92, dialogue: 95, structure: 98, pacing: 92 } },
-    { name: 'Joel Coen', skill: 95, tier: 'A_LIST' as WriterTier, stats: { creativity: 95, dialogue: 98, structure: 95, pacing: 94 } },
-    { name: 'Ethan Coen', skill: 95, tier: 'A_LIST' as WriterTier, stats: { creativity: 95, dialogue: 98, structure: 95, pacing: 94 } },
-    { name: 'Ava DuVernay', skill: 90, tier: 'A_LIST' as WriterTier, stats: { creativity: 88, dialogue: 92, structure: 90, pacing: 88 } },
-    { name: 'Barry Jenkins', skill: 93, tier: 'A_LIST' as WriterTier, stats: { creativity: 92, dialogue: 95, structure: 90, pacing: 85 } },
-    { name: 'Sian Heder', skill: 89, tier: 'A_LIST' as WriterTier, stats: { creativity: 85, dialogue: 92, structure: 90, pacing: 88 } },
-    { name: 'Celine Sciamma', skill: 92, tier: 'A_LIST' as WriterTier, stats: { creativity: 95, dialogue: 90, structure: 88, pacing: 82 } },
-    { name: 'Michaela Coel', skill: 91, tier: 'A_LIST' as WriterTier, stats: { creativity: 95, dialogue: 95, structure: 85, pacing: 92 } },
-    { name: 'Jesse Armstrong', skill: 94, tier: 'A_LIST' as WriterTier, stats: { creativity: 90, dialogue: 98, structure: 95, pacing: 98 } },
-    { name: 'Vince Gilligan', skill: 95, tier: 'A_LIST' as WriterTier, stats: { creativity: 92, dialogue: 95, structure: 98, pacing: 96 } },
-    { name: 'David Simon', skill: 94, tier: 'A_LIST' as WriterTier, stats: { creativity: 90, dialogue: 98, structure: 95, pacing: 92 } }
-
-];
-
 export const generateWriters = (count: number): Writer[] => {
     const writers: Writer[] = [];
     for (let i = 0; i < count; i++) {
         // 20% chance for a famous writer in the first 5 slots
-        const isFamous = Math.random() < 0.2 && i < 5; 
+        const isFamous = Math.random() < 0.2 && i < 5;
+        const availableFeaturedWriters = WRITER_NPC_LIBRARY.filter(profile => !writers.some(writer => writer.id === profile.id));
         
-        if (isFamous) {
-            const famous = FAMOUS_WRITERS[Math.floor(Math.random() * FAMOUS_WRITERS.length)];
+        if (isFamous && availableFeaturedWriters.length) {
+            const famous = availableFeaturedWriters[Math.floor(Math.random() * availableFeaturedWriters.length)];
             writers.push({
-                id: `writer_famous_${Date.now()}_${i}`,
+                id: famous.id,
                 name: famous.name,
-                skill: famous.skill,
+                skill: famous.writerSkill,
                 fee: 500000 + Math.floor(Math.random() * 500000),
-                speed: 0.5 + (Math.random() * 0.3),
+                speed: famous.writerSpeed,
                 tier: 'A_LIST',
-                stats: famous.stats
+                stats: famous.writerStats
             });
             continue;
         }

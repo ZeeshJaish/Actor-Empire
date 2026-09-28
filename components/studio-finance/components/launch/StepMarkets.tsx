@@ -12,7 +12,7 @@
    player had no way to know it existed.
    ========================================================================== */
 
-import { lazy, Suspense, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { Competition, Country } from '../../finance/launch';
 import { summarize, unclaimed } from '../../finance/launch';
 import type { StepProps } from './LaunchWizard';
@@ -22,9 +22,8 @@ import { FlagField, flagAccent } from '../FlagField';
 import { Sheet, Tag } from '../ui';
 import { CountryReport, ShareBar } from './CountryReport';
 import GroupMarketThumbnail from './GroupMarketThumbnail';
+import GroupMarketMap from './GroupMarketMap';
 import { quoteStreamingMarketFilingEnergy } from '../../../../services/streamingMarketFilingQuote';
-
-const GroupMarketMap = lazy(() => import('./GroupMarketMap'));
 
 /* Plain words. "Fierce" was doing no work that "fought over" doesn't do. */
 export const COMPETITION_LABEL: Record<Competition, string> = {
@@ -393,9 +392,7 @@ export function StepMarkets({ data, draft, patch, chosen, handlers }: StepProps)
             }
           >
             <p className="lw-verdict">{group.summary.verdict}</p>
-            <Suspense fallback={<p className="lw-rule">Loading group map…</p>}>
-              <GroupMarketMap countries={group.countries} selectedIds={picked} onToggle={toggle} />
-            </Suspense>
+            <GroupMarketMap countries={group.countries} selectedIds={picked} onToggle={toggle} />
             <div className="cr-tiles">
               <span><em>Audience</em><b>{compactCount(group.summary.audience)}</b></span>
               <span><em>Growth</em><b className="sf-tone-good">{signedPct(group.summary.growth, 1)}</b></span>

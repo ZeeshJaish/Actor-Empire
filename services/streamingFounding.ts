@@ -13,6 +13,8 @@ import type {
 import { createInitialOwnedStreamingPlatformState } from '../types';
 import { createDeterministicId } from './deterministicRandom';
 import { getAbsoluteWeek } from './legacyLogic';
+import { initializeHistoricalMarketPacing } from './historicalMarketRivals';
+import { advanceStreamingOpportunityMarket } from './streamingOpportunityMarket';
 import { cleanStreamingBrandMarkDataUrl } from './streamingBrandImage';
 import {
     compactOwnedStreamingPlatformForPersistence,
@@ -434,10 +436,10 @@ export const incorporateOwnedStreamingPlatform = (
         reason: 'INCORPORATED',
         issues: [],
         cinematicId,
-        player: {
+        player: advanceStreamingOpportunityMarket(initializeHistoricalMarketPacing({
             ...player,
             money: player.money - STREAMING_INCORPORATION_ECONOMY.cashRequired,
             ownedStreamingPlatform: withCinematic,
-        },
+        })),
     };
 };

@@ -702,36 +702,36 @@ export const InstagramApp: React.FC<InstagramAppProps> = ({ player, onBack, onPo
                 <>
                     {tab === 'FEED' ? (
                         <>
-                            <button onClick={onBack}><ArrowLeft size={22}/></button>
+                            <button onClick={onBack} className="grid h-11 w-11 place-items-center rounded-full" aria-label="Back to phone"><ArrowLeft size={22}/></button>
                             <div className="font-bold text-lg font-serif italic">Instagram</div>
                             <div className="flex items-center gap-4">
-                                <button onClick={handleOpenDMInbox} className="relative">
+                                <button onClick={handleOpenDMInbox} className="relative grid h-11 w-11 place-items-center" aria-label="Open direct messages">
                                     <Send size={21} />
                                     {dmContacts.some(entry => entry.state.chatHistory.some(msg => msg.sender === 'NPC' && msg.action?.status === 'PENDING')) && (
                                         <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-red-500 border border-black"></span>
                                     )}
                                 </button>
-                                <button onClick={() => setIsCreatingPost(true)}><Camera size={22} /></button>
+                                <button onClick={() => setIsCreatingPost(true)} className="grid h-11 w-11 place-items-center" aria-label="Create post"><Camera size={22} /></button>
                             </div>
                         </>
                     ) : (
                         <>
                             <div className="font-bold text-lg">{tab === 'SEARCH' ? 'Search' : player.instagram.handle}</div>
                             <div className="flex items-center gap-4">
-                                <button onClick={handleOpenDMInbox} className="relative">
+                                <button onClick={handleOpenDMInbox} className="relative grid h-11 w-11 place-items-center" aria-label="Open direct messages">
                                     <Send size={21} />
                                     {dmContacts.some(entry => entry.state.chatHistory.some(msg => msg.sender === 'NPC' && msg.action?.status === 'PENDING')) && (
                                         <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-red-500 border border-black"></span>
                                     )}
                                 </button>
-                                <button onClick={() => setIsCreatingPost(true)}><Camera size={22} /></button>
+                                <button onClick={() => setIsCreatingPost(true)} className="grid h-11 w-11 place-items-center" aria-label="Create post"><Camera size={22} /></button>
                             </div>
                         </>
                     )}
                 </>
             ) : (
                 <>
-                    <button onClick={handleBackNav} className="p-1 -ml-2"><ArrowLeft size={22}/></button>
+                    <button onClick={handleBackNav} className="grid h-11 w-11 place-items-center rounded-full" aria-label="Back"><ArrowLeft size={22}/></button>
                     <div className="font-bold text-sm truncate flex-1 text-center pr-6">
                         {view === 'POST_DETAIL'
                             ? selectedPost?.authorHandle
@@ -827,7 +827,7 @@ export const InstagramApp: React.FC<InstagramAppProps> = ({ player, onBack, onPo
                                                 {post.campaignId && (
                                                     <div className="mt-2 text-[10px] font-black uppercase tracking-[0.16em] text-orange-300/80">Fan campaign · follow the moment</div>
                                                 )}
-                                                <button onClick={() => openPostDetail(post)} className="text-[11px] text-zinc-500 mt-2">
+                                                <button onClick={() => openPostDetail(post)} className="mt-2 flex min-h-11 items-center text-left text-[11px] text-zinc-500">
                                                     View all {formatFollowers(post.comments)} comments
                                                 </button>
                                                 <div className="text-[10px] text-zinc-500 mt-1 uppercase">Week {post.week}</div>
@@ -956,9 +956,9 @@ export const InstagramApp: React.FC<InstagramAppProps> = ({ player, onBack, onPo
 
                 {/* Bottom Nav */}
                 <div className="flex border-t border-zinc-800 bg-black pb-4 shrink-0">
-                    <button onClick={() => setTab('FEED')} className={`flex-1 py-3 flex justify-center ${tab === 'FEED' ? 'text-white' : 'text-zinc-600'}`}><Grid size={24}/></button>
-                    <button onClick={() => setTab('SEARCH')} className={`flex-1 py-3 flex justify-center ${tab === 'SEARCH' ? 'text-white' : 'text-zinc-600'}`}><Search size={24}/></button>
-                    <button onClick={() => setTab('PROFILE')} className={`flex-1 py-3 flex justify-center ${tab === 'PROFILE' ? 'text-white' : 'text-zinc-600'}`}><User size={24}/></button>
+                    <button onClick={() => setTab('FEED')} className={`flex-1 py-3 flex justify-center ${tab === 'FEED' ? 'text-white' : 'text-zinc-600'}`} aria-label="Instagram feed"><Grid size={24}/></button>
+                    <button onClick={() => setTab('SEARCH')} className={`flex-1 py-3 flex justify-center ${tab === 'SEARCH' ? 'text-white' : 'text-zinc-600'}`} aria-label="Instagram search"><Search size={24}/></button>
+                    <button onClick={() => setTab('PROFILE')} className={`flex-1 py-3 flex justify-center ${tab === 'PROFILE' ? 'text-white' : 'text-zinc-600'}`} aria-label="Instagram profile"><User size={24}/></button>
                 </div>
             </>
         )}
@@ -1362,7 +1362,7 @@ export const InstagramApp: React.FC<InstagramAppProps> = ({ player, onBack, onPo
         {isCreatingPost && (
             <div className="absolute inset-0 bg-black z-50 flex flex-col animate-in slide-in-from-bottom duration-300">
                 <div className="flex justify-between items-center px-4 pt-12 pb-3 bg-zinc-950/95 border-b border-zinc-800 shrink-0">
-                    <button onClick={closeCreator} className="rounded-full bg-zinc-900 border border-zinc-800 p-2 active:scale-95 transition-transform">
+                    <button onClick={closeCreator} className="grid h-11 w-11 place-items-center rounded-full bg-zinc-900 border border-zinc-800 active:scale-95 transition-transform" aria-label="Close post editor">
                         <XCircle size={21} className="text-zinc-400"/>
                     </button>
                     <div className="text-center">

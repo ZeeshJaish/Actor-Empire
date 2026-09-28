@@ -4,6 +4,7 @@ import { INITIAL_PLAYER } from '../types';
 import type { IndustryContentFingerprint, IndustryProductionCommitment, NPCStudioState, StudioAiSlateCommitment, WorldState } from '../types';
 import { normalizeStudioAiState } from '../services/studioAi';
 import { executeStudioAiProductionWeek } from '../services/studioAi/studioAiProductionExecution';
+import { getTalentCareerProfile } from '../services/talentCareer';
 
 const START = 1700;
 const studio = { id: 'B6_LIVE', name: 'B6 Live', valuation: 20, reputation: 78, cashReserve: 500, recentHits: 2, archetype: 'COMMERCIAL' } as NPCStudioState;
@@ -24,7 +25,18 @@ for (let week = START + 1; week <= START + 12; week += 1) {
 assert.equal(world.industryProductions![production.id].status, 'RELEASED');
 assert.equal(world.projects.filter(project => project.id === production.canonicalProjectId).length, 1);
 assert.equal(world.industryProductions![production.id].paidMillions, 20);
-assert.equal(world.talentBookings?.filter(row => row.projectId === production.canonicalProjectId && row.status === 'RELEASED').length, 2);
+const releasedProduction = world.industryProductions![production.id];
+assert.ok(releasedProduction.writerId?.startsWith('writer_npc_'));
+assert.equal(world.projects.find(project => project.id === production.canonicalProjectId)?.writerId, releasedProduction.writerId);
+assert.ok((getTalentCareerProfile(world, releasedProduction.writerId!)?.upfrontIncome || 0) > 0,
+    'A funded production must credit the writer from its existing milestone budget.');
+const releaseTalent = releasedProduction.studioAiExecution!.talent!;
+assert.ok((releaseTalent.talentParticipation?.contracts || []).some(contract =>
+    (getTalentCareerProfile(world, contract.talentId)?.backendIncome || 0) > 0),
+    'A released production must settle eligible backend only from collected receipts.');
+assert.equal(world.studios![studio.id].ai!.ledger.filter(row => row.category === 'TALENT_BACKEND' && row.description.includes(production.title)).length, 1,
+    'A release must post one backend expense.');
+assert.equal(world.talentBookings?.filter(row => row.projectId === production.canonicalProjectId && row.status === 'RELEASED').length, 3);
 assert.equal(world.studios![studio.id].ai!.intelligence!.content.selectedFingerprints[0].lifecycle, 'MATERIALIZED');
 assert.equal(world.studios![studio.id].ai!.intelligence!.content.selectedFingerprints[0].canonicalProjectId, production.canonicalProjectId);
 const repeat = executeStudioAiProductionWeek({ player, world, absoluteWeek: START + 12 });
@@ -130,5 +142,8 @@ for (let week = START + 1; week <= START + 40; week += 1) {
     doomedWorld = executeStudioAiProductionWeek({ player: { ...player, world: doomedWorld }, world: doomedWorld, absoluteWeek: week }).world;
 }
 assert.equal(doomedWorld.industryProductions![doomed.id].status, 'CANCELLED', 'an unfunded production with no valid buyer must eventually fail');
+assert.equal(getTalentCareerProfile(doomedWorld, doomedWorld.industryProductions![doomed.id].writerId || '')?.income || 0,
+    getTalentCareerProfile(world, doomedWorld.industryProductions![doomed.id].writerId || '')?.income || 0,
+    'Unfunded cancelled work cannot pay writers.');
 
 console.log('Studio AI B6 live production audit passed.');

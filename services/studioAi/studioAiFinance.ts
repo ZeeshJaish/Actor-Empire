@@ -26,6 +26,7 @@ const ledgerOrder: Record<StudioAiLedgerEntry['category'], number> = {
     PRODUCTION: 3,
     RELEASE_MARKETING: 4,
     RIGHTS_INCOME: 5,
+    TALENT_BACKEND: 5.5,
     TURNAROUND: 6,
     PROJECT_OUTCOME: 7,
     OPERATING_COST: 8,

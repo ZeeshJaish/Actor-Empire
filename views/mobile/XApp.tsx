@@ -28,6 +28,7 @@ import { ArrowLeft, Home, Search, PenTool, Heart, Repeat, MessageCircle, MoreHor
 import { IndustryClaimBadge, IndustryClaimContextPanel, IndustrySourceTrackRecord, getIndustryClaimPresentation } from './IndustryClaimContext';
 import { IndustryNarrativeContext } from './IndustryNarrativeContext';
 import { applyProjectPromotionAttribution, getEligiblePromotionProjects } from '../../services/projectPromotionAttribution';
+import './x-app-responsive.css';
 
 interface XAppProps {
     player: Player;
@@ -687,19 +688,19 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
 
                     {/* Action Bar */}
                     <div className="flex justify-between text-zinc-500 max-w-xs pr-2">
-                        <button className="flex items-center gap-1 group hover:text-blue-400 transition-colors">
+                        <button className="flex min-h-11 min-w-11 items-center justify-center gap-1 group hover:text-blue-400 transition-colors" aria-label="Replies">
                             <MessageCircle size={16} className="group-hover:bg-blue-500/10 rounded-full p-1 box-content transition-colors"/>
                             <span className="text-xs">{formatNumber(post.replies)}</span>
                         </button>
-                        <button onClick={(e) => { e.stopPropagation(); toggleRetweet(post.id); }} className={`flex items-center gap-1 group transition-colors ${post.isRetweeted ? 'text-green-500' : 'hover:text-green-400'}`}>
+                        <button onClick={(e) => { e.stopPropagation(); toggleRetweet(post.id); }} className={`flex min-h-11 min-w-11 items-center justify-center gap-1 group transition-colors ${post.isRetweeted ? 'text-green-500' : 'hover:text-green-400'}`} aria-label="Repost">
                             <Repeat size={16} className="group-hover:bg-green-500/10 rounded-full p-1 box-content transition-colors"/>
                             <span className="text-xs">{formatNumber(post.retweets)}</span>
                         </button>
-                        <button onClick={(e) => { e.stopPropagation(); toggleLike(post.id); }} className={`flex items-center gap-1 group transition-colors ${post.isLiked ? 'text-pink-500' : 'hover:text-pink-400'}`}>
+                        <button onClick={(e) => { e.stopPropagation(); toggleLike(post.id); }} className={`flex min-h-11 min-w-11 items-center justify-center gap-1 group transition-colors ${post.isLiked ? 'text-pink-500' : 'hover:text-pink-400'}`} aria-label="Like">
                             <Heart size={16} fill={post.isLiked ? "currentColor" : "none"} className="group-hover:bg-pink-500/10 rounded-full p-1 box-content transition-colors"/>
                             <span className="text-xs">{formatNumber(post.likes)}</span>
                         </button>
-                        <button className="flex items-center gap-1 group hover:text-blue-400">
+                        <button className="flex min-h-11 min-w-11 items-center justify-center gap-1 group hover:text-blue-400" aria-label="More post options">
                             <MoreHorizontal size={16} className="group-hover:bg-blue-500/10 rounded-full p-1 box-content"/>
                         </button>
                     </div>
@@ -826,7 +827,10 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                             <img src={player.avatar} className="w-full h-full object-cover" />
                         </div>
                         <div className="text-xl font-bold">X</div>
-                        <div onClick={onBack} className="p-2 -mr-2"><ArrowLeft size={20} /></div>
+                        <div className="flex items-center">
+                            <button type="button" onClick={() => { setComposeType('GENERAL'); setComposeOpen(true); }} className="ae-x-compose-compact h-11 w-11 place-items-center rounded-full" aria-label="Compose post"><PenTool size={20} /></button>
+                            <button type="button" onClick={onBack} className="grid h-11 w-11 place-items-center rounded-full" aria-label="Back to phone"><ArrowLeft size={20} /></button>
+                        </div>
                     </div>
                     <div className="flex text-sm font-bold text-zinc-500">
                         <button onClick={() => setFeedTab('FOR_YOU')} className={`flex-1 py-3 text-center hover:bg-white/5 relative ${feedTab === 'FOR_YOU' ? 'text-white' : ''}`}>
@@ -1038,7 +1042,8 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
             {/* --- FLOATING ACTION BUTTON --- */}
             <button
                 onClick={() => { setComposeType('GENERAL'); setComposeOpen(true); }}
-                className="absolute bottom-20 right-4 w-14 h-14 bg-blue-500 rounded-full flex items-center justify-center shadow-lg shadow-blue-900/20 active:scale-90 transition-transform z-30"
+                className="ae-x-compose-floating absolute bottom-20 right-4 w-14 h-14 bg-blue-500 rounded-full flex items-center justify-center shadow-lg shadow-blue-900/20 active:scale-90 transition-transform z-30"
+                aria-label="Compose post"
             >
                 <PenTool size={24} className="text-white" />
             </button>
@@ -1065,7 +1070,7 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                     <div className="px-4 pt-12 pb-3 border-b border-zinc-900 flex items-center justify-between bg-black/95 shrink-0">
                         <button
                             onClick={() => setComposeOpen(false)}
-                            className="rounded-full bg-zinc-950 border border-zinc-800 px-4 py-2 text-xs font-black uppercase tracking-widest text-zinc-300 active:scale-95 transition-transform"
+                            className="min-h-11 rounded-full bg-zinc-950 border border-zinc-800 px-4 py-2 text-xs font-black uppercase tracking-widest text-zinc-300 active:scale-95 transition-transform"
                         >
                             {tr('x.cancel')}
                         </button>

@@ -1,0 +1,7 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "scripts/audit-ios-week-transaction-phase4.ts"
+  ],
+  "exclude": ["functions"]
+}

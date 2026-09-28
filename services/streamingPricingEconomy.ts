@@ -3,6 +3,9 @@ import type {
     OwnedStreamingPricingConfiguration,
     OwnedStreamingPricingPlan,
     StreamingBillingPath,
+    StreamingCommercialCoreModel,
+    StreamingCommercialOfferBenefit,
+    StreamingCommercialOfferIntent,
     StreamingRevenueStreamId,
 } from '../types';
 
@@ -18,11 +21,90 @@ export const STREAMING_ANNUAL_BILLING_SHARE = .33;
    so a player may be as reckless as they like and will feel it. */
 export const STREAMING_MAXIMUM_ANNUAL_DISCOUNT = 50;
 export const STREAMING_MAXIMUM_INTRO_OFFER = 90;
+/** A standard break is one 30-second spot. The saved value remains ad minutes
+    per eligible viewing hour, so old non-preset and zero-load saves stay exact. */
+export const STREAMING_AD_INTERVAL_PRESETS = [5, 10, 15, 20, 30] as const;
+export const adMinutesPerHourForInterval = (intervalMinutes: number): number => (
+    Number.isFinite(intervalMinutes) && intervalMinutes > 0
+        ? Math.round(30 / intervalMinutes * 100) / 100 : 0
+);
+export const adIntervalForMinutesPerHour = (minutesPerHour: number): number | null => (
+    STREAMING_AD_INTERVAL_PRESETS.find(interval =>
+        Math.abs(adMinutesPerHourForInterval(interval) - minutesPerHour) < .0001) ?? null
+);
 
 const round2 = (value: number): number => Math.round(value * 100) / 100;
 const clamp = (value: number, minimum: number, maximum: number): number => (
     Math.min(maximum, Math.max(minimum, Number.isFinite(value) ? value : minimum))
 );
+
+const normalizeBenefit = (value: unknown): StreamingCommercialOfferBenefit => {
+    const source = value && typeof value === 'object' && !Array.isArray(value)
+        ? value as Record<string, unknown> : {};
+    return {
+        premiumAccess: source.premiumAccess === true,
+        earlyAccessWeeks: Math.round(clamp(Number(source.earlyAccessWeeks), 0, 4)),
+    };
+};
+
+const normalizeCommercialOffers = (
+    value: unknown,
+    streams: StreamingRevenueStreamId[],
+    plans: OwnedStreamingPricingPlan[],
+): StreamingCommercialOfferIntent => {
+    const source = value && typeof value === 'object' && !Array.isArray(value)
+        ? value as Record<string, unknown> : {};
+    const passes = source.adFreePasses && typeof source.adFreePasses === 'object'
+        ? source.adFreePasses as Record<string, unknown> : {};
+    const benefits = source.benefits && typeof source.benefits === 'object'
+        ? source.benefits as Record<string, unknown> : {};
+    const savedPlans = benefits.plans && typeof benefits.plans === 'object' && !Array.isArray(benefits.plans)
+        ? benefits.plans as Record<string, unknown> : {};
+    const storeEligibility = source.storeEligibility && typeof source.storeEligibility === 'object'
+        ? source.storeEligibility as Record<string, unknown> : {};
+    const inferredCore: StreamingCommercialCoreModel = streams.includes('subs') && plans.length
+        ? 'SUBSCRIPTION' : streams.includes('ads') ? 'ADVERTISING'
+            : streams.includes('rentals') ? 'STORE' : 'LEGACY';
+    const requestedCore = source.coreModel;
+    const inactiveAdPlans = source.inactiveAdPlans && typeof source.inactiveAdPlans === 'object'
+        ? source.inactiveAdPlans as Record<string, { monthly?: unknown }> : {};
+    const coreModel: StreamingCommercialCoreModel = requestedCore === 'SUBSCRIPTION' && streams.includes('subs') && plans.length
+        ? 'SUBSCRIPTION' : requestedCore === 'ADVERTISING' && streams.includes('ads')
+            ? 'ADVERTISING' : requestedCore === 'STORE' && streams.includes('rentals')
+                ? 'STORE' : inferredCore;
+    const passPrice = (price: unknown): number | null => (
+        typeof price === 'number' && Number.isFinite(price) && price > 0
+            ? normalizeStreamingPlanPrice(price, false) : null
+    );
+    return {
+        schemaVersion: 1,
+        coreModelSelected: source.coreModelSelected !== false,
+        inactiveAdPlans: Object.fromEntries(plans.flatMap(plan => {
+            const monthly = inactiveAdPlans[plan.id]?.monthly;
+            return typeof monthly === 'number' && Number.isFinite(monthly) && monthly >= 0
+                ? [[plan.id, { monthly: normalizeStreamingPlanPrice(monthly, true) }]] : [];
+        })),
+        coreModel,
+        freeAdAccess: streams.includes('ads') && (coreModel === 'ADVERTISING' || (typeof source.freeAdAccess === 'boolean'
+            ? source.freeAdAccess : (!streams.includes('subs') || plans.some(plan => plan.ads && plan.monthly === 0)))),
+        storeEligibility: storeEligibility.kind === 'MEMBERSHIP_PLANS' || (source.storeEligibility !== undefined
+            && storeEligibility.kind !== 'PUBLIC')
+            ? { kind: 'MEMBERSHIP_PLANS', planIds: [...new Set(Array.isArray(storeEligibility.planIds)
+                ? storeEligibility.planIds.filter((id): id is string => typeof id === 'string'
+                    && plans.some(plan => plan.id === id && plan.monthly > 0)) : [])] }
+            : { kind: 'PUBLIC', planIds: [] },
+        adFreePasses: {
+            oneHourPrice: passPrice(passes.oneHourPrice),
+            dayPrice: passPrice(passes.dayPrice),
+        },
+        benefits: {
+            plans: Object.fromEntries(plans.filter(plan => savedPlans[plan.id] !== undefined)
+                .map(plan => [plan.id, normalizeBenefit(savedPlans[plan.id])])),
+            freeAds: normalizeBenefit(benefits.freeAds),
+            store: normalizeBenefit(benefits.store),
+        },
+    };
+};
 
 export const normalizeStreamingPlanPrice = (value: number, canBeFree: boolean): number => {
     const minimum = canBeFree ? 0 : STREAMING_MINIMUM_PAID_PLAN_PRICE;
@@ -50,7 +132,16 @@ export const normalizeStreamingPricingConfiguration = (
             id: String(plan.id || `PLAN_${index + 1}`).slice(0, 50),
             name: String(plan.name || `Plan ${index + 1}`).slice(0, 40),
             monthly: normalizeStreamingPlanPrice(Number(plan.monthly), ads),
-            featureIds: [...new Set(plan.featureIds.map(String))].slice(0, 20),
+            featureIds: (() => {
+                const ids = [...new Set((Array.isArray(plan.featureIds) ? plan.featureIds : []).map(String))];
+                const resolved = ids.filter(id => !(
+                    (id === 'hd' && ids.includes('uhd'))
+                    || (id === 'streams2' && ids.includes('streams4'))
+                    || (id === 'noads' && ads)
+                ));
+                if (!ads && !resolved.includes('noads')) resolved.push('noads');
+                return resolved.slice(0, 20);
+            })(),
             ads,
         };
     });
@@ -59,10 +150,20 @@ export const normalizeStreamingPricingConfiguration = (
     const introOfferPlanId = pricing.introOfferPlanId && plans.some(plan => plan.id === pricing.introOfferPlanId)
         ? pricing.introOfferPlanId
         : undefined;
+    const commercialOffers = normalizeCommercialOffers(pricing.commercialOffers, streams, plans);
+    const canonicalPlans = plans.map(plan => {
+        const benefit = commercialOffers.benefits.plans[plan.id];
+        const early = Boolean(benefit?.premiumAccess && benefit.earlyAccessWeeks > 0);
+        return { ...plan, featureIds: [
+            ...plan.featureIds.filter(id => id !== 'early'),
+            ...(early ? ['early'] : []),
+        ] };
+    });
     return {
         ...pricing,
         streams,
-        plans,
+        plans: canonicalPlans,
+        commercialOffers,
         annualDiscount: round2(clamp(pricing.annualDiscount, 0, STREAMING_MAXIMUM_ANNUAL_DISCOUNT)),
         introOffer: round2(clamp(pricing.introOffer, 0, STREAMING_MAXIMUM_INTRO_OFFER)),
         introOfferPlanId,

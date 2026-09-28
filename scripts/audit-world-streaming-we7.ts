@@ -51,18 +51,19 @@ player.world.worldStreamingViewing = createWorldStreamingViewingState(player, ab
 const activePlatformIds = new Set(Object.values(player.world.worldStreamingCustomers.countries)
     .flatMap(country => country.platformSummaries.map(platform => platform.platformId)));
 assert.ok(activePlatformIds.size > 4, 'the shared customer world includes the full eligible platform field');
-assert.deepEqual(
-    new Set(Object.keys(player.world.worldStreamingViewing.platforms)),
-    activePlatformIds,
-    'WE6 viewing covers every platform that owns a canonical WE5 customer cell',
-);
+const viewingPlatformIds = new Set(Object.keys(player.world.worldStreamingViewing.platforms));
+assert.ok([...activePlatformIds].every(platformId => viewingPlatformIds.has(platformId)),
+    'WE6 viewing covers every platform with a canonical WE5 customer cell');
+assert.ok(viewingPlatformIds.size >= activePlatformIds.size,
+    'free and store-led platforms may view without a paid WE5 customer cell');
 
 const before = JSON.stringify(player);
 const economy = createPlatformEconomy(player, absoluteWeek);
 const repeated = createPlatformEconomy(player, absoluteWeek);
 assert.deepEqual(economy, repeated, 'identical WE7 inputs produce deterministic platform outcomes');
 assert.equal(JSON.stringify(player), before, 'WE7 construction does not mutate the player');
-assert.deepEqual(new Set(Object.keys(economy.platforms)), activePlatformIds, 'every active platform receives one shared economy summary');
+assert.deepEqual(new Set(Object.keys(economy.platforms)), viewingPlatformIds,
+    'every paid, free, and store-led platform receives one shared economy summary');
 assert.equal(
     Object.values(economy.platforms).reduce((sum: number, platform: any) => sum + platform.endingPaidAccounts, 0),
     player.world.worldStreamingCustomers.global.endingPaidAccounts,

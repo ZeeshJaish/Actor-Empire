@@ -19,6 +19,7 @@ export interface GreenlightNegotiationState {
     roleId?: string;
     originalSalary: number;
     currentDemand: number;
+    backendDemandPoints: number;
     attemptsLeft: number;
     talentName: string;
     talentImage: string;

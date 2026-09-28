@@ -90,7 +90,7 @@ export const BusinessWizard: React.FC<BusinessWizardProps> = ({ player, onCancel
     return (
         <div className="space-y-6 animate-in slide-in-from-right duration-300 pb-40 pt-4 relative">
             <div className="flex items-center gap-4 mb-4">
-                <button onClick={() => { if(wizStep > 1) setWizStep(wizStep - 1); else onCancel(); }} className="bg-zinc-900 p-2 rounded-full hover:bg-zinc-800"><ArrowLeft size={20}/></button>
+                <button onClick={() => { if(wizStep > 1) setWizStep(wizStep - 1); else onCancel(); }} className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-zinc-900 hover:bg-zinc-800" aria-label="Back in venture setup"><ArrowLeft size={20}/></button>
                 <h2 className="text-2xl font-black text-white uppercase tracking-tighter">{tr('services.business.wizard.newVenture')}</h2>
             </div>
 

@@ -3,7 +3,7 @@
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const assert = require('node:assert/strict');
 
-const URL = 'http://127.0.0.1:3000/scripts/fixtures/content-market-cm1.html';
+const URL = `${process.env.AE_MARKET_URL || 'http://127.0.0.1:5174'}/scripts/fixtures/content-market-cm1.html`;
 
 async function enterMarket(page) {
   await page.goto(URL);
@@ -24,14 +24,12 @@ async function enterMarket(page) {
     await enterMarket(page);
 
     assert.ok(await page.locator('[data-content-market-scene="market"][data-content-market-design="zip-exact"]').count() >= 1);
-    await page.getByRole('textbox', { name: 'Search the market' }).fill('Harbour 1');
-    await page.waitForFunction(() => JSON.parse(sessionStorage.getItem('cm1-isolated-player') || '{}')
-      .ownedStreamingPlatform?.contentMarketDraft?.search === 'Harbour 1');
-    await page.getByRole('button', { name: /The Harbour 1 ·/ }).click();
+    await page.getByRole('button', { name: /Fixed-price/ }).click();
+    await page.locator('[data-content-market-scene="market"] button[aria-label*=" · "]').first().click();
     await page.locator('[data-content-market-scene="detail"]').waitFor();
     await page.getByRole('button', { name: 'Deal', exact: true }).click();
     assert.match(await page.locator('body').innerText(), /GUARANTEE/);
-    await page.getByRole('button', { name: /BUY ·/ }).click();
+    await page.getByRole('button', { name: /LICENSE ·/ }).click();
     await page.getByText('ACQUIRED', { exact: true }).waitFor();
 
     const privatePage = await browser.newPage({ viewport: { width: 390, height: 844 } });
@@ -40,9 +38,9 @@ async function enterMarket(page) {
     await privatePage.getByRole('button', { name: 'Explore on my own', exact: true }).click();
     await privatePage.getByRole('button', { name: 'CONTENT MARKET', exact: true }).click();
     await privatePage.getByRole('button', { name: /THE MARKET/ }).click();
-    await privatePage.getByRole('textbox', { name: 'Search the market' }).fill('Harbour 1');
-    await privatePage.getByRole('button', { name: /The Harbour 1 ·/ }).click();
-    await privatePage.getByRole('button', { name: 'Make private offer' }).click();
+    await privatePage.getByRole('button', { name: /Fixed-price/ }).click();
+    await privatePage.locator('[data-content-market-scene="market"] button[aria-label*=" · "]').first().click();
+    await privatePage.getByRole('button', { name: 'Negotiate rights' }).click();
     await privatePage.locator('[data-content-market-scene="offer"]').waitFor();
     assert.match(await privatePage.locator('body').innerText(), /YOUR OFFER/);
     await privatePage.getByRole('button', { name: 'SEND IT', exact: true }).click();

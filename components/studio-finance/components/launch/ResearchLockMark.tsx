@@ -1,12 +1,10 @@
 interface ResearchLockMarkProps {
-  /** What unlocks it, e.g. "Product Experience 24". Omit to say only that the
-      option is locked — for dense lists where the requirement is named once
-      elsewhere on the screen rather than repeated on every tile. */
+  /** Retained for callers; lock requirements no longer appear in player copy. */
   reason?: string;
   compact?: boolean;
 }
 
-export function ResearchLockMark({ reason, compact = false }: ResearchLockMarkProps) {
+export function ResearchLockMark({ compact = false }: ResearchLockMarkProps) {
   return (
     <span
       className={`lw-research-lock${compact ? ' is-compact' : ''}`}
@@ -21,7 +19,6 @@ export function ResearchLockMark({ reason, compact = false }: ResearchLockMarkPr
       </span>
       <span className="lw-research-lock-copy">
         <b>Research locked</b>
-        {reason ? <em>{reason}</em> : null}
       </span>
     </span>
   );

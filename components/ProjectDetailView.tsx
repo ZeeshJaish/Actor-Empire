@@ -7,6 +7,7 @@ import { calculateProjectMusicImpact, formatProjectMusicByline, getMusicCreditRo
 import { ArrowLeft, Film, Tv, Info, DollarSign, Crown, CheckCircle, Shield, Zap, User, TrendingUp, Users, Globe, List, Percent, Minus, Plus, Sparkles, Handshake, Calendar, BarChart3, Clock, AlertCircle, Music2 } from 'lucide-react';
 import { getCharacterIdentityLabels, getOpportunityCharacterProfile, inferStoryCompass } from '../services/characterIdentityLogic';
 import { evaluateCharacterProfileFit, formatCharacterStoryFitLabel } from '../services/characterStoryFit';
+import '../styles/responsive-project-detail.css';
 
 interface ProjectDetailViewProps {
     opportunity: AuditionOpportunity;
@@ -159,17 +160,17 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
     };
 
     return (
-        <div className="absolute inset-0 z-[200] bg-[#050505] flex flex-col text-white animate-in slide-in-from-right duration-300 font-sans overflow-hidden">
+        <div className="ae-project-detail-viewport absolute inset-0 z-[200] bg-[#050505] flex flex-col text-white animate-in slide-in-from-right duration-300 font-sans overflow-hidden">
             
             {/* HERO HEADER */}
-            <div className={`relative ${themeColor} pt-20 pb-6 px-6 shadow-xl shrink-0 transition-colors duration-500`}>
+            <div className={`ae-project-detail-header relative ${themeColor} pt-20 pb-6 px-6 shadow-xl shrink-0 transition-colors duration-500`}>
                 <div className="absolute top-0 left-0 right-0 h-full bg-gradient-to-b from-black/20 to-black/60 pointer-events-none"></div>
                 <div className="absolute top-0 right-0 p-4 opacity-10">
                     {isUniverse ? <Globe size={120} /> : <Film size={120} />}
                 </div>
 
                 <div className="relative z-10 flex items-center justify-between mb-4">
-                    <button onClick={onBack} className="p-2 bg-black/20 hover:bg-black/40 rounded-full backdrop-blur-md transition-colors"><ArrowLeft size={20}/></button>
+                    <button onClick={onBack} aria-label="Back to auditions" className="grid h-11 w-11 shrink-0 place-items-center bg-black/20 hover:bg-black/40 rounded-full backdrop-blur-md transition-colors"><ArrowLeft size={20}/></button>
                     <div className="text-[10px] font-bold uppercase tracking-widest bg-black/20 px-3 py-1 rounded-full backdrop-blur-md">{headerTitle}</div>
                 </div>
 
@@ -180,10 +181,10 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                         </div>
                         {isUniverse && <span className="bg-amber-500 text-black text-[10px] font-bold px-2 py-1 rounded uppercase flex items-center gap-1"><Crown size={10}/> Franchise</span>}
                     </div>
-                    <h1 className="text-3xl md:text-4xl font-black leading-tight tracking-tight mb-2 text-white shadow-sm line-clamp-2">
+                    <h1 className="text-3xl md:text-4xl font-black leading-tight tracking-tight mb-2 text-white shadow-sm break-words">
                         {isUniverse && universe ? universe.characterName : project.title}
                     </h1>
-                        <div className={`text-xs font-bold ${textColor} uppercase tracking-wider flex items-center gap-2`}>
+                        <div className={`text-xs font-bold ${textColor} uppercase tracking-wider flex flex-wrap items-center gap-2`}>
                             {isUniverse && universe ? <span>{universe.universeId} Universe</span> : <span>{studio.name}</span>}
                             <span className="w-1 h-1 bg-white/30 rounded-full"></span>
                             <span>{project.genre}</span>
@@ -199,7 +200,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
             </div>
 
             {/* SCROLL CONTENT */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4 bg-zinc-950">
+            <div className="ae-project-detail-body min-h-0 flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4 bg-zinc-950">
                 <section className="border-y border-cyan-300/15 bg-cyan-300/[0.035] px-1 py-4">
                     <div className="flex items-center justify-between gap-3">
                         <div>
@@ -497,24 +498,24 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                                 </div>
 
                                 <div className="flex items-center gap-2">
-                                    <button onClick={() => changeSalary(-500000)} className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center hover:bg-zinc-700 text-zinc-400"><Minus size={14}/></button>
+                                    <button onClick={() => changeSalary(-500000)} aria-label="Decrease salary" className="h-11 w-11 shrink-0 rounded-lg bg-zinc-800 flex items-center justify-center hover:bg-zinc-700 text-zinc-400"><Minus size={14}/></button>
                                     <div className="flex-1 bg-zinc-900 rounded-lg py-2 px-2 text-center border border-zinc-700">
                                         <span className="text-sm font-mono font-bold text-white">${counterSalary.toLocaleString()}</span>
                                     </div>
-                                    <button onClick={() => changeSalary(500000)} className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center hover:bg-zinc-700 text-zinc-400"><Plus size={14}/></button>
+                                    <button onClick={() => changeSalary(500000)} aria-label="Increase salary" className="h-11 w-11 shrink-0 rounded-lg bg-zinc-800 flex items-center justify-center hover:bg-zinc-700 text-zinc-400"><Plus size={14}/></button>
                                 </div>
 
                                 <div className="flex items-center gap-2">
-                                    <button onClick={() => changeRoyalty(-0.5)} className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center hover:bg-zinc-700 text-zinc-400"><Minus size={14}/></button>
+                                    <button onClick={() => changeRoyalty(-0.5)} aria-label="Decrease royalty" className="h-11 w-11 shrink-0 rounded-lg bg-zinc-800 flex items-center justify-center hover:bg-zinc-700 text-zinc-400"><Minus size={14}/></button>
                                     <div className="flex-1 bg-zinc-900 rounded-lg py-2 px-2 text-center border border-zinc-700">
                                         <span className="text-sm font-mono font-bold text-amber-400">{counterRoyaltyPct}% Points</span>
                                     </div>
-                                    <button onClick={() => changeRoyalty(0.5)} className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center hover:bg-zinc-700 text-zinc-400"><Plus size={14}/></button>
+                                    <button onClick={() => changeRoyalty(0.5)} aria-label="Increase royalty" className="h-11 w-11 shrink-0 rounded-lg bg-zinc-800 flex items-center justify-center hover:bg-zinc-700 text-zinc-400"><Plus size={14}/></button>
                                 </div>
 
                                 <button 
                                     onClick={handleSubmitCounter}
-                                    className="w-full py-3 bg-amber-600 hover:bg-amber-500 text-black font-bold rounded-lg text-xs uppercase tracking-wide transition-colors shadow-lg"
+                                    className="w-full min-h-11 py-3 bg-amber-600 hover:bg-amber-500 text-black font-bold rounded-lg text-xs uppercase tracking-wide transition-colors shadow-lg"
                                 >
                                     Submit Counter
                                 </button>

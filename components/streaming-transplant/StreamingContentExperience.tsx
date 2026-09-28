@@ -13,7 +13,7 @@
 import s from './presentation/screens/ContentDesk/ContentDesk.module.css';
 import { cx } from './presentation/cx';
 import { brandVars } from './presentation/brand';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Archive, ChevronRight, Film, LibraryBig, LockKeyhole, Sparkles, X } from 'lucide-react';
 import { Brand, Mark, brandColor, brandDeep, typeFace } from './StreamingBrandVisuals';
 
@@ -171,6 +171,21 @@ export const ContentDesk: React.FC<{
   const [tab, setTab] = useState<Tab>(initialTab ?? 'LIBRARY');
   const [filter, setFilter] = useState<'ALL' | 'ORIGINAL' | 'LICENSED' | 'OWNED' | 'EXPIRING'>('ALL');
   const [showEntryRoutes, setShowEntryRoutes] = useState(false);
+  const [openingMarket, setOpeningMarket] = useState(false);
+  const openFrame = useRef<number | null>(null);
+  const openTimer = useRef<number | null>(null);
+  useEffect(() => () => {
+    if (openFrame.current !== null) cancelAnimationFrame(openFrame.current);
+    if (openTimer.current !== null) clearTimeout(openTimer.current);
+  }, []);
+  const openContent = () => {
+    if (!onAddContent) { setShowEntryRoutes(true); return; }
+    if (openingMarket) return;
+    setOpeningMarket(true);
+    openFrame.current = requestAnimationFrame(() => {
+      openTimer.current = window.setTimeout(() => { setOpeningMarket(false); onAddContent(); }, 0);
+    });
+  };
 
   const licensed = useMemo(() => state.titles.filter(t => t.rights), [state.titles]);
   const expiring = useMemo(
@@ -262,7 +277,7 @@ export const ContentDesk: React.FC<{
           <section className={s.cdsec}>
             <div className={s.cdhead}>
               <h2>Library</h2>
-              <button className={s.cdadd} onClick={() => onAddContent ? onAddContent() : setShowEntryRoutes(true)}>+ ADD CONTENT</button>
+              <button className={s.cdadd} disabled={openingMarket} aria-busy={openingMarket} onClick={openContent}>{openingMarket ? 'OPENING MARKET…' : '+ ADD CONTENT'}</button>
             </div>
             <div className={s.chips}>
               {(['ALL', 'ORIGINAL', 'LICENSED', 'OWNED', 'EXPIRING'] as const).map(f => (
@@ -277,7 +292,7 @@ export const ContentDesk: React.FC<{
                 <span className={s.emptyLibraryMark}><Film size={25} /></span>
                 <strong>Your shelves are empty.</strong>
                 <p>Choose how the first title enters the service.</p>
-                <button type="button" onClick={() => onAddContent ? onAddContent() : setShowEntryRoutes(true)}>ADD CONTENT <ChevronRight size={15} /></button>
+                <button type="button" disabled={openingMarket} aria-busy={openingMarket} onClick={openContent}>{openingMarket ? 'OPENING MARKET…' : 'ADD CONTENT'} <ChevronRight size={15} /></button>
               </div>
             ) : shown.length === 0 ? <div className={s.empty}>Nothing matches that filter.</div> : null}
 

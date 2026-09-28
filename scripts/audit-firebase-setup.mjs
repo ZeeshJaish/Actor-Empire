@@ -36,7 +36,7 @@ for (const dependency of [
   if (!packageJson.dependencies?.[dependency]) failures.push(`package.json is missing ${dependency}`);
 }
 
-if (!indexSource.includes('void bootstrapFirebase();') || !indexSource.includes('installGlobalTelemetryHandlers();')) {
+if (!indexSource.includes('bootstrapFirebase();') || !indexSource.includes('installGlobalTelemetryHandlers();')) {
   failures.push('index.tsx does not bootstrap Firebase and global telemetry handlers');
 }
 

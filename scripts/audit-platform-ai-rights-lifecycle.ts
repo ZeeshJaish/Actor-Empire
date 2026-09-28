@@ -589,6 +589,8 @@ const renewalContracts = activated.world.platforms!.NETFLIX.ai!.rightsContracts.
 assert.equal(renewalContracts.length, 1);
 assert.equal(renewalContracts[0].startsAtAbsoluteWeek, EXPIRY_WEEK + 1);
 assert.equal(renewalContracts[0].renewedFromLicenseId, renewalContract.id);
+assert.equal(renewalContracts[0].accessGrant?.schemaVersion, 1,
+    'AI renewal must carry a finite access grant rather than leaving it implicit');
 const canonicalRenewalContract = activated.world.streamingRightsContracts?.[renewalContracts[0].id];
 assert.ok(canonicalRenewalContract, 'An activated Platform AI renewal should register one world-level canonical contract.');
 assert.equal(canonicalRenewalContract?.settlement.guarantee, 'PAID');

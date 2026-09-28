@@ -106,7 +106,7 @@ const sourceFor = (facility: OwnedStreamingFacility, fibre: number): CoverageSou
 };
 
 const normalizedShare = (value: number): number => Number.isFinite(value)
-    ? Math.max(0, Math.min(1, value))
+    ? (value >= 1 - 1e-8 ? 1 : Math.max(0, Math.min(1, value)))
     : 0;
 
 export const deriveStreamingNetworkCoverage = (
@@ -143,13 +143,16 @@ export const deriveStreamingNetworkCoverage = (
                 const strength = normalizedShare(1 - missed);
                 reachedShare += place.share * strength;
                 if (strength >= standard) {
-                    const served = place.share * strength;
+                    // Signal is a qualification gate, not a fractional customer.
+                    // A cluster meeting the stream standard is geographically
+                    // serviceable in full; concurrent load is checked separately.
+                    const served = place.share;
                     coveredShare += served;
                     if (strongest?.cloud) cloudServedShare += served;
                 }
             }
-            const normalized = normalizedShare(reachedShare);
-            const covered = Math.min(normalized, normalizedShare(coveredShare));
+            const covered = normalizedShare(coveredShare);
+            const normalized = Math.max(covered, normalizedShare(reachedShare));
             const cloudServed = Math.min(covered, normalizedShare(cloudServedShare));
             return {
                 countryId,

@@ -3,8 +3,21 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import StreamingContentMarket from '../components/StreamingContentMarket';
 import { contentMarketFixture } from './helpers/contentMarketFixture';
-import { getContentMarketCollections, getContentMarketListings, getContentMarketSupplySummary } from '../services/streamingContentMarket';
+import { getContentMarketCollections, getContentMarketListings, getContentMarketSupplySummary,
+  searchContentMarketLibrary } from '../services/streamingContentMarket';
 import { getStreamingBuyerAuctionLots, openStreamingBuyerAuction } from '../services/streamingBuyerAuctions';
+import { migratePlayerSave } from '../services/saveMigration';
+import { getHistoricalCatalogueTitles } from '../services/historicalCatalogue';
+import { createOwnedStreamingPlatformState, normalizeOwnedStreamingPlatformState } from '../services/ownedStreamingPlatform';
+
+for (const playerId of ['', 'player', 'legacy-streamer']) {
+  const expected = createOwnedStreamingPlatformState(playerId);
+  const recovered = normalizeOwnedStreamingPlatformState({}, playerId);
+  assert.equal(recovered.lifecycle, expected.lifecycle, 'Fast normalization keeps the default lifecycle');
+  assert.equal(recovered.infrastructureStrategy, expected.infrastructureStrategy, 'Fast normalization keeps the default infrastructure choice');
+  assert.equal(recovered.founderOwnershipPercent, expected.founderOwnershipPercent, 'Fast normalization keeps founder ownership');
+  assert.equal(recovered.simulationSeed, expected.simulationSeed, 'Fast normalization keeps the deterministic seed for legacy saves');
+}
 
 const player = contentMarketFixture();
 const brand = {
@@ -38,7 +51,7 @@ assert.doesNotMatch(html, /rights simply move/i, 'Studio import copy must not im
 assert.doesNotMatch(html, /own it outright/i, 'Commission copy must not promise ownership beyond the signed contract');
 assert.match(html, /\$500M to spend/, 'Buying power is projected from the real Content Market funds');
 const gateSupply = getContentMarketSupplySummary(player);
-assert.match(html, new RegExp(`${gateSupply.totalCanonicalTitles} TITLES · ${gateSupply.liveAuctions} LIVE`), 'The market gate counts canonical titles rather than package cards');
+assert.match(html, new RegExp(`${gateSupply.sharedLibraryTitles} TITLES · ${gateSupply.liveAuctions} LIVE`), 'The market gate shows the searchable shared library rather than just this cycle’s sale cards');
 
 const marketPlayer = contentMarketFixture();
 marketPlayer.ownedStreamingPlatform.contentMarketDraft = {
@@ -63,12 +76,41 @@ assert.match(marketHtml, /aria-label="Search the market"/, 'The ZIP catalogue se
 assert.match(marketHtml, />Filter</, 'The ZIP filter-sheet trigger is present');
 assert.match(marketHtml, /aria-label="Sort"/, 'The ZIP market sort control is present');
 assert.match(marketHtml, /aria-label="Toggle density"/, 'The ZIP density switch is present');
-assert.match(marketHtml, /In the room now/, 'The exact rails-first market includes live rooms');
-assert.match(marketHtml, /Everyone is talking about these/, 'The exact rails-first market includes public-interest discovery');
-assert.match(marketHtml, /Already proven/, 'The exact rails-first market includes proven releases');
+assert.match(marketHtml, /Live bidding/, 'The auction rail clearly names live bidding');
+assert.match(marketHtml, /Hot now/, 'The public-interest rail uses concise discovery language');
+assert.match(marketHtml, /Box-office proven/, 'The historical-results rail identifies its evidence');
 assert.match(marketHtml, /The Harbour 1/, 'The poster wall is populated from live game listings, not ZIP fixtures');
-assert.match(marketHtml, /OPEN/, 'Direct-purchase cards state their real availability');
-assert.match(marketHtml, /IN THE ROOM/, 'Persistent buyer auctions are integrated into the same ZIP market floor');
+assert.match(marketHtml, /FIXED-PRICE LICENCE/, 'Direct-purchase cards name the rights transaction');
+assert.match(marketHtml, /LIVE BIDDING/, 'Persistent buyer auctions are integrated into the same market floor');
+assert.doesNotMatch(marketHtml, /IN THE ROOM|>ROOM</, 'Market cards do not use ambiguous room shorthand');
+
+const sharedLibraryPlayer = migratePlayerSave(contentMarketFixture());
+sharedLibraryPlayer.ownedStreamingPlatform.contentMarketDraft = {
+  tab: 'ALL', search: 'Hollow Meridian', selectedId: '__open_market__', ownedIds: [],
+};
+const sharedLibraryHtml = renderToStaticMarkup(<StreamingContentMarket
+  player={sharedLibraryPlayer} brand={brand} onUpdatePlayer={() => undefined}
+  onClose={() => undefined} onOpenFinance={() => undefined}
+  onCommission={() => undefined} onReview={() => undefined} />);
+assert.match(sharedLibraryHtml, /Shared library search results/i,
+  'the active ZIP market screen must expose full-library search, not only the legacy screen');
+assert.match(sharedLibraryHtml, /The Hollow Meridian/,
+  'search must find a seeded marquee title by canonical identity');
+assert.match(sharedLibraryHtml, /MARQUEE/,
+  'premium fictional projects must be identifiable in the active market');
+const unshelvedTitle = getHistoricalCatalogueTitles(sharedLibraryPlayer).find(title =>
+  searchContentMarketLibrary(sharedLibraryPlayer, { query: title.title, limit: 100 })
+    .find(row => row.title.id === title.id)?.status === 'NOT_OFFERED');
+assert.ok(unshelvedTitle, 'a deep-library title should exist outside the small direct shelf');
+sharedLibraryPlayer.ownedStreamingPlatform.contentMarketDraft.search = unshelvedTitle.title;
+const deepLibraryHtml = renderToStaticMarkup(<StreamingContentMarket
+  player={sharedLibraryPlayer} brand={brand} onUpdatePlayer={() => undefined}
+  onClose={() => undefined} onOpenFinance={() => undefined}
+  onCommission={() => undefined} onReview={() => undefined} />);
+assert.ok(deepLibraryHtml.includes(unshelvedTitle.title),
+  'the active market search must discover an unshelved shared-library title');
+assert.match(deepLibraryHtml, /NOT OFFERED/,
+  'an unshelved title must not gain a purchase action through search');
 
 const detailPlayer = contentMarketFixture();
 const detailListing = getContentMarketListings(detailPlayer)[0];
@@ -93,10 +135,11 @@ assert.match(detailHtml, /YOU CAN LICENSE/, 'The exact avails sheet leads with e
 assert.match(detailHtml, />Rights</, 'The title page preserves the ZIP Rights face');
 assert.match(detailHtml, />Deal</, 'The title page preserves the ZIP Deal face');
 assert.match(detailHtml, />Interest</, 'The title page preserves the ZIP Interest face');
-assert.match(detailHtml, /THE ASK/, 'The listed guarantee remains the primary commercial decision');
+assert.match(detailHtml, /LICENCE GUARANTEE/, 'The listed guarantee remains the primary commercial decision');
 assert.match(detailHtml, /The Harbour 1/, 'The detail page uses the canonical project title');
-assert.match(detailHtml, /BUY ·/, 'The existing immediate-signing action remains connected to the ZIP action bar');
-assert.match(detailHtml, /OFFER/, 'The private-offer route remains connected to the ZIP action bar');
+assert.match(detailHtml, /LICENSE ·/, 'The immediate-signing action is explicitly a licence');
+assert.match(detailHtml, /NEGOTIATE RIGHTS/, 'The private-offer route names negotiation');
+assert.match(detailHtml, /film IP remains with/i, 'The detail clarifies that the film IP does not transfer');
 
 const collectionPlayer = contentMarketFixture();
 collectionPlayer.world.projects.push(...Array.from({ length: 20 }, (_, index) => ({
@@ -174,7 +217,7 @@ const roomsHtml = renderToStaticMarkup(
   />,
 );
 assert.match(roomsHtml, /data-content-market-scene="market"/, 'Live buyer auctions stay on the shared exact ZIP market floor');
-assert.match(roomsHtml, /IN THE ROOM/, 'An unentered auction clearly signals that bidding is live');
+assert.match(roomsHtml, /LIVE BIDDING/, 'An unentered auction clearly signals that bidding is live');
 
 const roomPlayer = contentMarketFixture();
 const roomLot = getStreamingBuyerAuctionLots(roomPlayer)[0];

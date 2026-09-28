@@ -1,15 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { createWorldCountryCutout } from '../../../../views/lifestyle/business/components/worldMapGeometry';
+import { createWorldCountryCutout as createDetailedWorldCountryCutout } from '../../../../views/lifestyle/business/components/worldMapDetailedGeometry';
 
 type CountryCutoutFactory = typeof createWorldCountryCutout;
 
-let detailedCountryCutoutFactoryPromise: Promise<CountryCutoutFactory> | undefined;
-
 export function loadDetailedCountryCutoutFactory(): Promise<CountryCutoutFactory> {
-  detailedCountryCutoutFactoryPromise ??= import(
-    '../../../../views/lifestyle/business/components/worldMapDetailedGeometry'
-  ).then(module => module.createWorldCountryCutout);
-  return detailedCountryCutoutFactoryPromise;
+  return Promise.resolve(createDetailedWorldCountryCutout);
 }
 
 interface Props {
@@ -41,25 +37,11 @@ export function CountryShape({
 }: Props) {
   const resolvedCode = (countryCode || (shape === 'uk' ? 'GB' : shape)).toUpperCase();
   const resolvedName = countryName || resolvedCode;
-  const [cutoutFactory, setCutoutFactory] = useState<CountryCutoutFactory>(() => createWorldCountryCutout);
-
-  useEffect(() => {
-    let mounted = true;
-    void loadDetailedCountryCutoutFactory()
-      .then(factory => {
-        if (mounted) setCutoutFactory(() => factory);
-      })
-      .catch(() => {
-        // The lightweight atlas remains a complete, interactive fallback.
-      });
-    return () => { mounted = false; };
-  }, []);
-
   const cutout = useMemo(
-    () => cutoutFactory(resolvedCode, resolvedName, 128, 100),
-    [cutoutFactory, resolvedCode, resolvedName],
+    () => createDetailedWorldCountryCutout(resolvedCode, resolvedName, 128, 100),
+    [resolvedCode, resolvedName],
   );
-  const mapDetail = cutoutFactory === createWorldCountryCutout ? '110m' : '50m';
+  const mapDetail = '50m';
 
   const pinPoints = pins.map(pin => {
     if (cutout && typeof pin.longitude === 'number' && typeof pin.latitude === 'number') {

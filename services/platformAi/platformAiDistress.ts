@@ -26,6 +26,8 @@ import {
     validateStreamingRightsAvailability,
 } from '../streamingRightsCore';
 import { settleStreamingRightsTransfer } from '../streamingRightsTransactions';
+import { createStreamingRightsAccessGrantForOffer } from '../streamingRightsAccessGrant';
+import { getWorldStreamingOffers } from '../worldEconomy/worldStreamingOffers';
 import { normalizeStreamingDayOneMarketIds, STREAMING_DAY_ONE_MARKETS } from '../streamingDayOneMarkets';
 import { calculatePlatformAiRightsValueMillions } from './platformAiContentSourcing';
 import { PLATFORM_AI_PROFILES } from './platformAiProfiles';
@@ -1261,6 +1263,11 @@ const transferPendingDeal = (
         sequelRightsIncluded: false,
         changeOfControl: 'NOTICE',
         cancellationPenalty: 0,
+        accessGrant: createStreamingRightsAccessGrantForOffer(
+            getWorldStreamingOffers({ ...player, world }, absoluteWeek).offers
+                .find(offer => offer.platformId === buyer.id)?.commercialConfiguration.streams || ['subs'],
+            false,
+        ),
     });
     buyer = {
         ...buyer,

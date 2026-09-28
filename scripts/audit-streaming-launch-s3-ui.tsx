@@ -8,6 +8,8 @@ import { StepMarkets } from '../components/studio-finance/components/launch/Step
 import { StepClearance } from '../components/studio-finance/components/launch/StepClearance';
 import { CountryReport } from '../components/studio-finance/components/launch/CountryReport';
 import { STREAMING_MARKET_SUB_REGIONS } from '../services/streamingMarketSubRegions';
+import StreamingDefineLaunchExperience from '../components/StreamingDefineLaunchExperience';
+import { contentMarketFixture } from './helpers/contentMarketFixture';
 
 const caribbean = STREAMING_MARKET_SUB_REGIONS.find(group => group.id === 'CARIBBEAN')!;
 const countries: Country[] = caribbean.countryIds.map((id, index) => ({
@@ -83,4 +85,21 @@ test('a zero-cash country report does not render non-finite cost bars', () => {
   } as Country;
   const report = renderToStaticMarkup(<CountryReport country={country} />);
   assert.doesNotMatch(report, /NaN|Infinity/);
+});
+
+test('Define the Launch header shows the player week instead of lifetime absolute week', () => {
+  const player = contentMarketFixture();
+  player.currentWeek = 12;
+  const markup = renderToStaticMarkup(<StreamingDefineLaunchExperience
+    player={player}
+    onUpdatePlayer={() => undefined}
+    onClose={() => undefined}
+    onOpenFinance={() => undefined}
+    onOpenCatalogue={() => undefined}
+    onOpenBuild={() => undefined}
+    onOpenPricing={() => undefined}
+    onOpenTechnology={() => undefined}
+  />);
+  assert.match(markup, /Week (?:<!-- -->)?12/);
+  assert.doesNotMatch(markup, /Week (?:<!-- -->)?1312/);
 });

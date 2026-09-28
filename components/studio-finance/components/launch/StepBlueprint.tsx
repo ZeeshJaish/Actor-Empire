@@ -15,7 +15,7 @@ import type { ReactNode } from 'react';
 import type { LaunchStepId } from '../../finance/launch';
 import { forecastPricing, summarize } from '../../finance/launch';
 import type { StepProps } from './LaunchWizard';
-import { compactCount, money, pct } from '../../finance/format';
+import { compactCount, money, moneyPrecise, pct } from '../../finance/format';
 import { FlagField } from '../FlagField';
 import { StreamingTitleArt } from '../StreamingTitleArt';
 import { Mark } from '../../../streaming-transplant/StreamingBrandVisuals';
@@ -29,13 +29,36 @@ const WAVE: Record<string, number[]> = {
   machine: [90, 20, 85, 25, 80, 30, 70],
 };
 
-export function StepBlueprint({ data, draft, chosen, treasury, free, gap, handlers, onJump }: StepProps & { onJump: (step: LaunchStepId) => void }) {
+export function summarizeBlueprintOffer(settings: import('../../finance/launch').PricingSettings) {
+  const subscription = settings.streams.includes('subs') && settings.plans.length > 0;
+  const ads = settings.streams.includes('ads');
+  const store = settings.streams.includes('rentals');
+  const planPrice = subscription ? Math.min(...settings.plans.map(plan => plan.monthly)) : 0;
+  const extras = [ads ? 'free ads' : null, store ? 'rent or buy' : null].filter(Boolean).join(' + ');
+  return {
+    showPlanLadder: subscription,
+    label: subscription ? 'What it costs a household' : 'Viewing offer',
+    value: subscription
+      ? `${settings.plans.length} plans from ${moneyPrecise(planPrice)}${extras ? ` + ${extras}` : ''}`
+      : ads && store ? 'Free with ads + rent or buy'
+        : ads ? `Free with ads · ${settings.ads.minutesPerHour} ad min/hour`
+          : store ? `Rent ${moneyPrecise(settings.rentals.rent)} · Buy ${moneyPrecise(settings.rentals.buy)}`
+            : 'Choose an offer',
+    readout: ads ? 'FREE' : store ? 'PER TITLE' : '',
+    detail: ads ? `${settings.ads.minutesPerHour} ad min/hour` : store ? 'Rent or own' : '',
+  };
+}
+
+export function StepBlueprint({ data, draft, chosen, treasury, free, gap, handlers, pricingPreview, onJump }: StepProps & { onJump: (step: LaunchStepId) => void }) {
   const footprint = summarize(chosen);
   const settings = draft.pricing ?? data.pricing;
+  const offer = summarizeBlueprintOffer(settings);
   const addressableHouseholds = chosen.reduce((sum, country) => sum + country.addressableHouseholds, 0);
   const pricingCohorts = chosen.flatMap(country => country.pricingCohorts || []);
-  const worldForecast = handlers.onForecastPricing?.(settings, chosen.map(country => country.id)) ?? null;
-  const forecast = forecastPricing(settings, addressableHouseholds, data.market, pricingCohorts, worldForecast);
+  const worldForecast = pricingPreview ? pricingPreview.worldForecast
+    : handlers.onForecastPricing?.(settings, chosen.map(country => country.id)) ?? null;
+  const forecast = pricingPreview?.forecast ?? forecastPricing(settings, addressableHouseholds, data.market, pricingCohorts, worldForecast);
+  const forecastReady = Boolean(worldForecast) && !pricingPreview?.updating;
   const approved = data.clearance.filter((c) => c.outcome === 'APPROVED' || c.outcome === 'CONDITIONS').length;
   const storefront = data.storefronts.find((s) => s.id === draft.storefrontId);
   const sound = data.identSounds.find((s) => s.id === draft.soundId);
@@ -154,13 +177,11 @@ export function StepBlueprint({ data, draft, chosen, treasury, free, gap, handle
           </div>
         </Tile>
 
-        <Tile label="What it costs a household" state={settings.streams.length > 0} onJump={() => onJump('pricing')}
-          value={settings.streams.includes('subs')
-            ? `${settings.plans.length} plans from ${money(forecast.entryPrice)}`
-            : `${settings.streams.length} revenue stream${settings.streams.length > 1 ? 's' : ''}`}>
+        <Tile label={offer.label} state={settings.streams.length > 0} onJump={() => onJump('pricing')}
+          value={offer.value}>
           {/* The price ladder, drawn against the dearest plan so the shape is
               the shape of your own pricing rather than an arbitrary scale. */}
-          <div
+          {offer.showPlanLadder ? <div
             className="bl-ladder"
             style={{ ['--bl-plan-count' as string]: Math.max(1, Math.min(5, settings.plans.length)) }}
             aria-label={`${settings.plans.length} household plan${settings.plans.length === 1 ? '' : 's'}`}
@@ -173,8 +194,9 @@ export function StepBlueprint({ data, draft, chosen, treasury, free, gap, handle
                 </span>
               );
             })}
-            {settings.plans.length === 0 && <em className="bl-none">No plans</em>}
-          </div>
+          </div> : <div className="bl-offer-readout" aria-label={offer.value}>
+            <strong>{offer.readout}</strong><span>{offer.detail}</span>
+          </div>}
         </Tile>
 
         <Tile label="Opening catalogue" state={data.catalogue.readyForLaunch ?? data.catalogue.titles > 0} onJump={() => onJump('catalogue')}
@@ -192,21 +214,21 @@ export function StepBlueprint({ data, draft, chosen, treasury, free, gap, handle
       <section className="bl-money">
         <div className="bl-money-top">
           <div>
-            <p className="sf-eyebrow">Forecast revenue</p>
-            <p className="bl-money-figure">{money(forecast.monthlyRevenue)}<i>/mo</i></p>
+            <p className="sf-eyebrow">Potential gross if playable</p>
+            <p className="bl-money-figure">{forecastReady ? money(forecast.monthlyRevenue) : '—'}<i>/mo</i></p>
           </div>
           <div className="is-end">
             <p className="sf-eyebrow">Households</p>
-            <p className="bl-money-figure">{compactCount(forecast.households)}</p>
+            <p className="bl-money-figure">{forecastReady ? compactCount(forecast.households) : '—'}</p>
           </div>
         </div>
         <div className="bl-money-bar" aria-hidden="true">
-          {forecast.streams.map((stream, i) => (
+          {forecastReady && forecast.streams.map((stream, i) => (
             <i key={stream.id} style={{ width: `${(stream.monthly / Math.max(1, forecast.monthlyRevenue)) * 100}%`, opacity: 1 - i * 0.14 }} title={stream.name} />
           ))}
         </div>
         <p className="bl-money-note">
-          Expected range {money(forecast.conservativeMonthlyRevenue)}–{money(forecast.breakoutMonthlyRevenue)} a month · {money(forecast.yearlyRevenue)} expected annually against {money(treasury.planned)} planned to launch
+          {forecastReady ? `${money(forecast.yearlyRevenue)} first-year equivalent if eligible titles are watched and buyers convert` : 'Forecast updating or unavailable'} · before network, payment and rights costs · {money(treasury.planned)} planned to launch
           {gap > 0 && <> · {money(gap)} still to find</>}
           {gap <= 0 && <> · {money(free - treasury.planned)} unspent</>}
         </p>

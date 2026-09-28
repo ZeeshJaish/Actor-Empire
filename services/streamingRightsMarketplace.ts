@@ -15,6 +15,8 @@ import type {
     StreamingCataloguePackageComponent,
     StreamingCataloguePackageOfferRow,
     StreamingRightsContract,
+    StreamingRightsAccessGrant,
+    StreamingTitleAccessMode,
 } from '../types';
 import { STREAMING_CATALOGUE_PACKAGE_SCHEMA_VERSION } from '../types';
 import { createDeterministicId, createDeterministicRng } from './deterministicRandom';
@@ -62,6 +64,7 @@ import {
     settleStreamingRightsSublicense,
     settleStreamingRightsTransfer,
 } from './streamingRightsTransactions';
+import { createStreamingRightsAccessGrantForOffer, intersectStreamingRightsAccessGrants, normalizeStreamingRightsAccessGrant } from './streamingRightsAccessGrant';
 
 export type StreamingRightsOpportunityKind = 'STUDIO_ACQUISITION' | 'PLATFORM_TRADE' | 'SUBLICENSE_OUT' | 'TRANSFER_OUT';
 
@@ -108,6 +111,7 @@ export interface StreamingRightsTermsInput {
     cancellationPenalty: number;
     /** Optional exact market subset for Content Market private proposals. */
     countryIds?: string[];
+    accessGrant?: StreamingRightsAccessGrant;
 }
 
 export interface StreamingRightsActionResult {
@@ -335,7 +339,10 @@ const buildOpportunity = (
     const remainingWeeks = sourceContract
         ? Math.max(1, sourceContract.expiresAtAbsoluteWeek - absoluteWeek)
         : kind === 'SUBLICENSE_OUT' ? 52 : 104;
-    const quote = getStreamingLicenseQuote(title, recommendedTerritory, Math.min(520, remainingWeeks), sourceContract?.exclusivity || 'NON_EXCLUSIVE');
+    const quoteVersion = platform.marketQuotePolicy?.version === 2
+        && getStreamingMarketCycle(absoluteWeek) >= platform.marketQuotePolicy.effectiveCycle ? 2 : 1;
+    const quote = getStreamingLicenseQuote(title, recommendedTerritory, Math.min(520, remainingWeeks),
+        sourceContract?.exclusivity || 'NON_EXCLUSIVE', quoteVersion);
     const excludedLegacyPlatform = sellerPlatformId && PLATFORM_IDS.includes(sellerPlatformId as PlatformId)
         ? sellerPlatformId as PlatformId
         : null;
@@ -613,11 +620,12 @@ export const getStreamingCataloguePackageOpportunities = (
             const component: StreamingCataloguePackageComponent = {
                 sourceProjectId: title.id,
                 title: title.title,
+                catalogueTier: title.catalogueTier,
                 projectType: title.projectType,
                 genre: title.genre,
-                originalLanguageId: sourceProject?.originalLanguageId || 'english',
+                originalLanguageId: sourceProject?.originalLanguageId || title.originalLanguageId || 'english',
                 sellerStudioId: studioId,
-                quality: Math.max(0, Number(sourceProject?.quality || (title.rating || 0) * 10)),
+                quality: Math.max(0, Number(sourceProject?.quality || title.quality || (title.rating || 0) * 10)),
                 audience: 0,
                 budget: 0,
                 theatricalGross: Math.max(0, Number(title.gross || sourceProject?.boxOffice || 0)),
@@ -639,7 +647,9 @@ export const getStreamingCataloguePackageOpportunities = (
         }));
         const totalGuarantee = roundMoney(Math.max(
             compatibleTitles.length * 1_000_000,
-            compatibleTitles.reduce((sum, title) => sum + getStreamingLicenseQuote(title, 'MULTI_REGION', 104, 'NON_EXCLUSIVE').suggestedGuarantee, 0) * .78,
+            compatibleTitles.reduce((sum, title) => sum + getStreamingLicenseQuote(title, 'MULTI_REGION', 104,
+                'NON_EXCLUSIVE', platform.marketQuotePolicy?.version === 2
+                    && getStreamingMarketCycle(absoluteWeek) >= platform.marketQuotePolicy.effectiveCycle ? 2 : 1).suggestedGuarantee, 0) * .78,
         ));
         const allocation = allocateStreamingCatalogueGuarantee({
             totalGuarantee,
@@ -791,6 +801,12 @@ export const signOwnedStreamingCataloguePackage = (
             sequelRightsIncluded: false,
             changeOfControl: 'NOTICE',
             cancellationPenalty: Math.round(row.minimumGuarantee * .2),
+            accessGrant: createStreamingRightsAccessGrantForOffer(
+                platform.serviceConfiguration.pricing.streams,
+                row.windowType === 'PERMANENT',
+                Math.max(0, ...Object.values(platform.serviceConfiguration.pricing.commercialOffers?.benefits.plans || {})
+                    .map(benefit => benefit.earlyAccessWeeks)),
+            ),
         });
         const registration = registerStreamingRightsContract(contractRegistry, createStreamingRightsContractFromLicense({
             license,
@@ -889,7 +905,40 @@ const normalizeTerms = (terms: StreamingRightsTermsInput): StreamingRightsTermsI
     changeOfControl: 'NONE',
     cancellationPenalty: roundMoney(clamp(terms.cancellationPenalty, 0, 2_000_000_000)),
     countryIds: normalizeStreamingDayOneMarketIds(terms.countryIds),
+    ...(Object.prototype.hasOwnProperty.call(terms, 'accessGrant') ? {
+        accessGrant: normalizeStreamingRightsAccessGrant(terms.accessGrant) || {
+            schemaVersion: 1 as const, modes: [] as StreamingTitleAccessMode[], earlyWindowWeeks: 0,
+            purchaseFulfillment: 'NONE' as const, source: 'EXPLICIT' as const,
+        },
+    } : {}),
 });
+
+const requestedAccessGrantForTerms = (
+    platform: OwnedStreamingPlatformState,
+    terms: StreamingRightsTermsInput,
+): StreamingRightsAccessGrant => {
+    const streams = platform.serviceConfiguration.pricing.streams;
+    const modes: StreamingTitleAccessMode[] = [
+        ...(streams.includes('subs') ? ['SUBSCRIPTION' as const] : []),
+        ...(streams.includes('ads') ? ['AD_SUPPORTED' as const] : []),
+        ...(streams.includes('rentals') ? ['RENTAL' as const] : []),
+        ...(streams.includes('rentals') && terms.windowType === 'PERMANENT' ? ['PURCHASE' as const] : []),
+    ];
+    const benefits = platform.serviceConfiguration.pricing.commercialOffers?.benefits;
+    const earlyWindowWeeks = Math.max(0, ...Object.values(benefits?.plans || {}).map(value => value.earlyAccessWeeks));
+    const requested = normalizeStreamingRightsAccessGrant(terms.accessGrant) || {
+        schemaVersion: 1,
+        modes,
+        earlyWindowWeeks: Math.min(4, earlyWindowWeeks),
+        purchaseFulfillment: modes.includes('PURCHASE') ? 'PERPETUAL' : 'NONE',
+        source: 'EXPLICIT' as const,
+    };
+    return terms.windowType === 'PERMANENT' ? requested : {
+        ...requested,
+        modes: requested.modes.filter(mode => mode !== 'PURCHASE'),
+        purchaseFulfillment: 'NONE',
+    };
+};
 
 const FALLBACK_MARKET_IDS = ['US', 'CA', 'MX'];
 
@@ -947,6 +996,19 @@ export const openStreamingRightsNegotiation = (
     const sourceLicense = opportunity.sourceLicenseId
         ? platform.catalogLicenses.find(license => license.id === opportunity.sourceLicenseId)
         : null;
+    const sourceContract = opportunity.sourceLicenseId
+        ? getStreamingRightsContract(player.world.streamingRightsContracts, opportunity.sourceLicenseId)
+        : null;
+    const sourceGrant = normalizeStreamingRightsAccessGrant(sourceContract?.accessGrant || sourceLicense?.accessGrant);
+    const requestedGrant = sourceGrant
+        && (opportunity.kind === 'PLATFORM_TRADE' || opportunity.kind === 'TRANSFER_OUT')
+        ? sourceGrant : requestedAccessGrantForTerms(platform, terms);
+    const accessGrant = sourceGrant
+        ? intersectStreamingRightsAccessGrants(sourceGrant, requestedGrant)
+        : opportunity.sourceLicenseId
+            ? { schemaVersion: 1 as const, modes: [] as StreamingTitleAccessMode[], earlyWindowWeeks: 0,
+                purchaseFulfillment: 'NONE' as const, source: 'EXPLICIT' as const }
+            : requestedGrant;
     const requestedCountryIds = normalizeStreamingDayOneMarketIds(terms.countryIds);
     const defaultCountryIds = opportunity.kind === 'PLATFORM_TRADE' || opportunity.kind === 'TRANSFER_OUT'
         ? opportunity.countryIds.slice().sort()
@@ -976,6 +1038,7 @@ export const openStreamingRightsNegotiation = (
         buyerName: opportunity.kind === 'SUBLICENSE_OUT' || opportunity.kind === 'TRANSFER_OUT'
             ? opportunity.rivalPlatformName : null,
         ...terms,
+        accessGrant,
         countryIds,
         rivalPlatformId: opportunity.kind === 'SUBLICENSE_OUT' || opportunity.kind === 'TRANSFER_OUT'
             ? null : opportunity.rivalPlatformId,
@@ -1054,6 +1117,19 @@ export const reviseStreamingRightsNegotiation = (
     const sourceLicense = current.sourceLicenseId
         ? platform.catalogLicenses.find(license => license.id === current.sourceLicenseId)
         : null;
+    const sourceContract = current.sourceLicenseId
+        ? getStreamingRightsContract(player.world.streamingRightsContracts, current.sourceLicenseId)
+        : null;
+    const sourceGrant = normalizeStreamingRightsAccessGrant(sourceContract?.accessGrant || sourceLicense?.accessGrant);
+    const inheritedExactTransfer = Boolean(sourceGrant && current.sourceLicenseId
+        && (current.kind === 'TRANSFER_OUT' || current.sellerType === 'PLATFORM'));
+    const requestedGrant = requestedAccessGrantForTerms(platform, terms);
+    const accessGrant = sourceGrant
+        ? inheritedExactTransfer ? sourceGrant : intersectStreamingRightsAccessGrants(sourceGrant, requestedGrant)
+        : current.sourceLicenseId
+            ? { schemaVersion: 1 as const, modes: [] as StreamingTitleAccessMode[], earlyWindowWeeks: 0,
+                purchaseFulfillment: 'NONE' as const, source: 'EXPLICIT' as const }
+            : requestedGrant;
     const defaultCountryIds = getNegotiationCountrySnapshot(platform, terms.territory, sourceLicense);
     const requestedCountryIds = normalizeStreamingDayOneMarketIds(terms.countryIds);
     const isPrivateOffer = Boolean(current.proposalVersion);
@@ -1065,6 +1141,7 @@ export const reviseStreamingRightsNegotiation = (
     const negotiation = {
         ...current,
         ...terms,
+        accessGrant,
         countryIds: terms.territory === 'GLOBAL' ? [] : (requestedCountryIds.length ? requestedCountryIds : defaultCountryIds)
             .slice(0, terms.territory === 'DOMESTIC' ? 1 : undefined)
             .sort(),
@@ -1443,6 +1520,7 @@ export const signStreamingRightsDeal = (
             price: negotiation.minimumGuarantee,
             absoluteWeek,
             idempotencyKey: `owned-rights-transfer:${negotiation.id}`,
+            requestedAccessGrant: negotiation.accessGrant,
             controllerAtCommitment: {
                 seller: isInboundPlatformTransfer ? 'AI' : 'PLAYER',
                 buyer: isInboundPlatformTransfer ? 'PLAYER' : 'AI',
@@ -1574,6 +1652,7 @@ export const signStreamingRightsDeal = (
             absoluteWeek,
             idempotencyKey: `owned-rights-sublicense:${negotiation.id}`,
             successorContractId: deal.id,
+            requestedAccessGrant: negotiation.accessGrant,
             controllerAtCommitment: { seller: 'PLAYER', buyer: 'AI' },
         });
         if ('reason' in sublicense) {
@@ -1637,6 +1716,10 @@ export const signStreamingRightsDeal = (
             changeOfControl: negotiation.changeOfControl,
             cancellationPenalty: negotiation.cancellationPenalty,
             renewedFromLicenseId: negotiation.kind === 'RENEW' ? negotiation.sourceLicenseId : null,
+            accessGrant: normalizeStreamingRightsAccessGrant(negotiation.accessGrant) || {
+                schemaVersion: 1, modes: ['SUBSCRIPTION'], earlyWindowWeeks: 0,
+                purchaseFulfillment: 'NONE', source: 'LEGACY_SNAPSHOT',
+            },
         });
         const canonicalRegistration = registerStreamingRightsContract(
             nextWorld.streamingRightsContracts,

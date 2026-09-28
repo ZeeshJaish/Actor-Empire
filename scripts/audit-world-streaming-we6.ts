@@ -76,7 +76,7 @@ player.world.projects = [
         reviews: 'A loud but shallow import.',
     },
     {
-        id: 'us-window-only', title: 'Liberty Signal', genre: 'THRILLER', originalLanguageId: 'English', mediaType: 'SERIES',
+        id: 'us-window-only', title: 'Liberty Signal', genre: 'THRILLER', originalLanguageId: 'English', mediaType: 'MOVIE',
         targetAudience: 'ADULT', studioId: 'harbor-pictures', budgetTier: 'MEDIUM', quality: 78, rating: 7.7,
         boxOffice: 0, year: player.age, weekReleased: player.currentWeek - 1,
         leadActorId: 'star-signal', leadActorName: 'June West', directorId: 'director-signal', directorName: 'Rae Cole',
@@ -101,17 +101,21 @@ player.ownedStreamingPlatform.originalCommissions = [
 ] as any;
 player.ownedStreamingPlatform.catalogLicenses = [{
     id: 'license-us-window', sourceProjectId: 'us-window-only', titleAtSigning: 'Liberty Signal',
-    projectType: 'SERIES', genre: 'THRILLER', licensorName: 'Harbor Pictures', territory: 'DOMESTIC',
+    projectType: 'MOVIE', genre: 'THRILLER', licensorName: 'Harbor Pictures', territory: 'DOMESTIC',
     countryIds: ['US'], durationWeeks: 52, exclusivity: 'EXCLUSIVE', minimumGuarantee: 12_000_000,
     platformRevenueShare: 70, licensorRevenueShare: 30, signedAtAbsoluteWeek: absoluteWeek - 5,
     startsAtAbsoluteWeek: absoluteWeek - 1, expiresAtAbsoluteWeek: absoluteWeek + 51, status: 'ACTIVE',
+    accessGrant: {
+        schemaVersion: 1, modes: ['SUBSCRIPTION', 'AD_SUPPORTED', 'RENTAL'], earlyWindowWeeks: 0,
+        purchaseFulfillment: 'NONE', source: 'EXPLICIT',
+    },
 }];
 player.ownedStreamingPlatform.catalogProjectIds = ['hindi-heart', 'imported-action', 'us-window-only'];
 player.ownedStreamingPlatform.launchSlate = {
     entries: [
         { id: 'slate-hindi-heart', projectId: 'hindi-heart', title: 'City of Monsoon', source: 'ORIGINAL', projectType: 'MOVIE', genre: 'DRAMA', launchWeek: 4, releasePattern: 'SINGLE_PREMIERE', marketingPlan: 'EVENT' },
         { id: 'slate-imported-action', projectId: 'imported-action', title: 'Cold Detonation', source: 'ORIGINAL', projectType: 'MOVIE', genre: 'ACTION', launchWeek: 4, releasePattern: 'SINGLE_PREMIERE', marketingPlan: 'STANDARD' },
-        { id: 'slate-us-window', projectId: 'us-window-only', title: 'Liberty Signal', source: 'LICENSED_WINDOW', projectType: 'SERIES', genre: 'THRILLER', launchWeek: 4, releasePattern: 'WEEKLY', marketingPlan: 'STANDARD' },
+        { id: 'slate-us-window', projectId: 'us-window-only', title: 'Liberty Signal', source: 'LICENSED_WINDOW', projectType: 'MOVIE', genre: 'THRILLER', launchWeek: 4, releasePattern: 'WEEKLY', marketingPlan: 'STANDARD' },
     ],
     programmedAtAbsoluteWeek: absoluteWeek - 3,
     revision: 1,
@@ -131,6 +135,70 @@ player.world.worldStreamingCustomers = createWorldStreamingCustomerState(player,
 const before = JSON.stringify(player);
 const state = createViewing(player, absoluteWeek);
 const repeated = createViewing(player, absoluteWeek);
+
+const earlyPlayer = structuredClone(player) as Player;
+earlyPlayer.ownedStreamingPlatform.serviceConfiguration.pricing.commercialOffers = {
+    schemaVersion: 1, coreModel: 'SUBSCRIPTION', freeAdAccess: true,
+    adFreePasses: { oneHourPrice: null, dayPrice: null },
+    benefits: {
+        plans: { PREMIERE: { premiumAccess: true, earlyAccessWeeks: 2 } },
+        freeAds: { premiumAccess: false, earlyAccessWeeks: 0 },
+        store: { premiumAccess: false, earlyAccessWeeks: 0 },
+    },
+};
+earlyPlayer.ownedStreamingPlatform.originalCommissions.push({
+    ...earlyPlayer.ownedStreamingPlatform.originalCommissions[0],
+    id: 'commission-early-title', canonicalProjectId: 'early-title', title: 'Early Window', status: 'DELIVERED',
+});
+earlyPlayer.ownedStreamingPlatform.catalogProjectIds.push('early-title');
+earlyPlayer.ownedStreamingPlatform.launchSlate!.entries.push({
+    id: 'slate-early-title', projectId: 'early-title', title: 'Early Window', source: 'ORIGINAL',
+    projectType: 'MOVIE', genre: 'DRAMA', launchWeek: 7, releasePattern: 'SINGLE_PREMIERE', marketingPlan: 'STANDARD',
+});
+const earlyState = createViewing(earlyPlayer, absoluteWeek);
+assert.ok((earlyState.platforms.PLAYER?.titlePerformance.find((item: any) => item.projectId === 'early-title')?.viewingAccounts || 0) > 0,
+    'a premium plan with actual rights may show a title two weeks before general release');
+const noEarlyPlayer = structuredClone(earlyPlayer) as Player;
+noEarlyPlayer.ownedStreamingPlatform.serviceConfiguration.pricing.commercialOffers!.benefits.plans = {};
+const noEarlyState = createViewing(noEarlyPlayer, absoluteWeek);
+assert.equal(noEarlyState.platforms.PLAYER?.titlePerformance.some((item: any) => item.projectId === 'early-title'), false,
+    'the same upcoming title cannot be viewed without the plan early benefit');
+const noEarlyRightsPlayer = structuredClone(earlyPlayer) as Player;
+noEarlyRightsPlayer.ownedStreamingPlatform.originalCommissions = noEarlyRightsPlayer.ownedStreamingPlatform.originalCommissions
+    .filter(commission => commission.canonicalProjectId !== 'early-title');
+noEarlyRightsPlayer.ownedStreamingPlatform.catalogProjectIds = noEarlyRightsPlayer.ownedStreamingPlatform.catalogProjectIds
+    .filter(projectId => projectId !== 'early-title');
+const noEarlyRightsState = createViewing(noEarlyRightsPlayer, absoluteWeek);
+assert.equal(noEarlyRightsState.platforms.PLAYER?.titlePerformance.some((item: any) => item.projectId === 'early-title'), false,
+    'an attractive early plan cannot create viewing when the title has no rights position');
+
+const mixedStorePlayer = structuredClone(player) as Player;
+mixedStorePlayer.ownedStreamingPlatform.catalogLicenses[0] = {
+    ...mixedStorePlayer.ownedStreamingPlatform.catalogLicenses[0],
+    durationWeeks: 520, expiresAtAbsoluteWeek: Number.MAX_SAFE_INTEGER,
+    windowType: 'PERMANENT', permanentPurchase: true,
+    accessGrant: {
+        schemaVersion: 1, modes: ['SUBSCRIPTION', 'RENTAL', 'PURCHASE'], earlyWindowWeeks: 0,
+        purchaseFulfillment: 'PERPETUAL', source: 'EXPLICIT',
+    },
+};
+mixedStorePlayer.ownedStreamingPlatform.catalogLicenses.push({
+    ...mixedStorePlayer.ownedStreamingPlatform.catalogLicenses[0],
+    id: 'license-in-window', countryIds: ['IN'], durationWeeks: 52,
+    expiresAtAbsoluteWeek: absoluteWeek + 51, windowType: 'FIRST_WINDOW', permanentPurchase: false,
+    accessGrant: {
+        schemaVersion: 1, modes: ['SUBSCRIPTION', 'RENTAL'], earlyWindowWeeks: 0,
+        purchaseFulfillment: 'NONE', source: 'EXPLICIT',
+    },
+});
+const mixedStoreState = createViewing(mixedStorePlayer, absoluteWeek);
+const mixedUs = mixedStoreState.countries.US?.titlePerformance.find((item: any) => item.projectId === 'us-window-only');
+const mixedIn = mixedStoreState.countries.IN?.titlePerformance.find((item: any) => item.projectId === 'us-window-only');
+assert.ok(mixedUs && mixedIn && mixedUs.viewingAccounts > 0 && mixedIn.viewingAccounts > 0,
+    'both country licences must support the same title independently');
+assert.ok(mixedUs.revenue.purchaseTransactions > 0, 'durable US rights should support permanent purchase');
+assert.equal(mixedIn.revenue.purchaseTransactions, 0,
+    'the finite India licence must not inherit US permanent-purchase transactions');
 
 const openingOwnedPlayer = structuredClone(player) as Player;
 openingOwnedPlayer.businesses = [{
@@ -166,18 +234,45 @@ assert.equal(advanceViewing(state, player, absoluteWeek), state, 'same-week adva
 
 const outcome = getPlayerOutcome(state);
 assert.ok(outcome, 'an active player platform receives a canonical WE6 outcome');
+const permissiveStoreReferencePlayer = structuredClone(player) as Player;
+permissiveStoreReferencePlayer.ownedStreamingPlatform.catalogLicenses[0].accessGrant = {
+    schemaVersion: 1, modes: ['SUBSCRIPTION', 'AD_SUPPORTED', 'RENTAL', 'PURCHASE'],
+    earlyWindowWeeks: 0, purchaseFulfillment: 'PERPETUAL', source: 'EXPLICIT',
+};
+const permissiveStoreReference = getPlayerOutcome(createViewing(permissiveStoreReferencePlayer, absoluteWeek));
+const actualGross = outcome.revenue.attributedSubscriptionRevenue + outcome.revenue.totalIncrementalRevenue;
+const permissiveGross = (permissiveStoreReference?.revenue.attributedSubscriptionRevenue || 0)
+    + (permissiveStoreReference?.revenue.totalIncrementalRevenue || 0);
+const grossDeltaPercent = ((actualGross - permissiveGross) / Math.max(1, permissiveGross)) * 100;
+assert.ok(Math.abs(grossDeltaPercent) <= 5, 'a larger C2 reference-week gross shift requires a balance review');
+const titleRevenueComparison = outcome.titlePerformance.map((title: any) => {
+    const reference = permissiveStoreReference?.titlePerformance.find((item: any) => item.projectId === title.projectId);
+    return {
+        projectId: title.projectId,
+        viewingAccounts: [reference?.viewingAccounts || 0, title.viewingAccounts],
+        adRevenue: [reference?.revenue.advertisingRevenue || 0, title.revenue.advertisingRevenue],
+        rentalRevenue: [reference?.revenue.rentalRevenue || 0, title.revenue.rentalRevenue],
+        purchaseRevenue: [reference?.revenue.purchaseRevenue || 0, title.revenue.purchaseRevenue],
+    };
+});
+console.log(`WE6 C2 reference-week gross: rights-aware $${actualGross}; permissive reference $${permissiveGross}; delta ${grossDeltaPercent.toFixed(3)}%.`);
+console.log(`WE6 C2 title lines (permissive, rights-aware): ${JSON.stringify(titleRevenueComparison)}`);
 assert.equal(outcome.platformId, 'PLAYER', 'the first WE6 consumer uses the stable player platform ID');
 assert.ok(outcome.totalViewingAccounts > 0, 'eligible live titles receive canonical viewing');
-assert.ok(outcome.totalViewingAccounts <= player.world.worldStreamingCustomers.global.playerAccessLoadAccounts, 'viewing cannot exceed the player access pool');
+assert.ok(outcome.totalViewingAccounts <= player.world.worldStreamingCustomers.global.playerAccessLoadAccounts
+    + (player.world.worldStreamingAudienceChoice?.global.freeAdHouseholds || 0)
+    + (player.world.worldStreamingAudienceChoice?.global.storeHouseholds || 0),
+    'viewing cannot exceed paid, free, and store access pools');
 assert.equal(
     outcome.titlePerformance.reduce((sum: number, title: any) => sum + title.viewingAccounts, 0),
     outcome.totalViewingAccounts,
     'title viewing reconciles to the platform total',
 );
 assert.equal(
-    outcome.accessMix.paidViewingAccounts + outcome.accessMix.sharedViewingAccounts,
+    outcome.accessMix.paidViewingAccounts + (outcome.accessMix.freeViewingAccounts || 0)
+        + (outcome.accessMix.storeViewingAccounts || 0) + outcome.accessMix.sharedViewingAccounts,
     outcome.totalViewingAccounts,
-    'legitimate paid and shared paths reconcile to platform viewing accounts',
+    'legitimate paid, free, store, and shared paths reconcile to platform viewing accounts',
 );
 assert.ok(outcome.accessMix.piracyViewingAccounts >= 0, 'pirated viewing remains a distinct non-paying path');
 assert.ok(outcome.unmetDemandAccounts > 0, 'the allocator preserves an explicit no-watch or unmet-demand option');
@@ -218,6 +313,8 @@ assert.equal(outcome.revenue.attributedSubscriptionRevenue, canonicalWeeklySubsc
 assert.ok(outcome.revenue.advertisingImpressions > 0 && outcome.revenue.advertisingRevenue > 0, 'ad-supported viewing creates impressions and advertising cash');
 assert.ok(outcome.revenue.premiumTransactions > 0 && outcome.revenue.premiumRevenue > 0, 'eligible fresh premieres can create premium transactions');
 assert.ok(outcome.revenue.rentalTransactions > 0 && outcome.revenue.rentalRevenue > 0, 'eligible title demand can create rentals');
+assert.equal(outcome.titlePerformance.find((title: any) => title.projectId === 'us-window-only')?.revenue.purchaseTransactions, 0,
+    'a finite US title licence cannot generate a permanent purchase transaction');
 assert.ok(outcome.revenue.purchaseTransactions > 0 && outcome.revenue.purchaseRevenue > 0, 'eligible title demand can create purchases');
 assert.ok(outcome.revenue.dayPassTransactions > 0 && outcome.revenue.dayPassRevenue > 0, 'non-subscribers can purchase day-pass access');
 assert.ok(outcome.revenue.meteredAccounts > 0 && outcome.revenue.meteredRevenue > 0, 'light viewers can purchase metered access');
@@ -275,7 +372,8 @@ assert.equal(weeklyOperations?.worldViewingIncrementalRevenue, outcome.revenue.t
 assert.equal(weeklyOperations?.worldViewingAdvertisingRevenue, outcome.revenue.advertisingRevenue, 'weekly operations retain advertising revenue evidence');
 assert.equal(weeklyOperations?.worldViewingTransactionRevenue,
     outcome.revenue.premiumRevenue + outcome.revenue.rentalRevenue + outcome.revenue.purchaseRevenue
-        + outcome.revenue.dayPassRevenue + outcome.revenue.meteredRevenue + outcome.revenue.patronRevenue,
+        + outcome.revenue.dayPassRevenue + (outcome.revenue.oneHourPassRevenue || 0)
+        + outcome.revenue.meteredRevenue + outcome.revenue.patronRevenue,
     'weekly operations retain transaction revenue evidence');
 assert.equal(weeklyOperations?.worldViewingSponsorshipRevenue, outcome.revenue.sponsorshipRevenue, 'weekly operations retain sponsorship revenue evidence');
 assert.equal(weeklyOperations?.worldViewingCommercialOperatingCost, outcome.revenue.commercialOperatingCost,

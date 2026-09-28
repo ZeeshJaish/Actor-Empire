@@ -10,9 +10,8 @@
    charged until the player confirms a paid step.
    ========================================================================== */
 
-import type { CustomPoster, StreamingPricingPlanColorId } from '../../../types';
+import type { CustomPoster, StreamingCommercialOfferIntent, StreamingPricingPlanColorId } from '../../../types';
 import type { WorldStreamingLaunchPricingForecast } from '../../../services/worldEconomy/worldStreamingPricingForecast';
-import { calculateWorldStreamingCommercialRevenue } from '../../../services/worldEconomy/worldStreamingCommercialEconomy';
 import { compactCount, money } from './format';
 /* The one pricing model. A second, cruder one used to live in this file — 30%
    of the annual discount and 25% of the intro, blended flat across every plan
@@ -246,7 +245,7 @@ export const PLAN_FEATURES: PlanFeature[] = [
   { id: 'streams2', name: '2 streams', value: 0.7, group: 'access' },
   { id: 'streams4', name: '4 streams', value: 1.3, group: 'access' },
   { id: 'downloads', name: 'Downloads', value: 0.8, group: 'access' },
-  { id: 'noads', name: 'No adverts', value: 1.6, group: 'access' },
+  { id: 'noads', name: 'No adverts', value: 0, group: 'access' },
   { id: 'early', name: 'Premieres a week early', value: 1.2, group: 'extras' },
   { id: 'live', name: 'Live events', value: 0.9, group: 'extras' },
   { id: 'extraseat', name: 'Extra member outside the home', value: 0.6, group: 'extras' },
@@ -316,6 +315,7 @@ export interface PricingSettings {
   sponsor: { perTitle: number; titles: number };
   metered: { perHour: number };
   patron: { monthly: number };
+  commercialOffers?: StreamingCommercialOfferIntent;
 }
 
 /**
@@ -480,6 +480,19 @@ const copyLaunchPricing = (pricing: PricingSettings): PricingSettings => ({
   sponsor: { ...pricing.sponsor },
   metered: { ...pricing.metered },
   patron: { ...pricing.patron },
+  commercialOffers: pricing.commercialOffers ? {
+    ...pricing.commercialOffers,
+    adFreePasses: { ...pricing.commercialOffers.adFreePasses },
+    inactiveAdPlans: pricing.commercialOffers.inactiveAdPlans
+      ? Object.fromEntries(Object.entries(pricing.commercialOffers.inactiveAdPlans).map(([id, terms]) => [id, { ...terms }]))
+      : undefined,
+    benefits: {
+      plans: Object.fromEntries(Object.entries(pricing.commercialOffers.benefits.plans)
+        .map(([id, benefit]) => [id, { ...benefit }])),
+      freeAds: { ...pricing.commercialOffers.benefits.freeAds },
+      store: { ...pricing.commercialOffers.benefits.store },
+    },
+  } : undefined,
 });
 
 /**
@@ -862,27 +875,22 @@ export function launchStepBar(
 
   if (stepId === 'pricing') {
     const pricing = draft.pricing ?? data.pricing;
-    const entry = pricing.plans.reduce<number | null>(
-      (low, plan) => (low === null || plan.monthly < low ? plan.monthly : low),
-      null,
-    );
-    /* The step's own figure is what the prices earn, not what the cheapest one
-       costs — the same monthly revenue the page prints at the end of itself. */
+    /* This is a conditional gross opportunity, not settled income. */
     return {
       ...base,
-      value: earnings ? earnings.monthly : entry ?? 0,
+      value: earnings ? earnings.monthly : 0,
       format: money,
       /* Two characters, because the cell is the same width on every page and
          "a month" spent three of them on being clipped. */
       unit: '/mo',
       gauge: {
-        value: pricing.plans.length,
-        limit: Math.max(1, pricing.plans.length),
+        value: pricing.streams.length,
+        limit: Math.max(1, pricing.streams.length),
         /* The read on the prices. It was the last line of a panel at the foot
            of the step; the panel repeated what the strip and the blueprint
            already said, so it went, and this is the sentence worth keeping. */
         label: earnings
-          ? `${compactCount(earnings.households)} households · ${money(earnings.yearly)} a year · ${earnings.position}`
+          ? `${compactCount(earnings.households)} potential households · gross if playable, before costs`
           : `${pricing.plans.length} ${pricing.plans.length === 1 ? 'plan' : 'plans'} priced across ${pricing.streams.length} ${pricing.streams.length === 1 ? 'stream' : 'streams'}`,
       },
     };
@@ -979,17 +987,6 @@ export interface PricingForecast {
   rivalMedianEntryPrice?: number;
 }
 
-const AD_SPOTS_PER_MINUTE = 2;      // 30-second spots
-const HOURS_PER_MONTH = 32;         // what an engaged household watches
-const RENT_PER_MONTH = 0.8;         // rentals per renting household
-const RENTER_SHARE = 0.18;
-const BUYER_SHARE = 0.03;
-const PREMIUM_SHARE = 0.06;         // households buying premiere access
-const PREMIUM_PER_QUARTER = 1 / 3;
-const DAYPASS_SHARE = 0.12;
-const DAYPASS_PER_MONTH = 1.4;
-const METERED_HOURS = 9;            // hours a metered household buys
-const PATRON_SHARE = 0.02;
 const FREE_REACH_BONUS = 1.9;       // an advert-funded service reaches wider
 
 export function planAppeal(plan: Plan): number {
@@ -1065,7 +1062,9 @@ export function forecastPricing(
       resolvedAddressable * market.reachRate * (plans.length > 0 ? 0.6 : FREE_REACH_BONUS),
     )
     : 0;
-  const households = subscribers + freeHouseholds;
+  const households = worldForecast
+    ? subscribers + worldForecast.freeAdHouseholds + worldForecast.storeHouseholds
+    : subscribers + freeHouseholds;
 
   const pull = plans.map((plan) => ({ plan, weight: planAppeal(plan) / Math.max(1, openingPriceByPlan.get(plan.id) || 0) ** 0.9 }));
   const totalPull = pull.reduce((sum, p) => sum + p.weight, 0) || 1;
@@ -1116,41 +1115,24 @@ export function forecastPricing(
       basis: `${plans.length} plan${plans.length === 1 ? '' : 's'} from ${entryPrice > 0 ? `$${entryPrice}` : 'free'}`,
     });
   }
-  const adHouseholds = freeHouseholds
-    + planRows.filter((row) => row.plan.ads).reduce((sum, row) => sum + row.subscribers, 0);
-  const projectedViewingAccounts = Math.max(0, Math.round(Math.max(households, resolvedAddressable * market.reachRate * .18) * .62));
-  const projectedPaidViewingAccounts = Math.max(0, Math.round(subscribers * .62));
-  const projectedNonSubscriberOpportunity = Math.max(0, Math.round(resolvedAddressable - subscribers));
-  const commercial = calculateWorldStreamingCommercialRevenue({
-    pricing: {
-      ...settings,
-      sponsor: {
-        ...settings.sponsor,
-        perTitle: settings.sponsor.perTitle * Math.max(0, settings.sponsor.titles),
-      },
-    },
-    paidViewingAccounts: projectedPaidViewingAccounts,
-    viewingAccounts: projectedViewingAccounts,
-    nonSubscriberOpportunityAccounts: projectedNonSubscriberOpportunity,
-    hoursViewed: projectedViewingAccounts * HOURS_PER_MONTH / 4.33,
-    adEligibleHours: adHouseholds * HOURS_PER_MONTH / 4.33,
-    estimatedViewers: projectedViewingAccounts * 1.45,
-    completionRate: .68,
-    repeatViewingRate: .1,
-    isFreshMovie: true,
-    isRentalEligible: true,
-    isSponsorEligible: settings.sponsor.titles > 0,
-    commerceCapabilityIndex: 55,
-    reputationIndex: 55,
-  });
-  const commercialMonth = 4.33;
-  if (on('ads')) streams.push({ id: 'ads', name: 'Advertising', monthly: commercial.advertisingRevenue * commercialMonth, basis: `${settings.ads.minutesPerHour} min an hour at $${settings.ads.cpm} CPM` });
-  if (on('rentals')) streams.push({ id: 'rentals', name: 'Rentals & purchases', monthly: (commercial.rentalRevenue + commercial.purchaseRevenue) * commercialMonth, basis: `$${settings.rentals.rent} to rent · $${settings.rentals.buy} to own` });
-  if (on('premium')) streams.push({ id: 'premium', name: 'Premium access', monthly: commercial.premiumRevenue * commercialMonth, basis: `$${settings.premium.price} a premiere` });
-  if (on('daypass')) streams.push({ id: 'daypass', name: 'Day passes', monthly: commercial.dayPassRevenue * commercialMonth, basis: `$${settings.daypass.price} for 24 hours` });
-  if (on('sponsor')) streams.push({ id: 'sponsor', name: 'Sponsored titles', monthly: commercial.sponsorshipRevenue * commercialMonth, basis: `${settings.sponsor.titles} titles at ${Math.round(settings.sponsor.perTitle / 1_000_000)}M` });
-  if (on('metered')) streams.push({ id: 'metered', name: 'Pay by the hour', monthly: commercial.meteredRevenue * commercialMonth, basis: `$${settings.metered.perHour} an hour` });
-  if (on('patron')) streams.push({ id: 'patron', name: 'Fund the show', monthly: commercial.patronRevenue * commercialMonth, basis: `$${settings.patron.monthly} a month per patron` });
+  // Non-subscription lines are conditional estimates from the same C4 resolver
+  // used by weekly settlement. A missing world forecast is unknown, not a
+  // license to invent a title, viewer hours or sponsor agreement here.
+  const weeklyToMonthly = 52 / 12;
+  if (on('ads')) {
+    streams.push({ id: 'ads', name: 'Advertising',
+      monthly: (worldForecast?.estimatedWeeklyAdRevenueIfPlayable || 0) * weeklyToMonthly,
+      basis: 'Conditional on eligible viewing, filled impressions and delivery' });
+    if (settings.commercialOffers?.adFreePasses.oneHourPrice || settings.commercialOffers?.adFreePasses.dayPrice) {
+      streams.push({ id: 'daypass', name: 'Ad-free passes',
+        monthly: (worldForecast?.estimatedWeeklyPassRevenueIfPlayable || 0) * weeklyToMonthly,
+        basis: 'Conditional on ad-supported viewers buying passes' });
+    }
+  }
+  if (on('rentals')) streams.push({ id: 'rentals', name: 'Rentals & purchases',
+    monthly: ((worldForecast?.estimatedWeeklyRentalRevenueIfPlayable || 0)
+      + (worldForecast?.estimatedWeeklyPurchaseRevenueIfPlayable || 0)) * weeklyToMonthly,
+    basis: 'Conditional on eligible titles, rights, delivery and buyers' });
 
   const monthlyRevenue = streams.reduce((sum, stream) => sum + stream.monthly, 0);
   const subscriptionMonthlyRevenue = streams.find(stream => stream.id === 'subs')?.monthly || 0;
@@ -1178,14 +1160,30 @@ export function forecastPricing(
     streams,
     monthlyRevenue,
     yearlyRevenue,
-    conservativeMonthlyRevenue: monthlyRevenue * 0.7,
-    breakoutMonthlyRevenue: monthlyRevenue * 1.45,
+    conservativeMonthlyRevenue: monthlyRevenue,
+    breakoutMonthlyRevenue: monthlyRevenue,
     perHousehold: households > 0 ? monthlyRevenue / households : 0,
     entryPrice,
     position: positionOf(settings, entryPrice, resolvedRivalPrice),
     activeRivalCount: worldForecast?.activeRivalCount,
     rivalMedianEntryPrice: worldForecast?.rivalMedianEntryPrice,
   };
+}
+
+/** A drag-time readout, not a second world forecast. Reprice the last settled
+    paid cohorts while keeping their audience and non-subscription receipts
+    fixed; the authoritative forecast replaces this as soon as the edit lands. */
+export function previewMonthlyAtCurrentAudience(forecast: PricingForecast, settings: PricingSettings): number {
+  const subscriptions = settings.streams.includes('subs') ? forecast.plans.reduce((total, row) => {
+    const plan = settings.plans.find(candidate => candidate.id === row.plan.id);
+    if (!plan) return total;
+    const applies = streamingIntroOfferAppliesTo(plan.id, settings.introOfferPlanId);
+    const monthly = streamingBillingPathPrice(plan.monthly, settings.annualDiscount, settings.introOffer, 0, 'MONTHLY', applies);
+    const annual = streamingBillingPathPrice(plan.monthly, settings.annualDiscount, settings.introOffer, 0, 'ANNUAL', applies);
+    return total + row.monthlyBillingSubscribers * monthly + row.annualBillingSubscribers * annual;
+  }, 0) : 0;
+  const other = forecast.streams.filter(stream => stream.id !== 'subs').reduce((total, stream) => total + stream.monthly, 0);
+  return Math.max(0, subscriptions + other);
 }
 
 function positionOf(settings: PricingSettings, entry: number, rivals: number): string {

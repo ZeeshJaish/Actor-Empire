@@ -507,7 +507,7 @@ export const DevelopmentLabScriptWizard: React.FC<DevelopmentLabScriptWizardProp
                                         <button
                                             key={t}
                                             onClick={() => setTargetAudience(t as TargetAudience)}
-                                            className={`shrink-0 min-w-[64px] px-4 py-3 rounded-2xl border text-xs font-black transition-colors ${
+                                            className={`shrink-0 min-h-11 min-w-[64px] px-4 py-3 rounded-2xl border text-xs font-black transition-colors ${
                                                 targetAudience === t ? audienceTone[t as TargetAudience] : 'bg-black border-zinc-800 text-zinc-400'
                                             }`}
                                         >

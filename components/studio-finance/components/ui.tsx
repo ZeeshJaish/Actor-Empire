@@ -148,7 +148,9 @@ export function useCountUp(target: number, duration = 620): number {
     const tick = (now: number) => {
       const t = Math.min(1, (now - start) / duration);
       const eased = 1 - (1 - t) ** 3;
-      setDisplay(from + (target - from) * eased);
+      const next = from + (target - from) * eased;
+      fromRef.current = next;
+      setDisplay(next);
       if (t < 1) frame = requestAnimationFrame(tick);
       else fromRef.current = target;
     };

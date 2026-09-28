@@ -1,5 +1,6 @@
 import type {
     OwnedStreamingInfrastructureSetupDraft,
+    OwnedStreamingInfrastructureSetup,
     OwnedStreamingOpeningProgrammeCommission,
     Player,
     StreamingLaunchMarketingForecastSnapshot,
@@ -287,6 +288,12 @@ const legacyCommission = (player: Player): OwnedStreamingOpeningProgrammeCommiss
     };
 };
 
+const physicalRackCount = (setup: OwnedStreamingInfrastructureSetup): number => setup.facilities?.length
+    ? setup.facilities
+        .filter(facility => facility.type !== 'CLOUD_ALLOCATION' && facility.lease?.tenure !== 'CLOUD')
+        .reduce((sum, facility) => sum + facility.installedRacks, 0)
+    : setup.networkPlacements.reduce((sum, placement) => sum + placement.racks, 0);
+
 export const getStreamingOpeningProgrammeView = (player: Player): StreamingOpeningProgrammeView => {
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
@@ -297,7 +304,7 @@ export const getStreamingOpeningProgrammeView = (player: Player): StreamingOpeni
         earliestOpeningAbsoluteWeek: platform.launchCommit.committedAtAbsoluteWeek,
         dateCertainty: 'CONFIRMED', controllingWorkstreamId: null, remainingWeeks: 0,
         cityCount: setup?.networkPlacements.length || 0,
-        rackCount: setup?.networkPlacements.reduce((sum, item) => sum + item.racks, 0) || 0,
+        rackCount: setup ? physicalRackCount(setup) : 0,
         releasedCapital: setup?.capitalInvested || 0, workstreams: [],
     };
     if (!commission || !setup) return {
@@ -327,7 +334,7 @@ export const getStreamingOpeningProgrammeView = (player: Player): StreamingOpeni
     const workstreams: StreamingOpeningWorkstreamView[] = [
         {
             id: 'INFRASTRUCTURE', label: 'Infrastructure', status: infrastructureReady ? 'READY' : 'IN_PROGRESS',
-            detail: infrastructureReady ? 'The commissioned network is operational.' : `Crews are building ${setup.networkPlacements.reduce((sum, item) => sum + item.racks, 0)} racks across ${setup.networkPlacements.length} cities.`,
+            detail: infrastructureReady ? 'The commissioned network is operational.' : `Crews are bringing the network online across ${setup.networkPlacements.length} cities.`,
             readyAtAbsoluteWeek: setup.readyAtAbsoluteWeek, elapsedWeeks: elapsed,
             remainingWeeks: Math.max(0, setup.readyAtAbsoluteWeek - absoluteWeek), controlsDate: controlling?.id === 'INFRASTRUCTURE', actionLabel: null, operationIds: [],
         },
@@ -360,7 +367,7 @@ export const getStreamingOpeningProgrammeView = (player: Player): StreamingOpeni
         controllingWorkstreamId: controlling?.id || null,
         remainingWeeks: Math.max(0, earliestOpeningAbsoluteWeek - absoluteWeek),
         cityCount: new Set(setup.networkPlacements.map(item => item.cityId)).size,
-        rackCount: setup.networkPlacements.reduce((sum, item) => sum + item.racks, 0),
+        rackCount: physicalRackCount(setup),
         releasedCapital: setup.capitalInvested,
         workstreams,
     };
@@ -379,6 +386,11 @@ export const appendStreamingOpeningProgrammeTransitions = (
     beforePlayer: Player,
     afterPlayer: Player,
 ): Player => {
+    // Once the service is live, opening workstreams cannot transition again.
+    // Avoid normalizing and comparing the full platform twice on every later
+    // Process Week; mature platform state can be very large.
+    if (afterPlayer.ownedStreamingPlatform.launchCommit
+        || afterPlayer.ownedStreamingPlatform.lifecycle === 'ACTIVE') return afterPlayer;
     const before = getStreamingOpeningProgrammeView(beforePlayer);
     const after = getStreamingOpeningProgrammeView(afterPlayer);
     if (!after.commissioned || after.state === 'LIVE') return afterPlayer;

@@ -311,13 +311,13 @@ export const BankApp: React.FC<BankAppProps> = ({ player, onBack, onUpdatePlayer
     <div className="absolute inset-0 z-40 flex flex-col bg-zinc-950 font-sans text-white animate-in slide-in-from-right duration-300">
       <div className="relative shrink-0 overflow-hidden bg-[#004b87] p-4 pb-6 pt-12 shadow-xl transition-all">
         <div className="relative z-20 mb-4 flex items-start justify-between">
-          <button onClick={() => detailView ? setDetailView(null) : onBack()} className="rounded-full bg-black/10 p-1 text-white/80 hover:text-white">
+          <button onClick={() => detailView ? setDetailView(null) : onBack()} className="grid h-11 w-11 place-items-center rounded-full bg-black/10 text-white/80 hover:text-white" aria-label="Back to phone">
             <ArrowLeft size={20} />
           </button>
           <div className="flex flex-col items-end">
             <button
               onClick={() => setShowYearMenu(!showYearMenu)}
-              className="flex items-center gap-1 rounded-full bg-black/20 px-3 py-1 text-xs font-bold transition-colors hover:bg-black/30"
+              className="flex min-h-11 items-center gap-1 rounded-full bg-black/20 px-3 py-1 text-xs font-bold transition-colors hover:bg-black/30"
             >
               {selectedYear === player.age ? tr('bank.currentYear', { year: selectedYear }) : tr('bank.year', { year: selectedYear })} <ChevronDown size={14} />
             </button>
@@ -330,7 +330,7 @@ export const BankApp: React.FC<BankAppProps> = ({ player, onBack, onUpdatePlayer
                       setSelectedYear(y);
                       setShowYearMenu(false);
                     }}
-                    className={`px-4 py-2 text-left text-xs font-bold hover:bg-slate-100 ${selectedYear === y ? 'bg-blue-50 text-blue-600' : ''}`}
+                    className={`min-h-11 px-4 py-2 text-left text-xs font-bold hover:bg-slate-100 ${selectedYear === y ? 'bg-blue-50 text-blue-600' : ''}`}
                   >
                     {y === player.age ? tr('bank.current', { year: y }) : tr('bank.year', { year: y })}
                   </button>

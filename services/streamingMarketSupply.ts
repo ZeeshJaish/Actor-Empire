@@ -9,7 +9,7 @@ export interface StreamingMarketSupplyProfile {
     cycleStartAbsoluteWeek: number;
     foundingBoost: boolean;
     directLimit: 12;
-    collectionLimit: 4 | 6;
+    collectionLimit: 5 | 6;
     collectionMaximumSize: 24 | 50;
     auctionLimit: 2 | 3;
 }
@@ -33,7 +33,7 @@ export const getStreamingMarketSupplyProfile = (player: Player): StreamingMarket
         cycleStartAbsoluteWeek: cycle * 3,
         foundingBoost,
         directLimit: 12,
-        collectionLimit: foundingBoost ? 6 : 4,
+        collectionLimit: foundingBoost ? 6 : 5,
         collectionMaximumSize: foundingBoost ? 50 : 24,
         auctionLimit: foundingBoost ? 3 : 2,
     };
@@ -72,13 +72,18 @@ export const selectStreamingMarketTitles = (
     const profile = getStreamingMarketSupplyProfile(player);
     const unique = Array.from(new Map(candidates.map(title => [title.id, title])).values());
     const headlineCount = Math.min(3, safeLimit, unique.length);
-    const headliners = unique.slice().sort((left, right) => (
+    const ranked = unique.slice().sort((left, right) => (
         headlineScore(right) - headlineScore(left)
         || left.id.localeCompare(right.id)
-    )).slice(0, headlineCount);
+    ));
+    const marqueeHeadliners = ranked.filter(title => title.catalogueTier === 'MARQUEE')
+        .slice(0, Math.min(2, headlineCount));
+    const ordinaryHeadliners = ranked.filter(title => title.catalogueTier !== 'MARQUEE')
+        .slice(0, headlineCount - marqueeHeadliners.length);
+    const headliners = [...marqueeHeadliners, ...ordinaryHeadliners];
     const headlineIds = new Set(headliners.map(title => title.id));
     const groups = new Map<string, StreamingCatalogTitle[]>();
-    unique.filter(title => !headlineIds.has(title.id)).forEach(title => {
+    unique.filter(title => !headlineIds.has(title.id) && title.catalogueTier !== 'MARQUEE').forEach(title => {
         const key = `${title.projectType}:${title.genre}:${title.studioId}`;
         groups.set(key, [...(groups.get(key) || []), title]);
     });

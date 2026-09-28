@@ -217,7 +217,7 @@ export const StocksApp: React.FC<StocksAppProps> = ({
         return (
             <div className="absolute inset-0 z-50 flex flex-col bg-black text-white animate-in slide-in-from-right duration-300">
                 <div className="flex items-center gap-3 border-b border-zinc-800 bg-zinc-900 p-4 pt-12">
-                    <button type="button" onClick={() => setSelectedStockId(null)}>
+                    <button type="button" onClick={() => setSelectedStockId(null)} aria-label="Back to stock market" className="grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-zinc-800">
                         <ArrowLeft size={20} />
                     </button>
                     <div className="min-w-0 flex-1">
@@ -229,7 +229,7 @@ export const StocksApp: React.FC<StocksAppProps> = ({
                                 </span>
                             ) : null}
                         </div>
-                        <div className="truncate text-xs text-zinc-400">{selectedStock.name}</div>
+                        <div className="break-words text-xs leading-snug text-zinc-400">{selectedStock.name}</div>
                     </div>
                     <div className="text-right">
                         <div className="text-lg font-bold">{formatMoney(selectedStock.price)}</div>
@@ -260,7 +260,7 @@ export const StocksApp: React.FC<StocksAppProps> = ({
                                         setOrderMode(mode);
                                         setSharesInput('');
                                     }}
-                                    className={`min-h-8 rounded-md text-[9px] font-bold uppercase transition ${
+                                    className={`min-h-11 rounded-md text-[9px] font-bold uppercase transition ${
                                         orderMode === mode ? 'bg-zinc-800 text-white' : 'text-zinc-600'
                                     }`}
                                 >
@@ -469,7 +469,7 @@ export const StocksApp: React.FC<StocksAppProps> = ({
                     {snapshot.isEntertainment ? (
                         <div className="mb-4 overflow-hidden rounded-xl border border-sky-500/30 bg-sky-950/20">
                             <div className="flex items-start gap-3 border-b border-sky-500/20 p-4">
-                                <div className="rounded-full bg-sky-300 p-2 text-slate-950"><Crown size={15} /></div>
+                                <div className="rounded-full bg-sky-300 p-2 text-sky-950"><Crown size={15} /></div>
                                 <div className="min-w-0 flex-1">
                                     <div className="text-xs font-bold uppercase tracking-wide text-sky-300">Majority Control</div>
                                     <div className="mt-1 text-base font-black text-white">{takeoverSnapshot.nextUnlockLabel}</div>
@@ -518,7 +518,7 @@ export const StocksApp: React.FC<StocksAppProps> = ({
                                     className={`min-h-12 w-full rounded-xl px-4 text-xs font-black uppercase tracking-wide ${
                                         takeoverSnapshot.canTransferControl
                                             ? 'bg-emerald-400 text-slate-950 active:bg-emerald-300'
-                                            : 'bg-zinc-900 text-zinc-600'
+                                            : 'bg-zinc-900 text-zinc-300'
                                     }`}
                                 >
                                     {takeoverSnapshot.canTransferControl ? 'Start Acquisition Process' : takeoverSnapshot.nextUnlockLabel}
@@ -541,7 +541,7 @@ export const StocksApp: React.FC<StocksAppProps> = ({
     return (
         <div className="absolute inset-0 z-40 flex flex-col bg-black font-sans text-white animate-in slide-in-from-right duration-300">
             <div className="flex shrink-0 items-center justify-between border-b border-zinc-800 bg-zinc-900 p-4 pb-3 pt-12 shadow-lg">
-                <button type="button" onClick={onBack} className="rounded-full p-1 hover:bg-white/10">
+                <button type="button" onClick={onBack} className="grid h-11 w-11 place-items-center rounded-full hover:bg-white/10" aria-label="Back to phone">
                     <ArrowLeft size={20} />
                 </button>
                 <div className="flex items-center gap-2 font-bold uppercase tracking-widest text-emerald-500">
@@ -569,7 +569,7 @@ export const StocksApp: React.FC<StocksAppProps> = ({
                 <button
                     type="button"
                     onClick={() => setTab('MARKET')}
-                    className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider ${
+                    className={`flex-1 min-h-11 py-3 text-xs font-bold uppercase tracking-wider ${
                         tab === 'MARKET' ? 'border-b-2 border-white text-white' : 'text-zinc-600'
                     }`}
                 >
@@ -578,7 +578,7 @@ export const StocksApp: React.FC<StocksAppProps> = ({
                 <button
                     type="button"
                     onClick={() => setTab('PORTFOLIO')}
-                    className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider ${
+                    className={`flex-1 min-h-11 py-3 text-xs font-bold uppercase tracking-wider ${
                         tab === 'PORTFOLIO' ? 'border-b-2 border-white text-white' : 'text-zinc-600'
                     }`}
                 >

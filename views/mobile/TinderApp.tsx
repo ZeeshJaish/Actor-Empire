@@ -710,7 +710,8 @@ export const TinderApp: React.FC<TinderAppProps> = ({ player, onBack, onUpdatePl
 
             {view === 'SETUP' && (
                 <div className="flex-1 p-8 flex flex-col bg-gradient-to-br from-rose-500 to-orange-600 text-white overflow-y-auto custom-scrollbar">
-                    <div className="flex-1 flex flex-col justify-center min-h-[500px]">
+                    <button type="button" onClick={onBack} className="relative z-10 grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white/15" aria-label="Back to phone"><ArrowLeft size={20} /></button>
+                    <div className="my-auto flex shrink-0 flex-col pt-3">
                         <div className="flex justify-center mb-6 drop-shadow-md"><Flame size={64} fill="white" /></div>
                         <h2 className="text-3xl font-bold text-center mb-2 drop-shadow-sm">{tr('dating.tinder.welcome')}</h2>
                         <p className="text-center text-white/90 mb-10 text-sm font-medium">{tr('dating.tinder.welcomeSub')}</p>
@@ -719,9 +720,9 @@ export const TinderApp: React.FC<TinderAppProps> = ({ player, onBack, onUpdatePl
                             <div>
 	                                <label className="text-xs font-bold uppercase tracking-widest mb-3 block opacity-90">{tr('dating.preferences.interestedIn')}</label>
 	                                <div className="flex bg-black/20 p-1 rounded-xl backdrop-blur-sm">
-	                                    <button onClick={() => setPreferences({ ...preferences, gender: 'MALE' })} className={`flex-1 py-3 rounded-lg text-xs font-bold transition-all ${preferences.gender === 'MALE' ? 'bg-white text-rose-500 shadow-md' : 'text-white hover:bg-white/10'}`}>{tr('dating.preferences.gender.men')}</button>
-	                                    <button onClick={() => setPreferences({ ...preferences, gender: 'FEMALE' })} className={`flex-1 py-3 rounded-lg text-xs font-bold transition-all ${preferences.gender === 'FEMALE' ? 'bg-white text-rose-500 shadow-md' : 'text-white hover:bg-white/10'}`}>{tr('dating.preferences.gender.women')}</button>
-	                                    <button onClick={() => setPreferences({ ...preferences, gender: 'ALL' })} className={`flex-1 py-3 rounded-lg text-xs font-bold transition-all ${preferences.gender === 'ALL' ? 'bg-white text-rose-500 shadow-md' : 'text-white hover:bg-white/10'}`}>{tr('dating.preferences.gender.everyone')}</button>
+	                                    <button onClick={() => setPreferences({ ...preferences, gender: 'MALE' })} className={`min-h-11 flex-1 py-3 rounded-lg text-xs font-bold transition-all ${preferences.gender === 'MALE' ? 'bg-white text-rose-500 shadow-md' : 'text-white hover:bg-white/10'}`}>{tr('dating.preferences.gender.men')}</button>
+	                                    <button onClick={() => setPreferences({ ...preferences, gender: 'FEMALE' })} className={`min-h-11 flex-1 py-3 rounded-lg text-xs font-bold transition-all ${preferences.gender === 'FEMALE' ? 'bg-white text-rose-500 shadow-md' : 'text-white hover:bg-white/10'}`}>{tr('dating.preferences.gender.women')}</button>
+	                                    <button onClick={() => setPreferences({ ...preferences, gender: 'ALL' })} className={`min-h-11 flex-1 py-3 rounded-lg text-xs font-bold transition-all ${preferences.gender === 'ALL' ? 'bg-white text-rose-500 shadow-md' : 'text-white hover:bg-white/10'}`}>{tr('dating.preferences.gender.everyone')}</button>
 	                                </div>
 	                            </div>
 
@@ -768,7 +769,7 @@ export const TinderApp: React.FC<TinderAppProps> = ({ player, onBack, onUpdatePl
                             <button onClick={handleSetupComplete} className="w-full bg-white text-rose-500 py-4 rounded-full font-bold text-lg shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all">
                                 {tr('dating.tinder.startSwiping')}
                             </button>
-                            <button onClick={onBack} className="w-full text-white/70 text-sm font-bold hover:text-white transition-colors">{tr('x.cancel')}</button>
+                            <button onClick={onBack} className="min-h-11 w-full text-white/70 text-sm font-bold hover:text-white transition-colors">{tr('x.cancel')}</button>
                         </div>
                     </div>
                 </div>
@@ -936,7 +937,7 @@ export const TinderApp: React.FC<TinderAppProps> = ({ player, onBack, onUpdatePl
                             <button onClick={() => setShowPreferencesSheet(true)} className="p-2 rounded-full text-gray-400 hover:bg-gray-100" aria-label={tr('dating.tinder.editFilters')}>
                                 <SlidersHorizontal size={22} />
                             </button>
-                            <button onClick={onBack} className="p-2 rounded-full text-gray-400 hover:bg-gray-100"><ArrowLeft size={24} /></button>
+                            <button onClick={onBack} className="grid h-11 w-11 place-items-center rounded-full text-gray-400 hover:bg-gray-100" aria-label="Back to phone"><ArrowLeft size={24} /></button>
                         </div>
                     </div>
 

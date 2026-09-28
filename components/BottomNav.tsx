@@ -13,11 +13,11 @@ interface BottomNavProps {
 const NAV_CSS = `
 .ae-live-dock{
   --gold:#f8a810;--line:rgba(255,255,255,.095);--ghost:rgba(249,246,239,.22);--alert:#ff5c5c;
-  position:fixed;left:0;right:0;bottom:0;z-index:50;padding:0 16px calc(12px + env(safe-area-inset-bottom));pointer-events:none;
+  position:fixed;left:0;right:0;bottom:0;z-index:50;padding:0 16px calc(var(--ae-shell-nav-edge,12px) + env(safe-area-inset-bottom));pointer-events:none;
 }
 .ae-live-dock::before{content:"";position:absolute;left:0;right:0;bottom:0;height:104px;pointer-events:none;background:linear-gradient(180deg,rgba(7,6,5,0),#070605 64%);}
 .ae-live-nav{
-  position:relative;width:100%;max-width:398px;height:60px;margin:0 auto;border-radius:20px;overflow:hidden;
+  position:relative;width:100%;max-width:398px;height:var(--ae-shell-nav-height,60px);margin:0 auto;border-radius:20px;overflow:hidden;
   display:grid;grid-template-columns:repeat(6,minmax(0,1fr));align-items:center;pointer-events:auto;
   background:rgba(19,18,16,.9);-webkit-backdrop-filter:blur(22px) saturate(1.4);backdrop-filter:blur(22px) saturate(1.4);
   box-shadow:inset 0 0 0 1px var(--line),0 20px 42px -24px #000;
@@ -25,7 +25,7 @@ const NAV_CSS = `
 .ae-live-nav-ind{position:absolute;inset:0 auto 0 0;width:16.6667%;pointer-events:none;transition:transform .42s cubic-bezier(.34,1.24,.4,1);}
 .ae-live-nav-ind::before{content:"";position:absolute;top:0;left:50%;transform:translateX(-50%);width:22px;height:2px;border-radius:0 0 2px 2px;background:var(--gold);box-shadow:0 0 12px var(--gold),0 0 26px rgba(248,168,16,.42);}
 .ae-live-nav-ind::after{content:"";position:absolute;top:0;left:50%;transform:translateX(-50%);width:58px;height:34px;background:radial-gradient(50% 100% at 50% 0%,rgba(248,168,16,.26),transparent 72%);}
-.ae-live-nav button{position:relative;height:100%;display:grid;place-items:center;color:var(--ghost);background:transparent;border:0;padding:0;cursor:pointer;transition:color .2s ease;-webkit-tap-highlight-color:transparent;}
+.ae-live-nav button{position:relative;height:100%;min-width:44px;display:grid;place-items:center;color:var(--ghost);background:transparent;border:0;padding:0;cursor:pointer;transition:color .2s ease;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
 .ae-live-nav button.is-on{color:var(--gold);}
 .ae-live-nav button>svg{transition:transform .2s cubic-bezier(.2,.8,.2,1);}
 .ae-live-nav button:active>svg{transform:scale(.86);}
@@ -46,7 +46,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ player, activePage, setPag
   const activeIndex = Math.max(0, navItems.findIndex(item => item.page === activePage));
 
   return (
-    <div className="ae-live-dock" data-ui="actor-empire-navigation-overhaul">
+    <div className="ae-live-dock" data-ui="actor-empire-navigation-overhaul" data-layout-fixed-chrome>
       <Style css={NAV_CSS} />
       <nav className="ae-live-nav" aria-label="Primary game navigation">
         <span className="ae-live-nav-ind" style={{ transform: `translateX(${activeIndex * 100}%)` }} aria-hidden="true" />

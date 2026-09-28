@@ -1,5 +1,6 @@
 import type { Player } from '../types';
 import { getAbsoluteWeek } from '../services/legacyLogic';
+import { getHistoricalCatalogueTitles } from '../services/historicalCatalogue';
 import { getStreamingDayOneMarket } from '../services/streamingDayOneMarkets';
 import { getOwnedPlatformPackageCountryIds } from '../services/streamingRightsMarketplace';
 import type { Lot, SellerAppetite, Terms, Territory } from './model';
@@ -7,9 +8,11 @@ import type { Lot, SellerAppetite, Terms, Territory } from './model';
 type ContentMarketSources = {
   listings: any[];
   collections: any[];
+  opportunityOffers?: any[];
   auctionLots: any[];
   upcomingSales: any[];
   ownedTitles: any[];
+  libraryTitles?: any[];
 };
 
 const hash = (value: string): number => [...value].reduce((sum, char) => ((sum * 31) + char.charCodeAt(0)) >>> 0, 2166136261);
@@ -81,14 +84,18 @@ const territoryMap = (player: Player, freeIds: string[], excludedIds: string[] =
   });
 };
 
-const projectRecord = (player: Player, id: string): any => (
-  (player.world.projects || []).find(project => project.id === id)
-  || (player.pastProjects || []).find(project => project.id === id)
-  || null
-);
+const projectIndex = (player: Player, libraryTitles?: any[]): Map<string, any> => {
+  // Keep the old precedence (world, past, historical) while paying for saved
+  // history materialization once per player snapshot instead of once per card.
+  const index = new Map<string, any>();
+  for (const project of libraryTitles || getHistoricalCatalogueTitles(player)) index.set(project.id, project);
+  for (const project of [...(player.pastProjects || [])].reverse()) index.set(project.id, project);
+  for (const project of [...(player.world.projects || [])].reverse()) index.set(project.id, project);
+  return index;
+};
 
-const storyCopy = (player: Player, id: string, title: string, genre: string, seller: string) => {
-  const project = projectRecord(player, id);
+const storyCopy = (projects: Map<string, any>, id: string, title: string, genre: string, seller: string) => {
+  const project = projects.get(id) || null;
   const logline = String(project?.logline || project?.premise || project?.description || `${seller} is offering the available streaming window for ${title}.`);
   const synopsis = String(project?.synopsis || project?.story || `A ${genre.toLowerCase()} title whose value will depend on its audience fit, rights reach, release history, and the final contract you sign.`);
   return { project, logline, synopsis };
@@ -105,10 +112,10 @@ const priorRun = (source: any, project: any) => {
   };
 };
 
-const collectionRows = (player: Player, collection: any, currentYear: number) => (
+const collectionRows = (projects: Map<string, any>, collection: any, currentYear: number) => (
   collection?.rows?.map((row: any) => {
     const component = collection.package.components.find((item: any) => item.sourceProjectId === row.componentProjectId);
-    const project = projectRecord(player, row.componentProjectId);
+    const project = projects.get(row.componentProjectId);
     return {
       id: row.componentProjectId,
       name: component?.title || project?.title || project?.name || 'Untitled',
@@ -126,18 +133,20 @@ const collectionRows = (player: Player, collection: any, currentYear: number) =>
 export const buildExactContentMarketLots = (player: Player, sources: ContentMarketSources): Lot[] => {
   const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
   const currentYear = Math.max(1, Math.floor(absoluteWeek / 52) + 1);
+  const projects = projectIndex(player, sources.libraryTitles);
   const auctionListingIds = new Set(sources.auctionLots.map(lot => lot.listingId));
   const liveUpcomingIds = new Set(sources.auctionLots.map(lot => lot.upcomingRightsSaleId).filter(Boolean));
 
   const listings: Lot[] = sources.listings.filter(listing => !auctionListingIds.has(listing.id)).map(listing => {
     const genre = displayGenre(listing.title.genre);
-    const copy = storyCopy(player, listing.title.id, listing.title.title, genre, listing.sellerName);
+    const copy = storyCopy(projects, listing.title.id, listing.title.title, genre, listing.sellerName);
     const heat = listing.marketHeat === 'HOT' ? 82 : listing.marketHeat === 'ACTIVE' ? 64 : 42;
     return {
       id: listing.id,
       sourceId: listing.id,
       sourceKind: 'LISTING',
       title: listing.title.title,
+      marquee: listing.title.catalogueTier === 'MARQUEE',
       year: yearFor(listing.title.releaseYear, currentYear),
       runtime: projectType(listing.title.projectType) === 'SERIES' ? 'Series' : 'Feature film',
       format: projectType(listing.title.projectType),
@@ -165,14 +174,33 @@ export const buildExactContentMarketLots = (player: Player, sources: ContentMark
     };
   });
 
+  const opportunities: Lot[] = (sources.opportunityOffers || []).map(offer => ({
+    id: offer.id, sourceId: offer.id, sourceKind: 'OPPORTUNITY',
+    title: offer.title, marquee: offer.premium, year: currentYear,
+    runtime: offer.projectType === 'SERIES' ? 'Series' : 'Feature film',
+    format: offer.projectType === 'SERIES' ? 'SERIES' : 'FILM',
+    genre: displayGenre(offer.genre), seller: offer.sellerName, sellerKind: 'STUDIO',
+    appetite: 'CASH', hue: hueFor(offer.projectId), logline: offer.logline,
+    synopsis: `Complete production from ${offer.sellerName}. Written by ${offer.writerName}, directed by ${offer.directorName}, starring ${offer.leadActorName}. Credits and results activate only after a signed deal and public premiere.`,
+    path: 'STREAMING ONLY', heat: offer.premium ? 83 : 52,
+    heatWhy: [offer.premium ? 'Premium discovery' : 'New market discovery',
+      `Forecast quality ${offer.qualityForecast}/100`, 'Unsold offer expires at the cycle boundary'],
+    terr: territoryMap(player, []),
+    listed: termsFor({ minimumGuarantee: offer.askingPrice, platformRevenueShare: 70,
+      durationWeeks: 104, windowType: 'FIRST_WINDOW', exclusivity: 'NON_EXCLUSIVE' }, 0),
+    mode: 'LISTED', avail: 'OPEN',
+    note: 'Fixed listed terms. Private negotiation is unavailable for this complete package.',
+  }));
+
   const collections: Lot[] = sources.collections.filter(collection => !auctionListingIds.has(collection.id)).map(collection => {
-    const rows = collectionRows(player, collection, currentYear);
+    const rows = collectionRows(projects, collection, currentYear);
     const terr = territoryMap(player, collection.package.requestedCountryIds || []);
     return {
       id: collection.id,
       sourceId: collection.id,
       sourceKind: 'COLLECTION',
       title: collection.package.name,
+      marquee: collection.package.components.some((component: any) => component.catalogueTier === 'MARQUEE'),
       year: rows.length ? Math.min(...rows.map(row => row.year)) : currentYear,
       runtime: `${rows.length} titles`,
       format: 'COLLECTION',
@@ -205,14 +233,15 @@ export const buildExactContentMarketLots = (player: Player, sources: ContentMark
     const sourceCollection = lot.listingKind === 'CATALOGUE_PACKAGE'
       ? sources.collections.find(collection => collection.id === lot.listingId)
       : null;
-    const rows = collectionRows(player, sourceCollection, currentYear);
+    const rows = collectionRows(projects, sourceCollection, currentYear);
     const genre = displayGenre(lot.genre);
-    const copy = storyCopy(player, lot.sourceProjectId, lot.title, genre, lot.sellerName);
+    const copy = storyCopy(projects, lot.sourceProjectId, lot.title, genre, lot.sellerName);
     return {
       id: lot.id,
       sourceId: lot.id,
       sourceKind: 'AUCTION',
       title: lot.title,
+      marquee: copy.project?.catalogueTier === 'MARQUEE',
       year: rows.length ? Math.min(...rows.map(row => row.year)) : yearFor(copy.project?.releaseYear || copy.project?.year, currentYear),
       runtime: lot.listingKind === 'CATALOGUE_PACKAGE' ? `${rows.length || lot.catalogueComponentIds?.length || 0} titles` : projectType(lot.projectType) === 'SERIES' ? 'Series' : 'Feature film',
       format: lot.listingKind === 'CATALOGUE_PACKAGE' ? 'COLLECTION' : projectType(lot.projectType),
@@ -236,7 +265,7 @@ export const buildExactContentMarketLots = (player: Player, sources: ContentMark
 
   const upcoming: Lot[] = sources.upcomingSales.filter(sale => !liveUpcomingIds.has(sale.id) && ['ANNOUNCED', 'LIVE'].includes(sale.status)).map(sale => {
     const genre = displayGenre(sale.genre);
-    const copy = storyCopy(player, sale.sourceProjectId, sale.title, genre, sale.sellerName);
+    const copy = storyCopy(projects, sale.sourceProjectId, sale.title, genre, sale.sellerName);
     return {
       id: sale.id,
       sourceId: sale.id,
@@ -265,7 +294,7 @@ export const buildExactContentMarketLots = (player: Player, sources: ContentMark
 
   const studio: Lot[] = sources.ownedTitles.map(title => {
     const genre = displayGenre(title.genre);
-    const copy = storyCopy(player, title.id, title.title, genre, title.studioName);
+    const copy = storyCopy(projects, title.id, title.title, genre, title.studioName);
     return {
       id: `studio:${title.id}`,
       sourceId: title.id,
@@ -295,5 +324,5 @@ export const buildExactContentMarketLots = (player: Player, sources: ContentMark
     };
   });
 
-  return [...auctions, ...listings, ...collections, ...upcoming, ...studio];
+  return [...auctions, ...opportunities, ...listings, ...collections, ...upcoming, ...studio];
 };

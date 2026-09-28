@@ -1404,7 +1404,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                     <div className="flex gap-4 text-white">
                         <Search size={20}/>
                         <Bell size={20}/>
-                        <button onClick={onBack} className="bg-zinc-800 p-1 rounded-full"><ArrowLeft size={16}/></button>
+                        <button onClick={onBack} className="grid h-11 w-11 place-items-center rounded-full bg-zinc-800" aria-label="Back to phone"><ArrowLeft size={16}/></button>
                     </div>
                 </div>
             )}
@@ -1413,7 +1413,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
             {view === 'UPLOAD' && (
                 <div className="absolute inset-0 flex flex-col bg-black z-50 animate-in slide-in-from-bottom duration-300">
                     <div className="px-4 pt-12 pb-3 border-b border-zinc-900 flex items-center justify-between bg-zinc-950/95 shrink-0">
-                        <button onClick={() => setView('MAIN')} className="rounded-full bg-zinc-900 border border-zinc-800 p-2 active:scale-95 transition-transform">
+                        <button onClick={() => setView('MAIN')} aria-label={tr('youtube.backToYoutube')} className="grid h-11 w-11 place-items-center rounded-full border border-zinc-800 bg-zinc-900 active:scale-95 transition-transform">
                             <ArrowLeft size={20}/>
                         </button>
                         <div className="text-center">
@@ -1689,7 +1689,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
             {view === 'WATCH' && selectedVideo && (
                 <div className="absolute inset-0 flex flex-col bg-zinc-950 z-50 animate-in slide-in-from-right duration-200">
                     <div className="p-4 pt-12 border-b border-zinc-900 bg-zinc-950/95 backdrop-blur flex items-center gap-4 shrink-0">
-                        <button onClick={() => setView('MAIN')} className="p-2 -ml-2 hover:bg-zinc-900 rounded-full" aria-label={tr('youtube.backToYoutube')}>
+                        <button onClick={() => setView('MAIN')} className="-ml-2 grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-zinc-900" aria-label={tr('youtube.backToYoutube')}>
                             <ArrowLeft size={20}/>
                         </button>
                         <div className="min-w-0">
@@ -1872,7 +1872,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                                         type="button"
                                         onClick={() => setHomeFilter(filter)}
                                         aria-pressed={homeFilter === filter}
-                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold shrink-0 border transition-colors ${
+                                        className={`min-h-11 min-w-11 px-3 py-1.5 rounded-lg text-xs font-bold shrink-0 border transition-colors ${
                                             homeFilter === filter
                                                 ? 'bg-white border-white text-black'
                                                 : 'bg-zinc-900 border-zinc-800 text-white hover:border-zinc-700'

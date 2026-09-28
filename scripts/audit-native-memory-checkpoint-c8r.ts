@@ -3,75 +3,61 @@ import assert from 'node:assert/strict';
 import { checkpointNativeMemoryPressure } from '../services/nativeMemoryCheckpoint';
 
 const run = async () => {
-  const committedPlayer = { age: 82, currentWeek: 17, marker: 'latest-committed-week' };
   const calls: string[] = [];
-  let persistedPlayer: typeof committedPlayer | null = null;
 
-  const saved = await checkpointNativeMemoryPressure({
+  const saved = checkpointNativeMemoryPressure({
     isPlaying: true,
     currentSlot: 2,
     isWeekProcessing: false,
-    getCommittedPlayer: () => committedPlayer,
+    hasVerifiedCheckpoint: () => true,
     cancelPendingAutosave: () => calls.push('cancel'),
-    persistCommittedPlayer: async (slot, player) => {
-      calls.push(`persist:${slot}`);
-      persistedPlayer = player;
-    },
   });
 
-  assert.deepEqual(saved, { status: 'SAVED', slot: 2 });
-  assert.deepEqual(calls, ['cancel', 'persist:2']);
-  assert.equal(persistedPlayer, committedPlayer);
+  assert.deepEqual(saved, { status: 'READY', slot: 2 });
+  assert.deepEqual(calls, ['cancel']);
 
   for (const skippedCase of [
     {
+      name: 'a save transfer is active',
+      input: { isPlaying: true, currentSlot: 1, isWeekProcessing: false, isSaveTransferActive: true },
+      expected: { status: 'SKIPPED', reason: 'SAVE_TRANSFER_ACTIVE' },
+    },
+    {
       name: 'a week is processing',
-      input: { isPlaying: true, currentSlot: 1, isWeekProcessing: true },
+      input: { isPlaying: true, currentSlot: 1, isWeekProcessing: true, isSaveTransferActive: false },
       expected: { status: 'SKIPPED', reason: 'WEEK_PROCESSING' },
     },
     {
       name: 'the game is not playing',
-      input: { isPlaying: false, currentSlot: 1, isWeekProcessing: false },
+      input: { isPlaying: false, currentSlot: 1, isWeekProcessing: false, isSaveTransferActive: false },
       expected: { status: 'SKIPPED', reason: 'NOT_PLAYING' },
     },
     {
       name: 'there is no active save slot',
-      input: { isPlaying: true, currentSlot: null, isWeekProcessing: false },
+      input: { isPlaying: true, currentSlot: null, isWeekProcessing: false, isSaveTransferActive: false },
       expected: { status: 'SKIPPED', reason: 'NO_SLOT' },
     },
   ] as const) {
     let cancelled = false;
-    let persisted = false;
-    const result = await checkpointNativeMemoryPressure({
+    const result = checkpointNativeMemoryPressure({
       ...skippedCase.input,
-      getCommittedPlayer: () => committedPlayer,
+      hasVerifiedCheckpoint: () => true,
       cancelPendingAutosave: () => {
         cancelled = true;
-      },
-      persistCommittedPlayer: async () => {
-        persisted = true;
       },
     });
 
     assert.deepEqual(result, skippedCase.expected, skippedCase.name);
-    assert.equal(cancelled, false, `${skippedCase.name}: autosave must stay untouched`);
-    assert.equal(persisted, false, `${skippedCase.name}: no checkpoint may be written`);
+    assert.equal(cancelled, true, `${skippedCase.name}: pending autosave must stop under pressure`);
   }
 
-  const persistenceError = new Error('storage unavailable');
-  await assert.rejects(
-    checkpointNativeMemoryPressure({
-      isPlaying: true,
-      currentSlot: 3,
-      isWeekProcessing: false,
-      getCommittedPlayer: () => committedPlayer,
-      cancelPendingAutosave: () => undefined,
-      persistCommittedPlayer: async () => {
-        throw persistenceError;
-      },
-    }),
-    persistenceError,
-  );
+  assert.deepEqual(checkpointNativeMemoryPressure({
+    isPlaying: true,
+    currentSlot: 3,
+    isWeekProcessing: false,
+    hasVerifiedCheckpoint: () => false,
+    cancelPendingAutosave: () => undefined,
+  }), { status: 'SKIPPED', reason: 'NO_VERIFIED_CHECKPOINT' });
 
   console.log('C8R native memory checkpoint audit passed.');
 };

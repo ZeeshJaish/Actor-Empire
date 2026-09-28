@@ -280,8 +280,24 @@ const hostileCommercialForecast = forecastPricing(
     1_000_000,
     { rivalAveragePrice: 12, reachRate: .5 },
 );
-assert.ok(hostileCommercialForecast.monthlyRevenue < normalCommercialForecast.monthlyRevenue,
-    'the launch forecast must reject absurd transactional pricing rather than multiplying it into free money');
+assert.equal(normalCommercialForecast.monthlyRevenue, 0,
+    'without a C4 world forecast the launch panel must not invent transaction buyers or cash');
+assert.equal(hostileCommercialForecast.monthlyRevenue, 0,
+    'extreme legacy transaction fields cannot mint cash from the local UI fallback');
+const storeOnlyPricing = normalizeStreamingPricingConfiguration({ ...basePricing, streams: ['rentals'] });
+const expensiveStorePricing = normalizeStreamingPricingConfiguration({ ...storeOnlyPricing,
+    rentals: { ...storeOnlyPricing.rentals, rent: 10_000, buy: 10_000 },
+});
+const normalStoreWorld = forecastWorldStreamingLaunchPricing(player, storeOnlyPricing, ['US', 'IN']);
+const expensiveStoreWorld = forecastWorldStreamingLaunchPricing(player, expensiveStorePricing, ['US', 'IN']);
+const normalStorePanel = forecastPricing(storeOnlyPricing as PricingSettings, 1_000_000,
+    { rivalAveragePrice: 12, reachRate: .5 }, [], normalStoreWorld);
+const expensiveStorePanel = forecastPricing(expensiveStorePricing as PricingSettings, 1_000_000,
+    { rivalAveragePrice: 12, reachRate: .5 }, [], expensiveStoreWorld);
+assert.ok(normalStorePanel.monthlyRevenue > expensiveStorePanel.monthlyRevenue,
+    'the conditional C4 store forecast must lose buyers at the supported maximum price');
+assert.ok(expensiveStorePanel.monthlyRevenue >= 0 && Number.isFinite(expensiveStorePanel.monthlyRevenue),
+    'out-of-range transaction input cannot create unbounded forecast cash');
 
 const saveResult = saveStreamingPricingPlan(player, {
     ...basePricing,

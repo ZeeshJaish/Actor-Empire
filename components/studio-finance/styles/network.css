@@ -158,6 +158,9 @@
   fill-opacity: 0.5;
   stroke: rgb(var(--net-reach));
 }
+.sf .bw-rg.is-cloud-dragging .bw-atlas-market.is-served {
+  transition-delay: 180ms;
+}
 
 /* --- reach: the fill that grows ------------------------------------------
    Blurred, then contrast-crushed by the SVG filter, so separate rooms fuse
@@ -172,6 +175,7 @@
   opacity: 0.22;
   transition: r 520ms var(--sf-ease);
 }
+.sf .bw-rg.is-cloud-dragging .bw-atlas-emit circle { transition-duration: 170ms; }
 .sf .bw-atlas-emit circle.is-preview { opacity: 0.12; }
 /* Overlapping halos take the strongest rather than adding up (#112). */
 .sf .bw-atlas-halos { isolation: isolate; }
@@ -180,6 +184,7 @@
 /* The field (#109): the gradient is the shading, the element's opacity is
    how much stands in the room. */
 .sf .bw-atlas-reach { transition: r 520ms var(--sf-ease), opacity 480ms var(--sf-ease); }
+.sf .bw-rg.is-cloud-dragging .bw-atlas-reach { transition-duration: 170ms; }
 /* The outer ring: ground inside reach but not served to the standard — the
    band between the solid core and the dashed ring. Faint enough that the alpha
    crush leaves a ragged edge rather than a second hard circle, but no fainter:
@@ -227,6 +232,8 @@
    round: a solid light head with a dark hairline holding it off the ground, so
    it sits ON the map rather than through it. */
 .sf .bw-atlas-pin { cursor: pointer; }
+.sf .bw-rg.is-cloud-dragging .bw-atlas-pin.is-held { animation: bw-cloud-site-arrive 180ms var(--sf-ease) both; }
+@keyframes bw-cloud-site-arrive { from { opacity: .35; } to { opacity: 1; } }
 .sf .bw-atlas-pin-hit { fill: transparent; }
 .sf .bw-atlas-pin-dot {
   fill: #eef4fb;
@@ -1168,8 +1175,8 @@
 }
 .sf .bw-rg-tiers .bw-net-duty {
   align-items: center;
-  gap: 4px;
-  padding: 10px 6px 9px;
+  gap: 2px;
+  padding: 8px 5px;
   text-align: center;
 }
 .sf .bw-rg-tiers .bw-net-duty > b {
@@ -1185,7 +1192,20 @@
   letter-spacing: 0.02em;
   font-feature-settings: 'tnum' 1;
 }
-.sf .bw-rg-tiers .bw-net-duty-set { margin: 2px 0 0; }
+.sf .bw-rg-tier-reach small {
+  display: block;
+  margin-top: 2px;
+  font: 500 9px/1.15 var(--sf-font-ui);
+  letter-spacing: 0;
+  color: var(--sf-fg-4);
+}
+.sf .bw-rg-tier-coverage {
+  font: 700 9px/1.15 var(--sf-font-ui);
+  color: var(--sf-fg-3);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+.sf .bw-rg-tiers .bw-net-duty-set { margin: 1px 0 0; }
 .sf .bw-rg-tiers .bw-net-duty-price { text-decoration: none; font: 500 10px/1.2 var(--sf-font-ui); color: var(--sf-fg-5); }
 .sf .bw-rg-tiers .bw-net-duty-carry {
   font: 600 10px/1.2 var(--sf-font-ui); font-style: normal;
@@ -1229,17 +1249,53 @@
 .sf .bw-rg-cover-quotes li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 10px; font-size: var(--sf-t-1); }
 .sf .bw-rg-cover-quotes em { color: var(--sf-fg-4); font-style: normal; }
 .sf .bw-machine-mark { display: block; width: 22px; height: 22px; flex: none; color: rgb(var(--duty, 206, 218, 235)); }
-.sf .bw-rg-tiers .bw-machine-mark { width: 27px; height: 27px; }
-.sf .bw-rg-prov-btn { gap: 7px; padding: 10px; }
-.sf .bw-rg-prov-identity { display: flex; align-items: center; gap: 7px; min-width: 0; }
-.sf .bw-rg-prov-btn b { font-size: var(--sf-t-2); white-space: normal; overflow: visible; }
-.sf .bw-rg-prov-spec { display: flex; flex-wrap: wrap; gap: 3px 10px; }
-.sf .bw-rg-prov-btn em { white-space: normal; overflow: visible; }
-.sf .bw-rg-prov-btn small { color: var(--sf-fg-4); font: 500 11px/1.35 var(--sf-font-ui); }
+.sf .bw-rg-tiers .bw-machine-mark { width: 23px; height: 23px; }
+.sf .bw-rg-prov-btn {
+  min-height: 126px;
+  gap: 3px;
+  padding: 9px 8px;
+  border-radius: 12px;
+  background: var(--sf-void);
+  transition: border-color var(--sf-fast) var(--sf-ease), background-color var(--sf-fast) var(--sf-ease);
+}
+.sf .bw-rg-prov-btn.is-atlas { --provider-accent: 85, 195, 236; }
+.sf .bw-rg-prov-btn.is-northwind { --provider-accent: 118, 222, 179; }
+.sf .bw-rg-prov-btn.is-meridian { --provider-accent: 189, 172, 255; }
+.sf .bw-rg-prov-btn.is-on { border-color: rgb(var(--provider-accent)); background-color: rgba(var(--provider-accent), .12); }
+.sf .bw-rg-prov-btn:hover:not(:disabled) { border-color: rgb(var(--provider-accent)); }
+.sf .bw-rg-prov-btn:focus-visible { outline: 2px solid rgb(var(--provider-accent)); outline-offset: 3px; }
+.sf .bw-rg-prov-crest { display: flex; align-items: center; justify-content: space-between; gap: 4px; color: rgb(var(--provider-accent)); }
+.sf .bw-rg-prov-crest em { font: 800 9px/1 var(--sf-font-ui); letter-spacing: .1em; color: rgb(var(--provider-accent)); }
+.sf .bw-rg-prov-btn b { font-size: 12px; line-height: 1.15; white-space: normal; overflow: visible; }
+.sf .bw-rg-prov-btn strong { margin-top: auto; font: 800 21px/1 var(--sf-font-ui); color: var(--sf-fg-max); font-feature-settings: 'tnum' 1; }
+.sf .bw-rg-prov-btn strong small { display: inline; margin-left: 3px; font: 600 9px/1 var(--sf-font-ui); color: var(--sf-fg-4); }
+.sf .bw-rg-prov-ceiling { font: 600 10px/1.1 var(--sf-font-ui); color: var(--sf-fg-4); white-space: nowrap; }
+.sf .bw-rg-prov-rate { font: 700 11px/1.1 var(--sf-font-ui); color: var(--sf-fg-3); white-space: nowrap; }
+.sf .bw-rg-prov-detail { display: flex; flex-wrap: wrap; gap: 2px 8px; margin: 0; padding: 8px 10px; border-radius: 9px; background: var(--sf-void); font: 500 11px/1.35 var(--sf-font-ui); color: var(--sf-fg-4); }
+.sf .bw-rg-prov-detail b { color: var(--sf-fg-2); }
+.sf .bw-rg-footprint-note { margin: 7px 12px 3px; color: var(--sf-fg-4); font: 500 11px/1.4 var(--sf-font-ui); }
+.sf .bw-cloud-footprint { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 3px 12px; margin: 8px 0 0; color: var(--sf-fg-2); font: 600 11px/1.35 var(--sf-font-ui); }
+.sf .bw-cloud-footprint span { color: rgb(var(--net-reach)); }
+.sf .bw-cloud-footprint small { font: inherit; font-weight: 400; }
 @media (max-width: 520px) {
-  .sf .bw-rg-prov { grid-template-columns: 1fr; }
-  .sf .bw-rg-tiers .bw-net-duty { padding: 10px 4px; }
+  .sf .bw-rg-prov { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .sf .bw-rg-prov-btn { min-height: 126px; padding: 8px 6px; }
+  .sf .bw-rg-prov-crest em { font-size: 8px; }
+  .sf .bw-rg-prov-btn b { font-size: 11px; }
+  .sf .bw-rg-prov-btn strong { font-size: 18px; }
+  .sf .bw-rg-tiers .bw-net-duty { padding: 8px 4px; }
   .sf .bw-rg-tiers .bw-net-duty > b { white-space: normal; overflow: visible; }
+}
+@media (max-width: 350px) {
+  .sf .bw-rg-prov { grid-auto-columns: minmax(104px, 1fr); grid-auto-flow: column; grid-template-columns: none; overflow-x: auto; scroll-snap-type: x mandatory; padding: 2px 2px 7px; }
+  .sf .bw-rg-prov-btn { scroll-snap-align: start; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sf .bw-rg-prov-btn { transition: none; }
+  .sf .bw-rg-prov-btn:hover:not(:disabled) { transform: none; }
+  .sf .bw-rg.is-cloud-dragging .bw-atlas-emit circle,
+  .sf .bw-rg.is-cloud-dragging .bw-atlas-reach { transition: none; }
+  .sf .bw-rg.is-cloud-dragging .bw-atlas-pin.is-held { animation: none; }
 }
 
 /* The build's price, on the line under the map (#120). */

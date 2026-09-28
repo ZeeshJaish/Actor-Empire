@@ -40,6 +40,7 @@ import type {
     StreamingCloudProviderId,
     StreamingServerTier,
     StreamingPricingPlanColorId,
+    StreamingCommercialOfferIntent,
     StreamingSoundIdentKey,
     StreamingTechnologyBranch,
 } from '../types';
@@ -512,20 +513,23 @@ const normalizePricingConfiguration = (root: UnknownRecord, source: UnknownRecor
     const metered = asRecord(pricing.metered);
     const patron = asRecord(pricing.patron);
     return normalizeStreamingPricingConfiguration({
-        streams: asArray(pricing.streams).length
+        streams: Array.isArray(pricing.streams)
             ? Array.from(new Set(asArray(pricing.streams).map(value => oneOf(value, REVENUE_STREAMS, 'subs'))))
             : ['subs'],
-        plans: plans.length ? plans : fallbackPlans,
+        plans: Array.isArray(pricing.plans) ? plans : fallbackPlans,
         annualDiscount: number(pricing.annualDiscount, 15, STREAMING_MAXIMUM_ANNUAL_DISCOUNT),
         introOffer: number(pricing.introOffer, 0, STREAMING_MAXIMUM_INTRO_OFFER),
         introOfferPlanId: text(pricing.introOfferPlanId, '', 50) || undefined,
-        ads: { minutesPerHour: number(ads.minutesPerHour, 4, 12), cpm: decimal(ads.cpm, 22, 100) },
+        // Ad cadence persists as minutes of 30-second spots per eligible hour.
+        // Decimal and zero legacy loads must not be rounded into a new preset.
+        ads: { minutesPerHour: decimal(ads.minutesPerHour, 4, 30), cpm: decimal(ads.cpm, 22, 100) },
         rentals: { rent: decimal(rentals.rent, 5.99, 50), buy: decimal(rentals.buy, 19.99, 100), windowWeeks: number(rentals.windowWeeks, 6, 52) },
         premium: { price: decimal(premium.price, 29.99, 100) },
         daypass: { price: decimal(daypass.price, 7.99, 100) },
         sponsor: { perTitle: number(sponsor.perTitle, 4_000_000, 100_000_000), titles: number(sponsor.titles, 0, 100) },
         metered: { perHour: decimal(metered.perHour, 1, 20) },
         patron: { monthly: decimal(patron.monthly, 10, 100) },
+        commercialOffers: pricing.commercialOffers as StreamingCommercialOfferIntent | undefined,
     });
 };
 
@@ -783,7 +787,7 @@ export const normalizeStreamingCanonicalFoundation = (value: unknown): Streaming
         ...migrateCountryMarkets(root),
         ...migrateRegionalMarkets(root),
         ...canonicalMarkets,
-    ], item => `${item.scope}:${item.scopeId}`).slice(-120);
+    ], item => `${item.scope}:${item.scopeId}`).slice(-240);
 
     return {
         launchProgram: normalizeLaunchProgram(root),

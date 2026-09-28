@@ -4,6 +4,7 @@ import { INITIAL_PLAYER } from '../types';
 import type { IndustryProductionCommitment, NPCStudioState, WorldState } from '../types';
 import { normalizeStudioAiState } from '../services/studioAi';
 import { packageStudioAiProductionTalent } from '../services/studioAi/studioAiProductionTalent';
+import { getTalentCareerProfile } from '../services/talentCareer';
 
 const WEEK = 900;
 const studio: NPCStudioState = {
@@ -33,8 +34,21 @@ assert.equal(first.changed, true);
 assert.equal(first.production.studioAiExecution?.talentSelected, true);
 assert.ok(first.production.studioAiExecution?.talent?.leadActorId);
 assert.ok(first.production.studioAiExecution?.talent?.directorId);
-assert.equal(first.world.talentBookings?.filter(row => row.projectId === production.canonicalProjectId).length, 2);
-assert.equal(first.production.talentBookingIds.length, 2);
+assert.ok(first.production.writerId?.startsWith('writer_npc_'), 'A new AI production books a persistent writer identity.');
+assert.equal(first.production.writerSource, 'NPC_WRITER');
+assert.equal(first.production.studioAiExecution?.talent?.writerId, first.production.writerId);
+assert.ok((first.production.studioAiExecution?.talent?.upfrontFeesMillions?.actor || 0)
+    + (first.production.studioAiExecution?.talent?.upfrontFeesMillions?.director || 0)
+    + (first.production.studioAiExecution?.talent?.upfrontFeesMillions?.writer || 0) <= first.production.budgetMillions,
+    'Named upfront fees fit inside the existing budget.');
+assert.ok((first.production.studioAiExecution?.talent?.talentParticipation?.contracts.length || 0) <= 3,
+    'AI backend terms are optional and bounded by role leverage.');
+assert.equal(getTalentCareerProfile(first.world, first.production.writerId!)?.upfrontIncome, 0,
+    'Booking cannot pay an unfunded talent fee.');
+assert.equal(first.world.talentBookings?.filter(row => row.projectId === production.canonicalProjectId).length, 3);
+assert.equal(first.production.talentBookingIds.length, 3);
+assert.equal(first.world.talentBookings?.find(row => row.projectId === production.canonicalProjectId && row.role === 'WRITER')?.npcId,
+    first.production.writerId, 'The named writer must have a real project booking.');
 
 const replay = packageStudioAiProductionTalent({ player: { ...player, world: first.world }, world: first.world, studio, production: first.production, absoluteWeek: WEEK + 1 });
 assert.equal(replay.changed, false);

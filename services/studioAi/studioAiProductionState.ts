@@ -46,6 +46,18 @@ const normalizeTalent = (value: unknown): StudioAiProductionTalent | null => {
         directorName,
         packageScore: bounded(raw.packageScore),
         estimatedCostMillions: money(raw.estimatedCostMillions),
+        ...(text(raw.writerId) && text(raw.writerName) ? { writerId: text(raw.writerId), writerName: text(raw.writerName) } : {}),
+        ...(raw.upfrontFeesMillions ? { upfrontFeesMillions: {
+            actor: money(raw.upfrontFeesMillions.actor), director: money(raw.upfrontFeesMillions.director), writer: money(raw.upfrontFeesMillions.writer),
+        } } : {}),
+        ...(raw.talentParticipation?.schemaVersion === 1 ? { talentParticipation: {
+            schemaVersion: 1 as const,
+            contracts: (Array.isArray(raw.talentParticipation.contracts) ? raw.talentParticipation.contracts : [])
+                .filter(contract => contract && contract.talentId && contract.talentName && Number.isInteger(contract.backendPoints) && contract.backendPoints >= 1 && contract.backendPoints <= 3),
+            processedReceiptKeys: (Array.isArray(raw.talentParticipation.processedReceiptKeys) ? raw.talentParticipation.processedReceiptKeys : [])
+                .filter((key): key is string => typeof key === 'string').slice(-156),
+            ...(Number.isInteger(raw.talentParticipation.lastSettledAbsoluteWeek) ? { lastSettledAbsoluteWeek: raw.talentParticipation.lastSettledAbsoluteWeek } : {}),
+        } } : {}),
     };
 };
 

@@ -17,11 +17,11 @@ export const BusinessHub: React.FC<BusinessHubProps> = ({ player, onBack, onSele
         <div className="space-y-6 animate-in slide-in-from-right duration-300 pb-20 pt-4">
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                    <button onClick={onBack} className="bg-zinc-900 p-2 rounded-full hover:bg-zinc-800"><ArrowLeft size={20}/></button>
+                    <button onClick={onBack} className="grid h-11 w-11 place-items-center rounded-full bg-zinc-900 hover:bg-zinc-800" aria-label="Back to Lifestyle"><ArrowLeft size={20}/></button>
                     <h2 className="text-3xl font-black text-white uppercase tracking-tighter">Empire</h2>
                 </div>
                 {player.businesses.length > 0 && (
-                    <button onClick={onStartWizard} className="bg-white text-black p-2 rounded-full hover:bg-zinc-200">
+                    <button onClick={onStartWizard} className="grid h-11 w-11 place-items-center rounded-full bg-white text-black hover:bg-zinc-200" aria-label="Start a venture">
                         <Plus size={24} />
                     </button>
                 )}

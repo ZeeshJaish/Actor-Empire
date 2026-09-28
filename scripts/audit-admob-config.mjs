@@ -29,22 +29,17 @@ assertIncludes(
 assertIncludes(
   'Direct AdMob plugin import',
   'services/adLogic.ts',
-  "import { AdMob } from '@capacitor-community/admob';"
-);
-assertIncludes(
-  'Rewarded ad retry',
-  'services/adLogic.ts',
-  'for (let attempt = 0; attempt < 2; attempt += 1)'
+  "import { AdMob, RewardAdPluginEvents } from '@capacitor-community/admob';"
 );
 assertIncludes(
   'Rewarded ad telemetry request',
-  'App.tsx',
-  "trackGameEvent('reward_ad_requested'"
+  'services/rewardedAdCoordinator.ts',
+  "name: 'reward_ad_requested'"
 );
 assertIncludes(
-  'Rewarded ad telemetry result',
+  'Rewarded ad telemetry subscription',
   'App.tsx',
-  "trackGameEvent('reward_ad_result'"
+  'subscribeRewardedAdDiagnostics'
 );
 
 const rewardHandlerStart = appSource.indexOf('const handleTriggerRewardAd');

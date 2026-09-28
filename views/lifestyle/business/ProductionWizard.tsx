@@ -316,7 +316,7 @@ export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCa
 
                 {/* Header */}
                 <div className="relative z-10 p-6 pt-safe-top flex justify-between items-center shrink-0">
-                    <button onClick={onCancel} className="text-zinc-500 hover:text-white transition-colors p-2 bg-black/50 rounded-full backdrop-blur-md"><ArrowLeft size={20}/></button>
+                    <button onClick={onCancel} aria-label="Back from studio setup" className="text-zinc-500 hover:text-white transition-colors min-h-[44px] min-w-[44px] inline-flex items-center justify-center bg-black/50 rounded-full backdrop-blur-md"><ArrowLeft size={20}/></button>
                     <div className="flex items-center gap-2 text-[10px] text-amber-400 font-black uppercase tracking-[0.2em] border border-amber-500/30 px-3 py-1 rounded-full bg-amber-950/40 backdrop-blur-md">
                         <Crown size={12} fill="currentColor" /> {tr('services.business.productionWizard.gate.eliteTier')}
                     </div>
@@ -439,7 +439,7 @@ export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCa
         <div className="fixed inset-0 z-[60] bg-zinc-950 flex flex-col animate-in slide-in-from-right duration-300 pt-safe-top">
             {/* Header */}
             <div className="p-6 border-b border-zinc-800 flex justify-between items-center bg-black/50 backdrop-blur-md shrink-0">
-                <button onClick={onCancel} className="text-zinc-500 hover:text-white"><ArrowLeft size={24}/></button>
+                <button onClick={onCancel} aria-label="Back from studio document" className="text-zinc-500 hover:text-white min-h-[44px] min-w-[44px] inline-flex items-center justify-center"><ArrowLeft size={24}/></button>
                 <div className="flex flex-col items-center">
                     <div className="text-[10px] text-amber-500 font-bold uppercase tracking-widest">{tr('services.business.productionWizard.document.premiumSetup')}</div>
                     <h2 className="text-white font-serif font-bold text-lg">{tr('lifestyle.productionHouse')}</h2>
@@ -491,7 +491,7 @@ export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCa
                                    <button 
                                        onClick={() => setStep(2)}
                                        disabled={!name}
-                                       className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest hover:text-amber-700 transition-colors disabled:opacity-30 font-sans"
+                                       className="flex min-h-[44px] items-center gap-2 text-xs font-bold uppercase tracking-widest hover:text-amber-700 transition-colors disabled:opacity-30 font-sans"
                                    >
                                        {tr('services.business.productionWizard.document.proceedScheduleA')} <ArrowRight size={14}/>
                                    </button>
@@ -528,8 +528,8 @@ export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCa
                                </div>
 
                                <div className="border-t-2 border-black pt-4 mt-2">
-                                   <div className="flex justify-between items-end mb-4">
-                                       <div className="text-xs relative min-w-[120px]">
+                                   <div className="flex flex-wrap items-end justify-between gap-4 mb-4">
+                                       <div className="text-xs relative min-w-0 flex-1 basis-[120px]">
                                            <span className="block text-[8px] uppercase font-bold opacity-50 font-sans mb-1">{tr('services.business.productionWizard.document.founderSignature')}</span>
                                            <div className="relative h-8 border-b border-black/10">
                                                {/* Signature Animation: Reveals width from 0 to 100% */}
@@ -540,7 +540,7 @@ export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCa
                                            </div>
                                        </div>
                                        
-	                                       <div className="text-right">
+	                                       <div className="ml-auto max-w-full text-right">
 	                                           <div className="text-[8px] uppercase font-bold opacity-50 font-sans">{tr('services.business.productionWizard.document.capitalCommitment')}</div>
 	                                           <div className="font-mono font-bold text-sm">${COST.toLocaleString()}</div>
 	                                       </div>

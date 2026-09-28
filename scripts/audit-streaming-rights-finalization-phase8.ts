@@ -17,6 +17,7 @@ import {
 } from '../services/streamingRightsCalendar';
 import { getAbsoluteWeek } from '../services/legacyLogic';
 import { compactPlayerForPersistence, FULL_LOCAL_MIRROR_BUDGET_BYTES } from '../services/saveCompaction';
+import { prepareLocalStorageMirror } from '../services/saveMirror';
 import { migratePlayerSave } from '../services/saveMigration';
 import { normalizeStreamingRightsContractRegistry } from '../services/streamingRightsCore';
 
@@ -76,6 +77,12 @@ assert.match(homeSource, /Rights Market A8 QA/);
 assert.match(homeSource, /buildStreamingRightsPhase8QaFixture/);
 
 const contractUniverse = JSON.stringify(qaFixture.world.streamingRightsContracts);
+const contractUniverseWithoutC2Grant = (input: Player['world']['streamingRightsContracts']): string => JSON.stringify(
+    Object.fromEntries(Object.entries(input || {}).map(([id, contract]) => {
+        const { accessGrant: _accessGrant, ...originalTerms } = contract;
+        return [id, originalTerms];
+    })),
+);
 const offerUniverse = JSON.stringify(Object.values(qaFixture.world.streamingRightsCalendar?.renewalCases || {}).map(renewal => ({
     sourceContractId: renewal.sourceContractId,
     offerDisposition: renewal.offerDisposition,
@@ -87,7 +94,8 @@ const offerUniverse = JSON.stringify(Object.values(qaFixture.world.streamingRigh
         absoluteWeek: qaAbsoluteWeek,
         patch: { controlMode },
     });
-    assert.equal(JSON.stringify(modePlayer.world.streamingRightsContracts), contractUniverse, `${controlMode} must not alter signed contracts`);
+    assert.equal(contractUniverseWithoutC2Grant(modePlayer.world.streamingRightsContracts),
+        contractUniverseWithoutC2Grant(qaFixture.world.streamingRightsContracts), `${controlMode} must not alter signed terms`);
     assert.equal(JSON.stringify(Object.values(modePlayer.world.streamingRightsCalendar?.renewalCases || {}).map(renewal => ({
         sourceContractId: renewal.sourceContractId,
         offerDisposition: renewal.offerDisposition,
@@ -146,7 +154,9 @@ assert.ok(compactedQaBytes < FULL_LOCAL_MIRROR_BUDGET_BYTES, `40-title QA save m
 const reloadedQa = migratePlayerSave(JSON.parse(JSON.stringify(compactedQa)) as Player);
 assert.equal(reloadedQa.businesses.find(business => business.id === 'empire-studios')?.name, 'Empire Studios');
 assert.equal(reloadedQa.pastProjects.filter(project => String(project.id).startsWith('qa_rights_a8_title_')).length, 40);
-assert.equal(JSON.stringify(reloadedQa.world.streamingRightsContracts), contractUniverse);
+assert.equal(contractUniverseWithoutC2Grant(reloadedQa.world.streamingRightsContracts),
+    contractUniverseWithoutC2Grant(qaFixture.world.streamingRightsContracts),
+    'Reloading may add C2 access grants but cannot alter other signed terms.');
 
 const runRightsHorizon = (input: Player, weeks: number): Player => {
     let branch = structuredClone(input) as Player;
@@ -170,6 +180,15 @@ assert.ok(Object.keys(horizonA.world.streamingRightsContracts || {}).length <= 2
 assert.ok(Object.keys(horizonA.world.streamingRightsCalendar?.renewalCases || {}).length <= 240, 'terminal renewal cases must remain bounded');
 assert.ok((horizonA.world.streamingRightsCalendar?.digests || []).length <= 20, 'calendar digests must remain bounded');
 assert.ok((horizonA.world.streamingRightsOffice?.digests || []).length <= 52, 'office digests must remain bounded');
-assert.ok(Buffer.byteLength(JSON.stringify(compactPlayerForPersistence(horizonA)), 'utf8') < FULL_LOCAL_MIRROR_BUDGET_BYTES, '400-year compacted save must remain within the local mirror budget');
+const compactedHorizon = compactPlayerForPersistence(horizonA);
+assert.equal(prepareLocalStorageMirror(compactedHorizon, 600_000).kind, 'METADATA_ONLY',
+    'A large 197-country save belongs in IndexedDB; localStorage keeps only slot metadata.');
+const reloadedHorizon = migratePlayerSave(JSON.parse(JSON.stringify(compactedHorizon)) as Player);
+assert.equal(Object.keys(reloadedHorizon.world.worldAudienceEconomy?.countries || {}).length, 197,
+    'Metadata-only local mirror must not discard the full IndexedDB world audience state.');
+assert.equal(Object.keys(reloadedHorizon.world.worldStreamingCustomers?.countries || {}).length, 197,
+    'A large career must retain every country customer state on reload.');
+assert.deepEqual(reloadedHorizon.world.streamingRightsContracts, compactedHorizon.world.streamingRightsContracts,
+    'A large career must retain canonical rights after reload.');
 
 console.log('Streaming Rights Phase A8 accessibility contract audit passed.');

@@ -9,6 +9,7 @@ import { appendStudioAiProductionKey } from './studioAiProductionState';
 import { packageStudioAiProductionTalent } from './studioAiProductionTalent';
 import { settleStudioAiProductionTurnaround } from './studioAiProductionTurnaround';
 import { planStudioAiProductionRelease } from './studioAiReleasePlanning';
+import { creditTalentUpfront } from '../talentCareer';
 
 const TERMINAL_PRODUCTIONS = new Set(['RELEASED', 'CANCELLED']);
 const TERMINAL_STUDIOS = new Set(['DORMANT', 'SOLD_MERGED', 'CLOSED']);
@@ -34,6 +35,18 @@ const checkpoint = (before: number, after: number, production: IndustryProductio
         [pre + Math.max(1, Math.floor(length * 0.70)), 'PRODUCTION_70'], [pre + length, 'POST_PRODUCTION_START'],
     ];
     return markers.filter(([week]) => before < week && after >= week).map(([, key]) => key);
+};
+
+const creditFundedTalent = (world: WorldState, production: IndustryProductionCommitment, absoluteWeek: number): WorldState => {
+    const execution = production.studioAiExecution;
+    const talent = execution?.talent;
+    const fees = talent?.upfrontFeesMillions;
+    if (!execution?.paidMilestoneIds.includes('PRODUCTION_START') || !talent || !fees || !talent.writerId || !talent.writerName) return world;
+    return creditTalentUpfront(world, production.canonicalProjectId, [
+        { talentId: talent.leadActorId, talentName: talent.leadActorName, role: 'ACTOR', amount: Math.round(fees.actor * 1_000_000) },
+        { talentId: talent.directorId, talentName: talent.directorName, role: 'DIRECTOR', amount: Math.round(fees.director * 1_000_000) },
+        { talentId: talent.writerId, talentName: talent.writerName, role: 'WRITER', amount: Math.round(fees.writer * 1_000_000) },
+    ], `studio_ai_funded:${production.id}`, absoluteWeek).world;
 };
 
 export const executeStudioAiProductionWeek = (input: ExecuteStudioAiProductionWeekInput): ExecuteStudioAiProductionWeekResult => {
@@ -94,6 +107,7 @@ export const executeStudioAiProductionWeek = (input: ExecuteStudioAiProductionWe
                     const paid = applyStudioAiProductionMilestone({ studio, production, milestone, absoluteWeek: input.absoluteWeek });
                     studio = paid.studio; production = paid.production;
                     world = { ...world, studios: { ...(world.studios || {}), [studio.id]: studio }, industryProductions: upsertCanonicalIndustryProduction(world.industryProductions, production) };
+                    world = creditFundedTalent(world, production, input.absoluteWeek);
                 }
                 if (production.status === 'ON_HOLD') {
                     production = { ...production, studioAiExecution: { ...production.studioAiExecution!, lastProgressedAbsoluteWeek: input.absoluteWeek, nextReviewAbsoluteWeek: input.absoluteWeek + 4 } };
@@ -126,6 +140,7 @@ export const executeStudioAiProductionWeek = (input: ExecuteStudioAiProductionWe
             const paid = applyStudioAiProductionMilestone({ studio, production, milestone: dueMilestone, absoluteWeek: input.absoluteWeek });
             studio = paid.studio; production = paid.production;
             world = { ...world, studios: { ...(world.studios || {}), [studio.id]: studio }, industryProductions: upsertCanonicalIndustryProduction(world.industryProductions, production) };
+            world = creditFundedTalent(world, production, input.absoluteWeek);
             if (production.status === 'ON_HOLD') { heldCount += 1; continue; }
         }
         const before = production.productionCalendar.elapsedWeeks;

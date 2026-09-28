@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "allowJs": false
+  },
+  "files": [
+    "scripts/audit-streaming-commercial-c6.ts",
+    "lab/c6QaSeeder.ts",
+    "scripts/audit-streaming-launch-phase8.ts",
+    "scripts/audit-streaming-pricing-world-integration.tsx"
+  ],
+  "include": [],
+  "exclude": ["dist", "functions"]
+}

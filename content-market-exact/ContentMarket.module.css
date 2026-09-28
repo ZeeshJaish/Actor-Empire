@@ -6,7 +6,7 @@
   background:radial-gradient(110% 46% at 50% -6%,rgba(255,190,110,.13),transparent 62%)}
 
 .mkwrap .mktop{position:relative;z-index:1;display:flex;align-items:center;gap:12px;padding:16px 0 12px}
-.mkwrap .mkback{width:34px;height:34px;flex-shrink:0;border-radius:11px;font-size:15px;color:#eceef3;
+.mkwrap .mkback{width:44px;height:44px;flex-shrink:0;border-radius:11px;font-size:15px;color:#eceef3;
   background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.11)}
 .mkwrap .mkmast b{display:block;font-size:13px;font-weight:900;letter-spacing:.2em}
 .mkwrap .mkmast span{display:block;margin-top:3px;font-size:8px;font-weight:800;letter-spacing:.18em;color:#8b93a6}
@@ -28,9 +28,7 @@
 .mkwrap .mkpwhead>em b{color:#cdd3e0;font-weight:800}
 /* the figure that matters, and only that one */
 .mkwrap .mkpwbig{display:block;margin-top:3px;font-size:30px;font-weight:900;letter-spacing:-.045em;
-  line-height:1.05;font-family:ui-monospace,Menlo,monospace;
-  background:linear-gradient(180deg,#fff,#c3cad8);-webkit-background-clip:text;
-  background-clip:text;color:transparent}
+  line-height:1.05;font-family:ui-monospace,Menlo,monospace;color:#f5f1e9}
 /* one track, split into what is left and what is already spoken for */
 .mkwrap .mkpwtrack{position:relative;height:6px;margin-top:11px;border-radius:99px;overflow:hidden;
   background:repeating-linear-gradient(-45deg,rgba(255,255,255,.11) 0 4px,rgba(255,255,255,.05) 4px 8px)}
@@ -90,6 +88,23 @@
 .mkwrap .mksearch input{width:100%;padding:10px 13px;border-radius:11px;font-size:12.5px;color:#eceef3;
   background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);outline:none}
 .mkwrap .mksearch input::placeholder{color:#6d7486}
+.mkwrap .mklibrarygrace{position:relative;z-index:1;display:grid;gap:3px;margin:8px 0 0;padding:11px 13px;border:1px solid rgba(223,184,106,.25);border-radius:12px;background:#15130f;color:#e4dece;font-size:10.5px;line-height:1.45}
+.mkwrap .mklibrarygrace b{color:#efcb83;font-size:9px;letter-spacing:.12em}
+.mkwrap .mklibrarygrace small{color:#aaa492;font-size:9.5px}
+.mkwrap .mkscout{position:relative;z-index:1;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:7px 12px;margin-top:10px;padding:13px;border:1px solid rgba(223,184,106,.32);border-radius:12px;background:#1b1711;box-shadow:inset 3px 0 0 #d7a956}
+.mkwrap .mkscout b{font-size:9px;letter-spacing:.15em;color:#f0c77e}
+.mkwrap .mkscout p{margin:4px 0;font-size:11px;line-height:1.4;color:#e1dbcf}
+.mkwrap .mkscout small{display:block;font-size:9px;line-height:1.4;color:#aaa494}
+.mkwrap .mkscout button{min-height:44px;padding:0 13px;border:1px solid #d9ad63;border-radius:9px;background:#dba95b;color:#111318;font-size:11px;font-weight:900;white-space:nowrap}
+.mkwrap .mkscout button:disabled{opacity:.45;cursor:not-allowed}
+.mkwrap .mkscout button:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.mkwrap .mkscoutconfirm{width:100%;padding-top:10px;border-top:1px solid rgba(255,190,110,.2)}
+.mkwrap .mkscoutconfirm>div{display:flex;gap:8px;margin-top:10px}
+.mkwrap .mkscoutconfirm button+button{background:transparent;color:#c3cad8;border-color:rgba(255,255,255,.22)}
+.mkwrap .mklibrarymarquee{display:inline-flex;padding:4px 6px;border-radius:99px;background:#e8c545;color:#161006;font-size:7px;font-weight:950;letter-spacing:.1em}
+.mkwrap .mklegend{position:relative;z-index:1;margin:9px 0 0;color:#aba797;font-size:10px;line-height:1.45}
+.mkwrap .mklegend b{color:#ebd6ac;font-weight:800}
+.mkwrap .mklibrary{position:relative;z-index:1}.mkwrap .mklibrary>p{margin:8px 0 4px;color:#919bad;font-size:10px;line-height:1.5}.mkwrap .mklibraryrow{display:flex;align-items:center;gap:11px;width:100%;padding:10px 8px;border:1px solid rgba(255,255,255,.08);border-radius:10px;background:rgba(255,255,255,.04);color:#e8ebf1;text-align:left}.mkwrap .mklibraryrow:disabled{opacity:.62;cursor:default}.mkwrap .mklibraryreason{color:#7ee0b0!important}.mkwrap .mklibraryrow:disabled .mklibraryreason{color:#aab3c0!important}.mkwrap .mklibraryfilters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:9px}.mkwrap .mklibraryfilters select,.mkwrap .mklibraryfilters button{min-width:0;min-height:42px;padding:8px;border:1px solid rgba(255,255,255,.13);border-radius:9px;background:#20242e;color:#e6e9f0;font-size:10px}.mkwrap .mklibraryfilters button[aria-pressed=true]{background:#7ee0b0;color:#101711}
 .mkwrap .mkwallgrid{position:relative;z-index:1;display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-top:14px}
 .mkwrap .mkcard{position:relative;padding:0;background:none;border:none;text-align:left;transition:transform .12s}
 .mkwrap .mkcard:active{transform:scale(.975)}
@@ -163,7 +178,7 @@
   font-family:ui-monospace,Menlo,monospace;letter-spacing:-.02em}
 .mkwrap .mktile i{font-style:normal;font-size:9px;color:#7b8395}
 .mkwrap .mkfaces{display:flex;gap:6px;margin-top:16px}
-.mkwrap .mkfaces button{flex:1;padding:9px;border-radius:10px;font-size:11px;font-weight:800;color:#98a0b2;
+.mkwrap .mkfaces button{flex:1;min-height:44px;padding:9px;border-radius:10px;font-size:11px;font-weight:800;color:#98a0b2;
   background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09)}
 .mkwrap .mkfaces button.on{color:#0b0c10;background:#fff;border-color:transparent}
 /* ── the avails map. Sized by what each market is worth, so a greyed-out
@@ -530,10 +545,17 @@
 .mkwrap .mkav-open{color:#0b0c10;background:#7ee0b0}
 .mkwrap .mkav-soon{color:#cdd3e0;background:rgba(255,255,255,.12)}
 .mkwrap .mkav-watch{color:#8b93a6;background:rgba(255,255,255,.07)}
-.mkwrap .mkcardav{position:absolute;top:7px;left:7px;z-index:2}
-.mkwrap .mkrate{position:absolute;top:7px;right:7px;z-index:2;font-size:10px;font-weight:900;
+.mkwrap .mkcardart{position:relative;display:block;width:100%;overflow:hidden;border-radius:6px}
+.mkwrap .mkcardflags{position:absolute;z-index:2;top:7px;left:7px;right:7px;display:flex;align-content:start;align-items:flex-start;flex-wrap:wrap;gap:4px;pointer-events:none}
+.mkwrap .mkcardflags .mkav{font-size:6.5px;letter-spacing:.07em;padding:4px 6px;max-width:100%;white-space:normal;line-height:1.2}
+.mkwrap .mkcardflags .mkrate{margin-left:auto}
+.mkwrap .mkrate{display:inline-flex;font-size:10px;font-weight:900;
   font-family:ui-monospace,Menlo,monospace;color:#0b0c10;background:#e8c545;
   padding:3px 6px;border-radius:5px}
+.mkwrap .mkdealsummary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:13px;padding:12px;border:1px solid rgba(223,184,106,.22);border-radius:12px;background:#17140f;color:#e9e5da;font-size:11px}
+.mkwrap .mkdealsummary span{display:grid;gap:3px;min-width:0;overflow-wrap:anywhere}
+.mkwrap .mkdealsummary span b{color:#b4a98e;font-size:8px;letter-spacing:.1em}
+.mkwrap .mkdealsummary small{grid-column:1/-1;color:#c5b99f;font-size:10px;line-height:1.5}
 .mkwrap .mkavrow{display:flex;align-items:center;gap:9px;margin-bottom:9px}
 .mkwrap .mkavrow em{font-style:normal;font-size:10.5px;color:#8b93a6}
 
@@ -543,7 +565,7 @@
 .mkwrap .mklenses{position:relative;z-index:1;display:flex;gap:6px;margin-top:8px;
   overflow-x:auto;padding-bottom:3px;scrollbar-width:none}
 .mkwrap .mklenses::-webkit-scrollbar{display:none}
-.mkwrap .mklenses button{flex-shrink:0;display:flex;align-items:center;gap:6px;padding:7px 12px;
+.mkwrap .mklenses button{flex-shrink:0;display:flex;align-items:center;gap:6px;min-height:44px;padding:7px 12px;
   border-radius:99px;font-size:11px;font-weight:800;color:#98a0b2;
   background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09)}
 .mkwrap .mklenses button i{font-style:normal;font-size:9px;font-weight:900;opacity:.65}
@@ -599,9 +621,7 @@
   box-shadow:inset 0 0 0 1px rgba(255,255,255,.1)}
 .mkwrap .mkask>span{font-size:7.5px;font-weight:900;letter-spacing:.22em;color:#8b93a6}
 .mkwrap .mkask>b{display:block;margin-top:5px;font-size:44px;font-weight:900;letter-spacing:-.05em;
-  line-height:1;font-family:ui-monospace,Menlo,monospace;
-  background:linear-gradient(180deg,#fff,#b9c0cf);-webkit-background-clip:text;
-  background-clip:text;color:transparent}
+  line-height:1;font-family:ui-monospace,Menlo,monospace;color:#f5f1e9}
 .mkwrap .mkfacts{display:flex;gap:16px;margin-top:15px;padding-top:13px;
   border-top:1px solid rgba(255,255,255,.09)}
 .mkwrap .mkfacts em{flex:1;font-style:normal;font-size:9.5px;line-height:1.35;color:#7b8395}
@@ -614,15 +634,15 @@
    long catalogue actually needs is a cap with a way through it, a sort, real
    filters, a dense mode, and a page size. */
 .mkwrap .mktools{position:relative;z-index:1;display:flex;gap:7px;margin-top:8px}
-.mkwrap .mktool{display:flex;align-items:center;gap:6px;padding:8px 13px;border-radius:11px;
+.mkwrap .mktool{display:flex;align-items:center;gap:6px;min-height:44px;padding:8px 13px;border-radius:11px;
   font-size:11.5px;font-weight:800;color:#cdd3e0;background:rgba(255,255,255,.06);
   border:1px solid rgba(255,255,255,.1)}
 .mkwrap .mktool i{font-style:normal;font-size:9px;font-weight:900;color:#0b0c10;background:#fff;
   padding:2px 6px;border-radius:99px}
-.mkwrap .mksort{flex:1;padding:8px 12px;border-radius:11px;font-size:11.5px;font-weight:800;
+.mkwrap .mksort{flex:1;min-height:44px;padding:8px 12px;border-radius:11px;font-size:11.5px;font-weight:800;
   color:#cdd3e0;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);
   -webkit-appearance:none;appearance:none;outline:none}
-.mkwrap .mkdense{width:42px;justify-content:center;font-size:15px}
+.mkwrap .mkdense{width:44px;justify-content:center;font-size:15px}
 .mkwrap .mkdense.on{color:#0b0c10;background:#fff;border-color:transparent}
 .mkwrap .mkresulthead{position:relative;z-index:1;display:flex;align-items:baseline;
   justify-content:space-between;margin-top:16px}

@@ -10,6 +10,9 @@ import { showAd } from '../../../services/adLogic';
 import { hasNoAds, spendPlayerEnergy } from '../../../services/premiumLogic';
 import { PHASE_ONE_ENERGY_COSTS } from '../../../services/energyCosts';
 import { getPlayerLanguage, t } from '../../../services/i18n';
+import { calculateGreenlightCounterChance, normalizeTalentBackendDraft, participationKey, setTalentBackendPoints, suggestReturningBackendDemand } from '../../../services/talentParticipation';
+import { creditTalentProject, creditTalentUpfront } from '../../../services/talentCareer';
+import { getAbsoluteWeek } from '../../../services/legacyLogic';
 import { resolveProjectType } from '../../../services/businessLogic';
 import { addBreadcrumb, markGameCheckpoint, markTraceAction, setCrashContext, startPerformanceTrace, stopPerformanceTrace, trackGameEvent } from '../../../services/firebaseService';
 import { finalizeOwnedStreamingOriginalGreenlight } from '../../../services/streamingOriginals';
@@ -64,6 +67,7 @@ import { GreenlightCastStep } from './components/GreenlightCastStep';
 import { GreenlightSoundtrackSection } from './components/GreenlightSoundtrackSection';
 import { GreenlightStoryConnectionSection } from './components/GreenlightStoryConnectionSection';
 import { GreenlightConfirmationStep } from './components/GreenlightConfirmationStep';
+import type { GreenlightParticipationRow } from './components/GreenlightParticipationSection';
 import {
     calculateAvailableGreenlightFunds,
     calculateGreenlightBudget,
@@ -214,6 +218,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         { id: 'lead_1', role: 'Lead Actor', roleType: 'LEAD', actorId: null, identitySource: 'AUTO' },
         { id: 'supp_1', role: 'Supporting Actor', roleType: 'SUPPORTING', actorId: null, identitySource: 'AUTO' }
     ]);
+    const [talentBackendDraft, setTalentBackendDraft] = useState<Record<string, number>>(() => normalizeTalentBackendDraft(initialConcept?.talentBackendDraft));
     const [exactTalentConflictNames, setExactTalentConflictNames] = useState<string[]>([]);
     const [backgroundCastingPlan, setBackgroundCastingPlan] = useState<BackgroundCastingPlan>(() => (
         normalizeBackgroundCastingPlan(initialConcept?.backgroundCastingPlan, {})
@@ -348,7 +353,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         };
     };
 
-    const buildCurrentConceptDraft = () => {
+    const buildCurrentConceptDraft = (backendDraftOverride: Record<string, number> = talentBackendDraft) => {
         if (!selectedScriptId) return null;
         const existingConcept = studio.studioState?.concepts?.find(c => c.scriptId === selectedScriptId);
 
@@ -359,6 +364,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             crewModes,
             selectedCrew,
             castList,
+            talentBackendDraft: backendDraftOverride,
             backgroundCastingPlan,
             selectedLocations,
             equipmentChoices,
@@ -385,8 +391,8 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         };
     };
 
-    const buildStudioWithCurrentDraft = (returningTalentOverride: any[] = currentReturningTalent) => {
-        const draft = buildCurrentConceptDraft();
+    const buildStudioWithCurrentDraft = (returningTalentOverride: any[] = currentReturningTalent, backendDraftOverride: Record<string, number> = talentBackendDraft) => {
+        const draft = buildCurrentConceptDraft(backendDraftOverride);
         if (!draft) return null;
 
         const baseStudioState: any = studio.studioState || {};
@@ -879,6 +885,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                     { id: 'lead_1', role: 'Lead Actor', roleType: 'LEAD', actorId: null, identitySource: 'AUTO' },
                     { id: 'supp_1', role: 'Supporting Actor', roleType: 'SUPPORTING', actorId: null, identitySource: 'AUTO' }
                 ]);
+                setTalentBackendDraft(normalizeTalentBackendDraft(existingConcept.talentBackendDraft));
                 setBackgroundCastingPlan(normalizeBackgroundCastingPlan(existingConcept.backgroundCastingPlan, backgroundCastingContext));
                 setSelectedLocations(existingConcept.selectedLocations || []);
                 setEquipmentChoices(existingConcept.equipmentChoices || {
@@ -937,6 +944,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                     { id: 'lead_1', role: 'Lead Actor', roleType: 'LEAD', actorId: null, identitySource: 'AUTO' },
                     { id: 'supp_1', role: 'Supporting Actor', roleType: 'SUPPORTING', actorId: null, identitySource: 'AUTO' }
                 ]);
+                setTalentBackendDraft({});
                 setBackgroundCastingPlan(buildBackgroundCastingPlan(backgroundCastingContext));
                 setSelectedLocations([]);
                 setEquipmentChoices({
@@ -1008,6 +1016,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                 name: details.directorName || 'Returning Director',
                                 originalSalary: directorSalary,
                                 newDemand: Math.floor(directorSalary * 1.2),
+                                backendDemandPoints: suggestReturningBackendDemand('DIRECTOR', directorSalary, isInternallyControlledTalent(details.directorId)),
                                 negotiated: isInternallyControlledTalent(details.directorId),
                                 accepted: isInternallyControlledTalent(details.directorId),
                                 attemptsLeft: isInternallyControlledTalent(details.directorId) ? 0 : 3
@@ -1085,6 +1094,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                     id: c.actorId,
                                     originalSalary,
                                     newDemand: Math.floor(originalSalary * 1.2),
+                                    backendDemandPoints: suggestReturningBackendDemand(role, originalSalary, isInternallyControlledTalent(c.actorId)),
                                     negotiated: isInternallyControlledTalent(c.actorId),
                                     accepted: isInternallyControlledTalent(c.actorId),
                                     attemptsLeft: isInternallyControlledTalent(c.actorId) ? 0 : 3,
@@ -1400,6 +1410,26 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
     const [negotiationModal, setNegotiationModal] = useState<GreenlightNegotiationState | null>(null);
 
     const [counterOfferInput, setCounterOfferInput] = useState<string>("");
+    const [counterBackendPoints, setCounterBackendPoints] = useState(0);
+
+    const negotiationParticipationKey = (roleType: string, talentId: string, roleId?: string): string | null => {
+        if (roleType === 'DIRECTOR') return participationKey('DIRECTOR', 'director', talentId);
+        if ((roleType === 'LEAD_ACTOR' || roleType === 'SUPPORTING_ACTOR') && roleId) return participationKey('ACTOR', roleId, talentId);
+        return null;
+    };
+
+    const activeParticipationKeysForNegotiation = (roleId?: string, additionalKey?: string | null): string[] => {
+        const keys = castList
+            .filter(role => role.id !== roleId && role.actorId && !isInternallyControlledTalent(role.actorId)
+                && isCastableMovieRoleId(role.actorId, player.flags.extraNPCs || []))
+            .map(role => participationKey('ACTOR', role.id, role.actorId!));
+        if (crewModes.director === 'HIRE' && selectedCrew.director && roleId !== 'director') {
+            keys.push(participationKey('DIRECTOR', 'director', selectedCrew.director));
+        }
+        if (selectedScript?.writerId) keys.push(participationKey('WRITER', 'script_writer', selectedScript.writerId));
+        if (additionalKey) keys.push(additionalKey);
+        return keys;
+    };
 
     const handleNegotiate = (talentId: string, returningData: any, roleId?: string) => {
         let talentName = 'Unknown Talent';
@@ -1451,12 +1481,16 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             pending_count: unresolvedReturningTalent.length,
         });
         setCounterOfferInput(Math.round(returningData.originalSalary + (returningData.newDemand - returningData.originalSalary) * 0.5).toString());
+        const rawBackendDemand = Number(returningData.backendDemandPoints);
+        const safeBackendDemand = Number.isFinite(rawBackendDemand) ? Math.max(0, Math.min(3, Math.round(rawBackendDemand))) : 0;
+        setCounterBackendPoints(safeBackendDemand);
         setNegotiationModal({
             talentId,
             roleType: returningData.role,
             roleId,
             originalSalary: returningData.originalSalary,
             currentDemand: returningData.newDemand,
+            backendDemandPoints: safeBackendDemand,
             attemptsLeft: returningData.negotiated ? 0 : (returningData.attemptsLeft ?? 3),
             talentName,
             talentImage,
@@ -1467,7 +1501,8 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
     const updateReturningTalentState = (
         talentId: string,
         roleType: string,
-        updater: (talent: any) => any
+        updater: (talent: any) => any,
+        backendDraftOverride: Record<string, number> = talentBackendDraft,
     ) => {
         const normalizedReturningTalent = dedupeReturningTalent(currentReturningTalent);
         const talentIndex = normalizedReturningTalent.findIndex(t => t.id === talentId && t.role === roleType);
@@ -1478,7 +1513,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         );
         setCurrentReturningTalent(updatedReturningTalent);
 
-        const updatedStudio = buildStudioWithCurrentDraft(updatedReturningTalent);
+        const updatedStudio = buildStudioWithCurrentDraft(updatedReturningTalent, backendDraftOverride);
         if (!updatedStudio) return false;
 
         const updatedBusinesses = Array.isArray(player.businesses) ? [...player.businesses] : [];
@@ -1578,6 +1613,16 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
     const acceptNegotiationDemand = () => {
         if (!negotiationModal) return;
         const finalDemand = negotiationModal.currentDemand;
+        const participationId = negotiationParticipationKey(negotiationModal.roleType, negotiationModal.talentId, negotiationModal.roleId);
+        const nextBackendDraft = participationId
+            ? setTalentBackendPoints(talentBackendDraft, participationId, negotiationModal.backendDemandPoints,
+                activeParticipationKeysForNegotiation(negotiationModal.roleType === 'DIRECTOR' ? 'director' : negotiationModal.roleId, participationId))
+            : talentBackendDraft;
+        if (participationId && negotiationModal.backendDemandPoints > 0 && nextBackendDraft[participationId] !== negotiationModal.backendDemandPoints) {
+            setNegotiationModal(previous => previous ? { ...previous, feedback: { message: 'Reduce other backend points first; this deal would exceed the person or project cap.', type: 'FAILURE' } } : null);
+            setTimeout(() => setNegotiationModal(previous => previous ? { ...previous, feedback: undefined } : null), 2000);
+            return;
+        }
         markGameCheckpoint('greenlight_negotiation_accept_demand', player, {
             script_title: selectedScript?.title || 'none',
             talent_name: negotiationModal.talentName,
@@ -1594,8 +1639,11 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 accepted: true,
                 negotiated: true,
                 newDemand: finalDemand,
+                acceptedBackendPoints: negotiationModal.backendDemandPoints,
             }),
+            nextBackendDraft,
         );
+        setTalentBackendDraft(nextBackendDraft);
         assignNegotiatedTalent(
             negotiationModal.talentId,
             negotiationModal.talentName,
@@ -1621,10 +1669,18 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         const demandDiff = negotiationModal.currentDemand - negotiationModal.originalSalary;
         const offerDiff = counterOffer - negotiationModal.originalSalary;
         const ratio = demandDiff > 0 ? offerDiff / demandDiff : 1;
-        let chance = 0.1 + (ratio * 0.8);
-        if (negotiationModal.talentTier === 'A_LIST') chance *= 0.8;
-        if (negotiationModal.talentTier === 'ESTABLISHED') chance *= 0.9;
-        chance = Math.max(0.05, Math.min(0.95, chance));
+        const chance = calculateGreenlightCounterChance(ratio, counterBackendPoints, negotiationModal.backendDemandPoints, negotiationModal.talentTier);
+
+        const participationId = negotiationParticipationKey(negotiationModal.roleType, negotiationModal.talentId, negotiationModal.roleId);
+        const nextBackendDraft = participationId
+            ? setTalentBackendPoints(talentBackendDraft, participationId, counterBackendPoints,
+                activeParticipationKeysForNegotiation(negotiationModal.roleType === 'DIRECTOR' ? 'director' : negotiationModal.roleId, participationId))
+            : talentBackendDraft;
+        if (participationId && counterBackendPoints > 0 && nextBackendDraft[participationId] !== counterBackendPoints) {
+            setNegotiationModal(previous => previous ? { ...previous, feedback: { message: 'Reduce other backend points first; this counter-offer would exceed the person or project cap.', type: 'FAILURE' } } : null);
+            setTimeout(() => setNegotiationModal(previous => previous ? { ...previous, feedback: undefined } : null), 2000);
+            return;
+        }
 
         const accepted = Math.random() < chance;
         markGameCheckpoint('greenlight_negotiation_counter_offer', player, {
@@ -1648,8 +1704,11 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                     accepted: true,
                     negotiated: true,
                     newDemand: counterOffer,
+                    acceptedBackendPoints: counterBackendPoints,
                 }),
+                nextBackendDraft,
             );
+            setTalentBackendDraft(nextBackendDraft);
             assignNegotiatedTalent(
                 negotiationModal.talentId,
                 negotiationModal.talentName,
@@ -1669,6 +1728,9 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         }
 
         const newAttempts = negotiationModal.attemptsLeft - 1;
+        const closedParticipationId = newAttempts <= 0 ? negotiationParticipationKey(negotiationModal.roleType, negotiationModal.talentId, negotiationModal.roleId) : null;
+        const failedBackendDraft = { ...talentBackendDraft };
+        if (closedParticipationId) delete failedBackendDraft[closedParticipationId];
         updateReturningTalentState(
             negotiationModal.talentId,
             negotiationModal.roleType,
@@ -1677,9 +1739,11 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 attemptsLeft: newAttempts,
                 ...(newAttempts <= 0 ? { negotiated: true, accepted: false } : {}),
             }),
+            failedBackendDraft,
         );
 
         if (newAttempts <= 0) {
+            setTalentBackendDraft(failedBackendDraft);
             clearNegotiatedTalent(negotiationModal.talentId, negotiationModal.roleType, negotiationModal.roleId);
             setNegotiationModal(previous => previous ? {
                 ...previous,
@@ -1708,6 +1772,9 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
 
     const walkAwayFromNegotiation = () => {
         if (!negotiationModal) return;
+        const participationId = negotiationParticipationKey(negotiationModal.roleType, negotiationModal.talentId, negotiationModal.roleId);
+        const nextBackendDraft = participationId ? { ...talentBackendDraft } : talentBackendDraft;
+        if (participationId) delete nextBackendDraft[participationId];
         markGameCheckpoint('greenlight_negotiation_walk_away', player, {
             script_title: selectedScript?.title || 'none',
             talent_name: negotiationModal.talentName,
@@ -1724,7 +1791,9 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 negotiated: true,
                 accepted: false,
             }),
+            nextBackendDraft,
         );
+        setTalentBackendDraft(nextBackendDraft);
         clearNegotiatedTalent(negotiationModal.talentId, negotiationModal.roleType, negotiationModal.roleId);
         setNegotiationModal(previous => previous ? {
             ...previous,
@@ -2448,8 +2517,34 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
     const commissionBudgetError = isPlayerPlatformCommission && packageBudget > lockedStreamingFundingAmount
         ? `Package exceeds the ${platformCommissionOffer!.platformName} production cap by ${formatMoney(packageBudget - lockedStreamingFundingAmount)}. Reduce cast, crew, music, equipment, or locations.`
         : null;
-    const greenlightErrors = commissionBudgetError ? [...greenlightStatus.errors, commissionBudgetError] : greenlightStatus.errors;
-    const canGreenlight = greenlightStatus.can && !commissionBudgetError;
+    const talentParticipants: GreenlightParticipationRow[] = castList
+        .filter(role => role.actorId && !isInternallyControlledTalent(role.actorId) && isCastableMovieRoleId(role.actorId, player.flags.extraNPCs || []))
+        .map(role => {
+            const key = participationKey('ACTOR', role.id, role.actorId!);
+            const returning = currentReturningTalent.find(talent => talent.id === role.actorId && (talent.role === 'LEAD_ACTOR' || talent.role === 'SUPPORTING_ACTOR'));
+            return { key, talentId: role.actorId!, role: role.roleType === 'LEAD' ? 'Lead actor' : 'Actor', name: role.actorName || 'Cast member',
+                upfrontFee: role.salary || 0, points: talentBackendDraft[key] || 0,
+                minimumPoints: returning?.accepted ? (returning.acceptedBackendPoints || 0) : 0 };
+        });
+    if (crewModes.director === 'HIRE' && selectedCrew.director) {
+        const key = participationKey('DIRECTOR', 'director', selectedCrew.director);
+        const returning = currentReturningTalent.find(talent => talent.id === selectedCrew.director && talent.role === 'DIRECTOR');
+        const director = getCrewData('director');
+        talentParticipants.push({ key, talentId: selectedCrew.director, role: 'Director', name: director.name, upfrontFee: director.cost,
+            points: talentBackendDraft[key] || 0, minimumPoints: returning?.accepted ? (returning.acceptedBackendPoints || 0) : 0 });
+    }
+    if (selectedScript?.writerId) {
+        const writer = studio.studioState?.writers.find(item => item.id === selectedScript.writerId);
+        const key = participationKey('WRITER', 'script_writer', selectedScript.writerId);
+        talentParticipants.push({ key, talentId: selectedScript.writerId, role: 'Writer', name: writer?.name || selectedScript.author || 'Credited writer',
+            upfrontFee: writer?.fee || 0, points: talentBackendDraft[key] || 0 });
+    }
+    const totalTalentBackendPoints = talentParticipants.reduce((sum, participant) => sum + participant.points, 0);
+    const participationError = totalTalentBackendPoints > 10 || talentParticipants.some(item => item.points < (item.minimumPoints || 0)
+        || talentParticipants.filter(other => other.talentId === item.talentId).reduce((sum, other) => sum + other.points, 0) > 3)
+        ? 'Talent backend terms exceed a person/project cap or an accepted return deal.' : null;
+    const greenlightErrors = [...greenlightStatus.errors, ...(commissionBudgetError ? [commissionBudgetError] : []), ...(participationError ? [participationError] : [])];
+    const canGreenlight = greenlightStatus.can && !commissionBudgetError && !participationError;
     const confirmationUniverseName = selectedUniverseId === 'NEW'
         ? newUniverseName
         : selectedUniverseId
@@ -2592,6 +2687,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             castList,
             crewModes,
             selectedCrew,
+            talentBackendDraft,
             currentReturningTalent,
             budgetBreakdown,
             reservedMarketingBudget,
@@ -2700,6 +2796,21 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             randomUniverseColor,
         });
 
+        const fundedDetails = fundedCommitment.projectDetails;
+        const greenlightTalent = [
+            ...(fundedDetails?.castList || []).filter(member => member.actorId && !['PLAYER_SELF', 'STUDIO_STAFF', 'UNKNOWN'].includes(member.actorId)).map(member => ({
+                talentId: member.actorId!, talentName: member.name, role: 'ACTOR' as const, amount: member.salary || 0,
+            })),
+            ...(fundedDetails?.directorId && crewModes.director === 'HIRE' ? [{ talentId: fundedDetails.directorId, talentName: fundedDetails.directorName, role: 'DIRECTOR' as const, amount: directorData.cost }] : []),
+            ...(fundedDetails?.writerId && fundedDetails.writerName ? [{ talentId: fundedDetails.writerId, talentName: fundedDetails.writerName, role: 'WRITER' as const,
+                amount: 0 }] : []),
+        ];
+        const greenlightAbsoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+        let greenlightWorld = creditTalentProject({ ...player.world, universes: updatedWorldUniverses, platforms: updatedWorldPlatforms,
+            talentBookings: talentReservation.bookings }, fundedCommitment.id, greenlightTalent,
+            `greenlight:${fundedCommitment.id}`, greenlightAbsoluteWeek);
+        greenlightWorld = creditTalentUpfront(greenlightWorld, fundedCommitment.id, greenlightTalent,
+            `greenlight_funded:${fundedCommitment.id}`, greenlightAbsoluteWeek).world;
         const updatedPlayerAfterGreenlight: Player = {
             ...player,
             news: [...fundingNewsItems, ...baseNewNews].slice(0, 80),
@@ -2707,12 +2818,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             x: { ...player.x, feed: newXFeed },
             activeReleases: updatedActiveReleases,
             commitments: [...updatedCommitments, fundedCommitment],
-            world: {
-                ...player.world,
-                universes: updatedWorldUniverses,
-                platforms: updatedWorldPlatforms,
-                talentBookings: talentReservation.bookings,
-            },
+            world: greenlightWorld,
             studio: {
                 ...player.studio,
                 talentRoster: updatedPlayerTalentRoster
@@ -3417,6 +3523,9 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                         linkedCastSummary={linkedCastSummary}
                         returningTalentReviewItems={returningTalentReviewItems}
                         directorName={getCrewData('director').name}
+                        talentParticipants={talentParticipants}
+                        totalTalentBackendPoints={totalTalentBackendPoints}
+                        onTalentBackendPointsChange={(key, points) => setTalentBackendDraft(current => setTalentBackendPoints(current, key, points, talentParticipants.map(item => item.key)))}
                         backgroundPerformerCount={backgroundCastingPlan.performerCount}
                         selectedLocationCount={selectedLocations.length}
                         budgetBreakdown={budgetBreakdown}
@@ -3495,6 +3604,8 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                     negotiation={negotiationModal}
                     counterOfferInput={counterOfferInput}
                     onCounterOfferInputChange={setCounterOfferInput}
+                    counterBackendPoints={counterBackendPoints}
+                    onCounterBackendPointsChange={setCounterBackendPoints}
                     onAcceptDemand={acceptNegotiationDemand}
                     onSubmitCounterOffer={submitNegotiationCounterOffer}
                     onWalkAway={walkAwayFromNegotiation}

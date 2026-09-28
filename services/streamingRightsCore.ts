@@ -7,6 +7,7 @@ import type {
     StreamingLicenseExclusivity,
     StreamingLicenseTerritory,
     StreamingRightsChangeOfControl,
+    StreamingRightsAccessGrant,
     StreamingRightsContract,
     StreamingRightsContractParty,
     StreamingRightsContractPartyType,
@@ -28,6 +29,7 @@ import { getAbsoluteWeek } from './legacyLogic';
 import { normalizeStreamingDayOneMarketIds } from './streamingDayOneMarkets';
 import { normalizeStreamingLanguageId } from './streamingLocalizationCapabilities';
 import { resolveStreamingRightsCompatibility as resolveCompatibility } from './streamingRightsCompatibility';
+import { normalizeStreamingRightsAccessGrant, snapshotLegacyStreamingRightsAccessGrants } from './streamingRightsAccessGrant';
 
 const FULL_CURRENCY_PER_MILLION = 1_000_000;
 const CONTRACT_PARTY_TYPES = new Set<StreamingRightsContractPartyType>([
@@ -185,6 +187,15 @@ const normalizeStreamingRightsContract = (value: unknown): StreamingRightsContra
         changeOfControl: enumValue(source.changeOfControl, CHANGE_OF_CONTROL_TERMS, 'NOTICE'),
         cancellationPenalty: finiteMoney(source.cancellationPenalty),
         renewedFromLicenseId: cleanText(source.renewedFromLicenseId, '', 180) || null,
+        ...(Object.prototype.hasOwnProperty.call(source, 'accessGrant') ? {
+            accessGrant: normalizeStreamingRightsAccessGrant(source.accessGrant) || {
+                schemaVersion: 1,
+                modes: [],
+                earlyWindowWeeks: 0,
+                purchaseFulfillment: 'NONE',
+                source: 'LEGACY_SNAPSHOT',
+            },
+        } : {}),
         seller,
         buyer,
         dealStructure: enumValue(source.dealStructure, DEAL_STRUCTURES, 'FLAT_LICENSE'),
@@ -420,7 +431,10 @@ export const migrateStreamingRightsContractRegistry = (player: Player): Player =
     const activeReleases = (player.activeReleases || []).map(release => {
         if (release.distributionPhase !== 'STREAMING' || !release.streaming?.platformId) return release;
         const referencedContractId = cleanText(release.streamingContractId || release.streaming.contractId, '', 180);
-        if (referencedContractId && registry[referencedContractId]) {
+        if (referencedContractId && registry[referencedContractId]
+            && registry[referencedContractId].sourceProjectId === release.id
+            && (registry[referencedContractId].buyer.platformId || registry[referencedContractId].buyerPlatformId)
+                === release.streaming.platformId) {
             if (release.streamingContractId === referencedContractId && release.streaming.contractId === referencedContractId) return release;
             return {
                 ...release,
@@ -428,6 +442,16 @@ export const migrateStreamingRightsContractRegistry = (player: Player): Player =
                 streaming: { ...release.streaming, contractId: referencedContractId },
             };
         }
+        const matchingContract = Object.values(registry)
+            .filter(contract => contract.sourceProjectId === release.id
+                && (contract.buyer.platformId || contract.buyerPlatformId) === release.streaming.platformId)
+            .sort((left, right) => right.signedAtAbsoluteWeek - left.signedAtAbsoluteWeek
+                || left.id.localeCompare(right.id))[0];
+        if (matchingContract) return {
+            ...release,
+            streamingContractId: matchingContract.id,
+            streaming: { ...release.streaming, contractId: matchingContract.id },
+        };
         const elapsedWeeks = Math.max(1, finiteWeek(release.streaming.weekOnPlatform, 1));
         const startsAtAbsoluteWeek = finiteWeek(
             release.streaming.startWeekAbsolute,
@@ -505,10 +529,35 @@ export const migrateStreamingRightsContractRegistry = (player: Player): Player =
             streaming: { ...release.streaming, contractId: canonicalId },
         };
     });
+    registry = snapshotLegacyStreamingRightsAccessGrants(player, registry);
+    const ownedLicenses = player.ownedStreamingPlatform?.catalogLicenses || [];
+    const syncedOwnedLicenses = ownedLicenses.map(license => {
+        const grant = registry[license.id]?.accessGrant;
+        return grant && JSON.stringify(grant) !== JSON.stringify(license.accessGrant)
+            ? { ...license, accessGrant: grant } : license;
+    });
+    const nextPlatforms = Object.fromEntries(Object.entries(player.world.platforms || {}).map(([id, platform]) => [
+        id,
+        platform.ai?.rightsContracts?.length ? {
+            ...platform,
+            ai: {
+                ...platform.ai,
+                rightsContracts: platform.ai.rightsContracts.map(license => {
+                    const grant = registry[license.id]?.accessGrant;
+                    return grant && JSON.stringify(grant) !== JSON.stringify(license.accessGrant)
+                        ? { ...license, accessGrant: grant } : license;
+                }),
+            },
+        } : platform,
+    ])) as typeof player.world.platforms;
     return {
         ...player,
+        ownedStreamingPlatform: {
+            ...player.ownedStreamingPlatform,
+            catalogLicenses: syncedOwnedLicenses,
+        },
         activeReleases,
-        world: { ...player.world, streamingRightsContracts: registry },
+        world: { ...player.world, platforms: nextPlatforms, streamingRightsContracts: registry },
     };
 };
 
@@ -552,6 +601,7 @@ export interface StreamingLicenseContractInput {
     changeOfControl?: StreamingRightsChangeOfControl;
     cancellationPenalty?: number;
     renewedFromLicenseId?: string | null;
+    accessGrant?: StreamingRightsAccessGrant;
 }
 
 export const createStreamingLicenseContract = (
@@ -597,6 +647,7 @@ export const createStreamingLicenseContract = (
         changeOfControl: input.changeOfControl,
         cancellationPenalty: input.cancellationPenalty,
         renewedFromLicenseId: input.renewedFromLicenseId,
+        ...(input.accessGrant ? { accessGrant: normalizeStreamingRightsAccessGrant(input.accessGrant) || undefined } : {}),
     };
 };
 
@@ -692,6 +743,10 @@ export const registerProductionStreamingRightsContract = (
         sublicensingAllowed: false,
         sequelRightsIncluded: false,
         changeOfControl: 'NOTICE',
+        accessGrant: {
+            schemaVersion: 1, modes: ['SUBSCRIPTION'], earlyWindowWeeks: 0,
+            purchaseFulfillment: 'NONE', source: 'EXPLICIT',
+        },
     });
     const registration = registerStreamingRightsContract(
         player.world.streamingRightsContracts,

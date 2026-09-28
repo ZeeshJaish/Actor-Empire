@@ -1,6 +1,7 @@
 import type {
     OwnedStreamingLaunchCommit,
     OwnedStreamingLedgerEntry,
+    OwnedStreamingPricingConfiguration,
     Player,
     StreamingHqSection,
     StreamingLaunchCapacityPlan,
@@ -21,6 +22,8 @@ import { resolveOwnedStreamingReach } from './streamingProgression';
 import { getStreamingLaunchDefinitionSignature } from './streamingLaunchProgram';
 import { getStreamingOpeningProgrammeView } from './streamingOpeningProgramme';
 import { getStreamingBlendedMonthlyPrice } from './streamingPricingEconomy';
+import { getStreamingOpeningCatalogueView } from './streamingOpeningCatalogue';
+import { projectStreamingCommercialOffers } from './streamingCommercialOffers';
 
 export type StreamingLaunchReadinessTone = 'READY' | 'WATCH' | 'BLOCKED';
 
@@ -74,6 +77,16 @@ export interface StreamingLaunchReadiness {
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 const roundCapacity = (value: number): number => Math.max(0, Math.round(value / 1_000) * 1_000);
 const roundMoney = (value: number): number => Math.max(0, Math.round(value / 10_000) * 10_000);
+
+/** Opening reach is not automatically a paid subscriber count for free or transactional offers. */
+export const calculateOpeningPaidSubscriberSeed = (
+    pricing: OwnedStreamingPricingConfiguration,
+    likelyConcurrentStreams: number,
+    readinessScore: number,
+    conversionMultiplier: number,
+): number => projectStreamingCommercialOffers(pricing).subscriptions.length > 0
+    ? Math.max(1, Math.round(likelyConcurrentStreams * (2.45 + readinessScore / 100) * conversionMultiplier))
+    : 0;
 
 const createItem = (
     id: string,
@@ -268,6 +281,21 @@ export const getStreamingLaunchReadiness = (player: Player): StreamingLaunchRead
         'CONTENT',
     ));
 
+    const openingCatalogue = getStreamingOpeningCatalogueView(player);
+    const missingOfferCountries = openingCatalogue.countries.filter(country => !country.launchGateReady);
+    const hasOpeningOffer = openingCatalogue.countries.length > 0 && missingOfferCountries.length === 0;
+    items.push(createItem(
+        'offer-coverage',
+        'Playable opening offer',
+        hasOpeningOffer
+            ? `At least one title can be watched under the saved offer in each of ${openingCatalogue.countries.length} opening countr${openingCatalogue.countries.length === 1 ? 'y' : 'ies'}.`
+            : missingOfferCountries.length
+                ? `${missingOfferCountries.map(country => country.country).join(', ')}: no title has a playable route under this offer and current rights.`
+                : 'Choose an opening country and connect a title to a playable offer.',
+        hasOpeningOffer ? 'READY' : 'BLOCKED',
+        'CONTENT',
+    ));
+
     const weeklyOperatingCost = setup?.weeklyOperatingCost || 0;
     const runwayWeeks = weeklyOperatingCost > 0 ? platform.treasuryCash / weeklyOperatingCost : 0;
     items.push(createItem(
@@ -391,11 +419,12 @@ export const commitOwnedStreamingLaunch = (
             ? 'PRESSURED_OPENING'
             : 'DEGRADED_OPENING';
     const conversionMultiplier = capacityPlan === 'STAGGERED_PREMIERE' ? 0.92 : 1;
-    const initialSubscribers = Math.max(1, Math.round(
-        option.effectiveLikelyConcurrentStreams
-        * (2.45 + readiness.score / 100)
-        * conversionMultiplier,
-    ));
+    const initialSubscribers = calculateOpeningPaidSubscriberSeed(
+        platform.serviceConfiguration.pricing,
+        option.effectiveLikelyConcurrentStreams,
+        readiness.score,
+        conversionMultiplier,
+    );
     const openingDemandIndex = clamp(Math.round(
         48
         + readiness.openingTitleCount * 4
@@ -436,7 +465,7 @@ export const commitOwnedStreamingLaunch = (
             outcomeTier,
         },
     };
-    const weightedArpu = getStreamingBlendedMonthlyPrice(platform);
+    const weightedArpu = initialSubscribers > 0 ? getStreamingBlendedMonthlyPrice(platform) : 0;
     const withLaunchFacts = compactOwnedStreamingPlatformForPersistence({
         ...platform,
         launchCommit,

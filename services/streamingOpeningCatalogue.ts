@@ -51,6 +51,7 @@ export interface StreamingOpeningCountryCoverage {
     rightsCoveredTitles: number;
     totalTitles: number;
     missingRightsTitles: string[];
+    missingRightsDetails: string[];
     subtitleCoveragePercent: number;
     dubCoveragePercent: number;
     projectedAudienceReachPercent: number;
@@ -239,8 +240,25 @@ export const getStreamingOpeningCatalogueView = (player: Player): StreamingOpeni
 
     const countries = operations.map((operation): StreamingOpeningCountryCoverage => {
         const profile = operation.countryProfile!;
-        const availableTitles = baseTitles.filter(title => title.access.available && title.access.coveredCountryIds.includes(operation.countryId!));
+        const availableTitles = baseTitles.filter(title => title.access.available
+            && title.access.coveredCountryIds.includes(operation.countryId!)
+            && Object.values(title.access.routesByCountry[operation.countryId!] || {}).some(route => route.allowed));
         const missingRightsTitles = baseTitles.filter(title => !availableTitles.includes(title)).map(title => title.title);
+        const reasonLabel = (reasonCode: string): string => ({
+            TERRITORY_DENIED: 'Not licensed in this country',
+            RIGHTS_MISSING: 'No rights agreement',
+            RIGHTS_EXPIRED: 'Rights expired',
+            RIGHTS_TRANSFERRED: 'Rights transferred away',
+            PRODUCTION_NOT_READY: 'Title not delivered',
+            EARLY_WINDOW_DENIED: 'Scheduled for a later release',
+            MODE_NOT_GRANTED: 'Offer not included in the rights agreement',
+            MARKET_INACTIVE: 'Market not active',
+        } as Record<string, string>)[reasonCode] || 'No playable offer here';
+        const missingRightsDetails = baseTitles.filter(title => !availableTitles.includes(title)).map(title => {
+            const routes = title.access.routesByCountry[operation.countryId!] || {};
+            const denial = routes.SUBSCRIPTION || routes.AD_SUPPORTED || routes.RENTAL || routes.PURCHASE;
+            return `${title.title}: ${reasonLabel(denial?.reasonCode || 'RIGHTS_MISSING')}`;
+        });
         const totalChecks = Math.max(1, availableTitles.length * Math.max(1, profile.languageDistribution.length));
         let subtitles = 0;
         let dubs = 0;
@@ -269,6 +287,7 @@ export const getStreamingOpeningCatalogueView = (player: Player): StreamingOpeni
             rightsCoveredTitles: Math.max(0, titleCount - missingRightsTitles.length),
             totalTitles: titleCount,
             missingRightsTitles,
+            missingRightsDetails,
             subtitleCoveragePercent: Math.round((subtitles / totalChecks) * 100),
             dubCoveragePercent: Math.round((dubs / totalChecks) * 100),
             projectedAudienceReachPercent: availableTitles.length

@@ -63,8 +63,9 @@ export interface Lot {
   id: string;
   sourceId: string;
   artId?: string;
-  sourceKind: 'LISTING' | 'COLLECTION' | 'AUCTION' | 'UPCOMING' | 'STUDIO';
+  sourceKind: 'LISTING' | 'COLLECTION' | 'AUCTION' | 'UPCOMING' | 'STUDIO' | 'OPPORTUNITY';
   title: string;
+  marquee?: boolean;
   year: number;
   runtime: string;
   format: 'FILM' | 'SERIES' | 'COLLECTION';

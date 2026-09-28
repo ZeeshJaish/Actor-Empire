@@ -29,7 +29,7 @@ export const GreenlightScriptStep: React.FC<GreenlightScriptStepProps> = ({
                 <h2 className="text-xl font-bold text-white mb-2">No Scripts Available</h2>
                 <p className="text-sm max-w-xs text-center leading-relaxed">Your vault is empty. Visit the script market, buy a project, then return here to green-light it.</p>
                 <div className="mt-8 flex flex-wrap justify-center gap-3">
-                    <button type="button" onClick={onOpenScriptMarket} className="px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-black rounded-xl text-xs font-black uppercase tracking-widest transition-all hover:scale-105 shadow-[0_0_25px_rgba(16,185,129,0.25)]">Open Script Market</button>
+                    <button type="button" onClick={onOpenScriptMarket} className="min-h-11 px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-black rounded-xl text-xs font-black uppercase tracking-widest transition-all hover:scale-105 shadow-[0_0_25px_rgba(16,185,129,0.25)]">Open Script Market</button>
                     {onOpenDevelopmentLab && (
                         <button type="button" onClick={onOpenDevelopmentLab} className="px-6 py-3 border border-violet-400/40 bg-violet-950/50 text-violet-200 rounded-xl text-xs font-black uppercase tracking-widest transition-all hover:bg-violet-900/60">Develop Script</button>
                     )}

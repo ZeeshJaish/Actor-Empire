@@ -39,6 +39,7 @@ import { inferStoryCompass, suggestCharacterIdentity } from '../../../services/c
 import { evaluateCastStoryFit, getCastStoryRead } from '../../../services/characterStoryFit';
 import { resolveProjectType } from '../../../services/businessLogic';
 import { formatProjectFormatLabel } from '../../../services/genreCatalog';
+import { buildGreenlightTalentParticipation, type SelectedTalentParticipant } from '../../../services/talentParticipation';
 import type {
     GreenlightCastRole,
     GreenlightPacing,
@@ -70,6 +71,7 @@ export interface BuildGreenlightProjectInput {
     castList: GreenlightCastRole[];
     crewModes: Record<string, GreenlightCrewMode>;
     selectedCrew: Record<string, string | null>;
+    talentBackendDraft?: Record<string, number>;
     currentReturningTalent: Array<{ id: string }>;
     budgetBreakdown: { total: number };
     reservedMarketingBudget: number;
@@ -122,6 +124,7 @@ export const buildGreenlightProject = ({
     castList,
     crewModes,
     selectedCrew,
+    talentBackendDraft,
     currentReturningTalent,
     budgetBreakdown,
     reservedMarketingBudget,
@@ -456,6 +459,24 @@ export const buildGreenlightProject = ({
             ? Number(selectedScript.assignedSkill)
             : selectedWriter?.skill;
         const newCommitmentId = `proj_${now()}`;
+        const selectedParticipants: SelectedTalentParticipant[] = finalizedCastList
+            .filter(member => member.actorId && !['PLAYER_SELF', 'STUDIO_STAFF', 'UNKNOWN'].includes(member.actorId))
+            .map(member => ({
+                role: 'ACTOR',
+                roleId: member.roleId,
+                talentId: member.actorId,
+                talentName: member.name,
+                upfrontFee: member.salary || 0,
+            }));
+        if (crewModes.director === 'HIRE' && selectedCrew.director) {
+            selectedParticipants.push({ role: 'DIRECTOR', roleId: 'director', talentId: selectedCrew.director,
+                talentName: directorData.name, upfrontFee: directorData.cost });
+        }
+        if (selectedScript.writerId && creditedWriterName) {
+            selectedParticipants.push({ role: 'WRITER', roleId: 'script_writer', talentId: selectedScript.writerId,
+                talentName: creditedWriterName, upfrontFee: selectedWriter?.fee || 0 });
+        }
+        const talentParticipation = buildGreenlightTalentParticipation(newCommitmentId, talentBackendDraft, selectedParticipants);
         const newCommitment: Commitment = {
             id: newCommitmentId,
             name: selectedScript.title,
@@ -475,6 +496,7 @@ export const buildGreenlightProject = ({
                 writerId: selectedScript.writerId || undefined,
                 writerName: creditedWriterName,
                 writerSkill: creditedWriterSkill,
+                ...(talentParticipation ? { talentParticipation } : {}),
                 isOriginal: selectedScript.isOriginal,
                 type: resolveProjectType(selectedScript.projectType, (selectedScript as any).type, (selectedScript as any).projectDetails?.type),
                 format: selectedScript.format || 'LIVE_ACTION',

@@ -11,6 +11,7 @@ import type {
     WorldState,
 } from '../../types';
 import { createDeterministicId } from '../deterministicRandom';
+import { createStreamingRightsAccessGrantForOffer, normalizeStreamingRightsAccessGrant } from '../streamingRightsAccessGrant';
 import {
     createStreamingLicenseContract,
     createStreamingRightsContractFromLicense,
@@ -418,6 +419,10 @@ const activateSettledRenewals = (
             changeOfControl: previous.changeOfControl,
             cancellationPenalty: previous.cancellationPenalty,
             renewedFromLicenseId: previous.id,
+            accessGrant: normalizeStreamingRightsAccessGrant(
+                getStreamingRightsContract(input.world.streamingRightsContracts, previous.id)?.accessGrant
+                || previous.accessGrant,
+            ) || createStreamingRightsAccessGrantForOffer(['subs'], false),
         });
         if (!hasCanonicalActiveRightAt(renewal, record.nextStartsAtAbsoluteWeek)) continue;
         const contractedRecord: PlatformAiRightsRenewalRecord = {

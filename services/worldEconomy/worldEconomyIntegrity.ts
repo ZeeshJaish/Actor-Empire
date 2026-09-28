@@ -10,6 +10,7 @@ import { createWorldAudienceEconomyState } from './worldAudienceCohorts';
 import { createWorldAudienceParticipationState } from './worldAudienceParticipation';
 import { createWorldPopulationState } from './worldPopulation';
 import { createWorldStreamingCompetitionState } from './worldStreamingCompetition';
+import { createWorldStreamingAudienceChoiceState } from './worldStreamingAudienceChoice';
 import { createWorldStreamingCustomerState } from './worldStreamingCustomers';
 import { createWorldStreamingPlatformEconomyState } from './worldStreamingPlatformEconomy';
 import { createWorldStreamingViewingState } from './worldStreamingViewing';
@@ -205,6 +206,8 @@ export const repairDerivedWorldEconomyState = (
     };
     const competition = createWorldStreamingCompetitionState(repaired, week);
     repaired = { ...repaired, world: { ...repaired.world, worldStreamingCompetition: competition } };
+    const audienceChoice = createWorldStreamingAudienceChoiceState(repaired, week, repaired.world.worldStreamingAudienceChoice);
+    repaired = { ...repaired, world: { ...repaired.world, worldStreamingAudienceChoice: audienceChoice } };
     const customers = createWorldStreamingCustomerState(repaired, week);
     repaired = { ...repaired, world: { ...repaired.world, worldStreamingCustomers: customers } };
     const viewing = createWorldStreamingViewingState(repaired, week);

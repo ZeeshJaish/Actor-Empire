@@ -49,7 +49,10 @@ import {
 import StreamingVisualScene from './StreamingVisualScene';
 import StreamingRightsCalendar, { getStreamingRightsTimingLabel } from './StreamingRightsCalendar';
 import { getStreamingRightsCalendar, normalizeStreamingRightsManagementState } from '../services/streamingRightsCalendar';
+import { getStreamingRightsContract } from '../services/streamingRightsCore';
+import { createStreamingRightsAccessGrantForOffer, normalizeStreamingRightsAccessGrant } from '../services/streamingRightsAccessGrant';
 import { getStreamingDayOneMarket } from '../services/streamingDayOneMarkets';
+import StreamingAccessGrantEditor from './StreamingAccessGrantEditor';
 import '../styles/streaming-rights-exchange.css';
 
 interface Props {
@@ -95,6 +98,7 @@ const termsFromNegotiation = (negotiation: OwnedStreamingRightsNegotiation): Str
   sequelRightsIncluded: negotiation.sequelRightsIncluded,
   changeOfControl: negotiation.changeOfControl,
   cancellationPenalty: negotiation.cancellationPenalty,
+  accessGrant: negotiation.accessGrant,
 });
 
 export default function StreamingRightsExchange({
@@ -140,6 +144,11 @@ export default function StreamingRightsExchange({
     selectedNegotiation?.sourceLicenseId
     && (selectedNegotiation.kind === 'TRANSFER_OUT' || selectedNegotiation.sellerType === 'PLATFORM'),
   );
+  const sourceGrant = selectedNegotiation?.sourceLicenseId
+    ? normalizeStreamingRightsAccessGrant(
+      getStreamingRightsContract(player.world.streamingRightsContracts, selectedNegotiation.sourceLicenseId)?.accessGrant
+      || platform.catalogLicenses.find(license => license.id === selectedNegotiation.sourceLicenseId)?.accessGrant,
+    ) : null;
 
   const openOpportunity = (opportunityId: string) => {
     const opportunity = opportunities.find(item => item.id === opportunityId);
@@ -401,6 +410,16 @@ export default function StreamingRightsExchange({
                   <label className="is-money"><span>Marketing guarantee</span><input type="number" min={0} step={250000} value={terms.marketingGuarantee} onChange={event => setTerms({ ...terms, marketingGuarantee: Number(event.target.value) })} /><small>{formatMoney(terms.marketingGuarantee)}</small></label>
                   </> : null}
                 </div>
+                <StreamingAccessGrantEditor
+                  grant={terms.accessGrant || createStreamingRightsAccessGrantForOffer(
+                    platform.serviceConfiguration.pricing.streams,
+                    terms.windowType === 'PERMANENT',
+                  )}
+                  ceiling={sourceGrant}
+                  permanentWindow={terms.windowType === 'PERMANENT'}
+                  readOnly={selectedIsExactTransfer}
+                  onChange={grant => setTerms({ ...terms, accessGrant: grant })}
+                />
                 {!selectedIsExactTransfer ? <div className="rights-clause-board">
                   {([
                     ['renewalOption', 'Renewal option'],

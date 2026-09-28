@@ -24,7 +24,7 @@ export const SaveRecoveryModal: React.FC<SaveRecoveryModalProps> = ({
             role="dialog"
             aria-modal="true"
             aria-labelledby="save-recovery-title"
-            className="relative w-full max-w-sm overflow-hidden rounded-[2rem] border border-amber-300/25 bg-[#11100e] shadow-[0_28px_100px_rgba(0,0,0,0.75)]"
+            className="relative w-full max-w-sm max-h-[calc(100dvh-2.5rem)] overflow-y-auto rounded-[2rem] border border-amber-300/25 bg-[#11100e] shadow-[0_28px_100px_rgba(0,0,0,0.75)]"
         >
             <div className="h-1 bg-gradient-to-r from-amber-500 via-yellow-200 to-emerald-400" />
             <div className="p-6">
@@ -43,7 +43,7 @@ export const SaveRecoveryModal: React.FC<SaveRecoveryModalProps> = ({
                 </p>
 
                 <div className="mt-5 border-y border-white/10 py-4">
-                    <div className="truncate text-lg font-black text-white">{playerName}</div>
+                    <div className="break-words text-lg font-black text-white">{playerName}</div>
                     <div className="mt-1 flex items-center gap-2 text-xs font-black uppercase tracking-[0.16em] text-zinc-500">
                         <span>Age {age}</span>
                         <span className="text-amber-400">•</span>
@@ -65,7 +65,7 @@ export const SaveRecoveryModal: React.FC<SaveRecoveryModalProps> = ({
                         type="button"
                         disabled={isRecovering}
                         onClick={onCancel}
-                        className="w-full rounded-2xl border border-white/10 px-4 py-3 text-xs font-black uppercase tracking-[0.14em] text-zinc-400 transition-colors hover:bg-white/5 hover:text-white disabled:opacity-40"
+                        className="min-h-11 w-full rounded-2xl border border-white/10 px-4 py-3 text-xs font-black uppercase tracking-[0.14em] text-zinc-400 transition-colors hover:bg-white/5 hover:text-white disabled:opacity-40"
                     >
                         Back to Save Slots
                     </button>
@@ -74,4 +74,3 @@ export const SaveRecoveryModal: React.FC<SaveRecoveryModalProps> = ({
         </section>
     </div>
 );
-

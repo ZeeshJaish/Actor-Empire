@@ -12,6 +12,8 @@ import { getProjectFundingEconomics } from '../../services/projectFundingEconomi
 import { RolePerformanceReport } from '../../components/RolePerformanceReport';
 import { getDynastyCareerArchives } from '../../services/dynastyCareer';
 import { getCanonicalReleasedMarketProjects } from '../../services/industryWorld/publicIndustryProjection';
+import { ResponsiveGrid } from '../../ui-layout/ResponsiveGrid';
+import type { ColumnPolicy } from '../../ui-layout/policy';
 
 interface BoxOfficeAppProps {
   player: Player;
@@ -21,6 +23,14 @@ interface BoxOfficeAppProps {
 type BoxOfficeSection = 'LIVE' | 'WEEKLY' | 'ALL_TIME' | 'PARTNERS' | 'RECORDS';
 type BoxOfficeDetailTab = 'OVERVIEW' | 'WEEKLY' | 'REGIONS' | 'PARTNERS';
 type BoxOfficeAllTimeMode = 'WORLDWIDE' | 'STUDIO' | 'ROI' | 'OPENING' | 'STREAMING';
+
+const DETAIL_TAB_POLICY: ColumnPolicy = {
+  gapPx: 4,
+  variants: [
+    { columns: 2, minItemWidthPx: 96 },
+    { columns: 4, minItemWidthPx: 96 },
+  ],
+};
 
 const BOX_OFFICE_SECTIONS: {
     id: BoxOfficeSection;
@@ -869,12 +879,12 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
 
       const renderDetailTabs = () => (
           <div className="shrink-0 border-b border-white/10 bg-black/35 px-3 py-2 backdrop-blur-md">
-              <div className="grid grid-cols-4 gap-1 rounded-2xl bg-black/35 p-1">
+              <ResponsiveGrid policy={DETAIL_TAB_POLICY} className="rounded-2xl bg-black/35 p-1">
                   {DETAIL_TABS.map(item => (
                       <button
                           key={item.id}
                           onClick={() => setDetailTab(item.id)}
-                          className={`h-9 rounded-xl text-[9px] font-black uppercase tracking-[0.08em] transition-all ${
+                          className={`min-h-11 rounded-xl text-[11px] font-black uppercase tracking-normal transition-all ${
                               detailTab === item.id
                                   ? `${isStreamingRelease ? 'bg-indigo-400 text-black' : 'bg-emerald-400 text-black'} shadow-lg`
                                   : 'text-zinc-500 hover:bg-white/5 hover:text-zinc-300'
@@ -883,7 +893,7 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
                           {tr(item.labelKey)}
                       </button>
                   ))}
-              </div>
+              </ResponsiveGrid>
           </div>
       );
 
@@ -1240,18 +1250,18 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
 	                          setSelectedReleaseId(null);
 	                          setSelectedArchivedRelease(null);
 	                      }}
-	                      className="cursor-pointer rounded-full p-1 transition-colors duration-200 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+	                      className="grid h-11 w-11 shrink-0 cursor-pointer place-items-center rounded-full transition-colors duration-200 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
 	                      aria-label="Back to box office"
 	                  >
 	                      <ArrowLeft size={20}/>
 	                  </button>
-	                  <div className="min-w-0 text-center">
+	                  <div className="min-w-0 flex-1 text-center">
 	                      <div className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-300">
 	                          {isArchived ? 'Final box-office record' : isStreamingRelease ? tr('box.streamingDetail') : tr('box.boxOfficeDetail')}
 	                      </div>
-                      <div className="truncate font-bold text-sm">{rel.name}</div>
+                      <div className="break-words font-bold text-sm leading-tight">{rel.name}</div>
                   </div>
-                  <div className="w-8"></div>
+                  <div className="w-11 shrink-0"></div>
               </div>
               {renderDetailTabs()}
               <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4">
@@ -1612,7 +1622,7 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
     <div className="absolute inset-0 bg-zinc-900 flex flex-col z-40 text-white animate-in slide-in-from-right duration-300">
         {/* Header */}
         <div className="bg-emerald-900/50 p-4 pt-12 pb-3 shadow-lg flex items-center justify-between shrink-0 border-b border-emerald-500/20 backdrop-blur-md">
-            <button onClick={onBack} className="p-1 rounded-full hover:bg-white/10"><ArrowLeft size={20}/></button>
+            <button onClick={onBack} className="grid h-11 w-11 place-items-center rounded-full hover:bg-white/10" aria-label="Back to phone"><ArrowLeft size={20}/></button>
             <div className="flex items-center gap-2 font-bold text-emerald-400 text-lg">
                 <BarChart3 size={20} /> {tr('box.title')}
             </div>
@@ -1622,8 +1632,8 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
         {/* Tabs */}
         {section === 'LIVE' && (
             <div className="flex bg-black/40 border-b border-emerald-500/20">
-                <button onClick={() => setTab('THEATERS')} className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider ${tab === 'THEATERS' ? 'text-emerald-400 border-b-2 border-emerald-400 bg-emerald-900/20' : 'text-zinc-500 hover:text-zinc-300'}`}>{tr('box.inTheaters')}</button>
-                <button onClick={() => setTab('STREAMING')} className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider ${tab === 'STREAMING' ? 'text-emerald-400 border-b-2 border-emerald-400 bg-emerald-900/20' : 'text-zinc-500 hover:text-zinc-300'}`}>{tr('box.streaming')}</button>
+                <button onClick={() => setTab('THEATERS')} className={`flex-1 min-h-11 py-3 text-xs font-bold uppercase tracking-wider ${tab === 'THEATERS' ? 'text-emerald-400 border-b-2 border-emerald-400 bg-emerald-900/20' : 'text-zinc-500 hover:text-zinc-300'}`}>{tr('box.inTheaters')}</button>
+                <button onClick={() => setTab('STREAMING')} className={`flex-1 min-h-11 py-3 text-xs font-bold uppercase tracking-wider ${tab === 'STREAMING' ? 'text-emerald-400 border-b-2 border-emerald-400 bg-emerald-900/20' : 'text-zinc-500 hover:text-zinc-300'}`}>{tr('box.streaming')}</button>
             </div>
         )}
 
@@ -1650,11 +1660,11 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
                                 className="w-full text-left bg-zinc-800 p-4 rounded-2xl border border-zinc-700 shadow-lg transition-colors hover:border-emerald-400/40"
                             >
                                 <div className="mb-3">
-                                    <div className="flex justify-between items-start gap-3">
-                                        <div className="min-w-0">
+                                    <div className="flex flex-wrap justify-between items-start gap-3">
+                                        <div className="min-w-[12rem] max-w-full flex-1">
                                             <div className="font-bold text-lg leading-tight break-words">{rel.name}</div>
                                         </div>
-                                        <div className="flex shrink-0 items-center gap-2">
+                                        <div className="ml-auto flex shrink-0 items-center gap-2">
                                             <div className="text-xs bg-emerald-900 text-emerald-400 px-2 py-1 rounded font-mono font-bold">
                                                 {tr('box.runWeekCompact', { week: rel.weekNum })}
                                             </div>
@@ -1737,11 +1747,11 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
                                 className="w-full text-left bg-zinc-800 p-4 rounded-2xl border border-zinc-700 shadow-lg transition-colors hover:border-indigo-400/40"
                             >
                                 <div className="mb-3">
-                                    <div className="flex justify-between items-start gap-3">
-                                        <div className="min-w-0">
+                                    <div className="flex flex-wrap justify-between items-start gap-3">
+                                        <div className="min-w-[12rem] max-w-full flex-1">
                                             <div className="font-bold text-lg break-words">{rel.name}</div>
                                         </div>
-                                        <div className="flex shrink-0 items-center gap-2">
+                                        <div className="ml-auto flex shrink-0 items-center gap-2">
                                             <div className={`text-[10px] px-2 py-1 rounded font-bold uppercase ${platform.color} bg-white/10`}>{platform.name}</div>
                                             <ChevronRight size={16} className="text-zinc-500" />
                                         </div>

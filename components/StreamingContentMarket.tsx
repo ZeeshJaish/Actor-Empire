@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, Bell, BellOff, CalendarDays, Check, ChevronDown, ChevronRight, Clock3, FileSignature, Film, Gavel, Handshake, LibraryBig, Search, Sparkles, Wallet, X } from 'lucide-react';
 import type { OwnedStreamingRightsNegotiation, Player } from '../types';
 import AccessibleDialog from './AccessibleDialog';
@@ -7,19 +7,26 @@ import { brandVars } from './streaming-transplant/presentation/brand';
 import { Poster } from './studio-finance/components/Poster';
 import { StreamingTitleArt } from './studio-finance/components/StreamingTitleArt';
 import { STREAMING_STARTER_CATALOG_PACKAGES } from '../services/streamingCatalog';
+import { getHistoricalCatalogueTitles } from '../services/historicalCatalogue';
 import { getStreamingDayOneMarket } from '../services/streamingDayOneMarkets';
-import { establishContentMarketCatalogue, getContentMarketAuctionCollections, getContentMarketListings, getContentMarketCollections, getContentMarketOwnedTitles, getContentMarketFunds, getContentMarketSupplySummary,
-    linkContentMarketOwnedTitles, purchaseContentMarketListing, purchaseContentMarketCollection, saveContentMarketStrategy, submitContentMarketPrivateOffer } from '../services/streamingContentMarket';
+import { establishContentMarketCatalogue, getContentMarketAuctionAssignments, getContentMarketListings, getContentMarketCollections, getContentMarketOwnedTitles, getContentMarketFunds, getContentMarketSupplySummary,
+    linkContentMarketOwnedTitles, purchaseContentMarketListing, purchaseContentMarketCollection, saveContentMarketStrategy, searchContentMarketLibrary, submitContentMarketPrivateOffer } from '../services/streamingContentMarket';
 import { normalizeOwnedStreamingPlatformState, compactOwnedStreamingPlatformForPersistence } from '../services/ownedStreamingPlatform';
 import { PHASE_ONE_ENERGY_COSTS } from '../services/energyCosts';
 import { acceptStreamingRightsCounter, reviseStreamingRightsNegotiation,
     signStreamingRightsDeal, withdrawStreamingRightsNegotiation, type StreamingRightsTermsInput } from '../services/streamingRightsMarketplace';
 import { getAbsoluteWeek } from '../services/legacyLogic';
+import { countActuallyPlayableMarketTitles } from '../services/historicalMarketRivals';
+import { getStreamingOpportunityCards, purchaseStreamingOpportunityOffer } from '../services/streamingOpportunityMarket';
+import { getStreamingPaidScoutQuote, refreshStreamingPaidScout } from '../services/paidMarketScouting';
+import { createStreamingRightsAccessGrantForOffer } from '../services/streamingRightsAccessGrant';
 import { getStreamingBuyerAuctionLots, openStreamingBuyerAuction } from '../services/streamingBuyerAuctions';
 import { followStreamingUpcomingRightsSale, getStreamingUpcomingRightsSales } from '../services/streamingUpcomingRights';
 import StreamingBuyerAuctionRoom from './StreamingBuyerAuctionRoom';
 import ContentMarketOneSheet from './ContentMarketOneSheet';
-import { ContentMarket as ExactContentMarket, type MarketScene } from '../content-market-exact/ExactContentMarket';
+import StreamingAccessGrantEditor from './StreamingAccessGrantEditor';
+import { ContentMarket as ExactContentMarket, type MarketScene, type SharedLibraryFilters,
+    type SharedLibraryResult } from '../content-market-exact/ExactContentMarket';
 import { buildExactContentMarketLots } from '../content-market-exact/adapter';
 import type { Lot as ExactContentMarketLot, Offer as ExactContentMarketOffer } from '../content-market-exact/model';
 import '../styles/streaming-content-market.css';
@@ -67,6 +74,9 @@ function PrivateOfferEditor({ title, sellerName, terms, setTerms, availableCount
         <label><span>Upfront offer</span><input type="number" min={0} step={250000} value={terms.minimumGuarantee} onChange={event => patchTerms({ minimumGuarantee: Number(event.target.value) })} /><small>{money(terms.minimumGuarantee)}</small></label>
         <label><span>Your revenue share</span><input type="range" min={45} max={90} value={terms.platformRevenueShare} onChange={event => patchTerms({ platformRevenueShare: Number(event.target.value) })} /><small>{terms.platformRevenueShare}% platform · {100 - terms.platformRevenueShare}% rights holder</small></label>
         <div className="cm-editor-pair"><label><span>Term</span><select value={terms.durationWeeks} onChange={event => patchTerms({ durationWeeks: Number(event.target.value) })}><option value={52}>1 year</option><option value={104}>2 years</option><option value={156}>3 years</option><option value={260}>5 years</option></select></label><label><span>Rights</span><select value={terms.exclusivity} onChange={event => patchTerms({ exclusivity: event.target.value as any })}><option value="NON_EXCLUSIVE">Shared</option><option value="EXCLUSIVE">Exclusive</option></select></label></div>
+        {terms.accessGrant && <StreamingAccessGrantEditor grant={terms.accessGrant}
+            permanentWindow={terms.windowType === 'PERMANENT'}
+            onChange={accessGrant => patchTerms({ accessGrant })} />}
         <fieldset className="cm-country-pick"><legend>Markets in this proposal</legend>{availableCountryIds.map(id => <button type="button" key={id} aria-pressed={chosenCountries.includes(id)} onClick={() => toggleCountry(id)}>{getStreamingDayOneMarket(id)?.country || id}</button>)}</fieldset>
         <button type="button" className="cm-advanced-toggle" aria-expanded={advanced} onClick={() => setAdvanced(!advanced)}>Deal protections <ChevronDown size={15} /></button>
         {advanced && <div className="cm-advanced-grid"><label><span>Marketing commitment</span><input type="number" min={0} step={250000} value={terms.marketingGuarantee} onChange={event => patchTerms({ marketingGuarantee: Number(event.target.value) })} /></label><label><span>Viewership bonus</span><input type="number" min={0} step={250000} value={terms.viewershipBonusAmount} onChange={event => patchTerms({ viewershipBonusAmount: Number(event.target.value) })} /></label><label><span>Bonus at viewers</span><input type="number" min={0} step={100000} value={terms.viewershipBonusThreshold} onChange={event => patchTerms({ viewershipBonusThreshold: Number(event.target.value) })} /></label><label><span>Cancellation penalty</span><input type="number" min={0} step={250000} value={terms.cancellationPenalty} onChange={event => patchTerms({ cancellationPenalty: Number(event.target.value) })} /></label><label><span>Change of control</span><select value={terms.changeOfControl} onChange={event => patchTerms({ changeOfControl: event.target.value as StreamingRightsTermsInput['changeOfControl'] })}><option value="NONE">No restriction</option><option value="NOTICE">Notify rights holder</option><option value="CONSENT_REQUIRED">Consent required</option></select></label><label className="cm-check"><input type="checkbox" checked={terms.renewalOption} onChange={event => patchTerms({ renewalOption: event.target.checked })} /><span>Renewal option</span></label><label className="cm-check"><input type="checkbox" checked={terms.sublicensingAllowed} onChange={event => patchTerms({ sublicensingAllowed: event.target.checked })} /><span>Sublicensing</span></label><label className="cm-check"><input type="checkbox" checked={terms.sequelRightsIncluded} onChange={event => patchTerms({ sequelRightsIncluded: event.target.checked })} /><span>Sequel rights</span></label></div>}
@@ -138,10 +148,6 @@ function ContentMarketGate({ player, funds, listingPrices, owned, liveRooms, bra
 
 export default function StreamingContentMarket({ player, brand, onUpdatePlayer, onClose, onOpenFinance, onCommission, onReview, returnToLaunch, initialTab, onResumeLegacy, onExistingNegotiations, initialOfferId, initialAuctionId }: Props) {
     const platform = player.ownedStreamingPlatform;
-    const posterById = useMemo(() => new Map(
-        [...(player.pastProjects || []), ...player.businesses.flatMap(business => business.studioState?.scripts || [])]
-            .flatMap(source => source.customPoster ? [[String(source.id), source.customPoster] as const] : []),
-    ), [player]);
     const [draft, setDraft] = useState<Draft>(() => initialAuctionId
         ? { ...(platform.contentMarketDraft || { search: '', ownedIds: [] }), tab: 'AUCTIONS', selectedId: initialAuctionId }
         : initialOfferId
@@ -150,19 +156,46 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
         ? { ...(platform.contentMarketDraft || { search: '', ownedIds: [] }), tab: initialTab, selectedId: null }
         : platform.contentMarketDraft || { tab: 'ALL', search: '', selectedId: null, ownedIds: platform.catalogSetupDraft?.selectedOwnedProjectIds || [] });
     const [feedback, setFeedback] = useState('');
+    const draftTimer = useRef<number | null>(null);
+    const scoutLock = useRef(false);
     const [busy, setBusy] = useState(false);
     const [offerEditor, setOfferEditor] = useState(false);
     const [advancedOffer, setAdvancedOffer] = useState(false);
     const [offerTerms, setOfferTerms] = useState<StreamingRightsTermsInput | null>(null);
+    const [libraryGenre, setLibraryGenre] = useState('');
+    const [libraryLanguage, setLibraryLanguage] = useState('');
+    const [libraryProducer, setLibraryProducer] = useState('');
+    const [libraryQuality, setLibraryQuality] = useState(0);
+    const [libraryYears, setLibraryYears] = useState(0);
+    const [marqueeOnly, setMarqueeOnly] = useState(false);
     const [atGate, setAtGate] = useState(() => !initialOfferId && !initialAuctionId && !platform.contentMarketDraft?.selectedId);
-    const listings = useMemo(() => getContentMarketListings(player), [player]);
-    const collections = useMemo(() => getContentMarketCollections(player), [player]);
-    const supplySummary = useMemo(() => getContentMarketSupplySummary(player), [player]);
-    const auctionLots = useMemo(() => getStreamingBuyerAuctionLots(player), [player]);
-    const upcomingSales = useMemo(() => getStreamingUpcomingRightsSales(player), [player]);
+    const inAuctionRoom = platform.buyerAuctionSessions.some(session => session.id === draft.selectedId);
+    // The room reads its persisted session directly. Rebuilding the entire
+    // storefront on every bid/timer tick blocked feedback behind unrelated work.
+    const posterById = useMemo(() => inAuctionRoom ? new Map<string, string>() : new Map(
+        [...(player.pastProjects || []), ...player.businesses.flatMap(business => business.studioState?.scripts || [])]
+            .flatMap(source => source.customPoster ? [[String(source.id), source.customPoster] as const] : []),
+    ), [player, inAuctionRoom]);
+    const marketSnapshot = useMemo(() => {
+        if (inAuctionRoom) return null;
+        const listings = getContentMarketListings(player);
+        const collections = getContentMarketCollections(player);
+        const libraryTitles = getHistoricalCatalogueTitles(player);
+        const assignments = getContentMarketAuctionAssignments(player, { listings, collections });
+        return {
+            listings, collections, libraryTitles, assignments,
+            opportunityOffers: getStreamingOpportunityCards(player).individuals,
+            supplySummary: getContentMarketSupplySummary(player, { listings, collections, assignments,
+                sharedLibraryTitles: libraryTitles.length }),
+            auctionLots: getStreamingBuyerAuctionLots(player, { listings, collections, assignments }),
+            upcomingSales: getStreamingUpcomingRightsSales(player),
+            owned: getContentMarketOwnedTitles(player),
+        };
+    }, [player, inAuctionRoom]);
+    const { listings = [], collections = [], libraryTitles = [], opportunityOffers = [], supplySummary = null,
+        auctionLots = [], upcomingSales = [], owned = [] } = marketSnapshot || {};
     const auctionListingIds = useMemo(() => new Set(auctionLots.filter(lot => lot.listingKind === 'TITLE').map(lot => lot.listingId)), [auctionLots]);
-    const auctionCollectionIds = useMemo(() => new Set(getContentMarketAuctionCollections(player).map(collection => collection.id)), [player]);
-    const owned = useMemo(() => getContentMarketOwnedTitles(player), [player]);
+    const auctionCollectionIds = marketSnapshot?.assignments.collectionIds || new Set<string>();
     /* Three different reasons the studio shelf can be bare, and they need three
        different answers: you own no production house, you own one that has not
        released anything yet, or a search is hiding what you have. */
@@ -180,7 +213,9 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
     const selectedOffer = privateOffers.find(offer => offer.id === draft.selectedId) || null;
     const selectedUpcoming = upcomingSales.find(sale => sale.id === draft.selectedId) || null;
     const selectedUpcomingLot = auctionLots.find(lot => lot.upcomingRightsSaleId === selectedUpcoming?.id) || null;
-    const funds = getContentMarketFunds(player);
+    const funds = inAuctionRoom ? 0 : getContentMarketFunds(player);
+    const scoutQuote = useMemo(() => inAuctionRoom ? null : getStreamingPaidScoutQuote(player), [player, inAuctionRoom]);
+    useEffect(() => { scoutLock.current = false; }, [scoutQuote?.cycle, scoutQuote?.completedInCycle]);
     const patch = (value: Partial<Draft>) => { setDraft(d => ({ ...d, ...value })); setFeedback(''); };
     const persistDraft = () => {
         const p = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
@@ -188,8 +223,11 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
     };
     useEffect(() => {
         if (JSON.stringify(player.ownedStreamingPlatform.contentMarketDraft) === JSON.stringify(draft)) return;
-        const timer = window.setTimeout(persistDraft, 350);
-        return () => window.clearTimeout(timer);
+        draftTimer.current = window.setTimeout(persistDraft, 350);
+        return () => {
+            if (draftTimer.current !== null) window.clearTimeout(draftTimer.current);
+            draftTimer.current = null;
+        };
     }, [draft, player, onUpdatePlayer]);
     const leave = (next: () => void) => { persistDraft(); next(); };
     const accept = (action: () => { player: Player; changed: boolean; detail: string }) => {
@@ -206,6 +244,25 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
         } finally { setBusy(false); }
     };
     const query = draft.search.trim().toLowerCase();
+    const librarySearchActive = Boolean(query || libraryGenre || libraryLanguage || libraryProducer
+        || libraryQuality || libraryYears || marqueeOnly);
+    const libraryResults = useMemo(() => !librarySearchActive || draft.tab === 'COLLECTIONS' || draft.tab === 'OWNED'
+        ? [] : searchContentMarketLibrary(player, {
+            query: draft.search,
+            projectType: draft.tab === 'MOVIE' || draft.tab === 'SERIES' ? draft.tab : undefined,
+            genre: libraryGenre || undefined,
+            languageId: libraryLanguage || undefined,
+            producerId: libraryProducer || undefined,
+            minimumQuality: libraryQuality || undefined,
+            releasedAfterYear: libraryYears ? Math.max(1, player.age - libraryYears + 1) : undefined,
+            catalogueTier: marqueeOnly ? 'MARQUEE' : undefined,
+            limit: 100,
+        }), [player, draft.search, draft.tab, librarySearchActive, libraryGenre,
+            libraryLanguage, libraryProducer, libraryQuality, libraryYears, marqueeOnly]);
+    const libraryGenres = useMemo(() => [...new Set(libraryTitles.map(title => title.genre))].sort(), [libraryTitles]);
+    const libraryLanguages = useMemo(() => [...new Set(libraryTitles.map(title => title.originalLanguageId))].sort(), [libraryTitles]);
+    const libraryProducers = useMemo(() => [...new Map<string, string>(libraryTitles.map(title => [title.studioId, title.studioName])).entries()]
+        .sort((left, right) => left[1].localeCompare(right[1])), [libraryTitles]);
     const visible = listings.filter(o => !auctionListingIds.has(o.id) && (draft.tab === 'ALL' || draft.tab === o.title.projectType)
         && `${o.title.title} ${o.title.genre} ${o.sellerName}`.toLowerCase().includes(query));
     const visibleCollections = collections.filter(o => !auctionCollectionIds.has(o.id) && ['ALL', 'COLLECTIONS'].includes(draft.tab) && o.package.name.toLowerCase().includes(query));
@@ -213,6 +270,12 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
     const ownedIds = draft.ownedIds.filter(id => owned.some(o => o.id === id && !o.linked && !o.unavailableReason));
     const detail = selected || collection || auctionLot || selectedUpcoming;
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+    const marketPacing = player.world.historicalCatalogue?.marketPacing;
+    const playableTitleCount = useMemo(() => marketPacing && !inAuctionRoom ? countActuallyPlayableMarketTitles(player) : 0,
+        [player, marketPacing, inAuctionRoom]);
+    const firstLookWeeksRemaining = marketPacing
+        ? Math.max(0, 12 - (absoluteWeek - marketPacing.anchorAbsoluteWeek)) : 0;
+    const firstLookActive = firstLookWeeksRemaining > 0 && playableTitleCount < 25;
     const statusLabel = (offer: OwnedStreamingRightsNegotiation) => ({
         AWAITING_RESPONSE: `Awaiting reply · ${Math.max(0, (offer.responseDueAbsoluteWeek || absoluteWeek) - absoluteWeek)} weeks`,
         SELLER_COUNTERED: 'Counter received', SELLER_ACCEPTED: `Accepted · ${Math.max(0, (offer.signingDeadlineAbsoluteWeek || absoluteWeek) - absoluteWeek)} weeks to sign`,
@@ -227,6 +290,8 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
             viewershipBonusAmount: base.viewershipBonusAmount, renewalOption: base.renewalOption,
             sublicensingAllowed: base.sublicensingAllowed, sequelRightsIncluded: base.sequelRightsIncluded,
             changeOfControl: base.changeOfControl, cancellationPenalty: base.cancellationPenalty,
+            accessGrant: base.accessGrant || createStreamingRightsAccessGrantForOffer(
+                platform.serviceConfiguration.pricing.streams, base.windowType === 'PERMANENT'),
             countryIds: 'terms' in source ? source.countryIds : source.countryIds });
         setAdvancedOffer(false); setOfferEditor(true); setFeedback('');
     };
@@ -258,8 +323,11 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
         try {
             const result = openStreamingBuyerAuction(player, auctionLot.id, Date.now());
             if (result.session) {
-                onUpdatePlayer(result.player);
-                setDraft(current => ({ ...current, tab: 'AUCTIONS', selectedId: result.session!.id }));
+                if (draftTimer.current !== null) window.clearTimeout(draftTimer.current);
+                draftTimer.current = null;
+                const next = { ...draft, tab: 'AUCTIONS' as const, selectedId: result.session.id };
+                setDraft(next);
+                onUpdatePlayer({ ...result.player, ownedStreamingPlatform: { ...result.player.ownedStreamingPlatform, contentMarketDraft: next } });
             } else setFeedback(result.detail || 'This auction can no longer be entered.');
         } finally { setBusy(false); }
     };
@@ -269,8 +337,11 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
         try {
             const result = openStreamingBuyerAuction(player, selectedUpcomingLot.id, Date.now());
             if (result.session) {
-                onUpdatePlayer(result.player);
-                setDraft(current => ({ ...current, tab: 'AUCTIONS', selectedId: result.session!.id }));
+                if (draftTimer.current !== null) window.clearTimeout(draftTimer.current);
+                draftTimer.current = null;
+                const next = { ...draft, tab: 'AUCTIONS' as const, selectedId: result.session.id };
+                setDraft(next);
+                onUpdatePlayer({ ...result.player, ownedStreamingPlatform: { ...result.player.ownedStreamingPlatform, contentMarketDraft: next } });
             } else setFeedback(result.detail || 'This auction can no longer be entered.');
         } finally { setBusy(false); }
     };
@@ -280,13 +351,42 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
         if (result.changed) onUpdatePlayer(result.player);
         setFeedback(result.detail);
     };
-    const exactLots = useMemo(() => buildExactContentMarketLots(player, {
+    const exactLots = useMemo(() => inAuctionRoom ? [] : buildExactContentMarketLots(player, {
         listings,
         collections,
+        opportunityOffers,
         auctionLots: auctionLots.filter(lot => !platform.buyerAuctionSessions.some(session => session.lot.id === lot.id && session.status !== 'LIVE')),
         upcomingSales,
         ownedTitles: owned,
-    }), [player, listings, collections, auctionLots, upcomingSales, owned, platform.buyerAuctionSessions]);
+        libraryTitles,
+    }), [player, listings, collections, opportunityOffers, auctionLots, upcomingSales, owned, libraryTitles, platform.buyerAuctionSessions, inAuctionRoom]);
+    const searchExactLibrary = (search: string, filters: SharedLibraryFilters): SharedLibraryResult[] => (
+        searchContentMarketLibrary(player, {
+            query: search,
+            projectType: filters.projectType || undefined,
+            genre: filters.genre || undefined,
+            languageId: filters.languageId || undefined,
+            producerId: filters.producerId || undefined,
+            minimumQuality: filters.minimumQuality || undefined,
+            releasedAfterYear: filters.releaseYears ? Math.max(1, player.age - filters.releaseYears + 1) : undefined,
+            catalogueTier: filters.marqueeOnly ? 'MARQUEE' : undefined,
+            limit: 100,
+        }).map(row => {
+            const auction = row.listingId ? auctionLots.find(lot => lot.listingId === row.listingId) : null;
+            const lot = auction ? exactLots.find(item => item.id === auction.id)
+                : row.listingId ? exactLots.find(item => item.sourceKind === 'LISTING' && item.sourceId === row.listingId)
+                    : null;
+            return {
+                id: row.title.id, title: row.title.title, studioName: row.title.studioName,
+                year: row.title.releaseYear || 0, genre: row.title.genre,
+                languageId: row.title.originalLanguageId || 'unknown', quality: row.title.quality || 0,
+                rating: row.title.rating, marquee: row.title.catalogueTier === 'MARQUEE',
+                status: row.status === 'AVAILABLE' && !lot ? 'NOT_OFFERED' : row.status,
+                reason: row.status === 'AVAILABLE' && !lot ? 'No current lot is open for this title.' : row.reason,
+                lotId: lot?.id || null,
+            };
+        })
+    );
     const exactInitialScene: MarketScene = atGate ? 'GATE'
         : draft.tab === 'OWNED' || draft.selectedId === '__open_studio__' ? 'STUDIO'
             : exactLots.some(lot => lot.id === draft.selectedId) ? 'DETAIL' : 'MARKET';
@@ -302,6 +402,7 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
     };
     const acquireExactLot = (lot: ExactContentMarketLot) => {
         if (lot.unavailableReason || lot.linked) return { changed: false, detail: lot.unavailableReason || 'This title is already in your catalogue.' };
+        if (lot.sourceKind === 'OPPORTUNITY') return runExactAction(() => purchaseStreamingOpportunityOffer(player, lot.sourceId));
         if (lot.sourceKind === 'LISTING') {
             const source = listings.find(item => item.id === lot.sourceId);
             return source ? runExactAction(() => purchaseContentMarketListing(player, source.id, source.signature)) : { changed: false, detail: 'This listing is no longer available.' };
@@ -332,6 +433,8 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
             sequelRightsIncluded: offer.sequel,
             changeOfControl: source.terms.changeOfControl,
             cancellationPenalty: source.terms.cancellationPenalty,
+            accessGrant: createStreamingRightsAccessGrantForOffer(
+                platform.serviceConfiguration.pricing.streams, offer.window === 'PERPETUAL'),
         });
         if (result.changed) onUpdatePlayer(result.player);
         setFeedback(result.detail || (result.changed ? 'Private offer sent.' : 'This offer could not be sent.'));
@@ -344,8 +447,11 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
         try {
             const result = openStreamingBuyerAuction(player, source.id, Date.now());
             if (result.session) {
-                onUpdatePlayer(result.player);
-                setDraft(current => ({ ...current, tab: 'AUCTIONS', selectedId: result.session!.id }));
+                if (draftTimer.current !== null) window.clearTimeout(draftTimer.current);
+                draftTimer.current = null;
+                const next = { ...draft, tab: 'AUCTIONS' as const, selectedId: result.session.id };
+                setDraft(next);
+                onUpdatePlayer({ ...result.player, ownedStreamingPlatform: { ...result.player.ownedStreamingPlatform, contentMarketDraft: next } });
             } else setFeedback(result.detail || 'This auction can no longer be entered.');
         } finally { setBusy(false); }
     };
@@ -359,12 +465,28 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
     };
     if (!selectedOffer && !activeAuctionSession) return <AccessibleDialog className="cm-market-exact-shell" data-epx-root style={brandVars(brand)} aria-label="Content Market" onEscape={() => leave(onClose)}>
         <ExactContentMarket
-            key={draft.selectedId || 'root'}
             brand={brand}
             ownsStudio={ownsStudio}
             state={{ treasury: platform.treasuryCash, committed: Math.max(0, platform.treasuryCash - funds), week: player.currentWeek, subs: platform.metrics.subscribers || 0 }}
             catalogue={exactLots}
-            supplySummary={supplySummary}
+            supplySummary={supplySummary || undefined}
+            searchLibrary={searchExactLibrary}
+            libraryOptions={{ genres: libraryGenres, languages: libraryLanguages,
+                producers: libraryProducers.map(([id, name]) => ({ id, name })) }}
+            firstLook={firstLookActive ? { protectedTitles: marketPacing!.protectedTitleIds.length,
+                weeksRemaining: firstLookWeeksRemaining } : null}
+            paidScout={{ price: scoutQuote!.price, count: scoutQuote!.completedInCycle,
+                shortfall: scoutQuote!.shortfall,
+                weeksUntilFree: Math.max(0, supplySummary!.nextRotationAbsoluteWeek - absoluteWeek),
+                onScout: () => {
+                    if (scoutLock.current) return { changed: false, detail: 'Scouting is already processing.' };
+                    scoutLock.current = true;
+                    const result = refreshStreamingPaidScout(player);
+                    if (result.changed) onUpdatePlayer(result.player);
+                    else scoutLock.current = false;
+                    setFeedback(result.detail);
+                    return { changed: result.changed, detail: result.detail };
+                } }}
             initialScene={exactInitialScene}
             initialLotId={draft.selectedId}
             initialQuery={draft.search}
@@ -406,7 +528,7 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
             {selectedOffer ? <>
                 <div className="cm-title"><StreamingTitleArt id={selectedOffer.sourceProjectId} title={selectedOffer.title} poster={posterById.get(selectedOffer.sourceProjectId)} size={68} /><div><span className="cm-kicker">PRIVATE OFFER · V{selectedOffer.proposalVersion}</span><h1>{selectedOffer.title}</h1><p>{selectedOffer.sellerName}</p></div></div>
                 <div className={`cm-offer-status is-${(selectedOffer.responseStatus || 'AWAITING_RESPONSE').toLowerCase()}`}><Clock3 size={16} /><div><b>{statusLabel(selectedOffer)}</b><small>{selectedOffer.responseStatus === 'AWAITING_RESPONSE' ? 'Rights remain on the market until you sign.' : selectedOffer.responseReason}</small></div></div>
-                <dl className="cm-terms cm-terms-compact"><div><dt>Your upfront offer</dt><dd>{money(selectedOffer.minimumGuarantee)}</dd></div><div><dt>Markets</dt><dd>{countries(selectedOffer.countryIds)}</dd></div><div><dt>Duration</dt><dd>{selectedOffer.durationWeeks} weeks</dd></div><div><dt>Your revenue share</dt><dd>{selectedOffer.platformRevenueShare}%</dd></div><div><dt>Rights</dt><dd>{selectedOffer.exclusivity === 'EXCLUSIVE' ? 'Exclusive' : 'Shared'}</dd></div></dl>
+                <dl className="cm-terms cm-terms-compact"><div><dt>Your upfront offer</dt><dd>{money(selectedOffer.minimumGuarantee)}</dd></div><div><dt>Markets</dt><dd>{countries(selectedOffer.countryIds)}</dd></div><div><dt>Duration</dt><dd>{selectedOffer.durationWeeks} weeks</dd></div><div><dt>Your revenue share</dt><dd>{selectedOffer.platformRevenueShare}%</dd></div><div><dt>Rights</dt><dd>{selectedOffer.exclusivity === 'EXCLUSIVE' ? 'Exclusive' : 'Shared'}</dd></div><div><dt>Viewer routes</dt><dd>{selectedOffer.accessGrant?.modes.join(', ') || 'No routes granted'}</dd></div></dl>
                 {selectedOffer.responseStatus === 'SELLER_COUNTERED' && <div className="cm-counter-strip"><span>Owner revision</span><b>{money(selectedOffer.counterMinimumGuarantee || 0)} · {selectedOffer.counterPlatformRevenueShare}% to your platform</b></div>}
                 {offerEditor && offerTerms ? <PrivateOfferEditor title={selectedOffer.title} sellerName={selectedOffer.sellerName} terms={offerTerms} setTerms={setOfferTerms} availableCountryIds={selectedOffer.countryIds} advanced={advancedOffer} setAdvanced={setAdvancedOffer} onCancel={() => setOfferEditor(false)} onSubmit={submitPrivateOffer} busy={busy} /> : <div className="cm-offer-actions">
                     {selectedOffer.responseStatus === 'AWAITING_RESPONSE' && <button className="cm-secondary" onClick={() => beginOffer(selectedOffer)}>Revise offer</button>}
@@ -491,8 +613,17 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
                 {platform.rightsNegotiations.some(n => ['OPEN', 'COUNTERED', 'READY_TO_SIGN'].includes(n.status)) && onExistingNegotiations && <button className="cm-finance-link" onClick={() => leave(onExistingNegotiations)}>Review existing negotiations <ChevronRight size={14} /></button>}
                 <div className="cm-shortcuts"><button onClick={() => patch({ tab: 'OWNED' })}><LibraryBig size={18} /><span>Bring from my studio<small>{owned.filter(o => !o.linked && !o.unavailableReason).length} available titles</small></span><ChevronRight size={15} /></button>
                     <button onClick={() => leave(onCommission)}><Sparkles size={18} /><span>Commission an Original<small>Brief, funding, and production</small></span><ChevronRight size={15} /></button></div>
-                <label className="cm-search"><Search size={17} /><input aria-label="Search content" placeholder="Search titles, genres, or studios" value={draft.search} onChange={e => patch({ search: e.target.value })} /></label>
+                {firstLookActive && <p className="cm-first-look"><b>YOUR FIRST LOOK</b> · {marketPacing!.protectedTitleIds.length} titles are protected from new rival bids for up to {firstLookWeeksRemaining} more {firstLookWeeksRemaining === 1 ? 'week' : 'weeks'}, ending sooner at 25 playable titles. Rights still have normal prices.</p>}
+                <label className="cm-search"><Search size={17} /><input aria-label="Search content" placeholder="Search all released titles, genres, or studios" value={draft.search} onChange={e => patch({ search: e.target.value })} /></label>
                 <div className="cm-filters" aria-label="Content source">{(['ALL', 'MOVIE', 'SERIES', 'COLLECTIONS', 'OWNED'] as const).map(tab => <button key={tab} aria-pressed={draft.tab === tab} onClick={() => patch({ tab, selectedId: null, ...(tab === 'OWNED' ? { search: '' } : {}) })}>{({ ALL: 'All', MOVIE: 'Films', SERIES: 'Series', COLLECTIONS: 'Collections', OWNED: 'My studio' })[tab]}</button>)}</div>
+                {!['OWNED', 'COLLECTIONS'].includes(draft.tab) && <div className="cm-library-filters" aria-label="Library search filters">
+                    <select aria-label="Genre" value={libraryGenre} onChange={e => setLibraryGenre(e.target.value)}><option value="">All genres</option>{libraryGenres.map(genre => <option key={genre} value={genre}>{genre.replaceAll('_', ' ')}</option>)}</select>
+                    <select aria-label="Language" value={libraryLanguage} onChange={e => setLibraryLanguage(e.target.value)}><option value="">All languages</option>{libraryLanguages.map(language => <option key={language} value={language}>{language.replaceAll('_', ' ')}</option>)}</select>
+                    <select aria-label="Producer" value={libraryProducer} onChange={e => setLibraryProducer(e.target.value)}><option value="">All producers</option>{libraryProducers.map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select>
+                    <select aria-label="Release age" value={libraryYears} onChange={e => setLibraryYears(Number(e.target.value))}><option value={0}>Any release year</option><option value={5}>Last 5 game years</option><option value={10}>Last 10 game years</option></select>
+                    <select aria-label="Minimum quality" value={libraryQuality} onChange={e => setLibraryQuality(Number(e.target.value))}><option value={0}>Any quality</option><option value={80}>Quality 80+</option><option value={90}>Quality 90+</option></select>
+                    <button type="button" aria-pressed={marqueeOnly} onClick={() => setMarqueeOnly(value => !value)}>Marquee only</button>
+                </div>}
                 {draft.tab === 'OWNED' ? <><div className="cm-section-heading cm-studio-heading"><span>YOUR STUDIO VAULT</span><b>Bring a release across</b><small>The title stays owned by your production company. Your platform only receives eligible streaming rights.</small></div><div className="cm-studio-shelf">{visibleOwned.map(t => <button className="cm-studio-card" key={t.id} disabled={t.linked || !!t.unavailableReason} aria-pressed={ownedIds.includes(t.id)} onClick={() => patch({ ownedIds: ownedIds.includes(t.id) ? ownedIds.filter(id => id !== t.id) : [...ownedIds, t.id] })}>
                     <span className="cm-studio-art"><ContentMarketOneSheet seed={t.id} title={t.title} genre={t.genre} />{ownedIds.includes(t.id) && <i><Check size={17} /></i>}</span><span className="cm-studio-copy"><strong>{t.title}</strong><small>{t.studioName} · {t.genre.replaceAll('_', ' ')}</small><em>{t.linked ? 'ALREADY IN CATALOGUE' : t.unavailableReason ? 'UNAVAILABLE' : 'AVAILABLE RIGHTS'}</em><span>{t.linked ? 'Already linked' : t.unavailableReason || countries(t.countryIds)}</span>{t.excludedCountryIds.length > 0 && <span>Except {countries(t.excludedCountryIds)}</span>}<b>NO INTERNAL FEE</b></span></button>)}</div>
                     {!visibleOwned.length && <div className="cm-empty"><LibraryBig size={28} />
@@ -503,9 +634,24 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
                             : <><h2>No release matches that search</h2><p>Clear the search to see all {owned.length} {owned.length === 1 ? 'release' : 'releases'} from your studio.</p></>}
                     </div>}
                     {ownedIds.length > 0 && <div className="cm-studio-action"><span><b>{ownedIds.length}</b> selected</span><button className="cm-primary" disabled={busy} onClick={() => accept(() => linkContentMarketOwnedTitles(player, ownedIds))}>Add {ownedIds.length} studio {ownedIds.length === 1 ? 'title' : 'titles'} · No internal fee</button></div>}
-                </> : <><div className="cm-market-grid">{visible.map(o => <button className="cm-row cm-market-card" key={o.id} onClick={() => patch({ selectedId: o.id })}><span className="cm-card-art"><ContentMarketOneSheet seed={o.title.id} title={o.title.title} genre={o.title.genre} /><em>LISTED NOW</em>{o.title.rating ? <b>{o.title.rating.toFixed(1)}</b> : null}</span><span className="cm-card-copy"><strong>{o.title.title}</strong><small>{o.sellerName}</small><span><b>{money(o.terms.minimumGuarantee)}</b><em>{o.title.projectType === 'SERIES' ? 'SERIES' : 'FILM'} · {o.countryIds.length} MARKETS</em></span></span></button>)}
-                    {visibleCollections.map(o => <button className="cm-row cm-market-card" key={o.id} onClick={() => patch({ selectedId: o.id })}><span className="cm-card-art cm-card-collection"><ContentMarketOneSheet seed={o.package.id} title={o.package.name} genre="Mixed" /><em>COLLECTION</em><b>{o.rows.length}</b></span><span className="cm-card-copy"><strong>{o.package.name}</strong><small>{o.sellerName}</small><span><b>{money(o.totalGuarantee)}</b><em>{o.rows.length} TITLES · ONE DEAL</em></span></span></button>)}</div>
-                    {!visible.length && !visibleCollections.length && <div className="cm-empty"><Film size={28} />
+                </> : <>{librarySearchActive && draft.tab !== 'COLLECTIONS' && <section className="cm-library-results" aria-label="Shared library results">
+                    <div className="cm-section-heading"><span>SHARED LIBRARY</span><b>Released titles</b><small>{libraryResults.length} results shown · A title needs a current rights offer before you can buy it.</small></div>
+                    {libraryResults.map(row => {
+                        const auction = row.listingId ? auctionLots.find(lot => lot.listingId === row.listingId) : null;
+                        return <button type="button" className="cm-library-row" key={row.title.id}
+                            disabled={!row.listingId} onClick={() => auction
+                                ? patch({ tab: 'AUCTIONS', selectedId: auction.id })
+                                : patch({ selectedId: row.listingId })}>
+                            <span className="cm-library-art"><ContentMarketOneSheet seed={row.title.id} title={row.title.title} genre={row.title.genre} /></span>
+                            <span className="cm-library-copy"><strong>{row.title.title}</strong><small>{row.title.studioName} · {row.title.genre.replaceAll('_', ' ')} · {row.title.releaseYear} · {row.title.originalLanguageId}</small><span>{row.title.catalogueTier === 'MARQUEE' ? 'MARQUEE · ' : ''}Quality {row.title.quality} · Rated {row.title.rating?.toFixed(1) || '—'}</span><em>{auction ? 'LIVE AUCTION' : row.status.replaceAll('_', ' ')} · {auction ? 'Open bidding room' : row.reason}</em></span>
+                            {row.listingId && <ChevronRight size={15} />}
+                        </button>;
+                    })}
+                    {!libraryResults.length && <div className="cm-empty"><Search size={27} /><h2>No library titles match</h2><p>Try a broader title or fewer filters. Rights status is shown for every result.</p></div>}
+                </section>}
+                {(!librarySearchActive || draft.tab === 'COLLECTIONS') && <div className="cm-market-grid">{visible.map(o => <button className="cm-row cm-market-card" key={o.id} onClick={() => patch({ selectedId: o.id })}><span className="cm-card-art"><ContentMarketOneSheet seed={o.title.id} title={o.title.title} genre={o.title.genre} /><em>{o.title.catalogueTier === 'MARQUEE' ? 'MARQUEE' : 'LISTED NOW'}</em>{o.title.rating ? <b>{o.title.rating.toFixed(1)}</b> : null}</span><span className="cm-card-copy"><strong>{o.title.title}</strong><small>{o.sellerName}</small><span><b>{money(o.terms.minimumGuarantee)}</b><em>{o.title.projectType === 'SERIES' ? 'SERIES' : 'FILM'} · {o.countryIds.length} MARKETS</em></span></span></button>)}
+                    {visibleCollections.map(o => <button className="cm-row cm-market-card" key={o.id} onClick={() => patch({ selectedId: o.id })}><span className="cm-card-art cm-card-collection"><ContentMarketOneSheet seed={o.package.id} title={o.package.name} genre="Mixed" /><em>COLLECTION</em><b>{o.rows.length}</b></span><span className="cm-card-copy"><strong>{o.package.name}</strong><small>{o.sellerName}</small><span><b>{money(o.totalGuarantee)}</b><em>{o.rows.length} TITLES · ONE DEAL</em></span></span></button>)}</div>}
+                    {(!librarySearchActive || draft.tab === 'COLLECTIONS') && !visible.length && !visibleCollections.length && <div className="cm-empty"><Film size={28} />
                         {!listings.length && !collections.length
                             ? <><h2>Nothing is listed yet</h2><p>Rival studios license their titles once they have released them, and none have reached release yet. The market fills as the industry produces. In the meantime you can commission an Original, or bring across a release of your own.</p></>
                             : <><h2>No listing matches that filter</h2><p>{listings.length + collections.length} {listings.length + collections.length === 1 ? 'listing is' : 'listings are'} available under the other shelves. Clear the search or switch tab to see them.</p></>}

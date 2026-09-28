@@ -3,14 +3,21 @@ import { FirebaseAnalytics } from '@capacitor-firebase/analytics';
 import { FirebaseCrashlytics } from '@capacitor-firebase/crashlytics';
 import { FirebaseMessaging } from '@capacitor-firebase/messaging';
 import { FirebasePerformance } from '@capacitor-firebase/performance';
+import { PushRegistration, type PushPermission, type PushRegistrationStatus } from './pushRegistration';
 import { APP_DISPLAY_VERSION } from './appVersion';
 import { Player } from '../types';
 import { getAwardEligibilityDiagnostics } from './awardLogic';
+import {
+  getIOSLongSessionPlayerCounts,
+  notifyIOSLongSessionCheckpoint,
+} from './iosLongSessionDiagnostics';
 
 let firebaseBootstrapped = false;
 let firebaseAuthBootstrapped = false;
-let firebasePushBootstrapped = false;
-let firebasePushListenersInstalled = false;
+let firebasePushBootstrapPromise: Promise<FirebasePushStatus> | null = null;
+let firebasePushListenerInstallPromise: Promise<void> | null = null;
+let pushRegistration: PushRegistration | null = null;
+let lastReportedPushTokenTail: string | null = null;
 let firebaseAuthUserId: string | null = null;
 export type FirebaseAuthStatus = {
   state: 'idle' | 'web_skipped' | 'starting' | 'ready' | 'signed_out' | 'failed';
@@ -18,14 +25,8 @@ export type FirebaseAuthStatus = {
   isNative: boolean;
   error?: string;
 };
-export type FirebasePushPermissionState = 'prompt' | 'prompt-with-rationale' | 'granted' | 'denied';
-export type FirebasePushStatus = {
-  state: 'web_skipped' | 'not_requested' | 'checking' | 'prompting' | 'ready' | 'denied' | 'failed';
-  receive?: FirebasePushPermissionState;
-  tokenTail: string | null;
-  isNative: boolean;
-  error?: string;
-};
+export type FirebasePushPermissionState = PushPermission;
+export type FirebasePushStatus = PushRegistrationStatus;
 let firebaseAuthStatus: FirebaseAuthStatus = {
   state: Capacitor.isNativePlatform() ? 'idle' : 'web_skipped',
   userId: null,
@@ -268,15 +269,13 @@ const getErrorMessage = (error: unknown) => {
   return String(error || 'Unknown error');
 };
 
-const getPushPermissionReceive = (permission: unknown): FirebasePushPermissionState | undefined => {
+const getPushPermissionReceive = (permission: unknown): FirebasePushPermissionState => {
   const receive = (permission as { receive?: FirebasePushPermissionState })?.receive;
   if (receive === 'prompt' || receive === 'prompt-with-rationale' || receive === 'granted' || receive === 'denied') {
     return receive;
   }
-  return undefined;
+  throw new Error('Firebase Messaging returned an invalid permission state.');
 };
-
-const getTokenTail = (token?: string | null) => token ? token.slice(-10) : null;
 
 const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> => {
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -556,55 +555,79 @@ const shouldSendCheckpointEvent = (checkpoint: string) => {
   return true;
 };
 
-const installPushMessagingListeners = () => {
-  if (!isNativeTelemetry() || firebasePushListenersInstalled) return;
-  firebasePushListenersInstalled = true;
-
-  void runSafely('push-token-listener', async () => {
-    await FirebaseMessaging.addListener('tokenReceived', (event) => {
-      const tokenTail = getTokenTail(event.token);
-      setFirebasePushStatus({ state: 'ready', tokenTail, error: undefined });
-      setCrashKey('push_token_tail', tokenTail || '');
-      addBreadcrumb('push_token_received', { token_tail: tokenTail || 'none' });
-      trackGameEvent('push_token_received', { has_token: Boolean(tokenTail), token_tail: tokenTail || 'none' });
-    });
-  });
-
-  void runSafely('push-received-listener', async () => {
-    await FirebaseMessaging.addListener('notificationReceived', (event) => {
-      addBreadcrumb('push_notification_received', {
-        title: event.notification.title || '',
-        has_data: Boolean(event.notification.data),
-      });
-      trackGameEvent('push_notification_received', {
-        has_title: Boolean(event.notification.title),
-        has_data: Boolean(event.notification.data),
-      });
-    });
-  });
-
-  void runSafely('push-action-listener', async () => {
-    await FirebaseMessaging.addListener('notificationActionPerformed', (event) => {
-      addBreadcrumb('push_notification_opened', {
-        action_id: event.actionId || 'tap',
-        title: event.notification.title || '',
-      });
-      trackGameEvent('push_notification_opened', {
-        action_id: event.actionId || 'tap',
-        has_data: Boolean(event.notification.data),
-      });
-    });
-  });
-
-  if (Capacitor.getPlatform() === 'ios') {
-    void runSafely('push-apns-token-listener', async () => {
-      await FirebaseMessaging.addListener('apnsTokenReceived', (event) => {
-        const tokenTail = getTokenTail(event.token);
-        setCrashKey('apns_token_tail', tokenTail || '');
-        addBreadcrumb('push_apns_token_received', { token_tail: tokenTail || 'none' });
-      });
+const getPushRegistration = () => {
+  if (!pushRegistration) {
+    pushRegistration = new PushRegistration({
+      platform: Capacitor.getPlatform() === 'ios' ? 'ios' : 'android',
+      isSupported: async () => (await FirebaseMessaging.isSupported()).isSupported,
+      checkPermissions: async () => getPushPermissionReceive(await FirebaseMessaging.checkPermissions()),
+      requestPermissions: async () => getPushPermissionReceive(await FirebaseMessaging.requestPermissions()),
+      getToken: async () => (await FirebaseMessaging.getToken()).token,
+      onStatus: (status) => {
+        setFirebasePushStatus(status);
+        if (status.receive) setCrashKey('push_permission', status.receive);
+        setCrashKey('push_enabled', status.state === 'ready');
+        if (status.state === 'ready' && status.tokenTail && status.tokenTail !== lastReportedPushTokenTail) {
+          lastReportedPushTokenTail = status.tokenTail;
+          addBreadcrumb('push_registration_ready');
+          trackGameEvent('push_registration_ready', { platform: getTelemetryPlatform() });
+        }
+      },
+      onFailure: (error, step) => {
+        recordNonFatal(error, 'push_registration_failed', { platform: getTelemetryPlatform(), step });
+        trackGameEvent('push_registration_failed', { platform: getTelemetryPlatform(), step });
+      },
     });
   }
+  return pushRegistration;
+};
+
+const installPushMessagingListeners = async () => {
+  if (!isNativeTelemetry()) return;
+  if (firebasePushListenerInstallPromise) return firebasePushListenerInstallPromise;
+  firebasePushListenerInstallPromise = (async () => {
+    const criticalListeners: Array<{ remove: () => Promise<void> }> = [];
+    try {
+      criticalListeners.push(await FirebaseMessaging.addListener('tokenReceived', (event) => {
+        getPushRegistration().tokenReceived(event.token);
+        addBreadcrumb('push_token_received', { has_token: Boolean(event.token) });
+        trackGameEvent('push_token_received', { has_token: Boolean(event.token) });
+      }));
+
+      if (Capacitor.getPlatform() === 'ios') {
+        criticalListeners.push(await FirebaseMessaging.addListener('apnsTokenReceived', () => {
+          addBreadcrumb('push_apns_token_received');
+          void getPushRegistration().apnsTokenReceived();
+        }));
+      }
+
+      await Promise.all([
+        runSafely('push-received-listener', async () => {
+          await FirebaseMessaging.addListener('notificationReceived', (event) => {
+            addBreadcrumb('push_notification_received', { has_data: Boolean(event.notification.data) });
+            trackGameEvent('push_notification_received', { has_title: Boolean(event.notification.title), has_data: Boolean(event.notification.data) });
+          });
+        }),
+        runSafely('push-action-listener', async () => {
+          await FirebaseMessaging.addListener('notificationActionPerformed', (event) => {
+            addBreadcrumb('push_notification_opened', { action_id: event.actionId || 'tap' });
+            trackGameEvent('push_notification_opened', { action_id: event.actionId || 'tap', has_data: Boolean(event.notification.data) });
+          });
+        }),
+      ]);
+
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') void getPushRegistration().bootstrap();
+      });
+    } catch (error) {
+      await Promise.all(criticalListeners.map(listener => listener.remove().catch(() => undefined)));
+      throw error;
+    }
+  })().catch((error) => {
+    firebasePushListenerInstallPromise = null;
+    throw error;
+  });
+  return firebasePushListenerInstallPromise;
 };
 
 export const bootstrapPushMessaging = async () => {
@@ -612,32 +635,20 @@ export const bootstrapPushMessaging = async () => {
     setFirebasePushStatus({ state: 'web_skipped', tokenTail: null, error: undefined });
     return getFirebasePushStatus();
   }
-  if (firebasePushBootstrapped) return getFirebasePushStatus();
-  firebasePushBootstrapped = true;
-  installPushMessagingListeners();
-  setFirebasePushStatus({ state: 'checking', error: undefined });
-
-  try {
-    const supported = await FirebaseMessaging.isSupported();
-    if (!supported.isSupported) {
-      setFirebasePushStatus({ state: 'failed', tokenTail: null, error: 'Firebase Messaging is not supported on this device.' });
-      return getFirebasePushStatus();
-    }
-    const permission = await FirebaseMessaging.checkPermissions();
-    const receive = getPushPermissionReceive(permission);
-    setFirebasePushStatus({
-      state: receive === 'granted' ? 'ready' : receive === 'denied' ? 'denied' : 'not_requested',
-      receive,
-      error: undefined,
-    });
-    setCrashKey('push_permission', receive || 'unknown');
-  } catch (error) {
-    const message = getErrorMessage(error);
-    setFirebasePushStatus({ state: 'failed', tokenTail: null, error: message });
-    recordNonFatal(error, 'push_bootstrap_failed', { platform: getTelemetryPlatform() });
+  if (!firebasePushBootstrapPromise) {
+    firebasePushBootstrapPromise = (async () => {
+      try {
+        await installPushMessagingListeners();
+        return await getPushRegistration().bootstrap();
+      } catch (error) {
+        setFirebasePushStatus({ state: 'failed', tokenTail: null, error: getErrorMessage(error) });
+        recordNonFatal(error, 'push_bootstrap_failed', { platform: getTelemetryPlatform() });
+        firebasePushBootstrapPromise = null;
+        return getFirebasePushStatus();
+      }
+    })();
   }
-
-  return getFirebasePushStatus();
+  return firebasePushBootstrapPromise;
 };
 
 export const enableManualPushNotifications = async (source = 'settings_support') => {
@@ -646,55 +657,26 @@ export const enableManualPushNotifications = async (source = 'settings_support')
     return getFirebasePushStatus();
   }
 
-  installPushMessagingListeners();
   markTraceAction('push_permission_requested', { flow: 'manual_push' });
   addBreadcrumb('push_permission_requested', { platform: getTelemetryPlatform() });
   trackGameEvent('push_permission_requested', { source });
-  setFirebasePushStatus({ state: 'prompting', error: undefined });
-
   try {
-    const supported = await FirebaseMessaging.isSupported();
-    if (!supported.isSupported) {
-      setFirebasePushStatus({ state: 'failed', tokenTail: null, error: 'Firebase Messaging is not supported on this device.' });
-      return getFirebasePushStatus();
+    await installPushMessagingListeners();
+    const status = await getPushRegistration().enable();
+    if (status.state === 'ready') {
+      addBreadcrumb('push_manual_enabled');
+      trackGameEvent('push_manual_enabled', { source });
+    } else if (status.state === 'denied') {
+      trackGameEvent('push_permission_denied', { source });
+    } else if (status.state === 'checking') {
+      trackGameEvent('push_registration_pending', { source });
     }
-
-    const permission = await FirebaseMessaging.requestPermissions();
-    const receive = getPushPermissionReceive(permission);
-    setCrashKey('push_permission', receive || 'unknown');
-
-    if (receive !== 'granted') {
-      setFirebasePushStatus({ state: 'denied', receive, tokenTail: null, error: undefined });
-      addBreadcrumb('push_permission_denied', { receive: receive || 'unknown' });
-      trackGameEvent('push_permission_denied', { receive: receive || 'unknown', source });
-      return getFirebasePushStatus();
-    }
-
-    const result = await FirebaseMessaging.getToken();
-    const tokenTail = getTokenTail(result.token);
-    setFirebasePushStatus({ state: 'ready', receive, tokenTail, error: undefined });
-    setCrashKey('push_enabled', true);
-    setCrashKey('push_token_tail', tokenTail || '');
-    addBreadcrumb('push_manual_enabled', { token_tail: tokenTail || 'none' });
-    trackGameEvent('push_manual_enabled', {
-      has_token: Boolean(tokenTail),
-      token_tail: tokenTail || 'none',
-      source,
-    });
+    return status;
   } catch (error) {
-    const message = getErrorMessage(error);
-    if (Capacitor.getPlatform() === 'ios' && message.includes('No APNS token specified')) {
-      setFirebasePushStatus({ state: 'checking', error: 'Waiting for APNS token.' });
-      addBreadcrumb('push_waiting_for_apns_token', { platform: getTelemetryPlatform() });
-      trackGameEvent('push_waiting_for_apns_token', { source });
-      return getFirebasePushStatus();
-    }
-    setFirebasePushStatus({ state: 'failed', error: message });
+    setFirebasePushStatus({ state: 'failed', tokenTail: null, error: getErrorMessage(error) });
     recordNonFatal(error, 'push_manual_enable_failed', { platform: getTelemetryPlatform() });
-    trackGameEvent('push_manual_enable_failed', { error: message, source });
+    return getFirebasePushStatus();
   }
-
-  return getFirebasePushStatus();
 };
 
 export const bootstrapFirebase = async () => {
@@ -821,6 +803,28 @@ export const trackGameEvent = (name: string, params: Record<string, unknown> = {
       }),
     })
   );
+};
+
+export const trackGameEventConfirmed = async (
+  name: string,
+  params: Record<string, unknown> = {},
+): Promise<boolean> => {
+  if (!isNativeTelemetry()) return false;
+  try {
+    await FirebaseAnalytics.logEvent({
+      name: sanitizeEventName(name),
+      params: sanitizeParams({
+        app_version: APP_DISPLAY_VERSION,
+        platform: getTelemetryPlatform(),
+        ...getCompactTraceParams(),
+        ...params,
+      }),
+    });
+    return true;
+  } catch (error) {
+    console.warn(`[Firebase] analytics:${name} skipped`, error);
+    return false;
+  }
 };
 
 export const setCurrentGameScreen = (screenName: string) => {
@@ -1057,6 +1061,31 @@ export const markWeekProcessingStage = (
       screen,
       error,
     });
+
+    const checkpoint = safeStage === 'start'
+      ? 'week_started'
+      : safeStage === 'persist_prepare_done'
+        ? 'week_persistence_prepared'
+        : safeStage === 'success'
+          ? 'week_verified'
+          : safeStage === 'failed'
+            ? 'week_failed'
+            : null;
+    if (checkpoint) {
+      const numericSaveSlot = Number(saveSlot);
+      void notifyIOSLongSessionCheckpoint({
+        checkpoint,
+        occurredAtMs: Date.now(),
+        age: snapshot.age,
+        week: snapshot.week,
+        saveSlot: Number.isFinite(numericSaveSlot) ? numericSaveSlot : undefined,
+        screen,
+        elapsedMs,
+        ...(safeStage === 'start' ? { runtimeBytes: saveSize } : {}),
+        ...(safeStage === 'persist_prepare_done' ? { persistedBytes: saveSize } : {}),
+        ...getIOSLongSessionPlayerCounts(player),
+      }).catch(() => undefined);
+    }
   }
 };
 

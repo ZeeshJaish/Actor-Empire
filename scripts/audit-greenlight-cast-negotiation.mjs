@@ -12,7 +12,7 @@ const checks = [
     },
     {
         name: 'Negotiation and save share a concept draft builder',
-        pass: source.includes('const buildCurrentConceptDraft = () =>') &&
+        pass: source.includes('const buildCurrentConceptDraft = (') &&
             source.includes('const buildStudioWithCurrentDraft = (returningTalentOverride')
     },
     {
@@ -21,7 +21,7 @@ const checks = [
     },
     {
         name: 'Returning talent updates preserve the active studio draft',
-        pass: /const updateReturningTalentState[\s\S]*buildStudioWithCurrentDraft\(updatedReturningTalent\)/.test(source)
+        pass: /const updateReturningTalentState[\s\S]*buildStudioWithCurrentDraft\(updatedReturningTalent, backendDraftOverride\)/.test(source)
     },
     {
         name: 'Player businesses are cloned before replacing the studio',
@@ -41,7 +41,7 @@ const checks = [
     },
     {
         name: 'Director connections refresh when relationships change',
-        pass: /\[[^\]]*player\.flags\.extraNPCs, player\.relationships, connectedDirectorCandidates/.test(source)
+        pass: /\[[^\]]*player\.flags\.extraNPCs, player\.relationships,[^\]]*connectedDirectorCandidates/.test(source)
     },
     {
         name: 'Connection cards do not duplicate directors in the public roster',

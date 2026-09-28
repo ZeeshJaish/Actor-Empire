@@ -13,6 +13,7 @@ import {
     type GreenlightInvestorFinancingSectionProps,
 } from './GreenlightInvestorFinancingSection';
 import type { ConnectedProjectIntent } from '../greenlightUtils';
+import { GreenlightParticipationSection, type GreenlightParticipationRow } from './GreenlightParticipationSection';
 
 interface GreenlightConfirmationBudget {
     director: number;
@@ -58,6 +59,9 @@ interface GreenlightConfirmationStepProps {
     linkedCastSummary: GreenlightConfirmationCastRole[];
     returningTalentReviewItems: GreenlightReturningTalentReviewItem[];
     directorName: string;
+    talentParticipants: GreenlightParticipationRow[];
+    totalTalentBackendPoints: number;
+    onTalentBackendPointsChange: (key: string, points: number) => void;
     backgroundPerformerCount: number;
     selectedLocationCount: number;
     budgetBreakdown: GreenlightConfirmationBudget;
@@ -97,6 +101,9 @@ export const GreenlightConfirmationStep: React.FC<GreenlightConfirmationStepProp
     linkedCastSummary,
     returningTalentReviewItems,
     directorName,
+    talentParticipants,
+    totalTalentBackendPoints,
+    onTalentBackendPointsChange,
     backgroundPerformerCount,
     selectedLocationCount,
     budgetBreakdown,
@@ -211,6 +218,13 @@ export const GreenlightConfirmationStep: React.FC<GreenlightConfirmationStepProp
                             </div>
                         </div>
                     ) : null}
+
+                    <GreenlightParticipationSection
+                        participants={talentParticipants}
+                        totalPoints={totalTalentBackendPoints}
+                        onPointsChange={onTalentBackendPointsChange}
+                        formatMoney={formatMoney}
+                    />
 
                     <div>
                         <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3 border-b border-zinc-800 pb-1">Above The Line</h3>

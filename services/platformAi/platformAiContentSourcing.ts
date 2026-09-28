@@ -32,6 +32,8 @@ import {
     validateStreamingRightsAvailability,
 } from '../streamingRightsCore';
 import { normalizeStreamingDayOneMarketIds, STREAMING_DAY_ONE_MARKETS } from '../streamingDayOneMarkets';
+import { createStreamingRightsAccessGrantForOffer } from '../streamingRightsAccessGrant';
+import { getWorldStreamingOffers } from '../worldEconomy/worldStreamingOffers';
 import {
     allocateStreamingCatalogueGuarantee,
     calculateStreamingCatalogueReferenceValue,
@@ -121,6 +123,8 @@ const budgetMillions = (project: IndustryProject): number => ({
 const roundMillions = (value: number): number => Math.round(Math.max(0, value) * 100) / 100;
 
 const releasedProject = (project: IndustryProject, absoluteWeek: number): boolean => {
+    if (project.marketOpportunityId && (project.marketPremiereAtAbsoluteWeek == null
+        || project.marketPremiereAtAbsoluteWeek > absoluteWeek)) return false;
     const releaseWeek = getAbsoluteWeek(project.year, project.weekReleased);
     return releaseWeek <= absoluteWeek;
 };
@@ -722,6 +726,9 @@ export const commitPlatformContentCandidate = (
             digestId: null,
         };
     }
+    const buyerStreams = input.candidate.source === 'COMMISSIONED_ORIGINAL' ? ['subs']
+        : getWorldStreamingOffers({ ...input.player, world: input.world }, input.absoluteWeek).offers
+            .find(offer => offer.platformId === input.platformId)?.commercialConfiguration.streams || ['subs'];
     const contracts = sourceProjects.flatMap((project, index) => {
         if (!project || input.candidate.source === 'COMMISSIONED_ORIGINAL') return [];
         const permanent = input.candidate.source === 'OWNED_STUDIO_TRANSFER';
@@ -778,6 +785,7 @@ export const commitPlatformContentCandidate = (
             sequelRightsIncluded: false,
             changeOfControl: permanent ? 'NONE' : 'NOTICE',
             cancellationPenalty: millionsToFullCurrency(perProjectCost * 0.2),
+            accessGrant: createStreamingRightsAccessGrantForOffer(buyerStreams, permanent),
         })];
     });
     if (input.candidate.source !== 'COMMISSIONED_ORIGINAL' && contracts.length !== sourceProjects.length) {

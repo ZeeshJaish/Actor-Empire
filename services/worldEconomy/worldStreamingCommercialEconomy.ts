@@ -2,11 +2,25 @@ import type {
     OwnedStreamingPricingConfiguration,
     StreamingRevenueStreamId,
 } from '../../types';
+import { resolveStreamingAdMarket, type StreamingAdMarketInput } from './worldStreamingAdMarket';
 
 const clamp = (value: number, minimum: number, maximum: number): number => (
     Math.min(maximum, Math.max(minimum, Number.isFinite(Number(value)) ? Number(value) : minimum))
 );
 const whole = (value: number): number => Math.max(0, Math.round(Number.isFinite(value) ? value : 0));
+
+/** Shared aggregate intent curve; entitlement and affordability are checked before this step. */
+export const calculateStreamingStoreConversion = (input: {
+    buyerPool: number;
+    price: number;
+    kind: 'RENTAL' | 'PURCHASE';
+}): number => {
+    const pool = whole(input.buyerPool);
+    const price = clamp(input.price, 0, 1_000_000);
+    const conversion = input.kind === 'RENTAL' ? .035 : .008;
+    const comfortable = input.kind === 'RENTAL' ? 12 : 30;
+    return Math.min(pool, whole(pool * conversion * Math.exp(-price / comfortable)));
+};
 
 export interface StreamingCommercialStreamDefinition {
     id: StreamingRevenueStreamId;
@@ -52,6 +66,42 @@ export interface WorldStreamingCommercialRevenue {
     commercialOperatingCost: number;
 }
 
+export interface StreamingAdFreePassOutcome {
+    oneHourTransactions: number;
+    dayTransactions: number;
+    oneHourRevenue: number;
+    dayRevenue: number;
+    coveredHours: number;
+}
+
+/** Weekly aggregate coverage; a pass removes ads only from already-entitled viewing. */
+export const calculateStreamingAdFreePassWeek = (input: {
+    adViewingHouseholds: number;
+    adEligibleHours: number;
+    oneHourPrice: number | null;
+    dayPrice: number | null;
+    oneHourEligibleHouseholds?: number;
+    dayEligibleHouseholds?: number;
+}): StreamingAdFreePassOutcome => {
+    const households = whole(input.adViewingHouseholds);
+    const eligibleHours = whole(input.adEligibleHours);
+    const oneHourPrice = input.oneHourPrice === null ? null : clamp(input.oneHourPrice, 0, 1_000_000);
+    const dayPrice = input.dayPrice === null ? null : clamp(input.dayPrice, 0, 1_000_000);
+    const empty = { oneHourTransactions: 0, dayTransactions: 0, oneHourRevenue: 0,
+        dayRevenue: 0, coveredHours: 0 };
+    if (!households || !eligibleHours || (oneHourPrice === null && dayPrice === null)) return empty;
+    const oneHourEligible = Math.min(households, whole(input.oneHourEligibleHouseholds ?? households));
+    const dayEligible = Math.min(households, whole(input.dayEligibleHouseholds ?? households));
+    const oneHourTransactions = oneHourPrice === null ? 0 : Math.min(oneHourEligible,
+        whole(oneHourEligible * .012 * priceDemand(oneHourPrice, 5)));
+    const dayTransactions = dayPrice === null ? 0 : Math.min(dayEligible, households - oneHourTransactions,
+        whole(dayEligible * .004 * priceDemand(dayPrice, 12)));
+    return { oneHourTransactions, dayTransactions,
+        oneHourRevenue: whole(oneHourTransactions * (oneHourPrice || 0)),
+        dayRevenue: whole(dayTransactions * (dayPrice || 0)),
+        coveredHours: Math.min(eligibleHours, oneHourTransactions + dayTransactions * 3) };
+};
+
 export interface WorldStreamingCommercialInput {
     pricing: OwnedStreamingPricingConfiguration;
     paidViewingAccounts: number;
@@ -64,9 +114,14 @@ export interface WorldStreamingCommercialInput {
     repeatViewingRate: number;
     isFreshMovie: boolean;
     isRentalEligible: boolean;
+    /** Separate durable-purchase permission; omitted fixed-input callers retain C0 behavior. */
+    isPurchaseEligible?: boolean;
     isSponsorEligible: boolean;
     commerceCapabilityIndex: number;
     reputationIndex: number;
+    /** Optional fixed-input market context; live viewing clears all platforms together. */
+    adMarket?: Omit<StreamingAdMarketInput, 'eligibleHours' | 'minutesPerHour' | 'targetCpm'
+        | 'audienceQualityIndex' | 'brandSafetyIndex'>;
 }
 
 const priceDemand = (price: number, comfortablePrice: number, floor = 0): number => (
@@ -106,13 +161,14 @@ export const calculateWorldStreamingCommercialRevenue = (
     const reputation = clamp(input.reputationIndex, 0, 100) / 100;
 
     const adMinutes = clamp(input.pricing.ads.minutesPerHour, 0, 30);
-    const adCpm = clamp(input.pricing.ads.cpm, 0, 100);
-    const adLoadTolerance = clamp(1 - Math.max(0, adMinutes - 6) * .055, .28, 1);
-    const adFillRate = clamp(.42 + capability * .38 + reputation * .12, .35, .94);
-    const advertisingImpressions = streams.has('ads')
-        ? whole((input.adEligibleHours ?? hoursViewed) * adMinutes * 2 * adFillRate * adLoadTolerance)
-        : 0;
-    const advertisingRevenue = whole(advertisingImpressions / 1_000 * adCpm);
+    const market = streams.has('ads') && input.adMarket
+        ? resolveStreamingAdMarket({ ...input.adMarket,
+            eligibleHours: input.adEligibleHours ?? hoursViewed,
+            minutesPerHour: adMinutes,
+            audienceQualityIndex: input.commerceCapabilityIndex,
+            brandSafetyIndex: input.reputationIndex }) : null;
+    const advertisingImpressions = market?.filledImpressions ?? 0;
+    const advertisingRevenue = market?.revenue ?? 0;
 
     const premiumPrice = clamp(input.pricing.premium.price, 0, 1_000_000);
     const premiumTransactions = streams.has('premium') && input.isFreshMovie
@@ -127,7 +183,7 @@ export const calculateWorldStreamingCommercialRevenue = (
         ? whole(transactionOpportunityAccounts * (.011 + completion * .019)
             * priceDemand(rentPrice, 9) * (.76 + capability * .3))
         : 0;
-    const purchaseTransactions = streams.has('rentals') && input.isRentalEligible
+    const purchaseTransactions = streams.has('rentals') && (input.isPurchaseEligible ?? input.isRentalEligible)
         ? whole(transactionOpportunityAccounts * (.002 + repeat * .014)
             * priceDemand(buyPrice, 27) * (.76 + capability * .3))
         : 0;
@@ -224,9 +280,12 @@ export const createAiStreamingCommercialConfiguration = (
     const maturityWeeks = Math.max(0, input.absoluteWeek - input.foundedAtAbsoluteWeek);
     const maturity = clamp(maturityWeeks / 156, 0, 1);
     const variation = hashUnit(`${input.platformId}:commercial`);
-    const streams: StreamingRevenueStreamId[] = ['subs'];
-    if (technology >= 18 || brand < 55) streams.push('ads');
-    if (technology >= 34 && catalogue >= 38) streams.push('rentals');
+    const coreModel: 'subs' | 'ads' | 'rentals' = variation >= .84 && technology >= 34 && catalogue >= 38
+        ? 'rentals' : variation >= .65 ? 'ads' : 'subs';
+    const streams: StreamingRevenueStreamId[] = [coreModel];
+    if (coreModel === 'subs' && (technology >= 18 || brand < 55)) streams.push('ads');
+    if (coreModel === 'subs' && technology >= 34 && catalogue >= 38) streams.push('rentals');
+    if (coreModel === 'ads' && variation >= .77 && technology >= 34 && catalogue >= 38) streams.push('rentals');
     if (technology >= 48 && catalogue >= 55 && maturity >= .3) streams.push('premium');
     if (technology >= 28 && brand >= 38) streams.push('sponsor');
     if (technology >= 55 && maturity >= .45 && (input.kind.includes('GLOBAL') || variation > .55)) streams.push('daypass');
@@ -236,7 +295,9 @@ export const createAiStreamingCommercialConfiguration = (
     const basePrice = clamp(5 + prestige * .075 + brand * .035, 4.5, 18);
     return {
         streams,
-        plans: [{ id: 'AI_BASE', name: 'Standard', monthly: Math.round(basePrice * 100) / 100, featureIds: [], ads: streams.includes('ads') }],
+        plans: streams.includes('subs')
+            ? [{ id: 'AI_BASE', name: 'Standard', monthly: Math.round(basePrice * 100) / 100, featureIds: [], ads: streams.includes('ads') }]
+            : [],
         annualDiscount: clamp(8 + (100 - brand) * .1, 5, 24),
         introOffer: maturity < .25 ? clamp(12 + (100 - brand) * .12, 8, 30) : 0,
         ads: {

@@ -28,9 +28,10 @@ import {
 } from './build';
 import { audiencePlaces } from '../../../services/worldPopulationClusters';
 import { baseReachKm, distanceKm, servedBand, siteFactor } from '../../../services/streamingNetworkReach';
-import { hasDataResidencyRule } from '../../../services/streamingServerSites';
+import { getStreamingServerSite, hasDataResidencyRule } from '../../../services/streamingServerSites';
 import { getPlaceByListingId } from '../../../services/streamingSitePlaces';
 import { expectedStandard, fibreMultiplier } from '../../../services/streamingFibreLadder';
+import { COUNTRY_GEOGRAPHY } from '../../../services/worldEconomy/worldCountryGeography.generated';
 
 /* --- what a region is, to this file ------------------------------------------ */
 
@@ -118,14 +119,30 @@ const isCloudListing = (listing: FacilityListing): boolean => (
 const isRentable = (listing: FacilityListing): boolean => (
   !isCloudListing(listing) && listing.availability !== 'RESEARCH' && (listing.tenures ?? ['RENTED']).includes('RENTED')
 );
-const buildingsIn = (data: BuildData, cityId: string): FacilityListing[] => (
-  data.listings
-    .filter(listing => listing.cityId === cityId && isRentable(listing))
-    .sort((a, b) => a.rackPositions - b.rackPositions || a.moveIn - b.moveIn)
-);
-const cloudIn = (data: BuildData, cityId: string): FacilityListing | undefined => (
-  data.listings.find(listing => listing.cityId === cityId && isCloudListing(listing) && listing.availability !== 'RESEARCH')
-);
+interface ListingIndex {
+  buildings: Map<string, FacilityListing[]>;
+  cloud: Map<string, FacilityListing>;
+}
+const listingIndexes = new WeakMap<BuildData['listings'], ListingIndex>();
+const listingIndex = (listings: BuildData['listings']): ListingIndex => {
+  const cached = listingIndexes.get(listings);
+  if (cached) return cached;
+  const index: ListingIndex = { buildings: new Map(), cloud: new Map() };
+  for (const listing of listings) {
+    if (isRentable(listing)) {
+      const city = index.buildings.get(listing.cityId) ?? [];
+      city.push(listing);
+      index.buildings.set(listing.cityId, city);
+    } else if (isCloudListing(listing) && listing.availability !== 'RESEARCH' && !index.cloud.has(listing.cityId)) {
+      index.cloud.set(listing.cityId, listing);
+    }
+  }
+  index.buildings.forEach(city => city.sort((a, b) => a.rackPositions - b.rackPositions || a.moveIn - b.moveIn));
+  listingIndexes.set(listings, index);
+  return index;
+};
+const buildingsIn = (data: BuildData, cityId: string): FacilityListing[] => listingIndex(data.listings).buildings.get(cityId) ?? [];
+const cloudIn = (data: BuildData, cityId: string): FacilityListing | undefined => listingIndex(data.listings).cloud.get(cityId);
 
 /** Where each site's audience is: the places it is the nearest site to,
     with how far each one is and how much of the region's night it holds. A
@@ -160,6 +177,27 @@ const weightsOf = (assigned: Map<string, Assigned>): Map<string, number> => (
   new Map([...assigned.entries()].map(([id, entry]) => [id, entry.weight]))
 );
 
+/** Add the above-ceiling units one by one toward each site's physical need.
+    Unlike a fresh largest-remainder split, increasing the slider by one can
+    never take compute away from an existing city and make its map field jump. */
+function distributeFootprintUnits(total: number, deficits: Map<string, number>): Map<string, number> {
+  const assigned = new Map<string, number>();
+  for (let unit = 0; unit < total; unit += 1) {
+    let chosen: string | undefined;
+    let lowest = Number.POSITIVE_INFINITY;
+    for (const [cityId, need] of deficits) {
+      if (need <= 0) continue;
+      const have = assigned.get(cityId) || 0;
+      if (have >= need) continue;
+      const progress = have / need;
+      if (progress < lowest) { lowest = progress; chosen = cityId; }
+    }
+    if (!chosen) break;
+    assigned.set(chosen, (assigned.get(chosen) || 0) + 1);
+  }
+  return assigned;
+}
+
 /** The opening markets that insist on rooms inside their borders and have
     nowhere in the region to rent one — audience nothing here can serve. */
 export function unservableIn(data: BuildData, region: RegionView): BuildMarket[] {
@@ -185,6 +223,83 @@ function serverSites(data: BuildData, region: RegionView): City[] {
 
 function cloudSites(data: BuildData, region: RegionView): City[] {
   return region.cities.filter(city => cloudIn(data, city.id));
+}
+
+/** A conservative per-site cloud plan for every supported population cluster
+    in the physical region, whether or not its market is open. The nearest
+    site only has to meet the normal stream standard; stronger signal is not
+    billed as fractional customers. Unopened residency rules do not turn
+    physical signal into a market entry. */
+const cloudFootprintNeedsCache = new WeakMap<BuildData, Map<string, Map<string, number>>>();
+
+function cloudFootprintNeeds(data: BuildData, region: RegionView, providerId: CloudProviderId, draft?: BuildDraft): Map<string, number> {
+  const servers = (draft?.facilities || []).filter(room => room.tenure !== 'CLOUD' && regionOfCity(data, room.cityId) === region.id);
+  const serverKey = servers.map(room => `${room.id}:${room.listingId}:${room.groups.map(group => `${group.tier}:${group.racks}`).join(',')}`).join('|');
+  const key = `${region.id}:${providerId}:${data.fibre?.generation ?? 0}:${data.fibre?.level ?? 0}:${serverKey}`;
+  const cache = cloudFootprintNeedsCache.get(data);
+  const saved = cache?.get(key);
+  if (saved) return saved;
+  const provider = CLOUD_PROVIDERS[providerId];
+  const sites = cloudProviderServes(provider, region.id) ? cloudSites(data, region) : [];
+  const needs = new Map(sites.map(site => [site.id, 0]));
+  if (!sites.length) return needs;
+  const oneComputeKm = new Map(sites.map(site => {
+    const listing = cloudIn(data, site.id);
+    const transit = getPlaceByListingId(listing?.id || '')?.transit ?? getStreamingServerSite(site.id)?.transit ?? 0;
+    // The canonical country-coverage engine's one-compute served radius.
+    // The map's decorative ring uses a different curve, so sizing from it
+    // under-bought cloud for distant islands.
+    const km = 540 * (0.55 + transit * 0.7) * provider.reach
+      * fibreMultiplier(data.fibre) * Math.sqrt(1 - expectedStandard(0));
+    return [site.id, km] as const;
+  }));
+  const serverSources = servers.flatMap(room => {
+    const city = region.cities.find(candidate => candidate.id === room.cityId);
+    const compute = computeRacks(room);
+    if (!city || compute <= 0) return [];
+    const transit = getPlaceByListingId(room.listingId)?.transit ?? getStreamingServerSite(city.id)?.transit ?? 0;
+    const radius = 540 * Math.sqrt(compute) * (0.55 + transit * 0.7)
+      * planReachFactor(tiersOf(room)) * fibreMultiplier(data.fibre);
+    return [{ lat: city.coord.lat, lng: city.coord.lng, radius }];
+  });
+  const standard = expectedStandard(0);
+  for (const country of region.countries) {
+    const geography = COUNTRY_GEOGRAPHY[code(country.code)];
+    for (const place of audiencePlaces(code(country.code), geography ? { lat: geography[1], lng: geography[2] } : undefined)) {
+      const missedByServers = serverSources.reduce((missed, source) => {
+        const km = distanceKm(source.lat, source.lng, place.lat, place.lng);
+        const strength = km >= source.radius ? 0 : Math.max(0, 1 - (km / source.radius) ** 2);
+        return missed * (1 - strength);
+      }, 1);
+      if (1 - missedByServers >= standard) continue;
+      let nearest = sites[0];
+      let nearestKm = Number.POSITIVE_INFINITY;
+      for (const site of sites) {
+        const km = distanceKm(site.coord.lat, site.coord.lng, place.lat, place.lng);
+        if (km < nearestKm) { nearest = site; nearestKm = km; }
+      }
+      const oneKm = oneComputeKm.get(nearest.id) || 0;
+      if (oneKm <= 0) continue;
+      // A tiny margin avoids floating-point boundary failures when the
+      // canonical coverage engine recomputes the same site's radius.
+      const required = Math.max(1, Math.ceil((nearestKm / oneKm) ** 2 * 1.01));
+      needs.set(nearest.id, Math.max(needs.get(nearest.id) || 0, required));
+    }
+  }
+  const held = cache ?? new Map<string, Map<string, number>>();
+  held.set(key, needs);
+  if (!cache) cloudFootprintNeedsCache.set(data, held);
+  return needs;
+}
+
+export function regionalCloudMaximum(data: BuildData, region: RegionView, providerId: CloudProviderId, draft?: BuildDraft): number {
+  const provider = CLOUD_PROVIDERS[providerId];
+  if (!cloudProviderServes(provider, region.id)) return 0;
+  const needs = cloudFootprintNeeds(data, region, providerId, draft);
+  return cloudSites(data, region).reduce((sum, site) => {
+    const standard = Math.max(1, Math.round(cloudCap(cloudIn(data, site.id)!) * provider.ceiling));
+    return sum + Math.max(standard, needs.get(site.id) || 0);
+  }, 0);
 }
 
 /* --- dividing a count by weight ---------------------------------------------- */
@@ -296,7 +411,18 @@ function allot(
   const counts = new Map<string, number>();
   if (total <= 0 || sites.length === 0) return counts;
   let left = total;
-  const km = (a: City, b: City) => distanceKm(a.coord.lat, a.coord.lng, b.coord.lat, b.coord.lng);
+  const siteById = new Map(sites.map(site => [site.id, site]));
+  const distances = new Map<string, Map<string, number>>();
+  const km = (a: City, b: City): number => {
+    const cached = distances.get(a.id)?.get(b.id);
+    if (cached !== undefined) return cached;
+    const distance = distanceKm(a.coord.lat, a.coord.lng, b.coord.lat, b.coord.lng);
+    if (!distances.has(a.id)) distances.set(a.id, new Map());
+    if (!distances.has(b.id)) distances.set(b.id, new Map());
+    distances.get(a.id)!.set(b.id, distance);
+    distances.get(b.id)!.set(a.id, distance);
+    return distance;
+  };
 
   /* --- 1 · the audience ---------------------------------------------------- */
   for (let guard = 0; left > 0 && guard < 400; guard += 1) {
@@ -323,9 +449,9 @@ function allot(
 
   /* --- 2 and 3 · light the home, then the rest ------------------------------ */
   const lit = (cityId: string): boolean => {
-    const here = sites.find(site => site.id === cityId)!;
+    const here = siteById.get(cityId)!;
     for (const [id, compute] of counts) {
-      const room = sites.find(site => site.id === id)!;
+      const room = siteById.get(id)!;
       if (km(room, here) <= Math.max(LOCAL_KM, greenKm(id)(compute))) return true;
     }
     return false;
@@ -342,7 +468,7 @@ function allot(
         const have = counts.get(cityId) ?? 0;
         const spend = to - have;
         if (spend <= 0 || spend > left || to > capOf(cityId)) return;
-        const here = sites.find(site => site.id === cityId)!;
+        const here = siteById.get(cityId)!;
         const radius = Math.max(LOCAL_KM, greenKm(cityId)(to));
         const gain = dark.filter(site => km(here, site) <= radius).length + (have === 0 && priorityOf(cityId) === tier ? 1 : 0);
         if (gain <= 0) return;
@@ -367,7 +493,7 @@ function allot(
     return counts;
   }
   while (left >= minimum) {
-    const standing = [...counts.keys()].map(id => sites.find(site => site.id === id)!);
+    const standing = [...counts.keys()].map(id => siteById.get(id)!);
     const open = sites.filter(site => !counts.has(site.id) && capOf(site.id) >= minimum);
     if (open.length === 0) break;
     const farthest = open
@@ -580,6 +706,7 @@ export function placeRegion(data: BuildData, draft: BuildDraft, regionId: string
       const weights = weightsOf(audience);
       const anyWeight = [...weights.values()].some(weight => weight > 0);
       const caps = new Map(sites.map(site => [site.id, Math.max(1, Math.round(cloudCap(cloudIn(data, site.id)!) * provider.ceiling))]));
+      const footprintNeeds = cloudFootprintNeeds(data, region, provider.id, draft);
       /* A plan sized to do its job in each city, like a room: Sydney's plan
          is three compute because Brisbane is 730 km away, Melbourne's is one. */
       const coverage = new Map(sites.map(site => [site.id, coverageOf(data, site, cloudIn(data, site.id), provider.reach, audience.get(site.id))]));
@@ -588,9 +715,8 @@ export function placeRegion(data: BuildData, draft: BuildDraft, regionId: string
       const homeOf = (cityId: string) => (openingIds.has(sites.find(site => site.id === cityId)!.countryId) ? 0 : 1);
       const assigned = new Map<string, number>(sites.map(site => [site.id, 0]));
       let left = wantCompute;
-      /* Water-fill: by weight, capped per city, the overflow passed on to the
-         cities with room, until none has — then the rest goes to the heaviest
-         city above its ceiling, at the step-up rate. */
+      /* Water-fill the standard-rate plans first. The provider ceiling is a
+         price breakpoint, not a limit on purchased or usable compute. */
       for (let pass = 0; left > 0 && pass < 6; pass += 1) {
         const open = sites.filter(site => (assigned.get(site.id) ?? 0) < (caps.get(site.id) ?? 0));
         if (open.length === 0) break;
@@ -612,15 +738,30 @@ export function placeRegion(data: BuildData, draft: BuildDraft, regionId: string
       }
       let extended = 0;
       if (left > 0 && sites.length > 0) {
-        const heaviest = [...sites].sort((a, b) => (weights.get(b.id) ?? 0) - (weights.get(a.id) ?? 0))[0];
-        assigned.set(heaviest.id, (assigned.get(heaviest.id) ?? 0) + left);
-        extended = left;
-        left = 0;
+        const deficits = new Map(sites.map(site => [site.id,
+          Math.max(0, (footprintNeeds.get(site.id) || 0) - (assigned.get(site.id) || 0))]));
+        const deficitTotal = [...deficits.values()].reduce((sum, value) => sum + value, 0);
+        const footprintSpend = Math.min(left, deficitTotal);
+        const spread = footprintSpend === deficitTotal
+          ? deficits
+          : distributeFootprintUnits(footprintSpend, deficits);
+        for (const [cityId, amount] of spread) {
+          assigned.set(cityId, (assigned.get(cityId) || 0) + amount);
+          left -= amount;
+          extended += amount;
+        }
+        // A reopened save may contain a larger plan than today's footprint
+        // target. Keep those paid units in play instead of discarding them.
+        if (left > 0) {
+          const extra = divide(left, new Map(sites.map(site => [site.id, 1])), 1);
+          for (const [cityId, amount] of extra) assigned.set(cityId, (assigned.get(cityId) || 0) + amount);
+          extended += left;
+          left = 0;
+        }
         notes.push(`${extended} compute above ${provider.name}'s ceiling in ${region.name}, at the step-up rate.`);
       }
       unplacedCompute = left;
       if (sites.length === 0) notes.push(`No cloud region in ${region.name}.`);
-      const heaviestId = [...sites].sort((a, b) => (weights.get(b.id) ?? 0) - (weights.get(a.id) ?? 0))[0]?.id;
       for (const site of sites) {
         const compute = assigned.get(site.id) ?? 0;
         if (compute <= 0) continue;
@@ -628,7 +769,7 @@ export function placeRegion(data: BuildData, draft: BuildDraft, regionId: string
         const room: Facility = {
           ...fillRoom(listing, takeListing(listing, 'CLOUD', idFor(listing)), { WORKHORSE: compute }),
           provider: provider.id,
-          cloudExtended: site.id === heaviestId ? extended : 0,
+          cloudExtended: Math.max(0, compute - (caps.get(site.id) || 0)),
         };
         placed.push(room);
       }

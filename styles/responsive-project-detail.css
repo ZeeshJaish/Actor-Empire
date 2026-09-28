@@ -1,0 +1,19 @@
+/* Short WebView heights need one continuous scroll; the long role header must not
+   leave only a sliver of the offer content and action footer accessible. */
+@media (max-height: 500px) {
+  .ae-project-detail-viewport.ae-project-detail-viewport {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .ae-project-detail-header.ae-project-detail-header {
+    padding-top: max(3rem, env(safe-area-inset-top));
+    padding-bottom: 1rem;
+  }
+
+  .ae-project-detail-body.ae-project-detail-body {
+    flex: none;
+    min-height: auto;
+    overflow: visible;
+  }
+}

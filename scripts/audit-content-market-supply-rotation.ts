@@ -127,7 +127,7 @@ assert.ok(
 const regularPlayer = structuredClone(deepFounding);
 regularPlayer.ownedStreamingPlatform.lifecycle = 'ACTIVE';
 const regularCollections = getStreamingCataloguePackageOpportunities(regularPlayer);
-assert.ok(regularCollections.length <= 4, 'Regular market collection count remains bounded.');
+assert.ok(regularCollections.length <= 5, 'Regular market collection count follows the five-package regular-cycle cap.');
 assert.ok(regularCollections.every(offer => offer.rows.length <= 24), 'Regular collections remain compact.');
 
 const sparsePlayer = buildSupplyFixture(7, 1);

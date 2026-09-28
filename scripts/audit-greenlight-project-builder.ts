@@ -10,6 +10,7 @@ import { buildGreenlightBuzz } from '../views/lifestyle/business/greenlightBuzz'
 import {
     buildGreenlightProject,
     prepareGreenlightFunding,
+    type BuildGreenlightProjectInput,
 } from '../views/lifestyle/business/greenlightProjectBuilder';
 
 const script: Script = {
@@ -78,7 +79,7 @@ const studio = {
     },
 } as unknown as Business;
 
-const project = buildGreenlightProject({
+const projectInput: BuildGreenlightProjectInput = {
     player,
     studio,
     selectedScript: script,
@@ -149,7 +150,8 @@ const project = buildGreenlightProject({
     getCastableActorById: () => undefined,
     now: () => 1_234,
     random: () => 0.5,
-});
+};
+const project = buildGreenlightProject(projectInput);
 
 assert.equal(project.newCommitment.id, 'proj_1234');
 assert.equal(project.newCommitment.projectPhase, 'PRE_PRODUCTION');
@@ -161,6 +163,32 @@ assert.equal(project.newCommitment.projectDetails?.hiddenStats?.qualityScore, 80
 assert.equal(project.newCommitment.projectDetails?.castList?.[0]?.actorId, 'PLAYER_SELF');
 assert.equal(project.updatedScripts[0].status, 'PRODUCED');
 assert.equal(project.updatedConcepts.length, 0);
+
+const firstFilmWithPoints = buildGreenlightProject({
+    ...projectInput,
+    player: { ...player, flags: { ...player.flags, extraNPCs: [{ id: 'actor_alpha', name: 'Actor Alpha', occupation: 'ACTOR', stats: { fame: 60, talent: 80 } }] } } as Player,
+    studio: {
+        ...studio,
+        studioState: {
+            ...studio.studioState!,
+            writers: [{ id: 'writer_npc_mira_sen', name: 'Mira Sen', skill: 92, fee: 500_000, speed: 0.7, tier: 'A_LIST', stats: { creativity: 92, dialogue: 94, structure: 90, pacing: 92 } }],
+        },
+    },
+    selectedScript: { ...script, writerId: 'writer_npc_mira_sen' },
+    castList: [{ id: 'lead', role: 'Lead', roleType: 'LEAD', actorId: 'actor_alpha', actorName: 'Actor Alpha', salary: 1_000_000 }],
+    crewModes: { ...projectInput.crewModes, director: 'HIRE' },
+    selectedCrew: { ...projectInput.selectedCrew, director: 'director_alpha' },
+    getCrewData: role => ({ name: role === 'director' ? 'Director Alpha' : 'In-House', tier: 'ESTABLISHED', quality: 80, cost: role === 'director' ? 2_000_000 : 0 }),
+    getCastableActorById: () => ({ stats: { talent: 80, fame: 60 } }),
+    talentBackendDraft: {
+        'ACTOR:lead:actor_alpha': 3,
+        'DIRECTOR:director:director_alpha': 2,
+        'WRITER:script_writer:writer_npc_mira_sen': 1,
+    },
+});
+assert.equal(firstFilmWithPoints.newCommitment.projectDetails?.talentParticipation?.contracts.length, 3, `First films must save all agreed participant points: ${JSON.stringify(firstFilmWithPoints.newCommitment.projectDetails?.talentParticipation?.contracts)}`);
+assert.equal(firstFilmWithPoints.newCommitment.projectDetails?.talentParticipation?.contracts.find(item => item.role === 'ACTOR')?.backendPoints, 3);
+assert.equal(firstFilmWithPoints.newCommitment.projectDetails?.talentParticipation?.processedReceiptKeys.length, 0, 'Phases 1-2 must not pay backend at Greenlight.');
 
 const funding = prepareGreenlightFunding({
     player,

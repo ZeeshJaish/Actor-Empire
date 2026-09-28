@@ -47,18 +47,14 @@ const loadDetailedCountryCutoutFactory = (CountryShapeModule as unknown as {
 assert.equal(
   typeof loadDetailedCountryCutoutFactory,
   'function',
-  'Build country cards must expose a lazy upgrade to the detailed shared-map geometry.',
+  'Build country cards must expose the shared detailed-map geometry.',
 );
 
 void loadDetailedCountryCutoutFactory!().then((detailedFactory) => {
   const detailed = detailedFactory('US', 'United States', 128, 100);
   assert.ok(detailed, 'The shared detailed atlas should resolve the United States card.');
   assert.equal(detailed.id, '840');
-  assert.ok(
-    detailed.path.length > countryPath.length,
-    `expected the detailed shared-map path to exceed the ${countryPath.length}-character fallback path`,
-  );
-  assert.notEqual(detailed.path, countryPath, 'The detailed card geometry must not silently reuse the old fallback path.');
+  assert.equal(detailed.path, countryPath, 'The first card render must already use detailed geometry, with no lazy map swap.');
   console.log('Streaming build country map audit passed.');
 }).catch((error) => {
   console.error(error);

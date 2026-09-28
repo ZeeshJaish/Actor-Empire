@@ -37,7 +37,7 @@ type MobileAppMode = 'HOME' | 'CASTLINK' | 'IMDB' | 'BOXOFFICE' | 'INSTAGRAM' | 
 
 // Helper Component for App Icon
 const AppIcon = ({ icon, color, label, onClick, badge, customContent, customBg, tutorialId }: any) => (
-    <div className="relative flex w-16 flex-col items-center gap-1 group cursor-pointer" onClick={onClick} data-tutorial-id={tutorialId}>
+    <button type="button" className="relative flex min-h-[76px] min-w-0 w-full flex-col items-center gap-1 group cursor-pointer text-center" onClick={onClick} data-tutorial-id={tutorialId}>
         <div className={`w-14 h-14 ${customBg || color} rounded-2xl flex items-center justify-center text-white shadow-lg group-active:scale-95 transition-transform relative overflow-hidden`}>
             {customContent ? customContent : icon}
         </div>
@@ -46,8 +46,8 @@ const AppIcon = ({ icon, color, label, onClick, badge, customContent, customBg, 
                 {badge > 9 ? '9+' : badge}
             </div>
         )}
-        <span className="text-[10px] text-white font-medium drop-shadow-md">{label}</span>
-    </div>
+        <span className="max-w-full break-words text-[10px] leading-tight text-white font-medium drop-shadow-md">{label}</span>
+    </button>
 );
 
 interface MobilePageProps {
@@ -769,8 +769,8 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
 
                 {/* HOME SCREEN */}
                 {appMode === 'HOME' && (
-                    <div className="h-full w-full p-4 pt-10 flex flex-col animate-in fade-in duration-300" data-tutorial-id="mobile-phone-home">
-                        <div className="grid grid-cols-4 gap-x-4 gap-y-8 mt-4">
+                    <div className="h-full w-full min-w-0 overflow-y-auto overscroll-contain px-3 pb-5 pt-9 flex flex-col animate-in fade-in duration-300" data-tutorial-id="mobile-phone-home">
+                        <div className="grid min-w-0 grid-cols-4 gap-x-1.5 gap-y-4 mt-2">
                             <AppIcon
                                 icon={<MessageSquare size={26} fill="white" />}
                                 color="bg-green-500"
@@ -788,7 +788,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                             />
 
                             {/* SOCIAL FOLDER */}
-                            <div className="flex flex-col items-center gap-1 group cursor-pointer" onClick={() => setAppMode('SOCIAL_FOLDER')} data-tutorial-id="mobile-social-folder">
+                            <button type="button" className="flex min-h-[76px] min-w-0 w-full flex-col items-center gap-1 group cursor-pointer text-center" onClick={() => setAppMode('SOCIAL_FOLDER')} data-tutorial-id="mobile-social-folder">
                                 <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-2xl p-2 grid grid-cols-2 gap-1 shadow-lg group-active:scale-95 transition-transform overflow-hidden">
                                     <div className="w-full h-full bg-black flex items-center justify-center rounded-[5px] shadow-sm border border-zinc-700">
                                         <X size={12} strokeWidth={3} className="text-white"/>
@@ -801,8 +801,8 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                                     </div>
                                     <div className="w-full h-full"></div>
                                 </div>
-                                <span className="text-[10px] text-white font-medium drop-shadow-md">{tr('mobile.social')}</span>
-                            </div>
+                                <span className="max-w-full break-words text-[10px] leading-tight text-white font-medium drop-shadow-md">{tr('mobile.social')}</span>
+                            </button>
 
                             <AppIcon
                                 icon={<Newspaper size={26} />}
@@ -856,7 +856,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                             />
 
                             {/* DATING FOLDER */}
-                            <div className="flex flex-col items-center gap-1 group cursor-pointer" onClick={() => setAppMode('DATING_FOLDER')} data-tutorial-id="mobile-dating-folder">
+                            <button type="button" className="flex min-h-[76px] min-w-0 w-full flex-col items-center gap-1 group cursor-pointer text-center" onClick={() => setAppMode('DATING_FOLDER')} data-tutorial-id="mobile-dating-folder">
                                 <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-2xl p-2 grid grid-cols-2 gap-1 shadow-lg group-active:scale-95 transition-transform overflow-hidden">
                                     <div className="w-full h-full bg-gradient-to-tr from-pink-500 to-orange-500 rounded-[5px] flex items-center justify-center shadow-sm">
                                         <Flame size={12} fill="white" className="text-white" />
@@ -868,8 +868,8 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                                     <div className="w-full h-full"></div>
                                     <div className="w-full h-full"></div>
                                 </div>
-                                <span className="text-[10px] text-white font-medium drop-shadow-md">{tr('mobile.dating')}</span>
-                            </div>
+                                <span className="max-w-full break-words text-[10px] leading-tight text-white font-medium drop-shadow-md">{tr('mobile.dating')}</span>
+                            </button>
 
                             {/* GUIDE APP (Updated Icon) */}
                             <AppIcon

@@ -211,6 +211,9 @@ assert.equal(licenceContract?.platformContentPlanId, licenceCommit.plan?.id);
 assert.equal(licenceContract?.contentSource, 'LICENSED_RELEASED_TITLE');
 assert.equal(licenceContract?.minimumGuarantee, millionsToFullCurrency(licence.rightsCostMillions));
 assert.equal(licenceContract?.origin, 'STUDIO_MARKET');
+assert.equal(licenceContract?.accessGrant?.schemaVersion, 1, 'new AI licences must freeze viewer access routes');
+assert.deepEqual(canonicalLicenceContract?.accessGrant, licenceContract?.accessGrant,
+    'AI buyer-local and canonical grants must match at signing');
 
 const repeatedLicenceCommit = commitPlatformContentCandidate({
     ...netflixInput,

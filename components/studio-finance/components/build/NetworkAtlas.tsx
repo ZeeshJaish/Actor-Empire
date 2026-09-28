@@ -29,16 +29,15 @@
 import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
   WORLD_BORDERS_PATH,
-  WORLD_COUNTRY_BY_ID,
-  WORLD_COUNTRY_NUMERIC_BY_ALPHA2,
   WORLD_GRATICULE_PATH,
   WORLD_LAND_PATH,
-  WORLD_PATH,
   WORLD_SHELF_PATH,
+  getCountryPath,
   getRegionGeometry,
   projectLonLat,
 } from '../../../../views/lifestyle/business/components/worldMapDetailedGeometry';
 import { REGION_MAP_OVERLAYS } from '../../../../services/regionMap';
+import { getCountryPosition, getCountryShapeId } from '../../../../services/worldEconomy/worldCountryGeography';
 import type {
   BuildData, BuildDraft, City, CountryService, Facility,
 } from '../../finance/build';
@@ -388,7 +387,9 @@ export interface NetworkAtlasProps {
   onShowWorld?: () => void;
 }
 
-export function NetworkAtlas({
+/* The surrounding readouts count up on every animation frame. Their numbers
+   do not change the SVG, so keep those frames out of this large atlas tree. */
+export const NetworkAtlas = React.memo(function NetworkAtlas({
   data, draft, services, regionId, cityId, previewCityId, previewRacks = 0, focusCityId,
   onSelectCity, onSelectRegion, onShowWorld,
 }: NetworkAtlasProps) {
@@ -415,12 +416,14 @@ export function NetworkAtlas({
 
   /* --- who you are opening to, and how well it is going ------------------- */
   const openingCountries = useMemo(() => data.countries.filter(country => country.opening), [data.countries]);
-  const marketPaths = useMemo(() => openingCountries.flatMap(country => {
-    const numeric = WORLD_COUNTRY_NUMERIC_BY_ALPHA2[country.code.toUpperCase()];
-    const feature = numeric ? WORLD_COUNTRY_BY_ID.get(numeric) : undefined;
-    const path = feature ? WORLD_PATH(feature) : null;
-    if (!path) return [];
-    return [{ id: country.id, code: country.code, name: country.name, path }];
+  const marketGeography = useMemo(() => openingCountries.flatMap(country => {
+    const code = country.code.toUpperCase();
+    const shapeId = getCountryShapeId(code);
+    const path = shapeId ? getCountryPath(shapeId) : '';
+    const position = getCountryPosition(code);
+    const point = position ? projectLonLat(position.longitude, position.latitude) : null;
+    if (!path && !point) return [];
+    return [{ id: country.id, code, name: country.name, path, point }];
   }), [openingCountries]);
 
   /* --- a market whose every person is served (#117) --------------------------
@@ -476,6 +479,7 @@ export function NetworkAtlas({
   const arrivedRef = useRef(new Set<string>());
   const [, rerender] = useReducer((n: number) => n + 1, 0);
   const [pinging, setPinging] = useState<string[]>([]);
+  const [arrivals, setArrivals] = useState<Map<string, number>>(new Map());
   const pingTimers = useRef<number[]>([]);
   const live = typeof window !== 'undefined';
   useEffect(() => {
@@ -488,7 +492,19 @@ export function NetworkAtlas({
       second = window.requestAnimationFrame(() => {
         fresh.forEach(id => arrivedRef.current.add(id));
         rerender();
+        setArrivals(previous => {
+          const next = new Map(previous);
+          fresh.forEach((id, index) => next.set(id, Math.min(180, index * 8)));
+          return next;
+        });
         setPinging(prev => [...prev, ...fresh]);
+        pingTimers.current.push(window.setTimeout(() => {
+          setArrivals(previous => {
+            const next = new Map(previous);
+            fresh.forEach(id => next.delete(id));
+            return next;
+          });
+        }, 420));
         pingTimers.current.push(window.setTimeout(() => {
           setPinging(prev => prev.filter(id => !fresh.includes(id)));
         }, 1400));
@@ -498,6 +514,7 @@ export function NetworkAtlas({
   }, [fields]);
   useEffect(() => () => { pingTimers.current.forEach(timer => window.clearTimeout(timer)); }, []);
   const drawnR = (field: AtlasField): number => (!live || arrivedRef.current.has(field.cityId) ? field.r : 0);
+  const arrivalDelay = (field: AtlasField): string => `${arrivals.get(field.cityId) ?? 0}ms`;
 
   /* The room you are about to take, drawn before you take it. This is the
      whole reason the map is fixed: you change a number down the page and the
@@ -861,7 +878,7 @@ export function NetworkAtlas({
       onPointerUp={endPointer}
       onPointerCancel={endPointer}
       role="group"
-      aria-label={`Network map: ${fields.length} ${fields.length === 1 ? 'site' : 'sites'} against ${marketPaths.length} opening ${marketPaths.length === 1 ? 'market' : 'markets'}`}
+      aria-label={`Network map: ${fields.length} ${fields.length === 1 ? 'site' : 'sites'} against ${openingCountries.length} opening ${openingCountries.length === 1 ? 'market' : 'markets'}`}
     >
       <defs>
         {/* The merge that turns separate fields into one coverage shape. Blur
@@ -985,17 +1002,29 @@ export function NetworkAtlas({
           how it is going is the field brushed over it (#110 — the tint by
           served share of #108 went, because it turned a whole country green
           for a room in one city). ------------------------------------- */}
-            <g className="bw-atlas-markets">
-        {marketPaths.map(market => (
+      <g className="bw-atlas-markets">
+        {marketGeography.map(market => market.path ? (
           <path
             key={market.id}
             d={market.path}
-            className={finished.has(market.code.toUpperCase()) ? 'bw-atlas-market is-served' : 'bw-atlas-market'}
+            className={finished.has(market.code) ? 'bw-atlas-market is-served' : 'bw-atlas-market'}
             data-code={market.code}
             strokeWidth={1.4}
             vectorEffect="non-scaling-stroke"
           />
-        ))}
+        ) : market.point ? (
+          <circle
+            key={market.id}
+            cx={market.point[0]}
+            cy={market.point[1]}
+            r={4 / Math.max(pixelScale, 0.001)}
+            className={finished.has(market.code) ? 'bw-atlas-market bw-atlas-market-marker is-served' : 'bw-atlas-market bw-atlas-market-marker'}
+            data-code={market.code}
+            data-marker-only="true"
+            strokeWidth={1.4}
+            vectorEffect="non-scaling-stroke"
+          />
+        ) : null)}
       </g>
 
       {/* --- reach: the green a site emits -----------------------------------
@@ -1013,7 +1042,7 @@ export function NetworkAtlas({
               look like. */}
           <g className="bw-atlas-emit">
             {fields.map(field => (
-              <circle key={`emit-${field.cityId}`} cx={field.x} cy={field.y} r={drawnR(field) * FIELD_WASH} fill="url(#bw-field-tail)" />
+              <circle key={`emit-${field.cityId}`} cx={field.x} cy={field.y} r={drawnR(field) * FIELD_WASH} fill="url(#bw-field-tail)" style={{ transitionDelay: arrivalDelay(field) }} />
             ))}
             {preview && preview.r > 0 && <circle className="is-preview" cx={preview.x} cy={preview.y} r={preview.r * FIELD_WASH} fill="url(#bw-field-tail)" />}
           </g>
@@ -1036,7 +1065,7 @@ export function NetworkAtlas({
                   r={drawnR(field) * FIELD_WASH}
                   className={field.planned ? 'bw-atlas-reach is-planned' : 'bw-atlas-reach'}
                   fill="url(#bw-field-tail)"
-                  style={{ opacity: field.intensity }}
+                  style={{ opacity: field.intensity, transitionDelay: arrivalDelay(field) }}
                 />
               ))}
               {preview && preview.r > 0 && (
@@ -1059,7 +1088,7 @@ export function NetworkAtlas({
                   r={drawnR(field) * SERVED_BAND * CORE_SOFT}
                   className={field.planned ? 'bw-atlas-reach is-planned' : 'bw-atlas-reach'}
                   fill="url(#bw-field-core)"
-                  style={{ opacity: field.intensity }}
+                  style={{ opacity: field.intensity, transitionDelay: arrivalDelay(field) }}
                 />
               ))}
               {preview && preview.r > 0 && (
@@ -1252,7 +1281,7 @@ export function NetworkAtlas({
       </g>
     </svg>
   );
-}
+});
 
 /** A route between two sites, bowed so two of them never lie on top of each
     other and the network reads as links rather than a scribble. */

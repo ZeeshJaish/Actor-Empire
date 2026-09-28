@@ -1,0 +1,13 @@
+.ae-x-compose-compact {
+  display: none;
+}
+
+@media (max-height: 500px) {
+  .ae-x-compose-compact {
+    display: grid;
+  }
+
+  .ae-x-compose-floating {
+    display: none;
+  }
+}

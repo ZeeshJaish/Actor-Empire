@@ -1,8 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Player, Business, Script, ProjectType, Universe } from '../../../types';
 import { ArrowLeft, BookOpen, ShoppingCart, Sparkles, Layers, Globe } from 'lucide-react';
 import { motion } from 'motion/react';
-import { generateWriters, generateIPMarket } from '../../../src/data/generators';
 import { normalizeStudioState } from '../../../services/businessLogic';
 import { createMarketTrends } from '../../../services/marketTrends';
 import { discardUnreleasedScript, renameScriptWorkingTitle } from '../../../services/projectNaming';
@@ -10,6 +9,8 @@ import { developOwnedRight, renewOwnedRight } from '../../../services/rightsNego
 import { deriveStudioOriginalRights } from '../../../services/studioOriginalIp';
 import { getPlayerLanguage, t } from '../../../services/i18n';
 import { getAbsoluteWeek } from '../../../services/legacyLogic';
+import { creditTalentUpfront } from '../../../services/talentCareer';
+import { getStudioPaidScoutQuote, refreshStudioPaidScout } from '../../../services/paidMarketScouting';
 import { DevelopmentLabMarket } from './components/DevelopmentLabMarket';
 import { DevelopmentLabScriptWizard } from './components/DevelopmentLabScriptWizard';
 import { DevelopmentLabFranchiseManager } from './components/DevelopmentLabFranchiseManager';
@@ -34,6 +35,8 @@ type DevTab = DevelopmentLabInitialTab;
 
 export const DevelopmentLab: React.FC<DevelopmentLabProps> = ({ player, studio, onBack, onUpdatePlayer, onOpenProject, initialRightsMarketOpportunityId, onRightsMarketTargetConsumed, initialTab, initialProjectType, initialScriptId }) => {
     const [activeTab, setActiveTab] = useState<DevTab>(initialRightsMarketOpportunityId ? 'IP_MARKET' : initialTab || 'VAULT');
+    const [refreshFeedback, setRefreshFeedback] = useState('');
+    const refreshLock = useRef(false);
     const language = getPlayerLanguage(player);
     const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
 
@@ -71,33 +74,21 @@ export const DevelopmentLab: React.FC<DevelopmentLabProps> = ({ player, studio, 
     };
 
     const handleRefreshMarket = () => {
-        if (studio.balance >= 250000) {
-            const currentAbsoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
-            const newMarket = generateIPMarket(6, studioState.purchasedIPTitles || [], player.currentWeek);
-            const marketTrends = createMarketTrends(player.currentWeek, language);
-            const newWriters = generateWriters(10);
-            
-            const updatedStudio = { 
-                ...studio, 
-                balance: studio.balance - 250000,
-                studioState: {
-                    ...studioState,
-                    ipMarket: newMarket,
-                    marketTrends,
-                    writers: newWriters,
-                    lastMarketRefreshWeek: player.currentWeek,
-                    lastWriterRefreshWeek: player.currentWeek,
-                    lastMarketRefreshAbsoluteWeek: currentAbsoluteWeek,
-                    lastWriterRefreshAbsoluteWeek: currentAbsoluteWeek,
-                }
-            };
-            
-            onUpdatePlayer({
-                ...player,
-                businesses: player.businesses.map(b => b.id === studio.id ? updatedStudio : b)
-            });
-        }
+        if (refreshLock.current) return;
+        refreshLock.current = true;
+        const result = refreshStudioPaidScout(player, studio.id);
+        setRefreshFeedback(result.detail);
+        if (result.changed) onUpdatePlayer(result.player);
+        else refreshLock.current = false;
     };
+    useEffect(() => { refreshLock.current = false; }, [studio.studioState?.paidScoutCount, studio.id]);
+    const scoutQuote = getStudioPaidScoutQuote(player, studio.id);
+    const currentAbsoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+    const legacyFreeElapsed = (player.currentWeek - Math.min(52,
+        Math.max(1, studioState.lastMarketRefreshWeek || player.currentWeek)) + 52) % 52;
+    const lastFreeAbsoluteWeek = Number.isFinite(studioState.lastMarketRefreshAbsoluteWeek)
+        ? studioState.lastMarketRefreshAbsoluteWeek! : currentAbsoluteWeek - legacyFreeElapsed;
+    const weeksUntilFreeRefresh = Math.max(0, 3 - (currentAbsoluteWeek - lastFreeAbsoluteWeek));
 
     const acquiredRights = studioState.ownedRights || [];
     const studioOriginalRights = deriveStudioOriginalRights({
@@ -110,35 +101,10 @@ export const DevelopmentLab: React.FC<DevelopmentLabProps> = ({ player, studio, 
     });
     const unifiedOwnedRights = [...acquiredRights, ...studioOriginalRights];
 
-    // Handle automatic market refresh and script cleanup
+    // The weekly simulation rotates the free market; opening this UI only cleans old drafts.
     React.useEffect(() => {
-        const currentAbsoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
-        const legacyElapsed = (
-            player.currentWeek - Math.min(52, Math.max(1, studioState.lastMarketRefreshWeek || player.currentWeek)) + 52
-        ) % 52;
-        const lastMarketRefreshAbsoluteWeek = Number.isFinite(Number(studioState.lastMarketRefreshAbsoluteWeek))
-            ? Number(studioState.lastMarketRefreshAbsoluteWeek)
-            : currentAbsoluteWeek - legacyElapsed;
-        
         let updatedState: Partial<typeof studioState> = {};
         let needsUpdate = false;
-
-        // 1. Refresh market only on 3-week cycle or if state is completely missing (initialization)
-        if (currentAbsoluteWeek - lastMarketRefreshAbsoluteWeek >= 3 || !studio.studioState) {
-            const newMarket = generateIPMarket(6, studioState.purchasedIPTitles || [], player.currentWeek);
-            const newWriters = generateWriters(10);
-            updatedState = { 
-                ...updatedState,
-                ipMarket: newMarket,
-                marketTrends: createMarketTrends(player.currentWeek, language),
-                writers: newWriters,
-                lastMarketRefreshWeek: player.currentWeek,
-                lastWriterRefreshWeek: player.currentWeek,
-                lastMarketRefreshAbsoluteWeek: currentAbsoluteWeek,
-                lastWriterRefreshAbsoluteWeek: currentAbsoluteWeek,
-            };
-            needsUpdate = true;
-        }
 
         // 2. Cleanup old produced scripts (older than 1 year / 52 weeks)
         const ONE_YEAR = 52;
@@ -161,14 +127,9 @@ export const DevelopmentLab: React.FC<DevelopmentLabProps> = ({ player, studio, 
             handleUpdateStudioState(updatedState);
         }
     }, [
-        language,
-        player.age,
         player.currentWeek,
         studio.id,
         studio.studioState,
-        studioState.lastMarketRefreshAbsoluteWeek,
-        studioState.lastMarketRefreshWeek,
-        studioState.purchasedIPTitles,
         studioState.scripts,
     ]);
 
@@ -178,7 +139,7 @@ export const DevelopmentLab: React.FC<DevelopmentLabProps> = ({ player, studio, 
             <div className="relative shrink-0 z-20 bg-zinc-950 border-b border-zinc-800">
                 <div className="flex items-center justify-between px-4 pt-12 pb-4">
                     <div className="flex items-center gap-3">
-                        <button onClick={onBack} className="p-2 hover:bg-zinc-800/50 rounded-full text-zinc-400 hover:text-white transition-colors">
+                        <button onClick={onBack} className="grid h-11 w-11 shrink-0 place-items-center hover:bg-zinc-800/50 rounded-full text-zinc-400 hover:text-white transition-colors" aria-label="Back to studio dashboard">
                             <ArrowLeft size={20} />
                         </button>
                         <div>
@@ -300,6 +261,9 @@ export const DevelopmentLab: React.FC<DevelopmentLabProps> = ({ player, studio, 
                             updatedStudio.studioState = { ...studioState, scripts: updatedScripts };
                             onUpdatePlayer({
                                 ...player,
+                                world: writer && cost > 0 ? creditTalentUpfront(player.world, scriptId,
+                                    [{ talentId: writer.id, talentName: writer.name, role: 'WRITER', amount: cost }],
+                                    `writer_assignment:${scriptId}:${writerId}`, getAbsoluteWeek(player.age, player.currentWeek)).world : player.world,
                                 businesses: player.businesses.map(b => b.id === studio.id ? updatedStudio : b)
                             });
                         }
@@ -373,8 +337,12 @@ export const DevelopmentLab: React.FC<DevelopmentLabProps> = ({ player, studio, 
 	                    currentWeek={player.currentWeek}
 	                    marketTrends={studioState.marketTrends || createMarketTrends(player.currentWeek, language)}
                         language={language}
-                    weeksUntilRefresh={3 - (player.currentWeek % 3)}
+                    weeksUntilRefresh={weeksUntilFreeRefresh}
                     onRefresh={handleRefreshMarket}
+                    refreshPrice={scoutQuote.price}
+                    refreshCount={scoutQuote.completedInCycle}
+                    refreshShortfall={scoutQuote.shortfall}
+                    refreshFeedback={refreshFeedback}
                     onBuy={(script, cost) => {
                         if (studio.balance >= cost) {
                             const updatedStudio = { ...studio, balance: studio.balance - cost };

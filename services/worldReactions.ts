@@ -268,6 +268,27 @@ const makeImpact = (
     return { updatedPlayer, log, logKey, effects };
 };
 
+export const resolveLegacyWorldReactionChoice = (
+    player: Player,
+    eventType: unknown,
+    optionId: string,
+): LifeEventImpactResult | null => {
+    if (!['ANTI_MONOPOLY_PRESSURE', 'RIVAL_RETALIATION', 'EMPLOYEE_DEPARTURE'].includes(String(eventType))) return null;
+    const modeByOption: Record<string, 'SAFE' | 'AGGRESSIVE' | 'GOLDEN'> = {
+        COOPERATE: 'SAFE',
+        FIGHT_PUBLICLY: 'AGGRESSIVE',
+        GOLDEN_COMPLIANCE: 'GOLDEN',
+        QUIET_DEALS: 'SAFE',
+        COUNTERPUNCH: 'AGGRESSIVE',
+        GOLDEN_SETTLEMENT: 'GOLDEN',
+        RETENTION_BONUS: 'SAFE',
+        HOLD_COSTS: 'AGGRESSIVE',
+        GOLDEN_RETENTION: 'GOLDEN',
+    };
+    const mode = modeByOption[optionId];
+    return mode ? makeImpact(eventType as WorldReactionEventType, mode)(player) : null;
+};
+
 const getWorldReactionEventType = (state: WorldReactionState): WorldReactionEventType | null => {
     if (state.antiMonopolyPressure >= 55) return 'ANTI_MONOPOLY_PRESSURE';
     if (state.rivalRetaliationRisk >= 45) return 'RIVAL_RETALIATION';

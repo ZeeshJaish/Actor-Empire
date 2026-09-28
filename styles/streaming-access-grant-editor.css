@@ -1,0 +1,10 @@
+.streaming-access-grant { min-width: 0; margin: 18px 0; padding: 16px; border: 1px solid #36404f; border-radius: 16px; color: #e7ebf1; background: #171d27; }
+.streaming-access-grant legend { padding: 0 7px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; font-size: 12px; }
+.streaming-access-grant p, .streaming-access-grant small { display: block; color: #aab3c1; line-height: 1.4; margin: 4px 0 12px; }
+.streaming-access-grant-modes { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
+.streaming-access-grant-modes button { border: 1px solid #4b5667; background: #202936; color: #c8d0dc; border-radius: 999px; padding: 8px 12px; font: inherit; font-size: 13px; cursor: pointer; }
+.streaming-access-grant-modes button[aria-pressed="true"] { border-color: #ff383f; background: #4b252d; color: #fff; }
+.streaming-access-grant-modes button:disabled { opacity: .55; cursor: default; }
+.streaming-access-grant label { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 13px; font-weight: 700; }
+.streaming-access-grant select { max-width: 130px; padding: 7px 10px; border: 1px solid #4b5667; border-radius: 8px; background: #202936; color: #fff; font: inherit; }
+.streaming-access-grant small { margin: 12px 0 0; }

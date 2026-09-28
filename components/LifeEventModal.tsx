@@ -1,20 +1,46 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { EventImpactSignal, Player, ScheduledEvent, LifeEvent, LifeEventImpactResult, LifeEventOption, LocalizedTextVars } from '../types';
+import { EventImpactSignal, Player, ScheduledEvent, LifeEvent, LifeEventImpactResult, LifeEventOption, LifeEventResolutionKind, LocalizedTextVars } from '../types';
 import { AlertTriangle, ShieldAlert, Scale, User, Zap, ChevronRight, PlayCircle, Loader2, CheckCircle, Activity, Newspaper } from 'lucide-react';
 import { motion } from 'motion/react';
-import { showAd } from '../services/adLogic';
+import { requestRewardedAd } from '../services/rewardedAdCoordinator';
+import { classifyRewardedAdFailure } from '../services/rewardedAdExperience';
 import { addBreadcrumb, recordNonFatal, setCrashContext, trackGameEvent } from '../services/firebaseService';
-import { resolveYoutubeEventChoice, YoutubeEventResolution } from '../services/youtubeEventLogic';
 import { getPlayerLanguage, t } from '../services/i18n';
 import { generateLegalHearing } from '../services/lifeEventLogic';
+import { buildLifeEventDiagnosticContext } from '../services/lifeEventDiagnostics';
+import { getLifeEventOptionIdentity } from '../services/lifeEventResolver';
+import { resolveLifeEventChoiceWithSafeFallback } from '../services/lifeEventSafeFallback';
+import {
+    beginPendingRewardAd,
+    clearPendingRewardAd,
+    getRecoverableRewardedAdReceipt,
+    markPendingRewardAdGranted,
+    markPendingRewardAdReady,
+    markPendingRewardAdVerifiedSave,
+    readPendingRewardAd,
+    recordPendingRewardAdStep,
+    RewardedAdPersistenceError,
+    type PendingRewardAdReceipt,
+} from '../services/rewardedAdRecovery';
+
+export interface LifeEventChoiceCommit {
+    updatedPlayer: Player;
+    log: string;
+    optionId: string;
+    impactId?: string;
+    resolutionSeed?: string;
+    resolutionKind: LifeEventResolutionKind;
+    rewardReceiptId?: string;
+}
 
 interface LifeEventModalProps {
     player: Player;
     event: ScheduledEvent;
-    onChoice: (updatedPlayer: Player, log: string) => void;
+    saveSlot: number;
+    onChoice: (resolution: LifeEventChoiceCommit) => Promise<void>;
 }
 
-export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, onChoice }) => {
+export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, saveSlot, onChoice }) => {
     const language = getPlayerLanguage(player);
     const tr = (key: string, vars?: LocalizedTextVars) => t(language, key, vars);
     const localizeText = (fallback: string | undefined, key?: string, vars?: LocalizedTextVars) =>
@@ -27,17 +53,15 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
         optionLabel: string;
         wasGolden: boolean;
         effects?: EventImpactSignal[];
+        optionId: string;
+        impactId?: string;
+        resolutionSeed?: string;
+        resolutionKind: LifeEventResolutionKind;
+        rewardReceiptId?: string;
     } | null>(null);
     const [isResolvingFeedback, setIsResolvingFeedback] = useState(false);
     const [resolveError, setResolveError] = useState('');
-    const mountedRef = useRef(true);
-
-    useEffect(() => {
-        return () => {
-            mountedRef.current = false;
-        };
-    }, []);
-    
+    const restoredReceiptRef = useRef<string | null>(null);
     // Legal hearings persist only a case id. Rebuild their live impacts at display time so
     // callbacks never enter IndexedDB while the hearing remains fully playable.
     const legalCaseId = typeof event.data?.caseId === 'string' ? event.data.caseId : undefined;
@@ -59,44 +83,126 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
         localizeText(effect.value, effect.valueKey, effect.textVars);
     const getImpactLog = (impactResult: LifeEventImpactResult) =>
         localizeText(impactResult.log, impactResult.logKey, impactResult.logVars);
+    const getRewardedAdError = (reason?: Parameters<typeof classifyRewardedAdFailure>[0]) => {
+        const kind = classifyRewardedAdFailure(reason);
+        if (kind === 'DISMISSED') return tr('app.ads.failure.dismissedSubtext');
+        if (kind === 'BUSY') return tr('app.ads.failure.busySubtext');
+        if (kind === 'OFFLINE') return tr('app.ads.failure.offlineSubtext');
+        if (kind === 'NO_FILL') return tr('app.ads.failure.noFillSubtext');
+        return tr('app.ads.failure.unavailableSubtext');
+    };
 
     const executeOptionImpact = (
         option: LifeEventOption,
         idx: number,
-        pCopy: Player,
+        sourcePlayer: Player,
         isGolden: boolean
     ): LifeEventImpactResult => {
-        const youtubeResolution = event.data?.youtubeResolution as YoutubeEventResolution | undefined;
+        const diagnosticContext = buildLifeEventDiagnosticContext(event, lifeEvent, option, idx);
 
-        try {
-            if (youtubeResolution?.domain === 'YOUTUBE' && option.id) {
-                return resolveYoutubeEventChoice(pCopy, youtubeResolution, option.id);
-            }
-
-            if (typeof option.impact === 'function') {
-                return option.impact(pCopy);
-            }
-        } catch (error) {
-            console.error('LifeEvent impact failed. Using fallback logic.', error);
-            recordNonFatal(error, 'life_event_impact_failed', {
-                event_id: event.id,
-                event_type: event.type,
-                option_index: idx,
+        const resolution = resolveLifeEventChoiceWithSafeFallback(
+            sourcePlayer,
+            event,
+            lifeEvent,
+            option,
+            idx,
+        );
+        const resolved = resolution.result;
+        if (resolution.primaryError !== undefined) {
+            console.error('LifeEvent primary impact failed; safe fallback applied.', resolution.primaryError);
+            recordNonFatal(resolution.primaryError, 'life_event_impact_failed', {
+                ...diagnosticContext,
                 golden: isGolden,
             });
-            return getFallbackImpact(lifeEvent, idx, pCopy, option);
+            trackGameEvent('life_event_safe_fallback_applied', {
+                ...diagnosticContext,
+                golden: isGolden,
+                fallback_reason: resolved.fallbackReason || 'PRIMARY_RESOLVER_ERROR',
+                fallback_source: resolved.fallbackSource || 'NO_CHANGE',
+                fallback_effect_count: resolved.effects?.length || 0,
+            });
         }
-
-        console.warn('LifeEvent impact function missing. Using fallback logic.');
-        trackGameEvent('life_event_impact_missing', {
-            event_type: event.type,
-            option_index: idx,
-            golden: isGolden,
-        });
-        return getFallbackImpact(lifeEvent, idx, pCopy, option);
+        if (resolved.resolutionKind === 'LEGACY_UNRESOLVABLE') {
+            trackGameEvent('legacy_event_unresolvable', {
+                ...diagnosticContext,
+                legacy_reason: resolved.legacyReason || 'UNKNOWN',
+            });
+        }
+        return resolved;
     };
 
+    const presentImpactResult = (
+        option: LifeEventOption,
+        idx: number,
+        impactResult: LifeEventImpactResult,
+        rewardReceiptId?: string,
+    ) => {
+        const { updatedPlayer, log, feedbackDelay, feedbackType, effects } = impactResult;
+        const localizedLog = getImpactLog(impactResult);
+
+        if (feedbackDelay && feedbackType) {
+            if (!updatedPlayer.flags) updatedPlayer.flags = {};
+            if (!updatedPlayer.flags.pendingFeedback) updatedPlayer.flags.pendingFeedback = [];
+            updatedPlayer.flags.pendingFeedback.push({
+                type: feedbackType,
+                weeksLeft: feedbackDelay,
+            });
+        }
+
+        setFeedback({
+            updatedPlayer,
+            log: localizedLog || log,
+            rawLog: log,
+            optionLabel: getOptionLabel(option),
+            wasGolden: !!option.isGolden,
+            effects,
+            optionId: getLifeEventOptionIdentity(event, option, idx),
+            impactId: option.impactId,
+            resolutionSeed: option.resolutionSeed,
+            resolutionKind: impactResult.resolutionKind || 'RUNTIME_CALLBACK',
+            rewardReceiptId,
+        });
+    };
+
+    const getRewardReceiptFromPersistenceError = (error: unknown): PendingRewardAdReceipt | null => (
+        error instanceof RewardedAdPersistenceError && error.receipt ? error.receipt : null
+    );
+
+    useEffect(() => {
+        if (!lifeEvent || feedback || isProcessingAd || restoredReceiptRef.current) return;
+        const options = Array.isArray(lifeEvent.options) ? lifeEvent.options : [];
+        for (let idx = 0; idx < options.length; idx += 1) {
+            const option = options[idx];
+            if (!option?.isGolden) continue;
+            const contextId = `${event.id}:${getLifeEventOptionIdentity(event, option, idx)}`;
+            const receipt = getRecoverableRewardedAdReceipt({
+                playerId: String(player.id || player.name),
+                saveSlot,
+                placement: 'LIFE_EVENT_OPTION',
+                contextId,
+            });
+            if (!receipt) continue;
+            restoredReceiptRef.current = receipt.id;
+            try {
+                presentImpactResult(option, idx, executeOptionImpact(option, idx, player, true), receipt.id);
+                trackGameEvent('reward_ad_storyline_resumed', {
+                    placement: 'LIFE_EVENT_OPTION',
+                    reward_session_id: receipt.id,
+                });
+            } catch (error) {
+                restoredReceiptRef.current = null;
+                recordNonFatal(error, 'reward_ad_storyline_resume_failed', {
+                    placement: 'LIFE_EVENT_OPTION',
+                    reward_session_id: receipt.id,
+                });
+                setResolveError(tr('life.modal.error.choiceFailed'));
+            }
+            break;
+        }
+    }, [event.id, feedback, isProcessingAd, lifeEvent, player.id, player.name, saveSlot]);
+
     const handleOptionClick = async (option: LifeEventOption, idx: number) => {
+        setResolveError('');
         setCrashContext(player, {
             flow: 'life_event_choice',
             event_id: event.id,
@@ -112,120 +218,83 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
             golden: !!option.isGolden,
         });
         trackGameEvent('life_event_choice_selected', {
-            event_type: event.type,
-            option_index: idx,
-            golden: !!option.isGolden,
+            ...buildLifeEventDiagnosticContext(event, lifeEvent, option, idx),
         });
-        let impactResult;
+        let impactResult: LifeEventImpactResult | undefined;
+        let rewardReceipt: PendingRewardAdReceipt | undefined;
         
         if (option.isGolden) {
             setIsProcessingAd(true);
             try {
-                const result = await showAd('REWARDED_BAILOUT');
-                if (result.success) {
-                    // Deep clone to prevent mutation issues, but preserve functions for the current session
-                    const pCopy = JSON.parse(JSON.stringify(player));
-                    // Restore functions for pendingEvents to allow subsequent events to work in the same session
-                    if (player.pendingEvents) {
-                        pCopy.pendingEvents = [...player.pendingEvents];
+                const contextId = `${event.id}:${getLifeEventOptionIdentity(event, option, idx)}`;
+                rewardReceipt = getRecoverableRewardedAdReceipt({
+                    playerId: String(player.id || player.name),
+                    saveSlot,
+                    placement: 'LIFE_EVENT_OPTION',
+                    contextId,
+                }) || undefined;
+                if (!rewardReceipt) {
+                    const interrupted = readPendingRewardAd();
+                    if (
+                        interrupted
+                        && interrupted.playerId === String(player.id || player.name)
+                        && interrupted.saveSlot === saveSlot
+                        && interrupted.placement === 'LIFE_EVENT_OPTION'
+                        && interrupted.contextId === contextId
+                        && interrupted.status === 'IN_PROGRESS'
+                    ) {
+                        clearPendingRewardAd(interrupted.id);
                     }
-
-                    impactResult = executeOptionImpact(option, idx, pCopy, true);
-                } else {
-                    return; // Ad failed or cancelled
+                    rewardReceipt = beginPendingRewardAd({
+                        playerId: String(player.id || player.name),
+                        saveSlot,
+                        type: 'REWARDED_BAILOUT',
+                        placement: 'LIFE_EVENT_OPTION',
+                        contextId,
+                        stepsRequired: 1,
+                    });
+                    const result = await requestRewardedAd({
+                        type: 'REWARDED_BAILOUT',
+                        placement: 'LIFE_EVENT_OPTION',
+                        contextId,
+                    });
+                    if (!result.success) {
+                        clearPendingRewardAd(rewardReceipt.id);
+                        setResolveError(getRewardedAdError(result.reason));
+                        return;
+                    }
+                    try {
+                        rewardReceipt = recordPendingRewardAdStep(rewardReceipt, {
+                            stepId: result.requestId,
+                            stepNumber: 1,
+                        });
+                        rewardReceipt = markPendingRewardAdReady(rewardReceipt);
+                    } catch (error) {
+                        const advancedReceipt = getRewardReceiptFromPersistenceError(error);
+                        if (!advancedReceipt) throw error;
+                        rewardReceipt = advancedReceipt.completedSteps === advancedReceipt.stepsRequired
+                            ? { ...advancedReceipt, status: 'READY_TO_GRANT', remainingStep: null }
+                            : advancedReceipt;
+                    }
                 }
+                impactResult = executeOptionImpact(option, idx, player, true);
             } catch (e) {
-                console.error("Ad failed", e);
+                console.error("Rewarded life-event choice failed", e);
+                setResolveError(getRewardedAdError('ERROR'));
                 return;
             } finally {
                 setIsProcessingAd(false);
             }
         } else {
-            // Deep clone to prevent mutation issues
-            const pCopy = JSON.parse(JSON.stringify(player));
-            // Restore functions for pendingEvents
-            if (player.pendingEvents) {
-                pCopy.pendingEvents = [...player.pendingEvents];
-            }
-
-            impactResult = executeOptionImpact(option, idx, pCopy, false);
-        }
-
-        if (impactResult) {
-            const { updatedPlayer, log, feedbackDelay, feedbackType, effects } = impactResult;
-            const localizedLog = getImpactLog(impactResult);
-            
-            // Handle delayed feedback if any
-            if (feedbackDelay && feedbackType) {
-                if (!updatedPlayer.flags) updatedPlayer.flags = {};
-                if (!updatedPlayer.flags.pendingFeedback) updatedPlayer.flags.pendingFeedback = [];
-                updatedPlayer.flags.pendingFeedback.push({
-                    type: feedbackType,
-                    weeksLeft: feedbackDelay
-                });
-            }
-            
-            setFeedback({
-                updatedPlayer,
-                log: localizedLog || log,
-                rawLog: log,
-                optionLabel: getOptionLabel(option),
-                wasGolden: !!option.isGolden,
-                effects,
-            });
-        }
-    };
-
-    // Fallback logic for when functions are stripped by JSON serialization
-    const getFallbackImpact = (event: LifeEvent, optionIdx: number, p: Player, option?: LifeEventOption) => {
-        const optionText = `${option?.label || ''} ${option?.description || ''}`.toLowerCase();
-        const isGolden = !!option?.isGolden;
-        const isRisky = event.type === 'SCANDAL' || event.type === 'CRIME' || event.type === 'LEGAL' || optionText.includes('double') || optionText.includes('clap') || optionText.includes('refuse') || optionText.includes('ignore') || optionText.includes('risk');
-        const isPositive = isGolden || optionText.includes('apolog') || optionText.includes('help') || optionText.includes('honest') || optionText.includes('professional') || optionText.includes('settle') || optionText.includes('accept');
-        const eventTitle = getLifeEventTitle(event) || tr('life.modal.fallback.momentTitle');
-        
-        // Specific fallbacks for common events to ensure game balance isn't broken
-        if (eventTitle === "The Side Hustle") {
-            if (optionIdx === 0) {
-                p.money += 2000;
-                p.energy.current = Math.max(0, p.energy.current - 10);
-                return { updatedPlayer: p, log: tr('life.modal.fallback.sideHustleWorkLog') };
-            } else if (optionIdx === 1) {
-                p.stats.experience += 5;
-                return { updatedPlayer: p, log: tr('life.modal.fallback.sideHustleAuditionLog') };
+            try {
+                impactResult = executeOptionImpact(option, idx, player, false);
+            } catch {
+                setResolveError(tr('life.modal.error.choiceFailed'));
+                return;
             }
         }
 
-        if (isGolden) {
-            p.stats.reputation = Math.min(100, (p.stats.reputation || 0) + 3);
-            p.stats.fame = Math.min(100, (p.stats.fame || 0) + 1);
-            return {
-                updatedPlayer: p,
-                log: tr('life.modal.fallback.goldenLog', { title: eventTitle })
-            };
-        }
-
-        if (isRisky && !isPositive) {
-            p.stats.reputation = Math.max(0, (p.stats.reputation || 0) - 2);
-            p.stats.fame = Math.min(100, (p.stats.fame || 0) + 1);
-            return {
-                updatedPlayer: p,
-                log: tr('life.modal.fallback.riskyLog', { title: eventTitle })
-            };
-        }
-
-        if (isPositive) {
-            p.stats.reputation = Math.min(100, (p.stats.reputation || 0) + 1);
-            return {
-                updatedPlayer: p,
-                log: tr('life.modal.fallback.positiveLog', { title: eventTitle })
-            };
-        }
-
-        return {
-            updatedPlayer: p,
-            log: tr('life.modal.fallback.neutralLog', { title: eventTitle })
-        };
+        if (impactResult) presentImpactResult(option, idx, impactResult, rewardReceipt?.id);
     };
 
     const getTypeTheme = () => {
@@ -248,6 +317,20 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
 
     const getOutcomeCopy = (log: string) => {
         const lower = log.toLowerCase();
+        if (feedback?.resolutionKind === 'SAFE_FALLBACK') {
+            return {
+                eyebrow: tr('life.modal.safeFallback.eyebrow'),
+                title: tr('life.modal.safeFallback.title'),
+                tone: tr('life.modal.safeFallback.tone'),
+            };
+        }
+        if (feedback?.resolutionKind === 'LEGACY_UNRESOLVABLE') {
+            return {
+                eyebrow: tr('life.modal.legacy.unresolvable.eyebrow'),
+                title: tr('life.modal.legacy.unresolvable.title'),
+                tone: tr('life.modal.legacy.unresolvable.tone'),
+            };
+        }
         if (feedback?.wasGolden) {
             return {
                 eyebrow: tr('life.modal.outcome.golden.eyebrow'),
@@ -290,7 +373,7 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
         return 'border-white/10 bg-white/5 text-zinc-200';
     };
 
-    const handleFeedbackContinue = () => {
+    const handleFeedbackContinue = async () => {
         if (!feedback || isResolvingFeedback) return;
         setResolveError('');
         setIsResolvingFeedback(true);
@@ -310,12 +393,27 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
             golden: feedback.wasGolden,
         });
         try {
-            onChoice(feedback.updatedPlayer, feedback.log);
-            window.setTimeout(() => {
-                if (!mountedRef.current) return;
-                setIsResolvingFeedback(false);
-                setResolveError(tr('life.modal.error.retryContinue'));
-            }, 1800);
+            await onChoice({
+                updatedPlayer: feedback.updatedPlayer,
+                log: feedback.log,
+                optionId: feedback.optionId,
+                impactId: feedback.impactId,
+                resolutionSeed: feedback.resolutionSeed,
+                resolutionKind: feedback.resolutionKind,
+                rewardReceiptId: feedback.rewardReceiptId,
+            });
+            if (feedback.rewardReceiptId) {
+                const receipt = readPendingRewardAd();
+                if (receipt?.id === feedback.rewardReceiptId) {
+                    try {
+                        const verified = markPendingRewardAdVerifiedSave(receipt);
+                        markPendingRewardAdGranted(verified);
+                    } catch {
+                        // The verified player grant marker remains the durable source of truth.
+                    }
+                    clearPendingRewardAd(feedback.rewardReceiptId);
+                }
+            }
         } catch (error) {
             console.error('LifeEvent continue failed:', error);
             recordNonFatal(error, 'life_event_continue_failed', {
@@ -329,7 +427,7 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
     };
 
     if (!lifeEvent) {
-        const handleDismissInvalidEvent = () => {
+        const handleDismissInvalidEvent = async () => {
             if (isResolvingFeedback) return;
             setResolveError('');
             setIsResolvingFeedback(true);
@@ -339,13 +437,19 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
                 event_type: event.type,
             });
             addBreadcrumb('life_event:invalid_dismiss', { eventId: event.id, eventType: event.type });
+            trackGameEvent('legacy_event_unresolvable', {
+                event_id: event.id,
+                event_type: event.type,
+                legacy_reason: 'MISSING_LIFE_EVENT_PAYLOAD',
+                resolution_path: 'LEGACY_UNRESOLVABLE',
+            });
             try {
-                onChoice(player, tr('life.modal.invalid.log'));
-                window.setTimeout(() => {
-                    if (!mountedRef.current) return;
-                    setIsResolvingFeedback(false);
-                    setResolveError(tr('life.modal.error.retryContinue'));
-                }, 1800);
+                await onChoice({
+                    updatedPlayer: player,
+                    log: tr('life.modal.invalid.log'),
+                    optionId: 'invalid_legacy_event',
+                    resolutionKind: 'LEGACY_UNRESOLVABLE',
+                });
             } catch (error) {
                 console.error('Invalid life event dismiss failed:', error);
                 recordNonFatal(error, 'invalid_life_event_dismiss_failed', {

@@ -177,6 +177,7 @@ import { STREAMING_INCORPORATION_ECONOMY } from './streamingEconomy';
 import { cleanStreamingBrandMarkDataUrl } from './streamingBrandImage';
 import { normalizeStreamingDayOneMarketIds } from './streamingDayOneMarkets';
 import { STREAMING_ANNUAL_BILLING_SHARE } from './streamingPricingEconomy';
+import { normalizeStreamingRightsAccessGrant } from './streamingRightsAccessGrant';
 import {
     aggregateStreamingFacilities,
     getStreamingFacilityContract,
@@ -2201,13 +2202,17 @@ const normalizeNetworkPlacements = (value: unknown): OwnedStreamingNetworkPlacem
             racks: Math.max(1, Math.round(clamp(source.racks, 1, 96, 1))),
             role,
         } as OwnedStreamingNetworkPlacement;
-    }).filter((item): item is OwnedStreamingNetworkPlacement => Boolean(item)).slice(0, 29);
+    }).filter((item): item is OwnedStreamingNetworkPlacement => Boolean(item)).slice(0, 256);
     if (placements.length && !placements.some(item => item.role === 'CORE_ORIGIN')) {
         placements[0] = { ...placements[0], role: 'CORE_ORIGIN' };
     }
     return placements;
 };
 
+// The world catalogue has 865 physical rooms and 194 cloud sites. The old
+// 48-room cap silently deleted paid multi-region infrastructure on save;
+// 1,200 still bounds malformed input beyond the whole supported catalogue.
+const STREAMING_FACILITY_SAVE_LIMIT = 1_200;
 const STREAMING_FACILITY_TYPES = STREAMING_FACILITY_CONTRACTS.map(contract => contract.type);
 const normalizeStreamingFacilities = (
     value: unknown,
@@ -2241,7 +2246,7 @@ const normalizeStreamingFacilities = (
             lease,
             physical: normalizeStreamingFacilityPhysical(source.physical, type, installedRacks, lease),
         } satisfies OwnedStreamingFacility];
-    }).slice(0, 48);
+    }).slice(0, STREAMING_FACILITY_SAVE_LIMIT);
     const migrated = facilities.length ? facilities : migratePlacementsToStreamingFacilities(legacyPlacements);
     if (migrated.length && !migrated.some(facility => facility.role === 'CORE_ORIGIN')) {
         migrated[0] = { ...migrated[0], role: 'CORE_ORIGIN' };
@@ -2315,7 +2320,7 @@ const normalizeLaunchRehearsalSnapshot = (
                 failedPercent: Math.round(clamp(country.failedPercent, 0, 100)),
                 viewerConsequence: cleanText(country.viewerConsequence, 'Viewer consequence unavailable.', 300),
             }];
-        }).slice(0, 40),
+        }).slice(0, 240),
         facilities: asArray<unknown>(source.facilities).flatMap(item => {
             const facility = asRecord(item);
             const facilityId = cleanText(facility.facilityId, '', 120);
@@ -2331,7 +2336,7 @@ const normalizeLaunchRehearsalSnapshot = (
                 failedPercent: Math.round(clamp(facility.failedPercent, 0, 100)),
                 limitingFactor: cleanText(facility.limitingFactor, 'NONE', 40),
             }];
-        }).slice(0, 48),
+        }).slice(0, STREAMING_FACILITY_SAVE_LIMIT),
         completedAtAbsoluteWeek: Math.max(0, Math.round(clamp(source.completedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
     };
 };
@@ -2912,6 +2917,10 @@ const normalizeCatalogLicense = (value: unknown): OwnedStreamingCatalogLicense |
         changeOfControl: isOneOf(source.changeOfControl, RIGHTS_CHANGE_OF_CONTROL, 'NOTICE'),
         cancellationPenalty: Math.round(clamp(source.cancellationPenalty, 0, Number.MAX_SAFE_INTEGER)),
         renewedFromLicenseId: cleanText(source.renewedFromLicenseId, '', 120) || null,
+        ...(source.accessGrant !== undefined ? { accessGrant: normalizeStreamingRightsAccessGrant(source.accessGrant) || {
+            schemaVersion: 1 as const, modes: [], earlyWindowWeeks: 0,
+            purchaseFulfillment: 'NONE' as const, source: 'LEGACY_SNAPSHOT' as const,
+        } } : {}),
     };
 };
 
@@ -2938,6 +2947,10 @@ const normalizeRightsNegotiation = (value: unknown): OwnedStreamingRightsNegotia
         buyerName: cleanText(source.buyerName, '', 140) || null,
         territory: isOneOf(source.territory, LICENSE_TERRITORIES, 'MULTI_REGION'),
         countryIds: normalizeStreamingDayOneMarketIds(source.countryIds).sort(),
+        ...(source.accessGrant !== undefined ? { accessGrant: normalizeStreamingRightsAccessGrant(source.accessGrant) || {
+            schemaVersion: 1 as const, modes: [], earlyWindowWeeks: 0,
+            purchaseFulfillment: 'NONE' as const, source: 'LEGACY_SNAPSHOT' as const,
+        } } : {}),
         durationWeeks: Math.round(clamp(source.durationWeeks, 26, 520, 104)),
         exclusivity: isOneOf(source.exclusivity, LICENSE_EXCLUSIVITY, 'NON_EXCLUSIVE'),
         windowType: isOneOf(source.windowType, RIGHTS_WINDOW_TYPES, 'SECOND_WINDOW'),
@@ -3894,7 +3907,16 @@ export const normalizeOwnedStreamingPlatformState = (
     playerId = 'player',
     protectedRivalMoveIds: ReadonlySet<string> = new Set(),
 ): OwnedStreamingPlatformState => {
-    const defaults = createOwnedStreamingPlatformState(playerId);
+    // Normalization runs repeatedly while Market selectors build their shelves.
+    // Constructing the entire initial platform here allocated hundreds of
+    // unrelated arrays/records, although only these four scalar defaults are read.
+    const normalizedPlayerId = cleanText(playerId, 'player', 80);
+    const defaults = {
+        founderOwnershipPercent: 100,
+        lifecycle: 'LOCKED' as OwnedStreamingPlatformState['lifecycle'],
+        infrastructureStrategy: 'UNDECIDED' as OwnedStreamingPlatformState['infrastructureStrategy'],
+        simulationSeed: normalizedPlayerId ? `owned-streaming:${normalizedPlayerId}` : '',
+    };
     const source = asRecord(value);
     const sourceVersion = Math.max(0, Math.round(clamp(
         source.schemaVersion,
@@ -4014,6 +4036,11 @@ export const normalizeOwnedStreamingPlatformState = (
             line => line.lineId,
         ).slice(-OWNED_STREAMING_PRODUCT_LINE_LIMIT),
         catalogSetupDraft: normalizeCatalogSetupDraft(source.catalogSetupDraft),
+        marketQuotePolicy: asRecord(source.marketQuotePolicy).version === 2
+            && Number.isSafeInteger(asRecord(source.marketQuotePolicy).effectiveCycle)
+            && Number(asRecord(source.marketQuotePolicy).effectiveCycle) >= 0
+            ? { version: 2, effectiveCycle: Number(asRecord(source.marketQuotePolicy).effectiveCycle) }
+            : undefined,
         contentMarketDraft: source.contentMarketDraft && typeof source.contentMarketDraft === 'object' ? {
             tab: ['ALL', 'MOVIE', 'SERIES', 'COLLECTIONS', 'OWNED', 'OFFERS', 'AUCTIONS', 'UPCOMING'].includes(source.contentMarketDraft.tab) ? source.contentMarketDraft.tab : 'ALL',
             search: String(source.contentMarketDraft.search || '').slice(0, 100),

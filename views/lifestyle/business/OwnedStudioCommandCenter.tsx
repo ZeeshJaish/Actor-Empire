@@ -966,7 +966,7 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
                                             </div>
                                             <div className="relative overflow-hidden rounded-[20px] border-2 border-[#29251f] bg-[#0a0908] p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_8px_0_#020202]">
                                                 <div className="pointer-events-none absolute inset-x-4 top-0 h-px bg-gradient-to-r from-transparent via-amber-200/25 to-transparent" />
-                                                <div className="grid grid-cols-2 gap-2.5">
+                                                <div className="grid grid-cols-1 gap-2.5 min-[390px]:grid-cols-2">
                                                     <StudioDivisionCard
                                                         title={tr('studio.devLab')}
                                                         subtitle={tr('services.business.productionDashboard.division.devSubtitle')}

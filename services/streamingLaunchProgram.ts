@@ -536,16 +536,17 @@ export const saveStreamingPricingPlan = (
 ): StreamingLaunchConfigurationResult => {
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     if (!platform.identity || platform.launchCommit) return { player, changed: false, reason: 'INVALID_STATE', shortfall: 0 };
-    if (!pricing.streams.length || pricing.streams.includes('subs') && !pricing.plans.length) {
+    if (pricing.commercialOffers?.coreModelSelected === false
+        || !pricing.streams.length || pricing.streams.includes('subs') && !pricing.plans.length) {
         return { player, changed: false, reason: 'INCOMPLETE', shortfall: 0 };
     }
     const activeProducts = new Set(platform.productLines.filter(line => line.status === 'ACTIVE').map(line => line.lineId));
     const commerce = platform.technologyLevels.ADVERTISING_COMMERCE;
     const product = platform.technologyLevels.PRODUCT_EXPERIENCE;
     const allowedStreams = pricing.streams.filter(stream => {
-        if (stream === 'subs') return true;
-        if (stream === 'ads' || stream === 'sponsor') return commerce >= 20 || activeProducts.has('FREE');
-        if (stream === 'rentals' || stream === 'premium') return activeProducts.has('STORE');
+        if (stream === 'subs' || stream === 'ads' || stream === 'rentals') return true;
+        if (stream === 'sponsor') return commerce >= 20 || activeProducts.has('FREE');
+        if (stream === 'premium') return activeProducts.has('STORE');
         if (stream === 'daypass') return activeProducts.has('LIVE');
         if (stream === 'metered') return commerce >= 60 && product >= 50;
         return activeProducts.has('FAN') && commerce >= 40;
@@ -558,7 +559,7 @@ export const saveStreamingPricingPlan = (
         if (feature === 'streams2') return platform.technologyLevels.RELIABILITY >= 10;
         if (feature === 'streams4') return platform.technologyLevels.RELIABILITY >= 35;
         if (feature === 'downloads') return platform.technologyLevels.PRODUCT_EXPERIENCE >= 25;
-        if (feature === 'early') return platform.technologyLevels.CONTENT_OPERATIONS >= 20;
+        if (feature === 'early') return true; // C5 offer benefit is rights-limited, not research-gated.
         if (feature === 'live') return activeProducts.has('LIVE');
         if (feature === 'extraseat') return commerce >= 30;
         return feature === 'noads' || feature === 'catalogue';
@@ -713,7 +714,8 @@ export const getStreamingLaunchProgramView = (player: Player): StreamingLaunchPr
     );
     const hasStorefront = Boolean(platform.serviceConfiguration.storefrontLayoutId);
     const hasPricing = Boolean(
-        platform.serviceConfiguration.pricingApproach
+        platform.serviceConfiguration.pricing.commercialOffers?.coreModelSelected !== false
+        && platform.serviceConfiguration.pricingApproach
         && platform.serviceConfiguration.pricing.streams.length
         && (!platform.serviceConfiguration.pricing.streams.includes('subs') || platform.serviceConfiguration.pricing.plans.length),
     );

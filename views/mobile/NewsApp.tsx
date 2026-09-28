@@ -204,13 +204,13 @@ const StoryDetail: React.FC<{
       <div className="w-full max-h-[86%] overflow-y-auto custom-scrollbar rounded-t-[2.2rem] border-t border-white/15 bg-zinc-950 shadow-2xl">
         <div className={`h-1.5 bg-gradient-to-r ${getOutletAccent(item)}`} />
         <div className="p-5">
-          <div className="flex items-start justify-between gap-4">
-            <div>
+          <div className="flex flex-col-reverse items-start gap-3 min-[380px]:flex-row min-[380px]:justify-between min-[380px]:gap-4">
+            <div className="min-w-0">
               <div className="text-[10px] font-black uppercase tracking-[0.24em] text-red-400">{getSource(item, language)}</div>
               {item.byline && <div className="mt-1 text-[10px] font-sans font-bold text-zinc-500">By {item.byline}</div>}
               <h2 className="mt-3 text-3xl font-black leading-[0.95] text-white tracking-tight">{item.headline}</h2>
             </div>
-            <button onClick={onClose} className="shrink-0 px-4 py-2 rounded-full bg-white text-black text-xs font-black uppercase tracking-widest">
+            <button onClick={onClose} className="min-h-11 shrink-0 self-end px-4 py-2 rounded-full bg-white text-black text-xs font-black uppercase tracking-widest">
               {t(language, 'common.close')}
             </button>
           </div>
@@ -275,16 +275,16 @@ const NewsAppLegacy: React.FC<NewsAppProps> = ({ player, onBack }) => {
   return (
     <div className="absolute inset-0 bg-zinc-950 flex flex-col z-40 text-white font-serif animate-in slide-in-from-right duration-300">
         <div className="bg-red-700 p-4 pt-12 pb-3 shadow-lg flex items-center justify-between shrink-0 relative overflow-hidden">
-            <button onClick={onBack} className="p-1 rounded-full bg-black/20 hover:bg-black/30 text-white relative z-10"><ArrowLeft size={18} /></button>
+            <button onClick={onBack} className="relative z-10 grid h-11 w-11 place-items-center rounded-full bg-black/20 text-white hover:bg-black/30" aria-label="Back to phone"><ArrowLeft size={18} /></button>
             <div className="flex flex-col items-center relative z-10"><h2 className="text-3xl font-black tracking-tighter uppercase leading-none">{t(language, 'news.brand')}</h2><span className="text-[9px] tracking-[0.2em] font-sans opacity-80 uppercase">{t(language, 'news.tagline')}</span></div>
             <div className="w-8"></div>
             <div className="absolute bottom-0 left-0 w-full h-1 bg-black/20"></div>
         </div>
 
         <div className="flex border-b border-zinc-800 bg-zinc-900 font-sans">
-            <button onClick={() => setTab('TOP_STORY')} className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider transition-colors ${tab === 'TOP_STORY' ? 'text-red-500 border-b-2 border-red-500 bg-zinc-800' : 'text-zinc-500 hover:text-zinc-300'}`}>{t(language, 'news.topStories')}</button>
-            <button onClick={() => setTab('INDUSTRY')} className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider transition-colors ${tab === 'INDUSTRY' ? 'text-red-500 border-b-2 border-red-500 bg-zinc-800' : 'text-zinc-500 hover:text-zinc-300'}`}>{t(language, 'news.industry')}</button>
-            <button onClick={() => setTab('YOU')} className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider transition-colors ${tab === 'YOU' ? 'text-red-500 border-b-2 border-red-500 bg-zinc-800' : 'text-zinc-500 hover:text-zinc-300'}`}>{t(language, 'news.you')}</button>
+            <button onClick={() => setTab('TOP_STORY')} className={`flex-1 min-h-11 py-3 text-xs font-bold uppercase tracking-wider transition-colors ${tab === 'TOP_STORY' ? 'text-red-500 border-b-2 border-red-500 bg-zinc-800' : 'text-zinc-500 hover:text-zinc-300'}`}>{t(language, 'news.topStories')}</button>
+            <button onClick={() => setTab('INDUSTRY')} className={`flex-1 min-h-11 py-3 text-xs font-bold uppercase tracking-wider transition-colors ${tab === 'INDUSTRY' ? 'text-red-500 border-b-2 border-red-500 bg-zinc-800' : 'text-zinc-500 hover:text-zinc-300'}`}>{t(language, 'news.industry')}</button>
+            <button onClick={() => setTab('YOU')} className={`flex-1 min-h-11 py-3 text-xs font-bold uppercase tracking-wider transition-colors ${tab === 'YOU' ? 'text-red-500 border-b-2 border-red-500 bg-zinc-800' : 'text-zinc-500 hover:text-zinc-300'}`}>{t(language, 'news.you')}</button>
         </div>
 
         <div className="flex-1 overflow-y-auto custom-scrollbar bg-zinc-950 p-0">
@@ -332,7 +332,7 @@ export const NewsApp: React.FC<NewsAppProps> = ({ player, onBack }) => {
       <div className="shrink-0 relative overflow-hidden border-b border-white/10 bg-zinc-950">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(239,68,68,0.28),transparent_38%),radial-gradient(circle_at_bottom_left,rgba(245,158,11,0.12),transparent_42%)]" />
         <div className="relative z-10 p-4 pt-12 pb-4 flex items-center justify-between">
-          <button onClick={onBack} className="w-10 h-10 rounded-full bg-white/8 border border-white/10 flex items-center justify-center text-white active:scale-95">
+          <button onClick={onBack} className="w-11 h-11 rounded-full bg-white/8 border border-white/10 flex items-center justify-center text-white active:scale-95" aria-label="Back to phone">
             <ArrowLeft size={20} />
           </button>
           <div className="text-center">

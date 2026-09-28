@@ -629,7 +629,7 @@ const compactIndustryProductions = (
     items: productions,
     idOf: (production: any) => stableHistoryId(production?.id),
     isProtected: (production: any) => (
-      !['DELIVERED', 'RELEASED', 'CANCELLED'].includes(String(production?.status || ''))
+      !['DELIVERED', 'CANCELLED'].includes(String(production?.status || ''))
       || referencedIds.has(stableHistoryId(production?.id))
       || retainedAwardProjectIds.has(stableHistoryId(production?.canonicalProjectId))
     ),
@@ -785,6 +785,7 @@ const compactWorldEconomy = (world: any) => {
   const audience = trimSnapshots(world.worldAudienceEconomy, 32);
   const participation = trimSnapshots(world.worldAudienceParticipation, 32);
   const competition = trimSnapshots(world.worldStreamingCompetition, 32);
+  const audienceChoice = world.worldStreamingAudienceChoice;
   const customersBase = trimSnapshots(world.worldStreamingCustomers, 52);
   const customers = customersBase && typeof customersBase === 'object'
     ? { ...customersBase, recentMovements: Array.isArray(customersBase.recentMovements) ? customersBase.recentMovements.slice(-624) : [] }
@@ -805,6 +806,7 @@ const compactWorldEconomy = (world: any) => {
     worldAudienceEconomy: audience,
     worldAudienceParticipation: participation,
     worldStreamingCompetition: competition,
+    worldStreamingAudienceChoice: audienceChoice,
     worldStreamingCustomers: customers,
     worldStreamingViewing: viewing,
     worldStreamingPlatformEconomy: economy,

@@ -5,6 +5,7 @@ import { applyStudioProjectOutcome } from '../studioEcosystem';
 import { releaseProjectTalentBookings } from '../talentBookings';
 import { appendStudioAiProductionKey } from './studioAiProductionState';
 import { STUDIO_AI_LEDGER_LIMIT } from './studioAiState';
+import { settleTalentReceipt } from '../talentCareer';
 
 const money = (value: number) => Math.round((value + Number.EPSILON * 100) * 1000) / 1000;
 const clamp = (value: number, min = 0, max = 100) => Math.max(min, Math.min(max, value));
@@ -35,7 +36,11 @@ export const releaseStudioAiProduction = (input: ReleaseStudioAiProductionInput)
     const marketingSpendMillions = money(input.production.budgetMillions * marketingRate);
     if (input.studio.cashReserve < marketingSpendMillions) return { world: input.world, studio: input.studio, production: input.production, project: null, changed: false };
     const studioReceiptsMillions = money(theatricalGrossMillions * 0.48 + streamingValueMillions);
-    const netResultMillions = money(studioReceiptsMillions - input.production.budgetMillions - marketingSpendMillions);
+    const talentSettlement = settleTalentReceipt(input.world, input.production.canonicalProjectId,
+        execution.talent.talentParticipation, `studio_ai_release:${input.production.id}`,
+        Math.round(studioReceiptsMillions * 1_000_000), input.absoluteWeek);
+    const backendMillions = money(talentSettlement.totalPaid / 1_000_000);
+    const netResultMillions = money(studioReceiptsMillions - backendMillions - input.production.budgetMillions - marketingSpendMillions);
     const outcome = netResultMillions >= input.production.budgetMillions * 0.6 ? 'HIT' as const : netResultMillions < 0 ? 'FLOP' as const : 'SOLID' as const;
     const rating = Math.round(clamp(4.2 + quality.creativeQuality * 0.058 + (rng() - 0.5) * 0.5, 1, 10) * 10) / 10;
     const { year, week } = yearWeek(input.absoluteWeek);
@@ -65,6 +70,7 @@ export const releaseStudioAiProduction = (input: ReleaseStudioAiProductionInput)
         budgetTier: budgetTier(input.production.budgetMillions), quality: Math.round(quality.creativeQuality), rating,
         boxOffice: Math.round(theatricalGrossMillions * 1_000_000), year, weekReleased: week,
         leadActorId: talent.leadActorId, leadActorName: talent.leadActorName, directorId: talent.directorId, directorName: talent.directorName,
+        ...(input.production.writerId ? { writerId: input.production.writerId } : {}), writerName: input.production.writerName,
         reviews: outcome === 'HIT' ? 'A major audience and critical success' : outcome === 'FLOP' ? 'A disappointing commercial response' : 'A solid industry performance',
         awardProfile: {
             leadPerformance: clamp(Math.round(quality.creativeQuality * 0.72 + talent.packageScore * 0.22)), directing: clamp(Math.round(quality.executionQuality * 0.72 + talent.packageScore * 0.22)),
@@ -75,14 +81,15 @@ export const releaseStudioAiProduction = (input: ReleaseStudioAiProductionInput)
         ...(input.production.universeId ? { universeId: input.production.universeId } : {}), releaseStrategy: execution.publicReleaseStrategy,
         streamingWindows, studioAiSlateCommitmentId: execution.slateCommitmentId, industryContentFingerprintId: execution.fingerprintId,
     };
-    const releaseCash = money(input.studio.cashReserve - marketingSpendMillions + studioReceiptsMillions);
+    const releaseCash = money(input.studio.cashReserve - marketingSpendMillions + studioReceiptsMillions - backendMillions);
     const settledStudio: NPCStudioState = { ...input.studio, cashReserve: releaseCash, ai: { ...input.studio.ai, ledger: [...input.studio.ai.ledger,
         { id: createDeterministicId('studio_ai_release_ledger', input.production.id, 'marketing'), absoluteWeek: input.absoluteWeek, category: 'RELEASE_MARKETING' as const, amountMillions: -marketingSpendMillions, balanceAfterMillions: money(input.studio.cashReserve - marketingSpendMillions), description: `${project.title}: release campaign` },
-        { id: createDeterministicId('studio_ai_release_ledger', input.production.id, 'income'), absoluteWeek: input.absoluteWeek, category: 'RIGHTS_INCOME' as const, amountMillions: studioReceiptsMillions, balanceAfterMillions: releaseCash, description: `${project.title}: studio receipts` },
+        { id: createDeterministicId('studio_ai_release_ledger', input.production.id, 'income'), absoluteWeek: input.absoluteWeek, category: 'RIGHTS_INCOME' as const, amountMillions: studioReceiptsMillions, balanceAfterMillions: money(releaseCash + backendMillions), description: `${project.title}: studio receipts` },
+        ...(backendMillions > 0 ? [{ id: createDeterministicId('studio_ai_release_ledger', input.production.id, 'backend'), absoluteWeek: input.absoluteWeek, category: 'TALENT_BACKEND' as const, amountMillions: -backendMillions, balanceAfterMillions: releaseCash, description: `${project.title}: contracted talent backend` }] : []),
     ].slice(-STUDIO_AI_LEDGER_LIMIT) } };
     const result = { releasedAtAbsoluteWeek: input.absoluteWeek, theatricalGrossMillions, streamingValueMillions, studioReceiptsMillions, productionSpendMillions: input.production.budgetMillions, marketingSpendMillions, netResultMillions, rating, outcome };
-    const production: IndustryProductionCommitment = { ...input.production, status: 'RELEASED', updatedAtAbsoluteWeek: input.absoluteWeek, studioAiExecution: { ...execution, result, lastProgressedAbsoluteWeek: input.absoluteWeek, processedKeys: appendStudioAiProductionKey(execution.processedKeys, `b6-release:${input.production.id}`) } };
-    let world: WorldState = { ...input.world, projects: [...input.world.projects, project], studios: { ...(input.world.studios || {}), [settledStudio.id]: settledStudio }, talentBookings: releaseProjectTalentBookings(input.world.talentBookings, project.id, input.absoluteWeek), industryProductions: upsertCanonicalIndustryProduction(input.world.industryProductions, production) };
+    const production: IndustryProductionCommitment = { ...input.production, status: 'RELEASED', updatedAtAbsoluteWeek: input.absoluteWeek, studioAiExecution: { ...execution, talent: { ...talent, talentParticipation: talentSettlement.participation }, result, lastProgressedAbsoluteWeek: input.absoluteWeek, processedKeys: appendStudioAiProductionKey(execution.processedKeys, `b6-release:${input.production.id}`) } };
+    let world: WorldState = { ...talentSettlement.world, projects: [...input.world.projects, project], studios: { ...(input.world.studios || {}), [settledStudio.id]: settledStudio }, talentBookings: releaseProjectTalentBookings(input.world.talentBookings, project.id, input.absoluteWeek), industryProductions: upsertCanonicalIndustryProduction(input.world.industryProductions, production) };
     world = applyStudioProjectOutcome(world, project, { productionSpendMillions: input.production.budgetMillions, marketingSpendMillions, studioReceiptsMillions, netResultMillions, cashAlreadySettled: true, outcome }).world;
     world = {
         ...world,

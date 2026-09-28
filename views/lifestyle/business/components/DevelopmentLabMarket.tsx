@@ -17,6 +17,10 @@ export interface DevelopmentLabMarketProps {
     playerMoney: number;
     onBuy: (script: Script, cost: number) => void;
     onRefresh: () => void;
+    refreshPrice: number;
+    refreshCount: number;
+    refreshShortfall: number;
+    refreshFeedback: string;
     weeksUntilRefresh: number;
     currentWeek: number;
     marketTrends: ReturnType<typeof createMarketTrends>;
@@ -41,6 +45,10 @@ export const DevelopmentLabMarket: React.FC<DevelopmentLabMarketProps> = ({
     playerMoney,
     onBuy,
     onRefresh,
+    refreshPrice,
+    refreshCount,
+    refreshShortfall,
+    refreshFeedback,
     weeksUntilRefresh,
     currentWeek,
     marketTrends,
@@ -106,6 +114,10 @@ export const DevelopmentLabMarket: React.FC<DevelopmentLabMarketProps> = ({
                     playerMoney={playerMoney}
                     onBuy={onBuy}
                     onRefresh={onRefresh}
+                    refreshPrice={refreshPrice}
+                    refreshCount={refreshCount}
+                    refreshShortfall={refreshShortfall}
+                    refreshFeedback={refreshFeedback}
                     weeksUntilRefresh={weeksUntilRefresh}
                     currentWeek={currentWeek}
                     marketTrends={marketTrends}
@@ -121,6 +133,10 @@ interface SourceMaterialMarketProps {
     playerMoney: number;
     onBuy: (script: Script, cost: number) => void;
     onRefresh: () => void;
+    refreshPrice: number;
+    refreshCount: number;
+    refreshShortfall: number;
+    refreshFeedback: string;
     weeksUntilRefresh: number;
     currentWeek: number;
     marketTrends: ReturnType<typeof createMarketTrends>;
@@ -132,12 +148,17 @@ const SourceMaterialMarket: React.FC<SourceMaterialMarketProps> = ({
     playerMoney,
     onBuy,
     onRefresh,
+    refreshPrice,
+    refreshCount,
+    refreshShortfall,
+    refreshFeedback,
     weeksUntilRefresh,
     currentWeek,
     marketTrends,
     language,
 }) => {
     const [filter, setFilter] = useState<'ALL' | 'TRENDING' | 'MOVIE' | 'SERIES'>('ALL');
+    const [confirmRefresh, setConfirmRefresh] = useState(false);
     const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
 
     const filteredMarket = (market || []).filter(script => {
@@ -160,21 +181,24 @@ const SourceMaterialMarket: React.FC<SourceMaterialMarketProps> = ({
                         <div className="flex items-center gap-4">
                             <div className="flex w-fit items-center gap-2 rounded-lg border border-amber-500/10 bg-amber-500/5 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-amber-500/80">
                                 <Clock size={12} />
-                                {tr(weeksUntilRefresh === 1 ? 'developmentLab.market.refreshesInWeek' : 'developmentLab.market.refreshesInWeeks', { weeks: weeksUntilRefresh })}
+                                {weeksUntilRefresh === 0 ? 'Free rotation on next week advance'
+                                    : tr(weeksUntilRefresh === 1 ? 'developmentLab.market.refreshesInWeek' : 'developmentLab.market.refreshesInWeeks', { weeks: weeksUntilRefresh })}
                             </div>
                             <button
-                                onClick={onRefresh}
-                                disabled={playerMoney < 250000}
+                                onClick={() => setConfirmRefresh(true)}
+                                disabled={refreshShortfall > 0}
                                 className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 ${
-                                    playerMoney >= 250000
+                                    refreshShortfall === 0
                                         ? 'border-zinc-800 bg-zinc-900/50 text-zinc-400 hover:bg-zinc-800 hover:text-white'
                                         : 'cursor-not-allowed border-zinc-900 bg-zinc-900/20 text-zinc-600 opacity-50'
                                 }`}
                             >
-                                <RefreshCw size={12} className={playerMoney >= 250000 ? 'animate-spin' : ''} />
-                                {tr('developmentLab.market.refreshNow', { amount: formatCurrency(250000) })}
+                                <RefreshCw size={12} />
+                                {tr('developmentLab.market.refreshNow', { amount: formatCurrency(refreshPrice) })}
                             </button>
                         </div>
+                        <p className="text-[10px] text-zinc-500">Paid scout #{refreshCount + 1} this cycle · studio treasury{refreshShortfall > 0 ? ` · short by ${formatCurrency(refreshShortfall)}` : ''}. Free rotation stays on schedule.</p>
+                        {refreshFeedback && <p role="status" className="text-xs text-amber-300">{refreshFeedback}</p>}
                     </div>
                 </div>
             </div>
@@ -189,7 +213,7 @@ const SourceMaterialMarket: React.FC<SourceMaterialMarketProps> = ({
                     <button
                         key={filterOption.id}
                         onClick={() => setFilter(filterOption.id as typeof filter)}
-                        className={`relative whitespace-nowrap pb-2 text-[10px] font-black uppercase tracking-[0.2em] transition-all ${
+                        className={`relative min-h-11 min-w-11 whitespace-nowrap px-2 pb-2 text-[10px] font-black uppercase tracking-[0.2em] transition-all ${
                             filter === filterOption.id ? 'text-white' : 'text-zinc-500 hover:text-zinc-400'
                         }`}
                     >
@@ -309,7 +333,7 @@ const SourceMaterialMarket: React.FC<SourceMaterialMarketProps> = ({
                                     <button
                                         onClick={() => onBuy(script, cost)}
                                         disabled={!canAfford}
-                                        className={`flex w-full items-center justify-center gap-2 rounded-xl py-3 text-[10px] font-black uppercase tracking-[0.2em] transition-all ${
+                                        className={`flex min-h-11 w-full items-center justify-center gap-2 rounded-xl py-3 text-[10px] font-black uppercase tracking-[0.2em] transition-all ${
                                             canAfford
                                                 ? 'bg-white text-black hover:scale-[1.02] hover:bg-amber-500 active:scale-95'
                                                 : 'cursor-not-allowed bg-zinc-800 text-zinc-600'
@@ -330,15 +354,24 @@ const SourceMaterialMarket: React.FC<SourceMaterialMarketProps> = ({
                     <BookOpen size={48} className="mb-4 opacity-20" />
                     <p className="text-xs font-bold uppercase tracking-widest">{tr('developmentLab.market.noItems')}</p>
                     <button
-                        onClick={onRefresh}
-                        disabled={playerMoney < 250000}
+                        onClick={() => setConfirmRefresh(true)}
+                        disabled={refreshShortfall > 0}
                         className="mt-6 flex items-center gap-2 rounded-xl border border-amber-500/20 bg-amber-500/5 px-6 py-3 text-[10px] font-black uppercase tracking-widest text-amber-500 transition-all hover:bg-amber-500/10 hover:text-amber-400 active:scale-95"
                     >
                         <RefreshCw size={14} />
-                        {tr('developmentLab.market.forceRefresh', { amount: formatCurrency(250000) })}
+                        {tr('developmentLab.market.forceRefresh', { amount: formatCurrency(refreshPrice) })}
                     </button>
                 </div>
             )}
+            {confirmRefresh && <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/75 p-4" role="dialog" aria-modal="true" aria-label="Confirm script scouting">
+                <div className="w-full max-w-sm rounded-2xl border border-amber-500/30 bg-zinc-950 p-5 shadow-2xl">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-400">Studio scouting</p>
+                    <h4 className="mt-2 text-lg font-black text-white">Find six new scripts?</h4>
+                    <p className="mt-2 text-xs leading-relaxed text-zinc-300">Pay {formatCurrency(refreshPrice)} from your studio treasury. Only unsold scripts on this shelf are replaced; acquired projects stay yours.</p>
+                    <p className="mt-2 text-[10px] text-zinc-500">Paid scout #{refreshCount + 1} this cycle · free rotation stays on schedule.</p>
+                    <div className="mt-5 flex gap-2"><button type="button" onClick={() => { onRefresh(); setConfirmRefresh(false); }} className="min-h-11 flex-1 rounded-lg bg-amber-500 px-4 text-xs font-bold text-black">Confirm scout</button><button type="button" onClick={() => setConfirmRefresh(false)} className="min-h-11 flex-1 rounded-lg border border-zinc-700 px-4 text-xs text-zinc-300">Cancel</button></div>
+                </div>
+            </div>}
         </div>
     );
 };

@@ -8,6 +8,18 @@ import {
 import { exportProfilePortrait } from '../views/avatar/profilePortraitRenderer';
 
 const avatarCache = new Map<string, string>();
+const MAX_GENERATED_AVATARS = 96;
+
+export const clearGeneratedAvatarCache = (): void => { avatarCache.clear(); };
+export const getGeneratedAvatarCacheSize = (): number => avatarCache.size;
+
+const rememberGeneratedAvatar = (key: string, portrait: string): string => {
+    avatarCache.set(key, portrait);
+    if (avatarCache.size > MAX_GENERATED_AVATARS) {
+        avatarCache.delete(avatarCache.keys().next().value!);
+    }
+    return portrait;
+};
 
 const toProfileBuilderGender = (gender: Gender): ProfileBuilderGender => {
     if (gender === 'FEMALE') return 'FEMALE';
@@ -73,19 +85,21 @@ export const getGenderedAvatar = (gender: Gender, nameSeed: string): string => {
     const profileGender = toProfileBuilderGender(gender);
     const cacheKey = `${profileGender}:${seed}`;
     const cached = avatarCache.get(cacheKey);
-    if (cached) return cached;
+    if (cached) {
+        avatarCache.delete(cacheKey);
+        avatarCache.set(cacheKey, cached);
+        return cached;
+    }
 
     if (typeof document !== 'undefined') {
         try {
             const portrait = exportProfilePortrait(createSeededProfileSelection(profileGender, seed), 1);
-            avatarCache.set(cacheKey, portrait);
-            return portrait;
+            return rememberGeneratedAvatar(cacheKey, portrait);
         } catch (error) {
             console.warn('NPC portrait generation failed; using the local fallback portrait.', error);
         }
     }
 
     const portrait = createFallbackPortrait(profileGender, seed);
-    avatarCache.set(cacheKey, portrait);
-    return portrait;
+    return rememberGeneratedAvatar(cacheKey, portrait);
 };

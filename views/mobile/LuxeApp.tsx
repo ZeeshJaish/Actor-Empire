@@ -898,7 +898,7 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
 
                 <div className="relative shrink-0 border-b border-white/5 bg-black/35 p-4 pt-12 backdrop-blur-xl">
                     <div className="flex items-center justify-between gap-3">
-                        <button onClick={onBack} className="text-amber-500">
+                        <button onClick={onBack} className="grid h-11 w-11 place-items-center text-amber-500" aria-label="Back to phone">
                             <ArrowLeft size={24} />
                         </button>
                         <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-[0.28em] text-amber-500">
@@ -1043,7 +1043,7 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
 
             <div className="relative shrink-0 border-b border-white/5 bg-black/35 p-4 pt-12 backdrop-blur-xl">
                 <div className="flex items-center justify-between gap-3">
-                    <button onClick={view === 'CHAT' ? () => setView('BROWSE') : onBack} className="text-amber-500">
+                    <button onClick={view === 'CHAT' ? () => setView('BROWSE') : onBack} className="grid h-11 w-11 place-items-center text-amber-500" aria-label="Back">
                         <ArrowLeft size={24} />
                     </button>
                     <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-[0.28em] text-amber-500">

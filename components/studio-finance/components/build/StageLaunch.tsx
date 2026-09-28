@@ -9,7 +9,7 @@
 
 import { useCallback, useMemo, useState } from 'react';
 import type { BuildStageId } from '../../finance/build';
-import { kitWords, cityFor, constructionProgress, facilityRacks, facilityRoomLabel, gates, listingFor } from '../../finance/build';
+import { kitWords, cityFor, computeRacks, constructionProgress, facilityRacks, facilityRoomLabel, gates, listingFor, providerOf } from '../../finance/build';
 import type { StageProps } from './BuildWizard';
 import { compactCount, money } from '../../finance/format';
 import { Cutscene } from '../cine/Cutscene';
@@ -28,27 +28,49 @@ export function StageLaunch({ data, draft, totals, plan, handlers, onJump }: Sta
     + definitionChecks.filter(check => check.complete).length;
   const requirementCount = list.length + definitionChecks.length;
   const readinessPercent = requirementCount > 0 ? readyCount / requirementCount * 100 : 0;
-  /* A contract is with someone. The rooms were a flat list; they are grouped
-     under the provider whose contract executes, which is what a schedule to an
-     agreement actually looks like. */
+  /* The schedule describes what is actually commissioned. Cloud compute is an
+     allocation, not a rack in a leased room. Its listing's real-estate
+     provider is not the cloud provider. Money stays in the canonical quote
+     below; listing move-in figures are not additive to that quote. */
   const providers = useMemo(() => {
-    const groups = new Map<string, { provider: string; rooms: Array<{ id: string; label: string; racks: number; moveIn: number }>; racks: number; moveIn: number }>();
+    type ScheduleGroup = {
+      key: string;
+      provider: string;
+      kind: 'PHYSICAL' | 'CLOUD';
+      items: Array<{ id: string; label: string; quantity: number }>;
+      quantity: number;
+    };
+    const groups = new Map<string, ScheduleGroup>();
     for (const facility of draft.facilities) {
-      const listing = listingFor(data, facility);
-      const provider = listing?.provider ?? 'Unnamed provider';
-      const group = groups.get(provider) ?? { provider, rooms: [], racks: 0, moveIn: 0 };
-      group.rooms.push({
+      const cloud = facility.tenure === 'CLOUD';
+      const provider = cloud
+        ? providerOf(facility).name
+        : listingFor(data, facility)?.provider ?? 'Unnamed provider';
+      const key = `${cloud ? 'cloud' : 'physical'}:${provider}`;
+      const group = groups.get(key) ?? {
+        key, provider, kind: cloud ? 'CLOUD' : 'PHYSICAL', items: [], quantity: 0,
+      };
+      const quantity = cloud ? computeRacks(facility) : facilityRacks(facility);
+      const cloudPeers = cloud
+        ? draft.facilities.filter(candidate => candidate.tenure === 'CLOUD'
+          && candidate.cityId === facility.cityId && providerOf(candidate).id === providerOf(facility).id)
+        : [];
+      const cloudOrdinal = cloudPeers.findIndex(candidate => candidate.id === facility.id) + 1;
+      group.items.push({
         id: facility.id,
-        label: facilityRoomLabel(data, draft.facilities, facility),
-        racks: facilityRacks(facility),
-        moveIn: listing?.moveIn ?? 0,
+        label: cloud
+          ? `${cityFor(data, facility)?.name ?? 'Cloud site'} · Allocation ${String(cloudOrdinal).padStart(2, '0')}`
+          : facilityRoomLabel(data, draft.facilities, facility),
+        quantity,
       });
-      group.racks += facilityRacks(facility);
-      group.moveIn += listing?.moveIn ?? 0;
-      groups.set(provider, group);
+      group.quantity += quantity;
+      groups.set(key, group);
     }
-    return [...groups.values()].sort((left, right) => right.racks - left.racks);
+    return [...groups.values()].sort((left, right) =>
+      Number(left.kind === 'CLOUD') - Number(right.kind === 'CLOUD') || right.quantity - left.quantity);
   }, [data, draft.facilities]);
+  const physicalRoomCount = draft.facilities.filter(facility => facility.tenure !== 'CLOUD').length;
+  const cloudSiteCount = draft.facilities.length - physicalRoomCount;
 
   /* One list of everything that must be true, whichever screen owns it — a
      Build gate and a Define the Launch check are the same kind of thing to the
@@ -270,30 +292,31 @@ export function StageLaunch({ data, draft, totals, plan, handlers, onJump }: Sta
         </header>
 
         <p className="bw-agreement-rule">
-          Schedule A · rooms commissioned
+          Schedule A · infrastructure commissioned
           <em>
-            {draft.facilities.length} {draft.facilities.length === 1 ? 'room' : 'rooms'}
-            {providers.length > 0 && ` · ${providers.length} ${providers.length === 1 ? 'provider' : 'providers'}`}
+            {physicalRoomCount} {physicalRoomCount === 1 ? 'room' : 'rooms'}
+            {cloudSiteCount > 0 && ` · ${cloudSiteCount} cloud ${cloudSiteCount === 1 ? 'site' : 'sites'}`}
           </em>
         </p>
 
         {providers.length === 0 ? (
-          <p className="bw-agreement-empty">Nothing leased. There is no build to commission.</p>
+          <p className="bw-agreement-empty">No infrastructure selected. There is no build to commission.</p>
         ) : (
           <ul className="bw-agreement-schedule">
             {providers.map(group => (
-              <li key={group.provider}>
+              <li key={group.key}>
                 <details className="bw-agreement-provider">
                   <summary className="bw-agreement-party">
-                    <b>{group.provider}</b>
-                    <em>{group.rooms.length} {group.rooms.length === 1 ? 'room' : 'rooms'} · {group.racks} racks · {money(group.moveIn)} room move-in</em>
+                    <b>{group.kind === 'CLOUD' ? 'Cloud · ' : 'Rooms · '}{group.provider}</b>
+                    <em>{group.items.length} {group.kind === 'CLOUD'
+                      ? group.items.length === 1 ? 'cloud site' : 'cloud sites'
+                      : group.items.length === 1 ? 'room' : 'rooms'} · {Number(group.quantity.toFixed(1))} {group.kind === 'CLOUD' ? 'compute' : group.quantity === 1 ? 'rack' : 'racks'}</em>
                   </summary>
                   <ul>
-                    {group.rooms.map(room => (
-                      <li key={room.id}>
-                        <span>{room.label}</span>
-                        <s>{room.racks} {room.racks === 1 ? 'rack' : 'racks'}</s>
-                        <b>{room.moveIn > 0 ? money(room.moveIn) : 'Included'}</b>
+                    {group.items.map(item => (
+                      <li key={item.id}>
+                        <span>{item.label}</span>
+                        <s>{Number(item.quantity.toFixed(1))} {group.kind === 'CLOUD' ? 'compute' : item.quantity === 1 ? 'rack' : 'racks'}</s>
                       </li>
                     ))}
                   </ul>
@@ -315,7 +338,7 @@ export function StageLaunch({ data, draft, totals, plan, handlers, onJump }: Sta
 
         <p className="bw-agreement-rule">On execution</p>
         <ul className="bw-agreement-terms">
-          <li>Every room above is contracted and {money(commissionNow)} leaves the treasury, once.</li>
+          <li>The listed rooms and cloud allocations are contracted and {money(commissionNow)} leaves the treasury, once.</li>
           <li>
             {totals.weeks > 0
               ? `Construction begins. ${kitWords(totals, ' and ')} across ${totals.cities} ${totals.cities === 1 ? 'city' : 'cities'} are operational in ${totals.weeks} ${totals.weeks === 1 ? 'week' : 'weeks'}.`

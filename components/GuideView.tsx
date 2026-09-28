@@ -532,9 +532,9 @@ const SectionList: React.FC<{
     onToggle: (id: string) => void;
     onBack: () => void;
 }> = ({ title, subtitle, icon, sections, expandedSection, guideText, onToggle, onBack }) => (
-    <div className="absolute inset-0 z-40 flex h-full flex-col bg-zinc-950 text-white animate-in slide-in-from-right duration-300">
+    <div data-ui="actor-empire-guide" className="absolute inset-0 z-40 flex h-full flex-col bg-zinc-950 text-white animate-in slide-in-from-right duration-300">
         <div className="flex shrink-0 items-center gap-3 border-b border-zinc-800 bg-zinc-900 p-4 pt-12">
-            <button onClick={onBack} className="-ml-2 rounded-full p-2 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white">
+            <button onClick={onBack} className="grid h-11 w-11 place-items-center rounded-full text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white" aria-label="Back">
                 <ArrowLeft size={20} />
             </button>
             <div className="flex items-center gap-2 text-lg font-bold">
@@ -577,9 +577,9 @@ const ProblemSolverView: React.FC<{
     onOpenApp?: (mode: GuideAppDestination) => void;
     onOpenRelated: (mode: Extract<GuideMode, 'HANDBOOK' | 'PLAYBOOKS' | 'FAQ'>, sectionId: string) => void;
 }> = ({ problem, guideText, onBack, onOpenApp, onOpenRelated }) => (
-    <div className="absolute inset-0 z-50 flex h-full flex-col bg-zinc-950 text-white animate-in slide-in-from-right duration-300">
+    <div data-ui="actor-empire-guide" className="absolute inset-0 z-50 flex h-full flex-col bg-zinc-950 text-white animate-in slide-in-from-right duration-300">
         <div className="flex shrink-0 items-center gap-3 border-b border-zinc-800 bg-zinc-900 p-4 pt-12">
-            <button onClick={onBack} className="-ml-2 rounded-full p-2 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white">
+            <button onClick={onBack} className="grid h-11 w-11 place-items-center rounded-full text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white" aria-label="Back">
                 <ArrowLeft size={20} />
             </button>
             <div className="flex min-w-0 items-center gap-2 text-lg font-bold">
@@ -711,8 +711,8 @@ export const GuideView: React.FC<GuideViewProps> = ({ player, onBack, onOpenApp 
     const renderWizard = () => {
         const step = WIZARD_STEPS[wizardStep];
         return (
-            <div className="absolute inset-0 z-50 flex h-full flex-col bg-black animate-in fade-in zoom-in-95 duration-300">
-                <button onClick={() => setMode('MENU')} className="absolute right-6 top-12 z-10 rounded-full bg-zinc-900 p-2 text-zinc-500 hover:text-white">
+            <div data-ui="actor-empire-guide" className="absolute inset-0 z-50 flex h-full flex-col bg-black animate-in fade-in zoom-in-95 duration-300">
+                <button onClick={() => setMode('MENU')} aria-label="Close guide" className="absolute right-6 top-12 z-10 grid h-11 w-11 place-items-center rounded-full bg-zinc-900 text-zinc-500 hover:text-white">
                     <X size={20} />
                 </button>
 
@@ -801,9 +801,9 @@ export const GuideView: React.FC<GuideViewProps> = ({ player, onBack, onOpenApp 
     }
 
     return (
-        <div className="absolute inset-0 z-40 flex h-full flex-col bg-zinc-950 font-sans text-white animate-in slide-in-from-right duration-300">
+        <div data-ui="actor-empire-guide" className="absolute inset-0 z-40 flex h-full flex-col bg-zinc-950 font-sans text-white animate-in slide-in-from-right duration-300">
             <div className="flex shrink-0 items-center gap-3 border-b border-zinc-800 bg-zinc-900/95 px-4 pb-3 pt-10">
-                <button onClick={onBack} className="-ml-2 rounded-full p-2 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white">
+                <button onClick={onBack} className="grid h-11 w-11 place-items-center rounded-full text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white" aria-label="Back to phone">
                     <ArrowLeft size={20} />
                 </button>
                 <div className="min-w-0">
@@ -891,7 +891,7 @@ export const GuideView: React.FC<GuideViewProps> = ({ player, onBack, onOpenApp 
                             className="w-full bg-transparent text-sm font-semibold text-white outline-none placeholder:text-zinc-600"
                         />
                         {searchQuery && (
-                            <button type="button" onClick={() => setSearchQuery('')} className="rounded-full p-1 text-zinc-500 hover:bg-zinc-800 hover:text-white">
+                            <button type="button" onClick={() => setSearchQuery('')} aria-label="Clear guide search" className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-zinc-500 hover:bg-zinc-800 hover:text-white">
                                 <X size={14} />
                             </button>
                         )}

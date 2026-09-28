@@ -51,15 +51,16 @@ export function Headline({ ask, state, tone, step }: {
 
 /* --- a number that counts to its value ----------------------------------- */
 
-export function Figure({ value, format, unit, className }: {
+export function Figure({ value, format, unit, className, duration }: {
   /** No @types/react here: a value-based component declares key itself. */
   key?: Key;
   value: number;
   format: (value: number) => string;
   unit?: string;
   className?: string;
+  duration?: number;
 }) {
-  const shown = useCountUp(value);
+  const shown = useCountUp(value, duration);
   return (
     <b className={className ? `kit-figure ${className}` : 'kit-figure'}>
       {format(shown)}
@@ -398,7 +399,7 @@ export function PlanStrip({ view, page, tone, over, money, measure, ways }: {
           <em><i aria-hidden="true" />{view.subject}</em>
           {/* Keyed by page so each one's figure starts at its own value
               instead of counting down from the last page's. */}
-          <Figure key={page} value={view.value} format={view.format} unit={view.unit} />
+          <Figure key={page} value={view.value} format={view.format} unit={view.unit} duration={page === 'pricing' ? 260 : undefined} />
         </span>
 
         <span className="kit-strip-measure-wrap">

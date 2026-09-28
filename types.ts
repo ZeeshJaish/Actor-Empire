@@ -1,4 +1,6 @@
 
+import type { PlayerPerformanceSettings } from './services/performancePreferences';
+
 // Enums & Basic Types
 export enum Page {
   HOME = 'HOME',
@@ -1487,6 +1489,9 @@ export interface Script {
         negotiated: boolean;
         accepted: boolean;
         attemptsLeft?: number;
+        /** Optional sequel leverage; absent on old scripts means zero. */
+        backendDemandPoints?: number;
+        acceptedBackendPoints?: number;
     }[];
 }
 
@@ -1505,6 +1510,8 @@ export interface Writer {
 export interface ProjectConcept {
     id: string;
     scriptId: string;
+    /** Optional saved Greenlight choices; absent on old drafts means no backend promises. */
+    talentBackendDraft?: Record<string, number>;
     lastUpdated: number;
     crewModes: Record<string, 'HIRE' | 'SELF' | 'IN_HOUSE'>;
     selectedCrew: Record<string, string | null>;
@@ -1963,6 +1970,9 @@ export interface StudioState {
     lastWriterRefreshWeek: number;
     lastMarketRefreshAbsoluteWeek?: number;
     lastWriterRefreshAbsoluteWeek?: number;
+    /** Paid script scouting is independent of the scheduled free refresh. */
+    paidScoutCycle?: number;
+    paidScoutCount?: number;
     lastTalentRefreshWeek?: number;
     departments?: StudioDepartments;
     equipment?: StudioEquipment;
@@ -2118,7 +2128,7 @@ export interface StudioFinanceEntry {
     week: number;
     year: number;
     amount: number;
-    type: 'THEATRICAL' | 'STREAMING_DEAL' | 'STREAMING_ROYALTY' | 'SOUNDTRACK' | 'UNIVERSE' | 'CAPITAL_INJECTION' | 'CAPITAL_WITHDRAWAL' | 'PRODUCTION_SPEND' | 'FUNDING_SURPLUS' | 'INVESTOR_FUNDING' | 'INVESTOR_PAYOUT' | 'ACQUISITION_MERGER' | 'IP_ACQUISITION' | 'STUDIO_SALE' | 'REBRAND' | 'LEGAL';
+    type: 'THEATRICAL' | 'STREAMING_DEAL' | 'STREAMING_ROYALTY' | 'SOUNDTRACK' | 'TALENT_BACKEND' | 'UNIVERSE' | 'CAPITAL_INJECTION' | 'CAPITAL_WITHDRAWAL' | 'PRODUCTION_SPEND' | 'FUNDING_SURPLUS' | 'INVESTOR_FUNDING' | 'INVESTOR_PAYOUT' | 'ACQUISITION_MERGER' | 'IP_ACQUISITION' | 'STUDIO_SALE' | 'REBRAND' | 'LEGAL';
     label: string;
     projectId?: string;
 }
@@ -2684,6 +2694,43 @@ export interface OutsideProductionInvestment {
     eventLog?: string[];
 }
 
+export interface TalentParticipationContract {
+    contractId: string;
+    role: 'ACTOR' | 'DIRECTOR' | 'WRITER';
+    roleId: string;
+    talentId: string;
+    talentName: string;
+    upfrontFee: number;
+    backendPoints: number;
+    receiptsBasis: 'STUDIO_COLLECTED_TITLE_RECEIPTS';
+}
+
+export interface TalentParticipationPackage {
+    schemaVersion: 1;
+    contracts: TalentParticipationContract[];
+    /** Phase 3 settlement ledger starts empty; phases 1-2 make no backend payment. */
+    processedReceiptKeys: string[];
+    /** Chronological replay guard once old per-receipt keys are compacted. */
+    lastSettledAbsoluteWeek?: number;
+}
+
+export interface TalentCareerProfile {
+    talentId: string;
+    talentName: string;
+    income: number;
+    upfrontIncome: number;
+    backendIncome: number;
+    projectIds: string[];
+    awardIds: string[];
+}
+
+export interface TalentCareerState {
+    schemaVersion: 1;
+    profiles: Record<string, TalentCareerProfile>;
+    processedEventKeys: string[];
+    lastProcessedAbsoluteWeek: number;
+}
+
 export interface ProjectDetails {
     title: string;
     sourceScriptId?: string;
@@ -2693,6 +2740,8 @@ export interface ProjectDetails {
     writerId?: string;
     writerName?: string;
     writerSkill?: number;
+    /** Contracts agreed at a new Greenlight; absent on older active projects means zero backend. */
+    talentParticipation?: TalentParticipationPackage;
     isOriginal?: boolean;
     type: ProjectType;
     description: string;
@@ -3241,6 +3290,32 @@ export interface OwnedStreamingPricingPlan {
     colorId?: StreamingPricingPlanColorId;
 }
 
+export type StreamingCommercialCoreModel = 'SUBSCRIPTION' | 'ADVERTISING' | 'STORE' | 'LEGACY';
+
+export interface StreamingCommercialOfferBenefit {
+    premiumAccess: boolean;
+    earlyAccessWeeks: number;
+}
+
+/** Versioned offer intent. Existing pricing fields remain the sole price authority. */
+export interface StreamingCommercialOfferIntent {
+    schemaVersion: 1;
+    /** False only for a new, untouched setup. Missing in older saves means chosen. */
+    coreModelSelected?: boolean;
+    /** Dormant ad-tier terms only; active plans remain the price authority. */
+    inactiveAdPlans?: Record<string, { monthly: number }>;
+    coreModel: StreamingCommercialCoreModel;
+    freeAdAccess: boolean;
+    /** Buyer permission for new store transactions; title rights are checked separately. */
+    storeEligibility?: { kind: 'PUBLIC' | 'MEMBERSHIP_PLANS'; planIds: string[] };
+    adFreePasses: { oneHourPrice: number | null; dayPrice: number | null };
+    benefits: {
+        plans: Record<string, StreamingCommercialOfferBenefit>;
+        freeAds: StreamingCommercialOfferBenefit;
+        store: StreamingCommercialOfferBenefit;
+    };
+}
+
 export interface OwnedStreamingPricingConfiguration {
     streams: StreamingRevenueStreamId[];
     plans: OwnedStreamingPricingPlan[];
@@ -3256,6 +3331,7 @@ export interface OwnedStreamingPricingConfiguration {
     sponsor: { perTitle: number; titles: number };
     metered: { perHour: number };
     patron: { monthly: number };
+    commercialOffers?: StreamingCommercialOfferIntent;
 }
 
 export interface OwnedStreamingServiceConfiguration {
@@ -4857,6 +4933,130 @@ export type StreamingRightsContractLegacySource =
     | 'PLATFORM_AI_LICENSE'
     | 'PRODUCTION_RELEASE';
 
+/** A proven legacy sale whose buyer cannot safely be reconstructed. */
+export interface LegacyStreamingRightsHold {
+    id: string;
+    sourceProjectId: string;
+    reason: 'UNKNOWN_BUYER' | 'CONFLICTING_EVIDENCE' | 'UNVERIFIED_ACCEPTED_BID';
+    observedAtAbsoluteWeek: number;
+}
+
+export interface LegacyStreamingRightsMigrationSummary {
+    schemaVersion: 1;
+    reconciledAtAbsoluteWeek: number;
+    explicitDealsPreserved: number;
+    permanentDealsProtected: number;
+    unresolvedTitlesHeld: number;
+}
+
+/** Compact, per-save recipe for the immutable historical screen library. */
+export interface HistoricalCatalogueProducer {
+    id: string;
+    name: string;
+    archetype: string;
+    languageId: string;
+    regionId: string;
+    weight: number;
+    earliestYear?: number;
+    kind: 'WORLD_STUDIO' | 'FICTIONAL_REGIONAL';
+}
+
+export interface HistoricalCatalogueOverlay {
+    rating?: number;
+    quality?: number;
+    boxOffice?: number;
+    reach?: number;
+    prestige?: number;
+    updatedAtAbsoluteWeek: number;
+}
+
+export interface HistoricalMarketPacingState {
+    anchorAbsoluteWeek: number;
+    protectedTitleIds: string[];
+    rivalOpeningContractIds: string[];
+    lastRivalCycle: number | null;
+}
+
+export interface HistoricalCatalogueState {
+    schemaVersion: 1;
+    generatorVersion: 1;
+    /** Separate append-only premium batch; v1 generation never changes. */
+    marqueeVersion?: 2;
+    marqueeActivatedAtAbsoluteWeek?: number;
+    marketPacing?: HistoricalMarketPacingState;
+    seed: string;
+    initializedAtAbsoluteWeek: number;
+    seededCount: number;
+    savedTitleCountAtInitialization: number;
+    producerRoster: HistoricalCatalogueProducer[];
+    overlays: Record<string, HistoricalCatalogueOverlay>;
+}
+
+/** Saved public discovery shelf. Unsold offers are not world projects. */
+export interface StreamingOpportunityOffer {
+    id: string;
+    projectId: string;
+    cycle: number;
+    title: string;
+    logline: string;
+    projectType: 'MOVIE' | 'SERIES';
+    genre: Genre;
+    originalLanguageId: string;
+    sellerId: string;
+    sellerName: string;
+    writerId: string;
+    writerName: string;
+    directorId: string;
+    directorName: string;
+    leadActorId: string;
+    leadActorName: string;
+    cast: Array<{ id: string; name: string }>;
+    askingPrice: number;
+    qualityForecast: number;
+    premium: boolean;
+    talentUpfrontPool: number;
+}
+
+export interface StreamingOpportunityMarketState {
+    schemaVersion: 1;
+    cycle: number;
+    openedAtAbsoluteWeek?: number;
+    offers: StreamingOpportunityOffer[];
+    /** References to existing rights-valid collection opportunities, not copied films. */
+    collectionIds: string[];
+    /** Private, unsigned player-first scouting shelf; expires with this cycle. */
+    scoutedOffers?: StreamingOpportunityOffer[];
+    scoutedCollectionIds?: string[];
+    paidScoutCount?: number;
+    sellerReceipts: Record<string, number>;
+    lastRivalCycle: number | null;
+    /** One bounded public auction opportunity per non-opening week. */
+    lastRivalPublicWeek?: number | null;
+}
+
+export interface HistoricalCatalogueTitle {
+    id: string;
+    title: string;
+    projectType: 'MOVIE' | 'SERIES';
+    genre: Genre;
+    originalLanguageId: string;
+    regionId: string;
+    studioId: string;
+    studioName: string;
+    rightsHolderId: string;
+    year: number;
+    weekReleased: number;
+    quality: number;
+    rating: number;
+    boxOffice: number;
+    budgetTier: BudgetTier;
+    reach: number;
+    prestige: number;
+    provenance: 'SAVED_RELEASE' | 'SEEDED_HISTORY';
+    catalogueTier?: 'MARQUEE';
+    inferredFields: string[];
+}
+
 export interface StreamingRightsContractParty {
     type: StreamingRightsContractPartyType;
     id: string;
@@ -4893,6 +5093,17 @@ export interface OwnedStreamingStarterCatalog {
     ownedProjectIds: string[];
     licensedProjectIds: string[];
     establishedAtAbsoluteWeek: number;
+}
+
+export type StreamingTitleAccessMode = 'SUBSCRIPTION' | 'AD_SUPPORTED' | 'RENTAL' | 'PURCHASE';
+
+/** Access permissions frozen when a title position is acquired. */
+export interface StreamingRightsAccessGrant {
+    schemaVersion: 1;
+    modes: StreamingTitleAccessMode[];
+    earlyWindowWeeks: number;
+    purchaseFulfillment: 'NONE' | 'PERPETUAL';
+    source: 'EXPLICIT' | 'LEGACY_SNAPSHOT';
 }
 
 export interface OwnedStreamingCatalogLicense {
@@ -4937,6 +5148,7 @@ export interface OwnedStreamingCatalogLicense {
     changeOfControl?: StreamingRightsChangeOfControl;
     cancellationPenalty?: number;
     renewedFromLicenseId?: string | null;
+    accessGrant?: StreamingRightsAccessGrant;
 }
 
 /** Actor-neutral canonical record shared by production and distribution views. */
@@ -5540,6 +5752,7 @@ export interface StreamingCataloguePackageExclusion {
 export interface StreamingCataloguePackageComponent {
     sourceProjectId: string;
     title: string;
+    catalogueTier?: 'MARQUEE';
     projectType: 'MOVIE' | 'SERIES';
     genre: string;
     originalLanguageId: string;
@@ -5674,6 +5887,8 @@ export interface OwnedStreamingRightsNegotiation {
     territory: StreamingLicenseTerritory;
     /** Exact bounded scope captured when the term sheet opens. GLOBAL uses []. */
     countryIds: string[];
+    /** Access modes frozen on the accepted term sheet, bounded by the seller's rights. */
+    accessGrant?: StreamingRightsAccessGrant;
     durationWeeks: number;
     exclusivity: StreamingLicenseExclusivity;
     windowType: StreamingRightsWindowType;
@@ -6497,6 +6712,8 @@ export interface OwnedStreamingPlatformState {
     campusProjects: OwnedStreamingCampusProject[];
     productLines: OwnedStreamingProductLine[];
     catalogSetupDraft: OwnedStreamingCatalogSetupDraft | null;
+    /** New quotes start only at this market cycle; absent on legacy saves until a safe weekly rollover. */
+    marketQuotePolicy?: { version: 2; effectiveCycle: number };
     contentMarketDraft?: { tab: 'ALL' | 'MOVIE' | 'SERIES' | 'COLLECTIONS' | 'OWNED' | 'OFFERS' | 'AUCTIONS' | 'UPCOMING'; search: string; selectedId: string | null; ownedIds: string[] } | null;
     buyerAuctionSessions: StreamingBuyerAuctionSession[];
     upcomingRightsSales: StreamingUpcomingRightsSale[];
@@ -6546,6 +6763,7 @@ export const OWNED_STREAMING_PLATFORM_SCHEMA_VERSION = 27;
 
 export const createInitialOwnedStreamingPlatformState = (playerId = ''): OwnedStreamingPlatformState => ({
     schemaVersion: OWNED_STREAMING_PLATFORM_SCHEMA_VERSION,
+    marketQuotePolicy: { version: 2, effectiveCycle: 0 },
     lifecycle: 'LOCKED',
     identity: null,
     foundingDraft: null,
@@ -6670,6 +6888,12 @@ export const createInitialOwnedStreamingPlatformState = (playerId = ''): OwnedSt
         storefrontLayoutId: null,
         pricingApproach: null,
         pricing: {
+            commercialOffers: {
+                schemaVersion: 1, coreModel: 'SUBSCRIPTION', coreModelSelected: false,
+                freeAdAccess: false, adFreePasses: { oneHourPrice: null, dayPrice: null },
+                benefits: { plans: {}, freeAds: { premiumAccess: false, earlyAccessWeeks: 0 },
+                    store: { premiumAccess: false, earlyAccessWeeks: 0 } },
+            },
             streams: ['subs'],
             plans: [
                 { id: 'BASIC', name: 'Essential', monthly: 7.99, featureIds: [], ads: false },
@@ -6983,6 +7207,8 @@ export interface PastProject {
     isQaArchive?: boolean;
     musicPlan?: ProjectMusicPlan;
     sourceScriptId?: string;
+    writerId?: string;
+    writerName?: string;
     isOriginal?: boolean;
 }
 
@@ -7215,7 +7441,34 @@ export interface LifeEventOption {
     textVars?: LocalizedTextVars;
     isGolden?: boolean; // Requires Ad
     previewEffects?: EventImpactSignal[];
+    impactId?: LifeEventImpactId;
+    impactPayload?: MaterializedLifeEventImpactPayload;
+    resolutionSeed?: string;
+    noEffect?: boolean;
+    safeFallback?: LifeEventSafeFallback;
     impact?: (player: Player) => LifeEventImpactResult;
+}
+
+export type LifeEventSafeFallbackStat = 'fame' | 'reputation' | 'happiness';
+
+export interface LifeEventSafeFallback {
+    statDeltas?: Partial<Record<LifeEventSafeFallbackStat, number>>;
+    log?: string;
+    logKey?: string;
+    logVars?: LocalizedTextVars;
+}
+
+export type LifeEventImpactId = 'MATERIALIZED_PATCH_V1';
+
+export interface LifeEventPatchOperation {
+    op: 'add' | 'remove' | 'replace';
+    path: Array<string | number>;
+    value?: unknown;
+}
+
+export interface MaterializedLifeEventImpactPayload {
+    patches: LifeEventPatchOperation[];
+    outcome: Omit<LifeEventImpactResult, 'updatedPlayer'>;
 }
 
 export interface EventImpactSignal {
@@ -7235,6 +7488,31 @@ export interface LifeEventImpactResult {
     effects?: EventImpactSignal[];
     feedbackDelay?: number;
     feedbackType?: string;
+    resolutionKind?: LifeEventResolutionKind;
+    legacyReason?: string;
+    fallbackReason?: string;
+    fallbackSource?: 'EXPLICIT' | 'STRUCTURED_PREVIEW' | 'NO_CHANGE';
+}
+
+export type LifeEventResolutionKind =
+    | 'SERIALIZED'
+    | 'SERIALIZED_ADAPTER'
+    | 'RUNTIME_CALLBACK'
+    | 'EXPLICIT_NO_EFFECT'
+    | 'LEGACY_RECONSTRUCTED'
+    | 'LEGACY_UNRESOLVABLE'
+    | 'SAFE_FALLBACK';
+
+export interface LifeEventResolutionReceipt {
+    id: string;
+    eventId: string;
+    optionId: string;
+    impactId?: string;
+    resolutionSeed?: string;
+    resolutionKind: LifeEventResolutionKind;
+    resolvedAt: number;
+    resolvedAge: number;
+    resolvedWeek: number;
 }
 
 export interface LifeEvent {
@@ -7248,6 +7526,7 @@ export interface LifeEvent {
     options: LifeEventOption[];
     image?: string;
     category?: string;
+    eventSchemaVersion?: number;
 }
 
 export interface LegalCase {
@@ -7607,7 +7886,7 @@ export interface NPCActor {
     openness: number;
     followers: number;
     netWorth: number;
-    occupation: 'ACTOR' | 'DIRECTOR' | 'MUSIC_ARTIST' | 'INVESTOR' | 'EXECUTIVE' | CrewOccupation;
+    occupation: 'ACTOR' | 'DIRECTOR' | 'WRITER' | 'MUSIC_ARTIST' | 'INVESTOR' | 'EXECUTIVE' | CrewOccupation;
     crewRole?: CrewOccupation;
     crewTier?: CrewMarketTier;
     salary?: number;
@@ -7839,6 +8118,13 @@ export interface IndustryProject {
     leadActorName: string;
     directorId?: string;
     directorName: string;
+    writerId?: string | null;
+    writerName?: string;
+    /** Market-born films are canonical after signing but award-eligible only after a public premiere. */
+    marketOpportunityId?: string;
+    marketAcquiredAtAbsoluteWeek?: number;
+    marketPremiereAtAbsoluteWeek?: number | null;
+    marketBuyerPlatformId?: string | null;
     reviews: string;
     awardProfile?: {
         leadPerformance: number;
@@ -8082,7 +8368,7 @@ export interface AwardHistoryEntry {
     }[];
 }
 
-export type IndustryTalentBookingRole = 'ACTOR' | 'DIRECTOR';
+export type IndustryTalentBookingRole = 'ACTOR' | 'DIRECTOR' | 'WRITER';
 export type IndustryTalentBookingOwner = 'PLAYER_COMMITMENT' | 'INDUSTRY_PRODUCTION';
 export type IndustryTalentBookingStatus = 'BOOKED' | 'CANCELLED' | 'RELEASED';
 
@@ -8140,6 +8426,10 @@ export interface StudioAiProductionTalent {
     directorName: string;
     packageScore: number;
     estimatedCostMillions: number;
+    writerId?: string;
+    writerName?: string;
+    upfrontFeesMillions?: { actor: number; director: number; writer: number };
+    talentParticipation?: TalentParticipationPackage;
 }
 
 export interface StudioAiFinalQuality {
@@ -8203,8 +8493,8 @@ export interface IndustryProductionCommitment {
     budgetMillions: number;
     paidMillions: number;
     talentBookingIds: string[];
-    writerSource: 'IN_HOUSE_TEAM';
-    writerId: null;
+    writerSource: 'IN_HOUSE_TEAM' | 'NPC_WRITER';
+    writerId: string | null;
     writerName: string;
     writerSkill: number;
     /** Deterministic execution metadata for AI-commissioned productions. */
@@ -9396,7 +9686,7 @@ export interface StudioAiSlateState {
     processedReviewKeys: string[];
 }
 
-export type StudioAiLedgerCategory = 'CATALOGUE_OPERATIONS' | 'DEVELOPMENT' | 'REWRITE' | 'PRODUCTION' | 'RELEASE_MARKETING' | 'RIGHTS_INCOME' | 'TURNAROUND' | 'OPERATING_COST' | 'DEBT_SERVICE' | 'PROJECT_OUTCOME' | 'SHORTFALL_BORROWING' | 'OWNERSHIP_HANDOFF';
+export type StudioAiLedgerCategory = 'CATALOGUE_OPERATIONS' | 'DEVELOPMENT' | 'REWRITE' | 'PRODUCTION' | 'RELEASE_MARKETING' | 'RIGHTS_INCOME' | 'TALENT_BACKEND' | 'TURNAROUND' | 'OPERATING_COST' | 'DEBT_SERVICE' | 'PROJECT_OUTCOME' | 'SHORTFALL_BORROWING' | 'OWNERSHIP_HANDOFF';
 
 export interface StudioAiLedgerEntry {
     id: string;
@@ -9775,11 +10065,15 @@ export interface WorldStreamingPlatformOffer {
     annualDiscountPercent: number;
     introOfferPercent: number;
     catalogueStrengthIndex: number;
+    /** Actual playable catalogue by market; absent on legacy/AI offers. */
+    catalogueStrengthByCountry?: Record<string, number>;
     localizationStrengthIndex: number;
     reputationIndex: number;
     reliabilityIndex: number;
     marketingIndex: number;
     loyaltyIndex: number;
+    /** Weeks since this commercial offer began; omitted legacy fixtures are treated as established. */
+    maturityWeeks?: number;
     countryMomentum: Record<string, number>;
     preferredGenres: Genre[];
     sourceFingerprint: string;
@@ -9858,6 +10152,74 @@ export interface WorldStreamingCompetitionState {
     countries: Record<string, WorldStreamingCompetitionCountryState>;
     global: WorldStreamingCompetitionGlobalSummary;
     snapshots: WorldStreamingCompetitionSnapshot[];
+}
+
+/** C3 shadow household choices; live WE5/WE6 cash switches only at C4. */
+export type WorldStreamingPrimaryAccessKind = 'SUBSCRIPTION' | 'FREE_AD' | 'STORE';
+
+export interface WorldStreamingAudienceChoiceAllocation {
+    platformId: string;
+    kind: WorldStreamingPrimaryAccessKind;
+    planId: string | null;
+    billingPath: StreamingBillingPath | null;
+    households: number;
+    primaryHouseholds: number;
+    monthlySpend: number;
+}
+
+export interface WorldStreamingAudienceChoiceCountrySummary {
+    countryId: string;
+    reachableHouseholds: number;
+    primarySubscriptions: number;
+    monthlySubscriptions: number;
+    annualSubscriptions: number;
+    secondarySubscriptions: number;
+    freeAdHouseholds: number;
+    storeHouseholds: number;
+    outsideHouseholds: number;
+    paidMonthlyBudget: number;
+    paidMonthlySpend: number;
+    playerSubscriptions: number;
+    playerFreeAdHouseholds: number;
+    playerStoreHouseholds: number;
+}
+
+export interface WorldStreamingAudienceChoicePlatformSummary {
+    platformId: string;
+    primarySubscriptions: number;
+    secondarySubscriptions: number;
+    freeAdHouseholds: number;
+    storeHouseholds: number;
+    passOpportunities: number;
+    rentalOpportunities: number;
+    purchaseOpportunities: number;
+}
+
+export interface WorldStreamingAudienceEntitlement {
+    transactionId: string;
+    platformId: string;
+    countryId: string;
+    titleId: string;
+    kind: 'RENTAL' | 'PURCHASE';
+    households: number;
+    purchasedAtAbsoluteWeek: number;
+    expiresAtAbsoluteWeek: number | null;
+}
+
+export interface WorldStreamingAudienceChoiceState {
+    schemaVersion: 1;
+    initializedAtAbsoluteWeek: number;
+    lastProcessedAbsoluteWeek: number;
+    sourceFingerprint: string;
+    countries: Record<string, WorldStreamingAudienceChoiceCountrySummary>;
+    platforms: Record<string, WorldStreamingAudienceChoicePlatformSummary>;
+    global: Omit<WorldStreamingAudienceChoiceCountrySummary, 'countryId' | 'playerSubscriptions' | 'playerFreeAdHouseholds' | 'playerStoreHouseholds'> & {
+        settledRevenue: 0;
+        countryCount: number;
+    };
+    entitlements: WorldStreamingAudienceEntitlement[];
+    /** Idempotency key for the latest WE6 transaction batch, never a revenue ledger. */
+    settledViewingFingerprint?: string;
 }
 
 export type WorldStreamingCustomerMovementKind =
@@ -10078,6 +10440,10 @@ export interface WorldStreamingViewingDiscoveryMix {
 
 export interface WorldStreamingViewingAccessMix {
     paidViewingAccounts: number;
+    /** Legitimate no-fee viewing; never a subscription account. Optional for old saves. */
+    freeViewingAccounts?: number;
+    /** Playback purchased through a title-level rental or permanent store entitlement. */
+    storeViewingAccounts?: number;
     sharedViewingAccounts: number;
     piracyViewingAccounts: number;
 }
@@ -10094,6 +10460,9 @@ export interface WorldStreamingViewingRevenue {
     purchaseRevenue: number;
     dayPassTransactions: number;
     dayPassRevenue: number;
+    oneHourPassTransactions?: number;
+    oneHourPassRevenue?: number;
+    adFreeCoveredHours?: number;
     meteredAccounts: number;
     meteredHours: number;
     meteredRevenue: number;
@@ -10207,6 +10576,40 @@ export interface WorldStreamingViewingSnapshot {
     incrementalRevenue: number;
 }
 
+/** A finite opening title grant for an ecosystem rival without an authored rights catalogue. */
+export interface WorldStreamingAiCatalogueTitle {
+    platformId: string;
+    titleId: string;
+    title: string;
+    contractId: string;
+    countryIds: string[];
+    startsAtAbsoluteWeek: number;
+    expiresAtAbsoluteWeek: number;
+    accessGrant: StreamingRightsAccessGrant;
+}
+
+export interface WorldStreamingAiStoreEntitlement {
+    platformId: string;
+    countryId: string;
+    titleId: string;
+    kind: 'RENTAL' | 'PURCHASE';
+    households: number;
+    purchasedAtAbsoluteWeek: number;
+    expiresAtAbsoluteWeek: number | null;
+}
+
+export interface WorldStreamingAiStoreTransaction {
+    transactionId: string;
+    platformId: string;
+    countryId: string;
+    titleId: string;
+    contractId: string;
+    kind: 'RENTAL' | 'PURCHASE';
+    households: number;
+    revenue: number;
+    purchasedAtAbsoluteWeek: number;
+}
+
 export interface WorldStreamingViewingState {
     schemaVersion: 2;
     initializedAtAbsoluteWeek: number;
@@ -10215,6 +10618,16 @@ export interface WorldStreamingViewingState {
     countries: Record<string, WorldStreamingViewingCountryState>;
     platforms: Record<string, WorldStreamingViewingPlatformSummary>;
     global: WorldStreamingViewingGlobalSummary;
+    /** Current-week aggregate store sales; omitted on historical WE6 saves. */
+    commercialTransactions?: Array<Omit<WorldStreamingAudienceEntitlement, 'platformId' | 'expiresAtAbsoluteWeek'> & {
+        /** Source membership at purchase time; null is a public store/free-ad buyer. */
+        buyerPlanId?: string | null;
+    }>;
+    /** Frozen only for rivals with no canonical title position at migration time. */
+    aiCatalogue?: WorldStreamingAiCatalogueTitle[];
+    aiCatalogueSeededPlatformIds?: string[];
+    aiStoreEntitlements?: WorldStreamingAiStoreEntitlement[];
+    aiStoreTransactions?: WorldStreamingAiStoreTransaction[];
     snapshots: WorldStreamingViewingSnapshot[];
 }
 
@@ -10345,6 +10758,9 @@ export interface WorldEconomyHealthSummary {
 
 export interface WorldState {
     projects: IndustryProject[];
+    streamingOpportunityMarket?: StreamingOpportunityMarketState;
+    talentCareer?: TalentCareerState;
+    historicalCatalogue?: HistoricalCatalogueState;
     trendingGenre: Genre;
     universes: Record<UniverseId, Universe>;
     famousMoviesReleased: string[];
@@ -10357,6 +10773,8 @@ export interface WorldState {
     platformAiPlayerCommissionOffers?: Record<string, PlatformAiPlayerCommissionOffer>;
     platformAiCatalogueDistressDeals?: PlatformAiCatalogueDistressDeal[];
     streamingRightsContracts?: StreamingRightsContractRegistry;
+    legacyStreamingRightsHolds?: Record<string, LegacyStreamingRightsHold>;
+    legacyStreamingRightsMigration?: LegacyStreamingRightsMigrationSummary;
     streamingRightsTransactions?: StreamingRightsTransactionRegistry;
     streamingRightsCalendar?: StreamingRightsCalendarState;
     streamingRightsOffice?: StreamingRightsOfficeState;
@@ -10375,6 +10793,7 @@ export interface WorldState {
     worldAudienceEconomy?: WorldAudienceEconomyState;
     worldAudienceParticipation?: WorldAudienceParticipationState;
     worldStreamingCompetition?: WorldStreamingCompetitionState;
+    worldStreamingAudienceChoice?: WorldStreamingAudienceChoiceState;
     worldStreamingCustomers?: WorldStreamingCustomerState;
     worldStreamingViewing?: WorldStreamingViewingState;
     worldStreamingPlatformEconomy?: WorldStreamingPlatformEconomyState;
@@ -10740,6 +11159,8 @@ export type GameLanguage = 'en' | 'pt-BR' | 'fr' | 'es' | 'tr' | 'de';
 
 export interface PlayerSettings {
     language: GameLanguage;
+    performance?: PlayerPerformanceSettings;
+    /** @deprecated Read only for migration and rollback compatibility. */
     smoothMode?: boolean;
 }
 
@@ -10895,7 +11316,11 @@ export const INITIAL_PLAYER: Player = {
     totalPlayTimeMs: 0,
     gender: 'MALE',
     avatar: '',
-    settings: { language: 'en', smoothMode: false },
+    settings: {
+        language: 'en',
+        performance: { schemaVersion: 1, preference: 'AUTOMATIC', noticeVersion: 0 },
+        smoothMode: false,
+    },
     money: 2000,
     energy: { current: 100, max: 100 },
     stats: {

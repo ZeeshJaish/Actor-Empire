@@ -36,6 +36,8 @@ import {
 import { normalizeStreamingRightsDelegationTrace } from './streamingRightsDelegation';
 import { buildStreamingBiddingRightsLot, resolveStreamingRightsCompatibility } from './streamingRightsCompatibility';
 import { normalizeStreamingDayOneMarketIds, STREAMING_DAY_ONE_MARKETS } from './streamingDayOneMarkets';
+import { createStreamingRightsAccessGrantForOffer } from './streamingRightsAccessGrant';
+import { getWorldStreamingOffers } from './worldEconomy/worldStreamingOffers';
 
 const asRecord = (value: unknown): Record<string, any> => (
     value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, any> : {}
@@ -86,7 +88,7 @@ const sameStrings = (left: string[], right: string[]): boolean => (
 );
 
 export const calculateStreamingCatalogueReferenceValue = (
-    component: Pick<StreamingCataloguePackageComponent, 'quality' | 'audience' | 'budget' | 'theatricalGross' | 'streamingRevenue' | 'franchiseProtected'>,
+    component: Pick<StreamingCataloguePackageComponent, 'quality' | 'audience' | 'budget' | 'theatricalGross' | 'streamingRevenue' | 'franchiseProtected' | 'catalogueTier'>,
 ): number => {
     const quality = clamp(Number(component.quality), 0, 100);
     const audienceValue = Math.min(180_000_000, Math.max(0, Number(component.audience) || 0) * 0.85);
@@ -95,9 +97,9 @@ export const calculateStreamingCatalogueReferenceValue = (
     const streamingProof = Math.min(180_000_000, finiteMoney(component.streamingRevenue) * 0.45);
     const qualityValue = quality * quality * 22_000;
     const franchiseValue = component.franchiseProtected ? 28_000_000 : 0;
-    return Math.max(1_000_000, Math.round(
-        1_000_000 + audienceValue + budgetProof + theatricalProof + streamingProof + qualityValue + franchiseValue,
-    ));
+    return Math.max(1_000_000, Math.round((
+        1_000_000 + audienceValue + budgetProof + theatricalProof + streamingProof + qualityValue + franchiseValue
+    ) * (component.catalogueTier === 'MARQUEE' ? 2 : 1)));
 };
 
 export interface AllocateStreamingCatalogueGuaranteeInput {
@@ -1106,6 +1108,8 @@ export const acceptStreamingCataloguePackageOffer = (
     }
 
     const signedAtAbsoluteWeek = Math.max(0, Math.round(input.absoluteWeek));
+    const buyerStreams = getWorldStreamingOffers(player, signedAtAbsoluteWeek).offers
+        .find(candidate => candidate.platformId === offer.platformId)?.commercialConfiguration.streams || ['subs'];
     let stagedRegistry = normalizeStreamingRightsContractRegistry(player.world.streamingRightsContracts);
     const stagedContracts: StreamingRightsContract[] = [];
     for (const row of offer.componentTerms) {
@@ -1141,6 +1145,7 @@ export const acceptStreamingCataloguePackageOffer = (
             sublicensingAllowed: false,
             sequelRightsIncluded: false,
             changeOfControl: 'NOTICE',
+            accessGrant: createStreamingRightsAccessGrantForOffer(buyerStreams, row.windowType === 'PERMANENT'),
         });
         const candidate = createStreamingRightsContractFromLicense({
             license,

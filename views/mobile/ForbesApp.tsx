@@ -1,8 +1,9 @@
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Business, NPCActor, Player } from '../../types';
+import { Business, NPCActor, Player, TalentCareerProfile } from '../../types';
 import { formatMoney } from '../../services/formatUtils';
 import { NPC_DATABASE } from '../../services/npcLogic';
+import { getTalentCareerProfile } from '../../services/talentCareer';
 import { getEnabledGlobalCreatorSocialProfiles } from '../../services/youtubeLogic';
 import { STUDIO_CATALOG } from '../../services/studioLogic';
 import { PLATFORMS } from '../../services/streamingLogic';
@@ -70,6 +71,7 @@ const FORBES_CELEB_OCCUPATIONS = new Set<NPCActor['occupation']>([
     'COMPOSER',
     'LINE_PRODUCER',
     'VFX_SUPERVISOR',
+    'WRITER',
 ]);
 const FORBES_PERSON_CATEGORY_PATTERN = /\b(actor|director|artist|creator|influencer|icon|mogul|investor|producer|writer|filmmaker)\b/i;
 const FORBES_BRAND_CATEGORY_PATTERN = /\b(brand|company|corporation|label|product)\b/i;
@@ -115,11 +117,22 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
       onUpdatePlayer(nextPlayer);
       return { ...result, player: nextPlayer };
   };
-  const actorPool = [
+  const knownActorPool = [
       ...NPC_DATABASE,
       ...(Array.isArray(player.flags?.extraNPCs) ? player.flags.extraNPCs : []),
       ...getEnabledGlobalCreatorSocialProfiles(player)
-  ].filter((npc, idx, arr) => arr.findIndex(entry => entry.id === npc.id || entry.name === npc.name) === idx);
+  ];
+  const knownActorIds = new Set(knownActorPool.map(npc => npc.id));
+  const paidLocalWriters: NPCActor[] = (Object.values(player.world.talentCareer?.profiles || {}) as TalentCareerProfile[])
+      .filter(profile => profile.talentId.startsWith('writer_') && profile.income > 0 && !knownActorIds.has(profile.talentId))
+      .map(profile => ({
+          id: profile.talentId, name: profile.talentName, handle: `@${profile.talentId}`,
+          gender: 'NON_BINARY', avatar: `https://api.dicebear.com/9.x/adventurer/svg?seed=${encodeURIComponent(profile.talentId)}`,
+          tier: 'UNKNOWN', prestigeBias: 'MIXED', openness: 50, followers: 0,
+          netWorth: 0, occupation: 'WRITER', bio: 'Screenwriter with credited projects.',
+      }));
+  const actorPool = [...knownActorPool, ...paidLocalWriters]
+      .filter((npc, idx, arr) => arr.findIndex(entry => entry.id === npc.id || entry.name === npc.name) === idx);
 
   // --- 1. CALCULATE PLAYER NET WORTH ---
   const allAssetsCatalog = [
@@ -141,7 +154,7 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
       ...actorPool.filter(isForbesCelebRankingEntry).map(npc => ({
           id: npc.id,
           name: npc.name,
-          netWorth: npc.netWorth,
+          netWorth: npc.netWorth + (getTalentCareerProfile(player.world, npc.id)?.income || 0),
           isPlayer: false,
           tier: npc.tier,
           avatar: getForbesCelebAvatar(npc),
@@ -597,7 +610,7 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
         )}
         {/* Header */}
         <div className="bg-zinc-900 p-4 pt-12 pb-3 shadow-lg flex items-center justify-between shrink-0 border-b border-zinc-800">
-            <button onClick={onBack} className="p-1 rounded-full hover:bg-white/10 transition-colors"><ArrowLeft size={20} className="text-zinc-400"/></button>
+            <button onClick={onBack} className="grid h-11 w-11 place-items-center rounded-full hover:bg-white/10 transition-colors" aria-label="Back to phone"><ArrowLeft size={20} className="text-zinc-400"/></button>
             <div className="flex flex-col items-center">
                 <h2 className="text-2xl font-black tracking-[0.2em] uppercase font-serif italic">FORBES</h2>
                 <div className="text-[7px] tracking-[0.4em] text-zinc-500 uppercase font-black">{tr('forbes.richest')}</div>

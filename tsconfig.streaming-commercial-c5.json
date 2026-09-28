@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "allowJs": false
+  },
+  "files": [
+    "scripts/audit-streaming-commercial-c5.ts",
+    "scripts/audit-streaming-pricing-p1.ts",
+    "components/StreamingDefineLaunchExperience.tsx",
+    "components/StreamingPlatformHQ.tsx"
+  ],
+  "include": [],
+  "exclude": ["dist", "functions"]
+}

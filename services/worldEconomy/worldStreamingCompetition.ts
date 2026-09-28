@@ -12,7 +12,7 @@ import type {
     StreamingBillingPath,
 } from '../../types';
 import { createDeterministicId } from '../deterministicRandom';
-import { getWorldStreamingOffers } from './worldStreamingOffers';
+import { getWorldStreamingOffers, getWorldStreamingOfferExposure } from './worldStreamingOffers';
 import { normalizeWorldAudienceEconomyState } from './worldAudienceCohorts';
 import { normalizeWorldAudienceParticipationState } from './worldAudienceParticipation';
 import { normalizeWorldPopulationState } from './worldPopulation';
@@ -103,8 +103,9 @@ const planUtility = (
         + (cohort.primaryPersonaId === 'PRESTIGE_EXPLORERS' && plan.featureIds.includes('uhd') ? 13 : 0)
         + (cohort.primaryPersonaId === 'VALUE_SEEKERS' && plan.ads ? 7 : 0)
         - (plan.ads ? (100 - cohort.priceSensitivityIndex) * .09 : 0);
-    const catalogueFit = offer.catalogueStrengthIndex
-        + (cohort.primaryPersonaId === 'FANDOM_LOYALISTS' ? offer.catalogueStrengthIndex * .16 : 0);
+    const countryCatalogue = offer.catalogueStrengthByCountry?.[countryId] ?? offer.catalogueStrengthIndex;
+    const catalogueFit = countryCatalogue
+        + (cohort.primaryPersonaId === 'FANDOM_LOYALISTS' ? countryCatalogue * .16 : 0);
     const localizationFit = offer.localizationStrengthIndex
         + (cohort.primaryPersonaId === 'LOCAL_FIRST' ? offer.localizationStrengthIndex * .22 : 0);
     const trustFit = offer.reliabilityIndex
@@ -160,8 +161,15 @@ const allocateBillingPath = (
         })
             .sort((left, right) => right.utility - left.utility || left.plan.id.localeCompare(right.plan.id));
         const best = ranked[0];
+        // An affordable plan is only an option, not an automatic customer.
+        // Awareness and catalogue depth affect both its share versus rivals
+        // and the choice to subscribe at all.
+        const countryCatalogue = offer.catalogueStrengthByCountry?.[countryId] ?? offer.catalogueStrengthIndex;
+        const catalogueFit = countryCatalogue <= 0 ? .0001
+            : clamp((countryCatalogue - 10) / 90, .02, 1);
         return [{ offer, plan: best.plan, billingPath, billingPrice: best.billingPrice, utility: best.utility,
-            weight: Math.max(.05, Math.exp(clamp((best.utility - 45) / 24, -3, 3))), driver: best.driver }];
+            weight: Math.max(.0001, Math.exp(clamp((best.utility - 45) / 24, -3, 3))
+                * catalogueFit * getWorldStreamingOfferExposure(offer)), driver: best.driver }];
     }).sort((left, right) => right.utility - left.utility || left.offer.platformId.localeCompare(right.offer.platformId));
     if (!candidates.length) {
         return { billingPath, reachableHouseholds, subscribingHouseholds: 0, totalSubscriptions: 0, totalBudget, totalSpend: 0, allocations: [] };
@@ -172,7 +180,13 @@ const allocateBillingPath = (
         .08,
         .94,
     );
-    const subscribingHouseholds = Math.min(reachableHouseholds, Math.round(reachableHouseholds * willingnessRate));
+    // The outside option remains available even in a one-service market. A
+    // launch-day offer with little catalogue therefore cannot inherit every
+    // household merely because no rival happens to be present.
+    const totalOfferWeight = candidates.reduce((sum, candidate) => sum + candidate.weight, 0);
+    const paidChoiceShare = totalOfferWeight / (1 + totalOfferWeight);
+    const subscribingHouseholds = Math.min(reachableHouseholds,
+        Math.round(reachableHouseholds * willingnessRate * paidChoiceShare));
     const sortedPrices = candidates.map(candidate => candidate.billingPrice).sort((left, right) => left - right);
     let affordableServices = 0;
     let cumulativePrice = 0;

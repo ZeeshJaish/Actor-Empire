@@ -2,10 +2,18 @@ import fs from 'node:fs';
 
 const configPath = new URL('../ios/App/App/capacitor.config.json', import.meta.url);
 const viewControllerPath = new URL('../ios/App/App/ViewController.swift', import.meta.url);
-const desiredPlugins = ['AdMobPlugin', 'PurchasesPlugin', 'TrackingPermissionPlugin'];
+const desiredPlugins = [
+  'AdMobPlugin',
+  'PurchasesPlugin',
+  'TrackingPermissionPlugin',
+  'IOSLongSessionDiagnosticsPlugin',
+  'IOSSaveTransferPlugin',
+];
 const desiredBridgeRegistrations = [
   'bridge?.registerPluginType(PurchasesPlugin.self)',
-  'bridge?.registerPluginType(TrackingPermissionPlugin.self)'
+  'bridge?.registerPluginType(TrackingPermissionPlugin.self)',
+  'bridge?.registerPluginType(IOSLongSessionDiagnosticsPlugin.self)',
+  'bridge?.registerPluginType(IOSSaveTransferPlugin.self)',
 ];
 
 try {

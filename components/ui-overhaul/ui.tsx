@@ -187,7 +187,7 @@ export function Sheet({
   return (
     <div className={"ae-sheet-wrap" + (open ? " is-open" : "")}>
       <div className="ae-scrim" onClick={onClose} />
-      <div className="ae-sheet" role="dialog" aria-modal="true" aria-label={title}>
+      <div className="ae-sheet ae-shell-sheet" role="dialog" aria-modal="true" aria-label={title}>
         <span className="ae-grip" />
         <div className="ae-sheet-top">
           {head || (

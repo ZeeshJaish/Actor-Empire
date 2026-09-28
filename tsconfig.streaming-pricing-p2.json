@@ -1,0 +1,7 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "allowJs": false },
+  "files": ["scripts/audit-streaming-pricing-p2.ts", "scripts/audit-streaming-commercial-c4.ts"],
+  "include": [],
+  "exclude": ["dist", "functions"]
+}

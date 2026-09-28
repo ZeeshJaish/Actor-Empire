@@ -1,5 +1,5 @@
-import React, { Suspense, lazy } from 'react';
-import { InteractiveRegionMapLegacy } from './InteractiveRegionMapLegacy';
+import React from 'react';
+import { InteractiveRegionMapV2 } from './InteractiveRegionMapV2';
 import type { InteractiveRegionMapProps } from './regionMapView';
 
 export type {
@@ -18,17 +18,7 @@ export {
     regionView,
 } from './regionMapView';
 
-const DetailedInteractiveRegionMap = lazy(async () => {
-    const module = await import('./InteractiveRegionMapV2');
-    return { default: module.InteractiveRegionMapV2 };
-});
-
-/**
- * Stable shared-map boundary. The compact 110m renderer paints immediately;
- * the detailed 50m presentation replaces it once its map-only chunk is ready.
- */
+/** The detailed renderer is ready before play; no first-open map swap. */
 export const InteractiveRegionMap: React.FC<InteractiveRegionMapProps> = props => (
-    <Suspense fallback={<InteractiveRegionMapLegacy {...props} />}>
-        <DetailedInteractiveRegionMap {...props} />
-    </Suspense>
+    <InteractiveRegionMapV2 {...props} />
 );
