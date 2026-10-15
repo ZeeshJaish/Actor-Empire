@@ -18,7 +18,7 @@ const fixture = contentMarketFixture();
 const absoluteWeek = getAbsoluteWeek(fixture.age, fixture.currentWeek);
 fixture.world.studios = {
     ...(fixture.world.studios || {}),
-    'future-studio': { id: 'future-studio', name: 'Northstar Pictures' } as any,
+    'future-studio': { id: 'future-studio', name: 'Northstar Pictures', cashReserve: 100 } as any,
 };
 fixture.world.industryProductions = {
     'future-production': {
@@ -130,14 +130,18 @@ assert.ok(room.changed && room.session, 'A future-title lot opens through the ex
 const bid = placeStreamingBuyerAuctionBid(room.player, room.session!.id, {
     minimumGuarantee: Math.round(upcomingLot!.referenceValue * 2.2),
     licensorRevenueShare: upcomingLot!.allowedTerms.backendMaximum,
-    marketingGuarantee: upcomingLot!.allowedTerms.marketingMaximum,
-    futureGreenlight: upcomingLot!.allowedTerms.futureGreenlightAllowed,
+    marketingGuarantee: 0,
+    futureGreenlight: false,
+    productionFunding: 2_000_000,
 }, 8_001_000);
 assert.ok(bid.changed);
-const closed = advanceStreamingBuyerAuction(bid.player, room.session!.id, 45, 8_046_000);
+const closed = advanceStreamingBuyerAuction(bid.player, room.session!.id, 75, 8_076_000);
 assert.equal(closed.session?.status, 'WON', 'A qualifying player bid can win the future rights');
 const futureLicense = closed.player.ownedStreamingPlatform.catalogLicenses.find(license => license.sourceProjectId === savedSale.sourceProjectId);
 assert.ok(futureLicense, 'The future auction settles into the canonical licence registry');
+assert.equal(closed.player.ownedStreamingPlatform.treasuryCash, room.player.ownedStreamingPlatform.treasuryCash - bid.session!.bids.find(b=>b.id===bid.session!.playerBidId)!.minimumGuarantee - 2_000_000, 'Production funding charges exactly once alongside upfront');
+assert.equal(closed.player.world.studios['future-studio'].cashReserve, 102, 'Current production contribution reaches the studio in millions');
+assert.equal(closed.player.world.streamingRightsContracts[futureLicense!.id].productionFunding, 2_000_000, 'Signed canonical contract preserves production contribution');
 assert.equal(futureLicense!.startsAtAbsoluteWeek, savedSale.plannedAvailabilityAbsoluteWeek);
 assert.equal(closed.player.ownedStreamingPlatform.upcomingRightsSales.find((sale: any) => sale.id === savedSale.id)?.status, 'ACQUIRED');
 const beforeDelivery = getStreamingContentAvailability(closed.player, savedSale.sourceProjectId);

@@ -484,6 +484,14 @@ export const getStreamingOriginalLiveStatus = (
     if (!commission.canonicalProjectId) return 'READY_FOR_GREENLIGHT';
     if (player.activeReleases.some(project => project.id === commission.canonicalProjectId)
         || player.pastProjects.some(project => project.id === commission.canonicalProjectId)) return 'RELEASED';
+    if (player.world.projects.some(project => project.id === commission.canonicalProjectId)) return 'RELEASED';
+    const industryProduction = Object.values(player.world.industryProductions || {})
+        .find(production => production.canonicalProjectId === commission.canonicalProjectId);
+    if (industryProduction) {
+        if (industryProduction.status === 'RELEASED') return 'RELEASED';
+        if (['DELIVERED', 'AWAITING_RELEASE'].includes(industryProduction.status)) return 'DELIVERED';
+        if (['PRE_PRODUCTION', 'PRODUCTION', 'POST_PRODUCTION', 'ON_HOLD'].includes(industryProduction.status)) return 'IN_PRODUCTION';
+    }
     const commitment = player.commitments.find(item => item.id === commission.canonicalProjectId);
     if (!commitment) return commission.status;
     if (commitment.projectPhase === 'AWAITING_RELEASE') return 'DELIVERED';

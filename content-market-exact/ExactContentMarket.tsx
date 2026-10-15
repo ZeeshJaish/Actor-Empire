@@ -408,7 +408,32 @@ const Market: React.FC<{
   const [libraryQuality, setLibraryQuality] = useState(0);
   const [libraryYears, setLibraryYears] = useState(0);
   const [libraryMarquee, setLibraryMarquee] = useState(false);
-  const [confirmScout, setConfirmScout] = useState(false);
+  const [confirmScoutPrice, setConfirmScoutPrice] = useState<number | null>(null);
+  const [scouting, setScouting] = useState(false);
+  const scoutBusy = useRef(false);
+  const scoutFrame = useRef<number | null>(null);
+  const scoutTimer = useRef<number | null>(null);
+  useEffect(() => { setConfirmScoutPrice(null); }, [paidScout?.price, paidScout?.count]);
+  useEffect(() => () => {
+    if (scoutFrame.current !== null) cancelAnimationFrame(scoutFrame.current);
+    if (scoutTimer.current !== null) clearTimeout(scoutTimer.current);
+  }, []);
+  const confirmScout = confirmScoutPrice !== null && confirmScoutPrice === paidScout?.price;
+  const scout = () => {
+    if (!paidScout || paidScout.shortfall > 0 || scoutBusy.current) return;
+    if (!confirmScout) { setConfirmScoutPrice(paidScout.price); setScoutFeedback(''); return; }
+    scoutBusy.current = true;
+    setScouting(true);
+    scoutFrame.current = requestAnimationFrame(() => {
+      scoutFrame.current = null;
+      scoutTimer.current = window.setTimeout(() => {
+        scoutTimer.current = null;
+        try { const result = paidScout.onScout(); setScoutFeedback(result.detail); }
+        catch { setScoutFeedback('Scouting could not finish. Please try again.'); }
+        finally { scoutBusy.current = false; setScouting(false); setConfirmScoutPrice(null); }
+      }, 0);
+    });
+  };
   const [scoutFeedback, setScoutFeedback] = useState('');
 
   const pool = useMemo(() => CATALOGUE.filter(l => l.mode !== 'STUDIO'), [CATALOGUE]);
@@ -491,16 +516,12 @@ const Market: React.FC<{
 
       <Power st={st} />
 
+
       {paidScout && <section className={css.mkscout} aria-label="Private content scouting">
         <div><b>PRIVATE SCOUTING</b><p>Find up to 25 new offers for your platform. Public listings and signed deals stay put.</p>
           <small>Scout #{paidScout.count + 1} this cycle · free rotation in {paidScout.weeksUntilFree} {paidScout.weeksUntilFree === 1 ? 'week' : 'weeks'}</small></div>
-        <button type="button" disabled={paidScout.shortfall > 0} onClick={() => setConfirmScout(true)}>Scout {money(paidScout.price)}</button>
+        <button type="button" disabled={paidScout.shortfall > 0 || scouting} aria-busy={scouting} onClick={scout}>{scouting ? 'Scouting…' : confirmScout ? 'Confirm' : `Scout ${money(paidScout.price)}`}</button>
         {paidScout.shortfall > 0 && <small role="status">Platform funds short by {money(paidScout.shortfall)}.</small>}
-        {confirmScout && <div className={css.mkscoutconfirm} role="group" aria-label="Confirm private scouting">
-          <p>Spend {money(paidScout.price)} from your streaming treasury? This replaces only your previous unsigned private scouting shelf.</p>
-          <div><button type="button" onClick={() => { const result = paidScout.onScout(); setScoutFeedback(result.detail); setConfirmScout(false); }}>Confirm scout</button>
-            <button type="button" onClick={() => setConfirmScout(false)}>Cancel</button></div>
-        </div>}
         {scoutFeedback && <small role="status">{scoutFeedback}</small>}
       </section>}
 

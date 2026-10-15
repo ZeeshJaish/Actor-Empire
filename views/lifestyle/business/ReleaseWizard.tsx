@@ -3,7 +3,7 @@ import { Player, PendingEvent, ScreeningStrategy, ProjectHiddenStats, NextSeason
 import { FESTIVALS, CALENDAR_EVENTS } from '../../../services/worldLogic';
 import { mergeUniverseRosterWithProject, normalizeUniverseMap } from '../../../services/universeLogic';
 import { getAbsoluteWeek } from '../../../services/legacyLogic';
-import { calculateBalancedNextSeasonFundingCap, getPlatformFundingRelationshipMultiplier } from '../../../services/streamingFundingLogic';
+import { calculateBalancedNextSeasonFundingCap, getPlatformFundingRelationshipMultiplier, PLAYER_STREAMING_FUNDING_DEADLINE_WEEKS } from '../../../services/streamingFundingLogic';
 import { CAMPAIGN_POSITIONING_OPTIONS, CAMPAIGN_TIMELINE_OPTIONS, MARKETING_CHANNEL_OPTIONS, calculateCampaignFit, calculateCampaignForecast, normalizeMarketingChannelAllocations } from '../../../services/marketingStrategy';
 import { BOX_OFFICE_REGIONS, getBoxOfficeRegionLabel, getBoxOfficeRegionShortLabel, getCinemaChainById, getCinemaChainTerms, getCinemaChainsForRegion } from '../../../services/cinemaChains';
 import { getDefaultReleaseRegionIds, getRegionMapSummary, normalizeReleaseRegionIds } from '../../../services/regionMap';
@@ -784,6 +784,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                 platformId: bid.platformId,
                 platformName,
                 amount: fundingAllocation.lockedFutureSeasonFund,
+                deadlineWeeks: PLAYER_STREAMING_FUNDING_DEADLINE_WEEKS,
                 sourceProjectId: project.id,
                 sourceTitle: project.name || project.title || 'Series',
                 franchiseId: project.projectDetails?.franchiseId || project.franchiseId || project.id,

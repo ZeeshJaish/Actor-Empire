@@ -328,7 +328,9 @@ export const applyLockedSeasonFunding = ({
     };
 };
 
+// Existing funds without an explicit deadline retain their original allowance.
 export const STREAMING_FUNDING_DEADLINE_WEEKS = 104;
+export const PLAYER_STREAMING_FUNDING_DEADLINE_WEEKS = 26;
 export const STREAMING_FUNDING_FIRST_WARNING_WEEKS = 26;
 export const STREAMING_FUNDING_FINAL_WARNING_WEEKS = 8;
 
@@ -403,7 +405,11 @@ export const processStreamingFundingContracts = ({
         const createdWeek = clamp(Math.floor(Number(funding.createdWeek) || 1), 1, 52);
         const createdYear = Math.max(0, Math.floor(Number(funding.createdYear) || currentYear));
         const extensionWeeks = Math.max(0, Math.floor(Number(funding.deadlineExtensionWeeks) || 0));
-        const deadlineWeeks = STREAMING_FUNDING_DEADLINE_WEEKS + extensionWeeks;
+        const requestedDeadline = Number(funding.deadlineWeeks);
+        const baseDeadlineWeeks = Number.isFinite(requestedDeadline) && requestedDeadline >= 1
+            ? Math.floor(requestedDeadline)
+            : STREAMING_FUNDING_DEADLINE_WEEKS;
+        const deadlineWeeks = baseDeadlineWeeks + extensionWeeks;
         const ageWeeks = Math.max(0, currentAbsoluteWeek - getAbsoluteContractWeek(createdYear, createdWeek));
         const weeksRemaining = deadlineWeeks - ageWeeks;
 

@@ -1,3 +1,4 @@
+import { normalizeAuctionFutureFunding } from './streamingAuctionTerms';
 import {
     createInitialOwnedStreamingPlatformState,
     OWNED_STREAMING_PLATFORM_SCHEMA_VERSION,
@@ -2872,7 +2873,7 @@ const normalizeCatalogLicense = (value: unknown): OwnedStreamingCatalogLicense |
     const id = cleanText(source.id, '', 120);
     const sourceProjectId = cleanText(source.sourceProjectId, '', 180);
     if (!id || !sourceProjectId) return null;
-    const platformRevenueShare = Math.round(clamp(source.platformRevenueShare, 50, 90, 70));
+    const platformRevenueShare = Math.round(clamp(source.platformRevenueShare, 1, 100, 70));
     const signedAtAbsoluteWeek = Math.max(0, Math.round(clamp(source.signedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER)));
     const startsAtAbsoluteWeek = Math.max(signedAtAbsoluteWeek, Math.round(clamp(source.startsAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER)));
     const durationWeeks = Math.round(clamp(source.durationWeeks, 26, 520, 104));
@@ -2932,7 +2933,7 @@ const normalizeRightsNegotiation = (value: unknown): OwnedStreamingRightsNegotia
     const id = cleanText(source.id, '', 120);
     const sourceProjectId = cleanText(source.sourceProjectId, '', 180);
     if (!id || !sourceProjectId) return null;
-    const platformRevenueShare = Math.round(clamp(source.platformRevenueShare, 45, 90, 70));
+    const platformRevenueShare = Math.round(clamp(source.platformRevenueShare, 1, 100, 70));
     return {
         id,
         idempotencyKey: cleanText(source.idempotencyKey, id, 180),
@@ -3047,6 +3048,11 @@ const normalizeRightsObligation = (value: unknown): OwnedStreamingRightsObligati
             ? null
             : Math.max(0, Math.round(clamp(source.resolvedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
         counterpartyId: cleanText(source.counterpartyId, '', 180) || null,
+        futureFunding: normalizeAuctionFutureFunding(source.futureFunding),
+        sourceAuctionId: cleanText(source.sourceAuctionId, '', 180) || undefined,
+        fundingActivatedAtAbsoluteWeek: source.fundingActivatedAtAbsoluteWeek == null ? undefined
+            : Math.max(0, Math.round(clamp(source.fundingActivatedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
+        fundedProductionIds: uniqueStrings(source.fundedProductionIds, 3),
         createdAtAbsoluteWeek: source.createdAtAbsoluteWeek == null
             ? null
             : Math.max(0, Math.round(clamp(source.createdAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
@@ -3087,7 +3093,7 @@ const normalizeBuyerAuctionSession = (value: unknown): StreamingBuyerAuctionSess
         minimumBidIncrement: Math.round(clamp(lotSource.minimumBidIncrement, 100_000, 1_000_000_000)),
         reserveSellerValue: Math.round(clamp(lotSource.reserveSellerValue, 1, 10_000_000_000)),
         allowedTerms: {
-            backendMinimum: Math.round(clamp(allowedSource.backendMinimum, 0, 40)),
+            backendMinimum: source.status === 'LIVE' ? 0 : Math.round(clamp(allowedSource.backendMinimum, 0, 40)),
             backendMaximum: Math.round(clamp(allowedSource.backendMaximum, 0, 40)),
             marketingMaximum: Math.round(clamp(allowedSource.marketingMaximum, 0, 2_000_000_000)),
             futureGreenlightAllowed: Boolean(allowedSource.futureGreenlightAllowed),
@@ -3125,9 +3131,11 @@ const normalizeBuyerAuctionSession = (value: unknown): StreamingBuyerAuctionSess
             licensorRevenueShare: Math.round(clamp(bidSource.licensorRevenueShare, 0, 40)),
             marketingGuarantee: Math.round(clamp(bidSource.marketingGuarantee, 0, 2_000_000_000)),
             futureGreenlight: Boolean(bidSource.futureGreenlight),
+            productionFunding: Math.round(clamp(bidSource.productionFunding, 0, 2_000_000_000)),
+            futureFunding: normalizeAuctionFutureFunding(bidSource.futureFunding),
             guaranteedExposure: Math.round(clamp(bidSource.guaranteedExposure, 0, 10_000_000_000)),
             sellerValue: Math.round(clamp(bidSource.sellerValue, 0, 10_000_000_000)),
-            createdAtActiveSecond: Math.max(0, Math.round(clamp(bidSource.createdAtActiveSecond, 0, 45))),
+            createdAtActiveSecond: Math.max(0, Math.round(clamp(bidSource.createdAtActiveSecond, 0, 75))),
         };
     }).filter((item): item is NonNullable<typeof item> => Boolean(item));
     const rivals = asArray<unknown>(source.rivals).map(item => {
@@ -3143,7 +3151,7 @@ const normalizeBuyerAuctionSession = (value: unknown): StreamingBuyerAuctionSess
             sellerValueCeiling: Math.round(clamp(rival.sellerValueCeiling, 0, 100_000_000_000)),
             preferredBackend: Math.round(clamp(rival.preferredBackend, 0, 40)),
             marketingLimit: Math.round(clamp(rival.marketingLimit, 0, 2_000_000_000)),
-            nextActionSecond: Math.max(1, Math.round(clamp(rival.nextActionSecond, 1, 45))),
+            nextActionSecond: Math.max(1, Math.round(clamp(rival.nextActionSecond, 1, 75))),
             revision: Math.max(0, Math.round(clamp(rival.revision, 0, 20))),
             status: isOneOf(rival.status, ['WATCHING', 'ACTIVE', 'FINAL', 'WITHDRAWN'] as const, 'WATCHING'),
             currentBidId: cleanText(rival.currentBidId, '', 180) || null,
@@ -3156,7 +3164,7 @@ const normalizeBuyerAuctionSession = (value: unknown): StreamingBuyerAuctionSess
         return {
             id: eventId,
             type: isOneOf(event.type, ['OPENED', 'BID_PLACED', 'BID_REVISED', 'RIVAL_BID', 'RIVAL_WITHDREW', 'CLOSED', 'SETTLED', 'INVALIDATED'] as const, 'OPENED'),
-            activeSecond: Math.max(0, Math.round(clamp(event.activeSecond, 0, 45))),
+            activeSecond: Math.max(0, Math.round(clamp(event.activeSecond, 0, 75))),
             bidderId: cleanText(event.bidderId, '', 180) || null,
             bidId: cleanText(event.bidId, '', 180) || null,
         };
@@ -3167,9 +3175,11 @@ const normalizeBuyerAuctionSession = (value: unknown): StreamingBuyerAuctionSess
         lot,
         status: isOneOf(source.status, ['LIVE', 'WON', 'LOST', 'NO_SALE', 'WITHDRAWN', 'INVALIDATED'] as const, 'INVALIDATED'),
         openedAtAbsoluteWeek: Math.max(0, Math.round(clamp(source.openedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
-        roomSecondsRemaining: Math.max(0, Math.round(clamp(source.roomSecondsRemaining, 0, 45))),
-        activeSecondsElapsed: Math.max(0, Math.round(clamp(source.activeSecondsElapsed, 0, 45))),
-        hardClosesAtSecond: 45,
+        roomSecondsRemaining: Math.max(0, Math.round(clamp(source.roomSecondsRemaining, 0, 75))),
+        activeSecondsElapsed: Math.max(0, Math.round(clamp(source.activeSecondsElapsed, 0, 75))),
+        hardClosesAtSecond: Math.round(clamp(source.hardClosesAtSecond, 45, 75, 45)),
+        lastExtensionSeconds: Math.round(clamp(source.lastExtensionSeconds, 0, 12)),
+        lastExtensionAtSecond: source.lastExtensionAtSecond == null ? undefined : Math.round(clamp(source.lastExtensionAtSecond, 0, 75)),
         materialEventCount: Math.max(0, Math.round(clamp(source.materialEventCount, 0, 100))),
         lastRealtimeAtMs: Math.max(0, Math.round(clamp(source.lastRealtimeAtMs, 0, Number.MAX_SAFE_INTEGER))),
         playerBidderId: cleanText(source.playerBidderId, 'player-platform', 180),
@@ -3179,7 +3189,7 @@ const normalizeBuyerAuctionSession = (value: unknown): StreamingBuyerAuctionSess
         events,
         leaderBidId: cleanText(source.leaderBidId, '', 180) || null,
         winnerBidId: cleanText(source.winnerBidId, '', 180) || null,
-        closedAtActiveSecond: source.closedAtActiveSecond == null ? null : Math.max(0, Math.round(clamp(source.closedAtActiveSecond, 0, 45))),
+        closedAtActiveSecond: source.closedAtActiveSecond == null ? null : Math.max(0, Math.round(clamp(source.closedAtActiveSecond, 0, 75))),
         settledAtAbsoluteWeek: source.settledAtAbsoluteWeek == null ? null : Math.max(0, Math.round(clamp(source.settledAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
         resultReason: cleanText(source.resultReason, '', 300) || null,
         outcomeMessageId: cleanText(source.outcomeMessageId, '', 180) || null,
@@ -3301,8 +3311,8 @@ const normalizeOriginalCommission = (value: unknown): OwnedStreamingOriginalComm
         lineageId,
         seasonNumber: Math.round(clamp(source.seasonNumber, 1, 50, 1)),
         contract: {
-            platformRightsPercent: Math.round(clamp(contractSource.platformRightsPercent, 51, 100, 85)),
-            producerBackendPercent: Math.round(clamp(contractSource.producerBackendPercent, 0, 49, 15)),
+            platformRightsPercent: Math.round(clamp(contractSource.platformRightsPercent, 1, 100, 85)),
+            producerBackendPercent: Math.round(clamp(contractSource.producerBackendPercent, 0, 99, 15)),
             exclusiveWindowWeeks: Math.round(clamp(contractSource.exclusiveWindowWeeks, 4, 104, 24)),
             sequelRightsIncluded: contractSource.sequelRightsIncluded !== false,
         },

@@ -1925,12 +1925,13 @@ export const evaluateStreamingRightsCompliance = (
     ));
     const rightsObligations = platform.rightsObligations.map(obligation => {
         if (obligation.status === 'SATISFIED' || obligation.status === 'BREACHED') return obligation;
+        if (obligation.futureFunding?.commitment === 'OPTION' && obligation.fundingActivatedAtAbsoluteWeek == null) return obligation;
         const observedAmount = obligation.type === 'MARKETING_SPEND'
             ? platform.growthActions
                 .filter(action => action.projectId === obligation.sourceProjectId && action.status === 'APPLIED')
                 .reduce((sum, action) => sum + action.cashCost, 0)
             : obligation.type === 'FUTURE_GREENLIGHT'
-                ? platform.originalCommissions.some(commission => (
+                ? obligation.sourceAuctionId ? obligation.observedAmount : platform.originalCommissions.some(commission => (
                     commission.producerStudioId === obligation.counterpartyId
                     && commission.commissionedAtAbsoluteWeek >= (obligation.createdAtAbsoluteWeek || 0)
                     && ['GREENLIT', 'IN_PRODUCTION', 'DELIVERED', 'RELEASED'].includes(commission.status)

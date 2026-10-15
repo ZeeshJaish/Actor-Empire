@@ -1,5 +1,13 @@
 import assert from 'node:assert/strict';
-import { contentMarketFixture } from './helpers/contentMarketFixture';
+import { contentMarketFixture as makeContentMarketFixture } from './helpers/contentMarketFixture';
+
+const contentMarketFixture = () => {
+    const player = makeContentMarketFixture();
+    player.world.studios['seller-cm1'] = {
+        ...Object.values(player.world.studios)[0], id: 'seller-cm1' as any, name: 'Fixture Seller Studio',
+    };
+    return player;
+};
 import {
     advanceStreamingBuyerAuction,
     getStreamingBuyerAuctionLots,
@@ -69,7 +77,7 @@ assert.ok(opened.changed && opened.session, 'Entering an eligible auction create
 const openedSession = opened.session!;
 assert.equal(openedSession.status, 'LIVE');
 assert.equal(openedSession.roomSecondsRemaining, 15, 'The shared room begins at 15 seconds');
-assert.equal(openedSession.hardClosesAtSecond, 45, 'The room has a 45-second hard cap');
+assert.equal(openedSession.hardClosesAtSecond, 45, 'The room starts with a 45-second base cap before bounded late extensions');
 assert.deepEqual(openedSession.lot.countryIds, lot.countryIds, 'Opening cannot mutate the lot scope');
 assert.ok(openedSession.rivals.length >= 2, 'At least two funded AI rivals enter a live room');
 assert.ok(openedSession.rivals.every(rival => rival.sellerValueCeiling > 0), 'Rival valuation ceilings are fixed when the room opens');
@@ -280,8 +288,10 @@ assert.ok(recordedLowOffer.sellerValue < leadingBeforeLowOffer.sellerValue,
 const bidTerms = {
     minimumGuarantee: lot.minimumGuarantee,
     licensorRevenueShare: Math.min(lot.allowedTerms.backendMaximum, lot.allowedTerms.backendMinimum + 3),
-    marketingGuarantee: lot.allowedTerms.marketingMaximum,
-    futureGreenlight: lot.allowedTerms.futureGreenlightAllowed,
+    marketingGuarantee: 0,
+    futureGreenlight: true,
+    futureFunding: { kind: 'NEW_ORIGINAL' as const, count: 1, budgetPerProject: 2_000_000,
+        format: 'ANY' as const, commitment: 'FIRM' as const, deadlineWeeks: 52, platformRightsPercent: 85 },
 };
 const placed = placeStreamingBuyerAuctionBid(opened.player, openedSession.id, bidTerms, 1_001_000);
 assert.ok(placed.changed && placed.session?.playerBidId, 'A valid mixed-term player bid becomes binding');
@@ -346,11 +356,16 @@ const runToClose = (minimumGuarantee: number) => {
     const bid = placeStreamingBuyerAuctionBid(room.player, room.session!.id, {
         minimumGuarantee,
         licensorRevenueShare: activeLot.allowedTerms.backendMaximum,
-        marketingGuarantee: activeLot.allowedTerms.marketingMaximum,
-        futureGreenlight: activeLot.allowedTerms.futureGreenlightAllowed,
+        marketingGuarantee: 0,
+        futureGreenlight: true,
+        futureFunding: { kind: 'NEW_ORIGINAL' as const, count: 1, budgetPerProject: 2_000_000,
+            format: 'ANY' as const, commitment: 'FIRM' as const, deadlineWeeks: 52, platformRightsPercent: 85 },
     }, 2_001_000);
     assert.ok(bid.changed);
-    return advanceStreamingBuyerAuction(bid.player, room.session!.id, 45, 2_046_000);
+    const closed = advanceStreamingBuyerAuction(bid.player, room.session!.id, 75, 2_076_000);
+    assert.ok(closed.session!.activeSecondsElapsed <= 75 && closed.session!.hardClosesAtSecond <= 75,
+        'Late extensions never exceed the absolute 75-second cap');
+    return closed;
 };
 
 const winning = runToClose(Math.round(lot.referenceValue * 1.8));
@@ -382,8 +397,8 @@ const compliancePlatform = {
     }],
 };
 const compliance = evaluateStreamingRightsCompliance(compliancePlatform, futureGreenlightObligation!.createdAtAbsoluteWeek! + 2);
-assert.equal(compliance.platform.rightsObligations.find(item => item.id === futureGreenlightObligation!.id)?.status, 'SATISFIED',
-    'Commissioning an original with the promised producer satisfies the future-greenlight obligation');
+assert.notEqual(compliance.platform.rightsObligations.find(item => item.id === futureGreenlightObligation!.id)?.status, 'SATISFIED',
+    'An unrelated same-producer original cannot satisfy a contract linked to another sourceAuctionId');
 
 const losing = runToClose(lot.minimumGuarantee);
 assert.ok(['LOST', 'NO_SALE'].includes(losing.session?.status || ''), 'A weak player contract can lose or leave the lot unsold');

@@ -1,4 +1,7 @@
+import { processAuctionFutureFunding } from './streamingAuctionFunding';
+import { normalizeAuctionFutureFunding } from './streamingAuctionTerms';
 import type {
+    StreamingAuctionFutureFundingTerms,
     OwnedStreamingCostCommitment,
     OwnedStreamingRightsObligation,
     PlatformId,
@@ -37,6 +40,7 @@ import { getStreamingUpcomingRightsAuctionLots, resolveStreamingUpcomingRightsAu
 const ROOM_OPEN_SECONDS = 15;
 const ROOM_HARD_CAP_SECONDS = 45;
 const ROOM_EVENT_FLOOR_SECONDS = 12;
+const ROOM_ABSOLUTE_CAP_SECONDS = 75;
 const RIVAL_COOLDOWN_SECONDS = 6;
 
 export interface StreamingBuyerAuctionBidTerms {
@@ -44,13 +48,15 @@ export interface StreamingBuyerAuctionBidTerms {
     licensorRevenueShare: number;
     marketingGuarantee: number;
     futureGreenlight: boolean;
+    productionFunding?: number;
+    futureFunding?: StreamingAuctionFutureFundingTerms;
 }
 
 export interface StreamingBuyerAuctionActionResult {
     player: Player;
     changed: boolean;
     session?: StreamingBuyerAuctionSession;
-    reason?: 'NOT_FOUND' | 'NOT_LIVE' | 'INVALID_TERMS' | 'INSUFFICIENT_TREASURY' | 'RIGHTS_UNAVAILABLE';
+    reason?: 'NOT_FOUND' | 'NOT_LIVE' | 'INVALID_TERMS' | 'INSUFFICIENT_TREASURY' | 'RIGHTS_UNAVAILABLE' | 'UNCHANGED';
     detail?: string;
 }
 
@@ -111,8 +117,9 @@ export const calculateStreamingBuyerAuctionSellerValue = (
 ): number => money(
     terms.minimumGuarantee * lot.sellerPriorities.cash
     + lot.referenceValue * (terms.licensorRevenueShare / 100) * 2.25 * lot.sellerPriorities.backend
-    + terms.marketingGuarantee * 0.45 * lot.sellerPriorities.marketing
-    + (terms.futureGreenlight ? lot.allowedTerms.futureGreenlightReserve * 0.55 * lot.sellerPriorities.futureGreenlight : 0)
+    + (terms.productionFunding || 0) * lot.sellerPriorities.cash
+    + (terms.futureFunding?.commitment === 'FIRM'
+        ? terms.futureFunding.count * terms.futureFunding.budgetPerProject * 0.55 * lot.sellerPriorities.futureGreenlight : 0)
     + lot.referenceValue * (clamp(relationshipMultiplier, 0.9, 1.12) - 1),
 );
 
@@ -146,7 +153,7 @@ export const getStreamingBuyerAuctionLots = (
         const excludedCountryIds = exactPlatformMarkets.filter(id => !countryIds.includes(id));
         const id = createDeterministicId('streaming_buyer_auction_lot', listing.id, getStreamingMarketCycle(absoluteWeek));
         const allowedTerms = {
-            backendMinimum: 1,
+            backendMinimum: 0,
             backendMaximum: 10,
             marketingMaximum: money(referenceValue * 0.18),
             futureGreenlightAllowed: listing.sellerType === 'STUDIO',
@@ -215,7 +222,7 @@ export const getStreamingBuyerAuctionLots = (
             minimumBidIncrement: money(Math.max(100_000, referenceValue * 0.01)),
             reserveSellerValue: money(referenceValue * 0.84),
             allowedTerms: {
-                backendMinimum: 1,
+                backendMinimum: 0,
                 backendMaximum: 10,
                 marketingMaximum: 0,
                 futureGreenlightAllowed: false,
@@ -296,7 +303,7 @@ const buildRivalBid = (
         lot.allowedTerms.backendMinimum,
         lot.allowedTerms.backendMaximum,
     ));
-    const marketingGuarantee = money(Math.min(rival.marketingLimit, lot.allowedTerms.marketingMaximum * (0.35 + rng() * 0.55)));
+    const marketingGuarantee = 0;
     const futureGreenlight = false;
     const nonCashValue = calculateStreamingBuyerAuctionSellerValue(lot, {
         minimumGuarantee: 0,
@@ -385,12 +392,22 @@ export const openStreamingBuyerAuction = (
     return { player: upsertSession(player, session), changed: true, session };
 };
 
-const extendRoom = (session: StreamingBuyerAuctionSession): Pick<StreamingBuyerAuctionSession, 'roomSecondsRemaining' | 'materialEventCount'> => {
-    const extension = session.materialEventCount < 3 ? 3 : session.materialEventCount < 6 ? 2 : 1;
-    const hardRemaining = Math.max(0, session.hardClosesAtSecond - session.activeSecondsElapsed);
+const extendRoom = (session: StreamingBuyerAuctionSession, meaningful = true): Partial<StreamingBuyerAuctionSession> => {
+    if (!meaningful) return {};
+    const late = session.roomSecondsRemaining <= 5;
+    const hardClosesAtSecond = late
+        ? Math.min(ROOM_ABSOLUTE_CAP_SECONDS, session.hardClosesAtSecond + 3)
+        : session.hardClosesAtSecond;
+    const hardRemaining = Math.max(0, hardClosesAtSecond - session.activeSecondsElapsed);
+    const roomSecondsRemaining = Math.min(hardRemaining, late
+        ? session.roomSecondsRemaining + 3
+        : Math.max(ROOM_EVENT_FLOOR_SECONDS, session.roomSecondsRemaining + 3));
+    const added = Math.max(0, roomSecondsRemaining - session.roomSecondsRemaining);
     return {
-        roomSecondsRemaining: Math.min(hardRemaining, Math.max(ROOM_EVENT_FLOOR_SECONDS, session.roomSecondsRemaining + extension)),
+        hardClosesAtSecond,
+        roomSecondsRemaining,
         materialEventCount: session.materialEventCount + 1,
+        ...(added ? {lastExtensionSeconds: added, lastExtensionAtSecond: session.activeSecondsElapsed} : {}),
     };
 };
 
@@ -439,12 +456,21 @@ export const placeStreamingBuyerAuctionBid = (
     const terms = {
         minimumGuarantee: money(rawTerms.minimumGuarantee),
         licensorRevenueShare: Math.round(Number(rawTerms.licensorRevenueShare)),
-        marketingGuarantee: money(rawTerms.marketingGuarantee),
-        futureGreenlight: Boolean(rawTerms.futureGreenlight),
+        marketingGuarantee: 0,
+        futureGreenlight: Boolean(rawTerms.futureFunding),
+        productionFunding: money(rawTerms.productionFunding || 0),
+        futureFunding: rawTerms.futureFunding ? {...rawTerms.futureFunding} : undefined,
     };
     const allowed = session.lot.allowedTerms;
     if (
-        terms.minimumGuarantee < session.lot.minimumGuarantee
+        !Number.isFinite(rawTerms.minimumGuarantee) || !Number.isFinite(rawTerms.licensorRevenueShare)
+        || Boolean(rawTerms.marketingGuarantee)
+        || (Boolean(rawTerms.futureGreenlight) && !rawTerms.futureFunding)
+        || (Boolean(terms.productionFunding) && !session.lot.upcomingRightsSaleId)
+        || (Boolean(terms.productionFunding || terms.futureFunding) && !player.world.studios[session.lot.sellerId])
+        || !Number.isFinite(Number(rawTerms.productionFunding || 0))
+        || Number(rawTerms.productionFunding || 0) < 0
+        || terms.minimumGuarantee < session.lot.minimumGuarantee
         || terms.minimumGuarantee > session.lot.referenceValue * 2.5
         || terms.licensorRevenueShare < allowed.backendMinimum
         || terms.licensorRevenueShare > allowed.backendMaximum
@@ -452,15 +478,34 @@ export const placeStreamingBuyerAuctionBid = (
         || terms.marketingGuarantee > allowed.marketingMaximum
         || terms.futureGreenlight && !allowed.futureGreenlightAllowed
     ) return { player, changed: false, session, reason: 'INVALID_TERMS', detail: 'One or more terms fall outside the seller’s auction rules.' };
-    const guaranteedExposure = terms.minimumGuarantee + terms.marketingGuarantee
-        + (terms.futureGreenlight ? allowed.futureGreenlightReserve : 0);
+    const future = terms.futureFunding;
+    if (future && (
+        !['NEW_ORIGINAL', 'SEQUEL', 'NEXT_SEASON'].includes(future.kind)
+        || (future.kind === 'SEQUEL' && session.lot.projectType !== 'MOVIE')
+        || (future.kind === 'NEXT_SEASON' && session.lot.projectType !== 'SERIES')
+        || !Number.isInteger(future.count) || future.count < 1 || future.count > 3
+        || !Number.isFinite(future.budgetPerProject) || future.budgetPerProject < 100_000 || future.budgetPerProject > 2_000_000_000
+        || !['ANY', 'LIVE_ACTION', 'ANIMATED', 'ANIME'].includes(future.format)
+        || !['FIRM', 'OPTION'].includes(future.commitment)
+        || future.deadlineWeeks !== 52
+        || !Number.isInteger(future.platformRightsPercent) || future.platformRightsPercent < 1 || future.platformRightsPercent > 100
+    )) return {player, changed:false, session, reason:'INVALID_TERMS', detail:'Choose a valid future production, budget, rights share and 52-week deadline.'};
+    terms.futureFunding = normalizeAuctionFutureFunding(terms.futureFunding);
+    const guaranteedExposure = terms.minimumGuarantee + terms.productionFunding
+        + (future?.commitment === 'FIRM' ? future.count * future.budgetPerProject : 0);
     const existingCommitment = platform.costCommitments.find(item => item.sourceReferenceId === session.id && item.status === 'COMMITTED');
     const spendableIncludingThisRoom = getContentMarketFunds(player) + (existingCommitment?.committedAmount || 0);
     if (guaranteedExposure > spendableIncludingThisRoom) {
         return { player, changed: false, session, reason: 'INSUFFICIENT_TREASURY', detail: 'Available funds cannot support this complete offer.' };
     }
     const sellerValue = calculateStreamingBuyerAuctionSellerValue(session.lot, terms, 1);
-    const previous = activeBidFor(session, session.playerBidderId);
+    const previous = [...session.bids].reverse().find(item => item.bidderId === session.playerBidderId) || null;
+    if (previous?.status === 'ACTIVE' && previous.minimumGuarantee === terms.minimumGuarantee
+        && previous.licensorRevenueShare === terms.licensorRevenueShare
+        && (previous.productionFunding || 0) === terms.productionFunding
+        && JSON.stringify(previous.futureFunding || null) === JSON.stringify(terms.futureFunding || null)) {
+        return {player, changed:false, session, reason:'UNCHANGED', detail:'This offer is unchanged. Improve your terms to add time.'};
+    }
     const revision = (previous?.revision || 0) + 1;
     const bid: StreamingBuyerAuctionBid = {
         id: createDeterministicId('streaming_buyer_auction_bid', session.id, session.playerBidderId, revision),
@@ -477,7 +522,7 @@ export const placeStreamingBuyerAuctionBid = (
         sellerValue,
         createdAtActiveSecond: session.activeSecondsElapsed,
     };
-    const extended = extendRoom(session);
+    const extended = extendRoom(session, !previous || sellerValue > previous.sellerValue);
     const nextSession = withLeader({
         ...session,
         ...extended,
@@ -538,7 +583,7 @@ const placeRivalBid = (
             ? Math.min(rival.sellerValueCeiling, marketLeaderValue + session.lot.minimumBidIncrement * (0.5 + rng() * 1.5))
             : Math.min(rival.sellerValueCeiling, session.lot.reserveSellerValue * (0.3 + rng() * 0.5));
     const bid = buildRivalBid(session, rival, target);
-    const extended = extendRoom(session);
+    const extended = extendRoom(session, !rivalCurrent || bid.sellerValue > rivalCurrent.sellerValue);
     return withLeader({
         ...session,
         ...extended,
@@ -653,6 +698,9 @@ const finishPlayerWin = (
             minimumGuarantee: winner.minimumGuarantee,
             platformRevenueShare: 100 - winner.licensorRevenueShare,
             marketingGuarantee: winner.marketingGuarantee,
+            viewershipBonusThreshold:0, viewershipBonusAmount:0,
+            renewalOption:false, sublicensingAllowed:false, sequelRightsIncluded:false,
+            cancellationPenalty:0,
         });
         if (!opened.changed || !opened.negotiation) {
             const invalid = { ...session, status: 'INVALIDATED' as const, resultReason: opened.detail || 'The rights became unavailable before settlement.' };
@@ -663,7 +711,7 @@ const finishPlayerWin = (
             ownedStreamingPlatform: {
                 ...opened.player.ownedStreamingPlatform,
                 rightsNegotiations: opened.player.ownedStreamingPlatform.rightsNegotiations.map(item => item.id === opened.negotiation!.id
-                    ? { ...item, status: 'READY_TO_SIGN' as const }
+                    ? { ...item, status: 'READY_TO_SIGN' as const, minimumGuarantee:winner.minimumGuarantee, platformRevenueShare:100-winner.licensorRevenueShare }
                     : item),
             },
         };
@@ -694,17 +742,44 @@ const finishPlayerWin = (
         sourceProjectId: session.lot.sourceProjectId,
         title: session.lot.title,
         type: 'FUTURE_GREENLIGHT',
-        targetAmount: 1,
+        targetAmount: winner.futureFunding?.count || 1,
         observedAmount: 0,
-        dueAtAbsoluteWeek: absoluteWeek + 26,
+        dueAtAbsoluteWeek: absoluteWeek + (winner.futureFunding?.deadlineWeeks || 26),
         status: 'PENDING',
-        breachPenalty: session.lot.allowedTerms.futureGreenlightReserve,
+        breachPenalty: winner.futureFunding ? 0 : session.lot.allowedTerms.futureGreenlightReserve,
         successPayment: 0,
         resolvedAtAbsoluteWeek: null,
         counterpartyId: session.lot.sellerId,
         createdAtAbsoluteWeek: absoluteWeek,
+        futureFunding: winner.futureFunding,
+        sourceAuctionId: winner.futureFunding ? session.id : undefined,
+        fundingActivatedAtAbsoluteWeek: winner.futureFunding?.commitment === 'FIRM' ? absoluteWeek : undefined,
+        fundedProductionIds: winner.futureFunding ? [] : undefined,
     } : null;
-    const paidCommitments = terminalCommitments(result, session, 'PAID', winner.minimumGuarantee);
+    if (license && result.world.streamingRightsContracts[license.id]) {
+        result = {...result, world:{...result.world, streamingRightsContracts:{...result.world.streamingRightsContracts,
+            [license.id]:{...result.world.streamingRightsContracts[license.id],
+                biddingSessionId:session.id,sourceOfferId:winner.id,
+                productionFunding:winner.productionFunding || 0,
+                futureSeasonFunding:winner.futureFunding?.kind === 'NEXT_SEASON' && winner.futureFunding.commitment === 'FIRM'
+                    ? winner.futureFunding.count * winner.futureFunding.budgetPerProject : 0,
+                futureFunding:winner.futureFunding,
+            }}}};
+    }
+    const currentFunding = winner.productionFunding || 0;
+    if (currentFunding > 0) {
+        const studio = result.world.studios[session.lot.sellerId];
+        result = {...result, world:{...result.world,studios:{...result.world.studios,
+            [session.lot.sellerId]:{...studio,cashReserve:studio.cashReserve + currentFunding / 1_000_000}}}};
+    }
+    const paidCommitments = terminalCommitments(result, session, 'PAID', winner.minimumGuarantee + (winner.productionFunding || 0));
+    if (futureObligation?.futureFunding?.commitment === 'FIRM') {
+        const reserve = futureObligation.futureFunding.count * futureObligation.futureFunding.budgetPerProject;
+        paidCommitments.push({...auctionCommitment(resultPlatform, session, reserve),
+            id: createDeterministicId('streaming_cost_commitment', futureObligation.id),
+            idempotencyKey: `auction-funding:${futureObligation.id}`,
+            label: `${session.lot.title} future production funding`, sourceReferenceId: futureObligation.id});
+    }
     const inbox = result.inbox.some(message => message.data?.streamingBuyerAuctionId === session.id)
         ? result.inbox
         : [outcomeMessage(won, absoluteWeek), ...result.inbox];
@@ -713,6 +788,7 @@ const finishPlayerWin = (
         inbox,
         ownedStreamingPlatform: compactOwnedStreamingPlatformForPersistence({
             ...resultPlatform,
+            treasuryCash: resultPlatform.treasuryCash - currentFunding,
             costCommitments: paidCommitments,
             buyerAuctionSessions: [...resultPlatform.buyerAuctionSessions.filter(item => item.id !== won.id), won],
             rightsObligations: futureObligation && !resultPlatform.rightsObligations.some(item => item.id === futureObligation.id)
@@ -720,6 +796,7 @@ const finishPlayerWin = (
                 : resultPlatform.rightsObligations,
         }, result.id),
     };
+    result = processAuctionFutureFunding(result, absoluteWeek);
     return { player: result, changed: true, session: won };
 };
 
@@ -923,7 +1000,7 @@ export const advanceStreamingBuyerAuction = (
     let session = platform.buyerAuctionSessions.find(item => item.id === sessionId);
     if (!session) return { player, changed: false, reason: 'NOT_FOUND' };
     if (session.status !== 'LIVE') return { player, changed: false, session, reason: 'NOT_LIVE' };
-    const count = Math.round(clamp(seconds, 0, ROOM_HARD_CAP_SECONDS));
+    const count = Math.round(clamp(seconds, 0, ROOM_ABSOLUTE_CAP_SECONDS));
     for (let index = 0; index < count && session.status === 'LIVE'; index += 1) {
         session = {
             ...session,
@@ -954,7 +1031,7 @@ export const reconcileStreamingBuyerAuction = (
     const session = platform.buyerAuctionSessions.find(item => item.id === sessionId);
     if (!session) return { player, changed: false, reason: 'NOT_FOUND' };
     if (session.status !== 'LIVE') return { player, changed: false, session, reason: 'NOT_LIVE' };
-    const elapsed = Math.round(clamp(Math.floor((nowMs - session.lastRealtimeAtMs) / 1_000), 0, ROOM_HARD_CAP_SECONDS));
+    const elapsed = Math.round(clamp(Math.floor((nowMs - session.lastRealtimeAtMs) / 1_000), 0, ROOM_ABSOLUTE_CAP_SECONDS));
     return elapsed > 0 ? advanceStreamingBuyerAuction(player, sessionId, elapsed, nowMs) : { player, changed: false, session };
 };
 
@@ -982,7 +1059,7 @@ export const processStreamingBuyerAuctionsWeek = (player: Player): Player => {
     const sessions = normalizeOwnedStreamingPlatformState(result.ownedStreamingPlatform, result.id).buyerAuctionSessions
         .filter(session => session.status === 'LIVE');
     sessions.forEach(session => {
-        result = advanceStreamingBuyerAuction(result, session.id, ROOM_HARD_CAP_SECONDS, session.lastRealtimeAtMs + ROOM_HARD_CAP_SECONDS * 1_000).player;
+        result = advanceStreamingBuyerAuction(result, session.id, ROOM_ABSOLUTE_CAP_SECONDS, session.lastRealtimeAtMs + ROOM_ABSOLUTE_CAP_SECONDS * 1_000).player;
     });
     return result;
 };

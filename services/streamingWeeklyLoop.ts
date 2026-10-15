@@ -1,3 +1,4 @@
+import { processAuctionFutureFunding } from './streamingAuctionFunding';
 import type {
     OwnedStreamingLedgerEntry,
     OwnedStreamingPlatformState,
@@ -442,6 +443,7 @@ export const processOwnedStreamingPlatformWeek = (
     const auctionSessionSnapshot = player.ownedStreamingPlatform.buyerAuctionSessions
         .map(session => `${session.id}:${session.status}`).join('|');
     player = processStreamingBuyerAuctionsWeek(player);
+    player = processAuctionFutureFunding(player, absoluteWeek);
     const auctionsChanged = auctionSessionSnapshot !== player.ownedStreamingPlatform.buyerAuctionSessions
         .map(session => `${session.id}:${session.status}`).join('|');
     const privateOffers = processStreamingPrivateOffersWeek(player, absoluteWeek);

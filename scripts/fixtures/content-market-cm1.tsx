@@ -19,6 +19,7 @@ function Fixture() {
     if (saved) return JSON.parse(saved);
     const p = contentMarketFixture();
     p.money = 900_000_000;
+    p.world.studios['seller-cm1'] = {...Object.values(p.world.studios)[0], id:'seller-cm1', name:'Harbour Pictures'} as any;
     if (new URLSearchParams(location.search).has('noStudio')) { p.businesses = []; p.pastProjects = []; }
     if (new URLSearchParams(location.search).has('gold')) p.ownedStreamingPlatform.identity!.primaryColor = '#f1bd24';
     p.ownedStreamingPlatform = normalizeOwnedStreamingPlatformState(p.ownedStreamingPlatform, p.id);
@@ -59,10 +60,10 @@ function Fixture() {
         const bid = placeStreamingBuyerAuctionBid(opened.player, opened.session.id, {
           minimumGuarantee: Math.round(lot.referenceValue * 1.8),
           licensorRevenueShare: lot.allowedTerms.backendMaximum,
-          marketingGuarantee: lot.allowedTerms.marketingMaximum,
-          futureGreenlight: lot.allowedTerms.futureGreenlightAllowed,
+          marketingGuarantee: 0,
+          futureGreenlight: false,
         }, 6_001_000);
-        if (bid.changed) return advanceStreamingBuyerAuction(bid.player, opened.session.id, 45, 6_046_000).player;
+        if (bid.changed) return advanceStreamingBuyerAuction(bid.player, opened.session.id, 75, 6_076_000).player;
       }
     }
     return p;

@@ -2055,6 +2055,8 @@ export interface LockedStreamingFunding {
     reason?: string;
     warningStage?: 'FIRST' | 'FINAL';
     deadlineExtensionWeeks?: number;
+    /** Explicit delivery clock for new funding; missing preserves legacy contracts. */
+    deadlineWeeks?: number;
     /** Links a platform commission to the existing studio Greenlight workflow. */
     ownedStreamingCommissionId?: string;
     fundingSource?: 'EXTERNAL_PLATFORM' | 'OWNED_STREAMING_PLATFORM' | 'AI_PLATFORM_COMMISSION';
@@ -5166,6 +5168,7 @@ export interface StreamingRightsContract extends OwnedStreamingCatalogLicense {
     dealStructure: StreamingRightsDealStructure;
     productionFunding: number;
     futureSeasonFunding: number;
+    futureFunding?: StreamingAuctionFutureFundingTerms;
     localization: StreamingRightsLocalizationTerms;
     localizationRequirements?: StreamingLocalizationPromise[];
     backendBasis: StreamingBackendBasis;
@@ -5568,6 +5571,17 @@ export type StreamingBuyerAuctionStatus = 'LIVE' | 'WON' | 'LOST' | 'NO_SALE' | 
 export type StreamingBuyerAuctionBidStatus = 'ACTIVE' | 'OUTBID' | 'WITHDRAWN' | 'WON' | 'LOST';
 export type StreamingBuyerAuctionEventType = 'OPENED' | 'BID_PLACED' | 'BID_REVISED' | 'RIVAL_BID' | 'RIVAL_WITHDREW' | 'CLOSED' | 'SETTLED' | 'INVALIDATED';
 
+/** Agreed future production, separate from the rights acquisition price. */
+export interface StreamingAuctionFutureFundingTerms {
+    kind: 'NEW_ORIGINAL' | 'SEQUEL' | 'NEXT_SEASON';
+    count: number;
+    budgetPerProject: number;
+    format: 'ANY' | ProjectFormat;
+    commitment: 'FIRM' | 'OPTION';
+    deadlineWeeks: number;
+    platformRightsPercent: number;
+}
+
 export interface StreamingBuyerAuctionAllowedTerms {
     backendMinimum: number;
     backendMaximum: number;
@@ -5630,6 +5644,8 @@ export interface StreamingBuyerAuctionBid {
     licensorRevenueShare: number;
     marketingGuarantee: number;
     futureGreenlight: boolean;
+    productionFunding?: number;
+    futureFunding?: StreamingAuctionFutureFundingTerms;
     guaranteedExposure: number;
     sellerValue: number;
     createdAtActiveSecond: number;
@@ -5667,6 +5683,8 @@ export interface StreamingBuyerAuctionSession {
     roomSecondsRemaining: number;
     activeSecondsElapsed: number;
     hardClosesAtSecond: number;
+    lastExtensionSeconds?: number;
+    lastExtensionAtSecond?: number;
     materialEventCount: number;
     lastRealtimeAtMs: number;
     playerBidderId: string;
@@ -5972,6 +5990,10 @@ export interface OwnedStreamingRightsObligation {
     /** Optional producer/counterparty required by a future-greenlight promise. */
     counterpartyId?: string | null;
     createdAtAbsoluteWeek?: number | null;
+    futureFunding?: StreamingAuctionFutureFundingTerms;
+    sourceAuctionId?: string;
+    fundingActivatedAtAbsoluteWeek?: number;
+    fundedProductionIds?: string[];
 }
 
 export type StreamingOriginalGapId =

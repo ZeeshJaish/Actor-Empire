@@ -85,7 +85,7 @@ export const getStreamingUpcomingRightsAuctionLots = (player: Player): Streaming
                 minimumBidIncrement: Math.max(500_000, Math.round(sale.referenceValue * 0.025 / 100_000) * 100_000),
                 reserveSellerValue: Math.round(sale.referenceValue * 0.84 / 100_000) * 100_000,
                 allowedTerms: {
-                    backendMinimum: 1,
+                    backendMinimum: 0,
                     backendMaximum: 10,
                     marketingMaximum: Math.round(sale.referenceValue * 0.18 / 100_000) * 100_000,
                     futureGreenlightAllowed: true,

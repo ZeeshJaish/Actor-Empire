@@ -1,3 +1,4 @@
+import { normalizeAuctionFutureFunding } from './streamingAuctionTerms';
 import type {
     OwnedStreamingCatalogLicense,
     PlatformAiContentSource,
@@ -201,6 +202,7 @@ const normalizeStreamingRightsContract = (value: unknown): StreamingRightsContra
         dealStructure: enumValue(source.dealStructure, DEAL_STRUCTURES, 'FLAT_LICENSE'),
         productionFunding: finiteMoney(source.productionFunding),
         futureSeasonFunding: finiteMoney(source.futureSeasonFunding),
+        futureFunding: normalizeAuctionFutureFunding(source.futureFunding),
         localization: enumValue(source.localization, LOCALIZATION_TERMS, 'NONE'),
         localizationRequirements: normalizeLocalizationPromises(source.localizationRequirements),
         backendBasis: 'ADJUSTED_GROSS_RECEIPTS',
