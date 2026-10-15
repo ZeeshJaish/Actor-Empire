@@ -238,19 +238,6 @@ const makeChoiceImpact = (
     return { updatedPlayer, log, logKey, logVars: { staff: (updatedPlayer as any).lastDepartedStaff || '' }, effects };
 };
 
-export const resolveLegacyTalentInstabilityChoice = (
-    player: Player,
-    optionId: string,
-): LifeEventImpactResult | null => {
-    const modeByOption: Record<string, 'RETENTION' | 'HOLD' | 'GOLDEN'> = {
-        RETENTION_PACKAGE: 'RETENTION',
-        HOLD_THE_LINE: 'HOLD',
-        GOLDEN_RETENTION_WAR_ROOM: 'GOLDEN',
-    };
-    const mode = modeByOption[optionId];
-    return mode ? makeChoiceImpact(mode)(player) : null;
-};
-
 const makeTalentNews = (player: Player, state: TalentInstabilityState, language: GameLanguage): NewsItem => ({
     id: `news_talent_instability_${player.age}_${player.currentWeek}`,
     headline: t(language, state.departureRisk >= 65

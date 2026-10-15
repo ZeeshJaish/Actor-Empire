@@ -22,10 +22,12 @@ const pricing: OwnedStreamingPricingConfiguration = {
     introOffer: 0,
 };
 const allCountries = Object.keys(normalizeWorldPopulationState(player.world.worldPopulation, absoluteWeek).countries).sort();
-assert.ok(allCountries.length > 40, 'scope fixture must exercise the existing launch-country limit');
+assert.ok(allCountries.length > 40, 'scope fixture must exercise a worldwide launch');
 const forecast = forecastWorldStreamingLaunchPricing(player, pricing, allCountries);
-assert.ok(forecast.countries.length <= 40,
-    'forecast must not claim reach in countries beyond the player offer country limit');
+assert.ok(forecast.countries.length > 40 && forecast.countries.length <= allCountries.length,
+    'forecast should support a worldwide launch without inventing countries');
+assert.ok(forecast.countries.every(country => allCountries.includes(country.countryId)),
+    'forecast must not claim reach outside the requested player markets');
 assert.equal(forecast.reachableHouseholds,
     forecast.countries.reduce((sum, country) => sum + country.reachableHouseholds, 0),
     'headline reachable households must reconcile to forecastable player markets');

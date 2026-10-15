@@ -5,6 +5,7 @@ import {
     getStreamingLicenseCandidatePool,
     getStreamingLicenseOpportunities,
     getStreamingLicenseQuote,
+    getActiveStreamingQuoteVersion,
     type StreamingCatalogTitle,
 } from './streamingCatalog';
 import { getStreamingContentAvailability } from './streamingContentAvailability';
@@ -161,7 +162,8 @@ export const processHistoricalMarketRivalWeek = (player: Player): Player => {
     ));
     for (const title of rankedBidTitles(player, getStreamingLicenseCandidatePool(player), cycle)) {
         for (const rival of rivals) {
-            const guarantee = getStreamingLicenseQuote(title, 'GLOBAL', 104, 'EXCLUSIVE').suggestedGuarantee;
+            const guarantee = getStreamingLicenseQuote(title, 'GLOBAL', 104, 'EXCLUSIVE',
+                getActiveStreamingQuoteVersion(player.ownedStreamingPlatform.marketQuotePolicy, now), 'FIRST_WINDOW', player.age).suggestedGuarantee;
             if (rival.cashReserve < fullCurrencyToMillions(guarantee)) continue;
             const claim = registerRivalClaim(player, registry, title, rival.id, now, guarantee, 'bid');
             if (!claim) continue;

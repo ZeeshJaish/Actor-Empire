@@ -11,6 +11,7 @@ import {
   type StreamingLaunchMarketingForecastSnapshot,
 } from '../types';
 import { getAbsoluteWeek } from '../services/legacyLogic';
+import { configureStreamingPricingOffer } from '../services/streamingCommercialOffers';
 import { normalizeOwnedStreamingPlatformState } from '../services/ownedStreamingPlatform';
 import {
   commitStreamingInfrastructureSetup,
@@ -222,7 +223,9 @@ const createReadyPlayer = (): { player: Player; draft: OwnedStreamingInfrastruct
     },
   };
   const priced = saveStreamingPricingPlan(player, {
-    ...player.ownedStreamingPlatform.serviceConfiguration.pricing,
+    ...configureStreamingPricingOffer(player.ownedStreamingPlatform.serviceConfiguration.pricing, {
+      kind: 'CORE', coreModel: 'SUBSCRIPTION',
+    }),
     annualDiscount: 15,
     introOffer: 20,
     introOfferPlanId: 'BASIC',

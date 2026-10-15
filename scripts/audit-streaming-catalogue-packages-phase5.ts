@@ -501,7 +501,7 @@ strategyPlayer.streamingRightsManagement = {
 };
 const strategyProposalWeek = processStreamingCataloguePackagesWeek(strategyPlayer, 404);
 const strategyAutomation = processStreamingCataloguePackageStrategyAutomation(strategyProposalWeek.player, 404);
-assert.equal(strategyAutomation.signedPackageIds.length, 1, 'Strategy routine automation should close one safe package without title-by-title work');
+assert.equal(strategyAutomation.signedPackageIds.length, 1, `Strategy routine automation should close one safe package without title-by-title work (${strategyAutomation.skippedReasons.join(', ')})`);
 const automaticallySigned = strategyAutomation.player.world.streamingCataloguePackages![strategyAutomation.signedPackageIds[0]];
 assert.equal(automaticallySigned.lifecycle, 'SIGNED');
 assert.equal(automaticallySigned.components.length, automaticallySigned.componentContractIds.length);

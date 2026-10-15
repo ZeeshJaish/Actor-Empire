@@ -189,6 +189,7 @@ const DEFINE_STEP_BY_DESTINATION: Partial<Record<StreamingLaunchDestination, Str
 interface Props {
   player: Player;
   onUpdatePlayer?: (player: Player) => void;
+  onTrustedMarketUpdate?: (player: Player) => void;
   onBack: () => void;
   onReturnToGame?: () => void;
   onOpenOriginalProduction?: (target: { studioId: string; scriptId: string; commissionId: string }) => void;
@@ -288,7 +289,7 @@ function EmptyState({
   );
 }
 
-export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, onReturnToGame, onOpenOriginalProduction, onOpenBank, initialDestination = 'HOME', initialContentMarketOfferId, onContentMarketOfferConsumed }: Props) {
+export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedMarketUpdate, onBack, onReturnToGame, onOpenOriginalProduction, onOpenBank, initialDestination = 'HOME', initialContentMarketOfferId, onContentMarketOfferConsumed }: Props) {
   const platform = player.ownedStreamingPlatform;
   const constructionSetup = platform.pendingInfrastructureSetup
     || (!platform.launchCommit ? platform.infrastructureSetup : null);
@@ -993,8 +994,13 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
       completion,
       subsAcquired: Math.round((performance?.viewingAccounts || 0) * 0.03),
       churnPrevented: Math.round((performance?.viewingAccounts || 0) * 0.015),
-      revenue: performance?.attributedSubscriptionRevenue || 0,
-      cost: performance?.allocatedCashCost || performance?.allocatedContentAmortization || 0,
+      revenue: (performance?.attributedSubscriptionRevenue || 0)
+        + (performance?.advertisingRevenue || 0) + (performance?.incrementalRevenue || 0),
+      cost: (performance?.allocatedCashCost || 0) + (performance?.allocatedContentAmortization || 0),
+      rightsInvestment: platform.catalogLicenses
+        .filter(license => license.sourceProjectId === titleDossierInitialProjectId)
+        .reduce((total, license) => total + license.minimumGuarantee, 0),
+      financialsAvailable: Boolean(performance),
       sources: sourceMix ? [
         { label: 'Homepage', pct: sourceMix.homepagePercent },
         { label: 'Recommendations', pct: sourceMix.recommendationsPercent },
@@ -1013,7 +1019,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
       press: [{ id: 'canonical-summary', tag: 'LATEST', source: identity.name, head: title, body: performance ? `${performance.viewingAccounts.toLocaleString()} accounts watched during the latest measured week.` : 'Performance reporting begins after release.' }],
       maturity: { have: performance?.weeksAvailable || 0, need: 8 },
     };
-  }, [cinematicAudienceState.chart, cinematicContentState.titles, commandDeckBrand.hue, identity.name, platform.metrics, platform.weeklyHistory, titleDossierInitialProjectId]);
+  }, [cinematicAudienceState.chart, cinematicContentState.titles, commandDeckBrand.hue, identity.name, platform.catalogLicenses, platform.metrics, platform.weeklyHistory, titleDossierInitialProjectId]);
   const launchReadiness = useMemo(() => getStreamingLaunchReadiness(player), [player]);
   const cinematicPremiereInputs = useMemo<StreamingPremiereInputs>(() => {
     const commit = platform.launchCommit;
@@ -2355,7 +2361,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onBack, on
       {showContentMarket && !showOriginalCommissioning && !showCatalogSetup && !showRightsExchange ? (
         <StreamingContentMarket
           initialTab={contentMarketInitialTab}
-          player={player} brand={commandDeckBrand} onUpdatePlayer={persist}
+          player={player} brand={commandDeckBrand} onUpdatePlayer={onTrustedMarketUpdate || persist}
           initialOfferId={initialContentMarketOfferId}
           returnToLaunch={catalogueReturnToLaunch}
           onClose={() => {

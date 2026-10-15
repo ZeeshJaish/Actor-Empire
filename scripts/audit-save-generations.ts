@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import { INITIAL_PLAYER, type Player } from '../types';
 import { createSaveIntegrityManifest, type SaveIntegrityManifest } from '../services/saveIntegrity';
-import { prepareVerifiedPlayerForPersistence } from '../services/savePreparation';
 import {
     getSaveGenerationKeys,
     loadVerifiedGameData,
@@ -167,49 +166,6 @@ await saveVerifiedGameData(successful, slotKey, nextPlayer, nextManifest);
 assert.deepEqual(successful.records.get(keys.current), nextPlayer);
 assert.equal((successful.records.get(keys.previous) as StoredSaveGeneration).player.currentWeek, 12);
 assert.equal(successful.records.has(keys.candidate), false);
-
-const callbackPlayer = structuredClone(nextPlayer) as Player;
-callbackPlayer.pendingEvents = [{
-    id: 'save_callback_regression',
-    week: callbackPlayer.currentWeek,
-    type: 'LIFE_EVENT',
-    title: 'Save callback regression',
-    data: { lifeEvent: {
-        id: 'save_callback_regression',
-        title: 'Save callback regression',
-        description: 'A live choice must be materialized before persistence.',
-        category: 'QA',
-        options: [{ label: 'Accept', impact: player => ({ updatedPlayer: { ...player, money: player.money + 50 }, log: 'Accepted' }) }],
-    } },
-}] as Player['pendingEvents'];
-const callbackStore = new MemoryGenerationStore();
-callbackStore.records.set(keys.current, oldPlayer);
-callbackStore.records.set(keys.integrity, oldManifest);
-await assert.rejects(
-    () => saveVerifiedGameData(callbackStore, slotKey, callbackPlayer, createSaveIntegrityManifest(callbackPlayer, 'PROCESS_WEEK')),
-    /pendingEvents.*impact/,
-    'Passing a live callback directly to the verified save API must fail with its location.',
-);
-assert.equal(callbackStore.candidateWriteAttempts, 0, 'An uncloneable candidate must be rejected before opening an IndexedDB write.');
-assert.deepEqual(callbackStore.records.get(keys.current), oldPlayer, 'A rejected callback must not replace the last verified save.');
-const preparedCallback = prepareVerifiedPlayerForPersistence(callbackPlayer, 'PROCESS_WEEK');
-await saveVerifiedGameData(callbackStore, slotKey, preparedCallback.persistedPlayer, preparedCallback.manifest);
-assert.equal((callbackStore.records.get(keys.current) as Player).money, callbackPlayer.money);
-assert.equal((callbackStore.records.get(keys.current) as Player).pendingEvents?.[0]?.data?.lifeEvent?.options?.[0]?.impactId, 'MATERIALIZED_PATCH_V1');
-const importCallbackStore = new MemoryGenerationStore();
-importCallbackStore.records.set(keys.current, oldPlayer);
-importCallbackStore.records.set(keys.integrity, oldManifest);
-await assert.rejects(
-    () => stageVerifiedGameDataBatch(importCallbackStore, [{
-        currentKey: slotKey,
-        player: callbackPlayer,
-        manifest: createSaveIntegrityManifest(callbackPlayer, 'IMPORT'),
-    }]),
-    /pendingEvents.*impact/,
-    'Import staging must enforce the same callback-free save boundary.',
-);
-assert.equal(importCallbackStore.candidateWriteAttempts, 0);
-assert.deepEqual(importCallbackStore.records.get(keys.current), oldPlayer);
 
 for (const failure of ['write', 'read', 'promote'] as const) {
     const store = new MemoryGenerationStore();

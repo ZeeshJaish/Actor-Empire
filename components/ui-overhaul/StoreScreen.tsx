@@ -22,15 +22,6 @@ export interface StoreScreenCopy {
   rewardAfterConfirm: string;
   cancel: string;
   continue: string;
-  wellnessAdOne: string;
-  wellnessAdTwo: string;
-}
-
-export interface WellnessAdUiState {
-  completedSteps: 0 | 1 | 2;
-  actionLabel: string;
-  statusLabel: string;
-  disabled: boolean;
 }
 
 interface StoreScreenProps {
@@ -44,7 +35,6 @@ interface StoreScreenProps {
   genres: Genre[];
   formatGenre: (genre: Genre) => string;
   copy: StoreScreenCopy;
-  wellnessAd: WellnessAdUiState;
   onBack: () => void;
   onWatchAd: (type: RewardType, data?: keyof ActorSkills | Genre) => void;
   onBuy: (productId: PremiumProductId) => void;
@@ -58,7 +48,6 @@ const CSS = `
 .store-overhaul .st-restore{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:44px;margin-top:9px;border-radius:14px;font-size:12px;font-weight:750;color:var(--dim);background:rgba(255,255,255,.035);box-shadow:inset 0 0 0 1px var(--line)}
 .store-overhaul .st-ads{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:9px}.store-overhaul .st-ad{position:relative;padding:14px;border-radius:18px;text-align:left;background:color-mix(in srgb,var(--c) 7%,var(--card));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--c) 22%,transparent);transition:transform .12s ease}.store-overhaul .st-ad:active{transform:scale(.98)}.store-overhaul .st-ad-i{width:44px;height:44px;border-radius:15px;display:grid;place-items:center;color:var(--c);background:color-mix(in srgb,var(--c) 15%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--c) 28%,transparent)}.store-overhaul .st-tag{position:absolute;top:13px;right:13px;padding:3px 7px;border-radius:6px;font-size:8px;font-weight:800;letter-spacing:.14em;color:var(--faint);background:rgba(255,255,255,.07)}.store-overhaul .st-ad-n{display:block;margin-top:14px;font-size:16px;font-weight:800;letter-spacing:-.03em;line-height:1.15}.store-overhaul .st-ad-d{display:block;margin-top:5px;font-size:11px;font-weight:650;line-height:1.4;color:var(--faint)}
 .store-overhaul .st-boost{margin-top:9px;padding:14px;border-radius:19px;background:var(--card);box-shadow:inset 0 0 0 1px var(--line)}.store-overhaul .st-boost-h{display:flex;align-items:center;gap:12px}.store-overhaul .st-boost-i{width:44px;height:44px;flex:none;border-radius:15px;display:grid;place-items:center;color:var(--c);background:color-mix(in srgb,var(--c) 14%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--c) 28%,transparent)}.store-overhaul .st-boost-t{flex:1;min-width:0}.store-overhaul .st-boost-n{display:block;font-size:16px;font-weight:800;letter-spacing:-.03em}.store-overhaul .st-boost-d{display:block;margin-top:4px;font-size:11px;font-weight:650;line-height:1.4;color:var(--faint)}.store-overhaul .st-boost-c{flex:none;font-size:8px;font-weight:800;letter-spacing:.14em;color:var(--faint)}.store-overhaul .st-play{width:44px;height:44px;flex:none;border-radius:50%;display:grid;place-items:center;color:var(--c);background:color-mix(in srgb,var(--c) 13%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--c) 30%,transparent)}
-.store-overhaul .st-wellness-progress{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:13px}.store-overhaul .st-wellness-step{min-height:36px;display:flex;align-items:center;gap:7px;padding:8px 10px;border-radius:11px;font-size:10px;font-weight:800;letter-spacing:.04em;color:var(--faint);background:rgba(255,255,255,.035);box-shadow:inset 0 0 0 1px var(--hair)}.store-overhaul .st-wellness-dot{width:18px;height:18px;flex:none;border-radius:50%;display:grid;place-items:center;font-size:11px;color:var(--ghost);box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)}.store-overhaul .st-wellness-step.is-done{color:var(--health);background:color-mix(in srgb,var(--health) 9%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--health) 28%,transparent)}.store-overhaul .st-wellness-step.is-done .st-wellness-dot{color:#07120e;background:var(--health);box-shadow:none}.store-overhaul .st-wellness-status{min-height:18px;margin-top:9px;font-size:10.5px;font-weight:650;line-height:1.45;color:var(--dim)}.store-overhaul .st-wellness-action{width:100%;min-height:44px;margin-top:10px;padding:9px 12px;border-radius:13px;display:flex;align-items:center;justify-content:center;gap:8px;font-size:12px;font-weight:850;color:var(--health);background:color-mix(in srgb,var(--health) 12%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--health) 34%,transparent)}.store-overhaul .st-wellness-action:disabled{cursor:wait;opacity:.62}
 .store-overhaul .st-rail{display:flex;gap:7px;margin:13px -14px 0;padding:0 14px 2px;overflow-x:auto;scrollbar-width:none;-webkit-mask-image:linear-gradient(90deg,#000 0,#000 calc(100% - 34px),transparent);mask-image:linear-gradient(90deg,#000 0,#000 calc(100% - 34px),transparent)}.store-overhaul .st-rail::-webkit-scrollbar{display:none}.store-overhaul .st-opt{flex:none;padding:9px 14px;border-radius:11px;font-size:11.5px;font-weight:750;color:var(--faint);background:rgba(255,255,255,.045);box-shadow:inset 0 0 0 1px var(--hair)}.store-overhaul .st-opt.is-on{color:var(--c);background:color-mix(in srgb,var(--c) 15%,transparent);box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--c) 46%,transparent)}.store-overhaul .st-cta{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;height:46px;margin-top:12px;border-radius:14px;font-size:13px;font-weight:800;color:var(--c);background:color-mix(in srgb,var(--c) 13%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--c) 32%,transparent)}
 .store-overhaul .st-lead{display:flex;align-items:center;gap:13px;margin-top:9px;padding:14px;border-radius:19px;background:var(--card);box-shadow:inset 0 0 0 1px var(--line)}.store-overhaul .st-lead-i{width:42px;height:42px;flex:none;border-radius:15px;display:grid;place-items:center;color:var(--gold-hi);background:rgba(248,168,16,.12);box-shadow:inset 0 0 0 1px rgba(248,168,16,.26)}.store-overhaul .st-lead b{display:block;font-size:17px;font-weight:800;letter-spacing:-.03em}.store-overhaul .st-lead p{margin-top:4px;font-size:11px;font-weight:650;line-height:1.4;color:var(--faint)}
 .store-overhaul .st-band{display:flex;align-items:center;gap:10px;margin:22px 0 2px}.store-overhaul .st-band-i{width:30px;height:30px;flex:none;border-radius:11px;display:grid;place-items:center;color:var(--c);background:color-mix(in srgb,var(--c) 14%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--c) 28%,transparent)}.store-overhaul .st-band-n{font-size:11px;font-weight:800;letter-spacing:.19em}.store-overhaul .st-band-c{margin-left:auto;min-width:24px;height:22px;padding:0 8px;border-radius:8px;display:grid;place-items:center;font-size:10px;font-weight:800;color:var(--c);background:color-mix(in srgb,var(--c) 15%,transparent)}.store-overhaul .st-band-r{display:block;height:2px;border-radius:1px;margin:9px 0 0;background:linear-gradient(90deg,var(--c),color-mix(in srgb,var(--c) 22%,transparent) 38%,transparent 82%)}
@@ -84,7 +73,7 @@ function GroupBand({ group }: { group: StoreUiGroup }) {
   </div>;
 }
 
-export default function StoreScreen({ money, bonusBank, readyEnergy, groups, showPremium, premiumNote, skills, genres, formatGenre, copy, wellnessAd, onBack, onWatchAd, onBuy, onRestore }: StoreScreenProps) {
+export default function StoreScreen({ money, bonusBank, readyEnergy, groups, showPremium, premiumNote, skills, genres, formatGenre, copy, onBack, onWatchAd, onBuy, onRestore }: StoreScreenProps) {
   const [tab, setTab] = useState<StoreTab>('REWARDS');
   const [skill, setSkill] = useState<keyof ActorSkills>(skills[0] || 'delivery');
   const [genre, setGenre] = useState<Genre>(genres[0] || 'ACTION');
@@ -114,15 +103,7 @@ export default function StoreScreen({ money, bonusBank, readyEnergy, groups, sho
           <button type="button" className="st-ad" style={cssVar('--c', 'var(--gold-hi)')} onClick={() => onWatchAd('REWARDED_ENERGY')} aria-label="Watch ad to refill 25 energy"><span className="st-tag">AD</span><span className="st-ad-i"><Icon name="bolt" size={21} /></span><span className="st-ad-n">Refill 25 Energy</span><span className="st-ad-d">Keep working longer</span></button>
         </ActionGroup>
 
-        <section className="st-boost" style={cssVar('--c', 'var(--health)')}>
-          <div className="st-boost-h"><span className="st-boost-i"><Icon name="heart" size={21} /></span><span className="st-boost-t"><span className="st-boost-n">Wellness Package</span><span className="st-boost-d">Boost Health, Mood, Looks &amp; Body to 90+</span></span></div>
-          <div className="st-wellness-progress" role="status" aria-label={wellnessAd.statusLabel}>
-            <span className={`st-wellness-step${wellnessAd.completedSteps >= 1 ? ' is-done' : ''}`}><span className="st-wellness-dot">{wellnessAd.completedSteps >= 1 ? '✓' : '○'}</span>{copy.wellnessAdOne}</span>
-            <span className={`st-wellness-step${wellnessAd.completedSteps >= 2 ? ' is-done' : ''}`}><span className="st-wellness-dot">{wellnessAd.completedSteps >= 2 ? '✓' : '○'}</span>{copy.wellnessAdTwo}</span>
-          </div>
-          <p className="st-wellness-status">{wellnessAd.statusLabel}</p>
-          <button type="button" className="st-wellness-action" disabled={wellnessAd.disabled} onClick={() => onWatchAd('REWARDED_STATS')} aria-label={wellnessAd.actionLabel}><Icon name="play" size={15} />{wellnessAd.actionLabel}</button>
-        </section>
+        <section className="st-boost" style={cssVar('--c', 'var(--health)')}><div className="st-boost-h"><span className="st-boost-i"><Icon name="heart" size={21} /></span><span className="st-boost-t"><span className="st-boost-n">Wellness Package</span><span className="st-boost-d">Boost Health, Mood, Looks &amp; Body to 90+</span></span><button type="button" className="st-play" onClick={() => onWatchAd('REWARDED_STATS')} aria-label="Watch ad for Wellness Package"><Icon name="play" size={17} /></button></div></section>
 
         <section className="st-boost" style={cssVar('--c', 'var(--writing)')}><div className="st-boost-h"><span className="st-boost-i"><Icon name="brain" size={21} /></span><span className="st-boost-t"><span className="st-boost-n">Skill Master</span></span><span className="st-boost-c">{skills.length}</span></div><div className="st-rail" aria-label="Choose skill">{skills.map(item => <button type="button" className={`st-opt${skill === item ? ' is-on' : ''}`} key={item} aria-pressed={skill === item} onClick={() => setSkill(item)}>{titleCase(item)}</button>)}</div><button type="button" className="st-cta" onClick={() => onWatchAd('REWARDED_SKILL', skill)}><Icon name="play" size={15} />Boost {titleCase(skill)} (+10)</button></section>
 

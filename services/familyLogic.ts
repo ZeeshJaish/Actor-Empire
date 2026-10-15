@@ -2,6 +2,7 @@ import { FamilyObligation, GameLanguage, Gender, NewsItem, Player, PregnancyCarr
 import { getAbsoluteWeek, getRelationshipAge } from './legacyLogic';
 import { getGenderedAvatar } from './npcLogic';
 import { getPlayerLanguage, t } from './i18n';
+import { buildAbandonedBabyName } from './babyNaming';
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const sample = <T,>(items: T[]): T => items[Math.floor(Math.random() * items.length)];
@@ -108,12 +109,6 @@ type FamilyDramaSeed = {
 };
 
 type FamilyDramaLog = { msg: string; type: 'positive' | 'negative' | 'neutral' };
-
-const getSurname = (fullName: string) => {
-    const parts = (fullName || '').trim().split(/\s+/).filter(Boolean);
-    if (parts.length === 0) return 'Legacy';
-    return parts[parts.length - 1];
-};
 
 const ensureFamilyFlags = (player: Player) => {
     if (!player.flags) player.flags = {};
@@ -263,7 +258,11 @@ export const applyParenthoodAbandonment = (
     let child = config.childId ? nextPlayer.relationships.find(rel => rel.id === config.childId) : undefined;
     let hiddenChildForFutureClaim: Relationship | undefined;
     if (!child) {
-        const fallbackName = config.childName || `${config.babyGender === 'FEMALE' ? 'Mia' : 'Leo'} ${getSurname(config.partnerName || nextPlayer.name)}`;
+        const fallbackName = config.childName || buildAbandonedBabyName(
+            config.babyGender === 'FEMALE' ? 'Mia' : 'Leo',
+            config.partnerName || '',
+            nextPlayer.name,
+        );
         child = {
             id: `child_${Date.now()}`,
             name: fallbackName,

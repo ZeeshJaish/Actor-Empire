@@ -40,6 +40,8 @@ export interface DossierTitle {
   churnPrevented: number;
   revenue: number;
   cost: number;
+  rightsInvestment?: number;
+  financialsAvailable?: boolean;
   /** where the views came from, as percentages */
   sources: { label: string; pct: number }[];
 
@@ -113,10 +115,12 @@ export const TitleDossier: React.FC<{
             <Cell label="COMPLETION" value={`${t.completion}%`} tone="good" note="finished it" />
             <Cell label="SUBS ACQUIRED" value={count(t.subsAcquired)} tone="brand" note="joined for this title" />
             <Cell label="CHURN PREVENTED" value={count(t.churnPrevented)} tone="brand" note="stayed because of it" />
-            <Cell label="REVENUE CONTRIBUTION" value={money(t.revenue)} tone="good" />
-            <Cell label="COST" value={money(t.cost)} tone="bad" />
-            <Cell label="CONTRIBUTION MARGIN" value={`${marginPct > 0 ? '+' : ''}${marginPct}%`}
-              tone={marginPct >= 0 ? 'good' : 'bad'} note={money(margin)} />
+            {t.kind === 'LICENSED' && <Cell label="RIGHTS GUARANTEE PAID" value={money(t.rightsInvestment || 0)}
+              note="Paid upfront; accounted over the licence term" />}
+            <Cell label="REVENUE / LATEST WEEK" value={t.financialsAvailable === false ? '—' : money(t.revenue)} tone="good" />
+            <Cell label="COST / LATEST WEEK" value={t.financialsAvailable === false ? '—' : money(t.cost)} tone="bad" />
+            <Cell label="CONTRIBUTION / LATEST WEEK" value={t.financialsAvailable === false ? '—' : `${marginPct > 0 ? '+' : ''}${marginPct}%`}
+              tone={marginPct >= 0 ? 'good' : 'bad'} note={t.financialsAvailable === false ? 'Starts after release' : money(margin)} />
             <div className={cx(css.dcell, css.wide)}>
               <span>WHERE THEY CAME FROM</span>
               <div className={css.srclist}>

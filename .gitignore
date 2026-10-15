@@ -18,6 +18,7 @@ coverage
 *.tsbuildinfo
 *.sqlite
 *.db
+.playwright-cli/
 
 # Editor directories and files
 .vscode/*

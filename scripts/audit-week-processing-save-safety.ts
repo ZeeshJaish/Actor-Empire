@@ -4,7 +4,6 @@ import { generateLegalHearing } from '../services/lifeEventLogic';
 import { compactPlayerForPersistence } from '../services/saveCompaction';
 import { processGameWeek } from '../services/gameLoop';
 import { prepareVerifiedPlayerForPersistence } from '../services/savePreparation';
-import { getLifeEventResolutionContractViolations, resolveLifeEventChoice } from '../services/lifeEventResolver';
 
 const assert = (condition: unknown, message: string) => {
   if (!condition) throw new Error(message);
@@ -85,13 +84,7 @@ structuredClone(persistedWeek);
 
 const rebuiltHearing = generateLegalHearing(persistedWeek, scheduledHearing!.data.caseId);
 assert(typeof rebuiltHearing?.options[0]?.impact === 'function', 'Opening the saved hearing must rebuild its real choice behavior.');
-const resolvedHearing = resolveLifeEventChoice(
-  structuredClone(persistedWeek),
-  scheduledHearing!,
-  rebuiltHearing!,
-  rebuiltHearing!.options[0],
-  0,
-)!;
+const resolvedHearing = rebuiltHearing!.options[0].impact!(structuredClone(persistedWeek));
 assert(resolvedHearing.updatedPlayer.flags.activeCases?.[0]?.playerDefense === 70, 'Legal choice should retain its original player-defense effect.');
 structuredClone(compactPlayerForPersistence(resolvedHearing.updatedPlayer));
 
@@ -117,16 +110,11 @@ multiWeekPlayer.flags = {
 
 for (let tick = 0; tick < 8; tick += 1) {
   const result = await processGameWeek(multiWeekPlayer);
-  const preparedTick = prepareVerifiedPlayerForPersistence(result.player, 'PROCESS_WEEK');
   assert(
-    preparedTick.comparison.ok,
+    prepareVerifiedPlayerForPersistence(result.player, 'PROCESS_WEEK').comparison.ok,
     `Processed week ${tick + 1} must remain verifiable after persistence compaction.`
   );
-  assert(
-    getLifeEventResolutionContractViolations(preparedTick.persistedPlayer).length === 0,
-    `Processed week ${tick + 1} must not persist a new life event without a resolver contract.`
-  );
-  const persistedTick = preparedTick.persistedPlayer;
+  const persistedTick = compactPlayerForPersistence(result.player);
   structuredClone(persistedTick);
   assert(
     persistedTick.currentWeek !== multiWeekPlayer.currentWeek || persistedTick.age !== multiWeekPlayer.age,

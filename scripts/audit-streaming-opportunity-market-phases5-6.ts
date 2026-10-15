@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { INITIAL_PLAYER, type Player } from '../types';
 import { migratePlayerSave } from '../services/saveMigration';
-import { advanceStreamingOpportunityMarket, getStreamingOpportunityCards,
+import { advanceStreamingOpportunityMarket, buildStreamingOpportunityOffer, getStreamingOpportunityCards,
     purchaseStreamingOpportunityOffer, processStreamingOpportunityPremieres,
     processRivalBrokeredOpportunityWeek } from '../services/streamingOpportunityMarket';
 import { getAbsoluteWeek } from '../services/legacyLogic';
@@ -22,7 +22,7 @@ const fresh = (): Player => {
     player.age = 26;
     player.currentWeek = 9;
     player.ownedStreamingPlatform.lifecycle = 'FOUNDING';
-    player.ownedStreamingPlatform.treasuryCash = 300_000_000;
+    player.ownedStreamingPlatform.treasuryCash = 2_000_000_000;
     return migratePlayerSave(player);
 };
 
@@ -126,6 +126,12 @@ assert.ok(brokered.every(contract => !cards.individuals.some(offer => offer.proj
     'brokered titles cannot duplicate any public offer identity');
 assert.ok(brokered.every(contract => rivalWeek.world.platforms?.[contract.buyer.platformId!]?.cashReserve
     < rivalStartingCash[contract.buyer.platformId!]), 'each AI purchase debits its own treasury');
+assert.ok(brokered.every(contract => {
+    const card = [20, 21].map(index => buildStreamingOpportunityOffer(generated,
+        generated.world.streamingOpportunityMarket!.cycle, index, 'BROKERED'))
+        .find(item => item.projectId === contract.sourceProjectId);
+    return card && rivalWeek.world.projects.find(project => project.id === contract.sourceProjectId)?.budgetTier === card.budgetTier;
+}), 'rival-acquired films preserve the same production scale quoted to the player');
 assert.deepEqual(processRivalBrokeredOpportunityWeek(rivalWeek, week), rivalWeek,
     'rival cycle replay cannot duplicate titles, contracts or spending');
 const publicCompetition = processRivalBrokeredOpportunityWeek(rivalWeek, week + 1);

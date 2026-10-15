@@ -1,6 +1,5 @@
 import { INITIAL_PLAYER, type Business, type Player } from '../types';
 import { processRivalRetaliation } from '../services/rivalRetaliation';
-import { getLifeEventResolutionContractViolations, materializePlayerLifeEventImpacts, resolveLifeEventChoice } from '../services/lifeEventResolver';
 
 const assert = (condition: unknown, message: string) => {
     if (!condition) throw new Error(message);
@@ -147,14 +146,6 @@ assert(quietChoice, 'Rival retaliation popup should include a quiet backchannel 
 const quietResult = quietChoice.impact(processed);
 assert(quietResult.updatedPlayer.flags.rivalRetaliationState.lastRivalRetaliationChoiceWeek === 166, 'Choosing a rival option should stamp the choice week.');
 assert(quietResult.log.includes('Rival Retaliation'), 'Rival option should return readable feedback.');
-const preparedRival = materializePlayerLifeEventImpacts(processed, { strict: true });
-assert(getLifeEventResolutionContractViolations(preparedRival).length === 0, 'Rival retaliation choices must persist with registered resolvers.');
-const reloadedRivalPlayer = JSON.parse(JSON.stringify(preparedRival)) as Player;
-const reloadedRivalEvent = reloadedRivalPlayer.pendingEvents!.find(item => item.data?.rivalRetaliationEventType)!;
-const reloadedRivalLifeEvent = reloadedRivalEvent.data.lifeEvent;
-const reloadedQuietChoice = reloadedRivalLifeEvent.options.find((option: any) => option.id === 'QUIET_BACKCHANNEL');
-const reloadedQuietResult = resolveLifeEventChoice(reloadedRivalPlayer, reloadedRivalEvent, reloadedRivalLifeEvent, reloadedQuietChoice, 0);
-assert(reloadedQuietResult?.updatedPlayer.flags.rivalRetaliationState.lastRivalRetaliationChoiceWeek === 166, 'Rival retaliation choice must retain its exact effect after reload.');
 
 const second = processRivalRetaliation(processed);
 assert((second.pendingEvents || []).filter(event => event.data?.rivalRetaliationEventType).length === 1, 'Same-week processing should not duplicate rival retaliation events.');

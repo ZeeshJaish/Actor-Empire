@@ -26,6 +26,7 @@ interface LifestylePageProps {
   onStartBusiness: (type: any) => void;
   onShutdownBusiness: () => void;
   onUpdatePlayer?: (player: Player) => void;
+  onTrustedMarketUpdate?: (player: Player) => void;
   onPremiumPurchase: (productId: PremiumProductId) => void;
   onReturnHome?: () => void;
   onNavVisibilityChange?: (visible: boolean) => void;
@@ -61,7 +62,7 @@ const CustomizationHeroImage: React.FC<{ item: Property | Vehicle }> = ({ item }
   );
 };
 
-export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem, onSellItem, onSetResidence, onUpdatePlayer, onPremiumPurchase, onReturnHome, onNavVisibilityChange, initialView, onInitialViewConsumed, onOpenBank, initialRightsMarketOpportunityId, onRightsMarketTargetConsumed, initialStreamingContentOfferId, onStreamingContentOfferConsumed, initialStudioContinuation, onStudioContinuationConsumed, initialPlatformCommission, onPlatformCommissionConsumed }) => {
+export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem, onSellItem, onSetResidence, onUpdatePlayer, onTrustedMarketUpdate, onPremiumPurchase, onReturnHome, onNavVisibilityChange, initialView, onInitialViewConsumed, onOpenBank, initialRightsMarketOpportunityId, onRightsMarketTargetConsumed, initialStreamingContentOfferId, onStreamingContentOfferConsumed, initialStudioContinuation, onStudioContinuationConsumed, initialPlatformCommission, onPlatformCommissionConsumed }) => {
   const [view, setView] = useState<'MAIN' | 'ASSETS' | 'ACTIVITIES' | 'BUSINESS' | 'PRODUCTION_WIZARD' | 'PRODUCTION_GAME' | 'STREAMING_PLATFORM' | 'CINEMA_CHAIN'>('MAIN');
   const [customizationItem, setCustomizationItem] = useState<Property | Vehicle | null>(null);
   const [selectedCustomizations, setSelectedCustomizations] = useState<CustomizationOption[]>([]);
@@ -304,6 +305,7 @@ export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem,
       <StreamingLockedScreen
           player={player}
           onUpdatePlayer={onUpdatePlayer}
+          onTrustedMarketUpdate={onTrustedMarketUpdate}
           onBack={() => setView('MAIN')}
           onReturnToGame={onReturnHome || (() => setView('MAIN'))}
           onOpenBank={onOpenBank}

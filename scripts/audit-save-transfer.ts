@@ -557,8 +557,8 @@ assert(
 
 const appSource = readFileSync('App.tsx', 'utf8');
 assert(
-  appSource.includes('const runtimePlayerState = await persistCurrentSlotSnapshot(syncedPlayerState, {')
-    && appSource.includes('commitProcessedWeekPlayer(runtimePlayerState);'),
+  appSource.includes('const persistedPlayerState = await persistCurrentSlotSnapshot(syncedPlayerState, {')
+    && appSource.includes('commitProcessedWeekPlayer(persistedPlayerState);'),
   'Week advance should await persistence before showing the processed week.'
 );
 assert(
@@ -577,6 +577,26 @@ assert(
   verifySaveIntegrity(preparedImport.entries[0].player, preparedImport.entries[0].manifest).ok,
   'Every staged transfer slot must carry a matching verified manifest.',
 );
+// The restored legacy transfer boundary must preserve the current streaming economy schema.
+const streamingTransferSource = migratePlayerSave(JSON.parse(JSON.stringify(bulkyPlayer)));
+streamingTransferSource.ownedStreamingPlatform.marketQuotePolicy = {
+  version: 3, effectiveCycle: 0, previousVersion: 2,
+};
+streamingTransferSource.ownedStreamingPlatform.treasuryCash = 987_654_321;
+const streamingTransfer = await prepareSaveTransferImportEntries([
+  { key: 'actorEmpireSave_2', value: JSON.parse(JSON.stringify(streamingTransferSource)) },
+], { archiveAppVersion: '1.0.25', importedAt: '2026-10-15T00:00:00.000Z' });
+const restoredStreaming = streamingTransfer.entries[0].player;
+assert(JSON.stringify(restoredStreaming.ownedStreamingPlatform.marketQuotePolicy)
+  === JSON.stringify(streamingTransferSource.ownedStreamingPlatform.marketQuotePolicy),
+  'Legacy transfer must retain the latest V3 market policy and its rollout cycle.');
+assert(restoredStreaming.ownedStreamingPlatform.treasuryCash === 987_654_321,
+  'Legacy transfer must retain current streaming treasury cash exactly.');
+assert(JSON.stringify(restoredStreaming.world.historicalCatalogue)
+  === JSON.stringify(streamingTransferSource.world.historicalCatalogue),
+  'Legacy transfer must retain the current historical catalogue recipe.');
+assert(verifySaveIntegrity(restoredStreaming, streamingTransfer.entries[0].manifest).ok,
+  'The restored streaming transfer must retain a valid current integrity signature.');
 const publicOnly = selectPublicSaveTransferEntries([
   { key: 'actorEmpireSave_1', value: bulkyPlayer },
   { key: 'actorEmpireSave_1__previous', value: { internal: true } },

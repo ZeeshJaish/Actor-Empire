@@ -16,7 +16,7 @@ const viewports = [
     for (const viewport of viewports) {
       const page = await browser.newPage({ viewport });
       const player = { ...INITIAL_PLAYER, name: 'Lifestyle Layout QA', age: 27, currentWeek: 12 };
-      await page.addInitScript(({ player }: { player: typeof player }) => {
+      await page.addInitScript(({ player }: { player: typeof INITIAL_PLAYER }) => {
         localStorage.clear();
         localStorage.setItem('actorEmpireSeenWhatsNewVersion', '1.0.25');
         localStorage.setItem('aeMigrationCarePackageLedgerV1', JSON.stringify({ globalClaimed: true, fingerprints: [] }));

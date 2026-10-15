@@ -1,5 +1,4 @@
 
-import type { PlayerPerformanceSettings } from './services/performancePreferences';
 
 // Enums & Basic Types
 export enum Page {
@@ -5015,6 +5014,9 @@ export interface StreamingOpportunityOffer {
     qualityForecast: number;
     premium: boolean;
     talentUpfrontPool: number;
+    /** New offers freeze production economics separately from their rights guarantee. */
+    budgetTier?: BudgetTier;
+    productionBudgetEstimate?: number;
 }
 
 export interface StreamingOpportunityMarketState {
@@ -5086,6 +5088,8 @@ export interface OwnedStreamingCatalogSetupDraft {
     counterPlatformRevenueShare: number | null;
     negotiationRound: number;
     updatedAtAbsoluteWeek: number;
+    /** Missing on pre-V3 saves: their in-progress quote remains V1. */
+    quoteVersion?: 1 | 2 | 3;
 }
 
 export interface OwnedStreamingStarterCatalog {
@@ -6713,7 +6717,7 @@ export interface OwnedStreamingPlatformState {
     productLines: OwnedStreamingProductLine[];
     catalogSetupDraft: OwnedStreamingCatalogSetupDraft | null;
     /** New quotes start only at this market cycle; absent on legacy saves until a safe weekly rollover. */
-    marketQuotePolicy?: { version: 2; effectiveCycle: number };
+    marketQuotePolicy?: { version: 2 | 3; effectiveCycle: number; previousVersion?: 1 | 2 };
     contentMarketDraft?: { tab: 'ALL' | 'MOVIE' | 'SERIES' | 'COLLECTIONS' | 'OWNED' | 'OFFERS' | 'AUCTIONS' | 'UPCOMING'; search: string; selectedId: string | null; ownedIds: string[] } | null;
     buyerAuctionSessions: StreamingBuyerAuctionSession[];
     upcomingRightsSales: StreamingUpcomingRightsSale[];
@@ -6763,7 +6767,7 @@ export const OWNED_STREAMING_PLATFORM_SCHEMA_VERSION = 27;
 
 export const createInitialOwnedStreamingPlatformState = (playerId = ''): OwnedStreamingPlatformState => ({
     schemaVersion: OWNED_STREAMING_PLATFORM_SCHEMA_VERSION,
-    marketQuotePolicy: { version: 2, effectiveCycle: 0 },
+    marketQuotePolicy: { version: 3, effectiveCycle: 0 },
     lifecycle: 'LOCKED',
     identity: null,
     foundingDraft: null,
@@ -11159,8 +11163,6 @@ export type GameLanguage = 'en' | 'pt-BR' | 'fr' | 'es' | 'tr' | 'de';
 
 export interface PlayerSettings {
     language: GameLanguage;
-    performance?: PlayerPerformanceSettings;
-    /** @deprecated Read only for migration and rollback compatibility. */
     smoothMode?: boolean;
 }
 
@@ -11318,7 +11320,6 @@ export const INITIAL_PLAYER: Player = {
     avatar: '',
     settings: {
         language: 'en',
-        performance: { schemaVersion: 1, preference: 'AUTOMATIC', noticeVersion: 0 },
         smoothMode: false,
     },
     money: 2000,

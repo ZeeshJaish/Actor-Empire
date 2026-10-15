@@ -73,7 +73,10 @@ assert.match(marketHtml, /data-content-market-scene="market"/, 'The external rou
 assert.match(marketHtml, /THE MARKET/, 'The external route uses the transplanted market-floor masthead');
 assert.match(marketHtml, /WEEK 12/, 'The market masthead uses the real game week');
 assert.match(marketHtml, /aria-label="Search the market"/, 'The ZIP catalogue search is present');
-assert.match(marketHtml, />Filter</, 'The ZIP filter-sheet trigger is present');
+assert.match(marketHtml, />Refine</, 'Advanced criteria are named separately from the quick-view tabs');
+assert.doesNotMatch(marketHtml, /aria-label="(?:Next|Previous) titles in|>View all</,
+  'Poster rails should not add separate View all or arrow controls above the cards');
+assert.match(marketHtml, />See all</, 'The end-of-rail card still opens the full vertical list');
 assert.match(marketHtml, /aria-label="Sort"/, 'The ZIP market sort control is present');
 assert.match(marketHtml, /aria-label="Toggle density"/, 'The ZIP density switch is present');
 assert.match(marketHtml, /Live bidding/, 'The auction rail clearly names live bidding');
@@ -96,7 +99,7 @@ assert.match(sharedLibraryHtml, /Shared library search results/i,
   'the active ZIP market screen must expose full-library search, not only the legacy screen');
 assert.match(sharedLibraryHtml, /The Hollow Meridian/,
   'search must find a seeded marquee title by canonical identity');
-assert.match(sharedLibraryHtml, /MARQUEE/,
+assert.match(sharedLibraryHtml, /HEADLINE/,
   'premium fictional projects must be identifiable in the active market');
 const unshelvedTitle = getHistoricalCatalogueTitles(sharedLibraryPlayer).find(title =>
   searchContentMarketLibrary(sharedLibraryPlayer, { query: title.title, limit: 100 })

@@ -65,7 +65,6 @@ import { normalizeWorldStreamingCustomerState } from './worldEconomy/worldStream
 import { normalizeWorldStreamingViewingState } from './worldEconomy/worldStreamingViewing';
 import { normalizeWorldStreamingPlatformEconomyState } from './worldEconomy/worldStreamingPlatformEconomy';
 import { createWorldEconomyHealthSummary } from './worldEconomy/worldEconomyIntegrity';
-import { normalizePerformanceSettings } from './performancePreferences';
 
 export const SAVE_MIGRATION_VERSION = 50;
 const RUNAWAY_STOCK_CASH_CEILING = 10_000_000_000_000;
@@ -1109,10 +1108,6 @@ export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
         migratedWorldPopulation,
         migratedAbsoluteWeek,
     );
-    const performanceSettings = normalizePerformanceSettings(
-        (input as Partial<Player>)?.settings?.performance,
-        (input as Partial<Player>)?.settings?.smoothMode,
-    );
     const playerWithStocks: Player = {
         ...base,
         id: String(base.id || INITIAL_PLAYER.id),
@@ -1121,11 +1116,6 @@ export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
         totalPlayTimeMs: Math.max(0, Math.min(Number.MAX_SAFE_INTEGER, Math.round(Number(base.totalPlayTimeMs || 0)))),
         currentWeek: migratedCurrentWeek,
         money: normalizeMigratedCash(base.money, repairRunawayStockCash),
-        settings: {
-            ...base.settings,
-            performance: performanceSettings,
-            smoothMode: performanceSettings.preference === 'PERFORMANCE',
-        },
         world: {
             ...base.world,
             platformAiCatalogueDistressDeals: normalizePlatformAiCatalogueDistressDeals(

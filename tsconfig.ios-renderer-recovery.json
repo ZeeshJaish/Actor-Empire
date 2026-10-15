@@ -1,8 +1,0 @@
-{
-  "extends": "./tsconfig.json",
-  "include": [
-    "services/iosLongSessionDiagnostics.ts",
-    "scripts/audit-ios-renderer-recovery-phase7.ts"
-  ],
-  "exclude": ["functions"]
-}

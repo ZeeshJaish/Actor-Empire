@@ -44,12 +44,16 @@ npm run dev
 http://localhost:5173
 ```
 
+Use the development server for daily work and the Premium Store preview. The
+desktop production preview (`npm run preview`) shows rewarded-ad options and
+hides the native IAP catalogue. Development purchases are simulated; real
+payments and restores require the Android/iOS store build.
+
 ## Optional local environment variables
 
 If you want to customize local-only behavior, you can use an `.env.local` file.
 
 - `VITE_DEV_TOOLS_PASSCODE` sets a custom developer tools passcode
-- `VITE_ADAPTIVE_PERFORMANCE_APPLY=true` enables Android Automatic mode to apply measured Full/Balanced/Optimized transitions; omit it for the default telemetry-only shadow rollout
 - `GEMINI_API_KEY` is available if you wire up Gemini-powered features locally
 
 These env files are ignored by git and are not committed to the repository.

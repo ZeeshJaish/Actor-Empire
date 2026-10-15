@@ -1,4 +1,11 @@
 .mkwrap{position:absolute;inset:0;overflow:hidden}
+.mkwrap .mkprocessing,.mkwrap .mkfeedback{position:absolute;z-index:120;left:50%;top:18px;transform:translateX(-50%);max-width:calc(100% - 32px);padding:10px 14px;border-radius:12px;background:#1b2324;color:#f0f5f2;border:1px solid #52635c;font-size:12px;font-weight:700;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,.45)}
+.mkwrap .mkprocessing{pointer-events:all;min-width:180px}
+.mkwrap .mkprocessing::after{content:'';display:inline-block;width:8px;height:8px;margin-left:8px;border:2px solid #8ce0b3;border-right-color:transparent;border-radius:50%;animation:epx-market-spin .65s linear infinite}
+.mkwrap .mkfeedback{top:auto;bottom:calc(18px + env(safe-area-inset-bottom));background:#2c211e;border-color:#af655b}
+.mkwrap .mkofferslink{margin-left:auto;flex-shrink:0;padding:9px 10px;border-radius:10px;border:1px solid #5f5131;background:#211d16;color:#f2d698;font-size:9px;font-weight:900;letter-spacing:.07em}
+.mkwrap .mkofferslink i{font-style:normal;margin-left:4px;color:#fff}
+@keyframes epx-market-spin{to{transform:rotate(360deg)}}
 .mkwrap .mk{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;
   background:#07080b;color:#eceef3;padding:0 14px 40px}
 .mkwrap .mk *{box-sizing:border-box}
@@ -583,8 +590,10 @@
   padding:2px 7px;border-radius:99px;background:rgba(255,255,255,.08)}
 .mkwrap .mkrailhead span{font-size:11px;color:#7b8395}
 .mkwrap .mkrailrun{display:flex;gap:10px;margin-top:11px;overflow-x:auto;padding-bottom:4px;
-  scroll-snap-type:x mandatory;scrollbar-width:none}
+  scroll-snap-type:x mandatory;scrollbar-width:none;touch-action:pan-y;overscroll-behavior-x:contain;
+  user-select:none;-webkit-user-select:none}
 .mkwrap .mkrailrun::-webkit-scrollbar{display:none}
+.mkwrap .mkrailrun[data-dragging]{scroll-snap-type:none}
 .mkwrap .mkcard{position:relative}
 .mkwrap .mkcard.wide{flex:0 0 132px;scroll-snap-align:start}
 
@@ -801,6 +810,8 @@
     hsl(var(--epx-mkwrap-me,42) 80% 44%));
   box-shadow:0 10px 28px -12px hsl(var(--epx-mkwrap-me,42) 88% 58% / .7)}
 .mkwrap .mkbid.dead{opacity:.35;box-shadow:none}
+.mkwrap .mkbidbudget{display:block;margin:8px 4px 0;color:#a8b0c2;
+  font-size:10px;line-height:1.4;text-align:center}
 .mkwrap .mkroom .mkdials{grid-template-columns:1fr 1fr 1fr;margin-top:4px}
 
 /* ══ THE BOX SET ════════════════════════════════════════════════════════════

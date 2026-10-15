@@ -12,10 +12,6 @@ import { buildActiveNewPlayerTutorialState, writeNewPlayerTutorialState } from '
 import { isAndroidSaveTransferSurface, type SaveTransferResult } from '../services/saveTransfer';
 import { addBreadcrumb, enableManualPushNotifications, getFirebaseAuthStatus, getFirebasePushStatus, markTraceAction, onFirebaseAuthStatusChanged, onFirebasePushStatusChanged, submitPlayerIssueReport, trackGameEvent } from '../services/firebaseService';
 import { CountryFlagSvg } from '../components/studio-finance/components/FlagField';
-import {
-  normalizePerformanceSettings,
-  type PerformancePreference,
-} from '../services/performancePreferences';
 
 interface SettingsPageProps {
   player: Player;
@@ -79,11 +75,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
   const showSaveTransfer = isAndroidSaveTransferSurface();
   const selectedLanguageOption = SUPPORTED_LANGUAGES.find(option => option.id === language);
   const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
-  const performanceSettings = normalizePerformanceSettings(
-    player.settings?.performance,
-    player.settings?.smoothMode,
-  );
-  const performancePreference = performanceSettings.preference;
+  const smoothModeEnabled = player.settings?.smoothMode === true;
   const firebaseAuthUserId = authStatus.userId;
   const playerIdForSupport = player.id && player.id !== 'player' ? player.id : supportDeviceId;
   const shortPlayerId = playerIdForSupport.slice(-8).toUpperCase();
@@ -205,23 +197,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
     };
   }, [isReportOpen]);
 
-  const handlePerformancePreference = (preference: PerformancePreference) => {
-    if (preference === performancePreference) return;
+  const handleToggleSmoothMode = () => {
     onUpdatePlayer(prev => ({
       ...prev,
       settings: {
         ...prev.settings,
-        performance: {
-          ...normalizePerformanceSettings(prev.settings?.performance, prev.settings?.smoothMode),
-          preference,
-        },
-        smoothMode: preference === 'PERFORMANCE',
+        smoothMode: prev.settings?.smoothMode !== true,
       },
     }));
-    trackGameEvent('performance_preference_changed', {
-      preference: preference.toLowerCase(),
-      source: 'settings',
-    });
   };
 
   const handleChangeLanguage = (nextLanguage: GameLanguage) => {
@@ -540,29 +523,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
   };
 
   if (mode === 'PERFORMANCE') {
-    const performanceOptions: Array<{
-      id: PerformancePreference;
-      titleKey: string;
-      subtextKey: string;
-      badgeKey?: string;
-    }> = [
-      {
-        id: 'AUTOMATIC',
-        titleKey: 'settings.performanceMode.automatic',
-        subtextKey: 'settings.performanceMode.automaticSub',
-        badgeKey: 'settings.performanceMode.recommended',
-      },
-      {
-        id: 'CINEMATIC',
-        titleKey: 'settings.performanceMode.cinematic',
-        subtextKey: 'settings.performanceMode.cinematicSub',
-      },
-      {
-        id: 'PERFORMANCE',
-        titleKey: 'settings.performanceMode.performance',
-        subtextKey: 'settings.performanceMode.performanceSub',
-      },
-    ];
     return (
       <div className="space-y-5 pb-24 pt-4">
         {renderSubpageHeader(tr('settings.display'), tr('settings.performance'))}
@@ -575,50 +535,31 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
                 {tr('settings.visualModeSub')}
               </p>
             </div>
-            <div className="shrink-0 rounded-2xl border border-emerald-500/25 bg-emerald-500/15 px-3 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-emerald-300">
-              {tr(`settings.performanceMode.${performancePreference.toLowerCase()}` as Parameters<typeof t>[1])}
+            <div className={`shrink-0 rounded-2xl px-3 py-2 text-[10px] font-black uppercase tracking-[0.18em] ${smoothModeEnabled ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/25' : 'bg-zinc-900 text-zinc-400 border border-white/10'}`}>
+              {tr(smoothModeEnabled ? 'settings.smooth' : 'settings.full')}
             </div>
           </div>
 
-          <div className="space-y-2" role="radiogroup" aria-label={tr('settings.visualMode')}>
-            {performanceOptions.map(option => {
-              const selected = option.id === performancePreference;
-              return (
-                <button
-                  key={option.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={selected}
-                  onClick={() => handlePerformancePreference(option.id)}
-                  className={`w-full rounded-3xl border p-4 text-left transition-all ${selected ? 'border-emerald-400/40 bg-emerald-500/10' : 'border-white/10 bg-zinc-900/50 hover:bg-zinc-800'}`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`rounded-2xl p-3 ${selected ? 'bg-emerald-500 text-black' : 'bg-zinc-800 text-zinc-300'}`}>
-                      <Gauge size={22} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-black text-white">{tr(option.titleKey as Parameters<typeof t>[1])}</span>
-                        {option.badgeKey && (
-                          <span className="rounded-full bg-emerald-400/15 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-emerald-300">
-                            {tr(option.badgeKey as Parameters<typeof t>[1])}
-                          </span>
-                        )}
-                      </div>
-                      <div className="mt-1 text-xs leading-relaxed text-zinc-500">{tr(option.subtextKey as Parameters<typeof t>[1])}</div>
-                    </div>
-                    <div className={`h-5 w-5 shrink-0 rounded-full border-2 p-1 ${selected ? 'border-emerald-400' : 'border-zinc-600'}`}>
-                      {selected && <div className="h-full w-full rounded-full bg-emerald-400" />}
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="rounded-2xl border border-white/5 bg-black/20 px-4 py-3 text-xs leading-relaxed text-zinc-500">
-            {tr('settings.performanceMode.contentUnchanged')}
-          </div>
+          <button
+            type="button"
+            onClick={handleToggleSmoothMode}
+            className={`w-full rounded-3xl border p-4 text-left transition-all ${smoothModeEnabled ? 'border-emerald-400/40 bg-emerald-500/10' : 'border-white/10 bg-zinc-900/50 hover:bg-zinc-800'}`}
+          >
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className={`p-3 rounded-2xl ${smoothModeEnabled ? 'bg-emerald-500 text-black' : 'bg-zinc-800 text-zinc-300'}`}>
+                  <Gauge size={22} />
+                </div>
+                <div>
+                  <div className="font-black text-white">{tr('settings.smoothMode')}</div>
+                  <div className="mt-1 text-xs leading-relaxed text-zinc-500">{tr('settings.smoothModeSub')}</div>
+                </div>
+              </div>
+              <div className={`h-8 w-14 rounded-full p-1 transition-colors ${smoothModeEnabled ? 'bg-emerald-400' : 'bg-zinc-800'}`}>
+                <div className={`h-6 w-6 rounded-full bg-white transition-transform ${smoothModeEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
+              </div>
+            </div>
+          </button>
         </div>
       </div>
     );
@@ -744,7 +685,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
   if (mode === 'DATA_TRANSFER') {
     return (
       <div className="space-y-5 pb-24 pt-4">
-        {renderSubpageHeader('Save Transfer', 'Android & iOS Backups')}
+        {renderSubpageHeader('Android Migration', 'Save Transfer')}
 
         <div className="glass-card rounded-3xl p-5 space-y-4">
           <div className="flex items-start gap-3">
@@ -754,7 +695,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
             <div className="min-w-0">
               <div className="font-black text-white">Signed save file</div>
               <p className="mt-1 text-sm leading-relaxed text-zinc-500">
-                Export all local save slots to a signed file, then import it on another supported device. An incomplete or corrupted file is blocked before it replaces your saves.
+                Export from the Telegram build, then import the same file on the Play Store build. Edited or corrupted files are blocked before they touch the save slots.
               </p>
             </div>
           </div>
@@ -1298,8 +1239,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
         <SettingsRow
           icon={Gauge}
           title={tr('settings.performance')}
-          subtitle={tr('settings.performanceMode.summary')}
-          value={tr(`settings.performanceMode.${performancePreference.toLowerCase()}` as Parameters<typeof t>[1])}
+          subtitle={tr(smoothModeEnabled ? 'settings.performanceSubSmooth' : 'settings.performanceSubFull')}
+          value={tr(smoothModeEnabled ? 'settings.smooth' : 'settings.full')}
           tone="performance"
           onClick={() => setMode('PERFORMANCE')}
         />
@@ -1322,7 +1263,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
           <SettingsRow
             icon={Database}
             title="Save Transfer"
-            subtitle="Export or import signed save data across devices"
+            subtitle="Export or import signed Android save data"
             value="Android"
             tone="community"
             onClick={() => setMode('DATA_TRANSFER')}

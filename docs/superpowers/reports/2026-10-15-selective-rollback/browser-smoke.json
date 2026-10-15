@@ -1,0 +1,25 @@
+{
+  "origin": "http://127.0.0.1:4186/",
+  "session": "actor-rollback-check",
+  "career": "Rollback QA",
+  "viewport": [
+    390,
+    844
+  ],
+  "passed": [
+    "start-menu",
+    "empty-slots",
+    "new-career",
+    "home",
+    "career",
+    "improve",
+    "social",
+    "lifestyle",
+    "mobile",
+    "week-1-to-2",
+    "reload",
+    "saved-week-2-reopen"
+  ],
+  "screenshot": "output/playwright/2026-10-15-rollback-home.png",
+  "console": "favicon 404 only observed; no game JS error"
+}

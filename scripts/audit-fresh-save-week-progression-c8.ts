@@ -60,7 +60,7 @@ try {
             { ok: true },
             `fresh save persistence must preserve protected state on audit week ${index + 1}`,
         );
-        player = prepared.runtimePlayer;
+        player = prepared.player;
     }
 } finally {
     Math.random = originalRandom;

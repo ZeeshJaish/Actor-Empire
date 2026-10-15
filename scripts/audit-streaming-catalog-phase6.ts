@@ -148,7 +148,8 @@ let draft = createDefaultStreamingCatalogDraft(fixture);
 assert(draft.selectedOwnedProjectIds.includes('owned-release'), 'The opening draft should suggest eligible owned titles by reference.');
 assert(draft.opportunityProjectId === 'external-release', 'The opening draft should choose an actual external project, not an invented title.');
 const target = opportunities.find(item => item.id === draft.opportunityProjectId)!;
-const quote = getStreamingLicenseQuote(target, draft.territory, draft.durationWeeks, draft.exclusivity);
+const quote = getStreamingLicenseQuote(target, draft.territory, draft.durationWeeks, draft.exclusivity,
+    draft.quoteVersion || 1, 'FIRST_WINDOW', fixture.age);
 draft = {
     ...draft,
     currentStep: 3,

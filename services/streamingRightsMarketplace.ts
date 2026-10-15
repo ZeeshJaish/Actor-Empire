@@ -29,6 +29,7 @@ import {
     getStreamingLicenseCandidatePool,
     getStreamingLicenseOpportunities,
     getStreamingLicenseQuote,
+    getActiveStreamingQuoteVersion,
     type StreamingCatalogTitle,
 } from './streamingCatalog';
 import {
@@ -339,10 +340,10 @@ const buildOpportunity = (
     const remainingWeeks = sourceContract
         ? Math.max(1, sourceContract.expiresAtAbsoluteWeek - absoluteWeek)
         : kind === 'SUBLICENSE_OUT' ? 52 : 104;
-    const quoteVersion = platform.marketQuotePolicy?.version === 2
-        && getStreamingMarketCycle(absoluteWeek) >= platform.marketQuotePolicy.effectiveCycle ? 2 : 1;
+    const quoteVersion = getActiveStreamingQuoteVersion(platform.marketQuotePolicy, absoluteWeek);
     const quote = getStreamingLicenseQuote(title, recommendedTerritory, Math.min(520, remainingWeeks),
-        sourceContract?.exclusivity || 'NON_EXCLUSIVE', quoteVersion);
+        sourceContract?.exclusivity || 'NON_EXCLUSIVE', quoteVersion, recommendedWindow,
+        Math.floor(absoluteWeek / 52) + 1);
     const excludedLegacyPlatform = sellerPlatformId && PLATFORM_IDS.includes(sellerPlatformId as PlatformId)
         ? sellerPlatformId as PlatformId
         : null;
@@ -648,8 +649,7 @@ export const getStreamingCataloguePackageOpportunities = (
         const totalGuarantee = roundMoney(Math.max(
             compatibleTitles.length * 1_000_000,
             compatibleTitles.reduce((sum, title) => sum + getStreamingLicenseQuote(title, 'MULTI_REGION', 104,
-                'NON_EXCLUSIVE', platform.marketQuotePolicy?.version === 2
-                    && getStreamingMarketCycle(absoluteWeek) >= platform.marketQuotePolicy.effectiveCycle ? 2 : 1).suggestedGuarantee, 0) * .78,
+                'NON_EXCLUSIVE', getActiveStreamingQuoteVersion(platform.marketQuotePolicy, absoluteWeek), 'FIRST_WINDOW', player.age).suggestedGuarantee, 0) * .78,
         ));
         const allocation = allocateStreamingCatalogueGuarantee({
             totalGuarantee,

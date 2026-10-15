@@ -249,20 +249,6 @@ const makeImpact = (
     return { updatedPlayer, log, logKey, effects };
 };
 
-export const resolveLegacyRegulatorPressureChoice = (
-    player: Player,
-    optionId: string,
-): LifeEventImpactResult | null => {
-    const modeByOption: Record<string, 'COOPERATE' | 'FIGHT' | 'DIVEST' | 'GOLDEN'> = {
-        COOPERATE_WITH_REVIEW: 'COOPERATE',
-        FIGHT_REVIEW: 'FIGHT',
-        VOLUNTARY_LIMITS: 'DIVEST',
-        GOLDEN_COMPLIANCE_FIREWALL: 'GOLDEN',
-    };
-    const mode = modeByOption[optionId];
-    return mode ? makeImpact(mode)(player) : null;
-};
-
 const getRegulatorPressureEventType = (state: RegulatorPressureState): RegulatorPressureEventType | null => {
     if (state.pressureScore >= 65) return 'REGULATOR_REVIEW';
     if (state.controlledTakeoverCount >= 1 && state.pressureScore >= 50) return 'RIVAL_COMPLAINT';

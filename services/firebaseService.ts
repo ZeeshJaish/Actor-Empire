@@ -7,10 +7,6 @@ import { PushRegistration, type PushPermission, type PushRegistrationStatus } fr
 import { APP_DISPLAY_VERSION } from './appVersion';
 import { Player } from '../types';
 import { getAwardEligibilityDiagnostics } from './awardLogic';
-import {
-  getIOSLongSessionPlayerCounts,
-  notifyIOSLongSessionCheckpoint,
-} from './iosLongSessionDiagnostics';
 
 let firebaseBootstrapped = false;
 let firebaseAuthBootstrapped = false;
@@ -1062,30 +1058,7 @@ export const markWeekProcessingStage = (
       error,
     });
 
-    const checkpoint = safeStage === 'start'
-      ? 'week_started'
-      : safeStage === 'persist_prepare_done'
-        ? 'week_persistence_prepared'
-        : safeStage === 'success'
-          ? 'week_verified'
-          : safeStage === 'failed'
-            ? 'week_failed'
-            : null;
-    if (checkpoint) {
-      const numericSaveSlot = Number(saveSlot);
-      void notifyIOSLongSessionCheckpoint({
-        checkpoint,
-        occurredAtMs: Date.now(),
-        age: snapshot.age,
-        week: snapshot.week,
-        saveSlot: Number.isFinite(numericSaveSlot) ? numericSaveSlot : undefined,
-        screen,
-        elapsedMs,
-        ...(safeStage === 'start' ? { runtimeBytes: saveSize } : {}),
-        ...(safeStage === 'persist_prepare_done' ? { persistedBytes: saveSize } : {}),
-        ...getIOSLongSessionPlayerCounts(player),
-      }).catch(() => undefined);
-    }
+
   }
 };
 

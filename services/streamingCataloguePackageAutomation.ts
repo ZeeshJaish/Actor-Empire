@@ -15,6 +15,7 @@ import {
     acceptStreamingBiddingOffer,
     advanceStreamingBiddingSession,
     createStreamingCatalogueBiddingSession,
+    finishStreamingBiddingSession,
     getStreamingBiddingClosingOffers,
     upsertStreamingBiddingSession,
 } from './streamingBidding';
@@ -188,7 +189,10 @@ export const processStreamingCataloguePackageStrategyAutomation = (
         };
     }
 
-    const acceptedSession = acceptStreamingBiddingOffer(session, selected.id);
+    // Strategy automation selects one complete package agreement. A shared-rights
+    // bid can otherwise leave the room CLOSING, which the signing authority
+    // correctly rejects as not finalized.
+    const acceptedSession = finishStreamingBiddingSession(acceptStreamingBiddingOffer(session, selected.id));
     const livePackage: StreamingCataloguePackage = {
         ...candidate,
         lifecycle: 'LIVE',

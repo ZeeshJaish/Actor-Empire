@@ -81,8 +81,10 @@ export default function StreamingCatalogSetup({ player, onUpdatePlayer, onClose,
   )?.titleAtSigning;
   const selectedPackage = STREAMING_STARTER_CATALOG_PACKAGES.find(item => item.id === draft.packageId)
     || STREAMING_STARTER_CATALOG_PACKAGES[0];
+  const quoteVersion = draft.quoteVersion || 1;
   const quote = selectedOpportunity
-    ? getStreamingLicenseQuote(selectedOpportunity, draft.territory, draft.durationWeeks, draft.exclusivity)
+    ? getStreamingLicenseQuote(selectedOpportunity, draft.territory, draft.durationWeeks,
+      draft.exclusivity, quoteVersion, 'FIRST_WINDOW', player.age)
     : null;
 
   const updateDraft = (patch: Partial<OwnedStreamingCatalogSetupDraft>) => {
@@ -116,7 +118,8 @@ export default function StreamingCatalogSetup({ player, onUpdatePlayer, onClose,
   const chooseOpportunity = (projectId: string) => {
     const opportunity = opportunities.find(item => item.id === projectId);
     if (!opportunity) return;
-    const nextQuote = getStreamingLicenseQuote(opportunity, draft.territory, draft.durationWeeks, draft.exclusivity);
+    const nextQuote = getStreamingLicenseQuote(opportunity, draft.territory, draft.durationWeeks,
+      draft.exclusivity, quoteVersion, 'FIRST_WINDOW', player.age);
     updateDraft({
       opportunityProjectId: projectId,
       minimumGuarantee: nextQuote.suggestedGuarantee,
@@ -131,7 +134,8 @@ export default function StreamingCatalogSetup({ player, onUpdatePlayer, onClose,
     const territory = patch.territory || draft.territory;
     const durationWeeks = patch.durationWeeks || draft.durationWeeks;
     const exclusivity = patch.exclusivity || draft.exclusivity;
-    const nextQuote = getStreamingLicenseQuote(selectedOpportunity, territory, durationWeeks, exclusivity);
+    const nextQuote = getStreamingLicenseQuote(selectedOpportunity, territory, durationWeeks,
+      exclusivity, quoteVersion, 'FIRST_WINDOW', player.age);
     updateDraft({
       ...patch,
       minimumGuarantee: nextQuote.suggestedGuarantee,
@@ -366,7 +370,8 @@ export default function StreamingCatalogSetup({ player, onUpdatePlayer, onClose,
               <div className="catalog-market-grid">
                 {opportunities.map(title => {
                   const selected = title.id === draft.opportunityProjectId;
-                  const indicative = getStreamingLicenseQuote(title, 'MULTI_REGION', 104, 'NON_EXCLUSIVE');
+                  const indicative = getStreamingLicenseQuote(title, 'MULTI_REGION', 104,
+                    'NON_EXCLUSIVE', quoteVersion, 'FIRST_WINDOW', player.age);
                   return (
                     <button type="button" key={title.id} className={selected ? 'is-selected' : ''} onClick={() => chooseOpportunity(title.id)}>
                       <div className="catalog-market-art"><Film size={26} /><span>{title.projectType === 'SERIES' ? 'SERIES' : 'FILM'}</span></div>

@@ -419,14 +419,18 @@ export const processOwnedStreamingPlatformWeek = (
     // A legacy career keeps every quote on its current three-week shelf. The
     // next rotation is the first one that may use the new value model.
     if (['FOUNDING', 'ACTIVE'].includes(player.ownedStreamingPlatform.lifecycle)
-        && !player.ownedStreamingPlatform.marketQuotePolicy) {
+        && player.ownedStreamingPlatform.marketQuotePolicy?.version !== 3) {
+        const priorPolicy = player.ownedStreamingPlatform.marketQuotePolicy;
+        const currentCycle = getStreamingMarketCycle(getAbsoluteWeek(player.age, player.currentWeek));
+        const previousVersion = priorPolicy && currentCycle >= priorPolicy.effectiveCycle ? 2 : 1;
         player = {
             ...player,
             ownedStreamingPlatform: {
                 ...player.ownedStreamingPlatform,
                 marketQuotePolicy: {
-                    version: 2,
-                    effectiveCycle: getStreamingMarketCycle(getAbsoluteWeek(player.age, player.currentWeek)) + 1,
+                    version: 3,
+                    effectiveCycle: currentCycle + 1,
+                    previousVersion,
                 },
             },
         };

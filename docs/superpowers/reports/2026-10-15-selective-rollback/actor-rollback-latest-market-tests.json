@@ -1,0 +1,22 @@
+[
+  {
+    "test": "audit-content-market-pricing-v3",
+    "exit": 0,
+    "log": "/private/tmp/audit-content-market-pricing-v3-rollback.log"
+  },
+  {
+    "test": "audit-content-market-interaction-fixes",
+    "exit": 0,
+    "log": "/private/tmp/audit-content-market-interaction-fixes-rollback.log"
+  },
+  {
+    "test": "audit-content-market-back-draft",
+    "exit": 0,
+    "log": "/private/tmp/audit-content-market-back-draft-rollback.log"
+  },
+  {
+    "test": "audit-streaming-catalog-v3-ui",
+    "exit": 0,
+    "log": "/private/tmp/audit-streaming-catalog-v3-ui-rollback.log"
+  }
+]

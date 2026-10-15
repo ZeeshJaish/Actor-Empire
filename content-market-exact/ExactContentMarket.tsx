@@ -34,7 +34,7 @@ import type { Brand } from '../components/streaming-transplant/StreamingBrandVis
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Lot, Offer, Terms, Basis, Availability, Territory,
-  verdictOf, offerFrom, reachOf,
+  verdictOf, offerFrom, reachOf, getContentMarketPostActionScene,
   repFor, sayOf, yearsOf, termLabel,
 } from './model';
 
@@ -125,6 +125,7 @@ const Gate: React.FC<{
 }> = ({ st, supplySummary, onRoute, onCommission, onBack }) => {
   const CATALOGUE = useCatalogue();
   const mine = CATALOGUE.filter(l => l.mode === 'STUDIO');
+  const readyMine = mine.filter(l => !l.linked && !l.unavailableReason);
   const buyable = CATALOGUE.filter(l => l.mode !== 'STUDIO');
   const rooms = CATALOGUE.filter(l => l.mode === 'AUCTION');
 
@@ -149,7 +150,7 @@ const Gate: React.FC<{
         <div className={css.mkdoortext}>
           <b>FROM YOUR STUDIO</b>
           <span>Titles your companies control. Only eligible streaming markets are linked.</span>
-          <em>{mine.length} READY · NO INTERNAL FEE</em>
+          <em>{readyMine.length} READY · NO INTERNAL FEE</em>
         </div>
       </button>
 
@@ -264,7 +265,7 @@ const Card: React.FC<{ lot: Lot; onOpen: (l: Lot) => void; wide?: boolean }> = (
       <span className={css.mkcardflags}>
         <Chip lot={lot} />
         {lot.prior && <span className={css.mkrate}>{lot.prior.rating.toFixed(1)}</span>}
-        {lot.marquee && <span className={css.mklibrarymarquee}>MARQUEE</span>}
+        {lot.marquee && <span className={css.mklibrarymarquee}>HEADLINE</span>}
       </span>
     </span>
     <div className={css.mkcardfoot}>
@@ -275,6 +276,60 @@ const Card: React.FC<{ lot: Lot; onOpen: (l: Lot) => void; wide?: boolean }> = (
   </button>
 );
 
+const SwipeRail: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const gesture = useRef<{
+    pointerId: number; startX: number; startY: number; startLeft: number; axis: 'PENDING' | 'HORIZONTAL' | 'VERTICAL';
+  } | null>(null);
+  const suppressClick = useRef(false);
+
+  const finish = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (gesture.current?.pointerId !== event.pointerId) return;
+    const dragged = gesture.current.axis === 'HORIZONTAL';
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    delete event.currentTarget.dataset.dragging;
+    gesture.current = null;
+    if (dragged) {
+      suppressClick.current = true;
+      window.setTimeout(() => { suppressClick.current = false; }, 0);
+    }
+  };
+
+  return <div className={css.mkrailrun} data-rail-track
+    onPointerDown={event => {
+      if (event.pointerType === 'mouse' && event.button !== 0) return;
+      gesture.current = {
+        pointerId: event.pointerId, startX: event.clientX, startY: event.clientY,
+        startLeft: event.currentTarget.scrollLeft, axis: 'PENDING',
+      };
+    }}
+    onPointerMove={event => {
+      const active = gesture.current;
+      if (!active || active.pointerId !== event.pointerId) return;
+      const dx = event.clientX - active.startX;
+      const dy = event.clientY - active.startY;
+      if (active.axis === 'PENDING' && Math.max(Math.abs(dx), Math.abs(dy)) >= 8) {
+        active.axis = Math.abs(dx) > Math.abs(dy) ? 'HORIZONTAL' : 'VERTICAL';
+        if (active.axis === 'HORIZONTAL') {
+          event.currentTarget.setPointerCapture(event.pointerId);
+          event.currentTarget.dataset.dragging = 'true';
+        }
+      }
+      if (active.axis === 'HORIZONTAL') event.currentTarget.scrollLeft = active.startLeft - dx;
+    }}
+    onPointerUp={finish}
+    onPointerCancel={finish}
+    onClickCapture={event => {
+      if (!suppressClick.current) return;
+      event.preventDefault();
+      event.stopPropagation();
+      suppressClick.current = false;
+    }}>
+    {children}
+  </div>;
+};
+
 /* ============================================================
    THE MARKET — rails first, because a flat grid of forty is a spreadsheet
    ============================================================ */
@@ -282,7 +337,7 @@ type Lens = 'ALL' | Availability | 'PACKS';
 
 type Sort = 'PICKED' | 'CHEAP' | 'DEAR' | 'REACH' | 'HEAT' | 'RATED' | 'SOON';
 const SORTS: [Sort, string][] = [
-  ['PICKED', 'Our order'], ['CHEAP', 'Cheapest'], ['DEAR', 'Most expensive'],
+  ['PICKED', 'Recommended'], ['CHEAP', 'Cheapest'], ['DEAR', 'Most expensive'],
   ['REACH', 'Widest rights'], ['HEAT', 'Most talked about'], ['RATED', 'Best rated'],
   ['SOON', 'Closing soonest'],
 ];
@@ -334,7 +389,8 @@ const Market: React.FC<{
   libraryOptions?: SharedLibraryOptions;
   firstLook?: { protectedTitles: number; weeksRemaining: number } | null;
   paidScout?: PaidScoutView;
-}> = ({ st, onOpen, onBack, initialQuery = '', onQueryChange, onCommission, searchLibrary, libraryOptions, firstLook, paidScout }) => {
+  offerCount?: number; onOpenOffers?: () => void;
+}> = ({ st, onOpen, onBack, initialQuery = '', onQueryChange, onCommission, searchLibrary, libraryOptions, firstLook, paidScout, offerCount = 0, onOpenOffers }) => {
   const CATALOGUE = useCatalogue();
   const [view, setView] = useState<string>('ALL');
   const [q, setQ] = useState(initialQuery);
@@ -364,7 +420,7 @@ const Market: React.FC<{
     pool.forEach(l => { c[l.avail] = (c[l.avail] ?? 0) + 1; });
     c.PACKS = pool.filter(l => l.format === 'COLLECTION').length;
     c.PROVEN = pool.filter(l => !!l.prior?.boxOffice).length;
-    c.CHEAP = pool.filter(l => l.listed && l.listed.mg <= 1_500_000).length;
+    c.CHEAP = pool.filter(l => l.listed && l.listed.mg <= 50_000_000).length;
     return c;
   }, [pool]);
 
@@ -375,7 +431,7 @@ const Market: React.FC<{
     { key: 'HEAT', title: 'Hot now', note: 'Highest public interest', test: l => l.heat >= 60 },
     { key: 'PROVEN', title: 'Box-office proven', note: 'Released films with public results', test: l => !!l.prior?.boxOffice },
     { key: 'PACKS', title: 'Whole libraries', note: 'one signature, many titles', test: l => l.format === 'COLLECTION' },
-    { key: 'CHEAP', title: 'Under $1.5M', note: 'volume for a thin week', test: l => !!l.listed && l.listed.mg <= 1_500_000 },
+    { key: 'CHEAP', title: 'Entry licences', note: 'Rights packages under $50M', test: l => !!l.listed && l.listed.mg <= 50_000_000 },
     { key: 'OPENS', title: 'Not yet, but soon', note: 'follow one and you will be told', test: l => l.avail === 'OPENS' || l.avail === 'WATCH' },
   ];
   const seenRailIds = new Set<string>();
@@ -430,6 +486,7 @@ const Market: React.FC<{
       <header className={css.mktop}>
         <button className={css.mkback} onClick={onBack}>←</button>
         <div className={css.mkmast}><b>THE MARKET</b><span>WEEK {st.week} · {pool.length} LOTS</span></div>
+        {offerCount > 0 && <button className={css.mkofferslink} onClick={onOpenOffers}>YOUR OFFERS <i>{offerCount}</i></button>}
       </header>
 
       <Power st={st} />
@@ -449,7 +506,7 @@ const Market: React.FC<{
 
       {firstLook && <div className={css.mklibrarygrace}><b>FIRST LOOK</b><span>{firstLook.protectedTitles} titles protected from new rival bids · up to {firstLook.weeksRemaining} {firstLook.weeksRemaining === 1 ? 'week' : 'weeks'} left</span><small>Normal licence prices apply. Protection ends at 25 playable titles.</small></div>}
 
-      <p className={css.mklegend}><b>Fixed-price licence</b> means sign at the listed rights terms. <b>Live bidding</b> means rivals can compete. <b>Marquee</b> marks a premium title, not a buying method.</p>
+      <p className={css.mklegend}><b>Fixed-price licence</b> means sign at the listed rights terms. <b>Live bidding</b> means rivals can compete. <b>Headline</b> marks a premium title, not a buying method.</p>
 
       <div className={css.mksearch}>
         <input value={q} onChange={e => { setQ(e.target.value); onQueryChange?.(e.target.value); }}
@@ -473,7 +530,7 @@ const Market: React.FC<{
       {/* the tools that make a long catalogue workable */}
       <div className={css.mktools}>
         <button className={css.mktool} onClick={() => setSheet(true)}>
-          Filter{filtersOn ? <i>{filtersOn}</i> : null}
+          Refine{filtersOn ? <i>{filtersOn}</i> : null}
         </button>
         <select className={css.mksort} value={sort} onChange={e => setSort(e.target.value as Sort)}
           aria-label="Sort">
@@ -498,7 +555,7 @@ const Market: React.FC<{
               onClick={() => offer && onOpen(offer)}>
               <span className={css.mkthumb}><Poster id={row.id} title={row.title} genre={row.genre} size="xs" /></span>
               <span className={css.mkrowmain}><b>{row.title}</b><em>{row.studioName} · {row.year} · {row.genre} · {row.languageId}</em>
-                <em>{row.marquee ? 'MARQUEE · ' : ''}Quality {row.quality} · Rated {row.rating?.toFixed(1) ?? '—'}</em>
+                <em>{row.marquee ? 'HEADLINE · ' : ''}Quality {row.quality} · Rated {row.rating?.toFixed(1) ?? '—'}</em>
                 <em className={css.mklibraryreason}>{offer?.mode === 'AUCTION' ? 'LIVE BIDDING' : row.status.replaceAll('_', ' ')} · {offer?.mode === 'AUCTION' ? 'Enter live bid' : row.reason}</em></span>
               {offer && <span aria-hidden="true">→</span>}
             </button>;
@@ -542,14 +599,14 @@ const Market: React.FC<{
                 <b>{r.title}<em>{all.length}</em></b>
                 <span>{r.note}</span>
               </div>
-              <div className={css.mkrailrun}>
+              <SwipeRail>
                 {preview.map(l => <Card key={l.id} lot={l} onOpen={onOpen} wide />)}
                 {over > 0 && (
                   <button className={css.mkseeall} onClick={() => setView(r.key)}>
                     <b>See all</b><i>{all.length}</i><em>→</em>
                   </button>
                 )}
-              </div>
+              </SwipeRail>
             </section>
           );
         })
@@ -559,7 +616,7 @@ const Market: React.FC<{
       {sheet && (
         <div className={css.mksheetwrap} onClick={() => setSheet(false)}>
           <div className={css.mkfilters} onClick={e => e.stopPropagation()}>
-            <div className={css.mkfhead}><b>NARROW IT DOWN</b>
+            <div className={css.mkfhead}><b>REFINE RESULTS</b>
               <button onClick={() => setSheet(false)}>Done</button></div>
             <span className={css.mkflabel}>FORMAT</span>
             <div className={css.mkfrow}>
@@ -590,7 +647,7 @@ const Market: React.FC<{
                 <select aria-label="Library producer" value={libraryProducer} onChange={e => setLibraryProducer(e.target.value)}><option value="">All producers</option>{libraryOptions?.producers.map(producer => <option key={producer.id} value={producer.id}>{producer.name}</option>)}</select>
                 <select aria-label="Library release age" value={libraryYears} onChange={e => setLibraryYears(Number(e.target.value))}><option value={0}>Any release year</option><option value={5}>Last 5 game years</option><option value={10}>Last 10 game years</option></select>
                 <select aria-label="Library minimum quality" value={libraryQuality} onChange={e => setLibraryQuality(Number(e.target.value))}><option value={0}>Any quality</option><option value={80}>Quality 80+</option><option value={90}>Quality 90+</option></select>
-                <button type="button" aria-pressed={libraryMarquee} onClick={() => setLibraryMarquee(value => !value)}>Marquee only</button>
+                <button type="button" aria-pressed={libraryMarquee} onClick={() => setLibraryMarquee(value => !value)}>Headline only</button>
               </div></>}
             <button className={css.mkfclear} onClick={clearAll}>
               Clear all filters
@@ -640,7 +697,7 @@ const Studio: React.FC<{ onBack: () => void; onTake: (l: Lot) => void; ownsStudi
         {mine.map(l => (
           <button className={css.mkcard} key={l.id} aria-label={`${l.title} · ${l.seller}`} disabled={l.linked || Boolean(l.unavailableReason)} onClick={() => onTake(l)}>
             <Poster id={l.artId || l.id} title={l.title} genre={l.genre} hue={l.hue} poster={l.poster} year={l.year} size="md" />
-            <div className={css.mkcardfoot}><b className={css.mkfree}>NO FEE</b><span>ALL MKTS</span></div>
+            <div className={css.mkcardfoot}><b className={css.mkfree}>NO FEE</b><span>ELIGIBLE MKTS</span></div>
           </button>
         ))}
       </div>
@@ -954,12 +1011,10 @@ const Detail: React.FC<{
               <div className={css.mkctgrid}>
                 <Cell k="BACKEND" v={lot.listed.backendPct ? `${lot.listed.backendPct}%` : 'None'} />
                 <Cell k="BASIS" v={lot.listed.backendPct ? lot.listed.basis : '—'} />
-                <Cell k="BACKEND CAP" v={lot.listed.backendCap ? exact(lot.listed.backendCap) : 'Uncapped'} />
                 <Cell k="TERM" v={termLabel(lot.listed.termWeeks)} />
                 <Cell k="RIGHTS" v={`${lot.listed.scope} · ${lot.listed.excl === 'EXCLUSIVE' ? 'exclusive' : 'shared'}`} />
                 <Cell k="WINDOW" v={lot.listed.window === 'FIRST' ? 'First window'
                   : lot.listed.window === 'SECOND' ? 'Second window' : 'Perpetual'} />
-                <Cell k="LOCALIZATION" v={lot.listed.localization} />
                 <Cell k="RENEWAL" v={lot.listed.renewal} />
                 {lot.listed.marketing ? <Cell k="MARKETING" v={exact(lot.listed.marketing)} /> : null}
                 {lot.listed.sequel ? <Cell k="SEQUEL RIGHTS" v="Included" /> : null}
@@ -1069,9 +1124,7 @@ const Redline: React.FC<{
         <div className={css.mksheethead}><b>HEADS OF TERMS</b><span>DRAFT 1</span></div>
         <div className={css.mkrow}><span>Guarantee</span>
           <b className={afford ? '' : css.mkover}>{exact(o.mg)}</b></div>
-        <div className={css.mkrow}><span>Backend</span><b>{o.backendPct}% · {o.basis.toLowerCase()}</b></div>
-        <div className={css.mkrow}><span>Guarantee is</span>
-          <b>{o.recoupable ? 'Recoupable' : 'Non-recoupable'}</b></div>
+        <div className={css.mkrow}><span>Seller backend</span><b>{o.backendPct}% · adjusted gross receipts</b></div>
         <div className={css.mkrow}><span>Term</span><b>{termLabel(o.termWeeks)}</b></div>
         <div className={css.mkrow}><span>Marketing</span><b>{o.marketing ? exact(o.marketing) : '—'}</b></div>
         <div className={css.mkrow}><span>Exclusivity</span>
@@ -1105,12 +1158,6 @@ const Redline: React.FC<{
         <Clause on={o.sublicense} label="Sublicensing" go={() => set('sublicense', !o.sublicense)} />
         <Clause on={o.renewal !== 'None'} label="Renewal option"
           go={() => set('renewal', o.renewal === 'None' ? 'First option' : 'None')} />
-        <Clause on={!o.recoupable} label="Non-recoupable"
-          go={() => set('recoupable', !o.recoupable)} />
-        {/* the basis is the single biggest lever on what a backend is worth */}
-        <Clause on={o.basis === 'Adjusted gross'} label={o.basis}
-          go={() => set('basis', o.basis === 'Net receipts' ? 'Adjusted gross'
-            : o.basis === 'Adjusted gross' ? 'Gross receipts' : 'Net receipts')} />
       </div>
 
       <div className={css.mkbar2}>
@@ -1119,7 +1166,7 @@ const Redline: React.FC<{
           {afford ? 'SEND IT' : `SHORT BY ${money(o.mg - power)}`}
         </button>
       </div>
-      <p className={css.mkfoot}>Nothing is charged while an offer sits with them. They answer in two to three weeks.</p>
+      <p className={css.mkfoot}>Seller reaction is indicative, not an acceptance. Nothing is charged while an offer sits with them. They answer in two to three processed weeks.</p>
     </div>
   );
 };
@@ -1154,6 +1201,7 @@ export const ContentMarket: React.FC<{
   onFollow?: (l: Lot) => { changed: boolean; detail: string };
   offerCount?: number;
   onOpenOffers?: () => void;
+  feedback?: string;
   onNavigation?: (scene: MarketScene, lotId: string | null) => void;
   initialQuery?: string;
   onQueryChange?: (query: string) => void;
@@ -1165,22 +1213,62 @@ export const ContentMarket: React.FC<{
   initialLotId?: string | null;
   /** Distinguishes "no production house" from "a studio with nothing released". */
   ownsStudio?: boolean;
-}> = ({ brand, state, supplySummary, catalogue, onBack, onCommission, ownsStudio, onAcquired, onOfferSent, onEnterRoom, onFollow, offerCount = 0, onOpenOffers, onNavigation, initialQuery = '', onQueryChange, searchLibrary, libraryOptions, firstLook, paidScout, initialScene = 'GATE', initialLotId = null }) => {
+}> = ({ brand, state, supplySummary, catalogue, onBack, onCommission, ownsStudio, onAcquired, onOfferSent, onEnterRoom, onFollow, offerCount = 0, onOpenOffers, feedback, onNavigation, initialQuery = '', onQueryChange, searchLibrary, libraryOptions, firstLook, paidScout, initialScene = 'GATE', initialLotId = null }) => {
   const c = brandColor(brand);
   const [scene, setScene] = useState<MarketScene>(initialScene);
   const [back, setBack] = useState<MarketScene>(initialScene === 'STUDIO' ? 'STUDIO' : 'MARKET');
   const [lot, setLot] = useState<Lot | null>(() => catalogue.find(item => item.id === initialLotId) || null);
   const [flash, setFlash] = useState<{ head: string; body: string; lot?: Lot; kind: 'SIGNED' | 'SENT' | 'FOLLOWED' } | null>(null);
+  const [processing, setProcessing] = useState<string | null>(null);
+  const [actionError, setActionError] = useState('');
+  const actionPending = useRef(false);
+  const actionFrame = useRef<number | null>(null);
+  const actionTimer = useRef<number | null>(null);
+  const flashTimer = useRef<number | null>(null);
+  useEffect(() => () => {
+    if (flashTimer.current !== null) window.clearTimeout(flashTimer.current);
+    if (actionFrame.current !== null) window.cancelAnimationFrame(actionFrame.current);
+    if (actionTimer.current !== null) window.clearTimeout(actionTimer.current);
+  }, []);
 
   const settle = (head: string, body: string, kind: 'SIGNED' | 'SENT' | 'FOLLOWED' = 'SIGNED', l?: Lot) => {
     setFlash({ head, body, kind, lot: l });
-    window.setTimeout(() => { setFlash(null); setScene('GATE'); onNavigation?.('GATE', null); }, 3600);
+    const next = getContentMarketPostActionScene(kind === 'SENT' ? 'OFFER' : l?.sourceKind || 'LISTING');
+    setScene(next);
+    onNavigation?.(next, null);
+    if (flashTimer.current !== null) window.clearTimeout(flashTimer.current);
+    flashTimer.current = window.setTimeout(() => { setFlash(null); flashTimer.current = null; }, 1600);
   };
-  const take = (l: Lot) => {
-    const result = l.mode === 'UPCOMING' ? onFollow?.(l) : onAcquired?.(l);
-    if (result?.changed) settle(l.title, result.detail, l.mode === 'UPCOMING' ? 'FOLLOWED' : 'SIGNED', l);
+  const performAction = (label: string, action: () => { changed: boolean; detail: string } | undefined,
+    onSuccess: (detail: string) => void) => {
+    if (actionPending.current) return;
+    actionPending.current = true;
+    setActionError('');
+    setProcessing(label);
+    // Paint the pressed state before potentially expensive catalogue/accounting work.
+    actionFrame.current = window.requestAnimationFrame(() => {
+      actionFrame.current = null;
+      actionTimer.current = window.setTimeout(() => {
+        actionTimer.current = null;
+        try {
+          const result = action();
+          if (result?.changed) onSuccess(result.detail);
+          else setActionError(result?.detail || 'This action could not be completed. No money was charged.');
+        } catch (error) {
+          console.error('Content Market action failed', error);
+          setActionError('This action could not be completed. Please try again.');
+        } finally {
+          actionPending.current = false;
+          setProcessing(null);
+        }
+      }, 0);
+    });
   };
+  const take = (l: Lot) => performAction(l.mode === 'STUDIO' ? 'Adding to catalogue…' : 'Checking rights and funds…',
+    () => l.mode === 'UPCOMING' ? onFollow?.(l) : onAcquired?.(l),
+    detail => settle(l.title, detail, l.mode === 'UPCOMING' ? 'FOLLOWED' : 'SIGNED', l));
   const navigate = (next: MarketScene, nextLot: Lot | null = lot) => {
+    setActionError('');
     setScene(next);
     onNavigation?.(next, nextLot?.id || null);
   };
@@ -1189,6 +1277,8 @@ export const ContentMarket: React.FC<{
   return (
     <CatalogueContext.Provider value={catalogue}>
     <div className={css.mkwrap} data-content-market-design="zip-exact" style={{ ['--epx-mkwrap-c' as string]: c }}>
+      {processing && <div className={css.mkprocessing} role="status" aria-live="polite">{processing}</div>}
+      {!processing && (actionError || feedback) && !flash && <div className={css.mkfeedback} role="status" aria-live="polite">{actionError || feedback}</div>}
       {flash && (
         <div className={cx(css.mksigned, css['mks-' + (flash.kind.toLowerCase())])}
           style={{ ['--epx-mkwrap-dh' as string]: String(flash.lot?.hue ?? 150) }}>
@@ -1205,13 +1295,15 @@ export const ContentMarket: React.FC<{
           <span className={css.mksigntitle}>{flash.head}</span>
           {flash.kind === 'SIGNED' && flash.lot ? (
             <div className={css.mksignfacts}>
-              <em><i>{flash.lot.listed ? money(flash.lot.listed.mg) : 'NO FEE'}</i>paid</em>
+              <em><i>{flash.lot.listed ? money(flash.lot.listed.mg) : 'NO FEE'}</i>{flash.lot.listed ? 'paid' : 'to link'}</em>
               <em><i>{reachOf(flash.lot.terr)}%</i>of its value</em>
               <em><i>{flash.lot.rows ? flash.lot.rows.length : 1}</i>{flash.lot.rows ? 'titles' : 'title'}</em>
             </div>
           ) : <em className={css.mksignnote}>{flash.body}</em>}
           {flash.kind === 'SIGNED' && (
-            <p className={css.mksignnote}>The contract is registered and it is in your catalogue.</p>
+            <p className={css.mksignnote}>{flash.lot?.sourceKind === 'STUDIO'
+              ? 'Your title is linked to the catalogue in its eligible streaming markets.'
+              : 'The contract is registered and it is in your catalogue.'}</p>
           )}
         </div>
       )}
@@ -1220,6 +1312,7 @@ export const ContentMarket: React.FC<{
           onRoute={r => navigate(r === 'STUDIO' ? 'STUDIO' : 'MARKET', null)} />
       )}
       {scene === 'MARKET' && <Market st={state} onCommission={onCommission} initialQuery={initialQuery} onQueryChange={onQueryChange}
+        offerCount={offerCount} onOpenOffers={onOpenOffers}
         searchLibrary={searchLibrary} libraryOptions={libraryOptions} firstLook={firstLook} paidScout={paidScout}
         onBack={() => navigate('GATE', null)} onOpen={l => open(l, 'MARKET')} />}
       {scene === 'STUDIO' && <Studio onBack={() => navigate('GATE', null)} onTake={take} ownsStudio={ownsStudio} onCommission={onCommission} />}
@@ -1230,10 +1323,8 @@ export const ContentMarket: React.FC<{
       )}
       {scene === 'OFFER' && lot && (
         <Redline lot={lot} st={state} onBack={() => navigate('DETAIL', lot)}
-          onSend={(l, offer) => {
-            const result = onOfferSent?.(l, offer);
-            if (result?.changed) settle(l.title, result.detail, 'SENT', l);
-          }} />
+          onSend={(l, offer) => performAction('Sending offer…',
+            () => onOfferSent?.(l, offer), detail => settle(l.title, detail, 'SENT', l))} />
       )}
     </div>
     </CatalogueContext.Provider>

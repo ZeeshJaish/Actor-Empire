@@ -200,8 +200,9 @@ export default function StreamingBuyerAuctionRoom({ player, session, onUpdatePla
                     <button className={css.mkstep} type="button" onClick={() => setUpfront(upfront + session.lot.minimumBidIncrement)}>+</button>
                 </div>
                 <button className={cx(css.mkbid, !canBid ? css.dead : '')} type="button" disabled={!canBid || submittingBid} aria-busy={submittingBid} onClick={placeBid}>
-                    {submittingBid ? 'SUBMITTING BID…' : guaranteedExposure > funds ? `SHORT BY ${money(guaranteedExposure - funds)}` : `${playerBid ? 'REVISE' : 'TABLE'} ${money(guaranteedExposure)}`}
+                    {submittingBid ? 'SUBMITTING BID…' : guaranteedExposure > funds ? `SHORT BY ${money(guaranteedExposure - funds)}` : `${playerBid ? 'REVISE' : 'TABLE'} ${money(upfront)}`}
                 </button>
+                <small className={css.mkbidbudget}>{money(guaranteedExposure)} budget reserved while this bid is active · includes {money(upfront)} upfront{marketing ? ` + ${money(marketing)} marketing` : ''}{futureGreenlight ? ` + ${money(session.lot.allowedTerms.futureGreenlightReserve)} future-original reserve` : ''}</small>
             </section>
 
             {termsOpen && <div className={css.mksheetwrap} onClick={() => setTermsOpen(false)}>

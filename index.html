@@ -42,10 +42,49 @@
         }
         .glass-card {
             background: rgba(20, 20, 23, 0.86);
-            backdrop-filter: blur(var(--ae-perf-glass-blur, 8px));
-            -webkit-backdrop-filter: blur(var(--ae-perf-glass-blur, 8px));
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
             border: 1px solid var(--glass-border);
         }
+
+        /* Android WebView can corrupt layers when many blurred panels are stacked.
+           Keep the look, but use cheaper solid glass on touch devices. */
+      @media (pointer: coarse) {
+        .glass-card,
+        [class*="backdrop-blur"] {
+          backdrop-filter: none !important;
+          -webkit-backdrop-filter: none !important;
+            }
+            .glass-card {
+                background: rgba(20, 20, 23, 0.94);
+            }
+        [class*="blur-"] {
+          filter: none !important;
+        }
+      }
+
+      .smooth-mode .glass-card,
+      .smooth-mode [class*="backdrop-blur"] {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+      }
+
+      .smooth-mode .glass-card {
+        background: rgba(20, 20, 23, 0.96);
+      }
+
+      .smooth-mode [class*="blur-"] {
+        filter: none !important;
+      }
+
+      .smooth-mode *,
+      .smooth-mode *::before,
+      .smooth-mode *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
 
       .genre-lab-grid {
         contain: layout paint;
@@ -58,6 +97,19 @@
         transform: translateZ(0);
       }
 
+      .smooth-mode .genre-lab-card {
+        background: rgba(24, 24, 27, 0.98) !important;
+        box-shadow: none !important;
+        transform: none !important;
+      }
+
+      .smooth-mode .genre-lab-card:active {
+        transform: none !important;
+      }
+
+      .smooth-mode .genre-lab-progress {
+        transition: none !important;
+      }
         .pattern-diagonal-lines {
             background-image: repeating-linear-gradient(
                 45deg,
@@ -157,38 +209,6 @@
         </div>
       </main>
     </div>
-    <script>
-      window.__actorEmpireStartupStartedAt = Date.now();
-      window.__actorEmpireStartupDiagnostics = [];
-      window.__actorEmpireRecordEarlyStartupCheckpoint = function (checkpoint, failureCode) {
-        var occurredAtMs = Date.now();
-        var event = {
-          checkpoint: checkpoint,
-          occurredAtMs: occurredAtMs,
-          durationMs: Math.max(0, occurredAtMs - window.__actorEmpireStartupStartedAt),
-          online: navigator.onLine !== false
-        };
-        if (failureCode) event.failureCode = String(failureCode).slice(0, 80);
-        window.__actorEmpireStartupDiagnostics.push(event);
-        if (window.__actorEmpireStartupDiagnostics.length > 32) {
-          window.__actorEmpireStartupDiagnostics.shift();
-        }
-      };
-      window.__actorEmpireRecordEarlyStartupCheckpoint('html_visible');
-      window.addEventListener('error', function (event) {
-        window.__actorEmpireRecordEarlyStartupCheckpoint('startup_failed', event && event.message ? 'early_js_error' : 'bundle_error');
-      });
-      window.addEventListener('unhandledrejection', function () {
-        window.__actorEmpireRecordEarlyStartupCheckpoint('startup_failed', 'early_unhandled_rejection');
-      });
-      window.__actorEmpireBootWatchdog = window.setTimeout(function () {
-        var shell = document.querySelector('.ae-boot-shell__content');
-        if (!shell || document.documentElement.dataset.actorEmpireMounted === 'true') return;
-        window.__actorEmpireRecordEarlyStartupCheckpoint('startup_failed', 'react_mount_timeout');
-        window.__actorEmpireRecordEarlyStartupCheckpoint('recovery_opened', 'react_mount_timeout');
-        shell.insertAdjacentHTML('beforeend', '<p class="ae-boot-shell__message">A connection or device startup issue interrupted loading. Retry now. If it continues, restart the game. Your careers were not changed.</p><div class="ae-boot-shell__actions"><button class="ae-boot-shell__retry" type="button" onclick="window.location.reload()">Retry</button><button class="ae-boot-shell__restart" type="button" onclick="window.location.reload()">Restart Game</button></div>');
-      }, 15000);
-    </script>
   <script type="module" src="/index.tsx"></script>
 </body>
 </html>

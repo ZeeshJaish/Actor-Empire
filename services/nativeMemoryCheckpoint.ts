@@ -1,24 +1,24 @@
 export type NativeMemoryCheckpointResult =
-  | { status: 'READY'; slot: number }
-  | { status: 'SKIPPED'; reason: 'NOT_PLAYING' | 'NO_SLOT' | 'WEEK_PROCESSING' | 'SAVE_TRANSFER_ACTIVE' | 'NO_VERIFIED_CHECKPOINT' };
+  | { status: 'SAVED'; slot: number }
+  | { status: 'SKIPPED'; reason: 'NOT_PLAYING' | 'NO_SLOT' | 'WEEK_PROCESSING' };
 
-export interface NativeMemoryCheckpointOptions {
+export interface NativeMemoryCheckpointOptions<T> {
   isPlaying: boolean;
   currentSlot: number | null;
   isWeekProcessing: boolean;
-  isSaveTransferActive?: boolean;
-  hasVerifiedCheckpoint: (slot: number) => boolean;
+  getCommittedPlayer: () => T;
   cancelPendingAutosave: () => void;
+  persistCommittedPlayer: (slot: number, player: T) => Promise<void>;
 }
 
 /**
- * A memory warning is too late to prepare another full save. Stop pending
- * autosave work and rely only on an already verified, durable generation.
+ * Persists only the latest player state that App has already committed.
+ * In-progress week work is deliberately excluded so a memory warning can
+ * never turn a half-simulated week into the authoritative save.
  */
-export const checkpointNativeMemoryPressure = (
-  options: NativeMemoryCheckpointOptions,
-): NativeMemoryCheckpointResult => {
-  options.cancelPendingAutosave();
+export const checkpointNativeMemoryPressure = async <T>(
+  options: NativeMemoryCheckpointOptions<T>,
+): Promise<NativeMemoryCheckpointResult> => {
   if (!options.isPlaying) {
     return { status: 'SKIPPED', reason: 'NOT_PLAYING' };
   }
@@ -28,11 +28,9 @@ export const checkpointNativeMemoryPressure = (
   if (options.isWeekProcessing) {
     return { status: 'SKIPPED', reason: 'WEEK_PROCESSING' };
   }
-  if (options.isSaveTransferActive) {
-    return { status: 'SKIPPED', reason: 'SAVE_TRANSFER_ACTIVE' };
-  }
 
-  return options.hasVerifiedCheckpoint(options.currentSlot)
-    ? { status: 'READY', slot: options.currentSlot }
-    : { status: 'SKIPPED', reason: 'NO_VERIFIED_CHECKPOINT' };
+  const committedPlayer = options.getCommittedPlayer();
+  options.cancelPendingAutosave();
+  await options.persistCommittedPlayer(options.currentSlot, committedPlayer);
+  return { status: 'SAVED', slot: options.currentSlot };
 };

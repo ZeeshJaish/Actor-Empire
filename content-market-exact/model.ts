@@ -8,6 +8,9 @@ export type Localization = 'Dubs + subtitles' | 'Subtitles only' | 'Original onl
 export type Renewal = 'First option' | 'Automatic' | 'None';
 export type Availability = 'LIVE' | 'CLOSING' | 'OPEN' | 'OPENS' | 'PRESALE' | 'WATCH';
 export type ReleasePath = 'POST-THEATRICAL' | 'DAY AND DATE' | 'STREAMING ONLY' | 'FESTIVAL ONLY' | 'UNRELEASED' | 'LIBRARY';
+export const getContentMarketPostActionScene = (
+  source: 'LISTING' | 'COLLECTION' | 'OPPORTUNITY' | 'STUDIO' | 'UPCOMING' | 'AUCTION' | 'OFFER',
+): 'MARKET' | 'STUDIO' => source === 'STUDIO' ? 'STUDIO' : 'MARKET';
 
 export interface Territory {
   id: string;
@@ -168,10 +171,10 @@ export const readOffer = (lot: Lot, offer: Offer): number => {
 export const askOf = (lot: Lot): number => lot.listed ? readOffer(lot, offerFrom(lot.listed)) + 0.1 : 1.05;
 export const verdictOf = (lot: Lot, offer: Offer): { tone: 'good' | 'warn' | 'bad'; line: string } => {
   const delta = readOffer(lot, offer) - askOf(lot);
-  if (delta >= 0.18) return { tone: 'good', line: 'This is a strong position. The seller is likely to sign.' };
-  if (delta >= 0) return { tone: 'good', line: 'This clears their current asking shape.' };
-  if (delta >= -0.14) return { tone: 'warn', line: 'Close. Expect a counter on the term they value most.' };
-  return { tone: 'bad', line: 'This reads as an opening position, not a deal.' };
+  if (delta >= 0.18) return { tone: 'good', line: 'A competitive opening position. The actual seller reply is still pending.' };
+  if (delta >= 0) return { tone: 'good', line: 'Near the listed asking shape. The seller may still counter or decline.' };
+  if (delta >= -0.14) return { tone: 'warn', line: 'Close to the ask. A counter is possible after the seller reviews it.' };
+  return { tone: 'bad', line: 'Below the asking shape. The seller may decline this round.' };
 };
 
 export const repFor = (seller: string) => {

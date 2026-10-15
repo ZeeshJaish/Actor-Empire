@@ -194,7 +194,7 @@ assert(committed.player.ownedStreamingPlatform.infrastructureSetup?.loadTest.lau
 
 const changedDrawing = saveStreamingInfrastructureDraft(saved, {
     ...saved.ownedStreamingPlatform.infrastructureSetupDraft!,
-    networkPlacements: draft.networkPlacements.map((placement, index) => ({
+    networkPlacements: (draft.networkPlacements.length ? draft.networkPlacements : [{ cityId: 'LA', racks: 1, role: 'CORE_ORIGIN' as const }]).map((placement, index) => ({
         ...placement, racks: placement.racks + (index === 0 ? 1 : 0),
     })),
 });
@@ -202,7 +202,7 @@ const changedForecast = getStreamingInfrastructureForecast(changedDrawing);
 const oldEvidence = changedDrawing.ownedStreamingPlatform.infrastructureSetupDraft!.lastLaunchRehearsal!;
 assert(
     rehearsalSnapshotToBuild(oldEvidence, 'changed-build', new Map(), changedForecast.configurationSignature) === null,
-    'Changing rack capacity after testing must invalidate the old rehearsal rather than silently reapprove it.',
+    'Changing network capacity after testing must invalidate the old rehearsal rather than silently reapprove it.',
 );
 
 const legacy = normalizeOwnedStreamingPlatformState({
@@ -246,13 +246,13 @@ assert(
 
 const engineSource = readFileSync('services/streamingLaunchRehearsal.ts', 'utf8');
 const buildSource = readFileSync('components/streaming-transplant/StreamingBuildoutExperience.tsx', 'utf8');
-const hqSource = readFileSync('components/StreamingPlatformHQ.tsx', 'utf8');
 const styleSource = readFileSync('components/streaming-transplant/presentation/screens/Buildout/Buildout.module.css', 'utf8');
 assert(!engineSource.includes('Math.random'), 'The canonical launch rehearsal must never use random outcomes.');
 ['AUDIENCE', 'ROUTE', 'STRESS', 'VIEWERS', 'DECISION', 'warningSummary', 'REPAIR THE PLAN', 'FOUNDER OVERRIDE AVAILABLE'].forEach(fragment => {
     assert(buildSource.includes(fragment), `The Phase 6 command sequence must expose ${fragment}.`);
 });
-assert(hqSource.includes('LEGACY MARKET FALLBACK') && hqSource.includes('getStreamingDayOneMarketsForRegion'), 'Pre-Day-One-Market saves must receive deterministic country evidence.');
+assert(!legacy.identity?.dayOneMarketIds?.length,
+    'An old save without filed opening markets must not gain fabricated country clearance.');
 assert(
     styleSource.includes('.rhrail')
     && /@media\s*\(max-width:\s*360px\)/.test(styleSource)

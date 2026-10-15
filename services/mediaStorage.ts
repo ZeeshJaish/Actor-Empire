@@ -14,39 +14,11 @@ export interface StoredMediaMeta {
 
 interface StoredMediaRecord extends StoredMediaMeta {
     blob: Blob;
-    importBatchId?: string;
-    importOriginalId?: string;
-    stagedAt?: number;
-}
-
-export interface BinaryMediaTransferRecord extends StoredMediaMeta {
-    blob: Blob;
 }
 
 export interface TransferMediaRecord extends StoredMediaMeta {
     dataBase64: string;
 }
-
-export interface MediaTransferInventory {
-    count: number;
-    totalBytes: number;
-    largestRecordBytes: number;
-    recordBytes: number[];
-}
-
-export const summarizeMediaTransferInventory = (
-    records: Array<{ size: number }>
-): MediaTransferInventory => {
-    const recordBytes = records.map(record => (
-        Number.isFinite(record.size) && record.size > 0 ? Math.floor(record.size) : 0
-    ));
-    return {
-        count: recordBytes.length,
-        totalBytes: recordBytes.reduce((sum, bytes) => sum + bytes, 0),
-        largestRecordBytes: Math.max(0, ...recordBytes),
-        recordBytes,
-    };
-};
 
 const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
     const bytes = new Uint8Array(buffer);
@@ -144,7 +116,7 @@ export const pruneMediaStore = async (
         const store = transaction.objectStore(STORE_NAME);
         const request = store.getAll();
         request.onerror = () => reject(request.error);
-        request.onsuccess = () => resolve((request.result as StoredMediaRecord[]).filter(record => !record.importBatchId && record.kind === kind));
+        request.onsuccess = () => resolve((request.result as StoredMediaRecord[]).filter(record => record.kind === kind));
     });
 
     const sorted = records.sort((a, b) => b.createdAt - a.createdAt);
@@ -171,148 +143,15 @@ export const pruneMediaStore = async (
     });
 };
 
-const loadStoredMediaRecords = async (): Promise<StoredMediaRecord[]> => {
+export const exportMediaTransferRecords = async (): Promise<TransferMediaRecord[]> => {
     const db = await openMediaDB();
-    return new Promise<StoredMediaRecord[]>((resolve, reject) => {
+    const records = await new Promise<StoredMediaRecord[]>((resolve, reject) => {
         const transaction = db.transaction(STORE_NAME, 'readonly');
         const store = transaction.objectStore(STORE_NAME);
         const request = store.getAll();
         request.onerror = () => reject(request.error);
-        request.onsuccess = () => resolve((request.result as StoredMediaRecord[]).filter(record => !record.importBatchId));
+        request.onsuccess = () => resolve(request.result as StoredMediaRecord[]);
     });
-};
-
-export const listMediaTransferBlobs = async (): Promise<BinaryMediaTransferRecord[]> => {
-    const records = await loadStoredMediaRecords();
-    return records.map(record => ({
-        id: record.id,
-        kind: record.kind,
-        mimeType: record.mimeType,
-        size: record.blob.size,
-        createdAt: record.createdAt,
-        width: record.width,
-        height: record.height,
-        blob: record.blob,
-    }));
-};
-
-const IMPORT_CANDIDATE_PREFIX = '__actorEmpireMediaImportCandidate__:';
-
-const candidateMediaId = (batchId: string, originalId: string) => (
-    `${IMPORT_CANDIDATE_PREFIX}${batchId}:${originalId}`
-);
-
-export const stageMediaTransferBlob = async (
-    batchId: string,
-    record: BinaryMediaTransferRecord,
-): Promise<void> => {
-    if (!batchId || !record.id || !(record.blob instanceof Blob) || record.blob.size !== record.size) {
-        throw new Error('Media import candidate is invalid.');
-    }
-    const db = await openMediaDB();
-    const staged: StoredMediaRecord = {
-        ...record,
-        id: candidateMediaId(batchId, record.id),
-        size: record.blob.size,
-        mimeType: record.mimeType || record.blob.type || 'application/octet-stream',
-        importBatchId: batchId,
-        importOriginalId: record.id,
-        stagedAt: Date.now(),
-    };
-    try {
-        await new Promise<void>((resolve, reject) => {
-            const transaction = db.transaction(STORE_NAME, 'readwrite');
-            transaction.objectStore(STORE_NAME).put(staged);
-            transaction.onerror = () => reject(transaction.error);
-            transaction.oncomplete = () => resolve();
-        });
-        const verified = await new Promise<StoredMediaRecord | null>((resolve, reject) => {
-            const transaction = db.transaction(STORE_NAME, 'readonly');
-            const request = transaction.objectStore(STORE_NAME).get(staged.id);
-            request.onerror = () => reject(request.error);
-            request.onsuccess = () => resolve((request.result as StoredMediaRecord | undefined) || null);
-        });
-        if (!verified || verified.blob.size !== record.size || verified.importOriginalId !== record.id) {
-            throw new Error('Media import candidate failed read-back verification.');
-        }
-    } finally {
-        db.close();
-    }
-};
-
-export const discardStagedMediaTransferBatch = async (batchId: string): Promise<void> => {
-    if (!batchId) return;
-    const db = await openMediaDB();
-    try {
-        await new Promise<void>((resolve, reject) => {
-            const transaction = db.transaction(STORE_NAME, 'readwrite');
-            const store = transaction.objectStore(STORE_NAME);
-            const request = store.getAll();
-            request.onerror = () => reject(request.error);
-            request.onsuccess = () => {
-                (request.result as StoredMediaRecord[])
-                    .filter(record => record.importBatchId === batchId)
-                    .forEach(record => store.delete(record.id));
-            };
-            transaction.onerror = () => reject(transaction.error);
-            transaction.oncomplete = () => resolve();
-        });
-    } finally {
-        db.close();
-    }
-};
-
-export const promoteStagedMediaTransferBatch = async (
-    batchId: string,
-    expectedOriginalIds: string[],
-): Promise<number> => {
-    const expected = new Set(expectedOriginalIds);
-    if (!batchId || expected.size !== expectedOriginalIds.length) throw new Error('Media import batch is invalid.');
-    const db = await openMediaDB();
-    try {
-        return await new Promise<number>((resolve, reject) => {
-            const transaction = db.transaction(STORE_NAME, 'readwrite');
-            const store = transaction.objectStore(STORE_NAME);
-            const request = store.getAll();
-            let promoted = 0;
-            let validationError: Error | null = null;
-            request.onerror = () => reject(request.error);
-            request.onsuccess = () => {
-                const candidates = (request.result as StoredMediaRecord[]).filter(record => record.importBatchId === batchId);
-                const actual = new Set(candidates.map(record => record.importOriginalId || ''));
-                if (candidates.length !== expected.size || actual.size !== expected.size || [...expected].some(id => !actual.has(id))) {
-                    validationError = new Error('Staged media batch is incomplete.');
-                    transaction.abort();
-                    return;
-                }
-                for (const candidate of candidates) {
-                    const originalId = candidate.importOriginalId as string;
-                    const {
-                        importBatchId: _batch,
-                        importOriginalId: _original,
-                        stagedAt: _stagedAt,
-                        ...active
-                    } = candidate;
-                    store.put({ ...active, id: originalId } satisfies StoredMediaRecord);
-                    store.delete(candidate.id);
-                    promoted += 1;
-                }
-            };
-            transaction.onerror = () => reject(transaction.error || validationError);
-            transaction.onabort = () => reject(validationError || transaction.error || new Error('Media import promotion aborted.'));
-            transaction.oncomplete = () => resolve(promoted);
-        });
-    } finally {
-        db.close();
-    }
-};
-
-export const exportMediaTransferRecords = async (
-    options: { beforeEncoding?: (inventory: MediaTransferInventory) => void | Promise<void> } = {},
-    dependencies: { loadRecords: () => Promise<StoredMediaRecord[]> } = { loadRecords: loadStoredMediaRecords },
-): Promise<TransferMediaRecord[]> => {
-    const records = await dependencies.loadRecords();
-    await options.beforeEncoding?.(summarizeMediaTransferInventory(records));
 
     const transferRecords: TransferMediaRecord[] = [];
     for (const record of records) {

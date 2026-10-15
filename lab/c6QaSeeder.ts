@@ -33,11 +33,11 @@ button.addEventListener('click', async () => {
         }
         const prepared = prepareVerifiedPlayerForPersistence(career, 'MANUAL');
         const key = 'actorEmpireSave_1';
-        await saveVerifiedGameData(key, prepared.persistedPlayer, prepared.manifest, {
+        await saveVerifiedGameData(key, prepared.player, prepared.manifest, {
             retainPrevious: prepared.retainPrevious,
             needsRecoveryCheckpoint: prepared.needsRecoveryCheckpoint,
         });
-        writeGameSaveSummary(key, prepared.persistedPlayer);
+        writeGameSaveSummary(key, prepared.player);
         result.innerHTML = 'Isolated signed career created in slot 1. <a href="/">Open the game</a>.';
     } catch (error) {
         result.textContent = `Fixture could not be created: ${error instanceof Error ? error.message : String(error)}`;

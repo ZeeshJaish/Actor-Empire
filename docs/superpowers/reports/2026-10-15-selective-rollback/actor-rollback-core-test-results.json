@@ -1,0 +1,50 @@
+[
+  {
+    "command": "audit:content-market-cm1",
+    "exit": 0,
+    "seconds": 1.0,
+    "log": "/private/tmp/actor-rollback-audit-content-market-cm1.log"
+  },
+  {
+    "command": "audit:content-market-cm2",
+    "exit": 0,
+    "seconds": 0.9,
+    "log": "/private/tmp/actor-rollback-audit-content-market-cm2.log"
+  },
+  {
+    "command": "audit:content-market-cm3",
+    "exit": 0,
+    "seconds": 0.5,
+    "log": "/private/tmp/actor-rollback-audit-content-market-cm3.log"
+  },
+  {
+    "command": "audit:content-market-cm4",
+    "exit": 0,
+    "seconds": 0.3,
+    "log": "/private/tmp/actor-rollback-audit-content-market-cm4.log"
+  },
+  {
+    "command": "audit:streaming-pricing-p5",
+    "exit": 0,
+    "seconds": 0.3,
+    "log": "/private/tmp/actor-rollback-audit-streaming-pricing-p5.log"
+  },
+  {
+    "command": "audit:greenlight-calculations",
+    "exit": 0,
+    "seconds": 0.1,
+    "log": "/private/tmp/actor-rollback-audit-greenlight-calculations.log"
+  },
+  {
+    "command": "audit:greenlight-project-builder",
+    "exit": 0,
+    "seconds": 0.3,
+    "log": "/private/tmp/actor-rollback-audit-greenlight-project-builder.log"
+  },
+  {
+    "command": "audit:episode-ratings",
+    "exit": 0,
+    "seconds": 0.1,
+    "log": "/private/tmp/actor-rollback-audit-episode-ratings.log"
+  }
+]

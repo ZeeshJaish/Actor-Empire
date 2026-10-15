@@ -1,0 +1,98 @@
+{
+  "languages": [
+    {
+      "language": "en",
+      "identicalToEnglishGeneratedContent": true,
+      "localizedNewsShell": true,
+      "englishNewsBody": true,
+      "englishSocialGroups": true,
+      "missingFallback": "Audit Film keeps building at the box office, now sitting near 8M worldwide as weekend tracking stays hot."
+    },
+    {
+      "language": "pt-BR",
+      "identicalToEnglishGeneratedContent": true,
+      "localizedNewsShell": true,
+      "englishNewsBody": true,
+      "englishSocialGroups": true,
+      "missingFallback": "Audit Film keeps building at the box office, now sitting near 8M worldwide as weekend tracking stays hot."
+    },
+    {
+      "language": "fr",
+      "identicalToEnglishGeneratedContent": true,
+      "localizedNewsShell": true,
+      "englishNewsBody": true,
+      "englishSocialGroups": true,
+      "missingFallback": "Audit Film keeps building at the box office, now sitting near 8M worldwide as weekend tracking stays hot."
+    },
+    {
+      "language": "es",
+      "identicalToEnglishGeneratedContent": true,
+      "localizedNewsShell": true,
+      "englishNewsBody": true,
+      "englishSocialGroups": true,
+      "missingFallback": "Audit Film keeps building at the box office, now sitting near 8M worldwide as weekend tracking stays hot."
+    },
+    {
+      "language": "tr",
+      "identicalToEnglishGeneratedContent": true,
+      "localizedNewsShell": true,
+      "englishNewsBody": true,
+      "englishSocialGroups": true,
+      "missingFallback": "Audit Film keeps building at the box office, now sitting near 8M worldwide as weekend tracking stays hot."
+    },
+    {
+      "language": "de",
+      "identicalToEnglishGeneratedContent": true,
+      "localizedNewsShell": true,
+      "englishNewsBody": true,
+      "englishSocialGroups": true,
+      "missingFallback": "Audit Film keeps building at the box office, now sitting near 8M worldwide as weekend tracking stays hot."
+    }
+  ],
+  "combinations": {
+    "syntheticContextCombinations": 10000,
+    "advertisedEngineEstimate": 8000000000,
+    "note": "Estimate is a product of bank sizes, not a verified count of distinct reachable sentences. Matrix covers five main classification dimensions and five focuses, with fixed genre, role, world and career inputs."
+  },
+  "checks": [
+    "Portuguese stored headline survives switching to French; only shell changes.",
+    "Stored news language switch and all six language producer/render checks reproduced."
+  ],
+  "sample": {
+    "opening": {
+      "headline": "Audit Film finds a healthy opening lane",
+      "subtext": "Efficiency protects the studio, while audience enthusiasm decides the ceiling. Every major conversation about the film eventually returns to Audit Player."
+    },
+    "critic": {
+      "headline": "Audit Player makes the hero role the story of Audit Film",
+      "subtext": "Audit Player gives the film the kind of performance that changes future casting conversations. Against-type success gives agents permission to send scripts that were previously out of reach."
+    },
+    "x": [
+      {
+        "content": "That was not on the bingo card. Audit Film finds a healthy opening lane. This kind of story lives or dies on emotional precision rather than production scale. #AuditPlayerAsHero",
+        "replies": [
+          "The lean budget creates room for upside without making success automatic. Audit Player finds choices in the hero part that the campaign never knew how to sell.",
+          "Critics see a film whose ambition is matched by its execution. Every major conversation about the film eventually returns to Audit Player. The praise is for the craft, not simply the low price tag."
+        ]
+      },
+      {
+        "content": "The casting discourse just changed. Audit Player gives the film the kind of performance that changes future casting conversations. Without spectacle to hide behind, the project’s control becomes its main selling point. #AuditFilm",
+        "replies": [
+          "Audit Player turns the hero role into the project’s most replayed talking point. The casting risk may have opened an entirely new lane for future offers.",
+          "The chemistry feels built rather than purchased. The restrained canvas is giving audiences more room to argue about character detail.",
+          "A role outside the expected lane is now forcing the industry to redraw it. The restrained canvas is giving audiences more room to argue about character detail."
+        ]
+      }
+    ],
+    "instagram": [
+      {
+        "caption": "The performance conversation around Audit Film belongs to Audit Player. #AuditPlayerEra",
+        "comments": [
+          "The lean budget creates room for upside without making success automatic. Every major conversation about the film eventually returns to Audit Player.",
+          "The chemistry feels built rather than purchased. The restrained canvas is giving audiences more room to argue about character detail.",
+          "A role outside the expected lane is now forcing the industry to redraw it. The restrained canvas is giving audiences more room to argue about character detail."
+        ]
+      }
+    ]
+  }
+}

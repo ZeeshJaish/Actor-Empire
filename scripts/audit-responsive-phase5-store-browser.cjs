@@ -7,18 +7,18 @@ const url = 'http://127.0.0.1:5178/scripts/fixtures/responsive-store-rewards.htm
   const browser = await chromium.launch({ headless: true });
   try {
     for (const viewport of [{ width: 320, height: 568 }, { width: 448, height: 956 }]) {
-      for (const step of [0, 1]) {
+      for (const step of [0]) {
         const page = await browser.newPage({ viewport, reducedMotion: 'reduce' });
         const errors = [];
         page.on('pageerror', error => errors.push(error.message));
         await page.goto(`${url}?step=${step}`, { waitUntil: 'domcontentloaded' });
         await page.locator('[data-ui="actor-empire-store-overhaul"]').waitFor();
-        const action = page.getByRole('button', { name: `Watch Ad ${step + 1} of 2` });
+        const action = page.getByRole('button', { name: 'Watch ad for Wellness Package' });
         await action.scrollIntoViewIfNeeded();
         const actionBox = await action.boundingBox();
         assert.ok(actionBox && actionBox.height >= 44, `${viewport.width} ${step}/2: wellness action below 44px`);
         assert.ok(actionBox.y >= 0 && actionBox.y + actionBox.height <= viewport.height + 1, `${viewport.width} ${step}/2: wellness action unreachable`);
-        assert.equal(await page.locator('.st-wellness-step.is-done').count(), step, `${viewport.width}: wrong progress`);
+        assert.equal(await page.locator('.st-wellness-step').count(), 0, 'Legacy wellness UI must not show the retired retry-state controls.');
         assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1), `${viewport.width}: store overflow`);
         assert.deepEqual(errors, [], `${viewport.width} ${step}/2: page errors`);
         if (viewport.width === 320) await page.screenshot({ path: `docs/qa/responsive-after/ae-phase5-store-wellness-${step}-of-2-320x568.png` });

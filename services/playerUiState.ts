@@ -25,3 +25,9 @@ export const prepareExternalPlayerUpdateForUi = (player: Player): Player => (
 export const prepareProcessedWeekForUi = (player: Player): Player => (
     finalizePlayerUiState(player)
 );
+
+/** Market services return a complete player derived from the already-migrated live save.
+ * Keep load/import migration on the external path, not on every bid or catalogue tap. */
+export const prepareTrustedMarketUpdateForUi = (player: Player): Player => (
+    finalizePlayerUiState(player)
+);

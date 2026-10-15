@@ -1,4 +1,5 @@
 import type {
+    BudgetTier,
     IndustryProject,
     OwnedStreamingCatalogLicense,
     OwnedStreamingCatalogSetupDraft,
@@ -19,7 +20,7 @@ import {
     createStreamingRightsContractFromLicense,
     registerStreamingRightsContract,
 } from './streamingRightsCore';
-import { selectStreamingMarketTitles } from './streamingMarketSupply';
+import { getStreamingMarketCycle, selectStreamingMarketTitles } from './streamingMarketSupply';
 import { getHistoricalCatalogueTitles, resolveHistoricalCatalogueTitle } from './historicalCatalogue';
 import { normalizeStreamingDayOneMarketIds } from './streamingDayOneMarkets';
 import { resolveStreamingRightsCompatibility } from './streamingRightsCompatibility';
@@ -40,6 +41,7 @@ export interface StreamingCatalogTitle {
     quality?: number;
     reach?: number;
     prestige?: number;
+    budgetTier?: BudgetTier;
     catalogueTier?: 'MARQUEE';
 }
 
@@ -50,6 +52,14 @@ export interface StreamingLicenseQuote {
     targetPlatformRevenueShare: number;
     estimatedExpiryWeeks: number;
 }
+
+/** Keep the visible three-week shelf on its old economics until the saved policy activates. */
+export const getActiveStreamingQuoteVersion = (
+    policy: Player['ownedStreamingPlatform']['marketQuotePolicy'], absoluteWeek: number,
+): 1 | 2 | 3 => {
+    return policy && getStreamingMarketCycle(absoluteWeek) >= policy.effectiveCycle
+        ? policy.version : policy?.previousVersion || 1;
+};
 
 export const STREAMING_STARTER_CATALOG_PACKAGES: Array<{
     id: StreamingStarterCatalogPackageId;
@@ -148,6 +158,8 @@ const toOwnedTitle = (
         rating: asNumberOrNull(source.imdbRating ?? source.rating),
         releaseYear: asNumberOrNull(source.releaseYear ?? source.year),
         gross: asNumberOrNull(source.gross ?? source.totalGross),
+        budgetTier: ['LOW', 'MID', 'HIGH', 'BLOCKBUSTER'].includes(String(source.budgetTier || source.projectDetails?.budgetTier))
+            ? (source.budgetTier || source.projectDetails?.budgetTier) as BudgetTier : undefined,
         studioId,
         studioName: studioNames.get(studioId) || 'Owned studio',
         source: 'OWNED_LIBRARY',
@@ -185,6 +197,7 @@ const toWorldLicenseTitle = (
     rating: asNumberOrNull(project.rating),
     releaseYear: asNumberOrNull(project.year),
     gross: asNumberOrNull(project.boxOffice),
+    budgetTier: project.budgetTier,
     studioId: String(project.studioId),
     studioName: studioNames.get(String(project.studioId)) || String(project.studioId || 'Independent rights holder'),
     source: 'EXTERNAL_MARKET',
@@ -204,6 +217,7 @@ const toCareerLicenseTitle = (
         rating: asNumberOrNull(project.imdbRating ?? project.rating),
         releaseYear: asNumberOrNull(project.releaseYear ?? project.year),
         gross: asNumberOrNull(project.gross),
+        budgetTier: (project as any).budgetTier,
         studioId,
         studioName: studioId || 'Independent rights holder',
         source: 'EXTERNAL_MARKET',
@@ -255,6 +269,7 @@ export const getStreamingLicenseCandidatePool = (player: Player): StreamingCatal
                 quality: title.quality,
                 reach: title.reach,
                 prestige: title.prestige,
+                budgetTier: title.budgetTier,
                 catalogueTier: title.catalogueTier,
             }))
         : legacyCandidates;
@@ -364,6 +379,7 @@ export const resolveStreamingCatalogTitle = (
             reach: historical.reach,
             prestige: historical.prestige,
             catalogueTier: historical.catalogueTier,
+            budgetTier: historical.budgetTier,
             source: ownedStudioNames.has(historical.studioId)
                 ? 'OWNED_LIBRARY' as const : 'EXTERNAL_MARKET' as const,
         } : null;
@@ -376,15 +392,43 @@ export const getStreamingLicenseQuote = (
     territory: StreamingLicenseTerritory,
     durationWeeks: number,
     exclusivity: StreamingLicenseExclusivity,
-    pricingVersion: 1 | 2 = 1,
+    pricingVersion: 1 | 2 | 3 = 1,
+    windowType: 'FIRST_WINDOW' | 'SECOND_WINDOW' | 'PERMANENT' = 'FIRST_WINDOW',
+    currentYear?: number,
 ): StreamingLicenseQuote => {
     const territoryMultiplier = STREAMING_LICENSE_TERRITORIES.find(item => item.id === territory)?.multiplier || 1;
-    const durationMultiplier = durationWeeks >= 156 ? 1.32 : durationWeeks >= 104 ? 1 : 0.72;
+    const durationMultiplier = pricingVersion === 3
+        ? durationWeeks >= 260 ? 1.65 : durationWeeks >= 156 ? 1.32
+            : durationWeeks >= 104 ? 1 : 0.72
+        : durationWeeks >= 156 ? 1.32 : durationWeeks >= 104 ? 1 : 0.72;
     const exclusivityMultiplier = exclusivity === 'EXCLUSIVE' ? 1.55 : 1;
     const signal = (value: number | null | undefined, fallback: number): number => (
         value == null || !Number.isFinite(Number(value)) ? fallback : Number(value)
     );
-    const performanceBase = pricingVersion === 2
+    const performanceBase = pricingVersion === 3 ? (() => {
+        const gross = signal(title.gross, 0);
+        const tier = (['LOW', 'MID', 'HIGH', 'BLOCKBUSTER'].includes(String(title.budgetTier))
+            ? title.budgetTier : undefined) || (title.projectType === 'SERIES' ? 'MID'
+            : gross >= 250_000_000 ? 'BLOCKBUSTER' : gross >= 100_000_000 ? 'HIGH'
+                : gross >= 25_000_000 ? 'MID' : 'LOW');
+        const scale = { LOW: 20_000_000, MID: 52_000_000, HIGH: 112_000_000,
+            BLOCKBUSTER: 210_000_000 }[tier];
+        const productionEstimate = { LOW: 8_000_000, MID: 35_000_000,
+            HIGH: 80_000_000, BLOCKBUSTER: 180_000_000 }[tier];
+        const quality = clamp(signal(title.quality, signal(title.rating, 6.5) * 10), 0, 100);
+        const reach = clamp(signal(title.reach, 50), 0, 100);
+        const prestige = clamp(signal(title.prestige, 50), 0, 100);
+        const grossLift = title.projectType === 'SERIES' || gross <= 0 ? 0
+            : clamp((gross / productionEstimate - 1.25) * .1, -.12, .3);
+        const ageYears = Number.isFinite(currentYear) && Number.isFinite(title.releaseYear)
+            ? Math.max(0, Number(currentYear) - Number(title.releaseYear)) : 0;
+        const ageFactor = title.catalogueTier === 'MARQUEE'
+            ? Math.max(.86, 1 - ageYears * .006) : Math.max(.62, 1 - ageYears * .015);
+        return scale * clamp(1 + (quality - 65) * .01 + (reach - 50) * .005
+            + (prestige - 50) * .004 + grossLift, .55, 1.85)
+            * (title.projectType === 'SERIES' ? 1.22 : 1)
+            * (title.catalogueTier === 'MARQUEE' ? 1.35 : 1) * ageFactor;
+    })() : pricingVersion === 2
         ? (title.projectType === 'SERIES' ? 15_000_000 : 9_000_000)
             + clamp(signal(title.gross, 45_000_000) * 0.085, 0, 80_000_000)
             + clamp((signal(title.quality, signal(title.rating, 6.5) * 10) - 50) * 300_000, 0, 15_000_000)
@@ -392,9 +436,12 @@ export const getStreamingLicenseQuote = (
             + clamp(signal(title.prestige, 50) * 60_000, 0, 6_000_000)
         : Math.max(3_000_000,
             Math.min(90_000_000, (title.gross || 45_000_000) * 0.045 + (title.rating || 6.5) * 550_000));
-    const suggestedGuarantee = roundMoney(Math.min(pricingVersion === 2 ? 600_000_000 : Number.MAX_SAFE_INTEGER,
+    const suggestedGuarantee = roundMoney(Math.min(pricingVersion === 3 ? 1_600_000_000
+        : pricingVersion === 2 ? 600_000_000 : Number.MAX_SAFE_INTEGER,
         performanceBase * territoryMultiplier * durationMultiplier
-        * exclusivityMultiplier * (title.catalogueTier === 'MARQUEE' ? (pricingVersion === 2 ? 1.75 : 2) : 1)));
+        * (pricingVersion === 3 ? (exclusivity === 'EXCLUSIVE' ? 1.75 : 1)
+            * (windowType === 'SECOND_WINDOW' ? .75 : 1) : exclusivityMultiplier)
+        * (pricingVersion === 3 ? 1 : title.catalogueTier === 'MARQUEE' ? (pricingVersion === 2 ? 1.75 : 2) : 1)));
     return {
         suggestedGuarantee,
         minimumGuarantee: roundMoney(suggestedGuarantee * 0.62),
@@ -427,9 +474,12 @@ export const createDefaultStreamingCatalogDraft = (player: Player): OwnedStreami
         counterPlatformRevenueShare: null,
         negotiationRound: 0,
         updatedAtAbsoluteWeek: getAbsoluteWeek(player.age, player.currentWeek),
+        quoteVersion: getActiveStreamingQuoteVersion(platform.marketQuotePolicy,
+            getAbsoluteWeek(player.age, player.currentWeek)),
     };
     if (!opportunity) return baseDraft;
-    const quote = getStreamingLicenseQuote(opportunity, baseDraft.territory, baseDraft.durationWeeks, baseDraft.exclusivity);
+    const quote = getStreamingLicenseQuote(opportunity, baseDraft.territory, baseDraft.durationWeeks,
+        baseDraft.exclusivity, baseDraft.quoteVersion, 'FIRST_WINDOW', player.age);
     return {
         ...baseDraft,
         minimumGuarantee: quote.suggestedGuarantee,
@@ -478,6 +528,8 @@ export const saveStreamingCatalogDraft = (
         counterPlatformRevenueShare: termsChanged ? null : inputDraft.counterPlatformRevenueShare,
         negotiationRound: termsChanged ? 0 : Math.round(clamp(inputDraft.negotiationRound, 0, 3)),
         updatedAtAbsoluteWeek: getAbsoluteWeek(player.age, player.currentWeek),
+        ...(inputDraft.quoteVersion ? { quoteVersion: inputDraft.quoteVersion }
+            : platform.catalogSetupDraft?.quoteVersion ? { quoteVersion: platform.catalogSetupDraft.quoteVersion } : {}),
     };
     return {
         ...player,
@@ -497,7 +549,8 @@ export const submitStreamingCatalogOffer = (
     const draft = platform.catalogSetupDraft || createDefaultStreamingCatalogDraft(savedPlayer);
     const opportunity = getStreamingLicenseOpportunities(savedPlayer).find(item => item.id === draft.opportunityProjectId);
     if (!opportunity) return { player: savedPlayer, draft, changed: false, message: 'No eligible external title is available for this opening negotiation.' };
-    const quote = getStreamingLicenseQuote(opportunity, draft.territory, draft.durationWeeks, draft.exclusivity);
+    const quote = getStreamingLicenseQuote(opportunity, draft.territory, draft.durationWeeks,
+        draft.exclusivity, draft.quoteVersion || 1, 'FIRST_WINDOW', savedPlayer.age);
     if (draft.minimumGuarantee < quote.minimumGuarantee || draft.minimumGuarantee > quote.maximumGuarantee) {
         return {
             player: savedPlayer,

@@ -1,4 +1,4 @@
-import { INITIAL_PLAYER, type Player } from '../types';
+import { INITIAL_PLAYER } from '../types';
 import {
     createShareholderVote,
     getShareholderInfluence,
@@ -9,7 +9,6 @@ import { getStockOutstandingShares, initializeStocks } from '../services/stockLo
 import { getEntertainmentStockSnapshot } from '../services/entertainmentStockMarket';
 import { getCompanyPosition } from '../services/companyPosition';
 import { getStockTakeoverSnapshot } from '../services/stockTakeover';
-import { getLifeEventResolutionContractViolations, materializePlayerLifeEventImpacts, resolveLifeEventChoice } from '../services/lifeEventResolver';
 
 const stocks = initializeStocks();
 const stock = stocks.find(candidate => candidate.id === 'stk_dis');
@@ -55,21 +54,6 @@ if ((passive.shareholderVotes || []).length) {
 }
 
 const voter = makePlayer(12);
-const voterWithQueuedBallot = processShareholderVoting(voter) as Player;
-const queuedBallotEvent = voterWithQueuedBallot.pendingEvents?.find(event => event.data?.stockDecisionType === 'SHAREHOLDER_VOTE');
-if (!queuedBallotEvent) throw new Error('Eligible shareholder should receive a queued ballot decision.');
-const materializedBallotPlayer = materializePlayerLifeEventImpacts(voterWithQueuedBallot, { strict: true });
-if (getLifeEventResolutionContractViolations(materializedBallotPlayer).length > 0) {
-    throw new Error('Shareholder ballot choices must persist with registered resolvers.');
-}
-const reloadedBallotPlayer = JSON.parse(JSON.stringify(materializedBallotPlayer)) as Player;
-const reloadedBallotEvent = reloadedBallotPlayer.pendingEvents!.find(event => event.data?.stockDecisionType === 'SHAREHOLDER_VOTE')!;
-const reloadedBallotLifeEvent = reloadedBallotEvent.data.lifeEvent;
-const reloadedVoteFor = reloadedBallotLifeEvent.options.find((option: any) => option.id === 'VOTE_FOR');
-const reloadedVoteResult = resolveLifeEventChoice(reloadedBallotPlayer, reloadedBallotEvent, reloadedBallotLifeEvent, reloadedVoteFor, 0);
-if (!reloadedVoteResult?.updatedPlayer.shareholderVotes.some(candidate => candidate.status === 'RESOLVED')) {
-    throw new Error('Shareholder ballot must retain its exact resolution after reload.');
-}
 const vote = createShareholderVote(voter, stock, 'DIVIDEND_POLICY');
 if (!vote || vote.status !== 'OPEN') {
     throw new Error('Eligible shareholder should receive an open vote.');

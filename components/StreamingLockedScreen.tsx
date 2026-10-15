@@ -43,6 +43,7 @@ import '../styles/streaming-lock.css';
 interface Props {
   player: Player;
   onUpdatePlayer?: (player: Player) => void;
+  onTrustedMarketUpdate?: (player: Player) => void;
   onBack?: () => void;
   onReturnToGame?: () => void;
   commercialPolicy?: StreamingCommercialPolicy;
@@ -176,6 +177,7 @@ function AccessUnavailable({
 export default function StreamingLockedScreen({
   player,
   onUpdatePlayer,
+  onTrustedMarketUpdate,
   onBack = () => history.back(),
   onReturnToGame,
   commercialPolicy = DEFAULT_STREAMING_COMMERCIAL_POLICY,
@@ -278,6 +280,7 @@ export default function StreamingLockedScreen({
       <StreamingPlatformHQ
         player={player}
         onUpdatePlayer={onUpdatePlayer}
+        onTrustedMarketUpdate={onTrustedMarketUpdate}
         onBack={onBack}
         onReturnToGame={onReturnToGame}
         onOpenOriginalProduction={onOpenOriginalProduction}

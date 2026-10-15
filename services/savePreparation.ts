@@ -14,7 +14,6 @@ import {
     repairDerivedWorldEconomyState,
     validateWorldEconomyCandidate,
 } from './worldEconomy/worldEconomyIntegrity';
-import { materializePlayerLifeEventImpacts } from './lifeEventResolver';
 
 const OVERSIZED_LEGACY_BYTES = 24 * 1024 * 1024;
 
@@ -59,10 +58,7 @@ export const isClearlyOversizedLegacySave = (player: Player): boolean => {
 };
 
 export interface PreparedVerifiedPlayer {
-    /** Full in-memory state. This copy may contain live event callbacks and must never be serialized. */
-    runtimePlayer: Player;
-    /** JSON-safe state for IndexedDB, local mirrors, exports, and integrity manifests. */
-    persistedPlayer: Player;
+    player: Player;
     manifest: SaveIntegrityManifest;
     comparison: ProtectedSaveComparison;
     estimatedSourceBytes: number | null;
@@ -90,7 +86,6 @@ export const prepareVerifiedPlayerForPersistence = (
             throw new Error(`Save preparation could not repair world data: ${worldIntegrity.violations.map(item => item.code).join('; ')}`);
         }
     }
-    canonical = materializePlayerLifeEventImpacts(canonical);
     const currentIsUnverified = options.currentIsUnverified === true;
     const estimatedSourceBytes = currentIsUnverified
         ? Math.max(0, Number(options.sourceByteEstimate) || estimateSaveJsonBytes(canonical))
@@ -101,7 +96,7 @@ export const prepareVerifiedPlayerForPersistence = (
         || (canonical.world?.projects?.length || 0) > 1_200
     );
     const compacted = compactPlayerForPersistence(canonical);
-    const persistedPlayer: Player = {
+    const player: Player = {
         ...compacted,
         world: {
             ...compacted.world,
@@ -114,21 +109,13 @@ export const prepareVerifiedPlayerForPersistence = (
             ),
         },
     };
-    const runtimePlayer: Player = {
-        ...canonical,
-        world: {
-            ...canonical.world,
-            worldEconomyHealth: persistedPlayer.world.worldEconomyHealth,
-        },
-    };
-    const comparison = compareProtectedSaveState(canonical, persistedPlayer);
+    const comparison = compareProtectedSaveState(canonical, player);
     if ('violations' in comparison) {
         throw new Error(`Save compaction rejected: ${comparison.violations.join('; ')}`);
     }
     return {
-        runtimePlayer,
-        persistedPlayer,
-        manifest: createSaveIntegrityManifest(persistedPlayer, reason, Date.now(), oversizedLegacy),
+        player,
+        manifest: createSaveIntegrityManifest(player, reason, Date.now(), oversizedLegacy),
         comparison,
         estimatedSourceBytes,
         oversizedLegacy,

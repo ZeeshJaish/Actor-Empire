@@ -363,7 +363,6 @@ marketFixture.ownedStreamingPlatform.starterCatalog = {
     licensedProjectIds: [],
     establishedAtAbsoluteWeek: 60,
 };
-marketFixture.ownedStreamingPlatform.treasuryCash = 200_000_000;
 const resaleOpportunity = getStreamingRightsOpportunities(marketFixture).find(opportunity => (
     opportunity.kind === 'PLATFORM_TRADE' && opportunity.sourceLicenseId === legacyContract.id
 ));
@@ -372,9 +371,12 @@ assert.equal(resaleOpportunity!.originalOwnerName, 'Empire Studios');
 assert.equal(resaleOpportunity!.currentHolderName, 'Hulu');
 assert.deepEqual(resaleOpportunity!.countryIds, ['JP']);
 assert.equal(resaleOpportunity!.remainingWeeks, 60);
+// V3 valuations can price a resale above the old fixed $200M fixture budget.
+// Fund the successful-signing scenario against the actual market quote.
+marketFixture.ownedStreamingPlatform.treasuryCash = Math.max(200_000_000, resaleOpportunity!.quote.suggestedGuarantee * 2);
 
 const openedResale = openStreamingRightsNegotiation(marketFixture, resaleOpportunity!.id);
-assert.equal(openedResale.changed, true);
+assert.equal(openedResale.changed, true, `Resale could not open: ${openedResale.reason ?? 'unknown'} ${openedResale.detail ?? ''}`);
 if (!openedResale.changed || !openedResale.negotiation) throw new Error('The canonical resale listing did not open.');
 const readyResale = {
     ...openedResale.player,
@@ -397,7 +399,7 @@ assert.equal(
     playerTrade.player.world.streamingRightsContracts![playerTransaction!.successorContractId!].expiresAtAbsoluteWeek,
     140,
 );
-assert.equal(playerTrade.player.ownedStreamingPlatform.treasuryCash, 145_000_000);
+assert.equal(playerTrade.player.ownedStreamingPlatform.treasuryCash, marketFixture.ownedStreamingPlatform.treasuryCash - 55_000_000);
 
 const playerHeldContractId = playerTransaction!.successorContractId!;
 assert.equal(
@@ -428,7 +430,7 @@ const readyOutbound = {
 };
 const soldByPlayer = signStreamingRightsDeal(readyOutbound, openedOutbound.negotiation.id);
 assert.equal(soldByPlayer.changed, true);
-assert.equal(soldByPlayer.player.ownedStreamingPlatform.treasuryCash, 185_000_000);
+assert.equal(soldByPlayer.player.ownedStreamingPlatform.treasuryCash, marketFixture.ownedStreamingPlatform.treasuryCash - 55_000_000 + 40_000_000);
 assert.equal(soldByPlayer.player.world.streamingRightsContracts![playerHeldContractId].status, 'TRANSFERRED_OUT');
 assert.equal(
     Object.values(soldByPlayer.player.world.streamingRightsTransactions || {})

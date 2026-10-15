@@ -1,0 +1,27 @@
+i18n audit failed:
+- pt-BR is missing 87 key(s): guide.handbook.healthCare.title, guide.handbook.healthCare.p1, guide.handbook.healthCare.p2, guide.handbook.healthCare.p3, guide.handbook.healthCare.b1, guide.handbook.healthCare.b2, guide.handbook.healthCare.b3, guide.handbook.healthCare.noteTitle, guide.handbook.healthCare.noteBody, guide.faq.health.title, guide.faq.health.p1, guide.problem.health.title
+- fr is missing 87 key(s): guide.handbook.healthCare.title, guide.handbook.healthCare.p1, guide.handbook.healthCare.p2, guide.handbook.healthCare.p3, guide.handbook.healthCare.b1, guide.handbook.healthCare.b2, guide.handbook.healthCare.b3, guide.handbook.healthCare.noteTitle, guide.handbook.healthCare.noteBody, guide.faq.health.title, guide.faq.health.p1, guide.problem.health.title
+- es is missing 87 key(s): guide.handbook.healthCare.title, guide.handbook.healthCare.p1, guide.handbook.healthCare.p2, guide.handbook.healthCare.p3, guide.handbook.healthCare.b1, guide.handbook.healthCare.b2, guide.handbook.healthCare.b3, guide.handbook.healthCare.noteTitle, guide.handbook.healthCare.noteBody, guide.faq.health.title, guide.faq.health.p1, guide.problem.health.title
+- tr is missing 87 key(s): guide.handbook.healthCare.title, guide.handbook.healthCare.p1, guide.handbook.healthCare.p2, guide.handbook.healthCare.p3, guide.handbook.healthCare.b1, guide.handbook.healthCare.b2, guide.handbook.healthCare.b3, guide.handbook.healthCare.noteTitle, guide.handbook.healthCare.noteBody, guide.faq.health.title, guide.faq.health.p1, guide.problem.health.title
+- de is missing 87 key(s): guide.handbook.healthCare.title, guide.handbook.healthCare.p1, guide.handbook.healthCare.p2, guide.handbook.healthCare.p3, guide.handbook.healthCare.b1, guide.handbook.healthCare.b2, guide.handbook.healthCare.b3, guide.handbook.healthCare.noteTitle, guide.handbook.healthCare.noteBody, guide.faq.health.title, guide.faq.health.p1, guide.problem.health.title
+- Improve self-care catalog explicit localization keys are missing: ImprovePage activity key usage, ImprovePage option key usage
+- Genre training catalog localization refs are missing: Genre Lab training label helper usage, Genre Lab training description helper usage
+- Workshop course catalog localization refs are missing: ImprovePage workshop helper usage, ImprovePage workshop enrollment key matching
+- award generated localization refs are missing: red carpet localized fallback call
+- premium localization refs are missing: store uses localized premium products, store premium sections localized
+- NPC venture localization refs are missing: NPC venture hit headline localization, NPC venture hit subtext localization
+- world runtime/generated localization refs are missing: industry release news helper, universe release headline localization
+- Forbes studio profile localization refs are missing: Forbes profile acquisition state localization
+- Studio acquisition desk shell copy is still hard-coded: Full Acquisition, Minority Stake, Purchase Agreement
+- universe generated news localization refs are missing: universe background headline localization
+- business weekly alert localization refs are missing: weekly business loop passes player language
+- business action result localization refs are missing: production house sell uses player language
+- production house finance localization refs are missing: sell studio localization, confirm sell localization
+- owned studio command center localization refs are missing: owned studio workbench localization
+- universe manager list/create UI copy is still hard-coded: >Cancel</button>
+- Release Wizard campaign marketing localization refs are missing: release campaign timeline description helper usage, release campaign channel custom aria localization
+- role logic generated copy localization refs are missing: career buzz label passes language
+- BoxOfficeApp static/generated labels are still hard-coded: Producer Stake
+
+Warnings:
+- Hard-coded player-facing text candidates remain for later phases: 1728 hit(s). Sample: App.tsx:1505, App.tsx:1506, App.tsx:1541, App.tsx:1542, App.tsx:1550, App.tsx:1551, App.tsx:2371, App.tsx:2376, App.tsx:2377, App.tsx:2386, App.tsx:2431, App.tsx:2432, App.tsx:2458, App.tsx:2459, App.tsx:2465, App.tsx:2466, App.tsx:2541, App.tsx:2542, App.tsx:2550, App.tsx:2551

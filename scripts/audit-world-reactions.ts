@@ -1,6 +1,5 @@
 import { INITIAL_PLAYER, type Business, type Player } from '../types';
 import { processWorldReactions } from '../services/worldReactions';
-import { getLifeEventResolutionContractViolations, materializePlayerLifeEventImpacts, resolveLifeEventChoice } from '../services/lifeEventResolver';
 
 const assert = (condition: unknown, message: string) => {
     if (!condition) throw new Error(message);
@@ -127,13 +126,6 @@ assert(['ANTI_MONOPOLY_PRESSURE', 'RIVAL_RETALIATION', 'EMPLOYEE_DEPARTURE'].inc
 const eventResult = reactionEvent!.data.lifeEvent.options[0].impact(first);
 assert(eventResult.updatedPlayer.flags.worldReactionState.lastWorldReactionChoiceWeek === player.currentWeek, 'Choosing a world reaction option should stamp the decision week.');
 assert(eventResult.log.includes('World Reaction'), 'World reaction option should return a readable log.');
-const preparedWorldReaction = materializePlayerLifeEventImpacts(first, { strict: true });
-assert(getLifeEventResolutionContractViolations(preparedWorldReaction).length === 0, 'World reaction choices must persist with registered resolvers.');
-const reloadedWorldReactionPlayer = JSON.parse(JSON.stringify(preparedWorldReaction)) as Player;
-const reloadedWorldReactionEvent = reloadedWorldReactionPlayer.pendingEvents!.find(item => item.data?.worldReactionEventType)!;
-const reloadedWorldReaction = reloadedWorldReactionEvent.data.lifeEvent;
-const reloadedWorldResult = resolveLifeEventChoice(reloadedWorldReactionPlayer, reloadedWorldReactionEvent, reloadedWorldReaction, reloadedWorldReaction.options[0], 0);
-assert(reloadedWorldResult?.updatedPlayer.flags.worldReactionState.lastWorldReactionChoiceWeek === player.currentWeek, 'World reaction choice must retain its exact effect after reload.');
 
 const changedStudio = first.businesses.find(business => business.id === 'WARNER_BROS');
 assert((changedStudio?.stats.investorConfidence || 100) < 72, 'Pressure should reduce investor confidence on controlled studios.');

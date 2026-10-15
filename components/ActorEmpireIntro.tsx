@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Player } from '../types';
 import { APP_DISPLAY_VERSION } from '../services/appVersion';
 
@@ -103,18 +103,6 @@ export const ActorEmpireIntroStyle: React.FC = () => (
       88% { opacity: var(--o); }
       100% { transform: translateY(-14vh) translateX(var(--dx)); opacity: 0; }
     }
-    @keyframes aeCareerSurfLeft {
-      0%, 100% { transform: translate(-111%, -45%) rotate(-12deg); }
-      50% { transform: translate(-119%, -51%) rotate(-15deg); }
-    }
-    @keyframes aeCareerSurfCenter {
-      0%, 100% { transform: translate(-50%, -50%) rotate(-2deg); }
-      50% { transform: translate(-50%, -54%) rotate(2deg); }
-    }
-    @keyframes aeCareerSurfRight {
-      0%, 100% { transform: translate(11%, -45%) rotate(12deg); }
-      50% { transform: translate(19%, -51%) rotate(15deg); }
-    }
     @media (prefers-reduced-motion: reduce) {
       .ae-intro-motion, .ae-intro-motion::before, .ae-intro-motion::after {
         animation-duration: .01s !important;
@@ -194,33 +182,14 @@ export const EmpireStudioBumper: React.FC = () => (
 type ActorEmpireLoadingScreenProps = {
   progress: number;
   status: string;
-  supportingMessage?: string;
-  errorTitle?: string;
-  error?: string;
-  primaryActionLabel?: string;
-  secondaryActionLabel?: string;
-  onPrimaryAction?: () => void;
-  onSecondaryAction?: () => void;
-  isPrimaryActionBusy?: boolean;
 };
 
-export const ActorEmpireLoadingScreen: React.FC<ActorEmpireLoadingScreenProps> = ({
-  progress,
-  status,
-  supportingMessage,
-  errorTitle = 'Startup paused',
-  error,
-  primaryActionLabel = 'Retry',
-  secondaryActionLabel,
-  onPrimaryAction,
-  onSecondaryAction,
-  isPrimaryActionBusy = false,
-}) => {
+export const ActorEmpireLoadingScreen: React.FC<ActorEmpireLoadingScreenProps> = ({ progress, status }) => {
   const safeProgress = Math.max(0, Math.min(100, Math.round(progress)));
   return (
-    <div className={`relative flex h-full w-full items-start justify-center bg-[radial-gradient(100%_66%_at_50%_38%,#0e0c08_0%,#040404_64%)] px-[30px] text-white ${error ? 'overflow-y-auto py-8' : 'overflow-hidden'}`}>
+    <div className="relative flex h-full w-full items-start justify-center overflow-hidden bg-[radial-gradient(100%_66%_at_50%_38%,#0e0c08_0%,#040404_64%)] px-[30px] text-white">
       <GrainAndVignette />
-      <div className={`relative z-10 flex w-full max-w-[420px] flex-col items-center ${error ? 'mt-[6dvh]' : 'mt-[22dvh]'}`}>
+      <div className="relative z-10 mt-[22dvh] flex w-full max-w-[420px] flex-col items-center">
         <div
           className="ae-intro-motion relative flex h-24 w-24 translate-y-4 scale-90 items-center justify-center rounded-3xl bg-[linear-gradient(155deg,#221c12,#0b0a07_65%)] opacity-0 shadow-[0_0_0_1px_rgba(232,182,76,0.30),inset_0_1px_0_rgba(255,223,142,0.18),0_24px_50px_-16px_rgba(0,0,0,0.95),0_0_70px_-6px_rgba(232,182,76,0.30)]"
           style={{ animation: 'aeIntroRiseIn .8s cubic-bezier(.16,1,.3,1) .1s forwards' }}
@@ -241,10 +210,10 @@ export const ActorEmpireLoadingScreen: React.FC<ActorEmpireLoadingScreenProps> =
           <span className="block">ACTOR</span>
           <span className="block">EMPIRE</span>
         </h1>
-        <div className={`ae-intro-motion w-full translate-y-4 opacity-0 ${error ? 'mt-[4dvh]' : 'mt-[7dvh]'}`} style={{ animation: 'aeIntroRiseIn .8s cubic-bezier(.16,1,.3,1) .38s forwards' }}>
-          <div className="mb-3.5 flex items-center justify-between gap-3">
-            <div role="status" aria-live="polite" className="min-w-0 flex-1 text-[11px] font-black uppercase leading-tight tracking-[0.14em] text-[#a8aab0]">{status}</div>
-            <div className="shrink-0 font-['Anton',sans-serif] text-[22px] tracking-[0.06em] text-[#e8b64c] drop-shadow-[0_0_24px_rgba(232,182,76,0.5)]">{safeProgress}%</div>
+        <div className="ae-intro-motion mt-[9dvh] w-full translate-y-4 opacity-0" style={{ animation: 'aeIntroRiseIn .8s cubic-bezier(.16,1,.3,1) .38s forwards' }}>
+          <div className="mb-3.5 flex items-baseline justify-between">
+            <div className="text-[12px] font-black uppercase tracking-[0.42em] text-[#8b8e94]">Loading</div>
+            <div className="font-['Anton',sans-serif] text-[22px] tracking-[0.06em] text-[#e8b64c] drop-shadow-[0_0_24px_rgba(232,182,76,0.5)]">{safeProgress}%</div>
           </div>
           <div className="relative h-[7px] rounded-full bg-[#17171a] shadow-[inset_0_1px_3px_rgba(0,0,0,0.8),0_1px_0_rgba(255,255,255,0.05)]">
             <div
@@ -258,79 +227,9 @@ export const ActorEmpireLoadingScreen: React.FC<ActorEmpireLoadingScreenProps> =
               style={{ left: `${safeProgress}%`, opacity: safeProgress > 1 ? 1 : 0 }}
             />
           </div>
-          {supportingMessage && (
-            <p className="mx-auto mt-5 max-w-[310px] text-center text-[12px] font-semibold leading-5 text-[#b8b4ab]">
-              {supportingMessage}
-            </p>
-          )}
-          {error && (
-            <div role="alert" className="ae-intro-motion mt-5 rounded-2xl border border-amber-300/20 bg-[#151108]/95 px-4 py-4 text-center opacity-0 shadow-[0_18px_50px_rgba(0,0,0,.45)]" style={{ animation: 'aeIntroRiseIn .45s cubic-bezier(.16,1,.3,1) forwards' }}>
-              <div className="text-[11px] font-black uppercase tracking-[0.18em] text-[#e8b64c]">{errorTitle}</div>
-              <p className="mt-2 text-[13px] font-semibold leading-5 text-[#d5d1c8]">{error}</p>
-              <div className="mt-4 grid grid-cols-1 gap-2.5">
-                <button
-                  type="button"
-                  onClick={onPrimaryAction}
-                  disabled={isPrimaryActionBusy}
-                  aria-busy={isPrimaryActionBusy}
-                  className="min-h-12 w-full rounded-xl bg-[#e8b64c] px-5 text-sm font-black uppercase tracking-[0.12em] text-[#100d08] shadow-[0_10px_28px_rgba(232,182,76,.2)] active:scale-[0.98] disabled:cursor-wait disabled:opacity-70"
-                >
-                  {isPrimaryActionBusy ? 'Retrying…' : primaryActionLabel}
-                </button>
-                {secondaryActionLabel && onSecondaryAction && (
-                  <button
-                    type="button"
-                    onClick={onSecondaryAction}
-                    className="min-h-12 w-full rounded-xl border border-white/15 bg-white/[0.04] px-5 text-sm font-black uppercase tracking-[0.1em] text-[#d5d1c8] active:scale-[0.98]"
-                  >
-                    {secondaryActionLabel}
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const CAREER_OPENING_TIPS = [
-  'Check your phone for messages and new opportunities.',
-  'Leave room in your week for work, training and rest.',
-  'Review your career before choosing your next role.',
-] as const;
-
-export const ActorEmpireCareerOpeningScreen: React.FC<{ status: string; supportingMessage: string }> = ({ status, supportingMessage }) => {
-  const [tipIndex, setTipIndex] = useState(0);
-
-  useEffect(() => {
-    const interval = window.setInterval(() => setTipIndex(index => (index + 1) % CAREER_OPENING_TIPS.length), 6_000);
-    return () => window.clearInterval(interval);
-  }, []);
-
-  return (
-    <div className="relative flex h-full w-full items-center justify-center overflow-hidden bg-[radial-gradient(ellipse_at_50%_24%,#211a0e_0%,#080706_52%,#040404_100%)] px-7 text-white">
-      <GrainAndVignette />
-      <div className="pointer-events-none absolute left-1/2 top-0 h-[55%] w-[min(90vw,420px)] -translate-x-1/2 bg-[linear-gradient(180deg,rgba(232,182,76,.14),transparent)] [clip-path:polygon(43%_0,57%_0,100%_100%,0_100%)]" />
-      <div className="relative z-10 flex w-full max-w-[390px] flex-col items-center text-center">
-        <div className="text-[10px] font-black uppercase tracking-[.38em] text-[#d5ad62]">The next scene</div>
-        <div data-ui="career-opening-deck" className="relative mt-5 h-[194px] w-[248px]">
-          <div className="ae-intro-motion absolute left-1/2 top-1/2 h-[146px] w-[106px] rounded-[15px] border border-[#a67c32]/50 bg-[linear-gradient(155deg,#43331b,#14110d_68%)] shadow-[0_18px_35px_rgba(0,0,0,.5)]" style={{ animation: 'aeCareerSurfLeft 3.8s ease-in-out infinite' }} />
-          <div className="ae-intro-motion absolute left-1/2 top-1/2 h-[146px] w-[106px] rounded-[15px] border border-[#a67c32]/50 bg-[linear-gradient(205deg,#4d391d,#14110d_68%)] shadow-[0_18px_35px_rgba(0,0,0,.5)]" style={{ animation: 'aeCareerSurfRight 3.8s ease-in-out infinite' }} />
-          <div role="note" aria-label="Career tip" className="ae-intro-motion absolute left-1/2 top-1/2 flex h-[174px] w-[196px] flex-col overflow-hidden rounded-[17px] border border-[#efc979]/75 bg-[radial-gradient(circle_at_50%_0%,#624820_0%,#272016_52%,#100d09_100%)] px-4 py-4 text-left shadow-[0_20px_45px_rgba(0,0,0,.72),0_0_34px_rgba(232,182,76,.22)]" style={{ animation: 'aeCareerSurfCenter 3.8s ease-in-out infinite' }}>
-            <div className="flex items-center justify-between border-b border-[#f1d290]/30 pb-2 text-[9px] font-black uppercase tracking-[.13em] text-[#f4dba4]"><span>Career tip</span><span>{String(tipIndex + 1).padStart(2, '0')} / {String(CAREER_OPENING_TIPS.length).padStart(2, '0')}</span></div>
-            <p className="flex flex-1 items-center text-[14px] font-semibold leading-[20px] text-[#f2e9d7]">{CAREER_OPENING_TIPS[tipIndex]}</p>
-            <div aria-hidden="true" className="flex items-center gap-1.5 border-t border-[#f1d290]/30 pt-2">
-              {CAREER_OPENING_TIPS.map((_, index) => <span key={index} className={`h-1 rounded-full ${index === tipIndex ? 'w-6 bg-[#efc979]' : 'w-2 bg-[#efc979]/35'}`} />)}
-            </div>
+          <div className="ae-intro-motion mt-[22px] min-h-4 text-center text-[11.5px] font-black uppercase tracking-[0.32em] text-[#a8aab0]" style={{ animation: 'aeIntroRiseIn .8s cubic-bezier(.16,1,.3,1) .5s forwards' }}>
+            {status}
           </div>
-        </div>
-        <h1 className="mt-2 font-['Anton',sans-serif] text-[clamp(42px,11vw,58px)] leading-none tracking-[.035em] text-[#f2efe8]">OPENING YOUR CAREER</h1>
-        <p role="status" aria-live="polite" className="mt-4 text-[12px] font-black uppercase tracking-[.16em] text-[#d4aa5d]">{status}</p>
-        <p className="sr-only">{supportingMessage}</p>
-        <div className="mt-5 h-[5px] w-full max-w-[300px] overflow-hidden rounded-full bg-white/10" aria-label="Career loading in progress">
-          <div className="h-full w-1/3 animate-pulse motion-reduce:animate-none rounded-full bg-[linear-gradient(90deg,#76531c,#f0c775,#fff2c8)] shadow-[0_0_20px_rgba(232,182,76,.5)]" />
         </div>
       </div>
     </div>

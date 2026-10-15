@@ -300,7 +300,6 @@ assertRuntimeSkeleton(INITIAL_PLAYER, corruptImport);
 assert(corruptImport.name === INITIAL_PLAYER.name, 'Invalid imported player name should fall back safely.');
 assert(corruptImport.age === 29 && corruptImport.currentWeek === 17, 'Numeric strings from old saves should migrate to numbers.');
 assert(corruptImport.money === 50000, 'Numeric money strings should migrate to numbers.');
-assert(corruptImport.settings.performance?.preference === 'AUTOMATIC', 'Malformed legacy Smooth Mode values should migrate to Automatic.');
 assert(Array.isArray(corruptImport.instagram.posts) && Array.isArray(corruptImport.instagram.feed), 'Imported social state should always have post/feed arrays.');
 assert(corruptImport.instagram.followers === 1200, 'Imported Instagram progress should be preserved while filling missing fields.');
 assert(Array.isArray(corruptImport.youtube.videos) && Array.isArray(corruptImport.youtube.activeBrandDeals), 'Imported YouTube state should always have required arrays.');
@@ -312,24 +311,6 @@ assert(corruptImport.relationships[1].relation === INITIAL_PLAYER.relationships[
 assert(corruptImport.relationships[1].closeness === 100, 'Relationship closeness should be clamped.');
 assert(Array.isArray(corruptImport.weeklyOpportunities.auditions) && Array.isArray(corruptImport.weeklyOpportunities.jobs), 'Weekly opportunities should be safe arrays after import.');
 assert(Array.isArray(corruptImport.awards) && Array.isArray(corruptImport.businesses), 'Awards and businesses should be safe arrays after import.');
-
-const legacySmoothModeSave = migratePlayerSave({
-    ...INITIAL_PLAYER,
-    settings: { language: 'en', smoothMode: true } as any,
-} as Player);
-assert(legacySmoothModeSave.settings.performance?.preference === 'PERFORMANCE', 'Legacy Smooth Mode should migrate to Performance.');
-assert(legacySmoothModeSave.settings.smoothMode === true, 'Rollback compatibility should mirror the explicit Performance preference.');
-
-const cinematicPerformanceSave = migratePlayerSave({
-    ...INITIAL_PLAYER,
-    settings: {
-        language: 'en',
-        smoothMode: true,
-        performance: { schemaVersion: 1, preference: 'CINEMATIC', noticeVersion: 1 },
-    },
-} as Player);
-assert(cinematicPerformanceSave.settings.performance?.preference === 'CINEMATIC', 'Versioned performance preferences should win over legacy Smooth Mode.');
-assert(cinematicPerformanceSave.settings.smoothMode === false, 'Legacy mirror should be false outside explicit Performance mode.');
 
 localStorage.clear();
 const legacyRewardTarget = migratePlayerSave({

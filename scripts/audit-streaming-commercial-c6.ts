@@ -518,7 +518,7 @@ const auditFirstLiveWeek = async (): Promise<void> => {
         promoteGenerationBatch: async () => { throw new Error('Batch import is not part of this journey'); },
     };
     const prepared = prepareVerifiedPlayerForPersistence(firstLive, 'PROCESS_WEEK');
-    await saveVerifiedGameData(store, 'c6-isolated-career', prepared.persistedPlayer, prepared.manifest);
+    await saveVerifiedGameData(store, 'c6-isolated-career', prepared.player, prepared.manifest);
     const loaded = await loadVerifiedGameData(store, 'c6-isolated-career');
     assert.equal(loaded.status, 'CURRENT', 'the first live week must reopen as a verified save generation');
     if (loaded.status !== 'CURRENT') return;

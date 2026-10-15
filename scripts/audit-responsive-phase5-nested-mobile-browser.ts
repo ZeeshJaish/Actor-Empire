@@ -47,7 +47,7 @@ async function verifySurface(page: any, label: string, viewport: Viewport, actio
         name: 'Nested Phone QA', age: 27, currentWeek: 12,
         news: [{ id: 'responsive-news', headline: 'A very long story headline about a major new studio release', subtext: 'A longer explanation that must stay readable on a compact phone.', category: 'TOP_STORY', week: 12, year: 2026, impactLevel: 'HIGH' }],
       };
-      await page.addInitScript(({ player }: { player: typeof player }) => {
+      await page.addInitScript(({ player }: { player: typeof INITIAL_PLAYER }) => {
         localStorage.clear();
         localStorage.setItem('actorEmpireSeenWhatsNewVersion', '1.0.25');
         localStorage.setItem('aeMigrationCarePackageLedgerV1', JSON.stringify({ globalClaimed: true, fingerprints: [] }));

@@ -5,7 +5,7 @@ import {
     createYoutubeCreatorInviteEvent,
     createYoutubeRivalryEvent
 } from '../services/gameLoop';
-import { resolveLifeEventChoice } from '../services/lifeEventResolver';
+import { resolveYoutubeEventChoice } from '../services/youtubeEventLogic';
 
 const assert = (condition: boolean, message: string) => {
     if (!condition) throw new Error(message);
@@ -66,13 +66,12 @@ const resolveSerializedChoice = (
     assert(typeof option.impact !== 'function', `${choiceId} unexpectedly retained its impact function`);
     assert(serialized.data?.youtubeResolution, `${choiceId} is missing serialized YouTube resolution data`);
 
-    const originalRandom = Math.random;
-    Math.random = () => randomValue;
-    try {
-        return resolveLifeEventChoice(makePlayer(), serialized, lifeEvent, option, lifeEvent.options.indexOf(option))!;
-    } finally {
-        Math.random = originalRandom;
-    }
+    return resolveYoutubeEventChoice(
+        makePlayer(),
+        serialized.data.youtubeResolution,
+        choiceId,
+        () => randomValue
+    );
 };
 
 const acceptClaim = resolveSerializedChoice(

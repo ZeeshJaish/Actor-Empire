@@ -2850,6 +2850,8 @@ const normalizeCatalogSetupDraft = (value: unknown): OwnedStreamingCatalogSetupD
             : Math.round(clamp(counterPlatformRevenueShare, 50, 90, 70)),
         negotiationRound: Math.round(clamp(source.negotiationRound, 0, 3)),
         updatedAtAbsoluteWeek: Math.max(0, Math.round(clamp(source.updatedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
+        ...([1, 2, 3].includes(Number(source.quoteVersion))
+            ? { quoteVersion: Number(source.quoteVersion) as 1 | 2 | 3 } : {}),
     };
 };
 
@@ -4036,10 +4038,16 @@ export const normalizeOwnedStreamingPlatformState = (
             line => line.lineId,
         ).slice(-OWNED_STREAMING_PRODUCT_LINE_LIMIT),
         catalogSetupDraft: normalizeCatalogSetupDraft(source.catalogSetupDraft),
-        marketQuotePolicy: asRecord(source.marketQuotePolicy).version === 2
+        marketQuotePolicy: (asRecord(source.marketQuotePolicy).version === 2
+            || asRecord(source.marketQuotePolicy).version === 3)
             && Number.isSafeInteger(asRecord(source.marketQuotePolicy).effectiveCycle)
             && Number(asRecord(source.marketQuotePolicy).effectiveCycle) >= 0
-            ? { version: 2, effectiveCycle: Number(asRecord(source.marketQuotePolicy).effectiveCycle) }
+            ? { version: asRecord(source.marketQuotePolicy).version as 2 | 3,
+                effectiveCycle: Number(asRecord(source.marketQuotePolicy).effectiveCycle),
+                ...(asRecord(source.marketQuotePolicy).version === 3
+                    && [1, 2].includes(Number(asRecord(source.marketQuotePolicy).previousVersion))
+                    ? { previousVersion: Number(asRecord(source.marketQuotePolicy).previousVersion) as 1 | 2 }
+                    : {}) }
             : undefined,
         contentMarketDraft: source.contentMarketDraft && typeof source.contentMarketDraft === 'object' ? {
             tab: ['ALL', 'MOVIE', 'SERIES', 'COLLECTIONS', 'OWNED', 'OFFERS', 'AUCTIONS', 'UPCOMING'].includes(source.contentMarketDraft.tab) ? source.contentMarketDraft.tab : 'ALL',

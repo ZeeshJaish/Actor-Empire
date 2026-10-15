@@ -63,11 +63,11 @@ assert.ok(nextOffer.quote.suggestedGuarantee > legacyOffer.quote.suggestedGuaran
   'The new quote version must activate for future cycles');
 const migratedWeek = processOwnedStreamingPlatformWeek(legacySave).player;
 assert.deepEqual(migratedWeek.ownedStreamingPlatform.marketQuotePolicy,
-  { version: 2, effectiveCycle: cycle + 1 },
+  { version: 3, effectiveCycle: cycle + 1, previousVersion: 1 },
   'First old-save weekly process must schedule, not immediately apply, the quote change');
 const persisted = compactOwnedStreamingPlatformForPersistence(migratedWeek.ownedStreamingPlatform, legacySave.id);
 assert.deepEqual(normalizeOwnedStreamingPlatformState(JSON.parse(JSON.stringify(persisted)), legacySave.id).marketQuotePolicy,
-  { version: 2, effectiveCycle: cycle + 1 }, 'The scheduled policy must survive save serialization');
+  { version: 3, effectiveCycle: cycle + 1, previousVersion: 1 }, 'The scheduled policy must survive save serialization');
 const legacyListing = getContentMarketListings(legacySave)[0];
 const negotiation = openStreamingPrivateOffer(legacySave, legacyListing.id, legacyListing.terms);
 assert.ok(negotiation.changed);

@@ -5,6 +5,7 @@ import { NPC_DATABASE } from './npcLogic';
 import { WRITER_NPC_LIBRARY } from './writerNpcLibrary';
 import { getStreamingMarketCycle } from './streamingMarketSupply';
 import { getStreamingCataloguePackageOpportunities } from './streamingRightsMarketplace';
+import { getActiveStreamingQuoteVersion, getStreamingLicenseQuote } from './streamingCatalog';
 import { normalizeOwnedStreamingPlatformState, compactOwnedStreamingPlatformForPersistence } from './ownedStreamingPlatform';
 import { createStreamingLicenseContract, createStreamingRightsContractFromLicense,
     registerStreamingRightsContract } from './streamingRightsCore';
@@ -70,8 +71,24 @@ export const buildStreamingOpportunityOffer = (
         : `${opener} ${qualifier}${subject} ${ending}`;
     const premium = index % 9 === 0;
     const qualityForecast = Math.round((premium ? 84 : 48) + rng() * (premium ? 12 : 39));
-    const askingPrice = Math.round((premium ? 20_000_000 + rng() * 35_000_000
-        : 2_000_000 + rng() * 14_000_000) / 250_000) * 250_000;
+    const budgetTier = premium ? (index % 18 === 0 ? 'BLOCKBUSTER' : 'HIGH')
+        : index % 7 === 0 ? 'LOW' : index % 3 === 0 ? 'HIGH' : 'MID';
+    const pricingVersion = getActiveStreamingQuoteVersion(player.ownedStreamingPlatform.marketQuotePolicy,
+        getAbsoluteWeek(player.age, player.currentWeek));
+    const askingPrice = pricingVersion === 3
+        ? getStreamingLicenseQuote({ id: '', title, projectType: index % 5 === 0 ? 'SERIES' : 'MOVIE', genre,
+            rating: null, releaseYear: null, gross: null, studioId: sellerId, studioName: sellerName,
+            source: 'EXTERNAL_MARKET', quality: qualityForecast,
+            reach: Math.min(100, 38 + qualityForecast * .36 + (premium ? 18 : 0)),
+            prestige: Math.min(100, 32 + qualityForecast * .42 + (premium ? 22 : 0)),
+            budgetTier, catalogueTier: premium ? 'MARQUEE' : undefined },
+        'GLOBAL', 104, 'NON_EXCLUSIVE', pricingVersion, 'FIRST_WINDOW', player.age).suggestedGuarantee
+        : Math.round((premium ? 20_000_000 + rng() * 35_000_000
+            : 2_000_000 + rng() * 14_000_000) / 250_000) * 250_000;
+    // Keep legacy shelf prices on their original RNG sequence during an in-flight rollout.
+    const productionBudgetEstimate = Math.round(({
+        LOW: 8_000_000, MID: 35_000_000, HIGH: 80_000_000, BLOCKBUSTER: 180_000_000,
+    }[budgetTier] * (.85 + rng() * .3)) / 250_000) * 250_000;
     const id = createDeterministicId('streaming_opportunity', player.id, cycle, lane, index);
     return {
         id, projectId: createDeterministicId('market_project', id), cycle, title,
@@ -85,7 +102,10 @@ export const buildStreamingOpportunityOffer = (
         leadActorId: lead.id, leadActorName: lead.name,
         cast: [...new Map([lead, supporting].map(npc => [npc.id, { id: npc.id, name: npc.name }])).values()],
         askingPrice, qualityForecast, premium,
-        talentUpfrontPool: Math.round(askingPrice * (premium ? .12 : .08)),
+        budgetTier, productionBudgetEstimate,
+        talentUpfrontPool: pricingVersion === 3
+            ? Math.round(productionBudgetEstimate * (premium ? .1 : .08))
+            : Math.round(askingPrice * (premium ? .12 : .08)),
     };
 };
 
@@ -184,7 +204,7 @@ export const purchaseStreamingOpportunityOffer = (
         id: offer.projectId, title: offer.title, genre: offer.genre,
         originalLanguageId: offer.originalLanguageId, mediaType: offer.projectType,
         targetAudience: offer.genre === 'HORROR' || offer.genre === 'CRIME' ? 'R' : 'PG-13',
-        studioId: offer.sellerId, budgetTier: offer.premium ? 'HIGH' : 'MID',
+        studioId: offer.sellerId, budgetTier: offer.budgetTier || (offer.premium ? 'HIGH' : 'MID'),
         quality: offer.qualityForecast, boxOffice: 0,
         year: player.age, weekReleased: player.currentWeek,
         leadActorId: offer.leadActorId, leadActorName: offer.leadActorName,
@@ -364,7 +384,7 @@ export const processRivalBrokeredOpportunityWeek = (player: Player, absoluteWeek
             id: offer.projectId, title: offer.title, genre: offer.genre,
             originalLanguageId: offer.originalLanguageId, mediaType: offer.projectType,
             targetAudience: offer.genre === 'HORROR' || offer.genre === 'CRIME' ? 'R' : 'PG-13',
-            studioId: offer.sellerId, budgetTier: offer.premium ? 'HIGH' : 'MID',
+            studioId: offer.sellerId, budgetTier: offer.budgetTier || (offer.premium ? 'HIGH' : 'MID'),
             quality: offer.qualityForecast, boxOffice: 0,
             year: Math.floor(absoluteWeek / 52) + 1, weekReleased: absoluteWeek % 52 + 1,
             leadActorId: offer.leadActorId, leadActorName: offer.leadActorName,
