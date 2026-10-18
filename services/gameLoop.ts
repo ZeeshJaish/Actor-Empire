@@ -91,7 +91,7 @@ import { calculateYoutubeCreatorScore, generateMusicVideoFeatureOffer, generateY
 import { getInstagramPostComments, pickInstagramMicroBrand } from './instagramLogic';
 import { checkForDirectorDecision, checkForProductionCrisis } from './productionService';
 import { applyProductionHouseReleaseOutcome, processBusinessWeek, recalculateBusinessValuation, resolveProjectType } from './businessLogic';
-import { getAbsoluteWeek, getRelationshipAge, getStreamingWeeksUntilStart, inferStreamingStartWeekAbsolute } from './legacyLogic';
+import { getAbsoluteWeek, getRelationshipAge, getInteractionAgeInWeeks, getRelationshipContactAbsoluteWeek, getStreamingWeeksUntilStart, inferStreamingStartWeekAbsolute } from './legacyLogic';
 import { hasNoAds, resetWeeklyEnergy, spendPlayerEnergy } from './premiumLogic';
 import { advanceLuxeConnections, advanceTinderConnections } from './datingLogic';
 import { generateNpcVentureRoleOffer, getNpcVentureOfferText } from './npcVentureLogic';
@@ -3845,8 +3845,8 @@ export const processGameWeek = async (
             return rel;
         }
 
-        const lastInteraction = rel.lastInteractionWeek || nextPlayer.currentWeek;
-        const weeksSince = nextPlayer.currentWeek - lastInteraction;
+        const lastInteractionAbsolute = getRelationshipContactAbsoluteWeek(rel, nextPlayer.age, nextPlayer.currentWeek);
+        const weeksSince = getInteractionAgeInWeeks({ ...rel, lastInteractionAbsolute }, nextPlayer.age, nextPlayer.currentWeek);
         let newCloseness = rel.closeness;
         if (weeksSince > 4) {
              newCloseness = Math.max(0, newCloseness - 2);
@@ -3868,7 +3868,7 @@ export const processGameWeek = async (
                 logsToAdd.push({ msg: `📰 Tabloids are reporting on your bad relationship with ${rel.name}.`, type: 'negative' });
             }
         }
-        return { ...rel, closeness: newCloseness, lastInteractionWeek: lastInteraction };
+        return { ...rel, closeness: newCloseness, lastInteractionAbsolute };
     });
 
     // --- 6. SPONSORSHIPS ---

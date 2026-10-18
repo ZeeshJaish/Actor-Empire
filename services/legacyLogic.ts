@@ -393,16 +393,34 @@ export const getRelationshipAge = (
     return relationship.age ?? 0;
 };
 
-export const getInteractionAgeInWeeks = (
+/** Resolve yearless legacy dates once without inventing a prior year of neglect. */
+export const getRelationshipContactAbsoluteWeek = (
     relationship: Pick<Relationship, 'lastInteractionWeek' | 'lastInteractionAbsolute'>,
     playerAge: number,
     currentWeek: number
 ): number => {
-    if (typeof relationship.lastInteractionAbsolute === 'number') {
-        return Math.max(0, getAbsoluteWeek(playerAge, currentWeek) - relationship.lastInteractionAbsolute);
+    const currentAbsoluteWeek = getAbsoluteWeek(playerAge, currentWeek);
+    const savedAbsoluteWeek = relationship.lastInteractionAbsolute;
+    // Zero was the default unset date in older saves. Future dates can belong to
+    // the previous actor's age clock after inheritance, so give those a fresh grace.
+    if (typeof savedAbsoluteWeek === 'number' && Number.isFinite(savedAbsoluteWeek)
+        && savedAbsoluteWeek > 0 && savedAbsoluteWeek <= currentAbsoluteWeek) {
+        return savedAbsoluteWeek;
     }
-    return Math.max(0, currentWeek - (relationship.lastInteractionWeek || currentWeek));
+    if (typeof savedAbsoluteWeek === 'number' && Number.isFinite(savedAbsoluteWeek)
+        && savedAbsoluteWeek > currentAbsoluteWeek) return currentAbsoluteWeek;
+    const savedWeek = relationship.lastInteractionWeek;
+    const elapsedThisYear = Number.isInteger(savedWeek) && savedWeek >= 1 && savedWeek <= 52
+        ? Math.max(0, currentWeek - savedWeek) : 0;
+    return Math.max(0, currentAbsoluteWeek - elapsedThisYear);
 };
+
+export const getInteractionAgeInWeeks = (
+    relationship: Pick<Relationship, 'lastInteractionWeek' | 'lastInteractionAbsolute'>,
+    playerAge: number,
+    currentWeek: number
+): number => Math.max(0, getAbsoluteWeek(playerAge, currentWeek)
+    - getRelationshipContactAbsoluteWeek(relationship, playerAge, currentWeek));
 
 export const inferStreamingStartWeekAbsolute = (
     streaming: Partial<StreamingState> | undefined,

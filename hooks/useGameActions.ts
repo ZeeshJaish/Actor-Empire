@@ -983,13 +983,14 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
                     closeness: newScore,
                     image: npc.avatar,
                     lastInteractionWeek: prev.currentWeek,
+                    lastInteractionAbsolute: getAbsoluteWeek(prev.age, prev.currentWeek),
                     npcId: npc.id
                 });
                 setToastMessage({ title: tr('actions.npc.newConnectionTitle'), subtext: tr('actions.npc.newConnectionSubtext', { npcName: npc.name }) });
             } else if (res.success) {
                 // Update closeness if already in relationships
                 updatedRelationships = updatedRelationships.map(r =>
-                    r.npcId === npc.id ? { ...r, closeness: newScore, lastInteractionWeek: prev.currentWeek } : r
+                    r.npcId === npc.id ? { ...r, closeness: newScore, lastInteractionWeek: prev.currentWeek, lastInteractionAbsolute: getAbsoluteWeek(prev.age, prev.currentWeek) } : r
                 );
             }
 

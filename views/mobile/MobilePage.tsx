@@ -284,6 +284,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                   ...relationship,
                   closeness: Math.max(0, Math.min(100, (relationship.closeness || 0) + closenessDelta)),
                   lastInteractionWeek: updatedPlayer.currentWeek,
+                  lastInteractionAbsolute: getAbsoluteWeek(updatedPlayer.age, updatedPlayer.currentWeek),
               }
               : relationship
           );

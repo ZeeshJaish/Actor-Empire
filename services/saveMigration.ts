@@ -1,7 +1,7 @@
 import { repairTalentNegotiations } from './talentNegotiation';
 import { INITIAL_PLAYER, type Business, type Message, type NewsItem, type Player, type PortfolioItem, type Relationship, type ScheduledEvent, type Stock, type StockTakeoverCase } from '../types';
 import { ensureLifestyleActivityState } from './lifestyleActivities';
-import { getAbsoluteWeek, inferStreamingStartWeekAbsolute } from './legacyLogic';
+import { getAbsoluteWeek, getRelationshipContactAbsoluteWeek, inferStreamingStartWeekAbsolute } from './legacyLogic';
 import { normalizeNewPlayerTutorialState } from './newPlayerTutorial';
 import { createGlobalActorPackNPCs } from './npcLogic';
 import {
@@ -892,7 +892,7 @@ const migrateInbox = (inbox: Message[] | undefined): Message[] => (
         .slice(0, 120)
 );
 
-const normalizeRelationship = (relationship: any, index: number): Relationship => {
+const normalizeRelationship = (relationship: any, index: number, age: number, currentWeek: number): Relationship => {
     const fallback = INITIAL_PLAYER.relationships.find(item => item.id === relationship?.id)
         || INITIAL_PLAYER.relationships[index]
         || INITIAL_PLAYER.relationships[0];
@@ -907,8 +907,8 @@ const normalizeRelationship = (relationship: any, index: number): Relationship =
         ? next.image
         : fallback.image;
     next.lastInteractionWeek = Math.max(0, Math.round(Number(next.lastInteractionWeek || 0)));
-    if (next.lastInteractionAbsolute !== undefined) {
-        next.lastInteractionAbsolute = Math.max(0, Math.round(Number(next.lastInteractionAbsolute || 0)));
+    if (next.relation !== 'Deceased Parent') {
+        next.lastInteractionAbsolute = getRelationshipContactAbsoluteWeek(next, age, currentWeek);
     }
     if (next.age !== undefined) {
         next.age = Math.max(0, Math.round(Number(next.age || 0)));
@@ -1179,9 +1179,9 @@ export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
         pendingEvents: dedupePendingEvents(base.pendingEvents),
         news: dedupeNews(base.news),
         inbox: migrateInbox(base.inbox),
-        relationships: toObjectSeries<any>(base.relationships).length > 0
-            ? toObjectSeries<any>(base.relationships).map(normalizeRelationship)
-            : clone(INITIAL_PLAYER.relationships),
+        relationships: (toObjectSeries<any>(base.relationships).length > 0
+            ? toObjectSeries<any>(base.relationships) : clone(INITIAL_PLAYER.relationships))
+            .map((relationship, index) => normalizeRelationship(relationship, index, migratedAge, migratedCurrentWeek)),
         logs: toArray<any>(base.logs).slice(0, 50),
         assetStates: toArray<any>(base.assetStates)
             .filter((state) => typeof state?.assetId === 'string')
