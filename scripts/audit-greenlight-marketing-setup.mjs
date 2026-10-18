@@ -28,9 +28,9 @@ for (const [needle, description] of [
   ['maxMarketingBudget', 'campaign reserve max based on available studio funding'],
   ['packageBudget', 'combined production plus marketing package cost'],
   ["translate('greenlight.marketing.reservedCampaignBudget')", 'localized setup page reserved campaign budget section'],
-  ['Production (includes music)', 'confirm page production budget display'],
-  ['Total Project Budget', 'setup/confirm total project budget display'],
-  ['Marketing Reserved', 'confirm page reserved marketing display'],
+  ['Production Budget', 'confirm page production budget display'],
+  ['Total Package', 'setup/confirm total package display'],
+  ['Campaign Pool', 'confirm page campaign pool display'],
 ]) {
   requireIncludes(greenlightModules, needle, description);
 }

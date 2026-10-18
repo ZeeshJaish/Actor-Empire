@@ -53,11 +53,11 @@ export const GreenlightMarketingBudgetSection: React.FC<GreenlightMarketingBudge
                             onPresetChange(option.id);
                             onReservedBudgetChange(amount);
                         }}
-                        className={`min-w-0 p-3 sm:p-4 rounded-xl border text-left transition-all ${isSelected ? 'bg-amber-500/10 border-amber-400 text-white shadow-[0_0_20px_rgba(245,158,11,0.18)]' : 'bg-zinc-900/80 border-zinc-800 text-zinc-400 hover:border-amber-500/40 hover:text-white'}`}
+                        className={`p-4 rounded-xl border text-left transition-all ${isSelected ? 'bg-amber-500/10 border-amber-400 text-white shadow-[0_0_20px_rgba(245,158,11,0.18)]' : 'bg-zinc-900/80 border-zinc-800 text-zinc-400 hover:border-amber-500/40 hover:text-white'}`}
                     >
-                        <div className="flex min-w-0 flex-wrap items-start justify-between gap-x-2 gap-y-1">
-                            <div className="min-w-0 break-words text-[11px] font-black uppercase tracking-widest">{translate(`greenlight.marketing.preset.${option.id}.label`)}</div>
-                            <div className="min-w-0 break-words font-mono text-xs font-black text-amber-300">{formatMoney(amount)}</div>
+                        <div className="flex items-center justify-between gap-2">
+                            <div className="text-[11px] font-black uppercase tracking-widest">{translate(`greenlight.marketing.preset.${option.id}.label`)}</div>
+                            <div className="font-mono text-xs font-black text-amber-300">{formatMoney(amount)}</div>
                         </div>
                         <div className="mt-2 text-[10px] text-zinc-500 leading-tight">{translate(`greenlight.marketing.preset.${option.id}.note`)}</div>
                     </button>
@@ -74,28 +74,9 @@ export const GreenlightMarketingBudgetSection: React.FC<GreenlightMarketingBudge
                 >
                     {translate('greenlight.marketing.custom')}
                 </button>
-                <div className="min-w-0 flex-1 space-y-3">
-                    <label className="block text-[10px] font-bold text-zinc-300">
-                        {translate('projectCost.exactMarketingAmount')}
-                        <input
-                            type="number"
-                            inputMode="numeric"
-                            min="0"
-                            max={maxMarketingBudget}
-                            step="1"
-                            value={reservedMarketingBudget}
-                            onChange={event => {
-                                const value = Number(event.target.value);
-                                onPresetChange('CUSTOM');
-                                onReservedBudgetChange(Math.min(maxMarketingBudget, Math.max(0, Number.isFinite(value) ? Math.floor(value) : 0)));
-                            }}
-                            className="mt-2 min-h-11 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 font-mono text-base text-white focus:border-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-400"
-                        />
-                    </label>
-                    <p className="text-[10px] leading-relaxed text-zinc-400">{translate('projectCost.exactMarketingHelp')}</p>
+                <div className="flex-1">
                     <input
                         type="range"
-                        aria-label={translate('greenlight.marketing.reservedCampaignBudget')}
                         min="0"
                         max={maxMarketingBudget}
                         step="50000"

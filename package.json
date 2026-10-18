@@ -296,8 +296,6 @@
     "audit:shareholder-voting": "esbuild scripts/audit-shareholder-voting.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-shareholder-voting.mjs && node /tmp/audit-shareholder-voting.mjs",
     "audit:shareholder-voting-ui": "node scripts/audit-shareholder-voting-ui.mjs",
     "audit:social-events": "esbuild scripts/audit-social-events.ts --bundle --platform=node --format=esm --outfile=/tmp/audit-social-events.mjs && node /tmp/audit-social-events.mjs",
-    "audit:project-cost-browser": "node scripts/audit-project-cost-browser.cjs",
-    "audit:project-cost-display": "esbuild scripts/audit-project-cost-display.tsx --bundle --platform=node --format=cjs --loader:.csv=text --loader:.css=empty --outfile=/tmp/audit-project-cost-display.cjs && node /tmp/audit-project-cost-display.cjs",
     "audit:relationship-decay": "esbuild scripts/audit-relationship-decay.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-relationship-decay.mjs && node /tmp/audit-relationship-decay.mjs && esbuild scripts/audit-relationship-contact-actions.tsx --bundle --platform=node --format=cjs --loader:.csv=text --outfile=/tmp/audit-relationship-contact-actions.cjs && node /tmp/audit-relationship-contact-actions.cjs",
     "audit:stock-takeovers": "esbuild scripts/audit-stock-takeovers.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-stock-takeovers.mjs && node /tmp/audit-stock-takeovers.mjs",
     "audit:stock-takeovers-ui": "node scripts/audit-stock-takeovers-ui.mjs",

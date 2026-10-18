@@ -1,19 +1,6 @@
 import type { TranslationKey } from '../../i18n';
 
 export const enTranslations: Record<TranslationKey, string> = {
-        'projectCost.totalBudget': 'Total Project Budget',
-        'projectCost.totalCost': 'Total Project Cost',
-        'projectCost.recordedTotal': 'Recorded Total',
-        'projectCost.total': 'Total',
-        'projectCost.production': 'Production',
-        'projectCost.marketingReserved': 'Marketing Reserved',
-        'projectCost.marketingSpent': 'Marketing Spent',
-        'projectCost.returnedReserve': 'Reserve Returned',
-        'projectCost.notRecorded': 'Not recorded',
-        'projectCost.viewBreakdown': 'View breakdown',
-        'projectCost.closeBreakdown': 'Close breakdown',
-        'projectCost.exactMarketingAmount': 'Exact marketing amount ($)',
-        'projectCost.exactMarketingHelp': 'Enter a whole-dollar amount within your available funds.',
         'common.back': 'Back',
         'common.active': 'Active',
         'common.enabled': 'Enabled',
