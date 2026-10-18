@@ -5731,7 +5731,7 @@ export const processGameWeek = async (
             }
         }
         else if (rel.distributionPhase === 'STREAMING' && rel.streaming) {
-            const contractRuns = buildStreamingPlatformRunsForProject(nextPlayer, rel.id, rel.streamingRuns || []);
+            const contractRuns = buildStreamingPlatformRunsForProject(nextPlayer, rel.id, rel.streamingRuns || [], rel);
             const streamingRuns = contractRuns.length > 0 ? contractRuns : [{
                 platformId: rel.streaming.platformId,
                 contractId: rel.streamingContractId || rel.streaming.contractId || `legacy:${rel.id}`,
@@ -5742,7 +5742,8 @@ export const processGameWeek = async (
                 weeklyViews: [...rel.streaming.weeklyViews],
                 isLeaving: rel.streaming.isLeaving,
             }];
-            if (!streamingRuns.some(run => settlementAbsoluteWeek >= run.startWeekAbsolute)) {
+            if (streamingRuns.some(run => !run.isLeaving)
+                && !streamingRuns.some(run => !run.isLeaving && settlementAbsoluteWeek >= run.startWeekAbsolute)) {
                 processedReleases.push(rel);
                 return;
             }
@@ -5834,8 +5835,9 @@ export const processGameWeek = async (
             let investorStreamingPayout = 0;
             let uncreditedStreamingRevenue = 0;
             const canonicalStreamingContracts = streamingRuns.flatMap(run => {
+                if (run.isLeaving || settlementAbsoluteWeek < run.startWeekAbsolute) return [];
                 const contract = nextPlayer.world.streamingRightsContracts?.[run.contractId];
-                return contract ? [{ run, contract }] : [];
+                return contract?.status === 'ACTIVE' ? [{ run, contract }] : [];
             });
             for (const { run, contract } of canonicalStreamingContracts) {
                 // Canonical AI buyers settle finite WE6 receipts once in their economy, then credit the studio below.
@@ -5854,13 +5856,13 @@ export const processGameWeek = async (
                     nextPlayer = settlement.player;
                     weeklyStreamingRevenue += settlement.royaltyPaid;
                 } else if (contract.licensorRevenueShare > 0 && contract.backendBasis !== 'ADS_RENTAL_RECEIPTS' && contract.royaltyPurpose !== 'PRODUCER_PARTICIPATION') {
-                    const runViews = Math.max(0, nextStreamingRuns.find(candidate => candidate.contractId === run.contractId)?.weeklyViews.at(-1) || 0);
+                    const runViews = Math.max(0, (nextStreamingRuns.find(candidate => candidate.contractId === run.contractId)?.totalViews || 0) - run.totalViews);
                     const proxyRoyalty = Math.floor(runViews * 0.10 * (contract.licensorRevenueShare / 100));
                     weeklyStreamingRevenue += proxyRoyalty;
                     uncreditedStreamingRevenue += proxyRoyalty;
                 }
             }
-            if (canonicalStreamingContracts.length === 0 && rel.studioRoyaltyPercentage) {
+            if (!streamingRuns.some(run => nextPlayer.world.streamingRightsContracts?.[run.contractId]) && rel.studioRoyaltyPercentage) {
                 const legacyRoyalty = Math.floor(newViews * 0.10 * (rel.studioRoyaltyPercentage / 100));
                 weeklyStreamingRevenue += legacyRoyalty;
                 uncreditedStreamingRevenue += legacyRoyalty;

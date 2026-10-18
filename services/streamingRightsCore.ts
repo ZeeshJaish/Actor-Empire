@@ -1,3 +1,4 @@
+import { buildStreamingPlatformRunsForProject } from './streamingReleaseRuns';
 import {getProjectFundingEconomics} from './projectFundingEconomics';
 import {getStreamingBuyerBackendCapability, streamingBackendPercentForBuyer, validateNewStreamingBackendTerms} from './streamingBackendPolicy';
 import {createStreamingRightsAccessGrantForOffer} from './streamingRightsAccessGrant';
@@ -31,7 +32,7 @@ import type {
 } from '../types';
 import { STREAMING_RIGHTS_CONTRACT_SCHEMA_VERSION } from '../types';
 import { createDeterministicId } from './deterministicRandom';
-import { getAbsoluteWeek } from './legacyLogic';
+import { getAbsoluteWeek, inferStreamingStartWeekAbsolute } from './legacyLogic';
 import { normalizeStreamingDayOneMarketIds } from './streamingDayOneMarkets';
 import { normalizeStreamingLanguageId } from './streamingLocalizationCapabilities';
 import { resolveStreamingRightsCompatibility as resolveCompatibility } from './streamingRightsCompatibility';
@@ -467,9 +468,17 @@ export const migrateStreamingRightsContractRegistry = (player: Player): Player =
         });
     const activeReleases = (player.activeReleases || []).map(release => {
         if (release.distributionPhase !== 'STREAMING' || !release.streaming?.platformId) return release;
+        const hasStreamingHistory = (release.streaming.weeklyViews?.length || 0) > 0
+            || release.streaming.totalViews > 0 || release.streaming.weekOnPlatform > 1;
+        const savedStart = release.streaming.startWeekAbsolute;
+        const historicalStart = typeof savedStart === 'number' && Number.isFinite(savedStart)
+            && savedStart >= 0 && savedStart <= currentAbsoluteWeek
+            ? savedStart
+            : inferStreamingStartWeekAbsolute(release.streaming, player.age, player.currentWeek) ?? currentAbsoluteWeek;
         const referencedContractId = cleanText(release.streamingContractId || release.streaming.contractId, '', 180);
         if (referencedContractId && registry[referencedContractId]
             && registry[referencedContractId].sourceProjectId === release.id
+            && (!hasStreamingHistory || registry[referencedContractId].startsAtAbsoluteWeek <= historicalStart)
             && (registry[referencedContractId].buyer.platformId || registry[referencedContractId].buyerPlatformId)
                 === release.streaming.platformId) {
             if (release.streamingContractId === referencedContractId && release.streaming.contractId === referencedContractId) return release;
@@ -481,8 +490,13 @@ export const migrateStreamingRightsContractRegistry = (player: Player): Player =
         }
         const matchingContract = Object.values(registry)
             .filter(contract => contract.sourceProjectId === release.id
-                && (contract.buyer.platformId || contract.buyerPlatformId) === release.streaming.platformId)
-            .sort((left, right) => right.signedAtAbsoluteWeek - left.signedAtAbsoluteWeek
+                && (contract.buyer.platformId || contract.buyerPlatformId) === release.streaming.platformId
+                && (!hasStreamingHistory || contract.startsAtAbsoluteWeek <= historicalStart))
+            .sort((left, right) => (
+                hasStreamingHistory
+                    ? Math.abs(left.startsAtAbsoluteWeek - historicalStart) - Math.abs(right.startsAtAbsoluteWeek - historicalStart)
+                    : 0
+            ) || right.signedAtAbsoluteWeek - left.signedAtAbsoluteWeek
                 || left.id.localeCompare(right.id))[0];
         if (matchingContract) return {
             ...release,
@@ -594,7 +608,27 @@ export const migrateStreamingRightsContractRegistry = (player: Player): Player =
             ...player.ownedStreamingPlatform,
             catalogLicenses: syncedOwnedLicenses,
         },
-        activeReleases,
+        activeReleases: activeReleases.map(release => {
+            if (release.distributionPhase !== 'STREAMING' || !release.streaming) return release;
+            const streamingRuns = buildStreamingPlatformRunsForProject(
+                { world: { ...player.world, streamingRightsContracts: registry } },
+                release.id, release.streamingRuns || [], release,
+            );
+            if (!streamingRuns.length) return release;
+            const singleRun = streamingRuns.length === 1 && streamingRuns[0].contractId === release.streamingContractId
+                ? streamingRuns[0] : undefined;
+            return {
+                ...release,
+                streamingRuns,
+                streaming: singleRun ? {
+                    ...release.streaming,
+                    weekOnPlatform: Math.max(release.streaming.weekOnPlatform, singleRun.weekOnPlatform),
+                    totalViews: Math.max(release.streaming.totalViews, singleRun.totalViews),
+                    weeklyViews: [...(singleRun.weeklyViews.length > release.streaming.weeklyViews.length
+                        ? singleRun.weeklyViews : release.streaming.weeklyViews)],
+                } : release.streaming,
+            };
+        }),
         world: { ...player.world, platforms: nextPlatforms, streamingRightsContracts: registry },
     };
 };

@@ -1,3 +1,4 @@
+import { normalizePlatformAiState } from '../services/platformAi/platformAiState';
 import assert from 'node:assert/strict';
 import {
     getStreamingRightsContract,
@@ -210,7 +211,9 @@ const aiLicense = {
     minimumGuarantee: 9_000_000,
     buyerPlatformId: 'NETFLIX' as const,
 };
-(richLicensePlayer.world.platforms!.NETFLIX as any).ai = { rightsContracts: [aiLicense] };
+// Keep the legacy license fixture complete for current buyer-capability validation.
+const netflixFixture = normalizePlatformAiState(richLicensePlayer.world.platforms!.NETFLIX, richLicensePlayer.id, 150);
+richLicensePlayer.world.platforms!.NETFLIX = { ...netflixFixture, ai: { ...netflixFixture.ai!, rightsContracts: [aiLicense] } };
 richLicensePlayer.world.streamingRightsContracts = {};
 const moneyBeforeRichMigration = richLicensePlayer.money;
 const ownedTreasuryBeforeRichMigration = richLicensePlayer.ownedStreamingPlatform.treasuryCash;
@@ -358,6 +361,7 @@ const currentSigningCashBefore = JSON.stringify({
     platformCash: currentSigningFixture.world.platforms!.NETFLIX.cashReserve,
 });
 const currentSigning = registerProductionStreamingRightsContract(currentSigningFixture, {
+    backendBasis: 'ADJUSTED_GROSS_RECEIPTS',
     sourceProjectId: 'production-release-1',
     title: 'Current Signing Picture',
     projectType: 'MOVIE',

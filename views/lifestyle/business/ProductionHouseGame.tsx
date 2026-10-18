@@ -23,7 +23,7 @@ import { SequelSetupModal } from './components/SequelSetupModal';
 import { markGameCheckpoint } from '../../../services/firebaseService';
 import { discardUnreleasedScript, renameStudioProjectTitle } from '../../../services/projectNaming';
 import { getProjectReleaseLabel, getProjectReleaseSortValue, getProjectReleaseTiming } from '../../../services/releaseTiming';
-import { getReleaseDisplayPhase } from '../../../services/releasePresentation';
+import { getReleaseDisplayPhase, getReleaseProgressWeek } from '../../../services/releasePresentation';
 import { createContinuationScript, getContinuationEligibility, getContinuationScriptBaseline } from '../../../services/sequelFlow';
 import { suggestReturningBackendDemand } from '../../../services/talentParticipation';
 import { getStudioGroup, getStudioSaleTreasuryLock, getStudioLiquidationBlocker, performStudioTreasuryTransfer } from '../../../services/studioGroup';
@@ -456,6 +456,8 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
             projectDetails: r.projectDetails,
             bids: r.bids,
             weekNum: r.weekNum,
+            streaming: r.streaming,
+            streamingRuns: r.streamingRuns,
             releaseWeek: r.releaseWeek,
             releaseYear: r.releaseYear,
             releasedAtAbsoluteWeek: r.releasedAtAbsoluteWeek,
@@ -1939,7 +1941,7 @@ const getStudioArchiveProjectType = (project: any) => resolveProjectType(
     project?.mediaType
 );
 
-const StudioFilmographyView: React.FC<{
+export const StudioFilmographyView: React.FC<{
     projects: any[];
     studio: Business;
     language: GameLanguage;
@@ -2092,7 +2094,7 @@ const FilmographyProjectRow: React.FC<{ project: any; language: GameLanguage; on
     const status = project.distributionPhase ? getReleaseDisplayPhase(project as ActiveRelease) : (project.phase || 'RELEASED');
     const releaseLabel = getProjectReleaseLabel(project, {}, { emptyLabel: 'Now' });
     const releaseTiming = getProjectReleaseTiming(project, {});
-    const runWeek = Number(project.weekNum || project.projectDetails?.weekNum || 0);
+    const runWeek = getReleaseProgressWeek(project);
     const franchiseName = project.universeSagaName || project.projectDetails?.universeSagaName || (project.universeId || project.projectDetails?.universeId ? 'Universe' : project.franchiseId || project.projectDetails?.franchiseId ? 'Franchise' : '');
     const customPoster = getCustomPoster(project);
 

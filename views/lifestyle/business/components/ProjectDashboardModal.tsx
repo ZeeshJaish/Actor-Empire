@@ -7,6 +7,7 @@ import { getAbsoluteWeek, getStreamingWeeksUntilStart } from '../../../../servic
 import { canRenameProjectTitle } from '../../../../services/projectNaming';
 import { WorkingTitleDialog } from './WorkingTitleDialog';
 import { getContinuationEligibility } from '../../../../services/sequelFlow';
+import { getReleaseProgressWeek } from '../../../../services/releasePresentation';
 import { getProjectReleaseLabel, getProjectReleaseTiming } from '../../../../services/releaseTiming';
 import { getReleasePlanningCtaLabel } from '../../../../services/releasePlanningCommitment';
 import { getPlayerLanguage, t } from '../../../../services/i18n';
@@ -232,7 +233,7 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
     const releaseFallback = isReleaseHistoryPhase ? { currentAge: player.age, currentWeek: player.currentWeek } : {};
     const releaseTiming = getProjectReleaseTiming(project, releaseFallback);
     const releaseSummaryLabel = getProjectReleaseLabel(project, releaseFallback, { emptyLabel: tr('projectDashboard.tba') });
-    const runWeek = Number(project.weekNum || project.projectDetails?.weekNum || 0);
+    const runWeek = getReleaseProgressWeek(project);
     const phaseKey = PHASES.find(p => p.id === project.phase)?.id;
     const currentPhaseLabel = phaseKey ? tr(`projectDashboard.phase.${phaseKey}`) : String(project.phase || tr('projectDashboard.phase.PLANNING')).replace(/[_-]/g, ' ');
     const timelineValue = runWeek > 0 ? tr('projectDashboard.timeline.runWeek', { week: runWeek }) : releaseTiming.releaseWeek ? tr('projectDashboard.timeline.week', { week: releaseTiming.releaseWeek }) : currentPhaseLabel;
