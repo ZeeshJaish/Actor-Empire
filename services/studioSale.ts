@@ -15,10 +15,15 @@ import {
     getAcquisitionDebtSummary,
     syncAcquisitionDebtLedger,
 } from './acquisitionDebt';
-import { recalculateBusinessValuation } from './businessLogic';
+import { BUSINESS_BLUEPRINTS } from './businessLogic';
+import { getAbsoluteWeek } from './legacyLogic';
+import { getStudioOwnershipPercent } from './studioOwnership';
+import { getStudioSaleEarnings, getStudioSaleHoldingPeriod } from './studioSaleHistory';
 import { dematerializeStudioOwnership } from './industryWorld/studioOwnershipMaterializer';
 
 export type StudioSaleRequirementId =
+    | 'MINORITY_MERGER_CLEAR'
+    | 'HOLDING_PERIOD'
     | 'PRODUCTION_HOUSE'
     | 'ACTIVE_SLATE_CLEAR'
     | 'SUBSIDIARIES_CLEAR'
@@ -38,6 +43,8 @@ export interface StudioSaleIncludedStudio {
     isPrimary: boolean;
     isAcquired: boolean;
     annualRevenue: number;
+    cash: number;
+    ownershipPercent: number;
     debt: number;
     catalogValue: number;
     recordedValue: number;
@@ -181,6 +188,23 @@ const getIncludedStudioIds = (player: Player, studio: Business): string[] => {
     return Array.from(ids);
 };
 
+const getTransferredStudioIds = (player: Player, studio: Business): string[] => {
+    const ids = new Set(getIncludedStudioIds(player, studio));
+    // Full-merger records keep a reversible asset snapshot. They transfer with
+    // their HQ and must be consumed, but must never be valued a second time.
+    let added = true;
+    while (added) {
+        added = false;
+        (player.businesses || []).forEach(business => {
+            if (business.studioState?.operatingModel === 'FULL_MERGER'
+                && ids.has(String(business.studioState.mergedIntoStudioId || '')) && !ids.has(business.id)) {
+                ids.add(business.id); added = true;
+            }
+        });
+    }
+    return [...ids];
+};
+
 const getOpenSubsidiaries = (player: Player, studio: Business) => {
     if (!isParentStudioSale(studio)) return [];
     return (player.businesses || []).filter(candidate => (
@@ -253,22 +277,35 @@ export const getStudioSaleActiveSlateItems = (player: Player, studioIds: string[
 
 const getCatalogValue = (player: Player, studioIds: string[]) => {
     const targetIds = new Set(studioIds);
-    const pastValue = (player.pastProjects || [])
-        .filter(project => targetIds.has(String(project.studioId || '')))
-        .reduce((sum, project) => {
-            const receipts = Math.max(0, Number(project.gross || 0) * 0.2)
-                + Math.max(0, Number(project.streamingRevenue || 0) * 0.8)
-                + Math.max(0, Number(project.soundtrackRevenue || 0) * 0.45);
-            return sum + receipts;
-        }, 0);
-    const liveValue = (player.activeReleases || [])
-        .filter(release => targetIds.has(String(release.projectDetails?.studioId || '')))
-        .reduce((sum, release) => (
-            sum
-            + Math.max(0, Number(release.totalGross || 0) * 0.14)
-            + Math.max(0, Number(release.streamingRevenue || 0) * 0.65)
-            + Math.max(0, Number(release.soundtrackRevenue || 0) * 0.35)
-        ), 0);
+    const now = getAbsoluteWeek(player.age, player.currentWeek);
+    const contracts = Object.values(player.world?.streamingRightsContracts || {});
+    // A completed film is a remaining-rights asset, not its already collected
+    // box office or licensing proceeds a second time. Count each title once.
+    const titles = new Map<string, { id: string; studioId: string; budget?: number; rating?: number; year?: number }>();
+    (player.pastProjects || []).forEach(project => {
+        if (targetIds.has(String(project.studioId || ''))) titles.set(project.id, project);
+    });
+    (player.activeReleases || []).forEach(release => {
+        const studioId = String(release.projectDetails?.studioId || '');
+        if (targetIds.has(studioId) && !titles.has(release.id)) {
+            titles.set(release.id, { id: release.id, studioId, budget: release.budget, rating: release.imdbRating });
+        }
+    });
+    const libraryValue = Array.from(titles.values()).reduce((sum, title) => {
+        const soldRights = contracts.filter(contract => (
+            contract.sourceProjectId === title.id && contract.status === 'ACTIVE' && !contract.transferredToContractId
+        ));
+        const permanentGlobalSale = soldRights.some(contract => contract.permanentPurchase && contract.territory === 'GLOBAL');
+        if (permanentGlobalSale) return sum;
+        const exclusiveWindow = soldRights.some(contract => (
+            contract.exclusivity === 'EXCLUSIVE' && contract.expiresAtAbsoluteWeek > now
+        ));
+        const age = Math.max(0, player.age - Number(title.year || player.age));
+        const quality = clamp(Number(title.rating || 5) * 10) / 100;
+        const replacementCost = Math.min(500_000_000, Math.max(1_000_000, Number(title.budget || 10_000_000)));
+        const futureRightsValue = replacementCost * 0.08 * (0.5 + quality) / (1 + age * 0.12);
+        return sum + futureRightsValue * (exclusiveWindow ? 0.25 : 1);
+    }, 0);
     const rightsValue = (player.businesses || [])
         .filter(business => targetIds.has(business.id))
         .reduce((sum, business) => {
@@ -285,12 +322,12 @@ const getCatalogValue = (player: Player, studioIds: string[]) => {
             const purchasedTitles = (business.studioState?.purchasedIPTitles || []).length * 6_000_000;
             return sum + ownedRights + purchasedTitles;
         }, 0);
-    return roundMoney(pastValue + liveValue + rightsValue);
+    return roundMoney(libraryValue + rightsValue);
 };
 
 const getDebtForStudios = (player: Player, studioIds: string[]) => {
     const targetIds = new Set(studioIds);
-    return roundMoney(getAcquisitionDebtSummary(player).entries
+    return Math.round(getAcquisitionDebtSummary(player).entries
         .filter(entry => targetIds.has(entry.studioId))
         .reduce((sum, entry) => sum + Math.max(0, entry.remainingPrincipal), 0));
 };
@@ -307,29 +344,29 @@ const getStudioValuationPart = (
     studio: Business,
     primaryStudioId: string,
 ): StudioSaleIncludedStudio & { score: number; operatingValue: number } => {
-    const annualRevenue = Math.max(0, Number(studio.stats?.weeklyRevenue || 0) * 52);
-    const annualProfit = Number(studio.stats?.weeklyProfit || 0) * 52;
+    const earnings = getStudioSaleEarnings(player, studio);
+    const annualRevenue = Math.max(0, earnings.revenue);
+    const annualProfit = earnings.profit;
     const catalogValue = getCatalogValue(player, [studio.id]);
-    const debt = getDebtForStudios(player, [studio.id]);
+    const debt = getDebtForStudios(player, getTransferredStudioIds(player, studio).filter(id => id === studio.id
+        || getStudioBusiness(player, id)?.studioState?.operatingModel === 'FULL_MERGER'));
     const qualityScore = getStudioQualityScore(studio);
     const revenueMultiple = 1.35 + (qualityScore / 100) * 2.1;
     const profitPremium = annualProfit > 0 ? annualProfit * (2.5 + (qualityScore / 35)) : annualProfit * 0.5;
-    const balanceValue = Math.max(0, Number(studio.balance || 0)) * 0.85;
-    const performanceValue = Math.max(0, (annualRevenue * revenueMultiple) + profitPremium + balanceValue + catalogValue);
-    const recordedValue = Math.max(0, Number(recalculateBusinessValuation(studio, player).stats?.valuation || studio.stats?.valuation || 0));
+    const balanceValue = Math.max(0, Number(studio.balance || 0));
+    const state = studio.studioState;
+    const facilities = Object.values(state?.departments || {}).reduce((sum, level) => sum + Math.max(0, level), 0) * 350_000
+        + Object.values(state?.equipment || {}).reduce((sum, level) => sum + Math.max(0, level), 0) * 600_000;
+    const development = (state?.scripts?.length || 0) * 1_200_000 + (state?.concepts?.length || 0) * 500_000;
+    const baseCost = BUSINESS_BLUEPRINTS.PRODUCTION_HOUSE.baseCost;
+    const tangibleAssets = baseCost * 0.42 * Math.max(1, Number(studio.stats.locations || 1)) + facilities + development;
+    const brandValue = baseCost * 0.3 * qualityScore / 100;
+    const operatingValue = balanceValue + Math.max(MIN_STUDIO_SALE_VALUE,
+        annualRevenue * revenueMultiple + profitPremium + tangibleAssets + brandValue + catalogValue);
+    // Keep the historical display field without using a contaminated lifetime/
+    // latest-week valuation as a price floor.
+    const recordedValue = Math.max(0, Number(studio.stats?.valuation || 0));
     const acquired = isAcquiredStudio(studio);
-
-    const revenueSupport = annualRevenue > 0
-        ? annualRevenue * (4.8 + (qualityScore / 14))
-        : 0;
-    const recordedWeight = acquired
-        ? 0.42 + (qualityScore / 500)
-        : 0.58 + (qualityScore / 420);
-    const maxRecordedSupport = acquired
-        ? Math.max(performanceValue * 1.35, revenueSupport + balanceValue + catalogValue)
-        : Math.max(performanceValue * 1.45, recordedValue * 0.9);
-    const recordedSignal = Math.min(recordedValue * recordedWeight, maxRecordedSupport);
-    const operatingValue = Math.max(MIN_STUDIO_SALE_VALUE, performanceValue, recordedSignal);
 
     return {
         id: studio.id,
@@ -337,10 +374,12 @@ const getStudioValuationPart = (
         isPrimary: studio.id === primaryStudioId,
         isAcquired: acquired,
         annualRevenue: roundMoney(annualRevenue),
+        cash: balanceValue,
+        ownershipPercent: getStudioOwnershipPercent(player, studio),
         debt,
         catalogValue,
         recordedValue: roundMoney(recordedValue),
-        estimatedValue: roundMoney(operatingValue),
+        estimatedValue: Math.round(operatingValue),
         score: Math.round(qualityScore),
         operatingValue,
     };
@@ -354,21 +393,23 @@ export const getStudioSaleValuation = (player: Player, studio: Business): Studio
     const parts = valuationStudios.map(business => getStudioValuationPart(player, business, studio.id));
     const annualRevenue = parts.reduce((sum, part) => sum + part.annualRevenue, 0);
     const catalogValue = getCatalogValue(player, includedStudioIds);
-    const debt = getDebtForStudios(player, includedStudioIds);
-    const weightedScoreBase = parts.reduce((sum, part) => sum + Math.max(1, part.annualRevenue + (part.estimatedValue * 0.18)), 0);
+    const debt = getDebtForStudios(player, getTransferredStudioIds(player, studio));
+    const weightedScoreBase = parts.reduce((sum, part) => sum + Math.max(1, part.annualRevenue + (Math.max(0, part.estimatedValue - part.cash) * 0.18)), 0);
     const qualityScore = parts.reduce((sum, part) => (
-        sum + (part.score * Math.max(1, part.annualRevenue + (part.estimatedValue * 0.18)))
+        sum + (part.score * Math.max(1, part.annualRevenue + (Math.max(0, part.estimatedValue - part.cash) * 0.18)))
     ), 0) / Math.max(1, weightedScoreBase);
     const operatingValue = parts.reduce((sum, part) => sum + part.operatingValue, 0);
-    const leverageRatio = debt / Math.max(1, operatingValue);
+    const cash = parts.reduce((sum, part) => sum + part.cash, 0);
+    const enterpriseValue = Math.max(0, operatingValue - cash);
+    const leverageRatio = debt / Math.max(1, enterpriseValue);
     const pressureDiscount = debt > 0 ? Math.min(0.38, leverageRatio * 0.42) : 0;
-    const debtDrag = debt > 0 ? Math.min(operatingValue * 0.65, debt * (0.2 + Math.min(0.45, leverageRatio * 0.3))) : 0;
-    const indicativeValue = roundMoney(Math.max(MIN_STUDIO_SALE_VALUE, (operatingValue * (1 - pressureDiscount)) - debtDrag));
+    const debtDrag = debt > 0 ? Math.min(enterpriseValue * 0.65, debt * (0.2 + Math.min(0.45, leverageRatio * 0.3))) : 0;
+    const indicativeValue = Math.round(cash) + roundMoney(Math.max(MIN_STUDIO_SALE_VALUE, ((operatingValue - cash) * (1 - pressureDiscount)) - debtDrag));
     const catalogTarget = isAcquiredStudio(studio) ? findParentProductionHouse(player, studio) : undefined;
     return {
         indicativeValue,
-        recommendedAsk: roundMoney(indicativeValue * 1.12),
-        recommendedFloor: roundMoney(indicativeValue * 0.82),
+        recommendedAsk: cash + roundMoney((indicativeValue - cash) * 1.12),
+        recommendedFloor: cash + Math.max(roundMoney(MIN_STUDIO_SALE_VALUE), roundMoney((indicativeValue - cash) * 0.82)),
         annualRevenue: roundMoney(annualRevenue),
         catalogValue,
         debt,
@@ -383,10 +424,12 @@ export const getStudioSaleValuation = (player: Player, studio: Business): Studio
 
 export const getStudioSalePricingBounds = (valuation: StudioSaleValuation) => {
     const value = Math.max(MIN_STUDIO_SALE_VALUE, Number(valuation.indicativeValue || 0));
+    const cash = valuation.includedStudios.reduce((sum, part) => sum + part.cash, 0);
+    const enterprise = Math.max(MIN_STUDIO_SALE_VALUE, value - cash);
     return {
-        minAsk: roundMoney(Math.max(MIN_STUDIO_SALE_VALUE, value * MIN_ASK_TO_VALUE)),
-        maxAsk: roundMoney(Math.max(MIN_STUDIO_SALE_VALUE, value * MAX_ASK_TO_VALUE)),
-        minFloor: roundMoney(Math.max(MIN_STUDIO_SALE_VALUE, value * MIN_FLOOR_TO_VALUE)),
+        minAsk: cash + roundMoney(Math.max(MIN_STUDIO_SALE_VALUE, enterprise * MIN_ASK_TO_VALUE)),
+        maxAsk: cash + roundMoney(Math.max(MIN_STUDIO_SALE_VALUE, enterprise * MAX_ASK_TO_VALUE)),
+        minFloor: cash + roundMoney(Math.max(MIN_STUDIO_SALE_VALUE, enterprise * MIN_FLOOR_TO_VALUE)),
     };
 };
 
@@ -396,8 +439,9 @@ export const normalizeStudioSalePricing = (
     minimumPrice: number,
 ) => {
     const bounds = getStudioSalePricingBounds(valuation);
-    const ask = roundMoney(clamp(Number(askPrice) || 0, bounds.minAsk, bounds.maxAsk));
-    const floor = roundMoney(clamp(Number(minimumPrice) || 0, bounds.minFloor, ask));
+    const cash = valuation.includedStudios.reduce((sum, part) => sum + part.cash, 0);
+    const ask = cash + roundMoney(clamp((Number(askPrice) || 0) - cash, bounds.minAsk - cash, bounds.maxAsk - cash));
+    const floor = cash + roundMoney(clamp((Number(minimumPrice) || 0) - cash, bounds.minFloor - cash, ask - cash));
     return { askPrice: ask, minimumPrice: floor, bounds };
 };
 
@@ -406,8 +450,8 @@ export const getStudioSalePricingIssue = (
     askPrice: number,
     minimumPrice: number,
 ) => {
-    const safeAsk = roundMoney(askPrice);
-    const safeMinimum = roundMoney(minimumPrice);
+    const safeAsk = Math.max(0, Math.round(askPrice));
+    const safeMinimum = Math.max(0, Math.round(minimumPrice));
     const bounds = getStudioSalePricingBounds(valuation);
     if (safeAsk <= 0 || safeMinimum <= 0) return 'Set a valid ask price and walk-away floor before listing.';
     if (safeMinimum > safeAsk) return 'Walk-away floor cannot be above the asking price.';
@@ -426,7 +470,31 @@ export const getStudioSaleReadiness = (player: Player, studio: Business): Studio
     const openSubsidiaries = getOpenSubsidiaries(player, studio);
     const activeDeck = studio.studioState?.saleDeck;
     const alreadyListed = Boolean(activeDeck && !['CLOSED', 'WITHDRAWN'].includes(activeDeck.status));
+    // Dormant merged records are not valued twice: their assets already live in
+    // HQ. Their original holding period and minority interests still matter.
+    const dormantMergers = isParentStudioSale(studio) ? (player.businesses || []).filter(business => (
+        business.studioState?.operatingModel === 'FULL_MERGER'
+        && business.studioState?.mergedIntoStudioId === studio.id
+    )) : [];
+    const partialMergers = dormantMergers.filter(business => getStudioOwnershipPercent(player, business) < 100);
+    const holdingStudioIds = new Set([...includedStudioIds, ...dormantMergers.map(business => business.id)]);
+    const holdingBlockers = (player.businesses || []).filter(business => holdingStudioIds.has(business.id))
+        .map(business => ({ business, holding: getStudioSaleHoldingPeriod(player, business) }))
+        .filter(({ holding }) => !holding.eligible);
     const requirements: StudioSaleRequirement[] = [
+        {
+            id: 'MINORITY_MERGER_CLEAR', label: 'Merged minority ownership settled', met: partialMergers.length === 0,
+            detail: partialMergers.length
+                ? `Carve out ${partialMergers.map(business => business.name).join(', ')} before selling the group so minority owners receive their share.`
+                : 'No dormant merged banner has unsettled minority ownership.',
+        },
+        {
+            id: 'HOLDING_PERIOD', label: '13 completed weeks of ownership',
+            met: holdingBlockers.length === 0,
+            detail: holdingBlockers.length
+                ? holdingBlockers.map(({ business, holding }) => `${business.name}: ${holding.remainingWeeks} week${holding.remainingWeeks === 1 ? '' : 's'} remaining before listing.`).join(' ')
+                : 'Every included banner has completed its 13-week holding period.',
+        },
         {
             id: 'PRODUCTION_HOUSE',
             label: 'Production house',
@@ -502,7 +570,7 @@ const normalizeTransferTermsForStudio = (
     terms?: Partial<StudioSaleTransferTerms>,
 ): StudioSaleTransferTerms => {
     const normalized = normalizeTransferTerms(terms);
-    if (isParentStudioSale(studio)) {
+    if (isParentStudioSale(studio) || getStudioOwnershipPercent(player, studio) < 100) {
         return { ...normalized, catalogRights: 'FULL_LIBRARY' };
     }
     if (isAcquiredStudio(studio) && sellerRetainsCatalog(normalized) && !findParentProductionHouse(player, studio)) {
@@ -583,7 +651,7 @@ const getOfferRoyaltyPitch = (
             : type === 'PRIVATE_EQUITY' ? -0.65
                 : type === 'STREAMING_PLATFORM' ? -0.25
                     : -0.1;
-    const debtPressure = valuation.debt > valuation.indicativeValue * 0.55 ? 0.45 + rng() * 0.55 : 0;
+    const debtPressure = valuation.debt > Math.max(0, valuation.indicativeValue - valuation.includedStudios.reduce((sum, part) => sum + part.cash, 0)) * 0.55 ? 0.45 + rng() * 0.55 : 0;
     const cashTrade = amountRatio > 1.05 ? 0.35 + rng() * 0.75 : amountRatio < 0.82 ? -(0.15 + rng() * 0.35) : 0;
     const royalty = terms.royaltyPercent + typeBias - debtPressure - cashTrade + ((rng() - 0.5) * 0.7);
     return Math.max(0, Math.min(8, Math.round(royalty * 10) / 10));
@@ -639,30 +707,90 @@ const applyOfferEconomics = (
     terms: StudioSaleTransferTerms,
     totalDebt = offer.debtAssumed,
 ): StudioSaleOffer => {
-    const safeAmount = roundMoney(amount);
-    const safeTotalDebt = roundMoney(totalDebt);
+    const safeAmount = Math.max(0, Math.round(Number.isFinite(amount) ? amount : 0));
+    const safeTotalDebt = Math.max(0, Math.round(Number.isFinite(totalDebt) ? totalDebt : 0));
     const royaltyWeeks = terms.royaltyWeeks;
     const safeRoyaltyPercent = Math.max(0, Math.min(8, Number(royaltyPercent) || 0));
     const royaltyEstimate = royaltyWeeks > 0 ? estimateRoyaltyValue(safeAmount, safeRoyaltyPercent, royaltyWeeks) : 0;
-    const bankerFee = roundMoney(safeAmount * 0.025);
+    const bankerFee = Math.round(safeAmount * 0.025);
     const requiredDebtAssumption = safeTotalDebt > 0
-        ? roundMoney(Math.max(0, safeTotalDebt - Math.max(0, safeAmount - bankerFee)))
+        ? Math.round(Math.max(0, safeTotalDebt - Math.max(0, safeAmount - bankerFee)))
         : 0;
     const debtAssumed = safeTotalDebt > 0
-        ? roundMoney(Math.min(safeTotalDebt, Math.max(offer.debtAssumed, requiredDebtAssumption)))
+        ? Math.round(Math.min(safeTotalDebt, Math.max(offer.debtAssumed, requiredDebtAssumption)))
         : 0;
-    const sellerDebtPayoff = roundMoney(Math.max(0, safeTotalDebt - debtAssumed));
-    const cashAtClose = roundMoney(Math.max(0, safeAmount - sellerDebtPayoff - bankerFee));
+    const sellerDebtPayoff = Math.round(Math.max(0, safeTotalDebt - debtAssumed));
+    const cashAtClose = Math.round(Math.max(0, safeAmount - sellerDebtPayoff - bankerFee));
     return {
         ...offer,
         amount: safeAmount,
         debtAssumed,
         cashAtClose,
+        companyCashAtClose: cashAtClose,
+        royaltyCompanyEstimate: royaltyEstimate,
         bankerFee,
         royaltyPercent: safeRoyaltyPercent,
         royaltyWeeks,
         royaltyEstimate,
     };
+};
+
+const getPackageCash = (valuation: StudioSaleValuation) => valuation.includedStudios.reduce((sum, part) => sum + part.cash, 0);
+
+const applySellerEntitlement = (player: Player, studio: Business, offer: StudioSaleOffer): StudioSaleOffer => {
+    const valuation = getStudioSaleValuation(player, studio);
+    const packageCash = getPackageCash(valuation);
+    const enterpriseWeight = valuation.includedStudios.reduce((sum, part) => sum + Math.max(0, part.estimatedValue - part.cash), 0);
+    const companyCash = offer.companyCashAtClose ?? offer.cashAtClose;
+    const payoff = Math.max(0, offer.amount - offer.bankerFee - companyCash);
+    const entitlement = valuation.includedStudios.reduce((sum, part) => {
+        const valueWeight = enterpriseWeight > 0 ? Math.max(0, part.estimatedValue - part.cash) / enterpriseWeight : 1 / valuation.includedStudios.length;
+        const grossPrice = part.cash + Math.max(0, offer.amount - packageCash) * valueWeight;
+        const allocatedFee = offer.amount > 0 ? offer.bankerFee * grossPrice / offer.amount : 0;
+        const debtPayoff = valuation.debt > 0 ? payoff * part.debt / valuation.debt : 0;
+        return sum + (grossPrice - allocatedFee - debtPayoff) * part.ownershipPercent / 100;
+    }, 0);
+    const sellerCash = Math.round(clamp(entitlement, 0, companyCash));
+    const equityPercent = companyCash > 0 ? sellerCash / companyCash * 100
+        : valuation.includedStudios.reduce((sum, part) => sum + Math.max(0, part.estimatedValue - part.cash) * part.ownershipPercent, 0) / Math.max(1, enterpriseWeight);
+    const companyRoyalty = estimateRoyaltyValue(Math.max(0, offer.amount - getPackageCash(valuation)), offer.royaltyPercent, offer.royaltyWeeks);
+    // Future royalties are contingent enterprise income, not the cash/debt
+    // closing waterfall. Minority interests survive an underwater cash exit.
+    const ownedEnterprise = valuation.includedStudios.reduce((sum, part) => (
+        sum + Math.max(0, part.estimatedValue - part.cash) * part.ownershipPercent / 100
+    ), 0);
+    const royaltyOwnership = enterpriseWeight > 0 ? ownedEnterprise / enterpriseWeight : equityPercent / 100;
+    return { ...offer, companyCashAtClose: companyCash, sellerOwnershipPercent: equityPercent,
+        cashAtClose: sellerCash, royaltyCompanyEstimate: companyRoyalty,
+        royaltyEstimate: Math.round(companyRoyalty * royaltyOwnership) };
+};
+
+const makeSaleSnapshot = (player: Player, studio: Business): NonNullable<StudioSaleDeck['saleSnapshot']> => ({
+    version: 1,
+    studios: getTransferredStudioIds(player, studio).sort().map(id => {
+        const business = getStudioBusiness(player, id)!;
+        return {
+            id, cash: business.studioState?.operatingModel === 'FULL_MERGER' ? 0 : Math.round(Math.max(0, Number(business.balance || 0))),
+            debt: getDebtForStudios(player, [id]), ownershipPercent: getStudioOwnershipPercent(player, business),
+            materialFingerprint: JSON.stringify({ mergedSnapshotCash: business.studioState?.operatingModel === 'FULL_MERGER' ? business.balance : undefined, config: business.config, departments: business.studioState?.departments,
+                equipment: business.studioState?.equipment, scripts: business.studioState?.scripts,
+                concepts: business.studioState?.concepts, ownedRights: business.studioState?.ownedRights,
+                purchasedIPTitles: business.studioState?.purchasedIPTitles,
+                catalogue: getCatalogValue(player, [id]), quality: getStudioQualityScore(business),
+                locations: business.stats.locations, earnings: getStudioSaleEarnings(player, business) }),
+        };
+    }),
+});
+
+export const getStudioSaleRevalidationIssue = (player: Player, studio: Business, deck = studio.studioState?.saleDeck): string | null => {
+    if (!deck || ['CLOSED', 'WITHDRAWN'].includes(deck.status)) return null;
+    if (!deck.saleSnapshot || deck.saleSnapshot.version !== 1) {
+        return 'This saved sale room needs buyer revalidation. Refresh buyer terms before accepting or signing.';
+    }
+    if (JSON.stringify(deck.saleSnapshot) !== JSON.stringify(makeSaleSnapshot(player, studio))) {
+        return 'Studio cash, debt, ownership or assets changed. Refresh buyer terms to reprice the package before accepting or signing.';
+    }
+    return null;
 };
 
 const makeSaleOffer = (
@@ -678,27 +806,31 @@ const makeSaleOffer = (
     rng: () => number,
 ): StudioSaleOffer => {
     const qualityLift = (valuation.score - 50) / 250;
-    const askTension = askPrice / Math.max(1, valuation.indicativeValue);
+    const cashAtListing = getPackageCash(valuation);
+    const askTension = Math.max(0, askPrice - cashAtListing) / Math.max(1, valuation.indicativeValue - cashAtListing);
     const buyerAggression = 0.78 + (rng() * 0.45) + qualityLift;
     const askAnchor = 1 + ((askTension - 1) * (0.22 + rng() * 0.24));
-    const riskHaircut = valuation.debt > 0 ? Math.min(0.16, valuation.debt / Math.max(1, valuation.indicativeValue) * (0.12 + rng() * 0.12)) : 0;
+    const riskHaircut = valuation.debt > 0 ? Math.min(0.16, valuation.debt / Math.max(1, valuation.indicativeValue - cashAtListing) * (0.12 + rng() * 0.12)) : 0;
     const loyaltyPremium = type === 'FAMOUS_PERSON' ? 0.04 : type === 'RIVAL_STUDIO' ? 0.06 : type === 'PRIVATE_EQUITY' ? -0.03 : 0;
     const termsModifier = getTermsValueModifier(terms);
-    const preliminaryAmount = roundMoney(Math.max(
-        minimumPrice * (0.72 + rng() * 0.25),
-        valuation.indicativeValue * buyerAggression * askAnchor * (1 - riskHaircut + loyaltyPremium + termsModifier),
+    const packageCash = getPackageCash(valuation);
+    const enterpriseValue = Math.max(0, valuation.indicativeValue - packageCash);
+    const preliminaryAmount = packageCash + roundMoney(Math.max(
+        Math.max(0, minimumPrice - packageCash) * (0.72 + rng() * 0.25),
+        enterpriseValue * buyerAggression * askAnchor * (1 - riskHaircut + loyaltyPremium + termsModifier),
     ));
-    const royaltyPercent = getOfferRoyaltyPitch(type, terms, preliminaryAmount / Math.max(1, valuation.indicativeValue), valuation, rng);
+    const royaltyPercent = getOfferRoyaltyPitch(type, terms, Math.max(0, preliminaryAmount - packageCash) / Math.max(1, enterpriseValue), valuation, rng);
     const royaltyCashTrade = 1 + ((terms.royaltyPercent - royaltyPercent) * 0.012);
-    const amount = roundMoney(Math.max(minimumPrice * 0.72, preliminaryAmount * royaltyCashTrade));
+    const amount = packageCash + roundMoney(Math.max(Math.max(0, minimumPrice - packageCash) * 0.72, (preliminaryAmount - packageCash) * royaltyCashTrade));
     const debtCoverage = valuation.debt > 0 ? clamp(45 + (rng() * 50) + (type === 'PRIVATE_EQUITY' ? 10 : 0), 20, 100) / 100 : 0;
-    const debtAssumed = roundMoney(Math.min(valuation.debt, valuation.debt * debtCoverage, amount * 0.45));
+    const debtAssumed = roundMoney(Math.min(valuation.debt, valuation.debt * debtCoverage, Math.max(0, amount - packageCash) * 0.45));
     const baseOffer: StudioSaleOffer = {
         id: `${deckId}_offer_${index}_${type.toLowerCase()}`,
         buyerName: pick(buyerPools[type], rng),
         buyerType: type,
         headline: pick(buyerHeadlines[type], rng),
         amount,
+        originalAmount: amount, originalRoyaltyPercent: royaltyPercent, packageCash,
         cashAtClose: 0,
         debtAssumed,
         bankerFee: 0,
@@ -714,7 +846,7 @@ const makeSaleOffer = (
         status: 'PENDING',
     };
     const availability = fromAbsoluteWeek(currentAbsoluteWeek(player) + baseOffer.availableAfterWeeks);
-    const offerWithEconomics = applyOfferEconomics(baseOffer, amount, royaltyPercent, terms, valuation.debt);
+    const offerWithEconomics = applySellerEntitlement(player, studio, applyOfferEconomics(baseOffer, amount, royaltyPercent, terms, valuation.debt));
     return {
         ...offerWithEconomics,
         availableWeek: availability.week,
@@ -802,6 +934,7 @@ export const createStudioSaleDeck = (
         minimumPrice: safeMinimum,
         indicativeValuation: readiness.valuation.indicativeValue,
         debtAtListing: readiness.valuation.debt,
+        saleSnapshot: makeSaleSnapshot(player, studio),
         listedWeek: player.currentWeek,
         listedYear: player.age,
         offerWindowWeeks: 3,
@@ -828,13 +961,49 @@ export const createStudioSaleDeck = (
     };
 };
 
+export const refreshStudioSaleDeck = (player: Player, studioId: string): StudioSaleResult => {
+    const studio = getStudioBusiness(player, studioId);
+    const deck = studio?.studioState?.saleDeck;
+    if (!studio || !deck || ['CLOSED', 'WITHDRAWN'].includes(deck.status)) {
+        return { success: false, player, message: 'No live sale room to revalidate.' };
+    }
+    const readiness = getStudioSaleReadiness(player, studio);
+    if (!readiness.canClose) return { success: false, player, message: readiness.blockers.find(blocker => !blocker.includes('live sale process')) || 'Closing requirements are not met yet.' };
+    const oldCash = deck.saleSnapshot?.studios.reduce((sum, part) => sum + part.cash, 0) || 0;
+    const newCash = getPackageCash(readiness.valuation);
+    const oldEnterprise = Math.max(1, deck.indicativeValuation - oldCash);
+    const newEnterprise = Math.max(0, readiness.valuation.indicativeValue - newCash);
+    const terms = normalizeTransferTermsForStudio(player, studio, deck.transferTerms);
+    const pricing = normalizeStudioSalePricing(readiness.valuation,
+        newCash + Math.max(0, deck.askPrice - oldCash) * newEnterprise / oldEnterprise,
+        newCash + Math.max(0, deck.minimumPrice - oldCash) * newEnterprise / oldEnterprise);
+    const refreshed: StudioSaleDeck = {
+        ...deck, status: 'LISTED', acceptedOfferId: undefined, signingStartedWeek: undefined, signingStartedYear: undefined,
+        indicativeValuation: readiness.valuation.indicativeValue, debtAtListing: readiness.valuation.debt,
+        askPrice: pricing.askPrice, minimumPrice: pricing.minimumPrice,
+        saleSnapshot: makeSaleSnapshot(player, studio), transferTerms: terms,
+        offers: deck.offers.map(offer => {
+            const amount = newCash + roundMoney(Math.max(0, offer.amount - oldCash) * newEnterprise / oldEnterprise);
+            const revised = applyOfferEconomics({ ...offer, debtAssumed: Math.min(offer.debtAssumed, readiness.valuation.debt) },
+                amount, offer.royaltyPercent, terms, readiness.valuation.debt);
+            return { ...applySellerEntitlement(player, studio, revised), status: 'PENDING',
+                originalAmount: newCash + roundMoney(Math.max(0, (offer.originalAmount ?? offer.amount) - oldCash) * newEnterprise / oldEnterprise),
+                originalRoyaltyPercent: offer.originalRoyaltyPercent ?? offer.royaltyPercent, packageCash: newCash,
+                counterAmount: undefined, counterRoyaltyPercent: undefined, counterStatus: undefined,
+                conditions: offer.conditions.filter(condition => !condition.includes('Counter accepted')) } as StudioSaleOffer;
+        }),
+    };
+    return { success: true, player: updateStudioDeck(player, studioId, refreshed), deck: refreshed,
+        message: 'Buyer terms refreshed for the current cash, debt, ownership and assets. Review the revised proceeds and accept a bid again.' };
+};
+
 export const withdrawStudioSaleDeck = (player: Player, studioId: string): StudioSaleResult => {
     const studio = getStudioBusiness(player, studioId);
     const deck = studio?.studioState?.saleDeck;
     if (!studio || !deck || ['CLOSED', 'WITHDRAWN'].includes(deck.status)) {
         return { success: false, player, message: 'No live sale deck to withdraw.' };
     }
-    if (deck.status === 'SIGNING') {
+    if (deck.status === 'SIGNING' && !getStudioSaleRevalidationIssue(player, studio, deck)) {
         return { success: false, player, message: 'This deal is already in signing. Finish or leave the room before changing terms.' };
     }
     const withdrawnDeck: StudioSaleDeck = { ...deck, status: 'WITHDRAWN' };
@@ -847,7 +1016,7 @@ export const withdrawStudioSaleDeck = (player: Player, studioId: string): Studio
 };
 
 const getDeckDebtAtClose = (player: Player, studio: Business, deck: StudioSaleDeck) => (
-    roundMoney(Number(deck.debtAtListing ?? getDebtForStudios(player, getIncludedStudioIds(player, studio))))
+    getDebtForStudios(player, deck.saleSnapshot?.studios.map(part => part.id) || getIncludedStudioIds(player, studio))
 );
 
 const updateOfferInDeck = (
@@ -858,7 +1027,10 @@ const updateOfferInDeck = (
     const studio = getStudioBusiness(player, studioId);
     const deck = studio?.studioState?.saleDeck;
     if (!studio || !deck) return { success: false, player, message: 'Sale room is not open.' };
-    const nextDeck = updater(deck, studio, getDeckDebtAtClose(player, studio, deck));
+    const issue = getStudioSaleRevalidationIssue(player, studio, deck);
+    if (issue) return { success: false, player, message: issue };
+    const updated = updater(deck, studio, getDeckDebtAtClose(player, studio, deck));
+    const nextDeck = { ...updated, offers: updated.offers.map(offer => applySellerEntitlement(player, studio, offer)) };
     return {
         success: true,
         player: updateStudioDeck(player, studioId, nextDeck),
@@ -873,14 +1045,17 @@ const counterAccepted = (
     counterAmount: number,
     counterRoyaltyPercent: number,
 ) => {
-    const rng = makeRng(`${deck.id}:${offer.id}:counter:${counterAmount}:${counterRoyaltyPercent}`);
-    const originalPackage = getOfferPackageValue(offer.amount, offer.royaltyPercent, offer.royaltyWeeks);
-    const counterPackage = getOfferPackageValue(counterAmount, counterRoyaltyPercent, offer.royaltyWeeks);
+    const rng = makeRng(`${deck.id}:${offer.id}:counter-ceiling`);
+    const cash = offer.packageCash ?? deck.saleSnapshot?.studios.reduce((sum, part) => sum + part.cash, 0) ?? 0;
+    const originalAmount = offer.originalAmount ?? offer.amount;
+    const originalRoyalty = offer.originalRoyaltyPercent ?? offer.royaltyPercent;
+    const originalPackage = getOfferPackageValue(Math.max(0, originalAmount - cash), originalRoyalty, offer.royaltyWeeks);
+    const counterPackage = getOfferPackageValue(Math.max(0, counterAmount - cash), counterRoyaltyPercent, offer.royaltyWeeks);
     const packageStretch = counterPackage / Math.max(1, originalPackage);
-    const royaltyStretch = Math.max(0, counterRoyaltyPercent - offer.royaltyPercent);
+    const royaltyStretch = Math.max(0, counterRoyaltyPercent - originalRoyalty);
     const acceptanceLimit = 1.03 + (rng() * 0.08) + (offer.buyerType === 'FAMOUS_PERSON' ? 0.03 : 0) + (offer.buyerType === 'PRIVATE_EQUITY' ? -0.025 : 0);
     const packageFloor = 0.92 + (rng() * 0.05);
-    return packageStretch >= packageFloor
+    return counterAmount >= cash && packageStretch >= packageFloor
         && packageStretch <= acceptanceLimit
         && royaltyStretch <= 2.5 + rng() * 1.5;
 };
@@ -894,9 +1069,10 @@ export const counterStudioSaleOffer = (
 ): StudioSaleResult => updateOfferInDeck(player, studioId, (deck, _studio, debtAtClose) => {
     const availableIds = new Set(getStudioSaleWindowState(player, deck).availableOffers.map(offer => offer.id));
     const nextOffers = deck.offers.map(offer => {
-        if (offer.id !== offerId || !availableIds.has(offer.id) || offer.status === 'ACCEPTED') return offer;
+        if (offer.id !== offerId || !availableIds.has(offer.id) || !['PENDING', 'COUNTERED'].includes(offer.status)) return offer;
         const royalty = Math.max(0, Math.min(8, Number(counterRoyaltyPercent ?? offer.royaltyPercent)));
-        const amount = roundMoney(counterAmount);
+        const cash = offer.packageCash ?? 0;
+        const amount = cash + roundMoney(Math.max(0, counterAmount - cash));
         const accepted = amount > 0 && counterAccepted(deck, offer, amount, royalty);
         if (!accepted) {
             return {
@@ -934,7 +1110,8 @@ export const counterAllStudioSaleOffers = (
         .map(offer => offer.id));
     const nextOffers = deck.offers.map(offer => {
         if (!availableIds.has(offer.id)) return offer;
-        const amount = roundMoney(counterAmount);
+        const cash = offer.packageCash ?? 0;
+        const amount = cash + roundMoney(Math.max(0, counterAmount - cash));
         const royalty = Math.max(0, Math.min(8, Number(counterRoyaltyPercent ?? offer.royaltyPercent)));
         const accepted = amount > 0 && counterAccepted(deck, offer, amount, royalty);
         if (!accepted) {
@@ -973,6 +1150,9 @@ export const acceptStudioSaleOffer = (
     if (!studio || !deck || !offer) {
         return { success: false, player, message: 'That offer is no longer available.' };
     }
+    if (['CLOSED', 'WITHDRAWN'].includes(deck.status)) return { success: false, player, message: 'That sale room is no longer open.' };
+    const revalidationIssue = getStudioSaleRevalidationIssue(player, studio, deck);
+    if (revalidationIssue) return { success: false, player, message: revalidationIssue };
     if (!getStudioSaleWindowState(player, deck).availableOffers.some(candidate => candidate.id === offerId)) {
         return { success: false, player, message: 'That buyer has not submitted the signed bid yet.' };
     }
@@ -985,7 +1165,7 @@ export const acceptStudioSaleOffer = (
     }
     const transferTerms = normalizeTransferTermsForStudio(player, studio, deck.transferTerms);
     const debtAtClose = getDeckDebtAtClose(player, studio, deck);
-    const closingOffer = applyOfferEconomics(offer, offer.amount, offer.royaltyPercent, transferTerms, debtAtClose);
+    const closingOffer = applySellerEntitlement(player, studio, applyOfferEconomics(offer, offer.amount, offer.royaltyPercent, transferTerms, debtAtClose));
 
     const signingDeck: StudioSaleDeck = {
         ...deck,
@@ -1264,7 +1444,7 @@ const makeRoyaltyContract = (
         soldStudioIds: includedStudioIds,
         buyerName: offer.buyerName,
         royaltyPercent: offer.royaltyPercent,
-        weeklyBase: roundMoney(offer.royaltyEstimate / Math.max(1, offer.royaltyWeeks)),
+        weeklyBase: Math.round(offer.royaltyEstimate / Math.max(1, offer.royaltyWeeks)),
         weeksRemaining: offer.royaltyWeeks,
         totalCollected: 0,
         startedWeek: player.currentWeek,
@@ -1283,11 +1463,15 @@ export const completeStudioSaleTransfer = (
         return { success: false, player, message: 'No accepted sale package is ready for signature.' };
     }
 
+    const revalidationIssue = getStudioSaleRevalidationIssue(player, studio, deck);
+    if (revalidationIssue) return { success: false, player, message: revalidationIssue };
+    const readiness = getStudioSaleReadiness(player, studio);
+    if (!readiness.canClose) return { success: false, player, message: readiness.blockers.find(blocker => !blocker.includes('live sale process')) || 'Closing requirements are not met yet.' };
     const transferTerms = normalizeTransferTermsForStudio(player, studio, deck.transferTerms);
-    const includedStudioIds = getIncludedStudioIds(player, studio);
+    const includedStudioIds = getTransferredStudioIds(player, studio);
     const includedSet = new Set(includedStudioIds);
     const debtAtClose = getDebtForStudios(player, includedStudioIds);
-    const offer = applyOfferEconomics(acceptedOffer, acceptedOffer.amount, acceptedOffer.royaltyPercent, transferTerms, debtAtClose);
+    const offer = applySellerEntitlement(player, studio, applyOfferEconomics(acceptedOffer, acceptedOffer.amount, acceptedOffer.royaltyPercent, transferTerms, debtAtClose));
     const relatedStockIds = new Set((player.stocks || [])
         .filter(stock => stock.relatedStudioId && includedSet.has(stock.relatedStudioId))
         .map(stock => stock.id));
@@ -1400,15 +1584,15 @@ export const processStudioSaleRoyalties = (player: Player): Player => {
     let totalPayout = 0;
     const updatedContracts = contracts.map(contract => {
         const weeksRemaining = Math.max(0, Math.round(Number(contract.weeksRemaining || 0)));
-        const weeklyBase = roundMoney(Number(contract.weeklyBase || 0));
+        const weeklyBase = Math.max(0, Math.round(Number(contract.weeklyBase || 0)));
         if (weeksRemaining <= 0 || weeklyBase <= 0) return { ...contract, weeksRemaining: 0 };
         const rng = makeRng(`${contract.id}:${weekKey}`);
-        const payout = roundMoney(weeklyBase * (0.85 + (rng() * 0.3)));
+        const payout = Math.round(weeklyBase * (0.85 + (rng() * 0.3)));
         totalPayout += payout;
         return {
             ...contract,
             weeksRemaining: weeksRemaining - 1,
-            totalCollected: roundMoney(Number(contract.totalCollected || 0) + payout),
+            totalCollected: Math.round(Number(contract.totalCollected || 0) + payout),
             lastCollectedWeek: player.currentWeek,
             lastCollectedYear: player.age,
         };

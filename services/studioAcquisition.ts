@@ -917,6 +917,8 @@ const buildAcquiredStudioBusiness = ({
         logo: '🎬',
         color: 'bg-amber-500',
         foundedWeek: player.currentWeek,
+        foundedYear: player.age,
+        foundedAbsoluteWeek: ((Math.max(1, player.age) - 1) * 52) + Math.max(0, player.currentWeek - 1),
         balance: Math.max(0, profile.capital || 0),
         isActive: true,
         config: {
@@ -956,6 +958,8 @@ const buildAcquiredStudioBusiness = ({
             acquisitionOrigin: 'STUDIO_ACQUISITION',
             acquiredWeek: player.currentWeek,
             acquiredYear: player.age,
+            acquiredAbsoluteWeek: ((Math.max(1, player.age) - 1) * 52) + Math.max(0, player.currentWeek - 1),
+            saleEarningsHistory: [],
             acquisitionPortfolio,
             purchasedIPTitles: resolvedRights,
             ownedRights: inheritedRights,

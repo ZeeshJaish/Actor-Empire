@@ -22,6 +22,8 @@ import {
     getOperatingModels,
     getOperatingModelDefinition,
     getStudioGroup,
+    getStudioSaleTreasuryLock,
+    getStudioFullMergerBlocker,
     reverseFullStudioMerger,
     setSubsidiaryOperatingModel,
 } from '../../../services/studioGroup';
@@ -459,6 +461,7 @@ const OperatingModelDialog: React.FC<{
     const [confirmingMerger, setConfirmingMerger] = React.useState(false);
     const selectedDefinition = selectedModel ? getOperatingModelDefinition(selectedModel, language) : null;
     const isMerger = selectedModel === 'FULL_MERGER';
+    const mergerLock = isMerger ? getStudioFullMergerBlocker(player, studio) : null;
 
     React.useEffect(() => {
         setConfirmingMerger(false);
@@ -561,9 +564,11 @@ const OperatingModelDialog: React.FC<{
                     </div>
                 )}
 
+                {mergerLock ? <p role="status" className="mt-4 text-xs font-bold text-amber-200">{mergerLock}</p> : null}
+
                 <button
                     type="button"
-                    disabled={!selectedModel}
+                    disabled={!selectedModel || !!mergerLock}
                     onClick={handlePrimaryAction}
                     className={`mt-5 flex min-h-14 w-full items-center justify-center gap-2 rounded-[22px] px-4 text-[9px] font-black uppercase tracking-[0.18em] shadow-[0_8px_0_#7a4a0a] transition-transform active:translate-y-1 active:shadow-[0_4px_0_#7a4a0a] disabled:cursor-not-allowed disabled:opacity-40 ${
                         confirmingMerger
@@ -590,6 +595,7 @@ const CarveOutDialog: React.FC<{
     const parentStudio = getStudioGroup(player).parentStudio;
     if (!terms || !parentStudio) return null;
     const canAfford = parentStudio.balance >= terms.totalCost;
+    const saleLock = getStudioSaleTreasuryLock(player, studio.id) || getStudioSaleTreasuryLock(player, parentStudio.id);
 
     return (
         <motion.div
@@ -634,6 +640,8 @@ const CarveOutDialog: React.FC<{
                     </div>
                 </div>
 
+                {saleLock ? <p role="status" className="mt-4 text-xs font-bold text-amber-200">{saleLock}</p> : null}
+
                 {!canAfford ? (
                     <div className="mt-3 rounded-[14px] border border-rose-300/25 bg-rose-300/[0.07] px-3 py-2.5 text-[8px] font-bold leading-relaxed text-rose-200">
                         HQ needs {formatMoney(terms.totalCost - parentStudio.balance)} more capital before this carve-out can close.
@@ -646,7 +654,7 @@ const CarveOutDialog: React.FC<{
                     </button>
                     <button
                         type="button"
-                        disabled={!canAfford}
+                        disabled={!canAfford || !!saleLock}
                         onClick={onConfirm}
                         className="min-h-11 rounded-[14px] bg-sky-300 px-3 text-[8px] font-black uppercase tracking-[0.15em] text-slate-950 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
                     >

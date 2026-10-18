@@ -50,7 +50,7 @@ export const BusinessWizard: React.FC<BusinessWizardProps> = ({ player, onCancel
         if (player.money < cost) { alert(tr('services.business.wizard.alert.insufficientFunds')); return; }
         const blueprint = BUSINESS_BLUEPRINTS[wizType];
         const emoji = blueprint.emojis[Math.floor(Math.random() * blueprint.emojis.length)];
-        const newBiz = createBusiness(wizName, wizType, wizSubtype, wizConfig, emoji, player.currentWeek);
+        const newBiz = createBusiness(wizName, wizType, wizSubtype, wizConfig, emoji, player.currentWeek, player.age);
         onUpdatePlayer({
             ...player,
             money: player.money - cost,

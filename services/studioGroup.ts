@@ -475,6 +475,33 @@ export const getStudioTreasuryWithdrawalQuote = (
     };
 };
 
+/** Manual capital movements freeze both endpoints while a buyer relies on the sale balance sheet. */
+export const getStudioSaleTreasuryLock = (player: Pick<Player, 'businesses'>, studioId: string): string | null => {
+    const studio = player.businesses.find(business => business.id === studioId && business.type === 'PRODUCTION_HOUSE');
+    if (!studio) return null;
+    const listing = player.businesses.find(candidate => {
+        const deck = candidate.studioState?.saleDeck;
+        if (candidate.type !== 'PRODUCTION_HOUSE' || !deck || deck.status === 'CLOSED' || deck.status === 'WITHDRAWN') return false;
+        if (candidate.id === studioId) return true;
+        const isParentPackage = !isAcquiredStudio(candidate) && candidate.studioState?.operatingModel !== 'FULL_MERGER';
+        return isParentPackage && isAcquiredStudio(studio) && studio.isActive !== false;
+    });
+    return listing
+        ? `${listing.name} has a live sale listing. Cancel the sale before moving capital; refresh buyer terms after material business changes.`
+        : null;
+};
+
+/** Acquired equity and bundled assets must leave through the ownership-aware sale settlement. */
+export const getStudioLiquidationBlocker = (player: Pick<Player, 'businesses'>, studio: Business): string | null => {
+    const listingLock = getStudioSaleTreasuryLock(player, studio.id);
+    if (listingLock) return listingLock;
+    if (isAcquiredStudio(studio)) return 'Use the studio sale room to exit an acquired studio so shareholder ownership and debt are settled correctly.';
+    if (player.businesses.some(candidate => candidate.id !== studio.id && isAcquiredStudio(candidate) && candidate.isActive !== false)) {
+        return 'Use the studio sale room to exit this group so subsidiary ownership, cash and debt are settled together.';
+    }
+    return null;
+};
+
 export const performStudioTreasuryTransfer = ({
     player,
     studioId,
@@ -498,6 +525,7 @@ export const performStudioTreasuryTransfer = ({
         | 'STUDIO_NOT_FOUND'
         | 'NOT_ACQUIRED_STUDIO'
         | 'MERGED_STUDIO'
+        | 'LIVE_SALE_LISTING'
         | 'HQ_NOT_FOUND'
         | 'INSUFFICIENT_PERSONAL_CASH'
         | 'INSUFFICIENT_HQ_CAPITAL'
@@ -509,12 +537,15 @@ export const performStudioTreasuryTransfer = ({
 
     const studio = player.businesses.find(business => business.id === studioId && business.type === 'PRODUCTION_HOUSE');
     if (!studio?.studioState) return { success: false, player, reason: 'STUDIO_NOT_FOUND' };
-    if (!isAcquiredStudio(studio)) return { success: false, player, studio, reason: 'NOT_ACQUIRED_STUDIO' };
+    if (!isAcquiredStudio(studio) && counterparty === 'HQ') return { success: false, player, studio, reason: 'NOT_ACQUIRED_STUDIO' };
     if (studio.studioState.operatingModel === 'FULL_MERGER') return { success: false, player, studio, reason: 'MERGED_STUDIO' };
 
     const parentStudio = counterparty === 'HQ' ? getParentStudio(player, studioId) : undefined;
     if (counterparty === 'HQ' && !parentStudio?.studioState) {
         return { success: false, player, studio, reason: 'HQ_NOT_FOUND' };
+    }
+    if (getStudioSaleTreasuryLock(player, studio.id) || (parentStudio && getStudioSaleTreasuryLock(player, parentStudio.id))) {
+        return { success: false, player, studio, parentStudio, reason: 'LIVE_SALE_LISTING' };
     }
     if (action === 'INJECT' && counterparty === 'PERSONAL' && player.money < safeAmount) {
         return { success: false, player, studio, reason: 'INSUFFICIENT_PERSONAL_CASH' };
@@ -523,7 +554,13 @@ export const performStudioTreasuryTransfer = ({
         return { success: false, player, studio, parentStudio, reason: 'INSUFFICIENT_HQ_CAPITAL' };
     }
     const withdrawalQuote = action === 'WITHDRAW'
-        ? getStudioTreasuryWithdrawalQuote(player, studio, safeAmount)
+        ? isAcquiredStudio(studio)
+            ? getStudioTreasuryWithdrawalQuote(player, studio, safeAmount)
+            : {
+                ownershipPercent: 100, operatingReserve: 0, distributableCash: Math.max(0, studio.balance),
+                maxOwnerProceeds: Math.max(0, studio.balance), requestedOwnerProceeds: safeAmount,
+                grossDistribution: safeAmount, minorityDistribution: 0,
+            }
         : undefined;
     if (withdrawalQuote && safeAmount > withdrawalQuote.maxOwnerProceeds) {
         return {
@@ -650,6 +687,16 @@ export const performStudioTreasuryTransfer = ({
     };
 };
 
+export const getStudioFullMergerBlocker = (player: Player, studio: Business): string | null => {
+    const parent = getParentStudio(player, studio.id);
+    const saleLock = getStudioSaleTreasuryLock(player, studio.id) || (parent ? getStudioSaleTreasuryLock(player, parent.id) : null);
+    if (saleLock) return saleLock;
+    if (getStudioOwnershipPercent(player, studio) < 100) {
+        return 'Full merger requires 100% ownership. Buy the remaining shares first, or keep this studio as a subsidiary.';
+    }
+    return null;
+};
+
 export const executeFullStudioMerger = ({
     player,
     studioId,
@@ -662,7 +709,7 @@ export const executeFullStudioMerger = ({
     parentStudio?: Business;
     mergedStudio?: Business;
     integrationCost?: number;
-    reason?: 'STUDIO_NOT_FOUND' | 'NOT_ACQUIRED_STUDIO' | 'ALREADY_MERGED' | 'HQ_NOT_FOUND';
+    reason?: 'STUDIO_NOT_FOUND' | 'NOT_ACQUIRED_STUDIO' | 'ALREADY_MERGED' | 'HQ_NOT_FOUND' | 'LIVE_SALE_LISTING' | 'MINORITY_OWNERSHIP';
 } => {
     const studio = player.businesses.find(business => business.id === studioId && business.type === 'PRODUCTION_HOUSE');
     if (!studio?.studioState) return { success: false, player, reason: 'STUDIO_NOT_FOUND' };
@@ -670,6 +717,14 @@ export const executeFullStudioMerger = ({
     if (studio.studioState.operatingModel === 'FULL_MERGER') return { success: false, player, mergedStudio: studio, reason: 'ALREADY_MERGED' };
     const parentStudio = getParentStudio(player, studioId);
     if (!parentStudio?.studioState) return { success: false, player, mergedStudio: studio, reason: 'HQ_NOT_FOUND' };
+
+    if (getStudioSaleTreasuryLock(player, studio.id) || getStudioSaleTreasuryLock(player, parentStudio.id)) {
+        return { success: false, player, parentStudio, reason: 'LIVE_SALE_LISTING' };
+    }
+
+    if (getStudioOwnershipPercent(player, studio) < 100) {
+        return { success: false, player, parentStudio, mergedStudio: studio, reason: 'MINORITY_OWNERSHIP' };
+    }
 
     const parentState = normalizeStudioState(parentStudio.studioState, player.currentWeek);
     const acquiredState = normalizeStudioState(studio.studioState, player.currentWeek);
@@ -852,7 +907,7 @@ export const reverseFullStudioMerger = ({
     restoredStudio?: Business;
     parentStudio?: Business;
     terms?: FullMergerCarveOutTerms;
-    reason?: 'STUDIO_NOT_FOUND' | 'NOT_MERGED' | 'HQ_NOT_FOUND' | 'HQ_INSUFFICIENT_CAPITAL';
+    reason?: 'STUDIO_NOT_FOUND' | 'NOT_MERGED' | 'HQ_NOT_FOUND' | 'HQ_INSUFFICIENT_CAPITAL' | 'LIVE_SALE_LISTING';
 } => {
     const studio = player.businesses.find(business => business.id === studioId && business.type === 'PRODUCTION_HOUSE');
     if (!studio?.studioState) return { success: false, player, reason: 'STUDIO_NOT_FOUND' };
@@ -862,6 +917,9 @@ export const reverseFullStudioMerger = ({
     const parentStudio = getParentStudio(player, studioId);
     if (!parentStudio?.studioState) return { success: false, player, reason: 'HQ_NOT_FOUND' };
 
+    if (getStudioSaleTreasuryLock(player, studio.id) || getStudioSaleTreasuryLock(player, parentStudio.id)) {
+        return { success: false, player, parentStudio, reason: 'LIVE_SALE_LISTING' };
+    }
     const terms = getFullMergerCarveOutTermsInternal(studio);
     if (parentStudio.balance < terms.totalCost) {
         return { success: false, player, parentStudio, terms, reason: 'HQ_INSUFFICIENT_CAPITAL' };

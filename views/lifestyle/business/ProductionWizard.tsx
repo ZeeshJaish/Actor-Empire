@@ -189,7 +189,7 @@ export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCa
                 pricing: 'HIGH', 
                 marketing: 'HIGH', 
                 headOfProductionId: headOfProd 
-            }, '🎬', player.currentWeek);
+            }, '🎬', player.currentWeek, player.age);
 
             const hopName = getHeadOfProductionName(headOfProd);
 

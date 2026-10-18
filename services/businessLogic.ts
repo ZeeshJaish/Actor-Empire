@@ -747,7 +747,7 @@ export const generateCandidates = (): EmployeeCandidate[] => {
 };
 
 export const createBusiness = (
-    name: string, type: BusinessType, subtype: BusinessSubtype, config: BusinessConfig, logo: string, currentWeek: number
+    name: string, type: BusinessType, subtype: BusinessSubtype, config: BusinessConfig, logo: string, currentWeek: number, currentYear?: number
 ): Business => {
     const cost = calculateSetupCost(type, subtype, config);
     const blueprint = BUSINESS_BLUEPRINTS[type];
@@ -764,7 +764,9 @@ export const createBusiness = (
     }
 
     return {
-        id: `biz_${Date.now()}`, name, type, subtype, logo, color: 'bg-zinc-800', foundedWeek: currentWeek, balance: initialBalance, isActive: true,
+        id: `biz_${Date.now()}`, name, type, subtype, logo, color: 'bg-zinc-800', foundedWeek: currentWeek,
+        ...(Number.isFinite(currentYear) ? { foundedYear: currentYear, foundedAbsoluteWeek: getAbsoluteWeek(currentYear!, currentWeek) } : {}),
+        balance: initialBalance, isActive: true,
         config: { ...config, marketingBudget: { social: 0, influencer: 0, billboard: 0, tv: 0 } },
         stats: {
             weeklyRevenue: 0, weeklyExpenses: 0, weeklyProfit: 0, lifetimeRevenue: 0, valuation: creationCost, brandHealth: 50, customerSatisfaction: 50, riskLevel: 10, hype: 20,
@@ -1427,7 +1429,7 @@ export const processBusinessWeek = (
         alerts.push(t(language, 'services.business.weekly.negativeFundsAlert', { businessName: b.name }));
     }
 
-    b.history.unshift({ week: 0, profit }); 
+    b.history.unshift({ week, year, profit });
     if (b.history.length > 12) b.history.pop();
 
     return { updated: b, alerts, rightsReportsReady, rightsNegotiationResponses };

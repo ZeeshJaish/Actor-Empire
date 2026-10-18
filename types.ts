@@ -1915,11 +1915,19 @@ export interface StudioSaleOffer {
     headline: string;
     amount: number;
     cashAtClose: number;
+    /** Immutable original bid anchors keep repeated negotiations from compounding. */
+    originalAmount?: number;
+    originalRoyaltyPercent?: number;
+    packageCash?: number;
+    /** Net company equity before allocating proceeds to the seller ownership. */
+    companyCashAtClose?: number;
+    sellerOwnershipPercent?: number;
     debtAssumed: number;
     bankerFee: number;
     royaltyPercent: number;
     royaltyWeeks: number;
     royaltyEstimate: number;
+    royaltyCompanyEstimate?: number;
     availableWeek: number;
     availableYear: number;
     availableAfterWeeks: number;
@@ -1941,6 +1949,11 @@ export interface StudioSaleDeck {
     minimumPrice: number;
     indicativeValuation: number;
     debtAtListing?: number;
+    /** Versioned balance sheet agreed with buyers; stale legacy offers require refresh. */
+    saleSnapshot?: {
+        version: 1;
+        studios: Array<{ id: string; cash: number; debt: number; ownershipPercent: number; materialFingerprint: string }>;
+    };
     listedWeek: number;
     listedYear: number;
     offerWindowWeeks: number;
@@ -1995,6 +2008,9 @@ export interface StudioState {
     acquisitionOrigin?: 'STUDIO_ACQUISITION';
     acquiredWeek?: number;
     acquiredYear?: number;
+    acquiredAbsoluteWeek?: number;
+    /** Actual completed-week receipts and operating profit; never an annualized forecast. */
+    saleEarningsHistory?: Array<{ absoluteWeek: number; revenue: number; profit: number; ledgerEntryIds?: string[] }>;
     acquisitionPortfolio?: StudioAcquisitionPortfolio;
     formerNames?: string[];
     lastRenamedWeek?: number;
@@ -7791,6 +7807,8 @@ export interface Business {
     logo: string;
     color: string;
     foundedWeek: number;
+    foundedYear?: number;
+    foundedAbsoluteWeek?: number;
     balance: number;
     isActive: boolean;
     config: BusinessConfig;
@@ -7799,7 +7817,7 @@ export interface Business {
     products: BusinessProduct[];
     hiringPool: EmployeeCandidate[];
     lastHiringRefreshWeek: number;
-    history: { week: number, profit: number }[];
+    history: { week: number, year?: number, profit: number }[];
     studioState?: StudioState;
 }
 

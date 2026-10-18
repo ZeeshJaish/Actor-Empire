@@ -1,3 +1,4 @@
+import { rebaseStudioSaleHistoryForInheritance } from './studioSaleHistory';
 import { ActorSkills, BloodlineMember, NPCActor, Player, PortfolioItem, Relationship, StreamingState, UniverseId, ProjectType } from '../types';
 import { buildDynastySuccessionState } from './dynastyCareer';
 
@@ -254,7 +255,13 @@ export const buildLegacyStudioInheritance = (
 ) => {
     const isDeceased = options.isDeceased ?? !!player.flags?.isDead;
     const parentActor = createLegacyParentActor(player, isDeceased);
-    const inheritedBusinesses = rewritePlayerSelfReferencesForLegacyParent(player.businesses || [], parentActor);
+    const sourceAbsoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+    const targetAbsoluteWeek = getAbsoluteWeek(options.heirAge ?? player.age, options.heirWeek ?? player.currentWeek);
+    const inheritedBusinesses = rebaseStudioSaleHistoryForInheritance(
+        rewritePlayerSelfReferencesForLegacyParent(player.businesses || [], parentActor),
+        sourceAbsoluteWeek,
+        targetAbsoluteWeek,
+    );
     const inheritedStudio = player.studio ? rewritePlayerSelfReferencesForLegacyParent(player.studio, parentActor) : undefined;
     const inheritedWorld = player.world ? rewritePlayerSelfReferencesForLegacyParent(player.world, parentActor) : undefined;
     const studioIds = inheritedBusinesses
@@ -336,8 +343,6 @@ export const buildLegacyStudioInheritance = (
         activeReleases: legacyCareerActiveReleases,
         awards: clone(player.awards || []),
     };
-    const sourceAbsoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
-    const targetAbsoluteWeek = getAbsoluteWeek(options.heirAge ?? player.age, options.heirWeek ?? player.currentWeek);
     const dynastySuccession = buildDynastySuccessionState({
         player,
         parentActor,

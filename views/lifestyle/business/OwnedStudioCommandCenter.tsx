@@ -36,6 +36,7 @@ import {
     getStudioMandateGroups,
     getStudioOperatingMandate,
     getStudioTreasuryWithdrawalQuote,
+    getStudioSaleTreasuryLock,
     getSubsidiaryControlProfile,
     performStudioTreasuryTransfer,
     setStudioOperatingMandate,
@@ -401,6 +402,8 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
     const parentStudio = getStudioGroup(player).parentStudio;
     const treasuryParsedAmount = Number.parseInt(treasuryAmount.replace(/[^\d]/g, ''), 10) || 0;
     const withdrawalQuote = getStudioTreasuryWithdrawalQuote(player, studio, treasuryParsedAmount);
+    const treasuryLock = getStudioSaleTreasuryLock(player, studio.id)
+        || (treasuryCounterparty === 'HQ' && parentStudio ? getStudioSaleTreasuryLock(player, parentStudio.id) : null);
     const debtParsedAmount = Number.parseInt(debtPaydownAmount.replace(/[^\d]/g, ''), 10) || 0;
     const proposals = [...(studio.studioState?.subsidiaryProjectProposals || [])].sort((a, b) => {
         const aTime = (a.createdYear * 52) + a.createdWeek;
@@ -492,6 +495,7 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
         if (!result.success) {
             const reasonCopy: Record<string, string> = {
                 INVALID_AMOUNT: 'Enter a valid transfer amount.',
+                LIVE_SALE_LISTING: treasuryLock || 'Cancel the live sale before moving capital.',
                 INSUFFICIENT_PERSONAL_CASH: 'Personal balance is lower than that injection.',
                 INSUFFICIENT_HQ_CAPITAL: 'Headquarters capital is lower than that injection.',
                 INSUFFICIENT_STUDIO_CAPITAL: 'This studio cannot cover that withdrawal.',
@@ -1340,6 +1344,7 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
                                     <button
                                         type="button"
                                         onClick={handleTreasuryTransfer}
+                                        disabled={!!treasuryLock}
                                         className="mt-3 flex min-h-12 w-full items-center justify-center rounded-[16px] border-2 border-emerald-300/35 bg-emerald-300 px-4 text-[11px] font-black uppercase text-black shadow-[0_5px_0_#064e3b] active:translate-y-0.5 active:shadow-[0_2px_0_#064e3b]"
                                     >
                                         {treasuryAction === 'INJECT' ? 'Authorize Injection' : 'Authorize Withdrawal'}
@@ -1349,9 +1354,9 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
                                             ? `Moves money into ${studio.name} so it can fund productions under its own banner.`
                                             : `Pulls available cash out of ${studio.name} without changing its operating model.`}
                                     </p>
-                                    {treasuryFeedback ? (
+                                    {(treasuryFeedback || treasuryLock) ? (
                                         <div aria-live="polite" className="mt-3 rounded-[12px] border border-amber-300/20 bg-amber-300/[0.07] px-3 py-2 text-[10px] font-black uppercase text-amber-200">
-                                            {treasuryFeedback}
+                                            {treasuryFeedback || treasuryLock}
                                         </div>
                                     ) : null}
                                 </div>

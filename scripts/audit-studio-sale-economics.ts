@@ -1,5 +1,6 @@
 import { INITIAL_PLAYER, type Business, type Player } from '../types';
 import { getAcquisitionDebtSummary } from '../services/acquisitionDebt';
+import { getAbsoluteWeek } from '../services/legacyLogic';
 import {
     acceptStudioSaleOffer,
     completeStudioSaleTransfer,
@@ -142,6 +143,14 @@ const mergedStudio = makeStudio('SEARCHLIGHT', 'Searchlight Pictures', {
     },
 });
 
+// Completed statements support genuine group earnings without projecting one week into a year.
+for (const studio of [parentStudio, acquiredStudio, mergedStudio]) {
+    studio.studioState!.saleEarningsHistory = Array.from({ length: 13 }, (_, index) => ({
+        absoluteWeek: getAbsoluteWeek(36, 22) - index,
+        revenue: studio.stats.weeklyRevenue,
+        profit: studio.stats.weeklyProfit,
+    }));
+}
 const player: Player = {
     ...INITIAL_PLAYER,
     id: 'audit_studio_sale',
@@ -207,7 +216,7 @@ const player: Player = {
 };
 
 const valuation = getStudioSaleValuation(player, parentStudio);
-assert(valuation.annualRevenue > parentStudio.stats.weeklyRevenue * 52, 'Parent sale valuation should include acquired studio revenue.');
+assert(valuation.annualRevenue === 13 * (42_000_000 + 14_000_000 + 8_000_000), 'Parent sale must sum all recorded group receipts without annualizing a weekly spike.');
 assert(valuation.debt === 2_500_000_000, 'Parent sale valuation should include all bundled studio debt.');
 assert(valuation.includedStudios.length === 3, 'Parent sale valuation should disclose each bundled studio in the banker file.');
 assert(valuation.includedStudios.some(studio => studio.id === 'ARTISAN_PICTURES' && studio.isAcquired), 'Parent sale valuation should mark acquired subsidiaries.');
@@ -337,7 +346,7 @@ assert(listed.success && listed.deck, 'Valid parent sale should create a sale de
 assert(listed.deck.debtAtListing === valuation.debt, 'Sale deck should snapshot debt at listing.');
 
 listed.deck.offers.forEach(offer => {
-    const sellerDebtPayoff = Math.max(0, offer.amount - offer.bankerFee - offer.cashAtClose);
+    const sellerDebtPayoff = Math.max(0, offer.amount - offer.bankerFee - (offer.companyCashAtClose ?? offer.cashAtClose));
     assert(
         offer.debtAssumed + sellerDebtPayoff >= valuation.debt - 1_000_000,
         `Every offer should account for all listed debt through assumption or escrow payoff. ${offer.buyerName}: assumed=${offer.debtAssumed}, escrow=${sellerDebtPayoff}, debt=${valuation.debt}, amount=${offer.amount}, fee=${offer.bankerFee}, cash=${offer.cashAtClose}`,
@@ -394,7 +403,7 @@ const catalogChild = makeStudio('CATALOG_CHILD', 'Catalog Child Pictures', {
         ...parentStudio.studioState!,
         acquisitionOrigin: 'STUDIO_ACQUISITION',
         operatingModel: 'CONTROLLED_SUBSIDIARY',
-        acquiredWeek: 19,
+        acquiredWeek: 8,
         acquiredYear: 36,
         purchasedIPTitles: ['Moon Vault'],
         ownedRights: [{

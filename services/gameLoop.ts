@@ -1,3 +1,4 @@
+import { recordStudioSaleEarnings } from './studioSaleHistory';
 import { hasTalentUses, mergeParentStudioTalentRosters, settleTalentContractWeek, talentAmountOutstanding } from './talentRoster';
 import {streamingBackendPercentForBuyer} from './streamingBackendPolicy';
 
@@ -7235,6 +7236,9 @@ export const processGameWeek = async (
     emitLoopStage('subsidiaries_done', {
         subsidiaries: nextPlayer.businesses?.filter(business => (business as any).parentStudioId).length || 0,
     });
+
+    // Persist the full completed-week statement after theatrical, soundtrack, platform and subsidiary flows.
+    nextPlayer = recordStudioSaleEarnings(nextPlayer, targetAbsoluteWeek, player);
 
     const actorArcTransition = getActorCareerArcTransitionFromPrevious(actorArcBeforeWeek, nextPlayer);
     const currentArcAbsoluteWeek = getAbsoluteWeek(nextPlayer.age, nextPlayer.currentWeek);

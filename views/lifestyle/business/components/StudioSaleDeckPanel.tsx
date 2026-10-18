@@ -1,3 +1,4 @@
+import { getStudioOwnershipPercent } from '../../../../services/studioOwnership';
 import React from 'react';
 import {
     ArrowLeft,
@@ -27,6 +28,8 @@ import {
     getStudioSaleEffectiveTransferTerms,
     getStudioSalePricingIssue,
     getStudioSaleReadiness,
+    getStudioSaleRevalidationIssue,
+    refreshStudioSaleDeck,
     getStudioSaleValuation,
     getStudioSaleWindowState,
     normalizeStudioSalePricing,
@@ -420,8 +423,11 @@ export const StudioSaleRoom: React.FC<StudioSaleRoomProps> = ({
     const liveStudio = getLiveStudio(player, studio);
     const deck = liveStudio.studioState?.saleDeck;
     const activeDeck = isActiveDeck(deck) ? deck : null;
+    const revalidationIssue = activeDeck ? getStudioSaleRevalidationIssue(player, liveStudio, activeDeck) : null;
     const valuation = React.useMemo(() => getStudioSaleValuation(player, liveStudio), [player, liveStudio]);
     const readiness = React.useMemo(() => getStudioSaleReadiness(player, liveStudio), [player, liveStudio]);
+    const ownershipPercent = getStudioOwnershipPercent(player, liveStudio);
+    const catalogRetentionAllowed = getStudioSaleEffectiveTransferTerms(player, liveStudio, { catalogRights: 'SELLER_RETAINS_BACK_CATALOG' }).catalogRights !== 'FULL_LIBRARY';
     const windowState = activeDeck ? getStudioSaleWindowState(player, activeDeck) : null;
     const acceptedOffer = activeDeck?.offers.find(offer => offer.id === activeDeck.acceptedOfferId);
 
@@ -505,6 +511,19 @@ export const StudioSaleRoom: React.FC<StudioSaleRoomProps> = ({
         const result = withdrawStudioSaleDeck(player, liveStudio.id);
         setFeedback(result.message);
         if (result.success) onUpdatePlayer(result.player);
+    };
+
+    const handleRefresh = () => {
+        const result = refreshStudioSaleDeck(player, liveStudio.id);
+        setFeedback(result.message);
+        if (result.success) {
+            onUpdatePlayer(result.player);
+            setSigningPage(0);
+            setDocSigned(false);
+            setWaxVisible(false);
+            setButtonReady(false);
+            setCounterDrafts({});
+        }
     };
 
     const draftFor = (offerId: string): CounterDraft => counterDrafts[offerId] || { amount: '', royalty: '2' };
@@ -610,7 +629,7 @@ export const StudioSaleRoom: React.FC<StudioSaleRoomProps> = ({
                 </div>
                 <div className="mt-2">
                     {[
-                        { label: 'Annual Revenue', value: valuation.annualRevenue, tone: 'text-emerald-300', minus: false, delay: 250 },
+                        { label: 'Recorded Revenue', value: valuation.annualRevenue, tone: 'text-emerald-300', minus: false, delay: 250 },
                         { label: 'Catalog & IP Library', value: valuation.catalogValue, tone: 'text-sky-300', minus: false, delay: 390 },
                         { label: 'Outstanding Debt', value: valuation.debt, tone: valuation.debt > 0 ? 'text-rose-300' : 'text-zinc-400', minus: true, delay: 530 },
                     ].map((row, index, rows) => (
@@ -761,8 +780,8 @@ export const StudioSaleRoom: React.FC<StudioSaleRoomProps> = ({
                         <Library size={12} />
                         IP & Catalog Transfer
                     </div>
-                    <div className={`grid gap-1.5 ${valuation.isParentSale ? 'grid-cols-1' : 'grid-cols-[repeat(3,minmax(0,1fr))]'}`}>
-                        {(valuation.isParentSale ? catalogOptions.filter(option => option.id === 'FULL_LIBRARY') : catalogOptions).map(option => (
+                    <div className={`grid gap-1.5 ${!catalogRetentionAllowed ? 'grid-cols-1' : 'grid-cols-[repeat(3,minmax(0,1fr))]'}`}>
+                        {(!catalogRetentionAllowed ? catalogOptions.filter(option => option.id === 'FULL_LIBRARY') : catalogOptions).map(option => (
                             <DealChip
                                 key={option.id}
                                 selected={terms.catalogRights === option.id}
@@ -776,6 +795,10 @@ export const StudioSaleRoom: React.FC<StudioSaleRoomProps> = ({
                     {valuation.isParentSale ? (
                         <div className="mt-2 rounded-[11px] border border-amber-300/15 bg-amber-300/[0.05] px-3 py-2 text-[9px] font-bold leading-relaxed text-amber-100/70">
                             Parent sale transfers the full library with the production house and bundled subsidiaries.
+                        </div>
+                    ) : ownershipPercent < 100 ? (
+                        <div className="mt-2 rounded-[11px] border border-amber-300/15 bg-amber-300/[0.05] px-3 py-2 text-[9px] font-bold leading-relaxed text-amber-100/70">
+                            Retaining the full library requires 100% ownership; minority owners must receive their share.
                         </div>
                     ) : valuation.retainedCatalogTargetStudioName ? (
                         <div className="mt-2 rounded-[11px] border border-sky-300/15 bg-sky-300/[0.05] px-3 py-2 text-[9px] font-bold leading-relaxed text-sky-100/70">
@@ -947,7 +970,7 @@ export const StudioSaleRoom: React.FC<StudioSaleRoomProps> = ({
 
                     <div className="mt-3 rounded-[14px] border border-amber-300/[0.22] bg-gradient-to-br from-amber-300/[0.09] to-transparent px-3 py-2.5">
                         <div className="text-[8px] font-black uppercase tracking-[0.12em] text-amber-300/60">
-                            {offer.counterStatus === 'ACCEPTED' ? 'Counter Locked' : 'Bid On Table'}
+                            {offer.counterStatus === 'ACCEPTED' ? 'Total package · Counter Locked' : 'Total package bid'}
                         </div>
                         <div className="mt-0.5 font-mono text-[21px] font-black text-amber-200">{formatMoney(offer.amount)}</div>
                         <div className={`mt-0.5 text-[8px] font-black tracking-[0.04em] ${vsAsk >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
@@ -955,8 +978,12 @@ export const StudioSaleRoom: React.FC<StudioSaleRoomProps> = ({
                         </div>
                     </div>
 
+                    {(offer.sellerOwnershipPercent ?? 100) < 100 ? (
+                        <p className="mt-2 text-[10px] font-bold text-sky-200">Your equity share: {(offer.sellerOwnershipPercent ?? 100).toFixed(1)}%. Your proceeds exclude outside shareholders.</p>
+                    ) : null}
+
                     <div className="mt-2 grid grid-cols-4 gap-1.5">
-                        <MiniMetric label="Cash" value={formatMoney(offer.cashAtClose)} tone="text-emerald-300" />
+                        <MiniMetric label="Your proceeds" value={formatMoney(offer.cashAtClose)} tone="text-emerald-300" />
                         <MiniMetric label="Debt" value={formatMoney(offer.debtAssumed)} tone="text-sky-200" />
                         <MiniMetric label="Royalty" value={`${offer.royaltyPercent.toFixed(1)}%`} tone="text-violet-200" />
                         <MiniMetric label="Est. Stream" value={formatMoney(offer.royaltyEstimate)} tone="text-zinc-300" />
@@ -1010,7 +1037,7 @@ export const StudioSaleRoom: React.FC<StudioSaleRoomProps> = ({
                                     <button
                                         type="button"
                                         onClick={() => handleCounter(offer.id)}
-                                        disabled={!parseMoneyInput(draft.amount)}
+                                        disabled={!!revalidationIssue || !parseMoneyInput(draft.amount)}
                                         className="shrink-0 rounded-[12px] border-[1.5px] border-sky-300/40 bg-sky-300/[0.12] px-3 text-[9px] font-black uppercase leading-tight tracking-[0.06em] text-sky-200 disabled:cursor-not-allowed disabled:opacity-35"
                                     >
                                         Send<br />Counter
@@ -1021,7 +1048,7 @@ export const StudioSaleRoom: React.FC<StudioSaleRoomProps> = ({
                                 <button
                                     type="button"
                                     onClick={() => handleCounterAll(offer.id)}
-                                    disabled={!parseMoneyInput(draft.amount)}
+                                    disabled={!!revalidationIssue || !parseMoneyInput(draft.amount)}
                                     className="min-h-11 rounded-[14px] border border-sky-300/25 bg-sky-300/[0.06] px-2 text-[9.5px] font-black uppercase tracking-[0.05em] text-sky-200 disabled:cursor-not-allowed disabled:opacity-30"
                                 >
                                     Counter All At This
@@ -1029,6 +1056,7 @@ export const StudioSaleRoom: React.FC<StudioSaleRoomProps> = ({
                                 <button
                                     type="button"
                                     onClick={() => handleAccept(offer.id)}
+                                    disabled={!!revalidationIssue}
                                     className="flex min-h-11 items-center justify-center gap-1.5 rounded-[14px] border-2 border-emerald-300/40 bg-gradient-to-b from-emerald-200 to-emerald-300 px-2 text-[10.5px] font-black uppercase tracking-[0.05em] text-black shadow-[0_4px_0_#064e3b] active:translate-y-0.5 active:shadow-[0_2px_0_#064e3b]"
                                 >
                                     <FileSignature size={14} />
@@ -1154,13 +1182,16 @@ export const StudioSaleRoom: React.FC<StudioSaleRoomProps> = ({
                         all associated banner operations for the negotiated consideration below.
                     </p>
                     <div className="mt-3 flex min-w-0 items-center justify-between gap-2 rounded-[12px] border border-amber-300/[0.15] bg-amber-300/[0.04] px-3 py-2">
-                        <span className="shrink-0 text-[8px] font-black uppercase tracking-[0.1em] text-amber-300/60">Final Price</span>
+                        <span className="shrink-0 text-[8px] font-black uppercase tracking-[0.1em] text-amber-300/60">Total package</span>
                         <span className="min-w-0 truncate text-right font-mono text-[13px] font-black text-amber-200">{formatMoneyInput(acceptedOffer.amount)}</span>
                     </div>
                     <div className="mt-2 flex min-w-0 items-center justify-between gap-2 rounded-[12px] border border-amber-300/[0.15] bg-amber-300/[0.04] px-3 py-2">
-                        <span className="shrink-0 text-[8px] font-black uppercase tracking-[0.1em] text-amber-300/60">Net Cash At Close</span>
+                        <span className="shrink-0 text-[8px] font-black uppercase tracking-[0.1em] text-amber-300/60">Your proceeds</span>
                         <span className="min-w-0 truncate text-right font-mono text-[13px] font-black text-amber-200">{formatMoneyInput(acceptedOffer.cashAtClose)}</span>
                     </div>
+                    {(acceptedOffer.sellerOwnershipPercent ?? 100) < 100 ? (
+                        <p className="mt-2 text-[10px] font-bold text-sky-200">Your equity share: {(acceptedOffer.sellerOwnershipPercent ?? 100).toFixed(1)}%. The remaining equity proceeds belong to outside shareholders.</p>
+                    ) : null}
                     <p className="mt-3.5 text-[8px] font-semibold uppercase leading-[1.7] tracking-[0.04em] text-[#4d483f]">
                         Subject to banker fees, escrow release schedule and the transfer conditions enumerated in documents two through four.
                         Execution of this page binds both parties to the closing calendar.
@@ -1356,7 +1387,7 @@ export const StudioSaleRoom: React.FC<StudioSaleRoomProps> = ({
                     <div className="mt-5 flex flex-col gap-2">
                         {[
                             { label: 'Buyer', value: soldSummary.buyerName, tone: 'text-white', delay: '1.7s' },
-                            { label: 'Final Price', value: formatMoneyInput(soldSummary.amount), tone: 'text-amber-200', delay: '1.9s' },
+                            { label: 'Total package', value: formatMoneyInput(soldSummary.amount), tone: 'text-amber-200', delay: '1.9s' },
                             {
                                 label: 'Royalty Stream',
                                 value: soldSummary.royaltyPercent > 0 ? `${soldSummary.royaltyPercent.toFixed(1)}% · ${soldSummary.royaltyWeeks} weeks` : 'Clean cash exit',
@@ -1394,7 +1425,7 @@ export const StudioSaleRoom: React.FC<StudioSaleRoomProps> = ({
        ============================================================ */
     const phase: 'sold' | 'signing' | 'offers' | 'setup' = soldSummary
         ? 'sold'
-        : activeDeck?.status === 'SIGNING' ? 'signing'
+        : activeDeck?.status === 'SIGNING' && !revalidationIssue ? 'signing'
         : activeDeck ? 'offers'
         : 'setup';
 
@@ -1453,6 +1484,15 @@ export const StudioSaleRoom: React.FC<StudioSaleRoomProps> = ({
                             </div>
                         </div>
                     </header>
+
+                    {revalidationIssue ? (
+                        <div role="status" className="shrink-0 border-b border-amber-300/20 bg-[#1c1608] px-4 py-3 text-[11px] font-bold text-amber-100">
+                            <p>{revalidationIssue}</p>
+                            <button type="button" onClick={handleRefresh} className="mt-2 min-h-11 rounded-xl bg-amber-300 px-4 font-black text-black">
+                                Refresh buyer terms
+                            </button>
+                        </div>
+                    ) : null}
 
                     {phase === 'signing' ? (
                         <div className="flex-1 overflow-hidden">

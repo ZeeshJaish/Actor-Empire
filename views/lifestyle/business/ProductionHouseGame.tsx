@@ -26,7 +26,7 @@ import { getProjectReleaseLabel, getProjectReleaseSortValue, getProjectReleaseTi
 import { getReleaseDisplayPhase } from '../../../services/releasePresentation';
 import { createContinuationScript, getContinuationEligibility, getContinuationScriptBaseline } from '../../../services/sequelFlow';
 import { suggestReturningBackendDemand } from '../../../services/talentParticipation';
-import { getStudioGroup } from '../../../services/studioGroup';
+import { getStudioGroup, getStudioSaleTreasuryLock, getStudioLiquidationBlocker, performStudioTreasuryTransfer } from '../../../services/studioGroup';
 import { getStudioGroupValuation } from '../../../services/studioGroupValuation';
 import { StudioGroupView } from './StudioGroupView';
 import { CustomPosterImage } from '../../../components/CustomPosterImage';
@@ -1352,73 +1352,27 @@ const FinanceModal: React.FC<{
     const language = getPlayerLanguage(player);
     const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
 
-    const handleInject = () => {
-        if (amount <= 0) {
-            setErrorMsg(tr('services.business.productionFinance.error.invalidInject'));
+    const treasuryLock = getStudioSaleTreasuryLock(player, studio.id);
+    const handleTransfer = (action: 'INJECT' | 'WITHDRAW') => {
+        const result = performStudioTreasuryTransfer({ player, studioId: studio.id, action, counterparty: 'PERSONAL', amount });
+        if (!result.success) {
+            const reasons: Record<string, string> = {
+                INVALID_AMOUNT: tr(action === 'INJECT' ? 'services.business.productionFinance.error.invalidInject' : 'services.business.productionFinance.error.invalidWithdraw'),
+                INSUFFICIENT_PERSONAL_CASH: tr('services.business.productionFinance.error.notEnoughPersonalCash'),
+                EXCEEDS_DISTRIBUTABLE_CASH: tr('services.business.productionFinance.error.notEnoughStudioCapital'),
+                INSUFFICIENT_STUDIO_CAPITAL: tr('services.business.productionFinance.error.notEnoughStudioCapital'),
+                LIVE_SALE_LISTING: treasuryLock || 'Cancel the live sale before moving capital.',
+                MERGED_STUDIO: 'Use the headquarters treasury for this merged studio.',
+            };
+            setErrorMsg(reasons[result.reason || ''] || 'Transfer could not be completed.');
             return;
         }
-        if (amount > player.money) {
-            setErrorMsg(tr('services.business.productionFinance.error.notEnoughPersonalCash'));
-            return;
-        }
-        const updatedStudio = { 
-            ...studio, 
-            balance: studio.balance + amount,
-            studioState: {
-                ...studio.studioState,
-                financeLedger: [{
-                    id: `studio_ledger_inject_${player.age}_${player.currentWeek}_${Date.now()}`,
-                    week: player.currentWeek,
-                    year: player.age,
-                    amount,
-                    type: 'CAPITAL_INJECTION',
-                    label: tr('services.business.productionFinance.ledger.ownerInjection')
-                }, ...((studio.studioState?.financeLedger || []))].slice(0, 200)
-            }
-        };
-        const updatedBusinesses = player.businesses.map(b => b.id === studio.id ? updatedStudio : b);
-        onUpdatePlayer({
-            ...player,
-            money: player.money - amount,
-            businesses: updatedBusinesses
-        });
+        onUpdatePlayer(result.player);
         setErrorMsg('');
         setAmountStr('');
     };
-
-    const handleWithdraw = () => {
-        if (amount <= 0) {
-            setErrorMsg(tr('services.business.productionFinance.error.invalidWithdraw'));
-            return;
-        }
-        if (amount > studio.balance) {
-            setErrorMsg(tr('services.business.productionFinance.error.notEnoughStudioCapital'));
-            return;
-        }
-        const updatedStudio = { 
-            ...studio, 
-            balance: studio.balance - amount,
-            studioState: {
-                ...studio.studioState,
-                financeLedger: [{
-                    id: `studio_ledger_withdraw_${player.age}_${player.currentWeek}_${Date.now()}`,
-                    week: player.currentWeek,
-                    year: player.age,
-                    amount: -amount,
-                    type: 'CAPITAL_WITHDRAWAL',
-                    label: tr('services.business.productionFinance.ledger.ownerWithdrawal')
-                }, ...((studio.studioState?.financeLedger || []))].slice(0, 200)
-            }
-        };
-        const updatedBusinesses = player.businesses.map(b => b.id === studio.id ? updatedStudio : b);
-        onUpdatePlayer({
-            ...player,
-            money: player.money + amount,
-            businesses: updatedBusinesses
-        });
-        setErrorMsg('');
-        setAmountStr('');
-    };
+    const handleInject = () => handleTransfer('INJECT');
+    const handleWithdraw = () => handleTransfer('WITHDRAW');
 
     const formatMoney = (val: number | undefined | null) => {
         if (val === undefined || val === null || isNaN(val)) return '$0';
@@ -1475,9 +1429,9 @@ const FinanceModal: React.FC<{
                             <span className="text-zinc-500">{tr('services.business.productionFinance.modal.available', { personal: formatMoney(player.money), studio: formatMoney(studio.balance) })}</span>
                             {amount > 0 && <span className="text-zinc-600">{tr('services.business.productionFinance.modal.parsed', { amount: formatMoney(amount) })}</span>}
                         </div>
-                        {errorMsg && (
+                        {(errorMsg || treasuryLock) && (
                             <div className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs font-medium text-rose-300">
-                                {errorMsg}
+                                {errorMsg || treasuryLock}
                             </div>
                         )}
                     </div>
@@ -1485,14 +1439,14 @@ const FinanceModal: React.FC<{
                     <div className="grid grid-cols-2 gap-3">
                         <button 
                             onClick={handleWithdraw}
-                            disabled={amount <= 0 || amount > studio.balance}
+                            disabled={!!treasuryLock || amount <= 0 || amount > studio.balance}
                             className="bg-zinc-800 hover:bg-zinc-700 text-white font-bold py-3 rounded-xl disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
                         >
                             <ArrowLeft size={16} /> {tr('services.business.productionFinance.modal.withdraw')}
                         </button>
                         <button 
                             onClick={handleInject}
-                            disabled={amount <= 0 || amount > player.money}
+                            disabled={!!treasuryLock || amount <= 0 || amount > player.money}
                             className="bg-amber-600 hover:bg-amber-500 text-black font-bold py-3 rounded-xl disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
                         >
                             {tr('services.business.productionFinance.modal.inject')} <ArrowLeft size={16} className="rotate-180" />
@@ -1618,11 +1572,13 @@ const StudioFinanceView: React.FC<{
     };
 
     const liquidateCheck = liquidateBusiness(studio, language);
+    const liquidationBlocker = getStudioLiquidationBlocker(player, studio);
 
     const executeExit = () => {
         if (!showExitModal) return;
 
         if (showExitModal === 'LIQUIDATE') {
+            if (getStudioLiquidationBlocker(player, studio)) return;
             const res = liquidateBusiness(studio, language);
             const updatedBusinesses = player.businesses.filter(b => b.id !== studio.id);
             const newMoney = player.money + res.payout;
@@ -1844,13 +1800,14 @@ const StudioFinanceView: React.FC<{
                             {/* Liquidate Option */}
                             <button 
                                 onClick={() => setShowExitModal('LIQUIDATE')}
+                                disabled={!!liquidationBlocker}
                                 className="w-full p-4 rounded-xl border border-rose-500/30 bg-rose-950/10 hover:bg-rose-950/30 transition-all flex flex-col gap-1 text-left"
                             >
                                 <div className="flex justify-between items-center w-full">
                                     <div className="font-bold text-sm text-rose-400">{tr('services.business.productionFinance.exit.shutDownLiquidate')}</div>
                                     <div className="text-xs font-mono font-bold text-zinc-400">{tr('services.business.productionFinance.exit.estimated', { amount: formatMoney(liquidateCheck.payout) })}</div>
                                 </div>
-                                <div className="text-[10px] text-zinc-500 font-normal">{tr('services.business.productionFinance.exit.liquidateHelper')}</div>
+                                <div className="text-[10px] text-zinc-500 font-normal">{liquidationBlocker || tr('services.business.productionFinance.exit.liquidateHelper')}</div>
                             </button>
                         </div>
                     </div>
