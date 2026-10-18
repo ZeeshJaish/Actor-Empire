@@ -1,6 +1,11 @@
+import {getProjectFundingEconomics} from './projectFundingEconomics';
+import {getStreamingBuyerBackendCapability, streamingBackendPercentForBuyer, validateNewStreamingBackendTerms} from './streamingBackendPolicy';
+import {createStreamingRightsAccessGrantForOffer} from './streamingRightsAccessGrant';
+import {getWorldStreamingBuyerCommercialOffer} from './worldEconomy/worldStreamingOffers';
 import { normalizeAuctionFutureFunding } from './streamingAuctionTerms';
 import type {
     OwnedStreamingCatalogLicense,
+    OwnedStreamingRightsObligation,
     PlatformAiContentSource,
     PlatformId,
     Player,
@@ -175,6 +180,7 @@ const normalizeStreamingRightsContract = (value: unknown): StreamingRightsContra
         cataloguePackageId: cleanText(source.cataloguePackageId, '', 180) || null,
         upcomingRightsSaleId: cleanText(source.upcomingRightsSaleId, '', 180) || null,
         contentSource: source.contentSource,
+        ...(source.royaltyPurpose==='PRODUCER_PARTICIPATION'?{royaltyPurpose:'PRODUCER_PARTICIPATION' as const}:{}),
         sellerType: enumValue(source.sellerType, SELLER_TYPES, seller.type.endsWith('PLATFORM') ? 'PLATFORM' : 'STUDIO'),
         sellerPlatformId: cleanText(source.sellerPlatformId, seller.platformId || '', 80).toUpperCase().replace(/[^A-Z0-9_]/g, '_') || seller.platformId,
         windowType: enumValue(source.windowType, WINDOW_TYPES, permanentPurchase ? 'PERMANENT' : 'FIRST_WINDOW'),
@@ -205,11 +211,17 @@ const normalizeStreamingRightsContract = (value: unknown): StreamingRightsContra
         futureFunding: normalizeAuctionFutureFunding(source.futureFunding),
         localization: enumValue(source.localization, LOCALIZATION_TERMS, 'NONE'),
         localizationRequirements: normalizeLocalizationPromises(source.localizationRequirements),
-        backendBasis: 'ADJUSTED_GROSS_RECEIPTS',
+        backendBasis: source.backendBasis === 'ADS_RENTAL_RECEIPTS' ? 'ADS_RENTAL_RECEIPTS' : 'ADJUSTED_GROSS_RECEIPTS',
         guaranteeRecoupment: enumValue(source.guaranteeRecoupment, GUARANTEE_RECOUPMENT_TERMS, 'NON_RECOUPABLE'),
         backendCap: source.backendCap === null || source.backendCap === undefined ? null : finiteMoney(source.backendCap),
         cumulativeRoyaltyAccrued: finiteMoney(source.cumulativeRoyaltyAccrued),
         cumulativeRoyaltyPaid: finiteMoney(source.cumulativeRoyaltyPaid),
+        ...(source.lastRoyaltyReceiptAbsoluteWeek !== undefined ? {
+            lastRoyaltyReceiptAbsoluteWeek: finiteMoney(source.lastRoyaltyReceiptAbsoluteWeek),
+        } : {}),
+        ...(source.lastRoyaltySellerReceiptAbsoluteWeek !== undefined ? {
+            lastRoyaltySellerReceiptAbsoluteWeek:finiteMoney(source.lastRoyaltySellerReceiptAbsoluteWeek),
+        } : {}),
         settlement: {
             guarantee: enumValue(settlementSource.guarantee, GUARANTEE_DISPOSITIONS, 'PENDING'),
             paymentKey: cleanText(settlementSource.paymentKey, `streaming-guarantee:${id}`, 180),
@@ -217,6 +229,28 @@ const normalizeStreamingRightsContract = (value: unknown): StreamingRightsContra
         },
         ...(LEGACY_SOURCES.has(source.legacySource) ? {
             legacySource: source.legacySource as StreamingRightsContract['legacySource'],
+        } : {}),
+        ...(Array.isArray(source.transferredObligationStates) ? {
+            transferredObligationStates: source.transferredObligationStates.slice(0, 64).flatMap((raw: unknown) => {
+                const row = asRecord(raw);
+                if (!cleanText(row.id) || !['MARKETING_SPEND', 'VIEWERSHIP_THRESHOLD', 'FUTURE_GREENLIGHT'].includes(row.type)) return [];
+                return [{
+                    id: cleanText(row.id, '', 180), licenseId: id, sourceProjectId,
+                    title: cleanText(row.title, 'Contract obligation', 140),
+                    type: row.type as OwnedStreamingRightsObligation['type'],
+                    targetAmount: finiteMoney(row.targetAmount), observedAmount: finiteMoney(row.observedAmount),
+                    dueAtAbsoluteWeek: finiteWeek(row.dueAtAbsoluteWeek),
+                    status: enumValue(row.status, new Set<OwnedStreamingRightsObligation['status']>(['PENDING', 'ON_TRACK', 'SATISFIED', 'BREACHED']), 'PENDING'),
+                    breachPenalty: finiteMoney(row.breachPenalty), successPayment: finiteMoney(row.successPayment),
+                    resolvedAtAbsoluteWeek: row.resolvedAtAbsoluteWeek == null ? null : finiteWeek(row.resolvedAtAbsoluteWeek),
+                    counterpartyId: cleanText(row.counterpartyId, '', 180) || null,
+                    createdAtAbsoluteWeek: row.createdAtAbsoluteWeek == null ? null : finiteWeek(row.createdAtAbsoluteWeek),
+                    futureFunding: normalizeAuctionFutureFunding(row.futureFunding),
+                    sourceAuctionId: cleanText(row.sourceAuctionId, '', 180) || undefined,
+                    ...(row.fundingActivatedAtAbsoluteWeek == null ? {} : {fundingActivatedAtAbsoluteWeek: finiteWeek(row.fundingActivatedAtAbsoluteWeek)}),
+                    ...(Array.isArray(row.fundedProductionIds) ? {fundedProductionIds: row.fundedProductionIds.filter((v:unknown) => typeof v === 'string').slice(0,3)} : {}),
+                }];
+            }),
         } : {}),
         rootContractId: cleanText(source.rootContractId, id, 180),
         parentContractId: cleanText(source.parentContractId, '', 180) || null,
@@ -362,16 +396,17 @@ export const createStreamingRightsContractFromLicense = (
         sourceOfferId: input.sourceOfferId || null,
         seller,
         buyer: input.buyer,
+        buyerPlatformId:input.buyer.platformId,
         dealStructure: inferDealStructure(license),
         productionFunding: input.productionFunding || 0,
         futureSeasonFunding: input.futureSeasonFunding || 0,
         localization: input.localization || 'NONE',
         localizationRequirements: normalizeLocalizationPromises(input.localizationRequirements),
-        backendBasis: 'ADJUSTED_GROSS_RECEIPTS',
-        guaranteeRecoupment: input.guaranteeRecoupment || 'NON_RECOUPABLE',
-        backendCap: input.backendCap ?? null,
-        cumulativeRoyaltyAccrued: 0,
-        cumulativeRoyaltyPaid: 0,
+        backendBasis: license.backendBasis || 'ADJUSTED_GROSS_RECEIPTS',
+        guaranteeRecoupment: input.guaranteeRecoupment || license.guaranteeRecoupment || 'NON_RECOUPABLE',
+        backendCap: input.backendCap !== undefined ? input.backendCap : license.backendCap ?? null,
+        cumulativeRoyaltyAccrued: license.cumulativeRoyaltyAccrued || 0,
+        cumulativeRoyaltyPaid: license.cumulativeRoyaltyPaid || 0,
         settlement: {
             guarantee: input.guaranteeDisposition,
             paymentKey: `streaming-guarantee:${license.id}`,
@@ -482,6 +517,7 @@ export const migrateStreamingRightsContractRegistry = (player: Player): Player =
         };
         const licensorRevenueShare = clampPercent(release.studioRoyaltyPercentage, 0);
         const license = createStreamingLicenseContract({
+                backendBasis: 'ADJUSTED_GROSS_RECEIPTS',
             id: contractId,
             sourceProject: {
                 id: release.id,
@@ -572,6 +608,8 @@ export const millionsToFullCurrency = (millions: number): number => (
 );
 
 export interface StreamingLicenseContractInput {
+    royaltyPurpose?: 'PRODUCER_PARTICIPATION';
+    backendBasis?: OwnedStreamingCatalogLicense['backendBasis'];
     id: string;
     sourceProject: { id: string; title: string; mediaType?: 'MOVIE' | 'SERIES'; genre?: string };
     buyerPlatformId: string | null;
@@ -612,6 +650,8 @@ export const createStreamingLicenseContract = (
     const permanentPurchase = input.permanentPurchase ?? input.windowType === 'PERMANENT';
     return {
         id: input.id,
+        ...(input.royaltyPurpose?{royaltyPurpose:input.royaltyPurpose}:{}),
+        backendBasis: input.backendBasis || 'ADS_RENTAL_RECEIPTS',
         sourceProjectId: input.sourceProject.id,
         titleAtSigning: input.sourceProject.title,
         projectType: input.sourceProject.mediaType === 'SERIES' ? 'SERIES' : 'MOVIE',
@@ -654,6 +694,8 @@ export const createStreamingLicenseContract = (
 };
 
 export interface ProductionStreamingRightsContractInput {
+    fundedPremiereContinuation?: boolean;
+    backendBasis?: OwnedStreamingCatalogLicense['backendBasis'];
     sourceProjectId: string;
     title: string;
     projectType: 'MOVIE' | 'SERIES';
@@ -691,6 +733,16 @@ export const registerProductionStreamingRightsContract = (
     player: Player,
     input: ProductionStreamingRightsContractInput,
 ): { player: Player; contract: StreamingRightsContract | null; changed: boolean } => {
+    const fundedProject = input.fundedPremiereContinuation
+        ? [...(player.commitments || []),...(player.activeReleases || [])].find(row=>row.id===input.sourceProjectId) : undefined;
+    const fundedStats = fundedProject?.projectDetails?.hiddenStats;
+    const fundedContinuation = !!fundedProject && input.minimumGuarantee===0 && input.platformRevenueShare===100
+        && getProjectFundingEconomics(fundedProject).platformFunding>0
+        && (fundedStats?.nextSeasonFundingPlatformId || fundedStats?.platformId)===input.buyerPlatformId;
+    if(input.fundedPremiereContinuation && !fundedContinuation) return {player,contract:null,changed:false};
+    const eligible = getStreamingBuyerBackendCapability(player,input.buyerPlatformId,input.signedAtAbsoluteWeek,input.countryIds || []);
+    if(!fundedContinuation && input.backendBasis !== 'ADJUSTED_GROSS_RECEIPTS' && validateNewStreamingBackendTerms({minimumGuarantee:input.minimumGuarantee,
+        licensorRevenueShare:100-input.platformRevenueShare,capability:eligible})) return {player,contract:null,changed:false};
     const signedAtAbsoluteWeek = finiteWeek(input.signedAtAbsoluteWeek);
     const startsAtAbsoluteWeek = Math.max(signedAtAbsoluteWeek, finiteWeek(input.startsAtAbsoluteWeek, signedAtAbsoluteWeek));
     const durationWeeks = Math.max(1, finiteWeek(input.durationWeeks, 52));
@@ -715,6 +767,7 @@ export const registerProductionStreamingRightsContract = (
         platformId: input.buyerPlatformId,
     };
     const license = createStreamingLicenseContract({
+        backendBasis: fundedContinuation ? Object.values(player.world.streamingRightsContracts || {}).find(row=>row.sourceProjectId===fundedStats?.nextSeasonFundingSourceProjectId && row.buyer.platformId===input.buyerPlatformId)?.backendBasis || 'ADJUSTED_GROSS_RECEIPTS' : input.backendBasis,
         id: contractId,
         sourceProject: {
             id: input.sourceProjectId,
@@ -745,10 +798,7 @@ export const registerProductionStreamingRightsContract = (
         sublicensingAllowed: false,
         sequelRightsIncluded: false,
         changeOfControl: 'NOTICE',
-        accessGrant: {
-            schemaVersion: 1, modes: ['SUBSCRIPTION'], earlyWindowWeeks: 0,
-            purchaseFulfillment: 'NONE', source: 'EXPLICIT',
-        },
+        accessGrant: createStreamingRightsAccessGrantForOffer(getWorldStreamingBuyerCommercialOffer(player,input.buyerPlatformId,signedAtAbsoluteWeek)?.commercialConfiguration.streams || ['subs'],false),
     });
     const registration = registerStreamingRightsContract(
         player.world.streamingRightsContracts,
@@ -817,6 +867,7 @@ export const registerProductionStreamingRightsContractFromOffer = (
         || contract.idempotencyKey === `streaming-offer:${input.offer.id}`
     ));
     if (existing) return { player, contract: existing, changed: false };
+    if(input.offer.backendBasis !== 'ADS_RENTAL_RECEIPTS') return {player,contract:null,changed:false};
     const lot = input.session.rightsLot;
     const exactScopeMatches = (
         input.offer.territory === lot.territory
@@ -840,6 +891,7 @@ export const registerProductionStreamingRightsContractFromOffer = (
     });
     if (!compatibility.available) return { player, contract: null, changed: false };
     const result = registerProductionStreamingRightsContract(player, {
+        backendBasis: input.offer.backendBasis,
         sourceProjectId: input.session.projectId,
         title: input.session.title,
         projectType: input.session.projectType,
@@ -869,6 +921,7 @@ export const registerProductionStreamingRightsContractFromOffer = (
     if (!result.contract) return result;
     const contract = normalizeStreamingRightsContract({
         ...result.contract,
+        backendBasis: input.offer.backendBasis,
         idempotencyKey: `streaming-offer:${input.offer.id}`,
         biddingSessionId: input.session.id,
         sourceOfferId: input.offer.id,

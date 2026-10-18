@@ -1,3 +1,4 @@
+import {getStreamingBuyerBackendCapability, streamingBackendPercentForBuyer, validateNewStreamingBackendTerms, minimumStreamingLicenseFee} from './streamingBackendPolicy';
 import type {
     BudgetTier,
     IndustryProject,
@@ -446,7 +447,7 @@ export const getStreamingLicenseQuote = (
         suggestedGuarantee,
         minimumGuarantee: roundMoney(suggestedGuarantee * 0.62),
         maximumGuarantee: roundMoney(suggestedGuarantee * 1.55),
-        targetPlatformRevenueShare: exclusivity === 'EXCLUSIVE' ? 64 : 72,
+        targetPlatformRevenueShare: 90,
         estimatedExpiryWeeks: durationWeeks,
     };
 };
@@ -483,7 +484,7 @@ export const createDefaultStreamingCatalogDraft = (player: Player): OwnedStreami
     return {
         ...baseDraft,
         minimumGuarantee: quote.suggestedGuarantee,
-        platformRevenueShare: quote.targetPlatformRevenueShare + 3,
+        platformRevenueShare: 100 - streamingBackendPercentForBuyer(player,null,getAbsoluteWeek(player.age,player.currentWeek),10),
     };
 };
 
@@ -522,7 +523,7 @@ export const saveStreamingCatalogDraft = (
             : defaults.durationWeeks,
         exclusivity: inputDraft.exclusivity === 'EXCLUSIVE' ? 'EXCLUSIVE' : 'NON_EXCLUSIVE',
         minimumGuarantee: roundMoney(Math.max(0, Number(inputDraft.minimumGuarantee) || 0)),
-        platformRevenueShare: Math.round(clamp(Number(inputDraft.platformRevenueShare) || 70, 50, 90)),
+        platformRevenueShare: Math.round(clamp(Number(inputDraft.platformRevenueShare) || 100, 80, 100)),
         negotiationStatus: termsChanged ? 'BUILDING' : inputDraft.negotiationStatus,
         counterMinimumGuarantee: termsChanged ? null : inputDraft.counterMinimumGuarantee,
         counterPlatformRevenueShare: termsChanged ? null : inputDraft.counterPlatformRevenueShare,
@@ -551,6 +552,9 @@ export const submitStreamingCatalogOffer = (
     if (!opportunity) return { player: savedPlayer, draft, changed: false, message: 'No eligible external title is available for this opening negotiation.' };
     const quote = getStreamingLicenseQuote(opportunity, draft.territory, draft.durationWeeks,
         draft.exclusivity, draft.quoteVersion || 1, 'FIRST_WINDOW', savedPlayer.age);
+    const termsError = validateNewStreamingBackendTerms({minimumGuarantee:draft.minimumGuarantee,licensorRevenueShare:100-draft.platformRevenueShare,
+        capability:getStreamingBuyerBackendCapability(savedPlayer,null,getAbsoluteWeek(savedPlayer.age,savedPlayer.currentWeek))});
+    if(termsError) return {player:savedPlayer,draft,changed:false,message:termsError};
     if (draft.minimumGuarantee < quote.minimumGuarantee || draft.minimumGuarantee > quote.maximumGuarantee) {
         return {
             player: savedPlayer,
@@ -560,7 +564,7 @@ export const submitStreamingCatalogOffer = (
         };
     }
     const accepted = draft.minimumGuarantee >= quote.suggestedGuarantee
-        && draft.platformRevenueShare <= quote.targetPlatformRevenueShare;
+        && draft.platformRevenueShare >= 80;
     const nextDraft: OwnedStreamingCatalogSetupDraft = accepted ? {
         ...draft,
         negotiationStatus: 'READY_TO_SIGN',
@@ -575,7 +579,7 @@ export const submitStreamingCatalogOffer = (
             quote.maximumGuarantee,
             roundMoney(Math.max(quote.suggestedGuarantee * 0.92, draft.minimumGuarantee * 1.08)),
         ),
-        counterPlatformRevenueShare: Math.min(draft.platformRevenueShare, quote.targetPlatformRevenueShare),
+        counterPlatformRevenueShare: 100 - streamingBackendPercentForBuyer(player,null,getAbsoluteWeek(player.age,player.currentWeek),Math.min(20,100-draft.platformRevenueShare)),
         negotiationRound: Math.max(1, draft.negotiationRound + 1),
         currentStep: 3,
     };
@@ -720,6 +724,10 @@ export const signStreamingStarterCatalog = (
     if (draft.negotiationStatus !== 'READY_TO_SIGN') return { player, changed: false, reason: 'NOT_READY' };
     const opportunity = getStreamingLicenseOpportunities(player).find(item => item.id === draft.opportunityProjectId);
     if (!opportunity) return { player, changed: false, reason: 'MISSING_TITLE' };
+    const quote = getStreamingLicenseQuote(opportunity,draft.territory,draft.durationWeeks,draft.exclusivity,draft.quoteVersion || 1,'FIRST_WINDOW',player.age);
+    if(draft.minimumGuarantee < quote.minimumGuarantee || validateNewStreamingBackendTerms({minimumGuarantee:draft.minimumGuarantee,licensorRevenueShare:100-draft.platformRevenueShare,
+        capability:getStreamingBuyerBackendCapability(player,null,getAbsoluteWeek(player.age,player.currentWeek))}))
+        return {player,changed:false,reason:'NOT_READY'};
     if (platform.treasuryCash < draft.minimumGuarantee) return { player, changed: false, reason: 'INSUFFICIENT_TREASURY' };
 
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
@@ -728,6 +736,7 @@ export const signStreamingStarterCatalog = (
     const eligibleOwnedIds = new Set(getEligibleOwnedStreamingTitles(player).map(title => title.id));
     const ownedProjectIds = Array.from(new Set(draft.selectedOwnedProjectIds.filter(id => eligibleOwnedIds.has(id))));
     const license: OwnedStreamingCatalogLicense = {
+            backendBasis: 'ADS_RENTAL_RECEIPTS',
         id: createDeterministicId('streaming_license', platform.simulationSeed, contractKey),
         sourceProjectId: opportunity.id,
         titleAtSigning: opportunity.title,

@@ -98,153 +98,59 @@ export const getTalentNegotiationProfile = (npc: NPCActor, language: GameLanguag
     };
 };
 
-const getMoneyScore = (offerRatio: number, profile: NegotiationProfile): number => {
-    let score = 0;
-
-    if (offerRatio < 0.5) {
-        score = offerRatio * 34;
-    } else if (offerRatio < 1) {
-        score = 17 + ((offerRatio - 0.5) * 72);
-    } else if (offerRatio < 2) {
-        score = 53 + ((offerRatio - 1) * 24);
-    } else if (offerRatio < 5) {
-        score = 77 + ((offerRatio - 2) * 6);
-    } else {
-        score = 96;
-    }
-
-    if (profile.id === 'MONEY') score += Math.max(0, offerRatio - 0.75) * 8;
-    if (profile.id === 'EGO') score += Math.max(0, offerRatio - 1.25) * 7;
-    if (profile.id === 'PRESTIGE' && offerRatio < 1) score -= 8;
-    if (profile.id === 'BREAKOUT' && offerRatio >= 0.55) score += 8;
-
-    return score;
-};
-
-const buildNegotiationMessage = (
-    npc: NPCActor,
-    profile: NegotiationProfile,
-    success: boolean,
-    offerRatio: number,
-    paymentMode: PaymentMode,
-    offeredAmount: number,
-    studioPull: number,
-    language: GameLanguage = 'en'
-) => {
-    const amount = `$${offeredAmount.toLocaleString()}${paymentMode === 'WEEKLY_INSTALLMENTS' ? '/wk' : ''}`;
-    let messageKey = 'standardReject';
-
-    if (success) {
-        if (offerRatio >= 2) {
-            messageKey = 'hugeAccept';
-            return t(language, `services.talentService.negotiation.${messageKey}`, { amount });
-        }
-
-        if (offerRatio < 0.8) {
-            messageKey = 'leanStudioAccept';
-            return t(language, `services.talentService.negotiation.${messageKey}`, { amount });
-        }
-
-        if (profile.id === 'PRESTIGE' && studioPull >= 14) {
-            messageKey = 'prestigeMomentumAccept';
-            return t(language, `services.talentService.negotiation.${messageKey}`, { amount });
-        }
-
-        if (profile.id === 'INDEPENDENT') {
-            messageKey = 'independentAccept';
-            return t(language, `services.talentService.negotiation.${messageKey}`, { amount });
-        }
-
-        messageKey = 'standardAccept';
-        return t(language, `services.talentService.negotiation.${messageKey}`, { amount });
-    }
-
-    if (offerRatio >= 2.5) {
-        messageKey = 'hugeReject';
-        return t(language, `services.talentService.negotiation.${messageKey}`, { amount });
-    }
-
-    if (profile.id === 'INDEPENDENT') {
-        messageKey = 'independentReject';
-        return t(language, `services.talentService.negotiation.${messageKey}`, { amount });
-    }
-
-    if (profile.id === 'PRESTIGE' && studioPull < 12) {
-        messageKey = 'prestigeReject';
-        return t(language, `services.talentService.negotiation.${messageKey}`, { amount });
-    }
-
-    if (profile.id === 'EGO') {
-        messageKey = 'egoReject';
-        return t(language, `services.talentService.negotiation.${messageKey}`, { amount });
-    }
-
-    if (offerRatio < 0.7) {
-        messageKey = 'lowReject';
-        return t(language, `services.talentService.negotiation.${messageKey}`, { amount });
-    }
-
-    return t(language, `services.talentService.negotiation.${messageKey}`, { amount });
-};
-
+/** Internal model only; negotiation UI deliberately does not expose odds. */
 export const evaluateOffer = (
-    npc: NPCActor, 
-    duration: number, // movies for MOVIE_DEAL
+    npc: NPCActor,
+    duration: number,
     offeredAmount: number,
     paymentMode: PaymentMode,
     playerFame: number,
     studioValuation: number,
-    language: GameLanguage = 'en'
+    language: GameLanguage = 'en',
+    context: { studioPrestige?: number; roll?: number } = {},
 ): TalentOfferEvaluation => {
-    if (duration > 10) {
-        return { success: false, message: t(language, 'services.talentService.validation.tooManyMovies'), maintenanceFee: 0, totalContractValue: 0 };
+    if (!Number.isInteger(duration) || duration < 1 || duration > 10 || !Number.isSafeInteger(offeredAmount) || offeredAmount <= 0
+        || !['UPFRONT', 'WEEKLY_INSTALLMENTS'].includes(paymentMode) || !Number.isSafeInteger(offeredAmount * (paymentMode === 'UPFRONT' ? 1 : 52))) {
+        return { success: false, message: 'Enter a positive whole-dollar offer and a commitment of 1–10 movies.', maintenanceFee: 0, totalContractValue: 0, acceptanceChance: 0 };
     }
-    if (duration < 1) {
-        return { success: false, message: t(language, 'services.talentService.validation.tooFewMovies'), maintenanceFee: 0, totalContractValue: 0 };
-    }
-
     const ask = calculateNPCAsk(npc, duration);
     const baseAsk = paymentMode === 'UPFRONT' ? ask.totalAmount : ask.weeklyInstallment;
+    const offerRatio = offeredAmount / baseAsk;
     const profile = getTalentNegotiationProfile(npc, language);
-    const offerRatio = baseAsk > 0 ? offeredAmount / baseAsk : 0;
-    const totalContractValue = paymentMode === 'UPFRONT' ? offeredAmount : offeredAmount * 52;
-    const traits = new Set(npc.traits || []);
-
-    const studioPull = clamp((playerFame / 4) + (studioValuation / 50_000_000), 0, 25);
-    const opennessScore = clamp(((npc.openness || 35) - 45) * 0.35, -14, 18);
-    const durationPenalty = Math.max(0, duration - 1) * (profile.id === 'INDEPENDENT' ? 3.5 : 2.4);
-    const moneyScore = getMoneyScore(offerRatio, profile);
-
-    let score = 8 + moneyScore + studioPull + opennessScore - durationPenalty;
-
-    if (profile.id === 'INDEPENDENT') score -= 14;
-    if (profile.id === 'PRESTIGE') score += (studioPull * 0.45) - 6;
-    if (profile.id === 'EGO') score -= 9;
-    if (profile.id === 'BREAKOUT') score += 11;
-    if (profile.id === 'PROFESSIONAL') score += offerRatio >= 0.85 ? 7 : 0;
-
-    if (traits.has('EASY_GOING')) score += 7;
-    if (traits.has('PROFESSIONAL')) score += 4;
-    if (traits.has('WORKAHOLIC') && duration <= 4) score += 4;
-    if (traits.has('AMBITIOUS')) score += studioPull >= 10 ? 5 : -3;
-    if (traits.has('BOX_OFFICE_POISON')) score += 5;
-
-    if (offerRatio >= 3) score += 10;
-    if (offerRatio >= 5) score = Math.max(score, 98);
-    if (offeredAmount <= 0) score = 0;
-
-    const acceptanceChance = clamp(score / 100, 0.03, 0.98);
-    const success = Math.random() < acceptanceChance;
-
+    const anchors = [[0.5, 0], [0.75, 0.12], [1, 0.70], [1.1, 0.85], [1.25, 0.95], [1.5, 1]];
+    let chance = 0;
+    for (let i = 1; i < anchors.length; i++) {
+        const [lowRatio, lowChance] = anchors[i - 1];
+        const [highRatio, highChance] = anchors[i];
+        if (offerRatio >= lowRatio) chance = lowChance + (highChance - lowChance) * clamp((offerRatio - lowRatio) / (highRatio - lowRatio), 0, 1);
+    }
+    const prestige = clamp(context.studioPrestige || 0, 0, 100) / 100;
+    const studioPull = clamp(playerFame / 100, 0, 1) * 0.03 + clamp(studioValuation / 2_000_000_000, 0, 1) * 0.02;
+    const personality = profile.id === 'INDEPENDENT' || profile.id === 'EGO' ? -0.06 : profile.id === 'BREAKOUT' ? 0.04 : 0;
+    // Prestige has the strongest influence on a modest below-ask discount.
+    // Fade modifiers toward the guarantee so increasing money never lowers odds.
+    const modifier = prestige * (profile.id === 'PRESTIGE' ? 0.16 : 0.12) + studioPull + personality;
+    chance += modifier * clamp((offerRatio - 0.5) * 2, 0, 1) * clamp((1.5 - offerRatio) * 2, 0, 1);
+    const acceptanceChance = offerRatio >= 1.5 ? 1 : offerRatio <= 0.5 ? 0 : clamp(chance, 0, 0.99);
+    const success = acceptanceChance === 1 || (context.roll ?? Math.random()) < acceptanceChance;
+    const rejection = offerRatio < 1
+        ? 'The offer is below this deal’s asking price. Raise the offer or reduce the number of movies; a stronger studio reputation can help secure a discount.'
+        : 'The artist has declined these terms. Raise the offer or reduce the movie commitment before trying again.';
     return {
         success,
-        message: buildNegotiationMessage(npc, profile, success, offerRatio, paymentMode, offeredAmount, studioPull, language),
+        message: success ? t(language, 'services.talentService.negotiation.standardAccept', { amount: `$${offeredAmount.toLocaleString()}${paymentMode === 'WEEKLY_INSTALLMENTS' ? '/wk' : ''}` }) : rejection,
         maintenanceFee: ask.maintenanceFee,
-        totalContractValue: success ? totalContractValue : 0,
-        acceptanceChance,
-        profileLabel: profile.label,
-        offerRatio
+        totalContractValue: success ? offeredAmount * (paymentMode === 'UPFRONT' ? 1 : 52) : 0,
+        acceptanceChance, profileLabel: profile.label, offerRatio,
     };
+};
+
+/** Explicit ICON tier shared by the actual single-film offer and actor listings. */
+export const calculateActorRoleSalary = (actor: Pick<NPCActor, 'tier' | 'stats'>, roleType: string, closeness = 0): number => {
+    const bases: Record<NPCTier, number> = { ICON: 40_000_000, A_LIST: 20_000_000, ESTABLISHED: 8_000_000, RISING: 2_000_000, INDIE: 100_000, UNKNOWN: 100_000 };
+    const roleMultiplier = ({ SUPPORTING: 0.4, CAMEO: 0.15, EXTRA: 0.05 } as Record<string, number>)[roleType] ?? 1;
+    const discount = closeness > 50 ? Math.min(0.7, (closeness - 50) / 100 + 0.2) : 0;
+    return Math.floor(Math.floor((bases[actor.tier] || 100_000) * (0.5 + (actor.stats?.fame || 0) / 100) * roleMultiplier) * (1 - discount));
 };
 
 export const createContract = (
@@ -265,7 +171,10 @@ export const createContract = (
         paymentMode,
         totalAmount,
         maintenanceFee,
-        installmentsPaid: 0,
+        installmentsPaid: paymentMode === 'UPFRONT' ? 1 : 0,
+        amountPaid: paymentMode === 'UPFRONT' ? totalAmount : 0,
+        accountingVersion: 1,
+        consumedProjectIds: [],
         totalInstallments,
         moviesRemaining: duration,
         totalMovies: duration,

@@ -1,3 +1,5 @@
+import {getAbsoluteWeek} from './legacyLogic';
+import {getStreamingBuyerBackendCapability, streamingBackendPercentForBuyer, validateNewStreamingBackendTerms, minimumStreamingLicenseFee} from './streamingBackendPolicy';
 import type {
     PlatformId,
     Player,
@@ -60,6 +62,7 @@ const buildPlatformInputs = (
             name: platform.name || brand.displayName,
             color: brand.primaryColor,
             cashAvailable: Math.max(0, Number(platform.cashReserve) || 0) * 1_000_000,
+            eligibleBackendRevenueFraction: getStreamingBuyerBackendCapability(player, platformId, getAbsoluteWeek(player.age,player.currentWeek)).eligibleRevenueFraction,
             baseBid: terms.baseBid,
             acquisitionCeiling: terms.ceiling,
             qualityPreference: terms.quality,

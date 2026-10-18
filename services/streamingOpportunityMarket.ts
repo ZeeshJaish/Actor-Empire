@@ -1,3 +1,4 @@
+import {getStreamingBuyerBackendCapability, streamingBackendPercentForBuyer, validateNewStreamingBackendTerms} from './streamingBackendPolicy';
 import type { Genre, IndustryProject, Player, StreamingOpportunityOffer } from '../types';
 import { createDeterministicId, createDeterministicRng } from './deterministicRandom';
 import { getAbsoluteWeek } from './legacyLogic';
@@ -186,7 +187,7 @@ export const purchaseStreamingOpportunityOffer = (
         sourceProject: { id: offer.projectId, title: offer.title, mediaType: offer.projectType, genre: offer.genre },
         buyerPlatformId: null, platformContentPlanId: null, cataloguePackageId: null,
         licensorName: offer.sellerName, territory: 'GLOBAL', countryIds: [], durationWeeks: 104,
-        exclusivity: 'NON_EXCLUSIVE', minimumGuarantee: offer.askingPrice, platformRevenueShare: 70,
+        exclusivity: 'NON_EXCLUSIVE', minimumGuarantee: offer.askingPrice, platformRevenueShare: 100 - streamingBackendPercentForBuyer(player,null,now,10),
         signedAtAbsoluteWeek: now, startsAtAbsoluteWeek: now,
         origin: 'STUDIO_MARKET', sellerType: 'STUDIO', sellerPlatformId: null,
         windowType: 'FIRST_WINDOW', accessGrant: createStreamingRightsAccessGrantForOffer(
@@ -367,7 +368,7 @@ export const processRivalBrokeredOpportunityWeek = (player: Player, absoluteWeek
             sourceProject: { id: offer.projectId, title: offer.title, mediaType: offer.projectType, genre: offer.genre },
             buyerPlatformId: rival.id, platformContentPlanId: null, cataloguePackageId: null,
             licensorName: offer.sellerName, territory: 'GLOBAL', countryIds: [], durationWeeks: 104,
-            exclusivity: 'NON_EXCLUSIVE', minimumGuarantee: offer.askingPrice, platformRevenueShare: 70,
+            exclusivity: 'NON_EXCLUSIVE', minimumGuarantee: offer.askingPrice, platformRevenueShare: 100 - streamingBackendPercentForBuyer({...player,world},rival.id,absoluteWeek,10),
             signedAtAbsoluteWeek: absoluteWeek, startsAtAbsoluteWeek,
             origin: 'STUDIO_MARKET', sellerType: 'STUDIO', sellerPlatformId: null,
             windowType: 'FIRST_WINDOW', accessGrant: { schemaVersion: 1, modes: ['SUBSCRIPTION'],

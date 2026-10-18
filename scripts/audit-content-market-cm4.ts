@@ -1,3 +1,4 @@
+import {configureStreamingPricingOffer} from '../services/streamingCommercialOffers';
 import assert from 'node:assert/strict';
 import * as contentMarket from '../services/streamingContentMarket';
 import { contentMarketFixture } from './helpers/contentMarketFixture';
@@ -15,6 +16,7 @@ assert.equal(
 );
 
 const fixture = contentMarketFixture();
+fixture.ownedStreamingPlatform.serviceConfiguration.pricing=configureStreamingPricingOffer(fixture.ownedStreamingPlatform.serviceConfiguration.pricing,{kind:'CORE',coreModel:'STORE'});
 const absoluteWeek = getAbsoluteWeek(fixture.age, fixture.currentWeek);
 fixture.world.studios = {
     ...(fixture.world.studios || {}),

@@ -46,6 +46,7 @@ const makeContract = (input: {
     const startsAtAbsoluteWeek = input.startsAtAbsoluteWeek ?? 0;
     const permanent = input.permanent ?? false;
     const license = createStreamingLicenseContract({
+        backendBasis:'ADJUSTED_GROSS_RECEIPTS',
         id: input.id,
         sourceProject: {
             id: input.projectId || `project-${input.id}`,

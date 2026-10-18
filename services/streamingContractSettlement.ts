@@ -1,12 +1,16 @@
 import type {
     Player,
+    PastProject,
     StreamingGuaranteeRecoupment,
     StreamingRoyaltySettlement,
     StreamingRoyaltySettlementRegistry,
     StreamingTitleRevenueAttribution,
     StreamingTitleRevenueSignal,
+    OwnedStreamingWeeklyOperations,
 } from '../types';
 import { createDeterministicId } from './deterministicRandom';
+import {applyPlayerTalentReceipt} from './playerTalentFinance';
+import {applyInvestorPayoutMemory,calculateInvestorPayout} from './projectInvestors';
 
 const finiteNonNegative = (value: unknown): number => {
     const numeric = Number(value);
@@ -15,6 +19,21 @@ const finiteNonNegative = (value: unknown): number => {
 
 const roundMoney = (value: number): number => Math.max(0, Math.round(finiteNonNegative(value)));
 const roundWeight = (value: number): number => Math.round(value * 1_000_000) / 1_000_000;
+
+export const normalizeStreamingContractRoyaltyStatements=(raw:unknown):NonNullable<OwnedStreamingWeeklyOperations['contractRoyaltyStatements']>=>{
+    if(!Array.isArray(raw))return [];
+    return raw.flatMap(row=>{
+        if(!row || typeof row!=='object' || !String(row.contractId || '').trim())return [];
+        const fields=['adjustedGrossReceipts','grossRoyaltyAccrued','royaltyPayable','cumulativeRoyaltyAccrued','cumulativeRoyaltyPaid',
+            'recoupmentRemaining','lastRoyaltyReceiptAbsoluteWeek'] as const;
+        if(fields.some(key=>!Number.isSafeInteger(row[key]) || row[key]<0)
+            || row.capRemaining!==null && (!Number.isSafeInteger(row.capRemaining) || row.capRemaining<0))return [];
+        return [{contractId:String(row.contractId).trim(),adjustedGrossReceipts:row.adjustedGrossReceipts,
+            grossRoyaltyAccrued:row.grossRoyaltyAccrued,royaltyPayable:row.royaltyPayable,
+            cumulativeRoyaltyAccrued:row.cumulativeRoyaltyAccrued,cumulativeRoyaltyPaid:row.cumulativeRoyaltyPaid,
+            recoupmentRemaining:row.recoupmentRemaining,capRemaining:row.capRemaining,lastRoyaltyReceiptAbsoluteWeek:row.lastRoyaltyReceiptAbsoluteWeek}];
+    });
+};
 
 const distributeIntegerTotal = (total: number, weights: number[]): number[] => {
     const integerTotal = roundMoney(total);
@@ -208,7 +227,7 @@ export const settleStreamingContractRoyaltyForPlayer = (
     input: SettleStreamingContractRoyaltyForPlayerInput,
 ): SettleStreamingContractRoyaltyForPlayerResult => {
     const contract = player.world.streamingRightsContracts?.[input.contractId];
-    if (!contract || contract.status !== 'ACTIVE') {
+    if (!contract || contract.status !== 'ACTIVE' || (contract.backendBasis === 'ADS_RENTAL_RECEIPTS' || contract.royaltyPurpose === 'PRODUCER_PARTICIPATION')) {
         return { player, changed: false, royaltyPaid: 0, settlementId: null };
     }
     const absoluteWeek = Math.max(0, Math.floor(Number(input.absoluteWeek) || 0));
@@ -218,8 +237,8 @@ export const settleStreamingContractRoyaltyForPlayer = (
     const idempotencyKey = `streaming-royalty:${contract.id}:${absoluteWeek}`;
     const existing = Object.values(player.world.streamingRoyaltySettlements || {})
         .find(row => row.idempotencyKey === idempotencyKey);
-    if (existing) {
-        return { player, changed: false, royaltyPaid: 0, settlementId: existing.id };
+    if (existing || (contract.lastRoyaltyReceiptAbsoluteWeek ?? -1)>=absoluteWeek) {
+        return { player, changed: false, royaltyPaid: 0, settlementId: existing?.id || null };
     }
     const calculation = calculateStreamingContractRoyalty({
         adjustedGrossReceipts: input.attribution.adjustedGrossReceipts,
@@ -312,6 +331,7 @@ export const settleStreamingContractRoyaltyForPlayer = (
         ...contract,
         cumulativeRoyaltyAccrued: calculation.cumulativeRoyaltyAccrued,
         cumulativeRoyaltyPaid: calculation.cumulativeRoyaltyPaid,
+        lastRoyaltyReceiptAbsoluteWeek:absoluteWeek,
     };
     return {
         player: {
@@ -331,4 +351,61 @@ export const settleStreamingContractRoyaltyForPlayer = (
         royaltyPaid: calculation.royaltyPayable,
         settlementId,
     };
+};
+
+/** Collect only receipts already expensed/paid by the AI buyer; never debit its treasury twice. */
+export const collectStreamingStudioRoyaltyReceipts=(source:Player,absoluteWeek:number):Player=>{
+    let player=source;
+    for(const buyer of Object.values(player.world.platforms || {})){
+        const snapshot=buyer.ai?.financeHistory.find(row=>row.absoluteWeek===absoluteWeek);
+        if(!snapshot)continue;
+        const statements=normalizeStreamingContractRoyaltyStatements(snapshot.contractRoyaltyStatements);
+        if(statements.reduce((sum,row)=>sum+row.royaltyPayable,0)>Math.round(snapshot.partnerRevenueShareCostMillions*1e6))continue;
+        for(const statement of statements){
+            const contract=player.world.streamingRightsContracts?.[statement.contractId];
+            if(!contract || contract.buyer.platformId!==buyer.id
+                || contract.cumulativeRoyaltyPaid<statement.cumulativeRoyaltyPaid
+                || (contract.lastRoyaltySellerReceiptAbsoluteWeek ?? -1)>=statement.lastRoyaltyReceiptAbsoluteWeek)continue;
+            const studioIndex=player.businesses.findIndex(row=>row.id===contract.seller.id && row.type==='PRODUCTION_HOUSE');
+            if(studioIndex<0)continue;
+            const legacyArchive=player.flags?.legacyCareerArchive;
+            const legacyProjects:PastProject[]=legacyArchive?.pastProjects || player.flags?.legacyStudioProjects || [];
+            const project=player.activeReleases.find(row=>row.id===contract.sourceProjectId)
+                || player.pastProjects.find(row=>row.id===contract.sourceProjectId)
+                || legacyProjects.find(row=>row.id===contract.sourceProjectId);
+            if(!project)continue;
+            const details='projectDetails' in project?project.projectDetails:null;
+            const gross=statement.royaltyPayable;const plan=project.investorPlan || details?.investorPlan;
+            const investor=calculateInvestorPayout(plan,gross);
+            const originalStudio=player.businesses[studioIndex];
+            let studio={...originalStudio,balance:originalStudio.balance+gross-investor,
+                stats:{...originalStudio.stats,weeklyRevenue:originalStudio.stats.weeklyRevenue+gross,
+                    weeklyProfit:originalStudio.stats.weeklyProfit+gross-investor,lifetimeRevenue:originalStudio.stats.lifetimeRevenue+gross}};
+            const key=`streaming_contract:${contract.id}:${statement.lastRoyaltyReceiptAbsoluteWeek}`;
+            if(studio.studioState && gross>0)studio={...studio,studioState:{...studio.studioState,financeLedger:[{
+                id:`studio_ledger_${key}`,week:player.currentWeek,year:player.age,amount:gross,type:'STREAMING_ROYALTY' as const,
+                label:`${contract.titleAtSigning} signed-contract royalty`,projectId:contract.sourceProjectId},
+                ...(investor>0?[{id:`studio_ledger_investor_${key}`,week:player.currentWeek,year:player.age,amount:-investor,
+                    type:'INVESTOR_PAYOUT' as const,label:`${contract.titleAtSigning} investor streaming payout`,projectId:contract.sourceProjectId}]:[]),
+                ...(studio.studioState.financeLedger || [])].slice(0,260)}};
+            studio=applyInvestorPayoutMemory({studio,plan,payout:investor,projectId:project.id,projectTitle:contract.titleAtSigning,
+                week:player.currentWeek,year:player.age}) || studio;
+            const talent=applyPlayerTalentReceipt({world:player.world,studio,projectId:project.id,projectTitle:contract.titleAtSigning,
+                participation:details?.talentParticipation || ('talentParticipation' in project?project.talentParticipation:undefined),receiptKey:key,studioReceipts:Math.max(0,gross-investor),
+                absoluteWeek,year:player.age,week:player.currentWeek});
+            const updatedProject={...project,streamingRoyaltyRevenue:(project.streamingRoyaltyRevenue || 0)+gross,
+                streamingRevenue:(project.streamingRevenue || 0)+gross,
+                investorPayouts:{...project.investorPayouts,lifetimeInvestorPayout:(project.investorPayouts?.lifetimeInvestorPayout || 0)+investor},
+                ...(details?{projectDetails:{...details,talentParticipation:talent.participation}}:{talentParticipation:talent.participation})};
+            player={...player,businesses:player.businesses.map((row,index)=>index===studioIndex?talent.studio:row),
+                activeReleases:player.activeReleases.map(row=>row.id===project.id?updatedProject as typeof row:row),
+                pastProjects:player.pastProjects.map(row=>row.id===project.id?updatedProject as typeof row:row),
+                flags:{...player.flags,
+                    ...(legacyArchive?{legacyCareerArchive:{...legacyArchive,pastProjects:legacyProjects.map(row=>row.id===project.id?updatedProject:row)}}:{}),
+                    ...(player.flags?.legacyStudioProjects?{legacyStudioProjects:player.flags.legacyStudioProjects.map((row:PastProject)=>row.id===project.id?updatedProject:row)}:{})},
+                world:{...talent.world,streamingRightsContracts:{...talent.world.streamingRightsContracts,
+                    [contract.id]:{...contract,lastRoyaltySellerReceiptAbsoluteWeek:statement.lastRoyaltyReceiptAbsoluteWeek}}}};
+        }
+    }
+    return player;
 };

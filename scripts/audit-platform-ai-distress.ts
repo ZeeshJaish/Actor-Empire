@@ -591,6 +591,7 @@ const catalogueDealFixture = (week: number): Player => {
                 debtMillions: platformId === 'NETFLIX' ? 55 : 0,
                 slate: platformId === 'NETFLIX' ? [releasedOriginalPlan(normalized)] : [],
                 rightsContracts: platformId === 'NETFLIX' ? [createStreamingLicenseContract({
+    backendBasis:'ADJUSTED_GROSS_RECEIPTS',
                     id: 'distress-source-entitlement',
                     sourceProject: catalogueProject,
                     buyerPlatformId: 'NETFLIX',
@@ -728,12 +729,27 @@ let royaltyWorld = withPlatform(transferred.world, queuedDeal.buyerPlatformId, p
             : plan),
     },
 }));
+// An active contract alone is not earned income. Feed an explicit current-week
+// funded receipt; the actual signed original owner must receive its backend.
+const noReceiptWorld={...royaltyWorld,worldStreamingViewing:undefined};
+assert.equal(settlePlatformAiEconomy({player:{...catalogueFixture,world:noReceiptWorld},
+    platform:noReceiptWorld.platforms![queuedDeal.buyerPlatformId],absoluteWeek:royaltyWeek})
+    .snapshot?.partnerRevenueShareCostMillions,0,'No viewing receipts means no fabricated recurring royalty.');
+const royaltyContract=royaltyWorld.streamingRightsContracts![queuedDeal.buyerContractId];
+const viewingRevenue={attributedSubscriptionRevenue:10000,advertisingRevenue:0,rentalRevenue:0,purchaseRevenue:0,
+    premiumRevenue:0,dayPassRevenue:0,meteredRevenue:0,patronRevenue:0,sponsorshipRevenue:0,totalIncrementalRevenue:0};
+royaltyWorld={...royaltyWorld,worldStreamingViewing:{schemaVersion:1,lastProcessedAbsoluteWeek:royaltyWeek,
+    platforms:{[queuedDeal.buyerPlatformId]:{revenue:viewingRevenue}},royaltyReceipts:[{
+        receiptId:'distress-earned-subscription',platformId:queuedDeal.buyerPlatformId,countryId:'US',
+        projectId:royaltyContract.sourceProjectId,contractId:royaltyContract.id,kind:'SUBSCRIPTION',grossReceipts:10000}],
+    aiStoreTransactions:[]} as any};
 const royaltyBuyerEconomy = settlePlatformAiEconomy({
     player: { ...catalogueFixture, world: royaltyWorld },
     platform: royaltyWorld.platforms![queuedDeal.buyerPlatformId],
     absoluteWeek: royaltyWeek,
 });
-assert.ok((royaltyBuyerEconomy.snapshot?.partnerRevenueShareCostMillions || 0) > 0, 'The active platform-trade licence must incur recurring share.');
+assert.equal(Math.round((royaltyBuyerEconomy.snapshot?.partnerRevenueShareCostMillions || 0)*1e6),
+    Math.round(10000*royaltyContract.licensorRevenueShare/100),'The original studio share applies exactly to actual earned receipts.');
 const immutableRoyaltyAllocations = (royaltyBuyerEconomy.snapshot as any)?.platformTradeRoyaltyAllocations || [];
 assert.deepEqual(immutableRoyaltyAllocations, [], 'The reseller must not receive the original studio backend after selling the licence.');
 royaltyWorld = withPlatform(royaltyWorld, queuedDeal.buyerPlatformId, () => royaltyBuyerEconomy.platform);
@@ -1066,6 +1082,7 @@ conflictWorld = withPlatform(conflictWorld, blockerId, platform => ({
     ai: {
         ...platform.ai!,
         rightsContracts: [...platform.ai!.rightsContracts, createStreamingLicenseContract({
+    backendBasis:'ADJUSTED_GROSS_RECEIPTS',
             id: 'post-queue-exclusive-conflict',
             sourceProject: catalogueProject,
             buyerPlatformId: blockerId,

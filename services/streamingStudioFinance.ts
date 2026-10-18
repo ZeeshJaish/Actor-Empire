@@ -98,23 +98,27 @@ const weekPointsFrom = (
     model: StreamingFinanceRoomModel,
     player: Player,
 ): WeekPoint[] => {
-    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
-    const capitalByWeek = new Map<number, number>();
-    platform.finance.capitalActions.forEach((action) => {
-        capitalByWeek.set(action.absoluteWeek, (capitalByWeek.get(action.absoluteWeek) || 0) + action.treasuryDelta);
+    const movementByWeek = new Map<number, number>();
+    const cashEntries = model.ledger.filter(entry => entry.affectsTreasury && entry.source !== 'HISTORY');
+    cashEntries.forEach((entry) => {
+        movementByWeek.set(entry.absoluteWeek, (movementByWeek.get(entry.absoluteWeek) || 0) + entry.cashDelta);
     });
-    let closingCash = model.treasuryCash;
     const points: WeekPoint[] = [];
     for (let index = model.cashflow.length - 1; index >= 0; index -= 1) {
         const point = model.cashflow[index];
+        const closingCash = model.treasuryCash - cashEntries
+            .filter(entry => entry.absoluteWeek > point.absoluteWeek).reduce((total, entry) => total + entry.cashDelta, 0);
         points.unshift({
             week: point.absoluteWeek,
             label: `W${point.absoluteWeek}`,
             revenue: point.revenue,
             expense: point.outflow,
             closingCash,
+            openingCash: closingCash - (movementByWeek.get(point.absoluteWeek) || 0),
+            accountingProfit: point.accountingContribution,
+            contentAmortization: point.contentAmortization,
+            incurredOperatingCost: point.incurredOperatingCost,
         });
-        closingCash = Math.max(0, closingCash - point.net - (capitalByWeek.get(point.absoluteWeek) || 0));
     }
     return points;
 };
@@ -136,13 +140,16 @@ const titlesFrom = (model: StreamingFinanceRoomModel, player: Player): TitleFina
         id: title.projectId,
         name: title.title,
         format: titleFormat(player, title.projectId, title.genre),
-        releasedLabel: `${title.source.replaceAll('_', ' ')} · ${title.genre}`,
+        releasedLabel: `${title.source.replaceAll('_', ' ')} · ${title.genre}${model.periodAccountingProfit === null ? ' · Legacy estimate' : ''}`,
         posterSeed: title.projectId,
         poster: posterById.get(title.projectId),
-        subscriptionValue: title.revenue,
-        advertising: 0,
+        subscriptionValue: title.subscriptionRevenue,
+        advertising: title.advertisingRevenue,
+        otherViewerRevenue: title.otherViewerRevenue,
         licensing: 0,
-        productionCost: title.cost,
+        productionCost: 0,
+        operatingCost: title.operatingCost,
+        contentAmortization: title.contentAmortization,
         marketingCost: 0,
         infrastructureCost: 0,
         trend: model.revenueChangePercent ?? 0,

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createPlatformAiFixture } from './helpers/platformAiFixture';
 import { getAbsoluteWeek } from '../services/legacyLogic';
-import { createWorldStreamingCustomerState } from '../services/worldEconomy/worldStreamingCustomers';
+import { createWorldStreamingCustomerState, createOpeningWorldStreamingCustomerState } from '../services/worldEconomy/worldStreamingCustomers';
 import { advanceWorldStreamingViewingToWeek, createWorldStreamingViewingState,
     getWorldStreamingPlayerViewingOutcome } from '../services/worldEconomy/worldStreamingViewing';
 import { normalizeWorldStreamingAudienceChoiceState, recordPlayerStreamingAudienceEntitlement,
@@ -14,7 +14,7 @@ import { normalizeWorldPopulationState } from '../services/worldEconomy/worldPop
 import { normalizeWorldAudienceEconomyState } from '../services/worldEconomy/worldAudienceCohorts';
 import { normalizeWorldAudienceParticipationState } from '../services/worldEconomy/worldAudienceParticipation';
 import { createWorldStreamingPlatformEconomyState } from '../services/worldEconomy/worldStreamingPlatformEconomy';
-import { calculateStreamingAdFreePassWeek, calculateStreamingStoreConversion } from '../services/worldEconomy/worldStreamingCommercialEconomy';
+import { createStreamingStoreWallet, spendStreamingStoreWallet, calculateStreamingAdFreePassWeek, calculateStreamingStoreConversion } from '../services/worldEconomy/worldStreamingCommercialEconomy';
 import { processOwnedStreamingPlatformWeek } from '../services/streamingWeeklyLoop';
 import { calculateAiTitleStoreBuyerPool } from '../services/worldEconomy/worldStreamingAiCatalogue';
 import { processGameWeek } from '../services/gameLoop';
@@ -30,10 +30,26 @@ assert.equal(calculateAiTitleStoreBuyerPool({ price: 8, monthlySubscriptionPrice
     subscriptionIncluded: true, freeAdIncluded: true,
     cohorts: [{ budget: 20, subscriptions: 10, freeAd: 4, store: 3 }] }), 3,
     'AI cannot rent an included title again to its subscription or free-access viewers');
-assert.equal(calculateStreamingStoreConversion({ buyerPool: 1000, price: 5, kind: 'RENTAL' }), 23,
+assert.equal(calculateStreamingStoreConversion({ buyerPool: 1000, price: 5, kind: 'RENTAL' }), 135,
     'player, AI and forecast rentals must share one bounded purchase-intent curve');
-assert.equal(calculateStreamingStoreConversion({ buyerPool: 1000, price: 18, kind: 'PURCHASE' }), 4,
+assert.equal(calculateStreamingStoreConversion({ buyerPool: 1000, price: 18, kind: 'PURCHASE' }), 16,
     'player, AI and forecast purchases must share one bounded purchase-intent curve');
+
+const wallet = createStreamingStoreWallet(10,43.30);
+assert.equal(wallet.remainingCents,10000,'monthly budget is divided over 4.33 weeks');
+assert.equal(spendStreamingStoreWallet(wallet,20,6),16);
+assert.equal(spendStreamingStoreWallet(wallet,20,3),1,'purchase shares the already-used rental wallet');
+assert.equal(wallet.remainingCents,100);
+for(const amount of [Infinity,NaN,-10,1e300]) {
+    const malformedWallet=createStreamingStoreWallet(amount,amount);
+    assert.ok(Number.isSafeInteger(malformedWallet.remainingCents) && malformedWallet.remainingCents>=0);
+    assert.ok(Number.isSafeInteger(spendStreamingStoreWallet(malformedWallet,amount,2)));
+}
+assert.equal(calculateStreamingStoreConversion({buyerPool:Infinity,price:1,kind:'RENTAL'}),0);
+assert.ok(calculateStreamingStoreConversion({buyerPool:10000,price:5,kind:'RENTAL',quality:95})
+    > calculateStreamingStoreConversion({buyerPool:10000,price:5,kind:'RENTAL',quality:20}));
+assert.ok(calculateStreamingStoreConversion({buyerPool:10000,price:5,kind:'RENTAL',quality:95,weeksAvailable:1})
+    > calculateStreamingStoreConversion({buyerPool:10000,price:5,kind:'RENTAL',quality:95,weeksAvailable:104}));
 
 const base = {
     countryId: 'US', absoluteWeek: 728, eligibleHours: 600_000,
@@ -179,7 +195,7 @@ paidPlayer.ownedStreamingPlatform.catalogLicenses[0].accessGrant = {
     schemaVersion: 1, modes: ['SUBSCRIPTION'], earlyWindowWeeks: 0,
     purchaseFulfillment: 'NONE', source: 'EXPLICIT',
 };
-paidPlayer.world.worldStreamingCustomers = createWorldStreamingCustomerState(paidPlayer, week);
+paidPlayer.world.worldStreamingCustomers = createOpeningWorldStreamingCustomerState(adPlayer, paidPlayer, week);
 paidPlayer.world.worldStreamingAudienceChoice = normalizeWorldStreamingAudienceChoiceState(undefined, paidPlayer, week);
 const paidMonthlyRevenue = paidPlayer.world.worldStreamingCustomers.global.playerMonthlySubscriptionRevenue;
 const paidAccounts = paidPlayer.world.worldStreamingCustomers.global.playerEndingPaidAccounts;
@@ -273,6 +289,19 @@ hybridPlayer.ownedStreamingPlatform.serviceConfiguration.pricing.streams = ['sub
 hybridPlayer.ownedStreamingPlatform.serviceConfiguration.pricing.plans = [{
     id: 'standard', name: 'Standard', monthly: 6, featureIds: [], ads: false,
 }];
+// Keep C4 Film store-only; a second, explicitly granted title supports the
+// membership whose subscribers can separately buy that excluded rental.
+hybridPlayer.world.projects.push({ ...hybridPlayer.world.projects[0], id: 'c4-membership-film',
+    title: 'C4 Membership Film' } as any);
+hybridPlayer.ownedStreamingPlatform.catalogProjectIds.push('c4-membership-film');
+hybridPlayer.ownedStreamingPlatform.catalogLicenses.push({ ...license, id: 'c4-membership-license',
+    sourceProjectId: 'c4-membership-film',
+    titleAtSigning: 'C4 Membership Film', accessGrant: { schemaVersion: 1,
+        modes: ['SUBSCRIPTION'], earlyWindowWeeks: 0, purchaseFulfillment: 'NONE', source: 'EXPLICIT' } });
+hybridPlayer.ownedStreamingPlatform.launchSlate!.entries.push({
+    ...hybridPlayer.ownedStreamingPlatform.launchSlate!.entries[0],
+    id: 'c4-membership-slate', projectId: 'c4-membership-film', title: 'C4 Membership Film',
+});
 hybridPlayer.ownedStreamingPlatform.metrics.subscribers = 250_000;
 hybridPlayer.world.worldStreamingCustomers = createWorldStreamingCustomerState(hybridPlayer, week);
 hybridPlayer.world.worldStreamingAudienceChoice = normalizeWorldStreamingAudienceChoiceState(undefined, hybridPlayer, week);
@@ -371,8 +400,13 @@ assert.equal(compactPurchaseState.entitlements.length, 1,
     'durable purchases compact by title and country instead of exhausting a transaction-row cap');
 assert.equal(compactPurchaseState.entitlements[0].households, 1025,
     'compaction preserves the number of purchasing households');
+assert.deepEqual(recordPlayerStreamingAudienceEntitlement(compactPurchaseState, storePlayer, {
+    transactionId: 'c4-purchase-1024', countryId: 'US', titleId: 'c4-film', kind: 'PURCHASE',
+    households: 1, purchasedAtAbsoluteWeek: week,
+}),compactPurchaseState,'compaction must retain replay protection for every transaction in this week');
 const saturatedStore = structuredClone(storePlayer);
-const storeAccess = saturatedStore.world.worldStreamingAudienceChoice!.countries.US.playerStoreHouseholds;
+const storeAccessCountry = saturatedStore.world.worldStreamingAudienceChoice!.countries.US;
+const storeAccess = storeAccessCountry.playerStoreHouseholds+(storeAccessCountry.playerSecondaryStoreHouseholds || 0);
 saturatedStore.world.worldStreamingAudienceChoice!.entitlements = [{
     transactionId: 'c4-earlier-purchases', platformId: 'PLAYER', countryId: 'US', titleId: 'c4-film',
     kind: 'PURCHASE', households: storeAccess - 1, purchasedAtAbsoluteWeek: week - 1,
@@ -412,6 +446,29 @@ assert.ok(storeForecast.estimatedWeeklyRentalRevenueIfPlayable > 0
     'a store-led proposal must show explicitly conditional rent and buy estimates');
 assert.equal(adForecast.estimatedWeeklyRentalRevenueIfPlayable, 0,
     'a free-ad offer without store pricing cannot forecast rental cash');
+
+const poorForecastPlayer=structuredClone(storePlayer),hitForecastPlayer=structuredClone(storePlayer);
+(poorForecastPlayer.world.projects[0] as any).quality=20;
+(hitForecastPlayer.world.projects[0] as any).quality=95;
+const poorStoreForecast=forecastWorldStreamingLaunchPricing(poorForecastPlayer,poorForecastPlayer.ownedStreamingPlatform.serviceConfiguration.pricing,['US']);
+const hitStoreForecast=forecastWorldStreamingLaunchPricing(hitForecastPlayer,hitForecastPlayer.ownedStreamingPlatform.serviceConfiguration.pricing,['US']);
+assert.ok(hitStoreForecast.estimatedWeeklyRentalRevenueIfPlayable+hitStoreForecast.estimatedWeeklyPurchaseRevenueIfPlayable
+    > poorStoreForecast.estimatedWeeklyRentalRevenueIfPlayable+poorStoreForecast.estimatedWeeklyPurchaseRevenueIfPlayable,
+    'store preview must use known title quality in the same bounded conversion curve as settlement');
+const staleForecastPlayer=structuredClone(hitForecastPlayer);
+staleForecastPlayer.world.worldStreamingViewing=createWorldStreamingViewingState(staleForecastPlayer,week-1);
+staleForecastPlayer.world.worldStreamingViewing.platforms.PLAYER.titlePerformance.forEach(title=>title.weeksAvailable=104);
+const staleStoreForecast=forecastWorldStreamingLaunchPricing(staleForecastPlayer,staleForecastPlayer.ownedStreamingPlatform.serviceConfiguration.pricing,['US']);
+assert.ok(staleStoreForecast.estimatedWeeklyRentalRevenueIfPlayable+staleStoreForecast.estimatedWeeklyPurchaseRevenueIfPlayable
+    < hitStoreForecast.estimatedWeeklyRentalRevenueIfPlayable+hitStoreForecast.estimatedWeeklyPurchaseRevenueIfPlayable,
+    'store preview ages known titles rather than silently assuming a fresh release');
+const noStoreTitles=structuredClone(storePlayer);
+noStoreTitles.ownedStreamingPlatform.catalogProjectIds=[];
+noStoreTitles.ownedStreamingPlatform.catalogLicenses=[];
+noStoreTitles.ownedStreamingPlatform.launchSlate!.entries=[];
+const emptyStoreForecast=forecastWorldStreamingLaunchPricing(noStoreTitles,noStoreTitles.ownedStreamingPlatform.serviceConfiguration.pricing,['US']);
+assert.equal(emptyStoreForecast.estimatedWeeklyRentalRevenueIfPlayable+emptyStoreForecast.estimatedWeeklyPurchaseRevenueIfPlayable,0,
+    'an empty store cannot advertise weekly earnings from an invented title');
 
 const aiOffers = getWorldStreamingOffers(createPlatformAiFixture(), 2500).offers.filter(offer => !offer.isPlayer);
 const aiFixture = createPlatformAiFixture();

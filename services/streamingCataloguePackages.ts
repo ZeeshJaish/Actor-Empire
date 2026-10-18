@@ -1,3 +1,4 @@
+import {getStreamingBuyerBackendCapability, streamingBackendPercentForBuyer, validateNewStreamingBackendTerms, minimumStreamingLicenseFee} from './streamingBackendPolicy';
 import type {
     Business,
     PlatformId,
@@ -103,6 +104,7 @@ export const calculateStreamingCatalogueReferenceValue = (
 };
 
 export interface AllocateStreamingCatalogueGuaranteeInput {
+    minimumGuaranteesByProject?: Record<string,number>;
     totalGuarantee: number;
     components: StreamingCataloguePackageComponent[];
     platformId: PlatformId;
@@ -188,7 +190,7 @@ export const allocateStreamingCatalogueGuarantee = (
     ));
     const referenceAllocations = components.map((_, index) => titleFloor + remainder * referenceWeights[index]);
     const desired = components.map((_, index) => titleFloor + remainder * hybridWeights[index]);
-    const lower = referenceAllocations.map(value => Math.ceil(Math.max(titleFloor, value * 0.5)));
+    const lower = referenceAllocations.map((value,index) => Math.ceil(Math.max(titleFloor,value*.5,input.minimumGuaranteesByProject?.[components[index].sourceProjectId] || 0)));
     const upper = referenceAllocations.map(value => Math.max(titleFloor, Math.floor(value * 1.75)));
     const allocations = projectToBoundedTotal(
         desired,
@@ -215,9 +217,9 @@ export const allocateStreamingCatalogueGuarantee = (
             minimumGuarantee,
             licensorRevenueShare,
             platformRevenueShare: 100 - licensorRevenueShare,
-            backendBasis: 'ADJUSTED_GROSS_RECEIPTS',
-            guaranteeRecoupment: licensorRevenueShare >= 5 ? 'RECOUPABLE' : 'NON_RECOUPABLE',
-            backendCap,
+            backendBasis: 'ADS_RENTAL_RECEIPTS',
+            guaranteeRecoupment: 'NON_RECOUPABLE',
+            backendCap: null,
             territory: component.rightsLot.territory,
             countryIds: [...component.rightsLot.countryIds],
             windowType: component.rightsLot.windowType,
@@ -1055,6 +1057,14 @@ export const acceptStreamingCataloguePackageOffer = (
     const offer = session.offers.find(candidate => candidate.id === input.offerId && candidate.status === 'ACCEPTED');
     if (!offer || offer.cataloguePackageId !== cataloguePackage.id || !offer.componentTerms) {
         return rejectPackageOffer(player, cataloguePackage, 'INVALID_OFFER', 'The selected package offer is unavailable.');
+    }
+    for (const row of offer.componentTerms) {
+        if(row.backendBasis !== 'ADS_RENTAL_RECEIPTS') return rejectPackageOffer(player,cataloguePackage,'INVALID_OFFER','Reopen this unsigned legacy offer for current licensing terms.');
+        const component = cataloguePackage.components.find(c=>c.sourceProjectId===row.componentProjectId);
+        const error = validateNewStreamingBackendTerms({minimumGuarantee:row.minimumGuarantee,licensorRevenueShare:row.licensorRevenueShare,
+            referenceFee: component?.referenceValue || 0,
+            capability:getStreamingBuyerBackendCapability(player,offer.platformId,input.absoluteWeek,row.countryIds)});
+        if (error) return rejectPackageOffer(player,cataloguePackage,'INVALID_OFFER',error);
     }
     const allocationValidation = validateStreamingCatalogueOfferRows({
         components: cataloguePackage.components,

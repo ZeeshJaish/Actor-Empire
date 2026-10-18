@@ -1,3 +1,4 @@
+import {getStreamingBuyerBackendCapability, streamingBackendPercentForBuyer, validateNewStreamingBackendTerms, minimumStreamingLicenseFee} from './streamingBackendPolicy';
 import { getOwnedPlatformPackageCountryIds } from './streamingContentAvailability';
 import type {
     OwnedStreamingLedgerEntry,
@@ -223,10 +224,17 @@ export const processStreamingPrivateOffersWeek = (
         let counterMinimumGuarantee: number | null = null;
         let counterPlatformRevenueShare: number | null = null;
         let signingDeadlineAbsoluteWeek: number | null = null;
+        const immutableTransfer = (current.kind==='ACQUIRE' && current.sellerType==='PLATFORM' || current.kind==='TRANSFER_OUT')
+            && !!current.sourceLicenseId && !!player.world.streamingRightsContracts?.[current.sourceLicenseId];
+        const invalidBackend=immutableTransfer ? null : validateNewStreamingBackendTerms({minimumGuarantee:current.minimumGuarantee,licensorRevenueShare:100-current.platformRevenueShare,
+            referenceFee:current.rivalBidAmount,capability:getStreamingBuyerBackendCapability(player,null,absoluteWeek,current.countryIds || [],current.accessGrant),permanentPurchase:current.windowType==='PERMANENT'});
         if (!compatibility.available) {
             status = 'LOST';
             responseStatus = 'RIGHTS_SOLD';
             responseReason = `The available ${current.territory === 'GLOBAL' ? 'worldwide' : 'market'} rights changed while your offer was under review. No money was charged.`;
+        } else if (invalidBackend || !immutableTransfer && current.viewershipBonusAmount > 0) {
+            status='LOST';responseStatus='SELLER_DECLINED';
+            responseReason=invalidBackend || 'New licensing terms use one ads and rental backend, without a separate success bonus.';
         } else {
             const referencePrice = Math.max(1, current.rivalBidAmount);
             const relationshipWins = platform.rightsNegotiations.filter(item => (
@@ -236,9 +244,9 @@ export const processStreamingPrivateOffersWeek = (
             const cashScore = current.minimumGuarantee / referencePrice;
             const sellerShare = 100 - current.platformRevenueShare;
             const economics = cashScore * 0.69
-                + clamp(sellerShare / 35, 0, 1.35) * 0.13
+                + getStreamingBuyerBackendCapability(player,null,absoluteWeek,current.countryIds || [],current.accessGrant).eligibleRevenueFraction * sellerShare / 100 * 0.13
                 + clamp(current.marketingGuarantee / referencePrice, 0, 0.2) * 0.35
-                + clamp(current.viewershipBonusAmount / referencePrice, 0, 0.2) * 0.2;
+;
             const clauses = (current.exclusivity === 'NON_EXCLUSIVE' ? 0.035 : -0.025)
                 + (current.renewalOption ? -0.015 : 0.02)
                 + (current.sublicensingAllowed ? -0.025 : 0.015)
@@ -256,7 +264,7 @@ export const processStreamingPrivateOffersWeek = (
                 status = 'COUNTERED';
                 responseStatus = 'SELLER_COUNTERED';
                 counterMinimumGuarantee = roundMoney(Math.max(current.minimumGuarantee * 1.08, referencePrice * (current.marketHeat === 'HOT' ? 0.96 : 0.9)));
-                counterPlatformRevenueShare = Math.round(clamp(current.platformRevenueShare - 3, 45, 90));
+                counterPlatformRevenueShare = immutableTransfer ? current.platformRevenueShare : 100-streamingBackendPercentForBuyer(player,null,absoluteWeek,Math.min(20,103-current.platformRevenueShare),current.countryIds || [],current.accessGrant);
                 signingDeadlineAbsoluteWeek = absoluteWeek + 3;
                 responseReason = `${current.sellerName} wants ${counterMinimumGuarantee.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })} upfront and a ${100 - counterPlatformRevenueShare}% rights-holder share. The revision is open for three processed weeks.`;
             } else {
@@ -555,7 +563,7 @@ export interface OwnedStreamingCataloguePackagePurchaseResult {
     changed: boolean;
     contracts: StreamingRightsContract[];
     package: StreamingCataloguePackage | null;
-    reason?: 'NOT_ACTIVE' | 'NOT_FOUND' | 'INSUFFICIENT_TREASURY' | 'RIGHTS_UNAVAILABLE' | 'INSUFFICIENT_ENERGY';
+    reason?: 'NOT_ACTIVE' | 'NOT_FOUND' | 'INSUFFICIENT_TREASURY' | 'RIGHTS_UNAVAILABLE' | 'INSUFFICIENT_ENERGY' | 'INVALID_TERMS';
     detail?: string;
 }
 
@@ -665,6 +673,10 @@ export const getStreamingCataloguePackageOpportunities = (
             localizationRequirements: [],
         });
         if (!allocation.valid) return [];
+        allocation.rows=allocation.rows.map(row=>{const pct=streamingBackendPercentForBuyer(player,null,absoluteWeek,row.licensorRevenueShare,row.countryIds);
+            const expectedRoyaltyCost=pct>0?Math.round(row.expectedRoyaltyCost*pct/Math.max(1,row.licensorRevenueShare)):0;
+            return {...row,licensorRevenueShare:pct,platformRevenueShare:100-pct,backendBasis:'ADS_RENTAL_RECEIPTS',guaranteeRecoupment:'NON_RECOUPABLE',backendCap:null,
+                expectedRoyaltyCost,expectedTotalCost:row.minimumGuarantee+expectedRoyaltyCost};});
         const packageId = createDeterministicId('owned_streaming_catalogue_package', platform.simulationSeed, getStreamingMarketCycle(absoluteWeek), studioId, ...valuedComponents.map(component => component.sourceProjectId));
         const acceptedOfferId = createDeterministicId('owned_streaming_catalogue_package_offer', packageId);
         const cataloguePackage: StreamingCataloguePackage = {
@@ -726,6 +738,10 @@ export const signOwnedStreamingCataloguePackage = (
         includeReservedOpportunityId: opportunityId,
     }).find(candidate => candidate.id === opportunityId);
     if (!opportunity) return { player, changed: false, contracts: [], package: null, reason: 'NOT_FOUND' };
+    const packageError = validateNewStreamingBackendTerms({minimumGuarantee:options.totalGuarantee ?? opportunity.totalGuarantee,
+        licensorRevenueShare:options.licensorRevenueShare ?? 0,referenceFee:opportunity.totalGuarantee,
+        capability:getStreamingBuyerBackendCapability(player,null,getAbsoluteWeek(player.age,player.currentWeek))});
+    if(packageError) return {player,changed:false,contracts:[],package:opportunity.package,reason:'INVALID_TERMS'};
     const totalGuarantee = Math.max(0, Math.round(options.totalGuarantee ?? opportunity.totalGuarantee));
     const licensorRevenueShare = options.licensorRevenueShare == null
         ? null
@@ -737,9 +753,10 @@ export const signOwnedStreamingCataloguePackage = (
             ? Math.max(0, totalGuarantee - allocated)
             : Math.floor((totalGuarantee * row.minimumGuarantee / allocationTotal) / 100_000) * 100_000;
         allocated += minimumGuarantee;
-        const sellerShare = licensorRevenueShare ?? row.licensorRevenueShare;
+        const sellerShare = licensorRevenueShare ?? streamingBackendPercentForBuyer(player,null,getAbsoluteWeek(player.age,player.currentWeek),row.licensorRevenueShare,row.countryIds);
         return {
             ...row,
+            backendBasis: 'ADS_RENTAL_RECEIPTS' as const,
             minimumGuarantee,
             licensorRevenueShare: sellerShare,
             platformRevenueShare: 100 - sellerShare,
@@ -747,6 +764,13 @@ export const signOwnedStreamingCataloguePackage = (
             expectedTotalCost: minimumGuarantee + row.expectedRoyaltyCost,
         };
     });
+    for(const row of effectiveRows){
+        const original=opportunity.rows.find(item=>item.componentProjectId===row.componentProjectId)!;
+        const grant=createStreamingRightsAccessGrantForOffer(platform.serviceConfiguration.pricing.streams,row.windowType==='PERMANENT');
+        const error=validateNewStreamingBackendTerms({minimumGuarantee:row.minimumGuarantee,licensorRevenueShare:row.licensorRevenueShare,referenceFee:original.minimumGuarantee,
+            capability:getStreamingBuyerBackendCapability(player,null,getAbsoluteWeek(player.age,player.currentWeek),row.countryIds,grant)});
+        if(error) return {player,changed:false,contracts:[],package:opportunity.package,reason:'INVALID_TERMS',detail:error};
+    }
     if (platform.treasuryCash < totalGuarantee) {
         return { player, changed: false, contracts: [], package: opportunity.package, reason: 'INSUFFICIENT_TREASURY' };
     }
@@ -878,10 +902,10 @@ export const createDefaultStreamingRightsTerms = (
         : 'NON_EXCLUSIVE',
     windowType: opportunity.recommendedWindow,
     minimumGuarantee: opportunity.quote.suggestedGuarantee,
-    platformRevenueShare: opportunity.kind === 'SUBLICENSE_OUT' ? 62 : opportunity.quote.targetPlatformRevenueShare,
+    platformRevenueShare: 100,
     marketingGuarantee: roundMoney(opportunity.quote.suggestedGuarantee * 0.12),
-    viewershipBonusThreshold: Math.max(100_000, Math.round(opportunity.quote.suggestedGuarantee / 45)),
-    viewershipBonusAmount: roundMoney(opportunity.quote.suggestedGuarantee * 0.08),
+    viewershipBonusThreshold: 0,
+    viewershipBonusAmount: 0,
     renewalOption: true,
     sublicensingAllowed: opportunity.kind !== 'SUBLICENSE_OUT',
     sequelRightsIncluded: false,
@@ -895,7 +919,7 @@ const normalizeTerms = (terms: StreamingRightsTermsInput): StreamingRightsTermsI
     exclusivity: terms.exclusivity === 'EXCLUSIVE' ? 'EXCLUSIVE' : 'NON_EXCLUSIVE',
     windowType: ['FIRST_WINDOW', 'SECOND_WINDOW', 'PERMANENT'].includes(terms.windowType) ? terms.windowType : 'SECOND_WINDOW',
     minimumGuarantee: roundMoney(clamp(terms.minimumGuarantee, 0, 5_000_000_000)),
-    platformRevenueShare: Math.round(clamp(terms.platformRevenueShare, 45, 90)),
+    platformRevenueShare: Math.round(clamp(terms.platformRevenueShare, 80, 100)),
     marketingGuarantee: roundMoney(clamp(terms.marketingGuarantee, 0, 1_000_000_000)),
     viewershipBonusThreshold: Math.round(clamp(terms.viewershipBonusThreshold, 0, 100_000_000)),
     viewershipBonusAmount: roundMoney(clamp(terms.viewershipBonusAmount, 0, 1_000_000_000)),
@@ -1187,14 +1211,17 @@ export const submitStreamingRightsOffer = (
     }
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
     if (absoluteWeek > current.expiresAtAbsoluteWeek) return { player, changed: false, reason: 'NOT_READY' };
+    const eligibility = getStreamingBuyerBackendCapability(player,null,absoluteWeek,current.countryIds || [],current.accessGrant);
+    const immutableTransfer=(current.kind==='ACQUIRE' && current.sellerType==='PLATFORM' || current.kind==='TRANSFER_OUT') && !!current.sourceLicenseId && !!player.world.streamingRightsContracts?.[current.sourceLicenseId];
+    const termsError = current.kind === 'SUBLICENSE_OUT' || immutableTransfer ? null : validateNewStreamingBackendTerms({minimumGuarantee:current.minimumGuarantee,
+        licensorRevenueShare:100-current.platformRevenueShare,referenceFee:current.rivalBidAmount,capability:eligibility,permanentPurchase:current.windowType==='PERMANENT'});
+    if(termsError || !immutableTransfer && current.viewershipBonusAmount > 0) return {player,changed:false,reason:'INVALID_TERMS',detail:termsError || 'New agreements use one ads and rental backend, without a separate success bonus.'};
     const rng = createDeterministicRng(`${platform.simulationSeed}:rights-offer:${current.id}:${current.round + 1}`);
     const referencePrice = Math.max(1, current.rivalBidAmount);
     const moneyScore = current.kind === 'SUBLICENSE_OUT'
         ? referencePrice / Math.max(1, current.minimumGuarantee)
         : current.minimumGuarantee / referencePrice;
-    const shareScore = current.kind === 'SUBLICENSE_OUT'
-        ? (100 - current.platformRevenueShare) / 38
-        : (100 - current.platformRevenueShare) / 32;
+    const shareScore = eligibility.eligibleRevenueFraction * (100-current.platformRevenueShare) / 100;
     const clauseScore = (
         (current.renewalOption ? 0.04 : 0)
         + (current.sublicensingAllowed ? -0.03 : 0.03)
@@ -1211,11 +1238,8 @@ export const submitStreamingRightsOffer = (
             : Math.max(current.minimumGuarantee * 1.08, referencePrice * 0.92))
         : null;
     const counterShare = status === 'COUNTERED'
-        ? Math.round(clamp(
-            current.platformRevenueShare + (current.kind === 'SUBLICENSE_OUT' ? 3 : -3),
-            45,
-            90,
-        ))
+        ? immutableTransfer ? current.platformRevenueShare : 100-streamingBackendPercentForBuyer(player,current.kind==='SUBLICENSE_OUT'?current.buyerPlatformId:null,absoluteWeek,
+            Math.min(20,100-current.platformRevenueShare+(current.kind==='SUBLICENSE_OUT'?-3:3)),current.countryIds || [],current.accessGrant)
         : null;
     const negotiation: OwnedStreamingRightsNegotiation = {
         ...current,
@@ -1368,6 +1392,12 @@ export const signStreamingRightsDeal = (
             detail: 'The signing window has expired. No money was charged.',
             negotiation,
         };
+    }
+    if (negotiation.kind !== 'SUBLICENSE_OUT' && negotiation.kind !== 'TRANSFER_OUT'
+        && !(negotiation.kind==='ACQUIRE' && negotiation.sellerType==='PLATFORM' && negotiation.sourceLicenseId && player.world.streamingRightsContracts?.[negotiation.sourceLicenseId])) {
+        const error=validateNewStreamingBackendTerms({minimumGuarantee:negotiation.minimumGuarantee,licensorRevenueShare:100-negotiation.platformRevenueShare,
+            referenceFee:negotiation.rivalBidAmount,capability:getStreamingBuyerBackendCapability(player,null,absoluteWeek,negotiation.countryIds || [],negotiation.accessGrant),permanentPurchase:negotiation.windowType==='PERMANENT'});
+        if(error || negotiation.viewershipBonusAmount > 0) return {player,changed:false,reason:'INVALID_TERMS',detail:error || 'Separate success bonuses are not part of new licenses.'};
     }
     const availableTreasury = Math.max(0, platform.treasuryCash - platform.costCommitments
         .filter(commitment => commitment.status === 'COMMITTED')
@@ -1616,8 +1646,8 @@ export const signStreamingRightsDeal = (
             durationWeeks: negotiation.durationWeeks,
             exclusivity: negotiation.exclusivity,
             upfrontFee: negotiation.minimumGuarantee,
-            sellerRevenueShare: negotiation.platformRevenueShare,
-            buyerRevenueShare: 100 - negotiation.platformRevenueShare,
+            sellerRevenueShare: 100 - negotiation.platformRevenueShare,
+            buyerRevenueShare: negotiation.platformRevenueShare,
             signedAtAbsoluteWeek: absoluteWeek,
             startsAtAbsoluteWeek,
             expiresAtAbsoluteWeek,
@@ -1851,10 +1881,10 @@ export const openStreamingRightsRenewal = (
         exclusivity: license.exclusivity,
         windowType: license.windowType || 'SECOND_WINDOW',
         minimumGuarantee: economics.minimumGuarantee,
-        platformRevenueShare: economics.platformRevenueShare,
+        platformRevenueShare: 100-streamingBackendPercentForBuyer(player,null,absoluteWeek,100-economics.platformRevenueShare,license.countryIds,license.accessGrant),
         marketingGuarantee: license.marketingGuarantee || 0,
-        viewershipBonusThreshold: license.viewershipBonusThreshold || 0,
-        viewershipBonusAmount: license.viewershipBonusAmount || 0,
+        viewershipBonusThreshold: 0,
+        viewershipBonusAmount: 0,
         renewalOption: true,
         sublicensingAllowed: Boolean(license.sublicensingAllowed),
         sequelRightsIncluded: Boolean(license.sequelRightsIncluded),

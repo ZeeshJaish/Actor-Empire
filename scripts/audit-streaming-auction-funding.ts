@@ -3,6 +3,7 @@ import { INITIAL_PLAYER, type Player } from '../types';
 import { getStreamingOriginalLiveStatus, getOwnedStreamingProgramEntries } from '../services/streamingOriginals';
 import { normalizeOwnedStreamingPlatformState } from '../services/ownedStreamingPlatform';
 import { activateAuctionFutureFunding, processAuctionFutureFunding } from '../services/streamingAuctionFunding';
+import { recognizeStreamingContentCost } from '../services/streamingContentAccounting';
 
 const fixture = (commitment: 'FIRM' | 'OPTION' = 'FIRM'): Player => {
  const p = structuredClone(INITIAL_PLAYER);
@@ -39,6 +40,9 @@ assert.equal(p.ownedStreamingPlatform.catalogLicenses.length,2);
 assert.equal(p.ownedStreamingPlatform.rightsObligations[0].observedAmount,2);
 assert.ok(p.ownedStreamingPlatform.catalogLicenses.every(x=>x.platformRevenueShare===85));
 assert.equal(Object.keys(p.world.streamingRightsContracts||{}).length,2);
+const fundedContent = recognizeStreamingContentCost(p.ownedStreamingPlatform, 152, p.world.streamingRightsContracts, p.world);
+assert.equal(fundedContent.state.assets.reduce((total, asset) => total + asset.costBasis, 0), 20_000_000,
+ 'Delivered Original funding represented by a commission and canonical license must be capitalized only once');
 const replay=processAuctionFutureFunding(JSON.parse(JSON.stringify(p)),152);
 assert.equal(replay.world.projects.length,p.world.projects.length,'Reload/replay must not duplicate deliveries');
 assert.deepEqual(processAuctionFutureFunding(p,153),p,'Completed obligation must remain byte-stable in later weeks');
@@ -71,9 +75,22 @@ assert.equal(processAuctionFutureFunding(fixture('OPTION'),200).ownedStreamingPl
 let late=fixture();late.world.studios={};late=processAuctionFutureFunding(late,100);
 late.world.studios=fixture().world.studios;late=processAuctionFutureFunding(late,140);
 assert.ok(Object.values(late.world.industryProductions||{}).every(x=>x.createdAtAbsoluteWeek===140 && x.productionCalendar.startedAbsoluteWeek===140 && x.productionCalendar.elapsedWeeks===0),'Late retry must start real production now with no retroactive progress');
+const prepaidOriginals=recognizeStreamingContentCost(late.ownedStreamingPlatform,140,late.world.streamingRightsContracts,late.world);
+assert.equal(prepaidOriginals.expense,0,'Undelivered funded productions remain prepaid');
+const firstUpgradeOnFailure=processAuctionFutureFunding(JSON.parse(JSON.stringify(late)),153);
+assert.equal(recognizeStreamingContentCost(firstUpgradeOnFailure.ownedStreamingPlatform,153,
+ firstUpgradeOnFailure.world.streamingRightsContracts,firstUpgradeOnFailure.world).expense,20_000_000,
+ 'First upgrade on the cancellation week must recover paid basis from canonical production and paid commitments');
+late.ownedStreamingPlatform.contentAccounting=prepaidOriginals.state;
 late=processAuctionFutureFunding(late,153);
 assert.equal(late.world.projects.length,1,'Late production cannot fake delivery after contract deadline');
 assert.ok(Object.values(late.world.industryProductions||{}).every(production=>production.status==='CANCELLED'),'Failed orders terminate their canonical productions');
 assert.equal(late.ownedStreamingPlatform.originalCommissions.length,0,'Failed unfinished orders cannot remain stuck in the active Originals pipeline');
 assert.equal(late.ownedStreamingPlatform.treasuryCash,80_000_000,'Spent funding must not be refunded on breach');
+const cancellationCost=recognizeStreamingContentCost(late.ownedStreamingPlatform,153,late.world.streamingRightsContracts,late.world);
+assert.equal(cancellationCost.expense,20_000_000,'Cancelled paid productions write off their actual sunk funding');
+late.ownedStreamingPlatform.contentAccounting=cancellationCost.state;
+assert.equal(recognizeStreamingContentCost(late.ownedStreamingPlatform,154,late.world.streamingRightsContracts,late.world).expense,0,
+ 'Cancellation write-off cannot repeat after removed commission/history reload');
+assert.equal(late.ownedStreamingPlatform.treasuryCash,80_000_000,'Non-cash write-offs must not charge treasury again');
 console.log('Auction future funding canonical production lifecycle passed.');

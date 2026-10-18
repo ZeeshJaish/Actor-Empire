@@ -1,3 +1,4 @@
+import {streamingBackendPercentForBuyer} from '../streamingBackendPolicy';
 import type {
     OwnedStreamingCatalogLicense,
     PlatformAiContentPlan,
@@ -401,6 +402,7 @@ const activateSettledRenewals = (
             durationWeeks: record.durationWeeks,
             exclusivity: previous.exclusivity,
             minimumGuarantee: millionsToFullCurrency(record.minimumGuaranteeMillions),
+            backendBasis: previous.backendBasis || 'ADJUSTED_GROSS_RECEIPTS',
             platformRevenueShare: previous.platformRevenueShare,
             signedAtAbsoluteWeek: input.absoluteWeek,
             startsAtAbsoluteWeek: record.nextStartsAtAbsoluteWeek,

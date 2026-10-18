@@ -1,3 +1,4 @@
+import {getStreamingBuyerBackendCapability, streamingBackendPercentForBuyer, validateNewStreamingBackendTerms} from './streamingBackendPolicy';
 import type {
     OwnedStreamingLedgerEntry,
     OwnedStreamingRightsObligation,
@@ -372,9 +373,8 @@ const ownedLedgerEntry = (
 
 const inheritedOwnedObligations = (
     successor: StreamingRightsContract,
-    transaction: StreamingRightsTransaction,
-): OwnedStreamingRightsObligation[] => {
-    const settledWeek = transaction.settledAtAbsoluteWeek || transaction.listedAtAbsoluteWeek;
+ ): OwnedStreamingRightsObligation[] => {
+    const settledWeek = successor.signedAtAbsoluteWeek;
     return [
         ...(successor.marketingGuarantee > 0 ? [{
             id: createDeterministicId('streaming_rights_obligation', successor.id, 'marketing'),
@@ -427,16 +427,8 @@ const updateOwnedParty = (
         : platform.catalogLicenses.some(contract => contract.id === successor.id)
             ? platform.catalogLicenses
             : [...platform.catalogLicenses, successor];
-    const sourceObligations = platform.rightsObligations
-        .filter(obligation => obligation.licenseId === source.id && obligation.status !== 'SATISFIED')
-        .map(obligation => ({
-            ...obligation,
-            id: createDeterministicId('streaming_rights_obligation', successor.id, obligation.type.toLowerCase()),
-            licenseId: successor.id,
-        }));
-    const transferredObligations = sourceObligations.length
-        ? sourceObligations
-        : inheritedOwnedObligations(successor, transaction);
+    const transferredObligations = (successor.transferredObligationStates
+        ?? inheritedOwnedObligations(successor)).map(obligation => ({ ...obligation, licenseId: successor.id }));
     const obligations = role === 'SELLER'
         ? platform.rightsObligations.filter(obligation => obligation.licenseId !== source.id)
         : [
@@ -541,6 +533,14 @@ export const settleStreamingRightsTransfer = (
                     purchaseFulfillment: 'NONE', source: 'LEGACY_SNAPSHOT' },
         ),
     };
+    // Capture before the seller projection removes obligations. Preserve payment IDs and
+    // resolved states; terminal history and event ledgers may later be pruned.
+    const localObligations = source.buyer.type === 'PLAYER_PLATFORM'
+        ? player.ownedStreamingPlatform?.rightsObligations.filter(row => row.licenseId === source.id) : [];
+    successor.transferredObligationStates = [
+        ...new Map([...(source.transferredObligationStates ?? (localObligations?.length ? [] : inheritedOwnedObligations(source))),
+            ...(localObligations || [])].map(row => [row.id, row])).values(),
+    ].map(row => ({ ...row, licenseId: successor.id }));
     const closedSource: StreamingRightsContract = {
         ...source,
         status: 'TRANSFERRED_OUT',
@@ -712,11 +712,30 @@ export const settleStreamingRightsSublicense = (
     const transactionId = createDeterministicId('streaming_rights_transaction', input.idempotencyKey);
     const successorId = input.successorContractId
         || createDeterministicId('streaming_rights_sublicense', source.id, partyKey(input.buyer), input.idempotencyKey);
+    const effectiveAccessGrant = intersectStreamingRightsAccessGrants(
+            normalizeStreamingRightsAccessGrant(source.accessGrant) || {
+                schemaVersion: 1, modes: [], earlyWindowWeeks: 0,
+                purchaseFulfillment: 'NONE', source: 'LEGACY_SNAPSHOT',
+            },
+            normalizeStreamingRightsAccessGrant(input.requestedAccessGrant)
+                || normalizeStreamingRightsAccessGrant(source.accessGrant)
+                || { schemaVersion: 1, modes: [], earlyWindowWeeks: 0,
+                    purchaseFulfillment: 'NONE', source: 'LEGACY_SNAPSHOT' },
+        );
+    const termsError=validateNewStreamingBackendTerms({minimumGuarantee:input.price,licensorRevenueShare:100-input.buyerRevenueShare,
+        // The current market quote governs resale cash; historical acquisition cost is sunk.
+        capability:getStreamingBuyerBackendCapability(player,input.buyer.platformId,input.absoluteWeek,input.countryIds,effectiveAccessGrant)});
+    if(termsError) return {player,changed:false,reason:'INVALID_PRICE',detail:termsError};
     const buyerRevenueShare = Math.max(0, Math.min(100, Math.round(input.buyerRevenueShare)));
     const successor: StreamingRightsContract = {
         ...source,
         id: successorId,
         idempotencyKey: `streaming-sublicense-contract:${input.idempotencyKey}`,
+        royaltyPurpose:undefined,backendBasis:'ADS_RENTAL_RECEIPTS',guaranteeRecoupment:'NON_RECOUPABLE',backendCap:null,
+        viewershipBonusThreshold:0,viewershipBonusAmount:0,
+        transferredObligationStates:undefined, marketingGuarantee:0,
+        productionFunding:0, futureSeasonFunding:0, futureFunding:undefined,
+        lastRoyaltyReceiptAbsoluteWeek:undefined,lastRoyaltySellerReceiptAbsoluteWeek:undefined,
         origin: 'PLATFORM_TRADE',
         seller: input.seller,
         buyer: input.buyer,
@@ -752,16 +771,7 @@ export const settleStreamingRightsSublicense = (
         renewalOption: false,
         sublicensingAllowed: false,
         changeOfControl: 'NONE',
-        accessGrant: intersectStreamingRightsAccessGrants(
-            normalizeStreamingRightsAccessGrant(source.accessGrant) || {
-                schemaVersion: 1, modes: [], earlyWindowWeeks: 0,
-                purchaseFulfillment: 'NONE', source: 'LEGACY_SNAPSHOT',
-            },
-            normalizeStreamingRightsAccessGrant(input.requestedAccessGrant)
-                || normalizeStreamingRightsAccessGrant(source.accessGrant)
-                || { schemaVersion: 1, modes: [], earlyWindowWeeks: 0,
-                    purchaseFulfillment: 'NONE', source: 'LEGACY_SNAPSHOT' },
-        ),
+        accessGrant: effectiveAccessGrant,
     };
     const transaction = normalizeStreamingRightsTransaction({
         schemaVersion: STREAMING_RIGHTS_TRANSACTION_SCHEMA_VERSION,

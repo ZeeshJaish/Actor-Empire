@@ -1,3 +1,4 @@
+import {calculateStreamingMarketPolicyCharges} from '../streamingMarketEconomics';
 import type {
     OwnedStreamingMarketOperation,
     PlatformAiDecisionRecord,
@@ -6,6 +7,7 @@ import type {
     PlatformAiFinanceSnapshot,
     PlatformAiPendingOneTimeObligation,
     PlatformAiReserveAllocation,
+    PlatformAiTradeRoyaltyAllocation,
     PlatformId,
     PlatformState,
     Player,
@@ -16,6 +18,7 @@ import {
     calculateStreamingRunwayFromTrailingCosts,
     calculateStreamingStandaloneValuationFullCurrency,
     calculateStreamingSubscriptionRevenueFullCurrency,
+    calculateStreamingSignedRoyaltyAllocations,
 } from '../streamingEconomyCore';
 import { getStreamingCountryMarketProfile } from '../streamingDayOneMarkets';
 import { fullCurrencyToMillions, isStreamingLicenseActiveAt } from '../streamingRightsCore';
@@ -24,7 +27,6 @@ import { createPlatformAiRecurringEfficiencySnapshot } from './platformAiEfficie
 import { getPlatformAiOperatingProfile } from './platformAiOperatingProfiles';
 import { PLATFORM_AI_PROFILES } from './platformAiProfiles';
 import {
-    calculatePlatformAiPartnerRevenueShares,
     createPlatformAiTradeRoyaltyEvidenceDecision,
     progressPlatformAiDistressWorld,
     selectPlatformAiWithdrawableMarket,
@@ -91,6 +93,49 @@ const activeMarkets = (platform: PlatformState): OwnedStreamingMarketOperation[]
     ))
 );
 
+/** A tax deduction, never another cash payment. Each funded asset has a fixed
+ * calendar life, so a week cannot restart amortization after rights expiry. */
+const paidContentTaxExpense = (player: Player, platform: PlatformState, absoluteWeek: number): number => {
+    const scheduledExpense = (basis: number, startsAt: number, life: number): number => {
+        if (!Number.isFinite(startsAt) || !Number.isFinite(life) || life < 1
+            || absoluteWeek < startsAt || absoluteWeek >= startsAt + life) return 0;
+        const elapsed = absoluteWeek - startsAt;
+        return Math.floor(basis * (elapsed + 1) / life) - Math.floor(basis * elapsed / life);
+    };
+    let expense = 0;
+    const contracts = new Map((platform.ai?.rightsContracts || []).map(row => [row.id, row]));
+    for (const contract of Object.values(player.world.streamingRightsContracts || {})) {
+        // Canonical ownership supersedes stale local projections, including transfers out.
+        if (contract.buyer.platformId === platform.id || contracts.has(contract.id)) contracts.set(contract.id, contract);
+    }
+    for (const license of contracts.values()) {
+        const canonical = player.world.streamingRightsContracts?.[license.id];
+        if (!canonical || canonical.buyer.platformId !== platform.id || !['PAID','LEGACY_PAID'].includes(canonical.settlement.guarantee)
+            || canonical.origin === 'OWNED_STUDIO_TRANSFER' || ['TRANSFERRED_OUT','TERMINATED'].includes(canonical.status)) continue;
+        const transaction = canonical.rightsTransactionId ? player.world.streamingRightsTransactions?.[canonical.rightsTransactionId] : undefined;
+        if (canonical.rightsTransactionId && (!transaction || transaction.status !== 'SETTLED' || transaction.successorContractId !== canonical.id)) continue;
+        const startsAt = Math.max(canonical.startsAtAbsoluteWeek, transaction?.settledAtAbsoluteWeek
+            ?? canonical.settlement.settledAtAbsoluteWeek ?? canonical.signedAtAbsoluteWeek);
+        const life = canonical.permanentPurchase || canonical.windowType === 'PERMANENT' ? 104
+            : Math.min(safe(canonical.durationWeeks), safe(canonical.expiresAtAbsoluteWeek - startsAt));
+        if (absoluteWeek >= canonical.expiresAtAbsoluteWeek) continue;
+        expense += scheduledExpense(safe(transaction?.acceptedPrice ?? canonical.minimumGuarantee), startsAt, life);
+    }
+    const seenProductions = new Set<string>();
+    for (const plan of platform.ai?.slate || []) {
+        if (plan.source !== 'COMMISSIONED_ORIGINAL' || !['RELEASED','SCHEDULED'].includes(plan.status)
+            || !plan.industryProductionId || seenProductions.has(plan.industryProductionId)) continue;
+        const production = player.world.industryProductions?.[plan.industryProductionId];
+        if (!production || production.commissioningPlatformId !== platform.id || production.status !== 'DELIVERED') continue;
+        const startsAt = plan.premiereAtAbsoluteWeek ?? plan.releasedAtAbsoluteWeek;
+        if (startsAt === null) continue;
+        seenProductions.add(plan.industryProductionId);
+        // paidMillions is principal actually funded, independent of marketing reserves.
+        expense += scheduledExpense(safe(production.paidMillions) * 1_000_000, startsAt, 104);
+    }
+    return expense;
+};
+
 const activeRegionCount = (platform: PlatformState): number => new Set(
     activeMarkets(platform).map(operation => operation.regionId),
 ).size;
@@ -156,24 +201,6 @@ const trailing = (platform: PlatformState, field: 'revenueMillions' | 'operating
         .map(snapshot => Number(snapshot[field]))
         .filter(Number.isFinite)
 );
-
-const marketPolicyCostMillions = (
-    markets: OwnedStreamingMarketOperation[],
-    revenueMillions: number,
-): number => {
-    if (!markets.length) return 0;
-    const audienceTotal = markets.reduce((sum, operation) => (
-        sum + safe(operation.countryProfile?.audienceSize, 1)
-    ), 0) || markets.length;
-    return roundMillions(markets.reduce((sum, operation) => {
-        const audienceShare = safe(operation.countryProfile?.audienceSize, 1) / audienceTotal;
-        const policyRate = (
-            safe(operation.policySnapshot?.effectiveTaxPercent, 0, 100)
-            + safe(operation.policySnapshot?.streamingLevyPercent, 0, 100)
-        ) / 100;
-        return sum + revenueMillions * audienceShare * policyRate;
-    }, 0));
-};
 
 const distressMultiplierFor = (platform: PlatformState): number => {
     const statusMultiplier = (() => {
@@ -460,13 +487,54 @@ export const calculatePlatformAiWeeklyEconomy = (
         getPlatformAiOperatingProfile(platform.id).efficiency.recurringOperationsCostMultiplier,
         'AI',
     );
-    const marketPolicyCost = marketPolicyCostMillions(markets, revenueMillions);
-    const partnerRevenueShareCalculation = calculatePlatformAiPartnerRevenueShares(
-        platform,
-        subscriptionRevenueMillions,
-        input.absoluteWeek,
-    );
-    const partnerRevenueShareCostMillions = partnerRevenueShareCalculation.totalCostMillions;
+    const royaltyAccruals={...ai.royaltyAccruals};
+    const storeAccruals = new Map((ai.financeHistory.at(-1)?.storeRoyaltyAccruals || []).map(row => [row.contractId, row]));
+    const storeReceiptWeek = canonicalViewing?.lastProcessedAbsoluteWeek ?? input.absoluteWeek;
+    const storeContracts = new Map(ai.rightsContracts.map(license => [license.id, license]));
+    Object.values(input.player.world.streamingRightsContracts || {}).forEach(contract => {
+        if (contract.buyer.platformId === platform.id)
+            storeContracts.set(contract.id, contract);
+    });
+    const storeLicenses = [...storeContracts.values()].filter(license => {
+        const canonical=input.player.world.streamingRightsContracts?.[license.id];
+        return !canonical || canonical.buyer.platformId===platform.id;
+    }).map(license => {
+        const canonical = input.player.world.streamingRightsContracts?.[license.id];
+        const contract = canonical || license;
+        const prior = royaltyAccruals[license.id];
+        const legacyStore = prior ? null : storeAccruals.get(license.id);
+        // An earned receipt remains payable when settlement runs after expiry.
+        // This financial projection grants no playback or new-sale permission.
+        const earnedBeforeExpiry = (contract.status === 'EXPIRED' || (contract.status === 'TRANSFERRED_OUT'
+            && (contract as NonNullable<typeof canonical>).transferredAtAbsoluteWeek != null && storeReceiptWeek < (contract as NonNullable<typeof canonical>).transferredAtAbsoluteWeek)) && storeReceiptWeek < input.absoluteWeek
+            && contract.startsAtAbsoluteWeek <= storeReceiptWeek && storeReceiptWeek < contract.expiresAtAbsoluteWeek;
+        return {...contract, status: earnedBeforeExpiry ? 'ACTIVE' as const : contract.status,
+            cumulativeRoyaltyAccrued: Math.max(contract.cumulativeRoyaltyAccrued || 0,prior?.accrued || 0)+(legacyStore?.accrued || 0),
+            cumulativeRoyaltyPaid: Math.max(contract.cumulativeRoyaltyPaid || 0,prior?.paid || 0)+(legacyStore?.paid || 0),
+            lastRoyaltyReceiptAbsoluteWeek:Math.max(contract.lastRoyaltyReceiptAbsoluteWeek ?? -1,prior?.lastReceiptAbsoluteWeek ?? -1)};
+    });
+    const storeRoyaltyAllocations = calculateStreamingSignedRoyaltyAllocations({
+        licenses: storeLicenses,
+        receipts: platformViewingRevenue ? [
+            ...(canonicalViewing?.royaltyReceipts || []).filter(row=>row.platformId===platform.id && row.contractId)
+                .map(row=>({...row,contractId:row.contractId!})),
+            ...(canonicalViewing?.aiStoreTransactions || [])
+                .filter(row => row.platformId === platform.id).map(row => ({receiptId:row.transactionId,contractId: row.contractId, sourceKind: row.kind, grossReceipts: row.revenue}))] : [],
+        absoluteWeek: storeReceiptWeek,
+    });
+    const tradeAllocations = new Map<string,PlatformAiTradeRoyaltyAllocation>();
+    for (const allocation of storeRoyaltyAllocations) {
+        royaltyAccruals[allocation.contractId]={accrued:allocation.cumulativeRoyaltyAccrued,paid:allocation.cumulativeRoyaltyPaid,
+            lastReceiptAbsoluteWeek:storeReceiptWeek};
+        storeAccruals.set(allocation.contractId,{contractId:allocation.contractId,accrued:allocation.cumulativeRoyaltyAccrued,paid:allocation.cumulativeRoyaltyPaid});
+        const license = storeLicenses.find(row => row.id === allocation.contractId)!;
+        if (license.origin !== 'PLATFORM_TRADE' || license.sellerType !== 'PLATFORM' || !license.sellerPlatformId
+            || !PLATFORM_AI_PROFILES[license.sellerPlatformId as PlatformId] || allocation.royaltyPayable <= 0) continue;
+        const previous = tradeAllocations.get(license.id);
+        tradeAllocations.set(license.id, {contractId: license.id, sellerPlatformId: license.sellerPlatformId as PlatformId,
+            amountMillions: roundMillions((previous?.amountMillions || 0) + fullCurrencyToMillions(allocation.royaltyPayable))});
+    }
+    const partnerRevenueShareCostMillions = roundMillions(fullCurrencyToMillions(storeRoyaltyAllocations.reduce((sum, row) => sum + row.royaltyPayable, 0)));
     // One-time rights guarantees, production milestones, and research capital costs settle in their owning services.
     const contentCostMillions = 0;
     const researchCostMillions = roundMillions(ai.researchQueue.reduce((sum, item) => (
@@ -510,6 +578,23 @@ export const calculatePlatformAiWeeklyEconomy = (
     const contractualCostAccruedMillions = oneTimeAccrued('CONTRACTUAL');
     const localizationCostAccruedMillions = oneTimeAccrued('LOCALIZATION');
     const discretionaryCostAccruedMillions = oneTimeAccrued('DISCRETIONARY');
+    const financingCostAccruedMillions = roundMillions(
+        safe(input.financingCostMillions || 0)
+        + safe(ai.debtMillions) * safe(ai.debtInterestRateAnnualPercent, 2, 20) / 100 / 52,
+    );
+    const countryRevenues=Object.fromEntries(markets.filter(x=>x.countryId).map(x=>{
+        const id=x.countryId!;
+        const customer=input.player.world.worldStreamingCustomers?.countries?.[id]?.platformSummaries.find(row=>row.platformId===platform.id);
+        const viewing=input.player.world.worldStreamingViewing?.countries?.[id]?.platformPerformance?.[platform.id];
+        return [id,(customer?.monthlySubscriptionRevenue||0)/4.33+(viewing?.revenue.totalIncrementalRevenue||0)];
+    }));
+    const marketCharges=calculateStreamingMarketPolicyCharges(markets,revenueMillions*1_000_000,{
+        deductibleOperatingCost:(recurringEfficiency.appliedEligibleCostMillions+partnerRevenueShareCostMillions
+            +contentCostMillions+researchCostMillions+technologyCostMillions+financingCostAccruedMillions)*1_000_000,
+        countryRevenues,
+        contentAmortization:paidContentTaxExpense(input.player,platform,input.absoluteWeek),
+    });
+    const marketPolicyCost=roundMillions(marketCharges.policyCost/1_000_000);
     const mandatoryCostAccruedMillions = roundMillions(
         recurringEfficiency.appliedEligibleCostMillions
         + marketPolicyCost
@@ -520,10 +605,6 @@ export const calculatePlatformAiWeeklyEconomy = (
     );
     const settledObligationAccruedMillions = roundMillions(
         contractualCostAccruedMillions + localizationCostAccruedMillions + discretionaryCostAccruedMillions,
-    );
-    const financingCostAccruedMillions = roundMillions(
-        safe(input.financingCostMillions || 0)
-        + safe(ai.debtMillions) * safe(ai.debtInterestRateAnnualPercent, 2, 20) / 100 / 52,
     );
     // Operating cost remains recurring and actor-neutral; settled obligations and financing stay separate.
     const operatingCostMillions = mandatoryCostAccruedMillions;
@@ -697,7 +778,9 @@ export const calculatePlatformAiWeeklyEconomy = (
         partnerRevenueShareCostMillions,
         administrationCostMillions: 0,
         recurringEfficiency,
-        platformTradeRoyaltyAllocations: partnerRevenueShareCalculation.platformTradeAllocations,
+        platformTradeRoyaltyAllocations: [...tradeAllocations.values()],
+        contractRoyaltyStatements:storeRoyaltyAllocations,
+        storeRoyaltyAccruals: [...storeAccruals.values()].sort((left,right)=>left.contractId.localeCompare(right.contractId)),
         contentCostMillions,
         researchCostMillions,
         technologyCostMillions,
@@ -735,6 +818,7 @@ export const calculatePlatformAiWeeklyEconomy = (
             ...platform,
             ai: {
                 ...ai,
+                royaltyAccruals,
                 pendingOneTimeObligations: nextPendingOneTimeObligations,
                 externalCommitments,
                 localizationJobs,

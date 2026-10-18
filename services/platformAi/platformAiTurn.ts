@@ -536,6 +536,14 @@ export const processPlatformAiWorldTurn = (
             discretionaryCostMillions: marketing.discretionaryCostMillions,
         });
         nextWorld = updatePlatform(nextWorld, platformId, economy.platform);
+        if(economy.changed && economy.platform.ai?.royaltyAccruals){
+            const accruals=economy.platform.ai.royaltyAccruals;
+            nextWorld={...nextWorld,streamingRightsContracts:Object.fromEntries(Object.entries(nextWorld.streamingRightsContracts || {})
+                .map(([id,contract])=>{const accrued=accruals[id];
+                    return accrued && (contract.buyer.platformId===platformId)
+                        ?[id,{...contract,cumulativeRoyaltyAccrued:accrued.accrued,cumulativeRoyaltyPaid:accrued.paid,
+                            lastRoyaltyReceiptAbsoluteWeek:accrued.lastReceiptAbsoluteWeek}]:[id,contract];}))};
+        }
         markCurrentPlatformCanonical(nextWorld, platformId, player.id, absoluteWeek);
         nextWorld = updatePlatform(nextWorld, platformId, progressPlatformAiLocalization({
             player: { ...player, world: nextWorld },

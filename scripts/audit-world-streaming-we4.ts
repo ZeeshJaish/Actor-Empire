@@ -10,6 +10,7 @@ import { normalizeWorldAudienceEconomyState } from '../services/worldEconomy/wor
 import { normalizeWorldAudienceParticipationState } from '../services/worldEconomy/worldAudienceParticipation';
 import { migratePlayerSave } from '../services/saveMigration';
 import { forecastPricing, type PricingSettings } from '../components/studio-finance/finance/launch';
+import { addStreamingAuditCatalogueTitle } from './helpers/streamingGrantedCatalogueFixture';
 
 const getOffers = (offerRegistry as any).getWorldStreamingOffers;
 assert.equal(typeof getOffers, 'function', 'WE4 exposes the canonical streaming offer registry');
@@ -37,6 +38,7 @@ player.ownedStreamingPlatform.serviceConfiguration.pricing = {
 };
 
 const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+addStreamingAuditCatalogueTitle(player, absoluteWeek, 'we4-membership-film');
 const before = JSON.stringify(player);
 const offers = getOffers(player, absoluteWeek);
 const repeated = getOffers(player, absoluteWeek);

@@ -15,6 +15,7 @@ import { migratePlayerSave } from '../services/saveMigration';
 import { getStreamingContentAvailability } from '../services/streamingContentAvailability';
 import { createWorldStreamingPlatformEconomyState } from '../services/worldEconomy/worldStreamingPlatformEconomy';
 import { normalizeOwnedStreamingPlatformState } from '../services/ownedStreamingPlatform';
+import {normalizeWorldStreamingAudienceChoiceState} from '../services/worldEconomy/worldStreamingAudienceChoice';
 
 const createViewing = (viewingEngine as any).createWorldStreamingViewingState;
 const normalizeViewing = (viewingEngine as any).normalizeWorldStreamingViewingState;
@@ -259,10 +260,11 @@ console.log(`WE6 C2 reference-week gross: rights-aware $${actualGross}; permissi
 console.log(`WE6 C2 title lines (permissive, rights-aware): ${JSON.stringify(titleRevenueComparison)}`);
 assert.equal(outcome.platformId, 'PLAYER', 'the first WE6 consumer uses the stable player platform ID');
 assert.ok(outcome.totalViewingAccounts > 0, 'eligible live titles receive canonical viewing');
+const accessChoice=normalizeWorldStreamingAudienceChoiceState(player.world.worldStreamingAudienceChoice,player,absoluteWeek);
 assert.ok(outcome.totalViewingAccounts <= player.world.worldStreamingCustomers.global.playerAccessLoadAccounts
-    + (player.world.worldStreamingAudienceChoice?.global.freeAdHouseholds || 0)
-    + (player.world.worldStreamingAudienceChoice?.global.storeHouseholds || 0),
-    'viewing cannot exceed paid, free, and store access pools');
+    + accessChoice.global.freeAdHouseholds + accessChoice.global.storeHouseholds
+    + Object.values(accessChoice.countries).reduce((sum,row)=>sum+(row.playerSecondaryStoreHouseholds || 0),0),
+    'viewing cannot exceed paid, free, primary store and secondary transactional access pools');
 assert.equal(
     outcome.titlePerformance.reduce((sum: number, title: any) => sum + title.viewingAccounts, 0),
     outcome.totalViewingAccounts,

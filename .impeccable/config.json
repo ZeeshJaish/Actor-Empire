@@ -11,6 +11,33 @@
         ],
         "createdAt": "2026-09-27T15:46:58.461Z",
         "reason": "Existing Greenlight negotiation uses purple as the returning-talent accent in HEAD and adjacent cast/talent selector; this phase preserved that incumbent visual identity."
+      },
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "components/streaming-transplant/presentation/screens/PremiereNight/PremiereNight.module.css"
+        ],
+        "createdAt": "2026-10-16T06:25:29.036Z",
+        "reason": "Agent verified: .playglyph uses a zero-width/zero-height CSS border triangle for the video play icon; this is not a card accent."
+      },
+      {
+        "rule": "border-accent-on-rounded",
+        "value": "*",
+        "files": [
+          "components/streaming-transplant/presentation/screens/PremiereNight/PremiereNight.module.css"
+        ],
+        "createdAt": "2026-10-16T06:25:29.103Z",
+        "reason": "Agent verified: flagged transparent top/bottom borders belong to .playglyph, a zero-size CSS play triangle with no border-radius; rounded card detection crosses selector boundaries."
+      },
+      {
+        "rule": "codex-grid-background",
+        "value": "*",
+        "files": [
+          "components/streaming-transplant/presentation/screens/PremiereNight/PremiereNight.module.css"
+        ],
+        "createdAt": "2026-10-16T06:25:51.447Z",
+        "reason": "Agent verified: .pnpress::before draws radial dots at varied repeat sizes as newspaper paper fibre, as the source comment states; it contains no two-axis grid-line gradients."
       }
     ]
   }

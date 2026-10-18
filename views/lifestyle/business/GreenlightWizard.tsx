@@ -1,3 +1,4 @@
+import { calculateActorRoleSalary } from '../../../services/talentService';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { Player, BudgetTier, Genre, ProjectDetails, ActiveRelease, Business, LocationDetails, Universe, UniverseId, ProjectMusicStrategy, MusicCreditRole, MusicArtist, ProjectInvestorFundingMode, StudioContract, RoleType, BackgroundCastingPlan, PlatformAiPlayerCommissionOffer, LockedStreamingFunding } from '../../../types';
@@ -1277,7 +1278,8 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             const rand = (seed % 100) / 100;
 
             let salary = 0;
-            if (t.tier === 'A_LIST') salary = 15000000 + (rand * 5000000); // 15M - 20M
+            if (t.tier === 'ICON') salary = calculateActorRoleSalary(t, 'LEAD');
+            else if (t.tier === 'A_LIST') salary = 15000000 + (rand * 5000000); // 15M - 20M
             else if (t.tier === 'ESTABLISHED') salary = 5000000 + (rand * 3000000); // 5M - 8M
             else if (t.tier === 'RISING') salary = 1000000 + (rand * 1000000); // 1M - 2M
             else salary = 250000 + (rand * 250000); // 250k - 500k
@@ -1573,30 +1575,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             }
         }
 
-        let baseSalary = 100000;
-        if (actor.tier === 'A_LIST') baseSalary = 20000000;
-        else if (actor.tier === 'ESTABLISHED') baseSalary = 8000000;
-        else if (actor.tier === 'RISING') baseSalary = 2000000;
-
-        // Fame multiplier (fame is 0-100)
-        const fameMultiplier = 0.5 + (actor.stats.fame / 100);
-
-        // Role multiplier
-        let roleMultiplier = 1;
-        if (roleType === 'LEAD') roleMultiplier = 1;
-        else if (roleType === 'SUPPORTING') roleMultiplier = 0.4;
-        else if (roleType === 'CAMEO') roleMultiplier = 0.15;
-        else if (roleType === 'EXTRA') roleMultiplier = 0.05;
-
-        const base = Math.floor(baseSalary * fameMultiplier * roleMultiplier);
-
-        // Relationship Discount
-        let discount = 0;
-        if (closeness > 50) {
-            discount = Math.min(0.7, (closeness - 50) / 100 + 0.2); // Up to 70% discount
-        }
-
-        return Math.floor(base * (1 - discount));
+        return calculateActorRoleSalary(actor, roleType, closeness);
     };
 
     const assignActorToSelectedRole = (actorId: string, actorName: string, salary: number) => {

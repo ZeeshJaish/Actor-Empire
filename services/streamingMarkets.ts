@@ -1,3 +1,4 @@
+import {calculateStreamingMarketPolicyCharges,type StreamingTaxExpenseBasis} from './streamingMarketEconomics';
 import type {
     NewsItem,
     OwnedStreamingCostCommitment,
@@ -317,17 +318,11 @@ export const advanceStreamingMarketClearances = (player: Player): StreamingMarke
     return { player: { ...player, ownedStreamingPlatform: nextPlatform, news: addUniqueNews(player, news) }, changed: true, reason: 'ADVANCED', shortfall: 0, amount: 0 };
 };
 
-export interface StreamingMarketOperatingCostView { marketOperatingCost: number; marketPolicyCost: number; total: number; activeCountryCount: number }
-/** Tax and levy are revenue percentages weighted by active-country audience. */
-export const calculateStreamingMarketOperatingCosts = (platform: OwnedStreamingPlatformState, weeklyRevenue: number): StreamingMarketOperatingCostView => {
-    const active = platform.marketOperations.filter(operation => operation.scope === 'COUNTRY' && operation.status === 'ACTIVE' && operation.countryProfile && operation.policySnapshot);
-    if (!active.length) return { marketOperatingCost: 0, marketPolicyCost: 0, total: 0, activeCountryCount: 0 };
-    const audienceTotal = active.reduce((sum, operation) => sum + (operation.countryProfile?.audienceSize || 0), 0) || active.length;
-    const marketOperatingCost = Math.round(active.reduce((sum, operation) => sum + operation.weeklyOperatingCost, 0));
-    const marketPolicyCost = Math.round(active.reduce((sum, operation) => {
-        const share = (operation.countryProfile?.audienceSize || 1) / audienceTotal;
-        const rate = ((operation.policySnapshot?.effectiveTaxPercent || 0) + (operation.policySnapshot?.streamingLevyPercent || 0)) / 100;
-        return sum + Math.max(0, weeklyRevenue) * share * rate;
-    }, 0));
-    return { marketOperatingCost, marketPolicyCost, total: marketOperatingCost + marketPolicyCost, activeCountryCount: active.length };
+export interface StreamingMarketOperatingCostView { marketOperatingCost:number; marketPolicyCost:number; marketIncomeTax:number; marketRevenueLevy:number; total:number; activeCountryCount:number }
+/** Fixed market operations, a receipts levy and income tax on earned contribution. */
+export const calculateStreamingMarketOperatingCosts=(platform:Pick<OwnedStreamingPlatformState,'marketOperations'>,weeklyRevenue:number,basis:StreamingTaxExpenseBasis={}):StreamingMarketOperatingCostView=>{
+    const active=platform.marketOperations.filter(x=>x.scope==='COUNTRY'&&x.status==='ACTIVE'&&x.countryProfile&&x.policySnapshot);
+    const marketOperatingCost=Math.round(active.reduce((sum,x)=>sum+x.weeklyOperatingCost,0));
+    const charges=calculateStreamingMarketPolicyCharges(active,weeklyRevenue,{...basis,deductibleOperatingCost:(basis.deductibleOperatingCost||0)+marketOperatingCost});
+    return {marketOperatingCost,marketPolicyCost:charges.policyCost,marketIncomeTax:charges.incomeTax,marketRevenueLevy:charges.revenueLevy,total:marketOperatingCost+charges.policyCost,activeCountryCount:active.length};
 };

@@ -16,9 +16,25 @@ import {
 } from '../services/worldEconomy/worldStreamingCustomers';
 import { migratePlayerSave } from '../services/saveMigration';
 import { getAbsoluteWeek } from '../services/legacyLogic';
+import { createStreamingLicenseContract } from '../services/streamingRightsCore';
 
 const player = structuredClone(INITIAL_PLAYER) as Player;
 const week = getAbsoluteWeek(player.age, player.currentWeek);
+// The launch forecast reconciles real paid membership demand, so its catalogue
+// must contain a subscription-granted title rather than an empty initial save.
+player.world.projects.push({ id: 'billing-path-film', title: 'Billing Path Film', genre: 'DRAMA',
+    mediaType: 'MOVIE', quality: 80, rating: 8, originalLanguageId: 'English', year: player.age } as any);
+const billingLicense = createStreamingLicenseContract({
+    id: 'billing-path-license', sourceProject: { id: 'billing-path-film', title: 'Billing Path Film' },
+    buyerPlatformId: null, platformContentPlanId: null, cataloguePackageId: null,
+    licensorName: 'Billing QA Studio', territory: 'GLOBAL', durationWeeks: 52,
+    exclusivity: 'NON_EXCLUSIVE', minimumGuarantee: 0, platformRevenueShare: 100,
+    signedAtAbsoluteWeek: week - 1, startsAtAbsoluteWeek: week - 1,
+    origin: 'STUDIO_MARKET', sellerType: 'STUDIO', sellerPlatformId: null, windowType: 'FIRST_WINDOW',
+});
+billingLicense.accessGrant = { schemaVersion: 1, modes: ['SUBSCRIPTION'], earlyWindowWeeks: 0,
+    purchaseFulfillment: 'NONE', source: 'EXPLICIT' };
+player.ownedStreamingPlatform.catalogLicenses = [billingLicense];
 const population = normalizeWorldPopulationState(player.world.worldPopulation, week);
 const audience = normalizeWorldAudienceEconomyState(player.world.worldAudienceEconomy, population, week);
 const participation = normalizeWorldAudienceParticipationState(player.world.worldAudienceParticipation, population, audience, week);

@@ -713,6 +713,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
         const promisedPremiereAbsoluteWeek = structuredAcceptance?.session.lockedPremiereAbsoluteWeek
             ?? structuredAcceptance?.offer.proposedPremiereAbsoluteWeek
             ?? biddingRightsStartWeek;
+        const fundedPremiere = bid.id.startsWith('locked_premiere_');
         const preparedSigning = structuredAcceptance
             ? registerProductionStreamingRightsContractFromOffer(player, {
                 session: structuredAcceptance.session,
@@ -720,8 +721,14 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                 signedAtAbsoluteWeek,
                 startsAtAbsoluteWeek: promisedPremiereAbsoluteWeek,
             })
-            : null;
-        if (structuredAcceptance && !preparedSigning?.contract) {
+            : fundedPremiere ? registerProductionStreamingRightsContract(player,{
+                sourceProjectId:project.id,title:project.name || project.title || 'Untitled project',
+                projectType:(project.projectDetails?.type || project.type)==='SERIES'?'SERIES':'MOVIE',genre:project.projectDetails?.genre || project.genre,
+                sellerStudioId:studio?.id || project.projectDetails?.studioId || 'player-rights-holder',sellerStudioName:studio?.name || 'Player rights holder',sellerPartyType:'PLAYER_STUDIO',
+                buyerPlatformId:bid.platformId,minimumGuarantee:0,platformRevenueShare:100,fundedPremiereContinuation:true,
+                signedAtAbsoluteWeek,startsAtAbsoluteWeek:promisedPremiereAbsoluteWeek,durationWeeks:52,
+            }) : null;
+        if ((structuredAcceptance || fundedPremiere) && !preparedSigning?.contract) {
             setBiddingRightsMessage('Rights availability changed before signature. Reopen the room for the current eligible markets.');
             return;
         }
@@ -757,7 +764,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                     ),
                 },
             }
-            : { ...player };
+            : preparedSigning ? {...preparedSigning.player} : { ...player };
         const platformName = structuredAcceptance?.offer.platformName
             || PLATFORMS.find(p => p.id === bid.platformId)?.name
             || bid.platformId;
@@ -1036,7 +1043,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
             ? promisedPremiereAbsoluteWeek
             : signedRelease?.streaming?.startWeekAbsolute
             ?? (commitmentIndex !== -1 ? signedAtAbsoluteWeek + 1 : signedAtAbsoluteWeek);
-        const registeredSigning = structuredAcceptance
+        const registeredSigning = preparedSigning
             ? { player: updatedPlayer, contract: preparedSigning!.contract, changed: preparedSigning!.changed }
             : registerProductionStreamingRightsContract(updatedPlayer, {
             sourceProjectId: project.id,

@@ -114,6 +114,20 @@ passPlayer.ownedStreamingPlatform.serviceConfiguration.pricing.commercialOffers 
     benefits: { plans: {}, freeAds: { premiumAccess: false, earlyAccessWeeks: 0 },
         store: { premiumAccess: false, earlyAccessWeeks: 0 } },
 };
+// Pass demand requires an actual title covered by the ad-supported plan.
+passPlayer.world.projects.push({ id: 'c3-pass-film', title: 'C3 Pass Film', genre: 'DRAMA',
+    mediaType: 'MOVIE', quality: 80, rating: 8, originalLanguageId: 'English', year: passPlayer.age } as any);
+const passLicense = createStreamingLicenseContract({
+    id: 'c3-pass-license', sourceProject: { id: 'c3-pass-film', title: 'C3 Pass Film' },
+    buyerPlatformId: null, platformContentPlanId: null, cataloguePackageId: null,
+    licensorName: 'C3 Studio', territory: 'GLOBAL', durationWeeks: 52,
+    exclusivity: 'NON_EXCLUSIVE', minimumGuarantee: 0, platformRevenueShare: 100,
+    signedAtAbsoluteWeek: week - 1, startsAtAbsoluteWeek: week - 1,
+    origin: 'STUDIO_MARKET', sellerType: 'STUDIO', sellerPlatformId: null, windowType: 'FIRST_WINDOW',
+});
+passLicense.accessGrant = { schemaVersion: 1, modes: ['SUBSCRIPTION'], earlyWindowWeeks: 0,
+    purchaseFulfillment: 'NONE', source: 'EXPLICIT' };
+passPlayer.ownedStreamingPlatform.catalogLicenses = [passLicense];
 const passState = normalizeWorldStreamingAudienceChoiceState(undefined, passPlayer, week);
 assert.ok(passState.platforms.PLAYER?.passOpportunities > 0,
     'ad-supported subscription households can choose optional ad-free passes without becoming extra households');

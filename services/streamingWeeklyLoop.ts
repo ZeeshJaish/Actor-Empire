@@ -43,6 +43,7 @@ import {
     commitStreamingCompetitiveWorldWeek,
     getStreamingCompetitiveWeeklyEffects,
 } from './streamingCompetitiveWorld';
+import { creditPlatformStreamingRoyaltySeller } from './platformAi/platformAiDistress';
 import { commitPlatformAiExternalCommitment } from './platformAi/platformAiExternalCommitments';
 import {
     completeDueStreamingAcquisitionIntegrations,
@@ -63,15 +64,20 @@ import {
 import { commitStreamingInfrastructureProgressionWeek } from './streamingInfrastructureProgression';
 import { calculateStreamingMarketOperatingCosts } from './streamingMarkets';
 import {
-    calculateStreamingPartnerRevenueShareFullCurrency,
+    calculateStreamingSignedRoyaltyAllocations,
     calculateStreamingRunwayFromTrailingCosts,
     calculateStreamingSubscriptionRevenueFullCurrency,
 } from './streamingEconomyCore';
+import { evaluatePlayerStreamingTitleRoute } from './streamingContentAvailability';
 import { getWorldStreamingPlayerOutcome } from './worldEconomy/worldStreamingCompetition';
 import { getWorldStreamingPlayerCustomerOutcome } from './worldEconomy/worldStreamingCustomers';
 import { getWorldStreamingPlayerViewingOutcome } from './worldEconomy/worldStreamingViewing';
 import { processOwnedStreamingLaunchMarketingWeek } from './streamingLaunchMarketingLifecycle';
 import { fibreWeeklyHoldCost } from './streamingFibreLadder';
+import { recognizeStreamingContentCost } from './streamingContentAccounting';
+import { getStreamingAdditionalOperatingExpense } from './streamingOperatingExpenses';
+import { createStreamingMarketTaxAssessment } from './streamingMarketEconomics';
+import { finalizeStreamingMaintenanceTax } from './streamingMarketTaxSettlement';
 import { completeDueStreamingInfrastructureExpansion } from './streamingInfrastructure';
 import {
     calculateStreamingFundingPressure,
@@ -480,6 +486,7 @@ export const processOwnedStreamingPlatformWeek = (
         normalizedPlatform.lifecycle !== 'ACTIVE'
         || !launchCommit
         || absoluteWeek <= launchCommit.committedAtAbsoluteWeek
+        || (normalizedPlatform.lastProcessedAbsoluteWeek !== null && absoluteWeek <= normalizedPlatform.lastProcessedAbsoluteWeek)
         || normalizedPlatform.processedWeekKeys.includes(weekKey)
     ) {
         return {
@@ -509,7 +516,9 @@ export const processOwnedStreamingPlatformWeek = (
     const rng = createDeterministicRng(`${platform.simulationSeed}:weekly:${absoluteWeek}`);
     const programWeek = getProgramWeek(platform, absoluteWeek);
     const worldCustomerOutcome = player.world.worldStreamingCustomers?.lastProcessedAbsoluteWeek === absoluteWeek
-        ? getWorldStreamingPlayerCustomerOutcome(player.world.worldStreamingCustomers)
+        ? getWorldStreamingPlayerCustomerOutcome(player.world.worldStreamingCustomers,
+            platform.marketOperations.some(operation=>operation.scope==='COUNTRY' && operation.countryId)
+                || Boolean(platform.identity?.dayOneMarketIds?.length))
         : null;
     const worldViewingOutcome = player.world.worldStreamingViewing?.lastProcessedAbsoluteWeek === absoluteWeek
         ? getWorldStreamingPlayerViewingOutcome(player.world.worldStreamingViewing)
@@ -625,7 +634,8 @@ export const processOwnedStreamingPlatformWeek = (
         0.1,
         0.42,
     );
-    const accessLoadAccounts = worldCustomerOutcome?.accessLoadAccounts ?? previousSubscribers;
+    const accessLoadAccounts = Math.max(worldCustomerOutcome?.accessLoadAccounts ?? previousSubscribers,
+        worldViewingOutcome?.streamLoadAccounts || 0);
     const peakConcurrentStreams = Math.max(1, Math.round(accessLoadAccounts * peakActivityRate));
     const burstCapacity = Math.max(1, platform.capacity.burstConcurrentStreams * infrastructureOperationsEffects.capacityMultiplier);
     const capacityUtilizationPercent = peakConcurrentStreams / burstCapacity * 100;
@@ -779,18 +789,29 @@ export const processOwnedStreamingPlatformWeek = (
             monthlyArpu: weightedArpu,
             paidSubscriberShare: 1,
         }));
-    const productRevenue = roundMoney(
-        averageActiveSubscribers * productEffects.weeklyRevenuePerSubscriber,
-    );
+    // Consumer product-line receipts are funded by the same household wallets
+    // as subscriptions and store transactions. Free's ads settle in WE6 only.
+    const productRevenue = worldViewingOutcome
+        ? Math.max(0,Math.floor(player.world.worldStreamingViewing?.householdProductRevenue || 0)) : 0;
     const worldViewingIncrementalRevenue = roundMoney(worldViewingOutcome?.revenue.totalIncrementalRevenue || 0);
     const worldViewingCommercialOperatingCost = roundMoney(worldViewingOutcome?.revenue.commercialOperatingCost || 0);
     const totalOperatingRevenue = subscriptionRevenue + productRevenue + worldViewingIncrementalRevenue;
-    const partnerRevenueShareCost = roundMoney(calculateStreamingPartnerRevenueShareFullCurrency({
-        weeklySubscriptionRevenueFullCurrency: subscriptionRevenue + worldViewingIncrementalRevenue,
-        licenses: platform.catalogLicenses,
-        availableTitleCount: availableEntries.length || platform.catalogProjectIds.length,
+    const contractRoyaltyAllocations = calculateStreamingSignedRoyaltyAllocations({
+        licenses: platform.catalogLicenses.map(license => player.world.streamingRightsContracts?.[license.id] || license),
+        receipts: [...(worldViewingOutcome ? player.world.worldStreamingViewing?.royaltyReceipts || [] : [])
+            .filter(row=>row.platformId==='PLAYER' && row.contractId)
+            .map(row=>({...row,contractId:row.contractId!})),
+            ...(worldViewingOutcome?.titlePerformance || []).flatMap(title => title.countryPerformance.flatMap(country =>
+            (['RENTAL', 'PURCHASE'] as const).flatMap(kind => {
+                const grossReceipts = kind === 'RENTAL' ? country.revenue.rentalRevenue : country.revenue.purchaseRevenue;
+                if (grossReceipts <= 0) return [];
+                const route = evaluatePlayerStreamingTitleRoute(player, title.projectId, country.countryId, absoluteWeek, {kind});
+                return route.allowed && route.contractId ? [{receiptId:JSON.stringify([absoluteWeek,country.countryId,title.projectId,kind]),
+                    contractId: route.contractId, sourceKind: kind, grossReceipts}] : [];
+            })))],
         absoluteWeek,
-    }));
+    });
+    const partnerRevenueShareCost = roundMoney(contractRoyaltyAllocations.reduce((sum, row) => sum + row.royaltyPayable, 0));
     const infrastructureCost = roundMoney(platform.infrastructureSetup?.weeklyOperatingCost || 0);
     const leadershipCost = roundMoney(platform.leadership.appointments
         .filter(appointment => appointment.status === 'ACTIVE')
@@ -822,30 +843,24 @@ export const processOwnedStreamingPlatformWeek = (
        you max out and forget. The generation itself carries no hold cost — that
        is what the research program's own `weeklyOperatingCost` is for. */
     const fibreHoldCost = roundMoney(fibreWeeklyHoldCost(platform.fibre));
-    const marketCosts = calculateStreamingMarketOperatingCosts(platform, totalOperatingRevenue);
-    const marketPolicyCost = roundMoney(marketCosts.marketPolicyCost);
-    const marketOperatingCost = roundMoney(marketCosts.marketOperatingCost);
-    const totalCashCost = roundMoney(
-        partnerRevenueShareCost
-        + fibreHoldCost
-        + infrastructureCost
-        + leadershipCost
-        + financingCost
-        + weeklyPlanCost
-        + growthPlanCost
-        + rightsComplianceCost
-        + technologyCampusCost
-        + productSuiteCost
-        + governanceCost
-        + competitiveOperationsCost
-        + acquisitionIntegrationCost
-        + crisisRecoveryCost
-        + infrastructureOperationsCost
-        + audienceEnforcementCost
-        + worldViewingCommercialOperatingCost
-        + marketPolicyCost
-        + marketOperatingCost,
-    );
+    const contentRecognition = recognizeStreamingContentCost(platform, absoluteWeek, player.world.streamingRightsContracts, player.world);
+    const contentAmortization = contentRecognition.expense;
+    const deductibleOperatingCost = roundMoney(partnerRevenueShareCost+fibreHoldCost+infrastructureCost+leadershipCost+financingCost
+        +weeklyPlanCost+growthPlanCost+rightsComplianceCost+technologyCampusCost+productSuiteCost+governanceCost
+        +competitiveOperationsCost+acquisitionIntegrationCost+crisisRecoveryCost+infrastructureOperationsCost
+        +audienceEnforcementCost+worldViewingCommercialOperatingCost);
+    const countryRevenues=Object.fromEntries(platform.marketOperations.filter(row=>row.countryId).map(row=>{
+        const countryId=row.countryId!;
+        const customer=player.world.worldStreamingCustomers?.countries?.[countryId]?.platformSummaries.find(x=>x.platformId==='PLAYER');
+        const viewing=player.world.worldStreamingViewing?.countries?.[countryId]?.platformPerformance?.PLAYER;
+        return [countryId,(customer?.monthlySubscriptionRevenue||0)/4.33+(viewing?.revenue.totalIncrementalRevenue||0)];
+    }));
+    const taxBasis={deductibleOperatingCost,contentAmortization,countryRevenues,
+        additionalOperatingExpense:getStreamingAdditionalOperatingExpense(platform,absoluteWeek)};
+    const marketCosts=calculateStreamingMarketOperatingCosts(platform,totalOperatingRevenue,taxBasis);
+    const marketPolicyCost=marketCosts.marketPolicyCost;
+    const marketOperatingCost=marketCosts.marketOperatingCost;
+    const totalCashCost=deductibleOperatingCost+marketOperatingCost+marketPolicyCost;
     const fundingPressure = calculateStreamingFundingPressure({
         treasuryBefore: platform.treasuryCash,
         operatingRevenue: totalOperatingRevenue,
@@ -855,11 +870,9 @@ export const processOwnedStreamingPlatformWeek = (
         platform.treasuryCash + totalOperatingRevenue - totalCashCost,
     ));
     const netCashContribution = treasuryAfter - platform.treasuryCash;
-    const contentAmortization = roundMoney((
-        platform.originalCommissions.reduce((sum, commission) => sum + commission.productionFundingApplied, 0)
-        + platform.catalogLicenses.reduce((sum, license) => sum + license.minimumGuarantee, 0)
-    ) / 104);
-    const accountingContribution = netCashContribution - contentAmortization;
+
+    // A cash floor cannot erase incurred expenses from the P&L.
+    const accountingContribution = totalOperatingRevenue - totalCashCost - contentAmortization;
     const cashRunwayWeeks = calculateStreamingRunwayFromTrailingCosts({
         cash: treasuryAfter,
         trailingWeeklyOperatingCost: totalCashCost,
@@ -1148,7 +1161,6 @@ export const processOwnedStreamingPlatformWeek = (
     const organicViewingAllocation = distributeIntegerTotal(organicViewingAccounts, baseTitleWeights);
     const revenueAllocation = distributeIntegerTotal(subscriptionRevenue, titleWeights);
     const cashCostAllocation = distributeIntegerTotal(totalCashCost, titleWeights);
-    const amortizationAllocation = distributeIntegerTotal(contentAmortization, titleWeights);
     const legacyTitlePerformance: OwnedStreamingTitleWeekPerformance[] = availableEntries.map((entry, index) => {
         const titleRng = createDeterministicRng(`${platform.simulationSeed}:title:${entry.projectId}:${absoluteWeek}`);
         const weeksAvailable = Math.max(1, programWeek - entry.launchWeek + 1);
@@ -1187,7 +1199,7 @@ export const processOwnedStreamingPlatformWeek = (
         const [homepagePercent, recommendationsPercent, searchPercent, directPercent] = discoveryAllocation;
         const attributedSubscriptionRevenue = revenueAllocation[index] || 0;
         const allocatedCashCost = cashCostAllocation[index] || 0;
-        const allocatedContentAmortization = amortizationAllocation[index] || 0;
+        const allocatedContentAmortization = contentRecognition.byProject.get(entry.projectId)?.expense || 0;
         const cashContributionForTitle = attributedSubscriptionRevenue - allocatedCashCost;
         return {
             id: createDeterministicId('streaming_title_week', platform.simulationSeed, entry.projectId, absoluteWeek),
@@ -1230,14 +1242,13 @@ export const processOwnedStreamingPlatformWeek = (
         Math.max(1, title.viewingAccounts)
     )) || [];
     const worldViewingCashCostAllocation = distributeIntegerTotal(totalCashCost, worldViewingWeights);
-    const worldViewingAmortizationAllocation = distributeIntegerTotal(contentAmortization, worldViewingWeights);
     const worldTitlePerformance: OwnedStreamingTitleWeekPerformance[] = worldViewingOutcome
         ? worldViewingOutcome.titlePerformance.map((title, index) => {
             const titleRng = createDeterministicRng(`${platform.simulationSeed}:world-title:${title.projectId}:${absoluteWeek}`);
             const attributedSubscriptionRevenue = title.revenue.attributedSubscriptionRevenue;
             const incrementalRevenue = title.revenue.totalIncrementalRevenue;
             const allocatedCashCost = worldViewingCashCostAllocation[index] || 0;
-            const allocatedContentAmortization = worldViewingAmortizationAllocation[index] || 0;
+            const allocatedContentAmortization = contentRecognition.byProject.get(title.projectId)?.expense || 0;
             const cashContributionForTitle = attributedSubscriptionRevenue + incrementalRevenue - allocatedCashCost;
 
             return {
@@ -1290,6 +1301,17 @@ export const processOwnedStreamingPlatformWeek = (
     const titlePerformance = worldViewingOutcome
         ? worldTitlePerformance
         : legacyTitlePerformance;
+    // Expired/disposed content can still have a final write-off without views.
+    for (const [projectId, { asset, expense }] of contentRecognition.byProject) {
+        if (titlePerformance.some(title => title.projectId === projectId)) continue;
+        titlePerformance.push({ id: createDeterministicId('streaming_title_week', platform.simulationSeed, projectId, absoluteWeek),
+            projectId, title: asset.title, source: asset.source, projectType: asset.projectType, genre: asset.genre,
+            absoluteWeek, programWeek, weeksAvailable: Math.max(0, absoluteWeek - (asset.startsAtAbsoluteWeek ?? absoluteWeek) + 1),
+            viewingAccounts: 0, hoursViewed: 0, completionRate: 0, repeatViewingRate: 0, satisfactionScore: 0,
+            discoveryMix: { homepagePercent: 0, recommendationsPercent: 0, searchPercent: 0, directPercent: 0 },
+            attributedSubscriptionRevenue: 0, allocatedCashCost: 0, allocatedContentAmortization: expense,
+            cashContribution: 0, accountingContribution: -expense, playbackSuccessRate });
+    }
     const growthTargetIndex = growthAction
         ? availableEntries.findIndex(entry => entry.projectId === growthAction.projectId)
         : -1;
@@ -1380,6 +1402,7 @@ export const processOwnedStreamingPlatformWeek = (
             worldViewingIncrementalRevenue: worldViewingOutcome?.revenue.totalIncrementalRevenue,
             worldViewingCommercialOperatingCost: worldViewingOutcome?.revenue.commercialOperatingCost,
             partnerRevenueShareCost,
+            contractRoyaltyStatements:contractRoyaltyAllocations,
             infrastructureCost,
             leadershipCost,
             financingCost,
@@ -1387,6 +1410,11 @@ export const processOwnedStreamingPlatformWeek = (
             growthPlanCost,
             rightsComplianceCost,
             marketPolicyCost,
+            marketIncomeTax:marketCosts.marketIncomeTax, marketRevenueLevy:marketCosts.marketRevenueLevy,
+            marketTaxSettlement:{schemaVersion:1,
+                ...createStreamingMarketTaxAssessment(platform.marketOperations,totalOperatingRevenue,
+                    {...taxBasis,deductibleOperatingCost:deductibleOperatingCost+marketOperatingCost}),
+                remainingFundedPolicyCost:Math.min(marketPolicyCost,Math.max(0,platform.treasuryCash+totalOperatingRevenue-(totalCashCost-marketPolicyCost)))},
             marketOperatingCost,
             technologyCampusCost,
             productSuiteCost,
@@ -1399,6 +1427,8 @@ export const processOwnedStreamingPlatformWeek = (
             totalCashCost,
             netCashContribution,
             contentAmortization,
+            contentAccountingVersion: contentRecognition.state.unverifiedAssetIds?.length ? undefined : 1,
+            additionalOperatingExpense: getStreamingAdditionalOperatingExpense(platform, absoluteWeek),
             accountingContribution,
             peakConcurrentStreams,
             capacityUtilizationPercent: roundPercent(capacityUtilizationPercent),
@@ -1478,6 +1508,13 @@ export const processOwnedStreamingPlatformWeek = (
     ));
     const weeklyCommittedPlatform = compactOwnedStreamingPlatformForPersistence({
         ...platform,
+        contentAccounting: contentRecognition.state,
+        catalogLicenses: platform.catalogLicenses.map(license=>{
+            const allocation=contractRoyaltyAllocations.find(row=>row.contractId===license.id);
+            return allocation?{...license,...player.world.streamingRightsContracts?.[license.id],
+                cumulativeRoyaltyAccrued:allocation.cumulativeRoyaltyAccrued,cumulativeRoyaltyPaid:allocation.cumulativeRoyaltyPaid,
+                lastRoyaltyReceiptAbsoluteWeek:absoluteWeek}:license;
+        }),
         treasuryCash: treasuryAfter,
         metrics: {
             subscribers,
@@ -1538,35 +1575,67 @@ export const processOwnedStreamingPlatformWeek = (
             },
         };
     }
-    const quarterCommittedPlatform = commitStreamingQuarterSeasonCycle(
+    const infrastructureOperationsCommittedPlatform = finalizeStreamingMaintenanceTax(commitStreamingInfrastructureOperationsWeek(
         competitiveCommittedPlatform,
         platformWarsCommittedPlayer,
         snapshot,
-    );
-    const infrastructureOperationsCommittedPlatform = commitStreamingInfrastructureOperationsWeek(
-        quarterCommittedPlatform,
-        platformWarsCommittedPlayer,
-        snapshot,
-    );
-    const crisisCommittedPlatform = commitStreamingCrisisSecurityWeek(
+    ),absoluteWeek);
+    const settledSnapshot = infrastructureOperationsCommittedPlatform.weeklyHistory
+        .find(item => item.absoluteWeek === absoluteWeek) || snapshot;
+    const quarterCommittedPlatform = commitStreamingQuarterSeasonCycle(
         infrastructureOperationsCommittedPlatform,
         platformWarsCommittedPlayer,
-        snapshot,
+        settledSnapshot,
+    );
+    const crisisCommittedPlatform = commitStreamingCrisisSecurityWeek(
+        quarterCommittedPlatform,
+        platformWarsCommittedPlayer,
+        settledSnapshot,
     );
     const publicMarketCommittedPlatform = commitStreamingPublicMarketWeek(
         crisisCommittedPlatform,
         platformWarsCommittedPlayer,
-        snapshot,
+        settledSnapshot,
     );
     const ownedStreamingPlatform = commitStreamingInfrastructureProgressionWeek(
         publicMarketCommittedPlatform,
         platformWarsCommittedPlayer,
-        snapshot,
+        settledSnapshot,
     );
 
+    // The buyer expense is committed before the true signed platform seller is credited.
+    for (const allocation of contractRoyaltyAllocations) {
+        const contract = platformWarsCommittedPlayer.world.streamingRightsContracts?.[allocation.contractId];
+        if (!contract || allocation.royaltyPayable <= 0 || contract.origin !== 'PLATFORM_TRADE'
+            || contract.sellerType !== 'PLATFORM' || !contract.sellerPlatformId) continue;
+        const seller = platformWarsCommittedPlayer.world.platforms?.[contract.sellerPlatformId];
+        if (!seller?.ai) continue;
+        const credited = creditPlatformStreamingRoyaltySeller(seller, 'PLAYER', contract.id, absoluteWeek, allocation.royaltyPayable / 1_000_000);
+        platformWarsCommittedPlayer = {...platformWarsCommittedPlayer, world: {...platformWarsCommittedPlayer.world,
+            platforms: {...platformWarsCommittedPlayer.world.platforms, [seller.id]: credited}}};
+    }
+
     return {
-        player: { ...platformWarsCommittedPlayer, ownedStreamingPlatform },
+        player: { ...platformWarsCommittedPlayer, ownedStreamingPlatform,
+            world: {...platformWarsCommittedPlayer.world,
+                streamingRightsContracts: Object.fromEntries(Object.entries(platformWarsCommittedPlayer.world.streamingRightsContracts || {})
+                    .map(([id, contract]) => {
+                        const allocation = contractRoyaltyAllocations.find(row => row.contractId === id);
+                        // Persist before local obligation/event history is compacted. A full
+                        // transfer must carry paid/breached proof even after that history rolls off.
+                        const obligations = rightsCompliance.platform.rightsObligations.filter(row => row.licenseId === id);
+                        const durableContract = obligations.length ? {...contract,
+                            transferredObligationStates: [...new Map([...(contract.transferredObligationStates || []), ...obligations]
+                                .map(row => [row.id, row])).values()],
+                        } : contract;
+                        return [id, allocation ? {...durableContract,
+                            cumulativeRoyaltyAccrued: allocation.cumulativeRoyaltyAccrued,
+                            cumulativeRoyaltyPaid: allocation.cumulativeRoyaltyPaid,
+                            lastRoyaltyReceiptAbsoluteWeek:absoluteWeek} : durableContract];
+                    })),
+            },
+        },
         processed: true,
-        snapshot,
+        snapshot: ownedStreamingPlatform.weeklyHistory.find(item => item.absoluteWeek === absoluteWeek) || settledSnapshot,
     };
 };

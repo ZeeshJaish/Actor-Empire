@@ -68,7 +68,7 @@ const OfferSlip: React.FC<{
 
         <div className="streaming-bid-slip__terms" aria-label={`${offer.platformName} contract terms`}>
             <div><span>Backend</span><strong>{offer.licensorRevenueShare}%</strong></div>
-            <div><span>Basis</span><strong>Adjusted gross</strong></div>
+            <div><span>Basis</span><strong>{offer.backendBasis === 'ADS_RENTAL_RECEIPTS' ? 'Ads + rental receipts' : 'Adjusted gross (legacy)'}</strong></div>
             <div><span>Guarantee</span><strong>{offer.guaranteeRecoupment === 'RECOUPABLE' ? 'Recoupable' : 'Non-recoupable'}</strong></div>
             <div><span>Backend cap</span><strong>{offer.backendCap === null ? 'Uncapped' : formatMoney(offer.backendCap)}</strong></div>
             <div><span>Term</span><strong>{offer.durationWeeks} weeks</strong></div>

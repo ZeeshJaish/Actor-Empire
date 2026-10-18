@@ -28,6 +28,7 @@ import type { StreamingTitleAccessRoute } from '../streamingTitleAccess';
 import { normalizeStreamingLanguageId, resolveStreamingGlobalLocalizationCapability } from '../streamingLocalizationCapabilities';
 import { getOwnedStreamingProgramEntries } from '../streamingOriginals';
 import { resolveHistoricalCatalogueTitle } from '../historicalCatalogue';
+import { streamingTitleQuality, streamingTitleWeeksAvailable } from './worldStreamingContentValue';
 import { normalizeWorldAudienceEconomyState } from './worldAudienceCohorts';
 import { normalizeWorldAudienceParticipationState } from './worldAudienceParticipation';
 import { normalizeWorldPopulationState } from './worldPopulation';
@@ -37,13 +38,16 @@ import {
 } from './worldStreamingCustomers';
 import { getWorldStreamingOffers } from './worldStreamingOffers';
 import { allocateStreamingAudienceChoice } from './worldStreamingAudienceChoice';
-import { calculateStreamingAdFreePassWeek, calculateStreamingStoreConversion,
+import {createStreamingCohortCommerce, spendStreamingCommerceSource, streamingBudgetEvidence,
+    type StreamingCommerceSource, fundStreamingAncillaryRevenue, fundStreamingAdFreePasses, streamingConsumerProductRate, fundStreamingConsumerProducts} from './worldStreamingHouseholdBudget';
+import { allocateStreamingStoreUnits, calculateStreamingAdFreePassWeek, calculateStreamingStoreConversion,
     calculateWorldStreamingCommercialRevenue } from './worldStreamingCommercialEconomy';
 import { projectStreamingCommercialOffers } from '../streamingCommercialOffers';
 import { clearStreamingAdMarket, getStreamingCountryAdMarket,
     type StreamingAdMarketOutcome, type StreamingAdMarketSupply } from './worldStreamingAdMarket';
-import { calculateAiTitleStoreBuyerPool, createAiTitleAccessResolver,
+import { createAiTitleAccessResolver,
     seedLegacyAiCatalogue } from './worldStreamingAiCatalogue';
+import {attachStreamingRoyaltyReceipts} from './worldStreamingRoyaltyAttribution';
 
 export const WORLD_STREAMING_VIEWING_SCHEMA_VERSION = 2 as const;
 const MAX_SNAPSHOTS = 52;
@@ -92,6 +96,15 @@ const isValidViewingState = (input: WorldStreamingViewingState | undefined, abso
         || !input.countries
         || !input.platforms
         || !Array.isArray(input.snapshots)
+        || (input.royaltyReceipts !== undefined && (!Array.isArray(input.royaltyReceipts)
+            || new Set(input.royaltyReceipts.map(row=>row.receiptId)).size!==input.royaltyReceipts.length
+            || input.royaltyReceipts.some(row=>(row.sourceKind !== undefined && !['SUBSCRIPTION','ADVERTISING','RENTAL','PURCHASE','SPONSORSHIP','ANCILLARY'].includes(row.sourceKind)) || !row.receiptId || !row.platformId || !row.countryId || !row.projectId
+                || !Number.isSafeInteger(row.grossReceipts) || row.grossReceipts<=0
+                || !['SUBSCRIPTION','NON_STORE'].includes(row.kind))))
+        || (input.royaltySourceReceipts !== undefined && (!Array.isArray(input.royaltySourceReceipts)
+            || input.royaltySourceReceipts.some(row=>!row.platformId || !row.countryId
+                || !Number.isSafeInteger(row.grossReceipts) || row.grossReceipts<=0
+                || !['SUBSCRIPTION','FREE_AD','STORE'].includes(row.sourceKind))))
         || (input.commercialTransactions !== undefined && (!Array.isArray(input.commercialTransactions)
             || input.commercialTransactions.some(row => !row.transactionId || !row.countryId || !row.titleId
                 || !Number.isSafeInteger(row.households) || row.households <= 0
@@ -225,24 +238,28 @@ interface RivalViewingProjection {
     adEligibleHours: Record<string, Record<string, number>>;
     aiStoreEntitlements: WorldStreamingAiStoreEntitlement[];
     aiStoreTransactions: WorldStreamingAiStoreTransaction[];
+    royaltySourceReceipts: NonNullable<WorldStreamingViewingState['royaltySourceReceipts']>;
 }
 
 interface CountryChoiceCount { subscriptions: number; freeAd: number; store: number; adSubscriptions: number;
-    storeEligibleSubscriptions: number }
+    storeEligibleSubscriptions: number; secondaryStore:number }
 interface CountryChoiceProjection {
     platforms: Record<string, CountryChoiceCount>;
     cohorts: Record<string, Record<string, CountryChoiceCount>>;
+    storeSources: Record<string,StreamingCommerceSource[]>;
+    budgets: Array<{cohortId:string;budget:ReturnType<typeof createStreamingCohortCommerce>['budget']}>;
 }
 
 const choiceZero = (): CountryChoiceCount => ({ subscriptions: 0, freeAd: 0, store: 0,
-    adSubscriptions: 0, storeEligibleSubscriptions: 0 });
+    adSubscriptions: 0, storeEligibleSubscriptions: 0, secondaryStore:0 });
 
 type WorldStreamingOfferRegistry = ReturnType<typeof getWorldStreamingOffers>;
 
-const projectCountryChoices = (
+export const projectCountryChoices = (
     player: Player,
     absoluteWeek: number,
     registry: WorldStreamingOfferRegistry,
+    customers: ReturnType<typeof normalizeWorldStreamingCustomerState>,
 ): Record<string, CountryChoiceProjection> => {
     const offerMap = new Map(registry.offers.map(offer => [offer.platformId, offer]));
     const commercialByPlatform = new Map(registry.offers.map(offer => [
@@ -252,12 +269,31 @@ const projectCountryChoices = (
     const result: Record<string, CountryChoiceProjection> = {};
     Object.entries(player.world.worldAudienceEconomy?.countries || {}).forEach(([countryId, country]) => {
         const offers = (registry.byCountry[countryId] || []).map(id => offerMap.get(id)).filter((offer): offer is NonNullable<typeof offer> => Boolean(offer));
-        const projected: CountryChoiceProjection = { platforms: {}, cohorts: {} };
+        const projected: CountryChoiceProjection = { platforms: {}, cohorts: {}, storeSources:{}, budgets:[] };
         country.cohorts.forEach(cohort => {
             const participation = player.world.worldAudienceParticipation?.countries[countryId]?.cohorts
                 .find(row => row.cohortId === cohort.id);
             if (!participation) return;
             const allocation = allocateStreamingAudienceChoice(countryId, cohort, participation, offers);
+            const subscriptions = (customers.countries[countryId]?.cohorts || [])
+                .filter(row=>row.cohortId===cohort.id).flatMap(row=>row.planCells.map(cell=>({
+                    platformId:cell.platformId,planId:cell.planId,households:cell.paidAccounts,
+                    monthlySpend:cell.monthlySubscriptionRevenue})));
+            const commerce=createStreamingCohortCommerce({countryId,cohort,participation,choice:allocation,offers,subscriptions,
+                consumerProductPlatformIds:streamingConsumerProductRate(player.ownedStreamingPlatform)>0?['PLAYER']:[]});
+            commerce.storeSources.forEach(source=>(projected.storeSources[source.platformId] ||= []).push(source));
+            projected.budgets.push({cohortId:cohort.id,budget:commerce.budget});
+            // Desired subscription demand can differ from retained paid stock.
+            // Commerce already caps complementary free reach against those live
+            // accounts; viewing must use the same households as their wallets.
+            commerce.storeSources.filter(row=>row.id===`${row.platformId}:secondary-ad`).forEach(row=>{
+                (projected.platforms[row.platformId] ||= choiceZero()).freeAd+=row.households;
+                ((projected.cohorts[cohort.id] ||= {})[row.platformId] ||= choiceZero()).freeAd+=row.households;
+            });
+            allocation.storeOpportunities.forEach(row=>{
+                (projected.platforms[row.platformId] ||= choiceZero()).secondaryStore+=row.households;
+                ((projected.cohorts[cohort.id] ||= {})[row.platformId] ||= choiceZero()).secondaryStore+=row.households;
+            });
             const cohortRows = projected.cohorts[cohort.id] ||= {};
             allocation.allocations.forEach(row => {
                 const aggregate = projected.platforms[row.platformId] ||= choiceZero();
@@ -297,6 +333,7 @@ const projectRivalViewing = (
     const rowsByPlatform = new Map<string, WorldStreamingViewingCountryPlatformSummary[]>();
     const entitlementMap = new Map<string, WorldStreamingAiStoreEntitlement>();
     const aiStoreTransactions: WorldStreamingAiStoreTransaction[] = [];
+    const royaltySourceReceipts: NonNullable<WorldStreamingViewingState['royaltySourceReceipts']> = [];
     const titleResolvers = new Map([...offers.values()].filter(offer => !offer.isPlayer).map(offer => [
         offer.platformId, createAiTitleAccessResolver(player, offer, aiCatalogue),
     ]));
@@ -310,7 +347,7 @@ const projectRivalViewing = (
             const customer: WorldStreamingCustomerPlatformSummary | undefined = country.platformSummaries
                 .find(row => row.platformId === offer.platformId);
             const choice = choices[country.countryId]?.platforms[offer.platformId] || choiceZero();
-            if (!customer && !choice.freeAd && !choice.store) return;
+            if (!customer && !choice.freeAd && !choice.store && !choice.secondaryStore) return;
             const playable = titleResolvers.get(offer.platformId)!;
             const paidPlanId = offer.plans.find(plan => plan.monthlyPrice > 0)?.id;
             const subscriptionTitles = paidPlanId
@@ -318,19 +355,6 @@ const projectRivalViewing = (
             const freeTitles = playable(country.countryId, absoluteWeek, { kind: 'AD_SUPPORTED' });
             const rentalTitles = playable(country.countryId, absoluteWeek, { kind: 'RENTAL' });
             const purchaseTitles = playable(country.countryId, absoluteWeek, { kind: 'PURCHASE' });
-            const subscriptionTitleIds = new Set(subscriptionTitles.map(title => title.titleId));
-            const freeTitleIds = new Set(freeTitles.map(title => title.titleId));
-            const buyerCohorts = (player.world.worldAudienceEconomy?.countries[country.countryId]?.cohorts || [])
-                .map(cohort => {
-                    const picked = choices[country.countryId]?.cohorts[cohort.id]?.[offer.platformId];
-                    return {
-                        budget: cohort.monthlyEntertainmentBudgetPerHousehold,
-                        subscriptions: picked?.subscriptions || 0,
-                        freeAd: picked?.freeAd || 0,
-                        store: picked?.store || 0,
-                        eligibleSubscriptions: picked?.storeEligibleSubscriptions || 0,
-                    };
-                });
             const valueStrength = offer.catalogueStrengthIndex * .34
                 + offer.localizationStrengthIndex * .18
                 + offer.reliabilityIndex * .18
@@ -384,27 +408,38 @@ const projectRivalViewing = (
                 commerceCapabilityIndex: clamp(offer.reliabilityIndex * .55 + offer.marketingIndex * .45, 0, 100),
                 reputationIndex: offer.reputationIndex,
             });
+            const storeSources = choices[country.countryId]?.storeSources[offer.platformId] || [];
+            const canBuy = (source:StreamingCommerceSource, titleId:string, price:number):boolean => {
+                if (source.remainingMonthlyBudget < price) return false;
+                if (commercialOffers.storeOffer?.eligibility.kind === 'MEMBERSHIP_PLANS'
+                    && (source.kind !== 'SUBSCRIPTION' || !commercialOffers.storeOffer.eligibility.planIds.includes(source.planId || ''))) return false;
+                if (source.kind === 'STORE') return true;
+                return !playable(country.countryId,absoluteWeek,source.kind==='FREE_AD'
+                    ? {kind:'AD_SUPPORTED'} : {kind:'SUBSCRIPTION',planId:source.planId || ''})
+                    .some(title=>title.titleId===titleId);
+            };
             const settleStore = (kind: 'RENTAL' | 'PURCHASE', titles: typeof rentalTitles): number => {
                 if (!titles.length) return 0;
                 const price = kind === 'RENTAL' ? commercialPricing.rentals.rent : commercialPricing.rentals.buy;
-                const eligiblePools = titles.map(title => calculateAiTitleStoreBuyerPool({ price,
-                    storeEligibility: commercialOffers.storeOffer?.eligibility,
-                    monthlySubscriptionPrice: (customer?.monthlySubscriptionRevenue || 0)
-                        / Math.max(1, customer?.endingPaidAccounts || 0),
-                    subscriptionIncluded: subscriptionTitleIds.has(title.titleId),
-                    freeAdIncluded: freeTitleIds.has(title.titleId),
-                    cohorts: buyerCohorts,
-                }));
-                const buyerPool = Math.max(0, ...eligiblePools);
-                const wanted = calculateStreamingStoreConversion({ buyerPool, price, kind });
-                const allocations = distributeInteger(wanted, eligiblePools);
+                const eligibleSources = titles.map(title=>storeSources.filter(source=>canBuy(source,title.titleId,price)));
+                const eligiblePools = eligibleSources.map(sources=>sources.reduce((sum,source)=>sum+source.households,0));
+                const buyerPool = storeSources.filter(source=>titles.some(title=>canBuy(source,title.titleId,price)))
+                    .reduce((sum,source)=>sum+source.households,0);
+                const quality = titles.reduce((sum,title)=>sum+streamingTitleQuality(player,title.titleId),0)/titles.length;
+                const weeksAvailable = titles.reduce((sum,title)=>sum+Math.max(1,absoluteWeek-title.startsAtAbsoluteWeek+1),0)/titles.length;
+                const wanted = calculateStreamingStoreConversion({ buyerPool, price, kind, quality, weeksAvailable });
+                const allocations = allocateStreamingStoreUnits(wanted, eligiblePools);
                 let settled = 0;
                 titles.forEach((title, index) => {
                     const key = `${offer.platformId}:${country.countryId}:${title.titleId}:${kind}`;
                     const owned = entitlementMap.get(key)?.households || 0;
                     const purchaseOwners = entitlementMap.get(`${offer.platformId}:${country.countryId}:${title.titleId}:PURCHASE`)?.households || 0;
                     const opportunity = eligiblePools[index];
-                    const units = Math.min(allocations[index], Math.max(0, opportunity - (kind === 'PURCHASE' ? owned : owned + purchaseOwners)));
+                    const rentalOwners = entitlementMap.get(`${offer.platformId}:${country.countryId}:${title.titleId}:RENTAL`)?.households || 0;
+                    const desiredUnits = Math.min(allocations[index], Math.max(0, opportunity - rentalOwners - purchaseOwners));
+                    const sources=eligibleSources[index];
+                    const units=allocateStreamingStoreUnits(desiredUnits,sources.map(source=>source.households))
+                        .reduce((sum,wanted,i)=>sum+spendStreamingCommerceSource(sources[i],Math.min(wanted,sources[i].households),price),0);
                     if (units <= 0) return;
                     settled += units;
                     aiStoreTransactions.push({ transactionId: createDeterministicId('ai-store-sale',
@@ -412,7 +447,7 @@ const projectRivalViewing = (
                         platformId: offer.platformId, countryId: country.countryId,
                         titleId: title.titleId, contractId: title.contractId, kind,
                         households: units,
-                        revenue: Math.round(units * (kind === 'RENTAL'
+                        revenue: Math.floor(units * (kind === 'RENTAL'
                             ? commercialPricing.rentals.rent : commercialPricing.rentals.buy)),
                         purchasedAtAbsoluteWeek: absoluteWeek });
                     entitlementMap.set(key, { platformId: offer.platformId, countryId: country.countryId,
@@ -433,6 +468,12 @@ const projectRivalViewing = (
             commercial.purchaseRevenue = settledTransactions.filter(row => row.kind === 'PURCHASE')
                 .reduce((sum, row) => sum + row.revenue, 0);
             commercial.totalIncrementalRevenue += commercial.rentalRevenue + commercial.purchaseRevenue - oldStoreRevenue;
+            const funded = fundStreamingAncillaryRevenue(commercial,commercialPricing,storeSources.filter(source=>{
+                const routes = source.kind==='SUBSCRIPTION' ? [{kind:'SUBSCRIPTION' as const,planId:source.planId || ''}]
+                    : source.kind==='FREE_AD' ? [{kind:'AD_SUPPORTED' as const}] : [{kind:'RENTAL' as const},{kind:'PURCHASE' as const}];
+                return routes.some(route=>titleResolvers.get(offer.platformId)!(country.countryId,absoluteWeek,route).length>0);
+            }));
+            royaltySourceReceipts.push(...funded.map(row=>({...row,platformId:offer.platformId,countryId:country.countryId})));
             commercial.commercialOperatingCost = Math.round(commercial.advertisingRevenue * .12
                 + (commercial.premiumRevenue + commercial.rentalRevenue + commercial.purchaseRevenue
                     + commercial.dayPassRevenue + commercial.meteredRevenue) * .035
@@ -486,7 +527,7 @@ const projectRivalViewing = (
             };
             return [platformId, summary];
         }));
-    return { platforms, countries, adEligibleHours, aiStoreTransactions: aiStoreTransactions.sort((left, right) =>
+    return { platforms, countries, adEligibleHours, royaltySourceReceipts, aiStoreTransactions: aiStoreTransactions.sort((left, right) =>
         left.transactionId.localeCompare(right.transactionId)), aiStoreEntitlements: [...entitlementMap.values()]
         .sort((left, right) => `${left.platformId}:${left.countryId}:${left.titleId}:${left.kind}`
             .localeCompare(`${right.platformId}:${right.countryId}:${right.titleId}:${right.kind}`)) };
@@ -621,7 +662,7 @@ export const resolveStreamingViewingProjectFacts = (player: Player, entry: Owned
         isFamous: Boolean(raw.isFamous || Number(raw.boxOffice || raw.gross || 0) >= 150_000_000),
         hasUniverse: Boolean(raw.universeId || raw.franchiseId),
         runtimeHours: Math.max(.25, runtimeHours),
-        weeksAvailable: Math.max(1, programWeek - entry.launchWeek + 1),
+        weeksAvailable: streamingTitleWeeksAvailable(player, entry, (player.ownedStreamingPlatform.launchCommit?.committedAtAbsoluteWeek ?? 1) + programWeek - 1),
         ownedLibrary: entry.source === 'OWNED_LIBRARY',
     };
 };
@@ -732,7 +773,9 @@ const buildViewingState = (
     const customers = normalizeWorldStreamingCustomerState(preparedPlayer.world.worldStreamingCustomers, preparedPlayer, absoluteWeek);
     markStage('customers_ready');
     const offerRegistry = getWorldStreamingOffers(preparedPlayer, absoluteWeek);
-    const choices = projectCountryChoices(preparedPlayer, absoluteWeek, offerRegistry);
+    const finish=(state:WorldStreamingViewingState)=>attachStreamingRoyaltyReceipts(
+        {...preparedPlayer,world:{...preparedPlayer.world,worldStreamingCustomers:customers}},state,offerRegistry.offers);
+    const choices = projectCountryChoices(preparedPlayer, absoluteWeek, offerRegistry, customers);
     markStage('choices_ready');
     const aiCatalogue = seedLegacyAiCatalogue(preparedPlayer,
         offerRegistry.offers, absoluteWeek,
@@ -741,6 +784,7 @@ const buildViewingState = (
     const rivalViewing = projectRivalViewing(preparedPlayer, absoluteWeek, customers, choices,
         aiCatalogue.titles, priorState?.aiStoreEntitlements || [], offerRegistry);
     markStage('rival_viewing_ready');
+    const royaltySourceReceipts = [...rivalViewing.royaltySourceReceipts];
     const playerCustomers = getWorldStreamingPlayerCustomerOutcome(customers);
     const platform = normalizeOwnedStreamingPlatformState(preparedPlayer.ownedStreamingPlatform, preparedPlayer.id);
     const playerActive = platform.lifecycle === 'ACTIVE' && Boolean(platform.identity) && Boolean(playerCustomers);
@@ -773,7 +817,7 @@ const buildViewingState = (
                 }];
             }),
         );
-        return {
+        return finish({
             schemaVersion: WORLD_STREAMING_VIEWING_SCHEMA_VERSION,
             initializedAtAbsoluteWeek,
             lastProcessedAbsoluteWeek: absoluteWeek,
@@ -783,7 +827,10 @@ const buildViewingState = (
             aiCatalogueSeededPlatformIds: aiCatalogue.seededPlatformIds,
             aiStoreEntitlements: rivalViewing.aiStoreEntitlements,
             aiStoreTransactions: rivalViewing.aiStoreTransactions,
+            royaltySourceReceipts,
             commercialTransactions: [],
+            householdProductRevenue:0,
+            householdBudgets:Object.entries(choices).flatMap(([id,choice])=>choice.budgets.map(row=>streamingBudgetEvidence(id,row.cohortId,row.budget))),
             snapshots: [...snapshots.filter(item => item.absoluteWeek !== absoluteWeek), {
                 absoluteWeek,
                 totalViewingAccounts: global.totalViewingAccounts,
@@ -791,7 +838,7 @@ const buildViewingState = (
                 unmetDemandAccounts: global.unmetDemandAccounts,
                 incrementalRevenue: global.revenue.totalIncrementalRevenue,
             }].slice(-MAX_SNAPSHOTS),
-        };
+        });
     }
 
     const programWeek = getProgramWeek({ ...preparedPlayer, ownedStreamingPlatform: platform }, absoluteWeek);
@@ -820,6 +867,7 @@ const buildViewingState = (
         customers.countries[countryId].platformSummaries.some(row => row.platformId === 'PLAYER' && row.accessLoadAccounts > 0)
         || (choices[countryId]?.platforms.PLAYER?.freeAd || 0) > 0
         || (choices[countryId]?.platforms.PLAYER?.store || 0) > 0
+        || (choices[countryId]?.platforms.PLAYER?.secondaryStore || 0) > 0
     ));
     const geographicCoverage = platform.infrastructureSetup
         ? new Map(deriveStreamingNetworkCoverage({
@@ -833,7 +881,8 @@ const buildViewingState = (
     const reachableDemandAccounts = playerCountryIds.reduce((sum, countryId) => sum + (
         (customers.countries[countryId].platformSummaries.find(row => row.platformId === 'PLAYER')?.accessLoadAccounts || 0)
         + ((choices[countryId]?.platforms.PLAYER?.freeAd || 0)
-            + (choices[countryId]?.platforms.PLAYER?.store || 0)) * countryReach(countryId)
+            + (choices[countryId]?.platforms.PLAYER?.store || 0)
+            + (choices[countryId]?.platforms.PLAYER?.secondaryStore || 0)) * countryReach(countryId)
     ), 0);
     const effectiveBurstCapacity = Math.max(0, platform.capacity.burstConcurrentStreams)
         * getStreamingInfrastructureOperationsEffects(platform).capacityMultiplier;
@@ -877,7 +926,8 @@ const buildViewingState = (
                     externalSharedHouseholds: 0, piracyReach: 0 } }];
         });
         const playerCohorts = [...paidPlayerCohorts, ...freePlayerCohorts];
-        if (!playerCohorts.length && !(choices[countryId]?.platforms.PLAYER?.store || 0)) return;
+        if (!playerCohorts.length && !(choices[countryId]?.platforms.PLAYER?.store || 0)
+            && !(choices[countryId]?.platforms.PLAYER?.secondaryStore || 0)) return;
         const eligibleByPlanId = new Map<string, ViewingCandidate[]>();
         for (const { cell } of playerCohorts) {
             if (eligibleByPlanId.has(cell.planId)) continue;
@@ -970,12 +1020,23 @@ const buildViewingState = (
 
         // A store customer acquires a title entitlement before a viewing event is counted.
         // Each country/title has at most one aggregate sale of each kind in this week.
-        const storeHomes = choices[countryId]?.platforms.PLAYER?.store || 0;
+        const storeHomes = (choices[countryId]?.platforms.PLAYER?.store || 0)
+            + (choices[countryId]?.platforms.PLAYER?.secondaryStore || 0);
         const storePolicy = playerCommercialOffers.storeOffer;
         const storeRestricted = storePolicy?.eligibility.kind === 'MEMBERSHIP_PLANS';
         accessibleAccounts += storeHomes;
         unmetDemandAccounts += storeHomes - Math.round(storeHomes * countryDeliveryFraction);
         if (pricing.streams.includes('rentals') && (storeHomes > 0 || playerCohorts.length > 0)) {
+            const sources = choices[countryId]?.storeSources.PLAYER || [];
+            const canBuyTitle = (source:StreamingCommerceSource,candidate:ViewingCandidate,price:number):boolean => {
+                if (source.remainingMonthlyBudget < price) return false;
+                if (storeRestricted && (source.kind!=='SUBSCRIPTION'
+                    || !storePolicy?.eligibility.planIds.includes(source.planId || ''))) return false;
+                return source.kind==='STORE' || !evaluateCachedRoute(candidate.entry.projectId,countryId,
+                    source.kind==='FREE_AD' ? {kind:'AD_SUPPORTED'}
+                        : {kind:'SUBSCRIPTION',planId:source.planId || ''}).allowed;
+            };
+            const reservedStoreHomes = new Map<string,number>();
             const saleRoutes = (['RENTAL', 'PURCHASE'] as const).map(kind => ({
                 kind,
                 eligible: candidates.filter(candidate => evaluateCachedRoute(
@@ -984,52 +1045,34 @@ const buildViewingState = (
             saleRoutes.forEach(({ kind, eligible }) => {
                 if (!eligible.length) return;
                 const price = kind === 'RENTAL' ? pricing.rentals.rent : pricing.rentals.buy;
-                const affordableStoreHomes = storeRestricted ? 0 : audienceCountry.cohorts.reduce((sum, cohort) => (
-                    sum + (cohort.monthlyEntertainmentBudgetPerHousehold >= price
-                        ? choices[countryId]?.cohorts[cohort.id]?.PLAYER?.store || 0 : 0)
-                ), 0);
-                const canBuyOutsidePlan = (candidate: ViewingCandidate, cohort: typeof playerCohorts[number]): boolean => {
-                    if (storeRestricted && (cohort.accessKind !== 'SUBSCRIPTION'
-                        || !storePolicy?.eligibility.planIds.includes(cohort.cell.planId))) return false;
-                    const alreadySpent = cohort.accessKind === 'SUBSCRIPTION'
-                        ? (cohort.cell.monthlySubscriptionRevenue || 0) / Math.max(1, cohort.cell.paidAccounts) : 0;
-                    if (cohort.audienceCohort.monthlyEntertainmentBudgetPerHousehold - alreadySpent < price) return false;
-                    const route = cohort.accessKind === 'FREE_AD'
-                        ? { kind: 'AD_SUPPORTED' as const }
-                        : { kind: 'SUBSCRIPTION' as const, planId: cohort.cell.planId };
-                    return !evaluateCachedRoute(candidate.entry.projectId, countryId, route).allowed;
-                };
-                const eligibleHomesByTitle = eligible.map(candidate => affordableStoreHomes
-                    + playerCohorts.reduce((sum, cohort) => sum
-                        + (canBuyOutsidePlan(candidate, cohort) ? cohort.cell.paidAccounts : 0), 0));
-                const buyerPool = affordableStoreHomes + playerCohorts.reduce((sum, cohort) => sum
-                    + (eligible.some(candidate => canBuyOutsidePlan(candidate, cohort))
-                        ? cohort.cell.paidAccounts : 0), 0);
-                const buyers = Math.round(calculateStreamingStoreConversion({ buyerPool, price, kind }) * countryDeliveryFraction);
-                const byTitle = distributeInteger(buyers, eligible.map((candidate, index) => (
+                const eligibleSourcesByTitle=eligible.map(candidate=>sources.filter(source=>canBuyTitle(source,candidate,price)));
+                const eligibleHomesByTitle=eligibleSourcesByTitle.map(rows=>rows.reduce((sum,source)=>sum+source.households,0));
+                const buyerPool=sources.filter(source=>eligible.some(candidate=>canBuyTitle(source,candidate,price)))
+                    .reduce((sum,source)=>sum+source.households,0);
+                const quality = eligible.reduce((sum,candidate)=>sum+candidate.quality,0)/eligible.length;
+                const weeksAvailable = eligible.reduce((sum,candidate)=>sum+candidate.weeksAvailable,0)/eligible.length;
+                const buyers = Math.round(calculateStreamingStoreConversion({ buyerPool, price, kind, quality, weeksAvailable }) * countryDeliveryFraction);
+                const byTitle = allocateStreamingStoreUnits(buyers, eligible.map((candidate, index) => (
                     eligibleHomesByTitle[index] * Math.max(1, candidate.quality)
                 )));
                 eligible.forEach((candidate, index) => {
-                    const existingOwners = activeEntitlementHouseholds.get(JSON.stringify([
-                        countryId,
-                        candidate.entry.projectId,
-                        kind,
-                    ])) || 0;
-                    const count = Math.min(byTitle[index] || 0,
-                        Math.max(0, eligibleHomesByTitle[index] - existingOwners));
+                    const ownershipKey = `${countryId}:${candidate.entry.projectId}`;
+                    const existingOwners = (['RENTAL','PURCHASE'] as const).reduce((sum,routeKind)=>
+                        sum+(activeEntitlementHouseholds.get(JSON.stringify([
+                            countryId,candidate.entry.projectId,routeKind])) || 0),0);
+                    const wanted = Math.min(byTitle[index] || 0,
+                        Math.max(0, eligibleHomesByTitle[index] - existingOwners - (reservedStoreHomes.get(ownershipKey) || 0)));
+                    const buyerSources = eligibleSourcesByTitle[index];
+                    const sourceSales = allocateStreamingStoreUnits(wanted,buyerSources.map(source=>source.households))
+                        .map((units,i)=>spendStreamingCommerceSource(buyerSources[i],Math.min(units,buyerSources[i].households),price));
+                    const count = sourceSales.reduce((sum,units)=>sum+units,0);
                     if (!count) return;
-                    const key = `${countryId}:${candidate.entry.projectId}`;
+                    reservedStoreHomes.set(ownershipKey,(reservedStoreHomes.get(ownershipKey) || 0)+count);
+                    const key = ownershipKey;
                     const existingSale = storeTransactions.get(key) || { rental: 0, purchase: 0 };
                     existingSale[kind === 'RENTAL' ? 'rental' : 'purchase'] += count;
                     storeTransactions.set(key, existingSale);
-                    const buyerSources = [
-                        { planId: null as string | null, households: affordableStoreHomes },
-                        ...playerCohorts.filter(cohort => canBuyOutsidePlan(candidate, cohort)).map(cohort => ({
-                            planId: cohort.accessKind === 'SUBSCRIPTION' ? cohort.cell.planId : null,
-                            households: cohort.cell.paidAccounts,
-                        })),
-                    ];
-                    distributeInteger(count, buyerSources.map(source => source.households)).forEach((households, sourceIndex) => {
+                    sourceSales.forEach((households, sourceIndex) => {
                         if (!households) return;
                         const buyerPlanId = buyerSources[sourceIndex].planId;
                         const segmentKey = JSON.stringify([countryId, candidate.entry.projectId, kind, buyerPlanId]);
@@ -1110,11 +1153,15 @@ const buildViewingState = (
                             + (budget - averagePaidMonthlyPrice >= price ? picked?.adSubscriptions || 0 : 0);
                     }, 0));
             };
-            const passes = calculateStreamingAdFreePassWeek({ adViewingHouseholds,
+            let passes = calculateStreamingAdFreePassWeek({ adViewingHouseholds,
                 adEligibleHours: totalEligibleHours,
                 oneHourPrice: passOffers.oneHourPrice, dayPrice: passOffers.dayPrice,
                 oneHourEligibleHouseholds: affordablePassHouseholds(passOffers.oneHourPrice),
                 dayEligibleHouseholds: affordablePassHouseholds(passOffers.dayPrice) });
+            const passSources=(choices[country.countryId]?.storeSources.PLAYER || []).filter(source=>source.kind==='FREE_AD'
+                || (source.kind==='SUBSCRIPTION' && pricing.plans.some(plan=>plan.id===source.planId && plan.ads)));
+            passes=fundStreamingAdFreePasses(passes,passSources,passOffers.oneHourPrice,passOffers.dayPrice,totalEligibleHours,
+                row=>royaltySourceReceipts.push({...row,platformId:'PLAYER',countryId:country.countryId}));
             const oneHourCounts = distributeInteger(passes.oneHourTransactions, eligibleHours);
             const dayCounts = distributeInteger(passes.dayTransactions, eligibleHours);
             const oneHourRevenue = distributeInteger(passes.oneHourRevenue, oneHourCounts);
@@ -1222,7 +1269,7 @@ const buildViewingState = (
         const countrySales = title.countryPerformance.map(country => (
             storeTransactions.get(`${country.countryId}:${title.projectId}`) || { rental: 0, purchase: 0 }
         ));
-        const rawCommercial = calculateWorldStreamingCommercialRevenue({
+        let rawCommercial = calculateWorldStreamingCommercialRevenue({
             pricing: passOffers.oneHourPrice !== null || passOffers.dayPrice !== null
                 ? { ...pricing, streams: pricing.streams.filter(stream => stream !== 'daypass') }
                 : pricing,
@@ -1241,10 +1288,26 @@ const buildViewingState = (
             commerceCapabilityIndex,
             reputationIndex: platform.competitiveWorld.globalPrestige,
         });
+        const rawWeights=title.countryPerformance.map(country=>Math.max(0,country.viewingAccounts));
+        const rawByField=Object.fromEntries(Object.entries(rawCommercial).map(([key,value])=>[key,distributeInteger(value,rawWeights)]));
+        const rawByCountry=title.countryPerformance.map((country,i)=>{
+            const raw={...rawCommercial};
+            (Object.keys(raw) as Array<keyof typeof raw>).forEach(key=>{raw[key]=rawByField[key][i];});
+            const funded=fundStreamingAncillaryRevenue(raw,pricing,(choices[country.countryId]?.storeSources.PLAYER || []).filter(source=>{
+                const routes = source.kind==='SUBSCRIPTION' ? [{kind:'SUBSCRIPTION' as const,planId:source.planId || ''}]
+                    : source.kind==='FREE_AD' ? [{kind:'AD_SUPPORTED' as const}] : [{kind:'RENTAL' as const},{kind:'PURCHASE' as const}];
+                return routes.some(route=>evaluatePlayerStreamingTitleRoute(preparedPlayer,title.projectId,country.countryId,absoluteWeek,route).allowed);
+            }));
+            royaltySourceReceipts.push(...funded.map(row=>({...row,platformId:'PLAYER',countryId:country.countryId,projectId:title.projectId})));
+            return raw;
+        });
+        (Object.keys(rawCommercial) as Array<keyof typeof rawCommercial>).forEach(key=>{
+            rawCommercial[key]=rawByCountry.reduce((sum,row)=>sum+row[key],0);
+        });
         const rentalTransactions = countrySales.reduce((sum, row) => sum + row.rental, 0);
         const purchaseTransactions = countrySales.reduce((sum, row) => sum + row.purchase, 0);
-        const rentalRevenue = Math.round(rentalTransactions * Math.max(0, pricing.rentals.rent));
-        const purchaseRevenue = Math.round(purchaseTransactions * Math.max(0, pricing.rentals.buy));
+        const rentalRevenue = Math.floor(rentalTransactions * Math.max(0, pricing.rentals.rent));
+        const purchaseRevenue = Math.floor(purchaseTransactions * Math.max(0, pricing.rentals.buy));
         const storeOperatingCost = Math.round((rentalRevenue + purchaseRevenue) * .035);
         const countryPasses = title.countryPerformance.map(country => passAllocations.get(`${country.countryId}:${title.projectId}`));
         const oneHourPassTransactions = countryPasses.reduce((sum, row) => sum + (row?.oneHourTransactions || 0), 0);
@@ -1291,20 +1354,20 @@ const buildViewingState = (
             rentalRevenueByCountry[countryIndex] + purchaseRevenueByCountry[countryIndex]
         ));
         const adOperatingCost = Math.round(advertisingRevenue * .12);
-        const nonStoreRevenueByCountry = distributeInteger(rawCommercial.totalIncrementalRevenue, countryWeights);
-        const nonStoreOperatingByCountry = distributeInteger(rawCommercial.commercialOperatingCost, countryWeights);
+        const nonStoreRevenueByCountry = rawByCountry.map(row=>row.totalIncrementalRevenue);
+        const nonStoreOperatingByCountry = rawByCountry.map(row=>row.commercialOperatingCost);
         const storeOperatingByCountry = distributeInteger(storeOperatingCost, storeRevenueByCountry);
         const adOperatingByCountry = distributeInteger(adOperatingCost, countryAds.map(row => row.revenue));
         const passOperatingByCountry = distributeInteger(passOperatingCost,
             countryPasses.map(row => (row?.oneHourRevenue || 0) + (row?.dayRevenue || 0)));
-        const legacyDayPassTransactions = distributeInteger(rawCommercial.dayPassTransactions, countryWeights);
-        const legacyDayPassRevenue = distributeInteger(rawCommercial.dayPassRevenue, countryWeights);
+        const legacyDayPassTransactions = rawByCountry.map(row=>row.dayPassTransactions);
+        const legacyDayPassRevenue = rawByCountry.map(row=>row.dayPassRevenue);
         const allocations = {
             attributedSubscriptionRevenue: distributeInteger(revenue.attributedSubscriptionRevenue, subscriptionWeights),
             advertisingImpressions: countryAds.map(row => row.filledImpressions),
             advertisingRevenue: countryAds.map(row => row.revenue),
-            premiumTransactions: distributeInteger(revenue.premiumTransactions, countryWeights),
-            premiumRevenue: distributeInteger(revenue.premiumRevenue, countryWeights),
+            premiumTransactions: rawByCountry.map(row=>row.premiumTransactions),
+            premiumRevenue: rawByCountry.map(row=>row.premiumRevenue),
             rentalTransactions: rentalByCountry,
             rentalRevenue: rentalRevenueByCountry,
             purchaseTransactions: purchaseByCountry,
@@ -1316,13 +1379,13 @@ const buildViewingState = (
             oneHourPassTransactions: countryPasses.map(row => row?.oneHourTransactions || 0),
             oneHourPassRevenue: countryPasses.map(row => row?.oneHourRevenue || 0),
             adFreeCoveredHours: countryPasses.map(row => row?.coveredHours || 0),
-            meteredAccounts: distributeInteger(revenue.meteredAccounts, countryWeights),
-            meteredHours: distributeInteger(revenue.meteredHours, countryWeights),
-            meteredRevenue: distributeInteger(revenue.meteredRevenue, countryWeights),
-            patronAccounts: distributeInteger(revenue.patronAccounts, countryWeights),
-            patronRevenue: distributeInteger(revenue.patronRevenue, countryWeights),
-            sponsorshipImpressions: distributeInteger(revenue.sponsorshipImpressions, countryWeights),
-            sponsorshipRevenue: distributeInteger(revenue.sponsorshipRevenue, countryWeights),
+            meteredAccounts: rawByCountry.map(row=>row.meteredAccounts),
+            meteredHours: rawByCountry.map(row=>row.meteredHours),
+            meteredRevenue: rawByCountry.map(row=>row.meteredRevenue),
+            patronAccounts: rawByCountry.map(row=>row.patronAccounts),
+            patronRevenue: rawByCountry.map(row=>row.patronRevenue),
+            sponsorshipImpressions: rawByCountry.map(row=>row.sponsorshipImpressions),
+            sponsorshipRevenue: rawByCountry.map(row=>row.sponsorshipRevenue),
             totalIncrementalRevenue: nonStoreRevenueByCountry.map((value, countryIndex) => (
                 value + storeRevenueByCountry[countryIndex] + countryAds[countryIndex].revenue
                     + (countryPasses[countryIndex]?.oneHourRevenue || 0) + (countryPasses[countryIndex]?.dayRevenue || 0)
@@ -1443,6 +1506,8 @@ const buildViewingState = (
         unmetDemandAccounts: global.unmetDemandAccounts,
         incrementalRevenue: global.revenue.totalIncrementalRevenue,
     };
+    const householdProductRevenue=Object.values(choices).reduce((sum,choice)=>sum+
+        fundStreamingConsumerProducts(choice.storeSources.PLAYER || [],streamingConsumerProductRate(platform)),0);
     const commercialTransactions = [...storeBuyerSegments.values()].map(segment => ({
         transactionId: createDeterministicId('streaming-store-sale', absoluteWeek,
             segment.countryId, segment.titleId, segment.kind, segment.buyerPlanId || 'PUBLIC'),
@@ -1450,7 +1515,7 @@ const buildViewingState = (
         buyerPlanId: segment.buyerPlanId, households: segment.households,
         purchasedAtAbsoluteWeek: absoluteWeek,
     })).sort((left, right) => left.transactionId.localeCompare(right.transactionId));
-    return {
+    return finish({
         schemaVersion: WORLD_STREAMING_VIEWING_SCHEMA_VERSION,
         initializedAtAbsoluteWeek,
         lastProcessedAbsoluteWeek: absoluteWeek,
@@ -1464,8 +1529,11 @@ const buildViewingState = (
         aiStoreEntitlements: rivalViewing.aiStoreEntitlements,
         aiStoreTransactions: rivalViewing.aiStoreTransactions,
         commercialTransactions,
+        royaltySourceReceipts,
+        householdProductRevenue,
+        householdBudgets:Object.entries(choices).flatMap(([id,choice])=>choice.budgets.map(row=>streamingBudgetEvidence(id,row.cohortId,row.budget))),
         snapshots: [...snapshots.filter(item => item.absoluteWeek !== absoluteWeek), nextSnapshot].slice(-MAX_SNAPSHOTS),
-    };
+    });
 };
 
 const buildState = (

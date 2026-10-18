@@ -202,10 +202,19 @@ const normalizedMarketResearch = normalizePlatformAiState(
 const exactOperatingResearchCost = normalizedMarketResearch
     .filter(item => item.stage === 'OPERATING')
     .reduce((sum, item) => sum + item.researchWeeklyOperatingCostMillions + item.licenseWeeklyCostMillions, 0);
-const activeRate = (
-    (activeMarket.policySnapshot?.effectiveTaxPercent || 0)
-    + (activeMarket.policySnapshot?.streamingLevyPercent || 0)
-) / 100;
+// Independent single-active-market arithmetic: levy follows gross receipts;
+// income tax follows positive contribution after real recurring costs and interest.
+// This fixture has no paid content assets to amortize.
+const activeIncomeTaxRate = (activeMarket.policySnapshot?.effectiveTaxPercent || 0) / 100;
+const activeLevyRate = (activeMarket.policySnapshot?.streamingLevyPercent || 0) / 100;
+const expectedRevenueLevy = Math.round(marketSnapshot.revenueMillions * 1_000_000 * activeLevyRate);
+const deductibleExpenseMillions = marketSnapshot.recurringEfficiency.appliedEligibleCostMillions
+    + marketSnapshot.partnerRevenueShareCostMillions + marketSnapshot.researchCostMillions
+    + marketSnapshot.technologyCostMillions + marketSnapshot.financingCostAccruedMillions;
+const expectedIncomeTax = Math.round(Math.max(0,
+    (marketSnapshot.revenueMillions - deductibleExpenseMillions) * 1_000_000 - expectedRevenueLevy,
+) * activeIncomeTaxRate);
+const expectedMarketPolicyCostMillions = (expectedRevenueLevy + expectedIncomeTax) / 1_000_000;
 closeTo(
     marketSnapshot.marketOperatingCostMillions,
     fullCurrencyToMillions(activeMarket.weeklyOperatingCost),
@@ -213,8 +222,8 @@ closeTo(
 );
 closeTo(
     marketSnapshot.marketPolicyCostMillions,
-    marketSnapshot.revenueMillions * activeRate,
-    'Only active market tax and levy should apply',
+    expectedMarketPolicyCostMillions,
+    'Only the active market levy and positive-profit income tax should apply; suspended markets cannot impose or shelter charges',
 );
 closeTo(marketSnapshot.researchCostMillions, exactOperatingResearchCost, 'Only exact normalized operating research costs should recur');
 assert.equal(marketSnapshot.contentCostMillions, 0, 'Already-paid rights and production commitments must not be charged again');
@@ -243,8 +252,8 @@ closeTo(
 );
 assert.equal(
     marketSnapshot.marketPolicyCostMillions,
-    marketSnapshot.revenueMillions * activeRate,
-    'Taxes and levies must remain outside the AI efficiency discount.',
+    expectedMarketPolicyCostMillions,
+    'Taxes and levies must use full policy rates after actual expenses, outside the AI efficiency discount.',
 );
 
 // Technology is a recurring operating expense only once it is in service.
@@ -468,7 +477,7 @@ const originalCandidate = buildPlatformContentCandidates(rightsInput).find(candi
 assert.ok(originalCandidate);
 assert.ok(originalCandidate!.depositMillions > 0 && originalCandidate!.depositMillions < originalCandidate!.productionBudgetMillions);
 
-// Revenue share follows the player weekly-loop formula and only eligible active licensed contracts participate.
+// Only actual earned receipts incur signed royalties; active rights alone cannot manufacture a payment.
 const rightsEconomyPlatform = structuredClone(rightsCommit.world.platforms!.NETFLIX);
 rightsEconomyPlatform.subscribers = 100;
 rightsEconomyPlatform.ai!.marketOperations = [];
@@ -482,16 +491,19 @@ rightsEconomyPlatform.ai!.rightsContracts = [
     { ...activeContract, id: 'expired-share', status: 'EXPIRED', startsAtAbsoluteWeek: ABSOLUTE_WEEK - 20, expiresAtAbsoluteWeek: ABSOLUTE_WEEK },
     { ...activeContract, id: 'owned-share', status: 'ACTIVE', origin: 'OWNED_STUDIO_TRANSFER', startsAtAbsoluteWeek: ABSOLUTE_WEEK, expiresAtAbsoluteWeek: ABSOLUTE_WEEK + 20 },
 ];
-const rightsEconomySnapshot = calculatePlatformAiWeeklyEconomy({
-    player: fixture,
-    platform: rightsEconomyPlatform,
-    absoluteWeek: ABSOLUTE_WEEK + 1,
-}).snapshot! as typeof marketSnapshot & { partnerRevenueShareCostMillions: number };
-const eligiblePlanCount = Math.max(1, new Set(rightsEconomyPlatform.ai!.slate.flatMap(plan => plan.sourceProjectIds)).size);
-const expectedRightsShare = rightsEconomySnapshot.subscriptionRevenueMillions
-    * activeContract.licensorRevenueShare / 100
-    * Math.min(0.45, 1 / eligiblePlanCount);
-closeTo(rightsEconomySnapshot.partnerRevenueShareCostMillions, expectedRightsShare, 'Only the eligible active licensed contract pays revenue share once');
+const rightsEconomyNoReceipts = calculatePlatformAiWeeklyEconomy({player:fixture,platform:rightsEconomyPlatform,
+    absoluteWeek:ABSOLUTE_WEEK+1}).snapshot!;
+assert.equal(rightsEconomyNoReceipts.partnerRevenueShareCostMillions,0,'No earned WE6 receipt means no proxy royalty.');
+const earnedReceiptWorld={...fixture.world,worldStreamingViewing:{lastProcessedAbsoluteWeek:ABSOLUTE_WEEK+1,
+    platforms:{NETFLIX:{revenue:{attributedSubscriptionRevenue:100000,advertisingRevenue:0,premiumRevenue:0,
+        rentalRevenue:0,purchaseRevenue:0,dayPassRevenue:0,meteredRevenue:0,patronRevenue:0,sponsorshipRevenue:0,totalIncrementalRevenue:0}}},
+    royaltyReceipts:rightsEconomyPlatform.ai!.rightsContracts.map(contract=>({receiptId:'earned-'+contract.id,
+        platformId:'NETFLIX',countryId:'US',projectId:contract.sourceProjectId,contractId:contract.id,
+        kind:'NON_STORE',sourceKind:'ADVERTISING',grossReceipts:100000})),aiStoreTransactions:[]} as any};
+const rightsEconomySnapshot=calculatePlatformAiWeeklyEconomy({player:{...fixture,world:earnedReceiptWorld},
+    platform:rightsEconomyPlatform,absoluteWeek:ABSOLUTE_WEEK+1}).snapshot!;
+const expectedRightsShare=Math.round(100000*activeContract.licensorRevenueShare/100)/1e6;
+closeTo(rightsEconomySnapshot.partnerRevenueShareCostMillions,expectedRightsShare,'Only the earned eligible active signed contract pays its exact rate once');
 
 // All sourcing entry points are frozen for any non-ACTIVE company status.
 for (const status of ['DISTRESSED', 'RESTRUCTURING', 'DORMANT'] as const) {
@@ -1187,7 +1199,7 @@ assert.equal(
     'With zero canonical market operations, two legacy regions must add the legacy regional fallback to the scaled base.',
 );
 
-const baseRightsContract = rightsCommit.world.platforms!.NETFLIX.ai!.rightsContracts[0];
+const baseRightsContract = {...rightsCommit.world.platforms!.NETFLIX.ai!.rightsContracts[0],backendBasis:'ADJUSTED_GROSS_RECEIPTS' as const}; // Historical signed adjusted-gross obligations.
 assert.ok(baseRightsContract, 'The real rights commitment must provide a contract fixture.');
 const rightsSharePlatform = normalizedPlatform('HULU');
 rightsSharePlatform.subscribers = 4.33;
@@ -1314,16 +1326,16 @@ rightsSharePlatform.ai!.rightsContracts = [
         licensorRevenueShare: 90,
     },
 ];
-const rightsShareSnapshot = calculatePlatformAiWeeklyEconomy({
-    player: fixture,
-    platform: rightsSharePlatform,
-    absoluteWeek: ABSOLUTE_WEEK + 30,
-}).snapshot! as unknown as Record<string, unknown>;
-assert.equal(
-    rightsShareSnapshot.partnerRevenueShareCostMillions,
-    0.6,
-    'One released revenue-share licence among six released titles must pay 12M × 30% × 1/6; both catalogue projects count and the unreleased contract counts zero.',
-);
+const rightsShareViewing={lastProcessedAbsoluteWeek:ABSOLUTE_WEEK+30,platforms:{HULU:{revenue:{attributedSubscriptionRevenue:12000000,
+    advertisingRevenue:0,premiumRevenue:0,rentalRevenue:0,purchaseRevenue:0,dayPassRevenue:0,meteredRevenue:0,patronRevenue:0,sponsorshipRevenue:0,totalIncrementalRevenue:0}}},
+    royaltyReceipts:[{receiptId:'six-title-licensed',platformId:'HULU',countryId:'US',projectId:'economy-share-licensed',
+        contractId:'economy-share-active',kind:'SUBSCRIPTION',grossReceipts:2000000},
+        {receiptId:'six-title-owned-remainder',platformId:'HULU',countryId:'US',projectId:'owned-other',contractId:null,kind:'SUBSCRIPTION',grossReceipts:10000000}],
+    aiStoreTransactions:[]} as any;
+const rightsShareSnapshot=calculatePlatformAiWeeklyEconomy({player:{...fixture,world:{...fixture.world,worldStreamingViewing:rightsShareViewing}},
+    platform:rightsSharePlatform,absoluteWeek:ABSOLUTE_WEEK+30}).snapshot!;
+assert.equal(rightsShareSnapshot.partnerRevenueShareCostMillions,0.6,
+    'A cleared 2M licensed receipt pays30%; the remaining10M assigned to owned titles cannot be paid again per license.');
 
 const technologyCostPlatform = normalizedPlatform('HULU');
 technologyCostPlatform.subscribers = 0;
@@ -1541,18 +1553,28 @@ dormantRelaunchPlatform.ai!.financeHistory = [];
 dormantRelaunchPlatform.ai!.researchQueue = [];
 dormantRelaunchPlatform.ai!.healthyOperatingWeeks = 0;
 let dormantRelaunchResult = dormantRelaunchPlatform;
-for (let week = 1; week <= 18; week += 1) {
-    dormantRelaunchResult = settlePlatformAiEconomy({
+let consecutiveCushionedWeeks = 0;
+for (let week = 1; week <= 26; week += 1) {
+    const settled = settlePlatformAiEconomy({
         player: fixture,
         platform: dormantRelaunchResult,
         absoluteWeek: ABSOLUTE_WEEK + 80 + week,
-    }).platform;
+    });
+    dormantRelaunchResult = settled.platform;
+    const snapshot = settled.snapshot!;
+    const fullyCushioned = snapshot.debtIncurredMillions === 0 && snapshot.closingDebtMillions === 0
+        && snapshot.operatingNetCashFlowMillions >= 0
+        && snapshot.closingCashMillions >= snapshot.operatingCostMillions * 13;
+    consecutiveCushionedWeeks = fullyCushioned ? consecutiveCushionedWeeks + 1 : 0;
     assert.equal(
         dormantRelaunchResult.ai!.status,
-        week === 18 ? 'ACTIVE' : 'DORMANT',
+        consecutiveCushionedWeeks === 13 ? 'ACTIVE' : 'DORMANT',
         `A dormant AI platform may relaunch only after thirteen distinct debt-free, profitable, fully cushioned weeks (week ${week}, healthy ${dormantRelaunchResult.ai!.healthyOperatingWeeks}, net ${dormantRelaunchResult.ai!.financeHistory.at(-1)?.operatingNetCashFlowMillions}, cash ${dormantRelaunchResult.cashReserve}, cost ${dormantRelaunchResult.ai!.financeHistory.at(-1)?.operatingCostMillions}).`,
     );
+    if (dormantRelaunchResult.ai!.status === 'ACTIVE') break;
 }
+assert.equal(consecutiveCushionedWeeks, 13, 'The dormant fixture must demonstrate thirteen consecutive qualifying weeks and complete relaunch.');
+assert.equal(dormantRelaunchResult.ai!.status, 'ACTIVE', 'A fully qualified dormant platform must relaunch within the fixture horizon.');
 assert.equal(dormantRelaunchResult.ai!.healthyOperatingWeeks, 0, 'A completed dormant relaunch must clear its recovery counter.');
 assert.equal(dormantRelaunchResult.ai!.spendingRestrictions.source, 'NONE', 'A viable dormant relaunch must remove administration spending locks.');
 
@@ -1706,13 +1728,14 @@ releasedRightsPlatform.ai!.rightsContracts = [
     { ...baseRightsContract, id: 'released-b-contract', sourceProjectId: 'released-b', buyerPlatformId: 'HULU', status: 'ACTIVE', startsAtAbsoluteWeek: ABSOLUTE_WEEK, expiresAtAbsoluteWeek: ABSOLUTE_WEEK + 200, licensorRevenueShare: 30, platformRevenueShare: 70 },
     { ...baseRightsContract, id: 'pre-release-contract', sourceProjectId: 'pre-release', buyerPlatformId: 'HULU', status: 'ACTIVE', startsAtAbsoluteWeek: ABSOLUTE_WEEK, expiresAtAbsoluteWeek: ABSOLUTE_WEEK + 200, licensorRevenueShare: 90, platformRevenueShare: 10 },
 ];
-const releasedRightsSnapshot = calculatePlatformAiWeeklyEconomy({
-    player: fixture,
-    platform: releasedRightsPlatform,
-    absoluteWeek: ABSOLUTE_WEEK + 78,
-}).snapshot!;
-assert.equal(releasedRightsSnapshot.subscriptionRevenueMillions, 12);
-assert.equal(releasedRightsSnapshot.partnerRevenueShareCostMillions, 1.62, 'Two licensed projects across a three-project released catalogue pay 12M × 30% × 45%.');
+const releasedRightsViewing={...rightsShareViewing,lastProcessedAbsoluteWeek:ABSOLUTE_WEEK+78,
+    royaltyReceipts:['released-a','released-b','released-original'].map(id=>({receiptId:'released-share-'+id,platformId:'HULU',countryId:'US',
+        projectId:id,contractId:id==='released-original'?null:id+'-contract',kind:'SUBSCRIPTION',grossReceipts:4000000}))};
+const releasedRightsSnapshot=calculatePlatformAiWeeklyEconomy({player:{...fixture,world:{...fixture.world,worldStreamingViewing:releasedRightsViewing}},
+    platform:releasedRightsPlatform,absoluteWeek:ABSOLUTE_WEEK+78}).snapshot!;
+assert.equal(releasedRightsSnapshot.subscriptionRevenueMillions,12);
+assert.equal(releasedRightsSnapshot.partnerRevenueShareCostMillions,2.4,
+    'Each of two cleared4M licensed receipts pays30%; the original consumes4M and the old45% catalogue cap no longer underpays.');
 
 // One-time obligations persist with stable IDs, settle once when cash arrives, and never create debt.
 const pendingPlatform = normalizedPlatform('HULU');

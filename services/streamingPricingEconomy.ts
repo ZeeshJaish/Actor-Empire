@@ -167,7 +167,20 @@ export const normalizeStreamingPricingConfiguration = (
         annualDiscount: round2(clamp(pricing.annualDiscount, 0, STREAMING_MAXIMUM_ANNUAL_DISCOUNT)),
         introOffer: round2(clamp(pricing.introOffer, 0, STREAMING_MAXIMUM_INTRO_OFFER)),
         introOfferPlanId,
+        // Money has a cent quantum. A positive sub-cent quote cannot debit
+        // zero cents while the revenue path still earns fractional dollars.
+        rentals:{...pricing.rentals,rent:normalizeStreamingTransactionPrice(pricing.rentals.rent),
+            buy:normalizeStreamingTransactionPrice(pricing.rentals.buy)},
+        premium:{...pricing.premium,price:normalizeStreamingTransactionPrice(pricing.premium.price)},
+        daypass:{...pricing.daypass,price:normalizeStreamingTransactionPrice(pricing.daypass.price)},
+        metered:{...pricing.metered,perHour:normalizeStreamingTransactionPrice(pricing.metered.perHour)},
+        patron:{...pricing.patron,monthly:normalizeStreamingTransactionPrice(pricing.patron.monthly)},
     };
+};
+
+const normalizeStreamingTransactionPrice = (value:number):number => {
+    const price=clamp(value,0,1_000_000);
+    return price>0?Math.max(.01,round2(price)):0;
 };
 
 /** Does the introductory offer apply to this plan? Undefined targeting means

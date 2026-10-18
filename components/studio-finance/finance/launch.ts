@@ -480,7 +480,7 @@ const copyLaunchPricing = (pricing: PricingSettings): PricingSettings => ({
   sponsor: { ...pricing.sponsor },
   metered: { ...pricing.metered },
   patron: { ...pricing.patron },
-  commercialOffers: pricing.commercialOffers ? {
+  ...(pricing.commercialOffers ? { commercialOffers: {
     ...pricing.commercialOffers,
     adFreePasses: { ...pricing.commercialOffers.adFreePasses },
     inactiveAdPlans: pricing.commercialOffers.inactiveAdPlans
@@ -492,7 +492,7 @@ const copyLaunchPricing = (pricing: PricingSettings): PricingSettings => ({
       freeAds: { ...pricing.commercialOffers.benefits.freeAds },
       store: { ...pricing.commercialOffers.benefits.store },
     },
-  } : undefined,
+  } } : {}),
 });
 
 /**

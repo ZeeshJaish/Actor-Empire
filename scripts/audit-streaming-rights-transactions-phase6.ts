@@ -18,6 +18,7 @@ import {
     getStreamingRightsOpportunities,
     openStreamingRightsNegotiation,
     signStreamingRightsDeal,
+    evaluateStreamingRightsCompliance,
 } from '../services/streamingRightsMarketplace';
 import { processPlatformAiRightsResaleWeek } from '../services/platformAi/platformAiRightsResale';
 import StreamingRightsExchange from '../components/StreamingRightsExchange';
@@ -126,7 +127,8 @@ sublicenseFixture.age = 2;
 sublicenseFixture.currentWeek = 29;
 sublicenseFixture.world = normalizeWorldPlatformAi(sublicenseFixture, sublicenseFixture.world, 80);
 sublicenseFixture.world.streamingRightsContracts = {
-    [legacyContract.id]: { ...legacyContract, sublicensingAllowed: true },
+    [legacyContract.id]: { ...legacyContract, sublicensingAllowed: true,viewershipBonusThreshold:100,viewershipBonusAmount:500000,
+    transferredObligationStates:[{id:'upstream-bonus',licenseId:legacyContract.id,sourceProjectId:legacyContract.sourceProjectId,title:legacyContract.titleAtSigning,type:'VIEWERSHIP_THRESHOLD',targetAmount:100,observedAmount:50,dueAtAbsoluteWeek:100,status:'ON_TRACK',breachPenalty:0,successPayment:500000,resolvedAtAbsoluteWeek:null}] },
 };
 sublicenseFixture.world.platforms!.HULU.ai!.rightsContracts = [{ ...legacyContract, sublicensingAllowed: true }];
 const sublicensed = settleStreamingRightsSublicense(sublicenseFixture, {
@@ -138,13 +140,18 @@ const sublicensed = settleStreamingRightsSublicense(sublicenseFixture, {
     windowType: 'FIRST_WINDOW',
     exclusivity: 'NON_EXCLUSIVE',
     durationWeeks: 20,
-    price: 10_000_000,
-    buyerRevenueShare: 80,
+    price: 13_000_000,
+    buyerRevenueShare: 100,
     absoluteWeek: 80,
     idempotencyKey: 'a6-sublicense-chain-check',
     controllerAtCommitment: { seller: 'AI', buyer: 'AI' },
 });
 assert.equal(sublicensed.changed, true);
+const newSublicense=Object.values(sublicensed.player.world.streamingRightsContracts).find(row=>row.parentContractId===legacyContract.id)!;
+assert.equal(newSublicense.transferredObligationStates,undefined,'A new sublicense cannot inherit upstream bonus obligations');
+assert.equal(newSublicense.backendBasis,'ADS_RENTAL_RECEIPTS');assert.equal(newSublicense.viewershipBonusAmount,0);
+assert.equal(sublicensed.player.world.streamingRightsContracts[legacyContract.id].viewershipBonusAmount,500000);
+
 const parentChainAfterSublicense = getStreamingRightsTransferChain(sublicensed.player.world, legacyContract.id);
 assert.equal(parentChainAfterSublicense.currentContractId, legacyContract.id, 'A sublicense must not replace the parent licence holder.');
 assert.deepEqual(parentChainAfterSublicense.holders.map(holder => holder.name), ['Empire Studios', 'Hulu']);
@@ -233,6 +240,49 @@ assert.deepEqual(
     obligationTransfer.player.ownedStreamingPlatform.rightsObligations.map(obligation => obligation.type).sort(),
     ['MARKETING_SPEND', 'VIEWERSHIP_THRESHOLD'],
 );
+
+// A paid signed bonus must remain paid through resale, reload and pruned history.
+assert(obligationTransfer.changed);
+const paidFixture = structuredClone(obligationTransfer.player);
+const paidBonus = paidFixture.ownedStreamingPlatform.rightsObligations.find(row => row.type === 'VIEWERSHIP_THRESHOLD')!;
+paidBonus.status = 'SATISFIED'; paidBonus.observedAmount = paidBonus.targetAmount;
+paidBonus.resolvedAtAbsoluteWeek = 81;
+const pendingMarketing = paidFixture.ownedStreamingPlatform.rightsObligations.find(row => row.type === 'MARKETING_SPEND')!;
+pendingMarketing.status = 'ON_TRACK'; pendingMarketing.observedAmount = 123;
+const originalDeadline = pendingMarketing.dueAtAbsoluteWeek;
+// Legacy saves use marketplace IDs, with no canonical snapshot before their next close.
+paidBonus.id = 'legacy-marketplace-bonus-with-simulation-seed';
+pendingMarketing.id = 'legacy-marketplace-marketing-with-simulation-seed';
+delete paidFixture.world.streamingRightsContracts![obligationTransfer.successorContract.id].transferredObligationStates;
+const soldPaid = settleStreamingRightsTransfer(paidFixture, {
+    sourceContractId: obligationTransfer.successorContract.id,
+    seller: obligationTransfer.successorContract.buyer,
+    buyer: legacyContract.buyer, price: 10_000_000, absoluteWeek: 82,
+    idempotencyKey: 'paid-bonus-sold', controllerAtCommitment: { seller: 'PLAYER', buyer: 'AI' },
+});
+assert(soldPaid.changed);
+const returnFixture = JSON.parse(JSON.stringify(soldPaid.player));
+// Terminal contracts and event ledgers are bounded; active successor must carry the proof itself.
+returnFixture.world.streamingRightsContracts = normalizeStreamingRightsContractRegistry({
+    [soldPaid.successorContract.id]: returnFixture.world.streamingRightsContracts[soldPaid.successorContract.id],
+});
+returnFixture.ownedStreamingPlatform.eventLedger = [];
+const boughtPaid = settleStreamingRightsTransfer(returnFixture, {
+    sourceContractId: soldPaid.successorContract.id, seller: legacyContract.buyer,
+    buyer: obligationTransfer.successorContract.buyer, price: 10_000_000, absoluteWeek: 83,
+    idempotencyKey: 'paid-bonus-returned', controllerAtCommitment: { seller: 'AI', buyer: 'PLAYER' },
+});
+assert(boughtPaid.changed);
+const returnedBonus = boughtPaid.player.ownedStreamingPlatform.rightsObligations.find(row => row.type === 'VIEWERSHIP_THRESHOLD')!;
+assert.equal(boughtPaid.player.ownedStreamingPlatform.rightsObligations.filter(row=>row.type==='VIEWERSHIP_THRESHOLD').length,1,'Legacy marketplace identity cannot create a second reconstructed bonus');
+assert.equal(returnedBonus.status, 'SATISFIED', 'Resale cannot reset an already paid bonus');
+assert.equal(returnedBonus.id, paidBonus.id, 'Payment identity must survive a full transfer chain');
+assert.equal(returnedBonus.resolvedAtAbsoluteWeek, 81);
+const returnedMarketing = boughtPaid.player.ownedStreamingPlatform.rightsObligations.find(row => row.type === 'MARKETING_SPEND')!;
+assert.equal(returnedMarketing.dueAtAbsoluteWeek, originalDeadline, 'Resale cannot extend an obligation deadline');
+assert.equal(returnedMarketing.observedAmount, 123);
+const complianceAfterReturn = evaluateStreamingRightsCompliance({...boughtPaid.player.ownedStreamingPlatform, rightsObligations: [returnedBonus]}, 83);
+assert.equal(complianceAfterReturn.complianceCost, 0, 'Paid bonus cannot be charged again without its old event ledger');
 
 const replay = settleStreamingRightsTransfer(settled.player, {
     sourceContractId: legacyContract.id,

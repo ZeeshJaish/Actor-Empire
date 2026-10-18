@@ -8,6 +8,7 @@ import type {
 import { getAbsoluteWeek } from './legacyLogic';
 import { normalizeOwnedStreamingPlatformState } from './ownedStreamingPlatform';
 import { getOwnedStreamingProgramEntries } from './streamingOriginals';
+import { getStreamingAdditionalOperatingExpense } from './streamingOperatingExpenses';
 
 export type StreamingAnalyticsRange = 4 | 12 | 26 | 52;
 export type StreamingAnalyticsTone = 'POSITIVE' | 'WATCH' | 'CRITICAL' | 'NEUTRAL';
@@ -526,10 +527,17 @@ export const getStreamingPlatformAnalytics = (
     const productRevenue = sum(operations.map(item => item.productRevenue || 0));
     const incrementalRevenue = viewing?.incrementalRevenue || 0;
     const totalOperatingRevenue = revenue + productRevenue + incrementalRevenue;
-    const cashCost = sum(operations.map(item => item.totalCashCost));
-    const cashContribution = sum(operations.map(item => item.netCashContribution));
+    const extraCost = (snapshot: OwnedStreamingWeeklySnapshot) => getStreamingAdditionalOperatingExpense(platform,
+        snapshot.absoluteWeek, snapshot.operations?.additionalOperatingExpense);
+    const additionalOperatingExpense = sum(snapshots.map(extraCost));
+    const cashCost = sum(operations.map(item => item.totalCashCost)) + additionalOperatingExpense;
+    const cashContribution = sum(operations.map(item => item.netCashContribution)) - additionalOperatingExpense;
     const contentAmortization = sum(operations.map(item => item.contentAmortization));
-    const accountingContribution = sum(operations.map(item => item.accountingContribution));
+    const accountingContribution = sum(operations.map(item => item.accountingContribution)) - additionalOperatingExpense;
+    const expectedAccountingContribution = sum(operations.map(item => item.contentAccountingVersion === 1
+        ? item.subscriptionRevenue + (item.productRevenue || 0) + (item.worldViewingIncrementalRevenue || 0)
+            - item.totalCashCost - item.contentAmortization
+        : item.netCashContribution - item.contentAmortization)) - additionalOperatingExpense;
     const totals: StreamingPlatformAnalytics['totals'] = {
         revenue,
         productRevenue,
@@ -560,12 +568,12 @@ export const getStreamingPlatformAnalytics = (
     const reconciliation: StreamingAnalyticsReconciliation = {
         subscriberWaterfall: waterfall?.reconciled ?? true,
         cashContribution: totalOperatingRevenue - cashCost === cashContribution,
-        accountingContribution: cashContribution - contentAmortization === accountingContribution,
+        accountingContribution: expectedAccountingContribution === accountingContribution,
         snapshotLedgerCoverage,
         status: (
             (waterfall?.reconciled ?? true)
             && totalOperatingRevenue - cashCost === cashContribution
-            && cashContribution - contentAmortization === accountingContribution
+            && expectedAccountingContribution === accountingContribution
             && snapshotLedgerCoverage
         ) ? 'RECONCILED' : 'PARTIAL',
         detail: snapshotLedgerCoverage
@@ -587,8 +595,8 @@ export const getStreamingPlatformAnalytics = (
         revenueTimeline: buildTimeline(snapshots, snapshot => snapshot.operations?.subscriptionRevenue || 0),
         contributionTimeline: buildTimeline(
             snapshots,
-            snapshot => snapshot.operations?.netCashContribution || 0,
-            snapshot => snapshot.operations?.accountingContribution || 0,
+            snapshot => (snapshot.operations?.netCashContribution || 0) - extraCost(snapshot),
+            snapshot => (snapshot.operations?.accountingContribution || 0) - extraCost(snapshot),
         ),
         capacityTimeline: buildTimeline(
             snapshots,

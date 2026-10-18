@@ -252,7 +252,7 @@ const closingMarkup = renderToStaticMarkup(React.createElement(StreamingBiddingR
     onBack: () => undefined,
 }));
 assert.match(closingMarkup, /Room clock/i);
-assert.match(closingMarkup, /Adjusted gross/i);
+assert.match(closingMarkup, /Ads \+ rental receipts/i);
 assert.match(closingMarkup, /Closing table/i);
 assert.match(closingMarkup, /data-platform-brand="NETFLIX"/i);
 assert.doesNotMatch(closingMarkup, /Highest bid|Winning bid|Best offer/i, 'the UI must not advise a winner');

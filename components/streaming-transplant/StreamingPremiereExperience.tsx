@@ -24,6 +24,7 @@ import { cx } from './presentation/cx';
 import { brandVars } from './presentation/brand';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Brand, Mark, brandColor, brandDeep, typeFace } from './StreamingBrandVisuals';
+import type { OwnedStreamingLaunchCommit } from '../../types';
 
 /* ============================================================
    MODEL
@@ -61,9 +62,11 @@ export interface PremiereInputs {
       but a real blocker must never be bypassed by the presentation layer. */
   launchAllowed?: boolean;
   launchBlockerMessage?: string;
+  /** Authoritative opening facts. The animation must never reroll this result. */
+  committedLaunch?: OwnedStreamingLaunchCommit | null;
 }
 
-export interface PremiereLaunchResult { ok: boolean; message?: string }
+export interface PremiereLaunchResult { ok: boolean; message?: string; commit?: OwnedStreamingLaunchCommit }
 
 export type NightVerdict = 'TRIUMPH' | 'HELD' | 'BROKE';
 
@@ -77,6 +80,15 @@ export interface PremiereResult {
   actions: string[];
   worstCity: string | null;
 }
+
+export const premiereResultFromCommit = (commit: OwnedStreamingLaunchCommit): PremiereResult => ({
+  verdict: commit.outcomeTier === 'DEGRADED_OPENING' ? 'BROKE'
+    : commit.outcomeTier === 'PRESSURED_OPENING' ? 'HELD' : 'TRIUMPH',
+  peak: commit.forecastLikelyConcurrentStreams,
+  failedPct: Math.round((100 - commit.playbackSuccessRate) * 100) / 100,
+  subsGained: commit.initialSubscribers, subsLost: 0,
+  burstCost: commit.capacityPlanCost, actions: [], worstCity: null,
+});
 
 type Beat = 'GATE' | 'DOORS' | 'IDENT' | 'SPIKE' | 'AFTER';
 
@@ -220,7 +232,13 @@ const rivalsFor = (r: PremiereResult, inp: PremiereInputs, name: string): RivalM
 };
 
 /* ── the press round-up: four outlets, four slants ── */
-const pressFor = (r: PremiereResult, inp: PremiereInputs, name: string) => {
+const pressFor = (r: PremiereResult, inp: PremiereInputs, name: string, commit?: OwnedStreamingLaunchCommit | null) => {
+  if (commit) return [
+    { outlet: 'BROADCAST BUSINESS', slant: 'financial', head: `${commit.initialSubscribers.toLocaleString()} paid subscribers`,
+      line: 'The opening count is recorded in the company books.' },
+    { outlet: 'THE FEED', slant: 'tabloid', head: `${commit.playbackSuccessRate.toFixed(2)}% playback success`,
+      line: `The service opened with ${commit.openingOriginalTitle}.` },
+  ];
   if (r.verdict === 'BROKE') return [
     { outlet: 'THE FEED', slant: 'tabloid', head: `“WHERE’S MY SHOW?”`, line: `${conc(r.subsLost)} paid and got a spinner.` },
     { outlet: 'BROADCAST BUSINESS', slant: 'financial', head: `Launch costs mount`, line: `A night that was meant to prove the model instead proved the ceiling.` },
@@ -348,13 +366,15 @@ export const PremiereNight: React.FC<{
   const [peek, setPeek] = useState(false);
   const [result, setResult] = useState<PremiereResult | null>(null);
   const [launchFeedback, setLaunchFeedback] = useState('');
+  const [savedLaunch, setSavedLaunch] = useState(inputs.committedLaunch);
+  const committedLaunch = savedLaunch ?? inputs.committedLaunch;
   const raf = useRef(0);
   const worstRef = useRef(0);
 
   /* Tonight is rolled, once, when the doors open. A build that only just
      cleared the rehearsal is a build that might not clear the night. */
   const roll = useRef(0.75 + deterministicUnit(`${inputs.simulationSeed || 'premiere'}:${inputs.title}`) * .9);
-  const target = Math.round(inputs.expected * roll.current);
+  const target = committedLaunch?.forecastLikelyConcurrentStreams ?? Math.round(inputs.expected * roll.current);
 
   const reds = inputs.checks.filter(x => !x.ok);
   const launchAllowed = inputs.launchAllowed !== false;
@@ -369,6 +389,7 @@ export const PremiereNight: React.FC<{
       setLaunchFeedback(outcome.message || 'Opening night could not be committed.');
       return;
     }
+    if (outcome && outcome.commit) setSavedLaunch(outcome.commit);
     setLaunchFeedback('');
     setBeat('DOORS');
   };
@@ -384,17 +405,18 @@ export const PremiereNight: React.FC<{
 
   const live = Math.round(effTarget * curveAt(t));
   const over = live > effCeiling;
-  const failedNow = over ? Math.min(88, Math.round(((live - effCeiling) / live) * 100 + inputs.wobble * 30)) : 0;
+  const failedNow = committedLaunch ? premiereResultFromCommit(committedLaunch).failedPct
+    : over ? Math.min(88, Math.round(((live - effCeiling) / live) * 100 + inputs.wobble * 30)) : 0;
   if (failedNow > worstRef.current) worstRef.current = failedNow;
 
   /* sign-ups run all night; the ones who hit a spinner do not all come back */
-  const subsSoFar = Math.round(effTarget * 3.1 * Math.min(1, t * 1.15));
+  const subsSoFar = committedLaunch?.initialSubscribers ?? Math.round(effTarget * 3.1 * Math.min(1, t * 1.15));
 
   /* The spike effect only depends on `beat`, so anything it closes over is
      frozen at the moment the night starts. Without this mirror the moves would
      visibly change the room and change nothing about the morning. */
-  const now = useRef({ used, effCeiling, effTarget, burstOn });
-  now.current = { used, effCeiling, effTarget, burstOn };
+  const now = useRef({ used, effCeiling, effTarget, burstOn, committedLaunch });
+  now.current = { used, effCeiling, effTarget, burstOn, committedLaunch };
 
   /* ── the spike runs on a clock, guarded so a backgrounded tab cannot
         strand the player mid-night ── */
@@ -417,6 +439,11 @@ export const PremiereNight: React.FC<{
       if (over_) return;
       over_ = true;
       const cur = now.current;
+      if (cur.committedLaunch) {
+        setResult(premiereResultFromCommit(cur.committedLaunch));
+        setBeat('AFTER');
+        return;
+      }
       const failed = worstRef.current;
       const gained = Math.round(cur.effTarget * 3.1);
       const lost = Math.round(gained * (failed / 100) * .45);
@@ -448,6 +475,7 @@ export const PremiereNight: React.FC<{
   }, [beat]);
 
   const use = (id: string) => {
+    if (committedLaunch) return;
     if (used.includes(id)) return;
     if (id === 'hold' && t > .42) return;      // too late to hold anything back
     if (id === 'burst' && inputs.burstCeiling <= inputs.ceiling) return;
@@ -522,8 +550,8 @@ export const PremiereNight: React.FC<{
       {beat === 'DOORS' && (
         <div className={css.pnstage2}>
           <span className={css.stagekick}>19:00 · DOORS OPEN</span>
-          <b className={css.stagenum}>{conc(Math.round(target * .34))}</b>
-          <span className={css.stagesub}>accounts created in the first hour</span>
+          <b className={css.stagenum}>{committedLaunch ? committedLaunch.initialSubscribers.toLocaleString() : conc(Math.round(target * .34))}</b>
+          <span className={css.stagesub}>{committedLaunch ? 'paid subscribers at opening' : 'accounts created in the first hour'}</span>
           <div className={css.stagebar}><i /></div>
           <p className={css.stageline}>
             They are early. They are refreshing the app. Nothing has played yet.
@@ -610,8 +638,8 @@ export const PremiereNight: React.FC<{
                 </div>
 
                 <div className={css.signups}>
-                  <span>SIGN-UPS TONIGHT</span>
-                  <b>{conc(subsSoFar)}</b>
+                  <span>{committedLaunch ? 'PAID SUBSCRIBERS' : 'SIGN-UPS TONIGHT'}</span>
+                  <b>{committedLaunch ? subsSoFar.toLocaleString() : conc(subsSoFar)}</b>
                 </div>
 
                 {failedNow > 0 && (
@@ -628,13 +656,13 @@ export const PremiereNight: React.FC<{
             <div className={css.moverow}>
               {MOVES.map(m => {
                 const spent = used.includes(m.id);
-                const dead = (m.id === 'hold' && t > .42)
+                const dead = Boolean(committedLaunch) || (m.id === 'hold' && t > .42)
                   || (m.id === 'burst' && inputs.burstCeiling <= inputs.ceiling);
                 return (
                   <button key={m.id} className={cx(css.move, (spent ? css.spent : ''))}
                     disabled={spent || dead} onClick={() => use(m.id)}>
                     <b>{m.label}</b>
-                    <span>{spent ? 'DONE' : dead ? 'TOO LATE' : m.cost}</span>
+                    <span>{committedLaunch ? 'OPENING SAVED' : spent ? 'DONE' : dead ? 'TOO LATE' : m.cost}</span>
                   </button>
                 );
               })}
@@ -648,7 +676,7 @@ export const PremiereNight: React.FC<{
         const nm = brand.name || 'EMPIRE+';
         const reactions = reactionsFor(result, inputs, nm);
         const social = socialFor(result, inputs, nm);
-        const papers = pressFor(result, inputs, nm);
+        const papers = pressFor(result, inputs, nm, committedLaunch);
         const rivalMoves = rivalsFor(result, inputs, nm);
         const forum = forumFor(result, inputs, nm);
         const chances = chancesFor(result, inputs, nm);
@@ -691,18 +719,20 @@ export const PremiereNight: React.FC<{
                 </div>
 
                 <p className={css.deck}>
-                  {result.verdict === 'TRIUMPH' && (
+                  {committedLaunch && <>{committedLaunch.initialSubscribers.toLocaleString()} paid subscribers at opening.
+                    {' '}{committedLaunch.playbackSuccessRate.toFixed(2)}% playback success.</>}
+                  {!committedLaunch && result.verdict === 'TRIUMPH' && (
                     <>Peak {conc(result.peak)} concurrent and not a frame dropped.
                       {' '}{conc(result.subsGained)} accounts by midnight.</>
                   )}
-                  {result.verdict === 'HELD' && (
+                  {!committedLaunch && result.verdict === 'HELD' && (
                     <>Peak {conc(result.peak)} concurrent.
                       {result.actions.length
                         ? ` Held together by ${listOf(result.actions).toLowerCase()}.`
                         : ' Held, narrowly.'}
                       {' '}{conc(result.subsGained)} accounts by midnight.</>
                   )}
-                  {result.verdict === 'BROKE' && (
+                  {!committedLaunch && result.verdict === 'BROKE' && (
                     <>Streams failed for {result.failedPct}% of the audience at peak
                       {result.worstCity ? `, ${result.worstCity} worst of all` : ''}.
                       {' '}{conc(result.subsLost)} of the people who came will not be back.</>
@@ -743,16 +773,18 @@ export const PremiereNight: React.FC<{
                 </figure>
 
                 <div className={css.pressstats}>
-                  <div><span>PEAK</span><b>{conc(result.peak)}</b></div>
-                  <div><span>ACCOUNTS</span><b>{conc(result.subsGained)}</b></div>
+                  <div><span>{committedLaunch ? 'EXPECTED PEAK' : 'PEAK'}</span><b>{conc(result.peak)}</b></div>
+                  <div><span>{committedLaunch ? 'PAID SUBSCRIBERS' : 'ACCOUNTS'}</span><b>{committedLaunch ? result.subsGained.toLocaleString() : conc(result.subsGained)}</b></div>
                   <div><span>LOST</span><b className={result.subsLost ? css.bad : ''}>{result.subsLost ? conc(result.subsLost) : '—'}</b></div>
                   <div><span>FAILED</span><b className={result.failedPct ? css.bad : ''}>{result.failedPct}%</b></div>
                 </div>
 
                 {result.burstCost > 0 && (
                   <p className={css.pressnote}>
-                    Burst capacity was bought mid-broadcast at {money(result.burstCost)} — a cost that
-                    appears in no budget because nobody planned it.
+                    {committedLaunch
+                      ? `${committedLaunch.capacityPlan === 'STAGGERED_PREMIERE' ? 'Staggered opening' : 'Reserved cloud burst'} cost ${money(result.burstCost)}, paid when the launch was committed.`
+                      : <>Burst capacity was bought mid-broadcast at {money(result.burstCost)} — a cost that
+                        appears in no budget because nobody planned it.</>}
                   </p>
                 )}
 

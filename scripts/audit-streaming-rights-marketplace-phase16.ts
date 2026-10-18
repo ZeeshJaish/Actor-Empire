@@ -212,7 +212,7 @@ assert(canonicalAcquiredContract?.minimumGuarantee === acquiredLicense.minimumGu
 assert(canonicalAcquiredContract?.buyer.type === 'PLAYER_PLATFORM', 'The canonical buyer should be the player-owned streaming platform.');
 assert(acquiredLicense.sublicensingAllowed, 'Negotiated sublicensing rights should persist in the contract.');
 assert(fixture.ownedStreamingPlatform.treasuryCash === treasuryBeforeAcquisition - acquisition.minimumGuarantee, 'The guarantee should debit platform treasury exactly once.');
-assert(fixture.ownedStreamingPlatform.rightsObligations.length === 2, 'Marketing and viewership promises should become tracked obligations.');
+assert(fixture.ownedStreamingPlatform.rightsObligations.length === 1, 'The marketing promise is tracked; new licenses have no separate success bonus.');
 
 const outgoingOpportunity = getStreamingRightsOpportunities(fixture).find(item => (
     item.kind === 'SUBLICENSE_OUT' && item.sourceLicenseId === acquiredLicense.id

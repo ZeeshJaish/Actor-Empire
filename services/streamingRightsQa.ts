@@ -65,6 +65,7 @@ const buildQaContract = (
     const expiresAtAbsoluteWeek = absoluteWeek + expiryOffsets[index];
     const sourceProjectId = `${QA_PREFIX}title_${String(index).padStart(2, '0')}`;
     const license = createStreamingLicenseContract({
+        backendBasis: 'ADJUSTED_GROSS_RECEIPTS',
         id: `${QA_PREFIX}contract_${String(index).padStart(2, '0')}`,
         sourceProject: {
             id: sourceProjectId,

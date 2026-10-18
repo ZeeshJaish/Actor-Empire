@@ -520,13 +520,19 @@ export const getOwnedStreamingProgramEntries = (player: Player): OwnedStreamingS
         .filter(entry => entry.source !== 'LICENSED_WINDOW' || activeLicensedProjectIds.has(entry.projectId))
         .map(entry => {
             if (entry.source !== 'LICENSED_WINDOW') return entry;
-            const license = platform.catalogLicenses.find(item => (
+            const license = platform.catalogLicenses.filter(item => (
                 item.sourceProjectId === entry.projectId && item.status === 'ACTIVE'
-            ));
+                && item.startsAtAbsoluteWeek <= absoluteWeek
+                && getStreamingCatalogLicenseStatus(item, absoluteWeek) === 'ACTIVE'
+            )).sort((left,right)=>right.startsAtAbsoluteWeek-left.startsAtAbsoluteWeek || left.id.localeCompare(right.id))[0];
             return license ? {
                 ...entry,
                 projectType: license.projectType || entry.projectType,
                 genre: license.genre || entry.genre,
+                // Setup keeps its twelve-week opening slate. A later acquired
+                // title cannot have premiered before its actual rights start.
+                launchWeek: launchAbsoluteWeek === null ? entry.launchWeek
+                    : Math.max(entry.launchWeek, license.startsAtAbsoluteWeek-launchAbsoluteWeek+1),
             } : entry;
         });
     const scheduledOriginals = launchAbsoluteWeek === null

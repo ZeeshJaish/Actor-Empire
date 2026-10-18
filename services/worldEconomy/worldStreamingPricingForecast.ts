@@ -11,13 +11,19 @@ import {
     streamingIntroOfferAppliesTo,
 } from '../streamingPricingEconomy';
 import { allocateStreamingAudienceChoice } from './worldStreamingAudienceChoice';
+import {createStreamingCohortCommerce, spendStreamingCommerceSource, fundStreamingAdFreePasses, streamingConsumerProductRate} from './worldStreamingHouseholdBudget';
 import { normalizeWorldPopulationState } from './worldPopulation';
 import { normalizeWorldAudienceEconomyState } from './worldAudienceCohorts';
 import { normalizeWorldAudienceParticipationState } from './worldAudienceParticipation';
 import { clearStreamingAdMarket, getStreamingCountryAdMarket } from './worldStreamingAdMarket';
 import { getWorldStreamingOffers } from './worldStreamingOffers';
-import { calculateStreamingAdFreePassWeek, calculateStreamingStoreConversion } from './worldStreamingCommercialEconomy';
+import { allocateStreamingStoreUnits, calculateStreamingAdFreePassWeek, calculateStreamingStoreConversion } from './worldStreamingCommercialEconomy';
 import { projectStreamingCommercialOffers } from '../streamingCommercialOffers';
+import { stageWorldStreamingOpeningOffer } from './worldStreamingOpening';
+import { deriveStreamingNetworkCoverage } from '../streamingNetworkCoverage';
+import { getOwnedStreamingProgramEntries } from '../streamingOriginals';
+import { evaluatePlayerStreamingTitleRoute } from '../streamingContentAvailability';
+import { streamingTitleQuality, streamingTitleWeeksAvailable } from './worldStreamingContentValue';
 
 export interface WorldStreamingLaunchPricingForecast {
     reachableHouseholds: number;
@@ -27,11 +33,12 @@ export interface WorldStreamingLaunchPricingForecast {
     monthlySubscriptionRevenue: number;
     freeAdHouseholds: number;
     storeHouseholds: number;
+    secondaryStoreOpportunities?: number;
     /** Conditional estimate, assuming eligible titles and delivery. Not guaranteed revenue. */
     estimatedWeeklyAdRevenueIfPlayable: number;
     /** Conditional on both an ad-entitled title and delivery. */
     estimatedWeeklyPassRevenueIfPlayable: number;
-    /** Conditional on one market-valid store-only title; no proposed title sale is guaranteed. */
+    /** Conditional on eligible saved titles and delivery; bounded by shared weekly buyer wallets. */
     estimatedWeeklyRentalRevenueIfPlayable: number;
     estimatedWeeklyPurchaseRevenueIfPlayable: number;
     estimatedWeeklyPassBuyersIfPlayable: number;
@@ -58,6 +65,7 @@ export interface WorldStreamingLaunchPricingCountryForecast {
     monthlySubscriptionRevenue: number;
     freeAdHouseholds: number;
     storeHouseholds: number;
+    secondaryStoreOpportunities?: number;
     estimatedWeeklyAdRevenueIfPlayable: number;
     estimatedWeeklyPassRevenueIfPlayable: number;
     estimatedWeeklyRentalRevenueIfPlayable: number;
@@ -105,7 +113,7 @@ const allocateDemandByCountry = (
 };
 
 const buildViewerAccounts = (country: WorldStreamingLaunchPricingCountryForecast): number => (
-    country.accounts + country.freeAdHouseholds + country.storeHouseholds
+    country.accounts + country.freeAdHouseholds + country.storeHouseholds + (country.secondaryStoreOpportunities || 0)
 );
 
 const median = (values: number[]): number => {
@@ -126,7 +134,7 @@ export const forecastWorldStreamingLaunchPricing = (
     const passPrices = projectStreamingCommercialOffers(pricing).adFreePasses;
     const storeEligibility = projectStreamingCommercialOffers(pricing).storeOffer?.eligibility;
     const requestedCountryIds = [...new Set(proposedCountryIds.map(id => String(id || '').trim().toUpperCase()).filter(Boolean))].sort();
-    const previewPlayer: Player = {
+    const previewBase: Player = {
         ...player,
         ownedStreamingPlatform: {
             ...platform,
@@ -146,16 +154,19 @@ export const forecastWorldStreamingLaunchPricing = (
                 launchServerCityId: null,
                 foundedAtAbsoluteWeek: absoluteWeek,
             },
-            marketOperations: [],
+            marketOperations: platform.lifecycle === 'ACTIVE' && platform.launchCommit ? platform.marketOperations : [],
             serviceConfiguration: {
                 ...platform.serviceConfiguration,
                 source: 'PLAYER_ACTION',
                 pricing,
                 revision: platform.serviceConfiguration.revision + 1,
             },
-            launchCommit: null,
+            launchCommit: platform.lifecycle === 'ACTIVE' ? platform.launchCommit : null,
         },
     };
+    const previewPlayer = platform.lifecycle === 'ACTIVE' && platform.launchCommit
+        ? previewBase : stageWorldStreamingOpeningOffer(previewBase, absoluteWeek);
+    const programEntries = getOwnedStreamingProgramEntries(previewPlayer);
     const registry = getWorldStreamingOffers(previewPlayer, absoluteWeek);
     // The saved platform normalizer bounds day-one markets and network coverage
     // may narrow them further. Forecast only the countries where the same player
@@ -168,14 +179,26 @@ export const forecastWorldStreamingLaunchPricing = (
     const participation = normalizeWorldAudienceParticipationState(previewPlayer.world.worldAudienceParticipation,
         population, audience, absoluteWeek);
     const offerMap = new Map(registry.offers.map(offer => [offer.platformId, offer]));
+    const facilities = platform.infrastructureSetup?.facilities;
+    const coveredShares = facilities?.length ? new Map(deriveStreamingNetworkCoverage({
+        facilities, openingCountryIds: requestedCountryIds, fibreState: platform.fibre,
+    }).countries.map(country => [country.countryId, country.coveredShare])) : null;
     const choices = countryIds.map(countryId => {
         const countryOffers = (registry.byCountry[countryId] || []).map(id => offerMap.get(id))
             .filter((offer): offer is NonNullable<typeof offer> => Boolean(offer));
         const cohorts = audience.countries[countryId]?.cohorts || [];
         const cohortChoices = cohorts.map(cohort => {
             const path = participation.countries[countryId]?.cohorts.find(row => row.cohortId === cohort.id);
-            return { cohort, allocations: path
-                ? allocateStreamingAudienceChoice(countryId, cohort, path, countryOffers).allocations : [] };
+            const coveredShare = coveredShares ? coveredShares.get(countryId) || 0 : 1;
+            const choice=path ? allocateStreamingAudienceChoice(countryId,cohort,path,countryOffers) : null;
+            if(!choice || !path) return {cohort,allocations:[],commerce:null};
+            choice.allocations=choice.allocations.map(row=>row.platformId==='PLAYER' ? {...row,
+                households:Math.round(row.households*coveredShare),primaryHouseholds:Math.round(row.primaryHouseholds*coveredShare),
+                monthlySpend:Math.round(row.monthlySpend*coveredShare*100)/100} : row);
+            choice.storeOpportunities=choice.storeOpportunities.map(row=>row.platformId==='PLAYER'
+                ? {...row,households:Math.round(row.households*coveredShare)} : row);
+            choice.freeAdOpportunities=choice.freeAdOpportunities.map(row=>row.platformId==='PLAYER'?{...row,households:Math.round(row.households*coveredShare)}:row);
+            return {cohort,allocations:[...choice.allocations,...choice.freeAdOpportunities],commerce:createStreamingCohortCommerce({countryId,cohort,participation:path,choice,offers:countryOffers,consumerProductPlatformIds:streamingConsumerProductRate(platform)>0?['PLAYER']:[]})};
         });
         return { countryId, allocations: cohortChoices.flatMap(row => row.allocations), cohortChoices };
     });
@@ -254,11 +277,56 @@ export const forecastWorldStreamingLaunchPricing = (
                 ), 0);
             }, 0));
         const estimatedAdHoursIfPlayable = adViewingHouseholds * 1.5;
-        const passes = calculateStreamingAdFreePassWeek({ adViewingHouseholds,
+        let passes = calculateStreamingAdFreePassWeek({ adViewingHouseholds,
             adEligibleHours: estimatedAdHoursIfPlayable,
             oneHourPrice: passPrices.oneHourPrice, dayPrice: passPrices.dayPrice,
             oneHourEligibleHouseholds: affordablePassHouseholds(passPrices.oneHourPrice),
             dayEligibleHouseholds: affordablePassHouseholds(passPrices.dayPrice) });
+        const storeSources = choice.cohortChoices.flatMap(row=>row.commerce?.storeSources || [])
+            .filter(source=>source.platformId==='PLAYER');
+        const reservedStoreHomes = new Map<string,number>();
+        const estimateStoreBuyers = (kind: 'RENTAL' | 'PURCHASE'): number => {
+            if (!pricing.streams.includes('rentals')) return 0;
+            const price = kind === 'RENTAL' ? pricing.rentals.rent : pricing.rentals.buy;
+            const titles = programEntries.filter(entry=>evaluatePlayerStreamingTitleRoute(
+                previewPlayer,entry.projectId,countryId,absoluteWeek,{kind}).allowed);
+            if(!titles.length) return 0;
+            const quality=titles.reduce((sum,title)=>sum+streamingTitleQuality(previewPlayer,title.projectId),0)/titles.length;
+            const weeksAvailable=titles.reduce((sum,title)=>sum+streamingTitleWeeksAvailable(previewPlayer,title,absoluteWeek),0)/titles.length;
+            const canBuyTitle = (source:typeof storeSources[number],titleId:string):boolean => {
+                const permitted=storeEligibility?.kind!=='MEMBERSHIP_PLANS'
+                    || (source.kind==='SUBSCRIPTION' && storeEligibility.planIds.includes(source.planId || ''));
+                if(!permitted || source.remainingMonthlyBudget<price) return false;
+                return source.kind==='STORE' || !evaluatePlayerStreamingTitleRoute(
+                    previewPlayer,titleId,countryId,absoluteWeek,source.kind==='FREE_AD'
+                        ? {kind:'AD_SUPPORTED'} : {kind:'SUBSCRIPTION',planId:source.planId || ''}).allowed;
+            };
+            const sources=storeSources.filter(source=>titles.some(title=>canBuyTitle(source,title.projectId)));
+            const pool=sources.reduce((sum,source)=>sum+source.households,0);
+            const eligibleByTitle=titles.map(title=>sources.filter(source=>canBuyTitle(source,title.projectId)));
+            const pools=eligibleByTitle.map(rows=>rows.reduce((sum,source)=>sum+source.households,0));
+            const wanted=calculateStreamingStoreConversion({buyerPool:pool,price,kind,quality,weeksAvailable});
+            const byTitle=allocateStreamingStoreUnits(wanted,titles.map((title,index)=>
+                pools[index]*Math.max(1,streamingTitleQuality(previewPlayer,title.projectId))));
+            return titles.reduce((sum,title,index)=>{
+                const owners=(previewPlayer.world.worldStreamingAudienceChoice?.entitlements || [])
+                    .filter(row=>row.countryId===countryId && row.titleId===title.projectId
+                        && (row.kind==='PURCHASE' || Number(row.expiresAtAbsoluteWeek)>absoluteWeek))
+                    .reduce((total,row)=>total+row.households,0);
+                const remaining=Math.max(0,pools[index]-owners-(reservedStoreHomes.get(title.projectId) || 0));
+                const counts=allocateStreamingStoreUnits(Math.min(byTitle[index],remaining),
+                    eligibleByTitle[index].map(source=>source.households));
+                const settled=eligibleByTitle[index].reduce((total,source,i)=>total+spendStreamingCommerceSource(
+                    source,Math.min(counts[i],source.households),price),0);
+                reservedStoreHomes.set(title.projectId,(reservedStoreHomes.get(title.projectId) || 0)+settled);
+                return sum+settled;
+            },0);
+        };
+        const rentalBuyers = estimateStoreBuyers('RENTAL');
+        const purchaseBuyers = estimateStoreBuyers('PURCHASE');
+        passes=fundStreamingAdFreePasses(passes,storeSources.filter(source=>source.kind==='FREE_AD'
+            || (source.kind==='SUBSCRIPTION' && pricing.plans.some(plan=>plan.id===source.planId && plan.ads))),
+            passPrices.oneHourPrice,passPrices.dayPrice,estimatedAdHoursIfPlayable);
         const adForecast = pricing.streams.includes('ads') && market
             ? clearStreamingAdMarket({ countryId, absoluteWeek,
                 advertiserDemandBudget: market.advertiserDemandBudget,
@@ -281,24 +349,6 @@ export const forecastWorldStreamingLaunchPricing = (
                             ? platform.competitiveWorld.globalPrestige : candidate.reputationIndex }];
                 }),
             }).byPlatform.PLAYER || null : null;
-        const estimateStoreBuyers = (kind: 'RENTAL' | 'PURCHASE'): number => {
-            if (!pricing.streams.includes('rentals')) return 0;
-            const price = kind === 'RENTAL' ? pricing.rentals.rent : pricing.rentals.buy;
-            const buyerPool = choice.cohortChoices.reduce((sum, row) => (
-                sum + row.allocations.filter(allocation => allocation.platformId === 'PLAYER').reduce((cohortSum, allocation) => {
-                    const permitted = storeEligibility?.kind !== 'MEMBERSHIP_PLANS'
-                        || (allocation.kind === 'SUBSCRIPTION'
-                            && storeEligibility.planIds.includes(allocation.planId || ''));
-                    const afterPlan = row.cohort.monthlyEntertainmentBudgetPerHousehold
-                        - (allocation.kind === 'SUBSCRIPTION'
-                            ? allocation.monthlySpend / Math.max(1, allocation.households) : 0);
-                    return cohortSum + (permitted && afterPlan >= price ? allocation.households : 0);
-                }, 0)
-            ), 0);
-            return calculateStreamingStoreConversion({ buyerPool, price, kind });
-        };
-        const rentalBuyers = estimateStoreBuyers('RENTAL');
-        const purchaseBuyers = estimateStoreBuyers('PURCHASE');
         return {
             countryId,
             reachableHouseholds: participation.countries[countryId]?.streamingReachableHouseholds || 0,
@@ -311,6 +361,7 @@ export const forecastWorldStreamingLaunchPricing = (
                 sum + row.monthlySpend
             ), 0) * 100) / 100,
             freeAdHouseholds, storeHouseholds,
+            secondaryStoreOpportunities:storeSources.filter(source=>source.kind==='STORE').reduce((sum,source)=>sum+source.households,0)-storeHouseholds,
             estimatedWeeklyAdRevenueIfPlayable: adForecast?.revenue || 0,
             estimatedWeeklyPassRevenueIfPlayable: passes.oneHourRevenue + passes.dayRevenue,
             estimatedWeeklyRentalRevenueIfPlayable: Math.round(rentalBuyers * pricing.rentals.rent),
@@ -332,6 +383,7 @@ export const forecastWorldStreamingLaunchPricing = (
         monthlySubscriptionRevenue: Math.round(countries.reduce((sum, row) => sum + row.monthlySubscriptionRevenue, 0) * 100) / 100,
         freeAdHouseholds: countries.reduce((sum, row) => sum + row.freeAdHouseholds, 0),
         storeHouseholds: countries.reduce((sum, row) => sum + row.storeHouseholds, 0),
+        secondaryStoreOpportunities:countries.reduce((sum,row)=>sum+(row.secondaryStoreOpportunities || 0),0),
         estimatedWeeklyPassRevenueIfPlayable: countries.reduce((sum, row) => sum + row.estimatedWeeklyPassRevenueIfPlayable, 0),
         estimatedWeeklyAdRevenueIfPlayable: countries.reduce((sum, row) => sum + row.estimatedWeeklyAdRevenueIfPlayable, 0),
         estimatedWeeklyRentalRevenueIfPlayable: countries.reduce((sum, row) => sum + row.estimatedWeeklyRentalRevenueIfPlayable, 0),
@@ -373,7 +425,8 @@ export const forecastWorldStreamingBuildDemand = (
         proposedPricing,
         proposedCountryIds,
     );
-    const forecastAccounts = pricingForecast.subscribers + pricingForecast.freeAdHouseholds + pricingForecast.storeHouseholds;
+    const forecastAccounts = pricingForecast.subscribers + pricingForecast.freeAdHouseholds + pricingForecast.storeHouseholds
+        + (pricingForecast.secondaryStoreOpportunities || 0);
     const low = Math.max(0, Math.round(forecastAccounts * 0.12));
     const likely = Math.max(low, Math.round(forecastAccounts * 0.24));
     const high = Math.max(likely, Math.round(forecastAccounts * 0.42));

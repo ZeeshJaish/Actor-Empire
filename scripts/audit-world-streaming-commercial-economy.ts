@@ -50,6 +50,8 @@ const commercial = calculateWorldStreamingCommercialRevenue({
     isSponsorEligible: true,
     commerceCapabilityIndex: 74,
     reputationIndex: 80,
+    adMarket: { countryId: 'US', absoluteWeek: 728, advertiserDemandBudget: 100_000,
+        marketReferenceCpm: 18 },
 });
 
 assert.ok(commercial.advertisingRevenue > 0, 'advertising must earn from delivered ad viewing');

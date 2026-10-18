@@ -13,7 +13,7 @@ import { normalizeWorldPopulationState } from './worldPopulation';
 import { normalizeWorldAudienceEconomyState } from './worldAudienceCohorts';
 import { normalizeWorldAudienceParticipationState } from './worldAudienceParticipation';
 import { allocateWorldStreamingCohort } from './worldStreamingCompetition';
-import { getWorldStreamingOffers, getWorldStreamingOfferExposure } from './worldStreamingOffers';
+import { getWorldStreamingOffers, getWorldStreamingOfferExposure, getWorldStreamingStoreStrength } from './worldStreamingOffers';
 
 const clamp = (value: number, low: number, high: number): number => Math.min(high, Math.max(low, Number.isFinite(value) ? value : low));
 const integer = (value: number): number => Math.max(0, Math.round(Number.isFinite(value) ? value : 0));
@@ -45,6 +45,10 @@ export interface StreamingAudienceCohortChoice {
     paidMonthlyBudget: number;
     paidMonthlySpend: number;
     allocations: WorldStreamingAudienceChoiceAllocation[];
+    /** Secondary opportunities overlap primary access; never add them to population or paid accounts. */
+    storeOpportunities: WorldStreamingAudienceChoiceAllocation[];
+    /** At most one complementary free-ad service per primary subscription household. */
+    freeAdOpportunities: WorldStreamingAudienceChoiceAllocation[];
 }
 
 /** Shared player/AI choice kernel. Nothing returned here is a sale or a viewer account. */
@@ -61,7 +65,7 @@ export const allocateStreamingAudienceChoice = (
         ...offer,
         plans: offer.plans.filter(plan => plan.monthlyPrice > 0 && plan.monthlyBillingPrice > 0 && plan.annualBillingMonthlyPrice > 0),
     })).filter(offer => offer.plans.length > 0 && offer.commercialConfiguration.streams.includes('subs'));
-    const paid = allocateWorldStreamingCohort(countryId, cohort, participation, paidOffers);
+    const paid = allocateWorldStreamingCohort(countryId, cohort, participation, paidOffers, countryOffers);
     const pathRows: Array<{ billingPath: StreamingBillingPath; reachableHouseholds: number; primarySubscriptions: number;
         monthlySpend: number; allocations: WorldStreamingAudienceChoiceAllocation[] }> = [];
     const nonpaidAllocations: WorldStreamingAudienceChoiceAllocation[] = [];
@@ -77,10 +81,11 @@ export const allocateStreamingAudienceChoice = (
             const quality = clamp((countryCatalogue * .28 + offer.localizationStrengthIndex * .16
                 + offer.reliabilityIndex * .17 + offer.reputationIndex * .16 + offer.marketingIndex * .11
                 + offer.loyaltyIndex * .12) / 100, .05, 1);
-            const free = projected.freeAdOffer ? [{ offer, kind: 'FREE_AD' as const, exposure,
+            const free = projected.freeAdOffer && countryCatalogue > 0 ? [{ offer, kind: 'FREE_AD' as const, exposure,
                 weight: quality * (1 + cohort.priceSensitivityIndex / 120)
                     * clamp(1 - projected.freeAdOffer.adMinutesPerHour / 35, .3, 1) * exposure }] : [];
             const store = projected.storeOffer && projected.storeOffer.eligibility.kind === 'PUBLIC'
+                && getWorldStreamingStoreStrength(offer,countryId)>0 && getWorldStreamingOfferExposure(offer)>0
                 && projected.storeOffer.rent <= budgetPerHome
                 ? [{ offer, kind: 'STORE' as const, exposure, weight: quality * .72
                     * clamp(1 - projected.storeOffer.rent / Math.max(1, budgetPerHome) * .45, .2, 1) * exposure }]
@@ -126,13 +131,58 @@ export const allocateStreamingAudienceChoice = (
     const subscriptionAllocations = pathRows.flatMap(row => row.allocations);
     const primarySubscriptions = pathRows.reduce((sum, row) => sum + row.primarySubscriptions, 0);
     const secondarySubscriptions = subscriptionAllocations.reduce((sum, row) => sum + row.households - row.primaryHouseholds, 0);
+    const allocations = [...subscriptionAllocations, ...nonpaidAllocations];
+    // A subscription to one service does not prevent using a public free service.
+    // Allocate one complementary attention slot, rather than a fresh household
+    // pool for every ad platform. Primary people and subscription money stay put.
+    const secondaryAds = new Map<string,number>();
+    const freeCandidates = countryOffers.flatMap(offer=>{
+        const projected=projectStreamingCommercialOffers(offer.commercialConfiguration);
+        const catalogue=offer.catalogueStrengthByCountry?.[countryId] ?? offer.catalogueStrengthIndex;
+        if(!projected.freeAdOffer || catalogue<=0) return [];
+        const fit=clamp((catalogue*.4+offer.reliabilityIndex*.2+offer.reputationIndex*.15+offer.localizationStrengthIndex*.15+offer.loyaltyIndex*.1)/100,0,1);
+        const weight=fit*(1+cohort.priceSensitivityIndex/120)*clamp(1-projected.freeAdOffer.adMinutesPerHour/35,.3,1)*getWorldStreamingOfferExposure(offer);
+        const reached=allocations.filter(row=>row.platformId===offer.platformId && row.kind!=='STORE').reduce((sum,row)=>sum+row.households,0);
+        return [{offer,weight,remaining:Math.max(0,reachable-reached)}];
+    });
+    for(const source of allocations.filter(row=>row.kind==='SUBSCRIPTION'&&row.primaryHouseholds>0)
+        .sort((a,b)=>a.platformId.localeCompare(b.platformId)||(a.planId||'').localeCompare(b.planId||''))){
+        const eligible=freeCandidates.filter(row=>row.offer.platformId!==source.platformId&&row.remaining>0);
+        const weight=eligible.reduce((sum,row)=>sum+row.weight,0);
+        const interest=clamp(.16+participation.streamingInterestIndex/155+cohort.entertainmentAppetiteIndex/420,.08,.84);
+        const total=Math.min(source.primaryHouseholds,Math.floor(source.primaryHouseholds*interest*weight/(1+weight)));
+        const counts=distribute(total,eligible.map(row=>row.weight));
+        eligible.forEach((row,index)=>{
+            const count=Math.min(counts[index],row.remaining);
+            row.remaining-=count;secondaryAds.set(row.offer.platformId,(secondaryAds.get(row.offer.platformId)||0)+count);
+        });
+    }
+    const freeAdOpportunities:WorldStreamingAudienceChoiceAllocation[]=[...secondaryAds.entries()].filter(([,n])=>n>0)
+        .sort(([a],[b])=>a.localeCompare(b)).map(([platformId,households])=>({platformId,kind:'FREE_AD',planId:null,billingPath:null,households,primaryHouseholds:0,monthlySpend:0}));
+    const storeOpportunities = countryOffers.flatMap(offer => {
+        const store = projectStreamingCommercialOffers(offer.commercialConfiguration).storeOffer;
+        const monthlyBudget = Math.min(cohort.monthlyEntertainmentBudgetPerHousehold,
+            reachable ? paid.totalBudget / reachable : 0);
+        if (!store || store.eligibility.kind !== 'PUBLIC' || getWorldStreamingStoreStrength(offer,countryId)<=0 || store.rent > monthlyBudget) return [];
+        const alreadyReached = allocations.filter(row => row.platformId === offer.platformId)
+            .reduce((sum, row) => sum + row.households, 0);
+        const catalogue = getWorldStreamingStoreStrength(offer,countryId);
+        const interest = clamp(.16 + participation.streamingInterestIndex / 155
+            + cohort.entertainmentAppetiteIndex / 420, .08, .84);
+        const households = Math.min(reachable - Math.min(reachable, alreadyReached), integer(
+            Math.max(0, reachable - alreadyReached) * interest * getWorldStreamingOfferExposure(offer)
+            * clamp(catalogue / 100, 0, 1)
+            * clamp(1 - store.rent / Math.max(1, monthlyBudget) * .45, 0, 1)));
+        return households ? [{platformId: offer.platformId, kind: 'STORE' as const,
+            planId: null, billingPath: null, households, primaryHouseholds: 0, monthlySpend: 0}] : [];
+    });
     return { reachableHouseholds: reachable, primarySubscriptions,
         monthlySubscriptions: pathRows.find(row => row.billingPath === 'MONTHLY')?.primarySubscriptions || 0,
         annualSubscriptions: pathRows.find(row => row.billingPath === 'ANNUAL')?.primarySubscriptions || 0,
         secondarySubscriptions, freeAdHouseholds, storeHouseholds, outsideHouseholds,
         paidMonthlyBudget: round2(paid.totalBudget),
         paidMonthlySpend: round2(pathRows.reduce((sum, row) => sum + row.monthlySpend, 0)),
-        allocations: [...subscriptionAllocations, ...nonpaidAllocations],
+        allocations, storeOpportunities, freeAdOpportunities,
     };
 };
 
@@ -194,6 +244,10 @@ const validCurrentState = (input: WorldStreamingAudienceChoiceState, absoluteWee
     if (input.schemaVersion !== 1 || input.lastProcessedAbsoluteWeek !== absoluteWeek
         || input.global?.settledRevenue !== 0 || !input.countries || !input.platforms
         || !Array.isArray(input.entitlements)) return false;
+    if (input.recordedTransactions && (input.recordedTransactions.absoluteWeek !== absoluteWeek
+        || !Array.isArray(input.recordedTransactions.ids)
+        || !input.recordedTransactions.ids.every(id=>typeof id==='string' && id.length>0)
+        || new Set(input.recordedTransactions.ids).size !== input.recordedTransactions.ids.length)) return false;
     const countryRows = Object.values(input.countries);
     const numericKeys = ['reachableHouseholds', 'primarySubscriptions', 'monthlySubscriptions',
         'annualSubscriptions', 'secondarySubscriptions', 'freeAdHouseholds', 'storeHouseholds',
@@ -239,6 +293,14 @@ export const createWorldStreamingAudienceChoiceState = (
             const participationCohort = participation.countries[countryId]?.cohorts.find(row => row.cohortId === cohort.id);
             if (!participationCohort) continue;
             const choice = allocateStreamingAudienceChoice(countryId, cohort, participationCohort, countryOffers);
+            choice.freeAdOpportunities.forEach(row=>{
+                const target=platforms[row.platformId] ||= platformZero(row.platformId);
+                target.secondaryFreeAdHouseholds=(target.secondaryFreeAdHouseholds||0)+row.households;
+                if(row.platformId==='PLAYER') summary.playerSecondaryFreeAdHouseholds=(summary.playerSecondaryFreeAdHouseholds||0)+row.households;
+            });
+            const secondaryStore = choice.storeOpportunities.filter(row=>row.platformId==='PLAYER')
+                .reduce((sum,row)=>sum+row.households,0);
+            summary.playerSecondaryStoreHouseholds = (summary.playerSecondaryStoreHouseholds || 0)+secondaryStore;
             for (const key of ['reachableHouseholds', 'primarySubscriptions', 'monthlySubscriptions', 'annualSubscriptions',
                 'secondarySubscriptions', 'freeAdHouseholds', 'storeHouseholds', 'outsideHouseholds',
                 'paidMonthlyBudget', 'paidMonthlySpend'] as const) summary[key] = add(summary[key], choice[key]);
@@ -278,7 +340,7 @@ export const createWorldStreamingAudienceChoiceState = (
         const storeHomes = !projected.storeOffer ? 0
             : projected.storeOffer.eligibility.kind === 'PUBLIC' ? accessHomes
                 : eligibleStoreMemberships.get(offer.platformId) || 0;
-        const adExposedHomes = summary.freeAdHouseholds + (adExposedSubscriptions.get(offer.platformId) || 0);
+        const adExposedHomes = summary.freeAdHouseholds + (summary.secondaryFreeAdHouseholds || 0) + (adExposedSubscriptions.get(offer.platformId) || 0);
         summary.passOpportunities = projected.adFreePasses.oneHourPrice || projected.adFreePasses.dayPrice
             ? Math.min(adExposedHomes, Math.round(adExposedHomes * .06)) : 0;
         summary.rentalOpportunities = storeHomes ? Math.round(storeHomes * .035) : 0;
@@ -305,6 +367,10 @@ export const createWorldStreamingAudienceChoiceState = (
             participation.lastProcessedAbsoluteWeek, participation.global.streamingReachableHouseholds),
         countries, platforms, global,
         entitlements: validEntitlements(prior?.entitlements, absoluteWeek),
+        recordedTransactions: prior?.recordedTransactions?.absoluteWeek === absoluteWeek
+            && Array.isArray(prior.recordedTransactions.ids)
+            ? { absoluteWeek, ids: [...new Set(prior.recordedTransactions.ids.filter(id=>typeof id==='string' && id.length>0))] }
+            : undefined,
         settledViewingFingerprint: prior?.settledViewingFingerprint,
     };
 };
@@ -325,7 +391,9 @@ export const recordPlayerStreamingAudienceEntitlement = (
         buyerPlanId?: string | null;
     },
 ): WorldStreamingAudienceChoiceState => {
-    if (state.entitlements.some(row => row.transactionId === transaction.transactionId)) return state;
+    if (state.entitlements.some(row => row.transactionId === transaction.transactionId)
+        || (state.recordedTransactions?.absoluteWeek === state.lastProcessedAbsoluteWeek
+            && state.recordedTransactions.ids.includes(transaction.transactionId))) return state;
     if (!transaction.transactionId || !transaction.titleId || !transaction.countryId
         || !['RENTAL', 'PURCHASE'].includes(transaction.kind)
         || !Number.isSafeInteger(transaction.households) || transaction.households <= 0
@@ -338,13 +406,15 @@ export const recordPlayerStreamingAudienceEntitlement = (
     const storeOffer = projectStreamingCommercialOffers(
         player.ownedStreamingPlatform.serviceConfiguration.pricing).storeOffer;
     const country = state.countries[transaction.countryId];
-    const accessible = (country?.playerSubscriptions || 0) + (country?.playerFreeAdHouseholds || 0)
-        + (country?.playerStoreHouseholds || 0);
+    const customers = player.world.worldStreamingCustomers;
+    const customer = customers?.lastProcessedAbsoluteWeek === transaction.purchasedAtAbsoluteWeek
+        ? customers.countries[transaction.countryId]?.platformSummaries.find(row => row.platformId === 'PLAYER') : undefined;
+    // Paid buyers are real saved customers, which can differ from this week's
+    // desired choice during churn or a legacy migration. Viewing uses the same cells.
+    const accessible = Math.min(country?.reachableHouseholds || 0,
+        (customer?.endingPaidAccounts ?? country?.playerSubscriptions ?? 0) + (country?.playerFreeAdHouseholds || 0)
+        + (country?.playerStoreHouseholds || 0) + (country?.playerSecondaryStoreHouseholds || 0));
     if (storeOffer?.eligibility.kind === 'MEMBERSHIP_PLANS') {
-        const customers = player.world.worldStreamingCustomers;
-        const customer = customers?.lastProcessedAbsoluteWeek === transaction.purchasedAtAbsoluteWeek
-            ? customers.countries[transaction.countryId]
-                ?.platformSummaries.find(row => row.platformId === 'PLAYER') : undefined;
         const activePlanAccounts = customer?.planAllocations.find(row => row.planId === transaction.buyerPlanId)?.paidAccounts || 0;
         if (!evaluateStreamingStoreBuyer(storeOffer, { planId: transaction.buyerPlanId || null,
             membershipActive: activePlanAccounts > 0 }).allowed || transaction.households > activePlanAccounts) {
@@ -352,12 +422,18 @@ export const recordPlayerStreamingAudienceEntitlement = (
         }
     }
     if (transaction.households > accessible) throw new Error('Streaming transaction exceeds reachable households');
+    const activeOwners = state.entitlements.filter(row => row.countryId === transaction.countryId
+        && row.titleId === transaction.titleId && (row.kind === 'PURCHASE'
+            || Number(row.expiresAtAbsoluteWeek) > transaction.purchasedAtAbsoluteWeek))
+        .reduce((sum,row)=>sum+row.households,0);
+    if (activeOwners + transaction.households > accessible)
+        throw new Error('Streaming transaction exceeds remaining reachable households');
     const existingIndex = state.entitlements.findIndex(row => row.kind === transaction.kind
         && row.countryId === transaction.countryId && row.titleId === transaction.titleId
         && (transaction.kind === 'PURCHASE' || row.purchasedAtAbsoluteWeek === transaction.purchasedAtAbsoluteWeek));
-    if (existingIndex >= 0 && state.entitlements[existingIndex].households + transaction.households > accessible) {
-        throw new Error('Streaming transaction exceeds remaining reachable households');
-    }
+    const recordedTransactions = { absoluteWeek: state.lastProcessedAbsoluteWeek,
+        ids: [...(state.recordedTransactions?.absoluteWeek === state.lastProcessedAbsoluteWeek
+            ? state.recordedTransactions.ids : []), transaction.transactionId] };
     const windowWeeks = normalizeStreamingPricingConfiguration(
         player.ownedStreamingPlatform.serviceConfiguration.pricing,
     ).rentals.windowWeeks;
@@ -367,11 +443,11 @@ export const recordPlayerStreamingAudienceEntitlement = (
         expiresAtAbsoluteWeek: transaction.kind === 'RENTAL'
             ? transaction.purchasedAtAbsoluteWeek + windowWeeks : null,
     };
-    if (existingIndex < 0) return { ...state, entitlements: [...state.entitlements, entitlement] };
+    if (existingIndex < 0) return { ...state, recordedTransactions, entitlements: [...state.entitlements, entitlement] };
     const entitlements = [...state.entitlements];
     entitlements[existingIndex] = { ...entitlements[existingIndex],
         households: entitlements[existingIndex].households + entitlement.households };
-    return { ...state, entitlements };
+    return { ...state, recordedTransactions, entitlements };
 };
 
 /** Commit only WE6 transactions that already reconciled to a licensed title-country revenue row. */

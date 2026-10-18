@@ -150,6 +150,7 @@ playerFixture.businesses = [{
     studioState: { platformRelations: {} },
 } as any];
 const registeredContract = registerProductionStreamingRightsContract(playerFixture, {
+    backendBasis:'ADJUSTED_GROSS_RECEIPTS',
     sourceProjectId: 'picture-a',
     title: 'Picture A',
     projectType: 'MOVIE',

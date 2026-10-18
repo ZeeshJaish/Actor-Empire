@@ -32,7 +32,7 @@ export function TitleSheet({ title, onClose, onOpenTitle }: Props) {
       <div className="sf-sheet-hero">
         <StreamingTitleArt id={title.posterSeed ?? title.id} title={title.name} genre={title.format} poster={title.poster} size={58} />
         <div>
-          <p className="sf-eyebrow">Lifetime profit</p>
+          <p className="sf-eyebrow">Period contribution</p>
           <p className={`sf-sheet-figure ${totals.net >= 0 ? 'sf-tone-good' : 'sf-tone-bad'}`}>{money(totals.net, { sign: true })}</p>
           <p className="sf-sheet-tags">
             <Tag tone={status.tone}>{status.label}</Tag>
@@ -44,14 +44,18 @@ export function TitleSheet({ title, onClose, onOpenTitle }: Props) {
       <p className="sf-eyebrow sf-block-head">Earned</p>
       <Row label="Subscription value" value={money(title.subscriptionValue)} tone="good" />
       <Row label="Advertising revenue" value={money(title.advertising)} tone="good" />
+      {!!title.otherViewerRevenue && <Row label="Viewer purchases & other" value={money(title.otherViewerRevenue)} tone="good" />}
       <Row label="Licensing revenue" value={money(title.licensing)} tone="good" />
       <Row label="Gross" value={money(totals.gross)} muted />
 
-      <p className="sf-eyebrow sf-block-head">Spent</p>
+      <p className="sf-eyebrow sf-block-head">Costs recognized</p>
       <Row label="Production cost" value={money(-title.productionCost)} tone="bad" />
       <Row label="Marketing cost" value={money(-title.marketingCost)} tone="bad" />
       <Row label="Infrastructure allocation" value={money(-title.infrastructureCost)} tone="bad" />
+      {!!title.operatingCost && <Row label="Allocated operating costs" value={money(-title.operatingCost)} tone="bad" />}
+      {!!title.contentAmortization && <Row label="Content amortization" value={money(-title.contentAmortization)} tone="bad" />}
       <Row label="Total cost" value={money(totals.cost)} muted />
+      <p className="sf-flow-note">Subscription value and shared costs are allocated estimates. This contribution does not measure the extra profit caused by this title.</p>
 
       <div className="sf-sheet-total">
         <span>Margin</span>

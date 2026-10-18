@@ -1,3 +1,4 @@
+import {getStreamingBuyerBackendCapability,streamingBackendPercentForBuyer} from '../services/streamingBackendPolicy';
 import type { Player } from '../types';
 import { getAbsoluteWeek } from '../services/legacyLogic';
 import { getHistoricalCatalogueTitles } from '../services/historicalCatalogue';
@@ -44,11 +45,13 @@ const appetiteFor = (id: string, marketHeat?: string, priorities?: Record<string
 const termsFor = (raw: any, countryCount: number): Terms => {
   const holderShare = Math.max(0, Math.min(100, 100 - Number(raw.platformRevenueShare ?? 70)));
   return {
+    royaltyPurpose: raw.royaltyPurpose || raw.inheritedContract?.royaltyPurpose,
     shape: holderShare > 0 ? 'GUARANTEE AND BACKEND' : 'PURE GUARANTEE',
     mg: Math.max(0, Number(raw.minimumGuarantee || 0)),
     recoupable: raw.guaranteeRecoupment === 'RECOUPABLE' || raw.inheritedContract?.guaranteeRecoupment === 'RECOUPABLE',
+    backendAllowed: raw.backendAllowed,
     backendPct: holderShare,
-    basis: 'Adjusted gross',
+    basis: (raw.inheritedContract?.backendBasis || raw.backendBasis) === 'ADJUSTED_GROSS_RECEIPTS' || raw.inheritedContract && !raw.inheritedContract.backendBasis ? 'Adjusted gross' : 'Ads + rental receipts',
     backendCap: raw.backendCap ?? raw.inheritedContract?.backendCap ?? undefined,
     termWeeks: Math.max(1, Number(raw.durationWeeks || 104)),
     window: raw.windowType === 'FIRST_WINDOW' ? 'FIRST' : raw.windowType === 'PERMANENT' ? 'PERPETUAL' : 'SECOND',
@@ -165,7 +168,7 @@ export const buildExactContentMarketLots = (player: Player, sources: ContentMark
         listing.rivalPlatformName ? `${listing.rivalPlatformName} has shown interest` : 'No public rival bid yet',
       ],
       terr: territoryMap(player, listing.countryIds, [], listing.unavailableReason),
-      listed: termsFor({ ...listing.terms, inheritedContract: listing.inheritedContract }, listing.countryIds.length),
+      listed: termsFor({ ...listing.terms, backendAllowed: !listing.inheritedContract && getStreamingBuyerBackendCapability(player,null,absoluteWeek,listing.countryIds,listing.terms.accessGrant).eligibleRevenueFraction>0, inheritedContract: listing.inheritedContract }, listing.countryIds.length),
       mode: 'LISTED',
       avail: listing.unavailableReason ? 'WATCH' : 'OPEN',
       chain: listing.sourceLicenseId ? [listing.originalOwnerName, listing.sellerName] : undefined,
@@ -186,7 +189,7 @@ export const buildExactContentMarketLots = (player: Player, sources: ContentMark
     heatWhy: [offer.premium ? 'Premium discovery' : 'New market discovery',
       `Forecast quality ${offer.qualityForecast}/100`, 'Unsold offer expires at the cycle boundary'],
     terr: territoryMap(player, []),
-    listed: termsFor({ minimumGuarantee: offer.askingPrice, platformRevenueShare: 70,
+    listed: termsFor({ minimumGuarantee: offer.askingPrice, platformRevenueShare: 100-streamingBackendPercentForBuyer(player,null,absoluteWeek,10),
       durationWeeks: 104, windowType: 'FIRST_WINDOW', exclusivity: 'NON_EXCLUSIVE' }, 0),
     mode: 'LISTED', avail: 'OPEN',
     note: 'Fixed listed terms. Private negotiation is unavailable for this complete package.',

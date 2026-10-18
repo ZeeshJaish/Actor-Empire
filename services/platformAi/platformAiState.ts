@@ -1,3 +1,4 @@
+import {normalizeStreamingContractRoyaltyStatements} from '../streamingContractSettlement';
 import {
     INITIAL_PLAYER,
     PLATFORM_AI_RUNTIME_SCHEMA_VERSION,
@@ -958,6 +959,7 @@ const normalizeFinanceHistory = (value: unknown, fallbackDebtMillions: number): 
             marketOperatingCostMillions: finiteNonNegative(raw.marketOperatingCostMillions),
             marketPolicyCostMillions: finiteNonNegative(raw.marketPolicyCostMillions),
             partnerRevenueShareCostMillions: finiteNonNegative(raw.partnerRevenueShareCostMillions),
+            contractRoyaltyStatements:normalizeStreamingContractRoyaltyStatements(raw.contractRoyaltyStatements),
             administrationCostMillions: finiteNonNegative(raw.administrationCostMillions),
             recurringEfficiency: {
                 controller: raw.recurringEfficiency?.controller === 'PLAYER' ? 'PLAYER' as const : 'AI' as const,
@@ -968,6 +970,9 @@ const normalizeFinanceHistory = (value: unknown, fallbackDebtMillions: number): 
                 savingMillions: finiteNonNegative(raw.recurringEfficiency?.savingMillions),
             },
             platformTradeRoyaltyAllocations,
+            ...(Array.isArray(raw.storeRoyaltyAccruals) ? {storeRoyaltyAccruals: raw.storeRoyaltyAccruals.flatMap(item =>
+                isRecord(item) && String(item.contractId || '').trim() ? [{contractId: String(item.contractId).trim(),
+                    accrued: Math.round(finiteNonNegative(item.accrued)), paid: Math.round(finiteNonNegative(item.paid))}] : [])} : {}),
             contentCostMillions: finiteNonNegative(raw.contentCostMillions),
             researchCostMillions: finiteNonNegative(raw.researchCostMillions),
             technologyCostMillions: finiteNonNegative(raw.technologyCostMillions),
@@ -2699,6 +2704,11 @@ export const normalizePlatformAiState = (
                 observedProductionIds: [],
             },
         financeHistory: normalizeFinanceHistory(existing?.financeHistory, debtMillions),
+        ...(isRecord(existing?.royaltyAccruals) ? {royaltyAccruals:Object.fromEntries(Object.entries(existing.royaltyAccruals)
+            .flatMap(([id,row])=>isRecord(row)?[[id,{accrued:Math.round(finiteNonNegative(row.accrued)),
+                paid:Math.round(finiteNonNegative(row.paid)),lastReceiptAbsoluteWeek:Math.round(finiteNonNegative(row.lastReceiptAbsoluteWeek))}]]:[]))} : {}),
+        ...(isRecord(existing?.royaltySellerPaidThrough) ? {royaltySellerPaidThrough:Object.fromEntries(Object.entries(existing.royaltySellerPaidThrough)
+            .map(([id,week])=>[id,Math.round(finiteNonNegative(week))]))} : {}),
         decisionHistory: normalizeDecisionHistory(existing?.decisionHistory),
         launchMarketingHistory: normalizePlatformAiLaunchMarketingHistory(existing?.launchMarketingHistory),
         distressEpisodes: normalizePlatformAiDistressEpisodes(

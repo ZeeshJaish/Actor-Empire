@@ -1,3 +1,4 @@
+import { consumeTalentUses } from '../../../services/talentRoster';
 import type {
     BackgroundCastingPlan,
     Business,
@@ -621,19 +622,10 @@ export const buildGreenlightProject = ({
         // Consume deals only from the studio making this project. The global
         // roster remains an HQ compatibility mirror and is never touched by a
         // subsidiary production.
-        const updateRoster = (roster: any[]) => {
-            return roster?.map(contract => {
-                if (usedActorIds.includes(contract.npcId) && contract.moviesRemaining > 0) {
-                    return { ...contract, moviesRemaining: contract.moviesRemaining - 1 };
-                }
-                return contract;
-            }).filter(c => c.moviesRemaining > 0) || [];
-        };
-
+        const updatedStudioTalentRoster = consumeTalentUses(studioTalentRoster, usedActorIds, newCommitmentId);
         const updatedPlayerTalentRoster = isPrimaryStudio
-            ? updateRoster(player.studio?.talentRoster || [])
+            ? updatedStudioTalentRoster
             : (player.studio?.talentRoster || []);
-        const updatedStudioTalentRoster = updateRoster(studioTalentRoster);
 
     return {
         directorData,

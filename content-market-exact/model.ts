@@ -3,7 +3,7 @@ import type { CustomPoster } from '../types';
 export type RightsWindowKind = 'FIRST' | 'SECOND' | 'PERPETUAL';
 export type Exclusivity = 'EXCLUSIVE' | 'SHARED';
 export type SellerAppetite = 'CASH' | 'BACKEND' | 'MARKETING' | 'RELATIONSHIP';
-export type Basis = 'Adjusted gross' | 'Net receipts' | 'Gross receipts';
+export type Basis = 'Ads + rental receipts' | 'Adjusted gross' | 'Net receipts' | 'Gross receipts';
 export type Localization = 'Dubs + subtitles' | 'Subtitles only' | 'Original only';
 export type Renewal = 'First option' | 'Automatic' | 'None';
 export type Availability = 'LIVE' | 'CLOSING' | 'OPEN' | 'OPENS' | 'PRESALE' | 'WATCH';
@@ -23,9 +23,11 @@ export interface Territory {
 }
 
 export interface Terms {
+  royaltyPurpose?: 'PRODUCER_PARTICIPATION';
   shape: 'GUARANTEE AND BACKEND' | 'PURE GUARANTEE' | 'BACKEND HEAVY';
   mg: number;
   recoupable: boolean;
+  backendAllowed?: boolean;
   backendPct: number;
   basis: Basis;
   backendCap?: number;
@@ -101,6 +103,7 @@ export interface Lot {
 export interface Offer {
   mg: number;
   recoupable: boolean;
+  backendAllowed?: boolean;
   backendPct: number;
   basis: Basis;
   backendCap?: number;
@@ -124,6 +127,7 @@ export const reachOf = (terr: Territory[]) => {
 };
 
 export const BASIS_WORTH: Record<Basis, number> = {
+  'Ads + rental receipts': .25,
   'Gross receipts': 1.35,
   'Adjusted gross': 1,
   'Net receipts': 0.45,
@@ -138,6 +142,7 @@ export const WEIGHTS: Record<SellerAppetite, { cash: number; back: number; mkt: 
 export const offerFrom = (terms: Terms): Offer => ({
   mg: terms.mg,
   recoupable: terms.recoupable,
+  backendAllowed: terms.backendAllowed,
   backendPct: terms.backendPct,
   basis: terms.basis,
   backendCap: terms.backendCap,

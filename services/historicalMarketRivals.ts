@@ -1,3 +1,4 @@
+import {getStreamingBuyerBackendCapability, streamingBackendPercentForBuyer, validateNewStreamingBackendTerms} from './streamingBackendPolicy';
 import type { Player, StreamingRightsContractRegistry } from '../types';
 import { createDeterministicId, hashDeterministicSeed } from './deterministicRandom';
 import { getAbsoluteWeek } from './legacyLogic';
@@ -59,11 +60,12 @@ const registerRivalClaim = (
     if (!compatible.available) return null;
     const id = createDeterministicId('historical_rival_right', player.id, phase, absoluteWeek, title.id, platformId);
     const license = createStreamingLicenseContract({
+        backendBasis: phase === 'opening' ? 'ADJUSTED_GROSS_RECEIPTS' : 'ADS_RENTAL_RECEIPTS',
         id, sourceProject: { id: title.id, title: title.title, mediaType: title.projectType, genre: title.genre },
         buyerPlatformId: platformId, platformContentPlanId: null, cataloguePackageId: null,
         contentSource: 'LICENSED_RELEASED_TITLE', licensorName: title.studioName,
         territory: 'GLOBAL', countryIds: [], durationWeeks: 104, exclusivity: 'EXCLUSIVE',
-        minimumGuarantee: guarantee, platformRevenueShare: 70,
+        minimumGuarantee: guarantee, platformRevenueShare: phase === 'opening' ? 70 : 100-streamingBackendPercentForBuyer(player,platformId,absoluteWeek,10),
         signedAtAbsoluteWeek: absoluteWeek, startsAtAbsoluteWeek: absoluteWeek,
         origin: 'STUDIO_MARKET', sellerType: 'STUDIO', sellerPlatformId: null,
         windowType: 'FIRST_WINDOW', accessGrant: { schemaVersion: 1,

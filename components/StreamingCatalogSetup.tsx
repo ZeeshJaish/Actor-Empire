@@ -123,7 +123,7 @@ export default function StreamingCatalogSetup({ player, onUpdatePlayer, onClose,
     updateDraft({
       opportunityProjectId: projectId,
       minimumGuarantee: nextQuote.suggestedGuarantee,
-      platformRevenueShare: nextQuote.targetPlatformRevenueShare + 3,
+      platformRevenueShare: 100,
     });
   };
 
@@ -139,7 +139,7 @@ export default function StreamingCatalogSetup({ player, onUpdatePlayer, onClose,
     updateDraft({
       ...patch,
       minimumGuarantee: nextQuote.suggestedGuarantee,
-      platformRevenueShare: nextQuote.targetPlatformRevenueShare + 3,
+      platformRevenueShare: 100,
     });
   };
 
@@ -461,8 +461,8 @@ export default function StreamingCatalogSetup({ player, onUpdatePlayer, onClose,
                   <div><span>$</span><input type="number" inputMode="numeric" step={250000} value={draft.minimumGuarantee} onChange={event => updateDraft({ minimumGuarantee: Math.max(0, Number(event.target.value) || 0) })} /></div>
                 </label>
                 <label>
-                  EMPIRE+ revenue share
-                  <div><input type="range" min={50} max={90} step={1} value={draft.platformRevenueShare} onChange={event => updateDraft({ platformRevenueShare: Number(event.target.value) })} /><strong>{draft.platformRevenueShare}%</strong></div>
+                  Seller backend · actual ads + rentals
+                  <div><input type="range" min={0} max={20} step={1} value={100 - draft.platformRevenueShare} onChange={event => updateDraft({ platformRevenueShare: 100 - Number(event.target.value) })} /><strong>{100 - draft.platformRevenueShare}%</strong></div>
                 </label>
                 <div className="catalog-offer-split">
                   <span><small>Platform</small><strong>{draft.platformRevenueShare}%</strong></span>
@@ -501,7 +501,7 @@ export default function StreamingCatalogSetup({ player, onUpdatePlayer, onClose,
                 <div><dt>Window</dt><dd>{draft.exclusivity === 'EXCLUSIVE' ? 'Exclusive' : 'Non-exclusive'}</dd></div>
                 <div><dt>Guarantee</dt><dd>{formatMoney(draft.minimumGuarantee)}</dd></div>
                 <div><dt>Platform share</dt><dd>{draft.platformRevenueShare}%</dd></div>
-                <div><dt>Licensor share</dt><dd>{100 - draft.platformRevenueShare}%</dd></div>
+                <div><dt>Seller backend (ads + rentals)</dt><dd>{100 - draft.platformRevenueShare}%</dd></div>
               </dl>
               <footer>
                 <BadgeCheck size={18} />

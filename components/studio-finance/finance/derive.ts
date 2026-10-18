@@ -20,7 +20,7 @@ export const PERIODS: Array<{ key: PeriodKey; label: string; weeks: number }> = 
   { key: '4W', label: '4 Weeks', weeks: 4 },
   { key: 'QUARTER', label: 'Quarter', weeks: 13 },
   { key: 'YEAR', label: 'Year', weeks: 52 },
-  { key: 'ALL', label: 'All Time', weeks: Number.POSITIVE_INFINITY },
+  { key: 'ALL', label: 'Recorded', weeks: Number.POSITIVE_INFINITY },
 ];
 
 export function periodWeeks(period: PeriodKey): number {
@@ -36,7 +36,7 @@ export function periodPhrase(period: PeriodKey): string {
   if (period === '4W') return 'in four weeks';
   if (period === 'QUARTER') return 'this quarter';
   if (period === 'YEAR') return 'this year';
-  return 'all time';
+  return 'over recorded weeks';
 }
 
 /** The tail of the weekly series that belongs to the selected period. */
@@ -50,6 +50,9 @@ export interface PeriodSummary {
   revenue: number;
   expense: number;
   net: number;
+  accountingProfit: number | null;
+  contentAmortization: number;
+  incurredOperatingCost: number;
   opening: number;
   closing: number;
   /** Money that moved for reasons other than trading — injections, raises,
@@ -63,7 +66,7 @@ export interface PeriodSummary {
 export function summarize(weeks: WeekPoint[], fallbackCash: number): PeriodSummary {
   if (weeks.length === 0) {
     return {
-      revenue: 0, expense: 0, net: 0, capital: 0,
+      revenue: 0, expense: 0, net: 0, capital: 0, accountingProfit: 0, contentAmortization: 0, incurredOperatingCost: 0,
       opening: fallbackCash, closing: fallbackCash,
       firstWeek: 0, lastWeek: 0, weeks,
     };
@@ -73,11 +76,15 @@ export function summarize(weeks: WeekPoint[], fallbackCash: number): PeriodSumma
   const closing = weeks[weeks.length - 1].closingCash;
   // Opening is the balance before the first week in view actually settled.
   const first = weeks[0];
-  const opening = first.closingCash - (first.revenue - first.expense);
+  const opening = first.openingCash ?? first.closingCash - (first.revenue - first.expense);
   return {
     revenue,
     expense,
     net: closing - opening,
+    accountingProfit: weeks.every(w => typeof w.accountingProfit === 'number')
+      ? weeks.reduce((total, w) => total + (w.accountingProfit as number), 0) : null,
+    contentAmortization: weeks.reduce((total, w) => total + (w.contentAmortization || 0), 0),
+    incurredOperatingCost: weeks.reduce((total, w) => total + (w.incurredOperatingCost ?? w.expense), 0),
     capital: closing - opening - (revenue - expense),
     opening,
     closing,
@@ -103,11 +110,11 @@ export interface FinanceHealth {
 
 export function health(data: StudioFinanceData, summary: PeriodSummary): FinanceHealth {
   const span = Math.max(1, summary.weeks.length);
-  const burn = summary.expense / span;
+  const burn = summary.incurredOperatingCost / span;
   const income = summary.revenue / span;
   const netWeekly = income - burn;
   const margin = summary.revenue > 0
-    ? ((summary.revenue - summary.expense) / summary.revenue) * 100
+    ? ((summary.accountingProfit ?? (summary.revenue - summary.incurredOperatingCost)) / summary.revenue) * 100
     : summary.expense > 0 ? -100 : 0;
   const runway = netWeekly >= 0
     ? Number.POSITIVE_INFINITY
@@ -165,8 +172,9 @@ export interface TitleTotals {
 }
 
 export function titleTotals(title: TitleFinance): TitleTotals {
-  const gross = title.subscriptionValue + title.advertising + title.licensing;
-  const cost = title.productionCost + title.marketingCost + title.infrastructureCost;
+  const gross = title.subscriptionValue + title.advertising + title.licensing + (title.otherViewerRevenue || 0);
+  const cost = title.productionCost + title.marketingCost + title.infrastructureCost
+    + (title.operatingCost || 0) + (title.contentAmortization || 0);
   const net = gross - cost;
   const margin = gross > 0 ? (net / gross) * 100 : -100;
   return { gross, cost, net, margin, status: title.status ?? classifyTitle(net, margin, title.trend) };

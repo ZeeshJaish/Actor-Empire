@@ -29,6 +29,11 @@ export interface WeekPoint {
   expense: number;
   /** Company cash at the end of this week. */
   closingCash: number;
+  /** Separate from cash paid; null marks an older, unverified accounting week. */
+  accountingProfit?: number | null;
+  contentAmortization?: number;
+  openingCash?: number;
+  incurredOperatingCost?: number;
 }
 
 export type EventKind = 'launch' | 'build' | 'capital' | 'record' | 'risk';
@@ -97,10 +102,13 @@ export interface TitleFinance {
   poster?: import('../../../types').CustomPoster;
   subscriptionValue: number;
   advertising: number;
+  otherViewerRevenue?: number;
   licensing: number;
   productionCost: number;
   marketingCost: number;
   infrastructureCost: number;
+  operatingCost?: number;
+  contentAmortization?: number;
   /** Percent change in contribution vs the previous period, e.g. -12.4. */
   trend: number;
   /** Host override. Omit and derive.ts classifies it from margin + trend. */

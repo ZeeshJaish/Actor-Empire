@@ -160,8 +160,8 @@ const buildCycleReview = (
     const averagePlaybackSuccessRate = roundPercent(average(operations.map(item => item.playbackSuccessRate)));
     const peakCapacityUtilizationPercent = roundPercent(Math.max(0, ...operations.map(item => item.capacityUtilizationPercent)));
     const totalSubscriptionRevenue = Math.round(sum(operations.map(item => item.subscriptionRevenue)));
-    const totalCashContribution = Math.round(sum(operations.map(item => item.netCashContribution)));
-    const totalAccountingContribution = Math.round(sum(operations.map(item => item.accountingContribution)));
+    const totalCashContribution = Math.round(sum(operations.map(item => item.netCashContribution - (item.additionalOperatingExpense || 0))));
+    const totalAccountingContribution = Math.round(sum(operations.map(item => item.accountingContribution - (item.additionalOperatingExpense || 0))));
     const strategicIdentity = getStrategicIdentity(window, totalCashContribution, averagePlaybackSuccessRate);
     const technicalVerdict = getTechnicalVerdict(averagePlaybackSuccessRate, peakCapacityUtilizationPercent);
     const performanceTier = getPerformanceTier(

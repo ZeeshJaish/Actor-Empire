@@ -979,7 +979,7 @@ export const getAvailableTalent = (currentWeek: number, occupation: 'ACTOR' | 'D
     const rotationSeed = Math.floor(currentWeek / 3);
     
     // 2. Filter DB by occupation
-    const allTalent = [...NPC_DATABASE, ...extraNPCs].filter(npc => (
+    const allTalent = [...new Map([...NPC_DATABASE, ...extraNPCs].map(npc => [npc.id, npc])).values()].filter(npc => (
         occupation === 'ACTOR' ? isCastableActor(npc) : npc.occupation === occupation
     ));
     

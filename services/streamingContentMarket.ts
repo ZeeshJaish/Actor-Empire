@@ -1,3 +1,4 @@
+import {streamingBackendPercentForBuyer} from './streamingBackendPolicy';
 import type { Player, StreamingStarterCatalogPackageId } from '../types';
 import { getAbsoluteWeek } from './legacyLogic';
 import { compactOwnedStreamingPlatformForPersistence, normalizeOwnedStreamingPlatformState } from './ownedStreamingPlatform';
@@ -30,7 +31,7 @@ export const getContentMarketListings = (player: Player) => {
     const countries = getOwnedPlatformPackageCountryIds(p);
     return getStreamingRightsOpportunities(player).filter(o => ['STUDIO_ACQUISITION', 'PLATFORM_TRADE'].includes(o.kind)).map(o => {
         const terms = { ...createDefaultStreamingRightsTerms(o), minimumGuarantee: o.quote.suggestedGuarantee,
-            platformRevenueShare: o.sourceLicenseId ? 100 - o.inheritedLicensorRevenueShare : o.quote.targetPlatformRevenueShare,
+            platformRevenueShare: o.sourceLicenseId ? 100 - o.inheritedLicensorRevenueShare : 100-streamingBackendPercentForBuyer(player,null,week,100-o.quote.targetPlatformRevenueShare,countries),
             marketingGuarantee: 0, viewershipBonusThreshold: 0, viewershipBonusAmount: 0,
             renewalOption: false, sublicensingAllowed: false, sequelRightsIncluded: false, cancellationPenalty: 0 };
         const source = o.sourceLicenseId ? player.world.streamingRightsContracts?.[o.sourceLicenseId] : null;

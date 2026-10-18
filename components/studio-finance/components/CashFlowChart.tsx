@@ -67,7 +67,7 @@ export function CashFlowChart({ weeks, events, totals }: Props) {
         <header className="sf-chart-head">
           <div className="sf-chart-stat"><p className="sf-eyebrow">Revenue</p><p className="sf-chart-value sf-tone-good">{money(0)}</p></div>
           <div className="sf-chart-stat"><p className="sf-eyebrow">Expenses</p><p className="sf-chart-value sf-tone-bad">{money(0)}</p></div>
-          <div className="sf-chart-stat"><p className="sf-eyebrow">Net result</p><p className="sf-chart-value sf-tone-good">{delta(0)}</p></div>
+          <div className="sf-chart-stat"><p className="sf-eyebrow">Operating cash</p><p className="sf-chart-value sf-tone-good">{delta(0)}</p></div>
         </header>
         <p className="sf-empty">Operating history begins after opening night.</p>
       </section>
@@ -110,7 +110,7 @@ export function CashFlowChart({ weeks, events, totals }: Props) {
               <p className="sf-chart-value sf-tone-bad">{money(totals.expense)}</p>
             </div>
             <div className="sf-chart-stat">
-              <p className="sf-eyebrow">Net result</p>
+              <p className="sf-eyebrow">Operating cash</p>
               <p className={`sf-chart-value ${totals.net >= 0 ? 'sf-tone-good' : 'sf-tone-bad'}`}>{delta(totals.net)}</p>
             </div>
           </>

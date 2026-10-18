@@ -1,3 +1,4 @@
+import {getStreamingBuyerBackendCapability, streamingBackendPercentForBuyer, validateNewStreamingBackendTerms} from './streamingBackendPolicy';
 import {
     STREAMING_RIGHTS_CALENDAR_SCHEMA_VERSION,
     type OwnedStreamingCatalogLicense,
@@ -619,6 +620,24 @@ export interface StreamingRightsRenewalControlDecision {
     delegatedReason: string | null;
 }
 
+/** A popularity score is not cash available to recover a new licence. */
+export const evaluateOwnedStreamingRenewalReturn=(player:Player,contract:StreamingRightsContract,economics:StreamingRightsRenewalEconomics)=>{
+    const weeks=player.ownedStreamingPlatform.weeklyHistory.filter(snapshot=>snapshot.absoluteWeek>=contract.startsAtAbsoluteWeek
+        && snapshot.absoluteWeek<contract.expiresAtAbsoluteWeek).slice(-13);
+    const contributions=weeks.flatMap(snapshot=>{
+        const titles=snapshot.operations?.titlePerformance || [];
+        const row=titles.find(title=>title.projectId===contract.sourceProjectId);
+        if(!row || !Number.isFinite(row.cashContribution)) return [];
+        const totalWeight=titles.reduce((sum,title)=>sum+Math.max(0,title.allocatedCashCost||0),0);
+        const maintenanceShare=totalWeight>0?Math.max(0,row.allocatedCashCost||0)/totalWeight:1/Math.max(1,titles.length);
+        return [row.cashContribution-(snapshot.operations?.additionalOperatingExpense||0)*maintenanceShare];
+    });
+    const mean=contributions.reduce((sum,n)=>sum+n,0)/Math.max(1,contributions.length);
+    // Existing titles age; a current run-rate is an estimate, never guaranteed income.
+    const expectedContribution=Math.max(0,mean)*economics.durationWeeks*.7;
+    return {observedWeeks:contributions.length,expectedContribution,requiredRecovery:economics.minimumGuarantee*1.15,
+        coversInvestment:contributions.length>=4&&expectedContribution>=economics.minimumGuarantee*1.15};
+};
 export const classifyStreamingRightsRenewalControl = (
     player: Player,
     contract: StreamingRightsContract,
@@ -626,6 +645,8 @@ export const classifyStreamingRightsRenewalControl = (
     management = normalizeStreamingRightsManagementState(player.streamingRightsManagement),
 ): StreamingRightsRenewalControlDecision => {
     const reasons: string[] = [];
+    if(contract.buyer.type==='PLAYER_PLATFORM' && offer.proposedEconomics
+        && !evaluateOwnedStreamingRenewalReturn(player,contract,offer.proposedEconomics).coversInvestment) reasons.push('RETURN_NOT_SUPPORTED');
     if (management.controlMode === 'FULL') reasons.push('FULL_CONTROL');
     if (management.manualContractIds.includes(contract.id)) reasons.push('MANUAL_CONTROL');
     if (management.protectedProjectIds.includes(contract.sourceProjectId)) reasons.push('PROTECTED_TITLE');
@@ -1069,7 +1090,8 @@ export type StreamingRightsRenewalResolutionReason =
     | 'DECISION_WINDOW_CLOSED'
     | 'SOURCE_CONTRACT_MISSING'
     | 'RIGHTS_CONFLICT'
-    | 'BUYER_CANNOT_PAY';
+    | 'BUYER_CANNOT_PAY'
+    | 'RETURN_NOT_SUPPORTED';
 
 export interface ResolveStreamingRightsRenewalInput {
     caseId: string;
@@ -1295,6 +1317,24 @@ export const resolveStreamingRightsRenewal = (
         return { player, changed: false, reason: 'OFFER_NOT_AVAILABLE', detail: 'No renewal offer is available to accept.', replacementContractId: null };
     }
     const economics = renewalCase.proposedEconomics;
+    // Re-evaluate saved offers at settlement too: performance can deteriorate
+    // between opening a case and the manager's next-week acceptance.
+    if (input.delegated && source.buyer.type === 'PLAYER_PLATFORM'
+        && !evaluateOwnedStreamingRenewalReturn(player, source, economics).coversInvestment) {
+        return {
+            player: updateRenewalCase(player, calendar, {
+                ...renewalCase,
+                status: 'ACTION_REQUIRED',
+                protectionReasons: Array.from(new Set([...renewalCase.protectionReasons, 'RETURN_NOT_SUPPORTED'])).sort(),
+                delegatedReason: null,
+                lastProcessedAbsoluteWeek: absoluteWeek,
+            }),
+            changed: true,
+            reason: 'RETURN_NOT_SUPPORTED',
+            detail: 'Recent title cash contribution does not support recovering this renewal investment. A manual decision is required.',
+            replacementContractId: null,
+        };
+    }
     if (!canBuyerPayRenewal(player, source, economics.minimumGuarantee, absoluteWeek)) {
         return { player, changed: false, reason: 'BUYER_CANNOT_PAY', detail: 'The incumbent can no longer fund these terms.', replacementContractId: null };
     }
@@ -1337,7 +1377,7 @@ export const resolveStreamingRightsRenewal = (
         durationWeeks: economics.durationWeeks,
         exclusivity: source.exclusivity,
         minimumGuarantee: economics.minimumGuarantee,
-        platformRevenueShare: economics.platformRevenueShare,
+        platformRevenueShare: 100-streamingBackendPercentForBuyer(player,source.buyer.platformId,absoluteWeek,100-economics.platformRevenueShare,source.countryIds,source.accessGrant),
         signedAtAbsoluteWeek: absoluteWeek,
         startsAtAbsoluteWeek: renewalCase.renewalStartsAtAbsoluteWeek,
         status: 'ACTIVE',
@@ -1347,8 +1387,8 @@ export const resolveStreamingRightsRenewal = (
         windowType: source.windowType || 'FIRST_WINDOW',
         permanentPurchase: false,
         marketingGuarantee: source.marketingGuarantee,
-        viewershipBonusThreshold: source.viewershipBonusThreshold,
-        viewershipBonusAmount: source.viewershipBonusAmount,
+        viewershipBonusThreshold: 0,
+        viewershipBonusAmount: 0,
         renewalOption: source.renewalOption,
         sublicensingAllowed: source.sublicensingAllowed,
         sequelRightsIncluded: source.sequelRightsIncluded,
@@ -1367,8 +1407,8 @@ export const resolveStreamingRightsRenewal = (
         futureSeasonFunding: 0,
         localization: source.localization,
         localizationRequirements: source.localizationRequirements,
-        guaranteeRecoupment: source.guaranteeRecoupment,
-        backendCap: source.backendCap,
+        guaranteeRecoupment: 'NON_RECOUPABLE',
+        backendCap: null,
         idempotencyKey: `streaming-renewal-contract:${renewalCase.id}`,
     });
     const registration = registerStreamingRightsContract(player.world.streamingRightsContracts, replacement);

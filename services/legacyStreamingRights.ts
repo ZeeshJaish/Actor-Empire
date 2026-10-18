@@ -261,6 +261,7 @@ export const reconcileLegacyStreamingRights = (
             platformId: buyerId,
         };
         const license = createStreamingLicenseContract({
+        backendBasis: 'ADJUSTED_GROSS_RECEIPTS',
             id: contractId,
             sourceProject: { id: placement.projectId, title: placement.title,
                 mediaType: placement.projectType, genre: placement.genre },
@@ -314,6 +315,7 @@ export const reconcileLegacyStreamingRights = (
         }
         const scope = legacyScope(source);
         const license = createStreamingLicenseContract({
+        backendBasis: 'ADJUSTED_GROSS_RECEIPTS',
             id: contractId,
             sourceProject: { id: projectId, title: text(source.titleAtSigning),
                 mediaType: source.projectType === 'SERIES' ? 'SERIES' : 'MOVIE',

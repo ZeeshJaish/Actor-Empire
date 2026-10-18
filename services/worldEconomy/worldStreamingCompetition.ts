@@ -12,12 +12,13 @@ import type {
     StreamingBillingPath,
 } from '../../types';
 import { createDeterministicId } from '../deterministicRandom';
-import { getWorldStreamingOffers, getWorldStreamingOfferExposure } from './worldStreamingOffers';
+import { getWorldStreamingOffers, getWorldStreamingOfferExposure, getWorldStreamingStoreStrength } from './worldStreamingOffers';
 import { normalizeWorldAudienceEconomyState } from './worldAudienceCohorts';
 import { normalizeWorldAudienceParticipationState } from './worldAudienceParticipation';
 import { normalizeWorldPopulationState } from './worldPopulation';
 import { calculateStreamingCommercialAudienceAdjustment } from './worldStreamingCommercialEconomy';
 import { STREAMING_ANNUAL_BILLING_SHARE } from '../streamingPricingEconomy';
+import { projectStreamingCommercialOffers } from '../streamingCommercialOffers';
 
 export const WORLD_STREAMING_COMPETITION_SCHEMA_VERSION = 1 as const;
 const MAX_SNAPSHOTS = 32;
@@ -95,6 +96,7 @@ const planUtility = (
     countryId: string,
     budgetPerHousehold: number,
     billingPrice: number,
+    transactionalPrice: number,
 ): { utility: number; driver: string } => {
     const affordability = clamp(100 - billingPrice / Math.max(.5, budgetPerHousehold) * 62, -80, 95);
     const featureFit = plan.appealIndex
@@ -103,7 +105,8 @@ const planUtility = (
         + (cohort.primaryPersonaId === 'PRESTIGE_EXPLORERS' && plan.featureIds.includes('uhd') ? 13 : 0)
         + (cohort.primaryPersonaId === 'VALUE_SEEKERS' && plan.ads ? 7 : 0)
         - (plan.ads ? (100 - cohort.priceSensitivityIndex) * .09 : 0);
-    const countryCatalogue = offer.catalogueStrengthByCountry?.[countryId] ?? offer.catalogueStrengthIndex;
+    const countryCatalogue = offer.subscriptionCatalogueStrengthByCountry?.[countryId]
+        ?? offer.catalogueStrengthByCountry?.[countryId] ?? offer.catalogueStrengthIndex;
     const catalogueFit = countryCatalogue
         + (cohort.primaryPersonaId === 'FANDOM_LOYALISTS' ? countryCatalogue * .16 : 0);
     const localizationFit = offer.localizationStrengthIndex
@@ -114,6 +117,13 @@ const planUtility = (
     const commercialAccessFit = offer.commercialConfiguration
         ? calculateStreamingCommercialAudienceAdjustment(offer.commercialConfiguration)
         : 0;
+    // A monthly bundle must earn its price through expected use. Low-use
+    // households can buy a few titles instead; frequent viewers value a bundle.
+    // This changes willingness, never the household's spending power.
+    const expectedTitles = (.5 + cohort.entertainmentAppetiteIndex / 10)
+        * clamp(countryCatalogue / 100, .1, 1);
+    const usageValue = clamp(100 - billingPrice
+        / Math.max(.5, expectedTitles * transactionalPrice) * 50, -100, 90);
     const utility = round2(
         affordability * (.18 + cohort.priceSensitivityIndex / 500)
         + featureFit * .19
@@ -125,7 +135,8 @@ const planUtility = (
         + offer.loyaltyIndex * .04
         + momentum
         + participation.streamingInterestIndex * .08
-        + commercialAccessFit,
+        + commercialAccessFit
+        + (usageValue - 50) * .4,
     );
     const drivers = [
         { id: 'PRICE_FIT', value: affordability * (.18 + cohort.priceSensitivityIndex / 500) },
@@ -145,11 +156,22 @@ const allocateBillingPath = (
     billingPath: StreamingBillingPath,
     reachableHouseholds: number,
     totalBudget: number,
+    transactionalOffers: WorldStreamingPlatformOffer[],
 ): BillingPathAllocation => {
     if (!reachableHouseholds || !totalBudget || !offers.length) {
         return { billingPath, reachableHouseholds, subscribingHouseholds: 0, totalSubscriptions: 0, totalBudget, totalSpend: 0, allocations: [] };
     }
     const budgetPerHousehold = totalBudget / reachableHouseholds;
+    const publicRentalPrices = transactionalOffers.flatMap(offer => {
+        const store = projectStreamingCommercialOffers(offer.commercialConfiguration).storeOffer;
+        const weight=getWorldStreamingStoreStrength(offer,countryId)/100*getWorldStreamingOfferExposure(offer);
+        return store?.eligibility.kind === 'PUBLIC' && store.rent > 0 && weight>0
+            && store.rent <= budgetPerHousehold ? [{price:store.rent,weight}] : [];
+    });
+    // A tiny/unseen store cannot set the whole market's value benchmark.
+    const referencePrice=Math.max(.5,budgetPerHousehold/4);
+    const transactionalPrice=(referencePrice+publicRentalPrices.reduce((sum,row)=>sum+row.price*row.weight,0))
+        /(1+publicRentalPrices.reduce((sum,row)=>sum+row.weight,0));
     const candidates = offers.flatMap(offer => {
         const affordablePlans = offer.plans.filter(plan => (
             (billingPath === 'MONTHLY' ? plan.monthlyBillingPrice : plan.annualBillingMonthlyPrice) <= budgetPerHousehold + .001
@@ -157,16 +179,17 @@ const allocateBillingPath = (
         if (!affordablePlans.length) return [];
         const ranked = affordablePlans.map(plan => {
             const billingPrice = billingPath === 'MONTHLY' ? plan.monthlyBillingPrice : plan.annualBillingMonthlyPrice;
-            return { plan, billingPrice, ...planUtility(cohort, participation, offer, plan, countryId, budgetPerHousehold, billingPrice) };
+            return { plan, billingPrice, ...planUtility(cohort, participation, offer, plan, countryId, budgetPerHousehold, billingPrice, transactionalPrice) };
         })
             .sort((left, right) => right.utility - left.utility || left.plan.id.localeCompare(right.plan.id));
         const best = ranked[0];
         // An affordable plan is only an option, not an automatic customer.
         // Awareness and catalogue depth affect both its share versus rivals
         // and the choice to subscribe at all.
-        const countryCatalogue = offer.catalogueStrengthByCountry?.[countryId] ?? offer.catalogueStrengthIndex;
-        const catalogueFit = countryCatalogue <= 0 ? .0001
-            : clamp((countryCatalogue - 10) / 90, .02, 1);
+        const countryCatalogue = offer.subscriptionCatalogueStrengthByCountry?.[countryId]
+            ?? offer.catalogueStrengthByCountry?.[countryId] ?? offer.catalogueStrengthIndex;
+        if (countryCatalogue <= 0) return [];
+        const catalogueFit = clamp((countryCatalogue - 10) / 90, .02, 1);
         return [{ offer, plan: best.plan, billingPath, billingPrice: best.billingPrice, utility: best.utility,
             weight: Math.max(.0001, Math.exp(clamp((best.utility - 45) / 24, -3, 3))
                 * catalogueFit * getWorldStreamingOfferExposure(offer)), driver: best.driver }];
@@ -239,6 +262,7 @@ export const allocateWorldStreamingCohort = (
     cohort: WorldAudienceCohortState,
     participation: WorldAudienceParticipationCohortState,
     offers: WorldStreamingPlatformOffer[],
+    transactionalOffers: WorldStreamingPlatformOffer[] = offers,
 ): CohortAllocation => {
     const reachableHouseholds = participation.streamingOnlyHouseholds + participation.dualParticipantHouseholds;
     const totalBudget = Math.max(0, participation.totalMonthlyStreamingBudget);
@@ -246,8 +270,8 @@ export const allocateWorldStreamingCohort = (
     const monthlyHomes = reachableHouseholds - annualHomes;
     const monthlyBudget = reachableHouseholds > 0 ? round2(totalBudget * monthlyHomes / reachableHouseholds) : 0;
     const paths = [
-        allocateBillingPath(countryId, cohort, participation, offers, 'MONTHLY', monthlyHomes, monthlyBudget),
-        allocateBillingPath(countryId, cohort, participation, offers, 'ANNUAL', annualHomes, round2(totalBudget - monthlyBudget)),
+        allocateBillingPath(countryId, cohort, participation, offers, 'MONTHLY', monthlyHomes, monthlyBudget, transactionalOffers),
+        allocateBillingPath(countryId, cohort, participation, offers, 'ANNUAL', annualHomes, round2(totalBudget - monthlyBudget), transactionalOffers),
     ];
     return {
         reachableHouseholds,

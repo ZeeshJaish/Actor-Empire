@@ -1,3 +1,4 @@
+import {streamingBackendPercentForBuyer} from '../streamingBackendPolicy';
 import type {
     IndustryProject,
     OwnedStreamingCatalogLicense,
@@ -185,11 +186,6 @@ type CatalogueBuyerSelection = {
     windowType: StreamingRightsWindowType;
 };
 
-export interface PlatformAiPartnerRevenueShareCalculation {
-    totalCostMillions: number;
-    platformTradeAllocations: PlatformAiTradeRoyaltyAllocation[];
-}
-
 const PLATFORM_TRADE_ROYALTY_EVIDENCE_TYPE = 'PLATFORM_TRADE_ROYALTY_ALLOCATION';
 
 const platformTradeRoyaltyEvidenceId = (
@@ -243,6 +239,7 @@ export const createPlatformAiTradeRoyaltyEvidenceDecision = (
 const readPlatformAiTradeRoyaltyEvidence = (
     buyer: PlatformState,
     absoluteWeek: number,
+    world: WorldState,
 ): PlatformAiTradeRoyaltyAllocation[] => {
     const evidence = buyer.ai?.decisionHistory.find(decision => (
         decision.id === platformTradeRoyaltyEvidenceId(buyer.id, absoluteWeek)
@@ -260,6 +257,10 @@ const readPlatformAiTradeRoyaltyEvidence = (
         return [];
     }
     const contractsById = new Map((buyer.ai?.rightsContracts || []).map(contract => [contract.id, contract]));
+    Object.values(world.streamingRightsContracts || {}).forEach(contract => {
+        if (contract.buyerPlatformId === buyer.id || contract.buyer.platformId === buyer.id)
+            contractsById.set(contract.id, contract);
+    });
     const seenContractIds = new Set<string>();
     const allocations: PlatformAiTradeRoyaltyAllocation[] = [];
     for (const raw of parsed.allocations) {
@@ -284,66 +285,6 @@ const readPlatformAiTradeRoyaltyEvidence = (
     }
     const allocationTotal = roundMillions(allocations.reduce((sum, allocation) => sum + allocation.amountMillions, 0));
     return allocationTotal === roundMillions(-evidence.cashImpactMillions) ? allocations : [];
-};
-
-/** Pure shared calculation used by buyer economy and seller settlement. */
-export const calculatePlatformAiPartnerRevenueShares = (
-    platform: PlatformState,
-    weeklySubscriptionRevenueMillions: number,
-    absoluteWeek: number,
-): PlatformAiPartnerRevenueShareCalculation => {
-    const eligibleProjects = new Set((platform.ai?.slate || [])
-        .filter(plan => plan.status === 'RELEASED')
-        .flatMap(plan => plan.sourceProjectIds)
-        .filter(Boolean));
-    const seenProjects = new Set<string>();
-    const active = (platform.ai?.rightsContracts || []).filter(contract => {
-        if (
-            contract.status !== 'ACTIVE'
-            || !isStreamingLicenseActiveAt(contract, absoluteWeek)
-            || contract.origin === 'OWNED_STUDIO_TRANSFER'
-            || contract.permanentPurchase
-            || !contract.sourceProjectId
-            || !eligibleProjects.has(contract.sourceProjectId)
-            || seenProjects.has(contract.sourceProjectId)
-        ) return false;
-        seenProjects.add(contract.sourceProjectId);
-        return true;
-    });
-    if (!active.length) return { totalCostMillions: 0, platformTradeAllocations: [] };
-    const viewingWeight = Math.min(0.45, active.length / Math.max(1, eligibleProjects.size));
-    const rawAmounts = active.map(contract => (
-        Math.max(0, weeklySubscriptionRevenueMillions)
-        * Math.max(0, Math.min(100, Number(contract.licensorRevenueShare) || 0))
-        / 100
-        * viewingWeight
-        / active.length
-    ));
-    const totalCostMillions = roundMillions(rawAmounts.reduce((sum, amount) => sum + amount, 0));
-    let allocatedMillions = 0;
-    const exactAmounts = rawAmounts.map((amount, index) => {
-        const exact = index === rawAmounts.length - 1
-            ? roundMillions(totalCostMillions - allocatedMillions)
-            : roundMillions(amount);
-        allocatedMillions = roundMillions(allocatedMillions + exact);
-        return exact;
-    });
-    return {
-        totalCostMillions,
-        platformTradeAllocations: active.flatMap((contract, index) => (
-            contract.origin === 'PLATFORM_TRADE'
-            && contract.sellerType === 'PLATFORM'
-            && contract.sellerPlatformId
-            && PLATFORM_AI_PROFILES[contract.sellerPlatformId as PlatformId]
-            && exactAmounts[index] > 0
-                ? [{
-                    contractId: contract.id,
-                    sellerPlatformId: contract.sellerPlatformId,
-                    amountMillions: exactAmounts[index],
-                }]
-                : []
-        )),
-    };
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> => (
@@ -844,6 +785,7 @@ const adjustCurrentFinanceCash = (
             ...snapshot,
             verifiedContractIncomeMillions: roundMillions(snapshot.verifiedContractIncomeMillions + amountMillions),
             revenueMillions: roundMillions(snapshot.revenueMillions + amountMillions),
+            operatingNetCashFlowMillions:roundMillions(snapshot.operatingNetCashFlowMillions+amountMillions),
             netCashFlowMillions: roundMillions(snapshot.netCashFlowMillions + amountMillions),
             closingCashMillions: roundMillions(snapshot.closingCashMillions + amountMillions),
         }
@@ -865,6 +807,18 @@ const adjustCurrentFinanceCash = (
     };
 };
 
+/** Durable paid-through receipt marker outlives compacted decision/statement history. */
+export const creditPlatformStreamingRoyaltySeller=(platform:PlatformState,buyerId:string,contractId:string,
+    absoluteWeek:number,amountMillions:number):PlatformState=>{
+    if(!platform.ai || amountMillions<=0)return platform;
+    const key=JSON.stringify([buyerId,contractId]);
+    if((platform.ai.royaltySellerPaidThrough?.[key] ?? -1)>=absoluteWeek)return platform;
+    const evidenceId=createDeterministicId('platform_ai_platform_trade_share',buyerId,contractId,absoluteWeek);
+    const credited=platform.ai.decisionHistory.some(row=>row.id===evidenceId)?platform:
+        adjustCurrentFinanceCash(platform,absoluteWeek,amountMillions,'SELLER_RECEIPT');
+    return {...credited,ai:{...credited.ai!,royaltySellerPaidThrough:{...credited.ai!.royaltySellerPaidThrough,[key]:absoluteWeek}}};
+};
+
 const settlePlatformTradeRevenueShares = (
     player: Player,
     sourceWorld: WorldState,
@@ -875,7 +829,7 @@ const settlePlatformTradeRevenueShares = (
         const buyer = world.platforms?.[buyerId];
         const snapshot = buyer?.ai?.financeHistory.find(item => item.absoluteWeek === absoluteWeek);
         if (!buyer?.ai || !snapshot || resolvePlatformController(player, buyer.id) === 'PLAYER') continue;
-        const allocations = readPlatformAiTradeRoyaltyEvidence(buyer, absoluteWeek);
+        const allocations = readPlatformAiTradeRoyaltyEvidence(buyer, absoluteWeek, world);
         const allocationTotal = roundMillions(allocations.reduce((sum, allocation) => sum + allocation.amountMillions, 0));
         if (allocationTotal > snapshot.partnerRevenueShareCostMillions) continue;
         for (const allocation of allocations) {
@@ -887,13 +841,8 @@ const settlePlatformTradeRevenueShares = (
                 allocation.contractId,
                 absoluteWeek,
             );
-            if (seller.ai.decisionHistory.some(decision => decision.id === evidenceId)) continue;
-            const credited = adjustCurrentFinanceCash(
-                seller,
-                absoluteWeek,
-                allocation.amountMillions,
-                'SELLER_RECEIPT',
-            );
+            const credited = creditPlatformStreamingRoyaltySeller(seller,buyer.id,allocation.contractId,absoluteWeek,allocation.amountMillions);
+            if(credited===seller)continue;
             world = replacePlatform(world, {
                 ...credited,
                 ai: {
@@ -1249,7 +1198,7 @@ const transferPendingDeal = (
         durationWeeks: deal.durationWeeks,
         exclusivity: 'NON_EXCLUSIVE',
         minimumGuarantee: millionsToFullCurrency(deal.priceMillions),
-        platformRevenueShare: 70,
+        platformRevenueShare: 100 - streamingBackendPercentForBuyer({...player,world},buyer.id,absoluteWeek,10,deal.countryIds),
         signedAtAbsoluteWeek: absoluteWeek,
         startsAtAbsoluteWeek: deal.startsAtAbsoluteWeek,
         status: 'ACTIVE',

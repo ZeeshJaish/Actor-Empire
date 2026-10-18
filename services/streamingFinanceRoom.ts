@@ -8,6 +8,7 @@ import type {
 import { getAbsoluteWeek } from './legacyLogic';
 import { normalizeOwnedStreamingPlatformState } from './ownedStreamingPlatform';
 import { STREAMING_CELEBRITY_INVESTOR_OFFERS } from './streamingLeadershipGovernance';
+import { getStreamingAdditionalOperatingExpense } from './streamingOperatingExpenses';
 
 export type StreamingFinanceLedgerCategory =
     | 'FORMATION'
@@ -41,6 +42,10 @@ export interface StreamingFinanceCashflowPoint {
     revenue: number;
     outflow: number;
     net: number;
+    contentAmortization: number;
+    accountingContribution: number | null;
+    incurredOperatingCost: number;
+    additionalOperatingExpense: number;
 }
 
 export interface StreamingFinanceSlice {
@@ -56,7 +61,12 @@ export interface StreamingFinanceTitlePerformance {
     source: string;
     genre: string;
     revenue: number;
+    subscriptionRevenue: number;
+    advertisingRevenue: number;
+    otherViewerRevenue: number;
     cost: number;
+    operatingCost: number;
+    contentAmortization: number;
     contribution: number;
     viewingAccounts: number;
 }
@@ -88,6 +98,7 @@ export interface StreamingFinanceRoomModel {
     periodRevenue: number;
     periodOutflow: number;
     periodNet: number;
+    periodAccountingProfit: number | null;
     periodMarginPercent: number;
     revenueChangePercent: number | null;
     openingCash: number;
@@ -125,13 +136,24 @@ const aggregateTitlePerformance = (rows: OwnedStreamingTitleWeekPerformance[]): 
             source: row.source,
             genre: row.genre,
             revenue: 0,
+            subscriptionRevenue: 0,
+            advertisingRevenue: 0,
+            otherViewerRevenue: 0,
             cost: 0,
+            operatingCost: 0,
+            contentAmortization: 0,
             contribution: 0,
             viewingAccounts: 0,
         };
-        current.revenue += roundMoney(row.attributedSubscriptionRevenue);
-        current.cost += roundMoney(row.allocatedCashCost);
-        current.contribution += Math.round(Number(row.cashContribution) || 0);
+        current.revenue += roundMoney(row.attributedSubscriptionRevenue) + roundMoney(row.incrementalRevenue || 0);
+        const advertising = Math.min(roundMoney(row.advertisingRevenue || 0), roundMoney(row.incrementalRevenue || 0));
+        current.subscriptionRevenue += roundMoney(row.attributedSubscriptionRevenue);
+        current.advertisingRevenue += advertising;
+        current.otherViewerRevenue += roundMoney(row.incrementalRevenue || 0) - advertising;
+        current.operatingCost += roundMoney(row.allocatedCashCost);
+        current.contentAmortization += roundMoney(row.allocatedContentAmortization);
+        current.cost += roundMoney(row.allocatedCashCost) + roundMoney(row.allocatedContentAmortization);
+        current.contribution += Math.round(Number(row.accountingContribution) || 0);
         current.viewingAccounts += roundMoney(row.viewingAccounts);
         totals.set(row.projectId, current);
     }
@@ -142,13 +164,19 @@ const operatingSnapshots = (history: OwnedStreamingWeeklySnapshot[]): Array<Owne
     history.filter((snapshot): snapshot is OwnedStreamingWeeklySnapshot & { operations: OwnedStreamingWeeklyOperations } => Boolean(snapshot.operations))
 );
 
+const operatingRevenue = (operations: OwnedStreamingWeeklyOperations): number => (
+    roundMoney(operations.subscriptionRevenue)
+    + roundMoney(operations.productRevenue || 0)
+    + roundMoney(operations.worldViewingIncrementalRevenue || 0)
+);
+
 /**
  * Weekly processing clamps treasury at zero. This is therefore the outflow the
  * game actually allowed through the operating account, not an invented P&L
  * payable that is not represented anywhere in the save.
  */
 const actualTreasuryOutflow = (operations: OwnedStreamingWeeklyOperations): number => {
-    const revenue = roundMoney(operations.subscriptionRevenue) + roundMoney(operations.productRevenue || 0);
+    const revenue = operatingRevenue(operations);
     return Math.max(0, revenue - Math.round(Number(operations.netCashContribution) || 0));
 };
 
@@ -166,6 +194,7 @@ const readNumber = (
 
 const cashDecisionFromEvent = (
     entry: OwnedStreamingLedgerEntry,
+    player: Player,
 ): Omit<StreamingFinanceLedgerEntry, 'id' | 'absoluteWeek'> | null => {
     const expense = (
         category: StreamingFinanceLedgerCategory,
@@ -233,6 +262,18 @@ const cashDecisionFromEvent = (
         case 'STREAMING_PLATFORM_ACQUIRED': return expense('CORPORATE', 'Platform acquisition signed', ['treasuryPaid']);
         case 'SYSTEM_REPAIR': return expense('RISK', 'System repair charge', ['penalty', 'cost']);
         case 'LICENSE_SIGNED': {
+            const transactionId = String(entry.metadata?.transactionId || '');
+            const transaction = player.world.streamingRightsTransactions?.[transactionId];
+            if (transaction?.status === 'SETTLED') {
+                const buyer = entry.idempotencyKey === `rights-transfer:${transactionId}:BUYER`;
+                const seller = entry.idempotencyKey === `rights-transfer:${transactionId}:SELLER`;
+                if (buyer || seller) {
+                    const amount = roundMoney(buyer ? transaction.acceptedPrice : transaction.sellerReceipt);
+                    return { category: 'CONTENT', label: buyer ? 'Rights position acquired' : 'Rights position sold',
+                        detail: entry.summary, source: 'DECISION', cashDelta: buyer ? -amount : amount,
+                        displayAmount: amount, affectsTreasury: amount !== 0 };
+                }
+            }
             const kind = String(entry.metadata?.kind || '');
             return kind === 'SUBLICENSE_OUT'
                 ? income('CONTENT', 'Rights sublicense income', ['minimumGuarantee', 'guarantee'])
@@ -255,7 +296,7 @@ const slices = (entries: Array<{ id: string; label: string; amount: number }>): 
         .sort((a, b) => b.amount - a.amount);
 };
 
-const expenseGroups = (operations: OwnedStreamingWeeklyOperations[]): StreamingFinanceSlice[] => {
+const expenseGroups = (operations: OwnedStreamingWeeklyOperations[], additionalOperatingExpense = 0): StreamingFinanceSlice[] => {
     const scheduledTotal = sum(operations.map(operation => operation.totalCashCost));
     const actualTotal = sum(operations.map(actualTreasuryOutflow));
     const scale = scheduledTotal > 0 ? Math.min(1, actualTotal / scheduledTotal) : 0;
@@ -269,7 +310,7 @@ const expenseGroups = (operations: OwnedStreamingWeeklyOperations[]): StreamingF
         {
             id: 'network',
             label: 'Network',
-            amount: scaled(sum(operations.map(item => item.infrastructureCost))),
+            amount: scaled(sum(operations.map(item => item.infrastructureCost))) + additionalOperatingExpense,
         },
         {
             id: 'people',
@@ -350,7 +391,7 @@ const buildLedger = (
 
     for (const snapshot of snapshots) {
         const operations = snapshot.operations;
-        const revenue = roundMoney(operations.subscriptionRevenue) + roundMoney(operations.productRevenue || 0);
+        const revenue = operatingRevenue(operations);
         const outflow = actualTreasuryOutflow(operations);
         if (revenue > 0) entries.push({
             id: `${snapshot.id}:revenue`,
@@ -379,7 +420,7 @@ const buildLedger = (
     for (const event of platform.eventLedger) {
         if (capitalKeys.has(event.idempotencyKey)) continue;
         if (['FOUNDER_CAPITAL_CONTRIBUTED', 'LOAN_DRAWN', 'LOAN_REPAID', 'EQUITY_ISSUED', 'CELEBRITY_INVESTMENT_ACCEPTED', 'IPO_LISTED'].includes(event.type)) continue;
-        const decision = cashDecisionFromEvent(event);
+        const decision = cashDecisionFromEvent(event, player);
         if (!decision) continue;
         entries.push({ id: event.id, absoluteWeek: event.absoluteWeek, ...decision });
     }
@@ -417,12 +458,17 @@ export const getStreamingFinanceRoom = (player: Player, requestedPeriod: 4 | 13 
     const period = allOperations.slice(-periodLength);
     const previousPeriod = requestedPeriod === 'ALL' ? [] : allOperations.slice(-(periodLength * 2), -periodLength);
     const chartOperations = requestedPeriod === 'ALL' ? period : period.slice(-24);
-    const periodRevenue = sum(period.map(item => item.operations.subscriptionRevenue + (item.operations.productRevenue || 0)));
-    const periodOutflow = sum(period.map(item => actualTreasuryOutflow(item.operations)));
-    const periodNet = period.reduce((total, item) => total + Math.round(Number(item.operations.netCashContribution) || 0), 0);
-    const previousRevenue = sum(previousPeriod.map(item => item.operations.subscriptionRevenue + (item.operations.productRevenue || 0)));
+    const additionalCost = (item: OwnedStreamingWeeklySnapshot & { operations: OwnedStreamingWeeklyOperations }) =>
+        getStreamingAdditionalOperatingExpense(platform, item.absoluteWeek, item.operations.additionalOperatingExpense);
+    const periodAdditionalCost = sum(period.map(additionalCost));
+    const periodRevenue = sum(period.map(item => operatingRevenue(item.operations)));
+    const periodOutflow = sum(period.map(item => actualTreasuryOutflow(item.operations))) + periodAdditionalCost;
+    const periodNet = period.reduce((total, item) => total + Math.round(Number(item.operations.netCashContribution) || 0), 0) - periodAdditionalCost;
+    const periodAccountingProfit = period.every(item => item.operations.contentAccountingVersion === 1)
+        ? period.reduce((total, item) => total + item.operations.accountingContribution, 0) - periodAdditionalCost : null;
+    const previousRevenue = sum(previousPeriod.map(item => operatingRevenue(item.operations)));
     const revenueChangePercent = previousRevenue > 0 ? ((periodRevenue - previousRevenue) / previousRevenue) * 100 : null;
-    const periodMarginPercent = periodRevenue > 0 ? (periodNet / periodRevenue) * 100 : 0;
+    const periodMarginPercent = periodRevenue > 0 ? ((periodAccountingProfit ?? periodNet) / periodRevenue) * 100 : 0;
     const periodCapital = platform.finance.capitalActions
         .filter(action => action.absoluteWeek >= (period[0]?.absoluteWeek ?? Number.POSITIVE_INFINITY))
         .reduce((total, action) => total + action.treasuryDelta, 0);
@@ -473,15 +519,21 @@ export const getStreamingFinanceRoom = (player: Player, requestedPeriod: 4 | 13 
     const revenueSlices = slices([
         { id: 'subscriptions', label: 'Subscriptions', amount: sum(period.map(item => item.operations.subscriptionRevenue)) },
         { id: 'products', label: 'Products & commerce', amount: sum(period.map(item => item.operations.productRevenue || 0)) },
+        { id: 'viewing', label: 'Advertising & viewer purchases', amount: sum(period.map(item => item.operations.worldViewingIncrementalRevenue || 0)) },
     ]);
     const cashflow = chartOperations.map(snapshot => {
-        const revenue = roundMoney(snapshot.operations.subscriptionRevenue) + roundMoney(snapshot.operations.productRevenue || 0);
-        const outflow = actualTreasuryOutflow(snapshot.operations);
+        const revenue = operatingRevenue(snapshot.operations);
+        const extra = additionalCost(snapshot);
+        const outflow = actualTreasuryOutflow(snapshot.operations) + extra;
         return {
             absoluteWeek: snapshot.absoluteWeek,
             revenue,
             outflow,
-            net: Math.round(Number(snapshot.operations.netCashContribution) || 0),
+            net: Math.round(Number(snapshot.operations.netCashContribution) || 0) - extra,
+            contentAmortization: snapshot.operations.contentAmortization,
+            accountingContribution: snapshot.operations.contentAccountingVersion === 1 ? snapshot.operations.accountingContribution - extra : null,
+            incurredOperatingCost: snapshot.operations.totalCashCost + extra,
+            additionalOperatingExpense: extra,
         };
     });
     const acceptedIds = new Set(platform.governance.celebrityInvestors.map(item => item.candidateId));
@@ -528,6 +580,25 @@ export const getStreamingFinanceRoom = (player: Player, requestedPeriod: 4 | 13 
                         : 'Operating history begins after opening night.',
                 };
 
+    const titlePerformance = aggregateTitlePerformance(period.flatMap(item => item.operations.titlePerformance || []));
+    // Weekly saves keep a bounded title breakdown. Preserve the known company
+    // remainder explicitly rather than making omitted titles/costs disappear.
+    const residualRevenue = Math.max(0, periodRevenue - titlePerformance.reduce((total, title) => total + title.revenue, 0));
+    const residualOperatingCost = Math.max(0, sum(period.map(item => item.operations.totalCashCost)) + periodAdditionalCost
+        - titlePerformance.reduce((total, title) => total + title.operatingCost, 0));
+    const residualAmortization = Math.max(0, sum(period.map(item => item.operations.contentAmortization))
+        - titlePerformance.reduce((total, title) => total + title.contentAmortization, 0));
+    if (residualRevenue || residualOperatingCost || residualAmortization) {
+        const subscriptions = Math.max(0, sum(period.map(item => item.operations.subscriptionRevenue))
+            - titlePerformance.reduce((total, title) => total + title.subscriptionRevenue, 0));
+        titlePerformance.push({ projectId: 'streaming-unallocated-operations', title: 'Other titles & shared operations',
+            source: 'CONSOLIDATED', genre: 'Consolidated', revenue: residualRevenue,
+            subscriptionRevenue: Math.min(subscriptions, residualRevenue), advertisingRevenue: 0,
+            otherViewerRevenue: residualRevenue - Math.min(subscriptions, residualRevenue),
+            operatingCost: residualOperatingCost, contentAmortization: residualAmortization,
+            cost: residualOperatingCost + residualAmortization,
+            contribution: residualRevenue - residualOperatingCost - residualAmortization, viewingAccounts: 0 });
+    }
     return {
         absoluteWeek,
         companyName: platform.identity?.name || 'EMPIRE+',
@@ -541,13 +612,14 @@ export const getStreamingFinanceRoom = (player: Player, requestedPeriod: 4 | 13 
         periodRevenue,
         periodOutflow,
         periodNet,
+        periodAccountingProfit,
         periodMarginPercent,
         revenueChangePercent,
         openingCash,
         cashflow,
         revenueSlices,
-        expenseSlices: expenseGroups(period.map(item => item.operations)),
-        titlePerformance: aggregateTitlePerformance(period.flatMap(item => item.operations.titlePerformance || [])),
+        expenseSlices: expenseGroups(period.map(item => item.operations), periodAdditionalCost),
+        titlePerformance,
         ledger: buildLedger(player, allOperations),
         founderOwnershipPercent: platform.founderOwnershipPercent,
         founderCapitalContributed,

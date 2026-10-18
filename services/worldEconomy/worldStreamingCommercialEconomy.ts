@@ -14,12 +14,66 @@ export const calculateStreamingStoreConversion = (input: {
     buyerPool: number;
     price: number;
     kind: 'RENTAL' | 'PURCHASE';
+    quality?: number;
+    weeksAvailable?: number;
 }): number => {
     const pool = whole(input.buyerPool);
     const price = clamp(input.price, 0, 1_000_000);
-    const conversion = input.kind === 'RENTAL' ? .035 : .008;
+    // Engaged transactional homes can rent roughly monthly; purchase intent is
+    // rarer. Price, content value and title age bound that intent before wallets.
+    const conversion = input.kind === 'RENTAL' ? .28 : .04;
+    const quality = input.quality === undefined ? 60 : clamp(input.quality, 0, 100);
+    const age = input.weeksAvailable === undefined ? 1 : clamp(input.weeksAvailable, 1, 1_000_000);
+    const contentValue = (.15 + 1.25 * Math.pow(quality / 100, 1.5))
+        * (.55 + .45 * Math.exp(-(age - 1) / 26));
     const comfortable = input.kind === 'RENTAL' ? 12 : 30;
-    return Math.min(pool, whole(pool * conversion * Math.exp(-price / comfortable)));
+    return Math.min(pool, whole(pool * conversion * contentValue * Math.exp(-price / comfortable)));
+};
+
+/** Deterministic whole-unit allocation used by store opportunity projections. */
+export const allocateStreamingStoreUnits = (total:number,weights:number[]):number[] => {
+    const safe=weights.map(weight=>clamp(weight,0,Number.MAX_SAFE_INTEGER));
+    const sum=safe.reduce((value,weight)=>value+weight,0);
+    if(!sum) return safe.map(()=>0);
+    const exact=safe.map(weight=>whole(total)*weight/sum);
+    const counts=exact.map(Math.floor);
+    let remainder=whole(total)-counts.reduce((value,count)=>value+count,0);
+    exact.map((value,index)=>({index,fraction:value-counts[index]}))
+        .sort((a,b)=>b.fraction-a.fraction || a.index-b.index)
+        .forEach(row=>{if(remainder>0){counts[row.index]++;remainder--;}});
+    return counts;
+};
+
+/** Shared player/AI weekly wallet. Both rental and purchase consume this same
+ * balance; multiplying title count cannot multiply entertainment spending. */
+export const createStreamingStoreWallet = (households:number, remainingMonthlyBudget:number) => ({
+    remainingCents: Math.min(Number.MAX_SAFE_INTEGER, Math.floor(whole(households) * clamp(remainingMonthlyBudget,0,1_000_000) * 100 / 4.33)),
+});
+export const spendStreamingStoreWallet = (wallet: ReturnType<typeof createStreamingStoreWallet>, wanted:number, price:number):number => {
+    const cents = Math.max(0, Math.round(clamp(price,0,1_000_000)*100));
+    const units = Math.min(Number.MAX_SAFE_INTEGER, whole(wanted), cents ? Math.floor(wallet.remainingCents/cents) : whole(wanted));
+    wallet.remainingCents -= units*cents;
+    return units;
+};
+
+/** One country/cohort budget, split before any platform settles. Integer cents
+ * and deterministic shares prevent player/AI execution order creating money. */
+export const createStreamingHouseholdBudget = (input: {
+    monthlyBudget: number; monthlySubscriptionSpend: number;
+    platformWeights: Array<{platformId: string; weight: number}>;
+}) => {
+    const monthlyBudget = clamp(input.monthlyBudget, 0, Number.MAX_SAFE_INTEGER / 100);
+    const monthlySubscriptionSpend = Number.isFinite(input.monthlySubscriptionSpend) && input.monthlySubscriptionSpend>=0
+        ? clamp(input.monthlySubscriptionSpend,0,Number.MAX_SAFE_INTEGER/100) : monthlyBudget;
+    const weeklyDiscretionaryCents = Math.floor(Math.max(0, monthlyBudget - monthlySubscriptionSpend) * 100 / 4.33);
+    const weights = new Map<string,number>();
+    input.platformWeights.forEach(row => weights.set(row.platformId,
+        (weights.get(row.platformId) || 0) + clamp(row.weight,0,Number.MAX_SAFE_INTEGER)));
+    const rows = [...weights].sort(([a],[b])=>a.localeCompare(b));
+    const shares = allocateStreamingStoreUnits(weeklyDiscretionaryCents, rows.map(([,weight])=>weight));
+    const wallets = Object.fromEntries(rows.map(([id],i)=>[id,{remainingCents:shares[i]}]));
+    return {monthlyBudget,monthlySubscriptionSpend,weeklyDiscretionaryCents,wallets,
+        allocatedCents:Object.fromEntries(rows.map(([id],i)=>[id,shares[i]]))};
 };
 
 export interface StreamingCommercialStreamDefinition {

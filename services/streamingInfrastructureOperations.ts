@@ -1,3 +1,5 @@
+import { getStreamingAdditionalOperatingExpense } from './streamingOperatingExpenses';
+import { finalizeStreamingMaintenanceTax } from './streamingMarketTaxSettlement';
 import type {
     OwnedStreamingFacility,
     OwnedStreamingInfrastructureIncident,
@@ -278,21 +280,29 @@ const performMaintenance = (
     const facility = facilities.find(item => item.id === facilityId);
     if (!facility) return { platform, changed: false, reason: 'That commissioned facility is unavailable.', cost: 0 };
     const cost = maintenanceCost(facility);
+    const key = `infrastructure-maintenance:${facility.id}:${absoluteWeek}`;
+    if (platform.eventLedger.some(entry => entry.idempotencyKey === key)) {
+        return { platform, changed: false, reason: 'This maintenance window has already settled.', cost };
+    }
     if (platform.treasuryCash < cost) return { platform, changed: false, reason: 'The platform treasury cannot fund this maintenance window.', cost };
     const physical = normalizeStreamingFacilityPhysical(facility.physical, facility.type, facility.installedRacks, facility.lease);
+    if (physical.lastMaintenanceAbsoluteWeek >= absoluteWeek) return { platform, changed: false, reason: 'This maintenance week has already settled.', cost };
     if (physical.maintenanceConditionPercent >= 98 && absoluteWeek - physical.lastMaintenanceAbsoluteWeek < 2) return { platform, changed: false, reason: 'This facility is already inside its healthy maintenance window.', cost };
     const maintained = { ...facility, physical: { ...physical, maintenanceConditionPercent: Math.min(100, physical.maintenanceConditionPercent + 18), lastMaintenanceAbsoluteWeek: absoluteWeek } };
     platform = replaceFacilities(platform, facilities.map(item => item.id === facility.id ? maintained : item));
     const operations = platform.crisisSecurity.infrastructureOperations;
-    const key = `infrastructure-maintenance:${facility.id}:${absoluteWeek}`;
     const entry = eventLedger(platform, absoluteWeek, 'INFRASTRUCTURE_MAINTENANCE_COMPLETED', key, `${facilityName(facility)} completed preventive maintenance.`, source, { facilityId, cost, conditionAfter: maintained.physical!.maintenanceConditionPercent });
     platform = {
         ...platform,
         treasuryCash: platform.treasuryCash - cost,
+        weeklyHistory: platform.weeklyHistory.map(snapshot => snapshot.absoluteWeek === absoluteWeek && snapshot.operations
+            ? { ...snapshot, operations: { ...snapshot.operations,
+                additionalOperatingExpense: getStreamingAdditionalOperatingExpense(platform, absoluteWeek, snapshot.operations.additionalOperatingExpense) + cost } }
+            : snapshot),
         crisisSecurity: { ...platform.crisisSecurity, infrastructureOperations: { ...operations, totalMaintenanceSpend: operations.totalMaintenanceSpend + cost } },
         eventLedger: [...platform.eventLedger, entry],
     };
-    return { platform, changed: true, reason: 'Preventive maintenance completed and facility condition improved.', cost };
+    return { platform: finalizeStreamingMaintenanceTax(platform, absoluteWeek), changed: true, reason: 'Preventive maintenance completed and facility condition improved.', cost };
 };
 
 export const performStreamingPreventiveMaintenance = (

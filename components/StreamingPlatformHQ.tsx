@@ -1,3 +1,4 @@
+import { getStreamingHqViewingSpotlight } from '../services/streamingAudienceMetrics';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {BadgeCheck, BarChart3, Banknote, Building2, Check, ChevronRight, CircleDot, Clapperboard, Compass, Crown, Eye, Film, Gauge, Globe2, Home, Layers3, LockKeyhole, Play, RadioTower, Rocket, Server, ShieldCheck, Sparkles, TrendingUp, UsersRound, WalletCards, X, type LucideIcon} from 'lucide-react';
 import type {
@@ -570,7 +571,8 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
       const performance = performanceByProject.get(projectId);
       const license = platform.catalogLicenses.find(item => item.sourceProjectId === projectId);
       const isOriginal = platform.originalCommissions.some(item => item.canonicalProjectId === projectId);
-      const completion = performance?.completionRate ?? 0;
+      const completionRate = performance?.completionRate ?? 0;
+      const completion = completionRate <= 1 ? completionRate * 100 : completionRate;
       const status: StreamingCommandServiceTitle['status'] = !performance
         ? 'STEADY'
         : performance.viewingAccounts === mostWatched?.viewingAccounts
@@ -651,13 +653,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
       treasury: platform.treasuryCash,
       readiness: { done: launchProgram.completedCount, total: launchProgram.totalCount },
       launchProgram: platform.launchCommit ? undefined : launchProgram,
-      nowPlaying: mostWatched ? {
-        title: mostWatched.title,
-        watching: Math.max(1, Math.round(mostWatched.viewingAccounts / 12)),
-      } : platform.launchCommit ? {
-        title: platform.launchCommit.openingOriginalTitle,
-        watching: Math.max(1, Math.round(platform.launchCommit.initialSubscribers * 0.04)),
-      } : undefined,
+      nowPlaying: getStreamingHqViewingSpotlight(latestPerformance),
       stats: [
         { id: 'ARPU', label: 'ARPU', value: platform.launchCommit ? formatMoney(platform.metrics.averageRevenuePerUser) : 'PENDING', tone: platform.launchCommit ? 'good' : 'pending' },
         { id: 'CHURN', label: 'CHURN', value: platform.launchCommit ? `${(platform.metrics.churnRate * 100).toFixed(1)}%` : 'PENDING', tone: platform.metrics.churnRate > 0.055 ? 'bad' : platform.launchCommit ? 'good' : 'pending' },
@@ -1062,6 +1058,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
       })),
       engineer: engineer ? { name: engineer.nameAtAppointment, role: 'CTO' } : null,
       simulationSeed: platform.simulationSeed,
+      committedLaunch: commit,
       launchAllowed: Boolean(commit) || launchReadiness.canLaunch,
       launchBlockerMessage: launchReadiness.canLaunch
         ? undefined
@@ -1317,7 +1314,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
     const launchPlayer = buildCommittedPlayerRef.current || player;
     const launchPlatform = launchPlayer.ownedStreamingPlatform;
     if (launchPlatform.launchCommit) {
-      return { ok: true } as const;
+      return { ok: true, commit: launchPlatform.launchCommit } as const;
     }
     if (!onUpdatePlayer) return { ok: false, message: 'The company save is not available.' } as const;
     const result = commitOwnedStreamingLaunch(launchPlayer, 'STANDARD');
@@ -1333,7 +1330,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
     buildCommittedPlayerRef.current = null;
     setPremiereStartedHere(true);
     persist(result.player);
-    return { ok: true } as const;
+    return { ok: true, commit: result.launchCommit } as const;
   };
 
   const openCinematicPremiere = () => {

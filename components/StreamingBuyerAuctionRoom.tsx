@@ -255,7 +255,7 @@ export default function StreamingBuyerAuctionRoom({ player, session, onUpdatePla
                     <div className={css.mkfhead}><b>YOUR TERMS</b><button type="button" onClick={() => setTermsOpen(false)}>Done</button></div>
                     <div className={css.mktermrows}>
                         <div className={css.mkbackendrow}>
-                            <span><b>Backend</b><small>{backend ? 'Share of streaming revenue paid to the seller' : 'Off · no revenue share offered'}</small></span>
+                            <span><b>Backend</b><small>{backend ? 'One share of this title’s actual ads + rental receipts' : 'Off · no revenue share offered'}</small></span>
                             <div><button type="button" aria-label="Decrease backend share" disabled={backend === 0} onClick={() => setBackend(Math.max(0, backend - 1))}>−</button><b>{backend}%</b><button type="button" aria-label="Increase backend share" disabled={backend >= session.lot.allowedTerms.backendMaximum} onClick={() => setBackend(Math.min(session.lot.allowedTerms.backendMaximum, backend + 1))}>+</button></div>
                         </div>
                         {session.lot.upcomingRightsSaleId && <label className={css.mkfundingfield}>Current production funding ($M)<input type="number" min="0" step="0.1" value={productionFunding / 1_000_000} onChange={event => setProductionFunding(Math.max(0, Number(event.target.value) || 0) * 1_000_000)} /><small>Additional funding for this title's production.</small></label>}

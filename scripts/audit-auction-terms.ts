@@ -1,3 +1,4 @@
+import {configureStreamingPricingOffer} from '../services/streamingCommercialOffers';
 import assert from 'node:assert/strict';
 import { contentMarketFixture } from './helpers/contentMarketFixture';
 import { getStreamingBuyerAuctionLots, openStreamingBuyerAuction, placeStreamingBuyerAuctionBid, advanceStreamingBuyerAuction, withdrawStreamingBuyerAuctionBid } from '../services/streamingBuyerAuctions';
@@ -6,6 +7,7 @@ import { getContentMarketFunds } from '../services/streamingContentMarket';
 import { getAbsoluteWeek } from '../services/legacyLogic';
 import { normalizeOwnedStreamingPlatformState } from '../services/ownedStreamingPlatform';
 const base=contentMarketFixture();
+base.ownedStreamingPlatform.serviceConfiguration.pricing=configureStreamingPricingOffer(base.ownedStreamingPlatform.serviceConfiguration.pricing,{kind:'CORE',coreModel:'STORE'});
 base.world.studios['seller-cm1']={...Object.values(base.world.studios)[0],id:'seller-cm1' as any,name:'Fixture studio'};
 const lot=getStreamingBuyerAuctionLots(base).find(l=>l.allowedTerms.futureGreenlightAllowed)!;
 assert.ok(lot);
@@ -66,7 +68,8 @@ weekly=processOwnedStreamingPlatformWeek(weekly).player;
 const agreement=weekly.ownedStreamingPlatform.rightsObligations.find(o=>o.sourceAuctionId===session.id)!;
 assert.equal(agreement.status,'SATISFIED');
 assert.equal(agreement.observedAmount,2);
-assert.ok(weekly.ownedStreamingPlatform.originalCommissions.every(c=>c.contract.platformRightsPercent===25),'Minority rights survive save normalization');
+assert.ok(weekly.ownedStreamingPlatform.originalCommissions.every(c=>c.contract.platformRightsPercent===25),'Minority production ownership survives save normalization');
+assert.ok(weekly.ownedStreamingPlatform.catalogLicenses.filter(row=>row.contentSource==='COMMISSIONED_ORIGINAL').every(row=>row.royaltyPurpose==='PRODUCER_PARTICIPATION'),'Funded producer participation remains classified separately from licensing backend');
 console.log('Auction signing -> save -> real weekly processor -> funded Originals delivery passed');
 
 const zeroOffer=placeStreamingBuyerAuctionBid(opened.player,opened.session!.id,{minimumGuarantee:Math.round(lot.referenceValue*1.8),licensorRevenueShare:0,marketingGuarantee:0,futureGreenlight:false},3000);

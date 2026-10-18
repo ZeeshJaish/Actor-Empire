@@ -213,11 +213,45 @@ export const processWorldTurn = (player: Player): { world: WorldState, news: New
 
     // Preserve the current and previous release years in full so early-year
     // contenders still exist when the following award season arrives.
-    const awardsWindowProjects = newWorld.projects.filter(project => project.year >= player.age - 1);
-    const olderProjects = newWorld.projects
+    // A live streaming asset still needs its authored facts after its award
+    // season. Dropping that record silently changes quality, runtime and genre.
+    const liveStreamingIds = new Set<string>();
+    const licenses = [
+        ...(player.ownedStreamingPlatform?.catalogLicenses || []),
+        ...Object.values(newWorld.streamingRightsContracts || {}),
+        ...Object.values(newWorld.platforms || {}).flatMap(platform => platform.ai?.rightsContracts || []),
+    ];
+    licenses.forEach(license => {
+        if (license.status === 'ACTIVE' && license.startsAtAbsoluteWeek <= currentAbsoluteWeek
+            && currentAbsoluteWeek < license.expiresAtAbsoluteWeek) liveStreamingIds.add(license.sourceProjectId);
+    });
+    const selectedCatalogIds = new Set(player.ownedStreamingPlatform?.catalogProjectIds || []);
+    (player.ownedStreamingPlatform?.starterCatalog?.ownedProjectIds || []).forEach(id => {
+        if (selectedCatalogIds.has(id)) liveStreamingIds.add(id);
+    });
+    const ownedStudioIds = new Set((player.businesses || [])
+        .filter(business => business.type === 'PRODUCTION_HOUSE')
+        .flatMap(business => [business.id,business.studioState?.acquisitionPortfolio?.sourceStudioId].filter(Boolean)));
+    newWorld.projects.forEach(project => {
+        if (selectedCatalogIds.has(project.id) && ownedStudioIds.has(project.studioId)) liveStreamingIds.add(project.id);
+    });
+    (player.ownedStreamingPlatform?.originalCommissions || []).forEach(commission => {
+        if (commission.canonicalProjectId && ['DELIVERED', 'RELEASED'].includes(commission.status))
+            liveStreamingIds.add(commission.canonicalProjectId);
+    });
+    Object.values(newWorld.platforms || {}).forEach(platform => (platform.ai?.slate || []).forEach(plan => {
+        if (plan.status === 'RELEASED' && plan.source === 'COMMISSIONED_ORIGINAL')
+            plan.sourceProjectIds.forEach(id => liveStreamingIds.add(id));
+    }));
+    const protectedProjects = newWorld.projects.filter(project => liveStreamingIds.has(project.id));
+    const ordinaryProjects = newWorld.projects.filter(project => !liveStreamingIds.has(project.id));
+    const awardsWindowProjects = ordinaryProjects.filter(project => project.year >= player.age - 1);
+    const olderProjects = ordinaryProjects
         .filter(project => project.year < player.age - 1)
         .slice(0, 20);
-    newWorld.projects = [...awardsWindowProjects, ...olderProjects].slice(0, 320);
+    const retained = new Set([...protectedProjects,
+        ...[...awardsWindowProjects, ...olderProjects].slice(0, Math.max(0, 320-protectedProjects.length))]);
+    newWorld.projects = newWorld.projects.filter(project => retained.has(project));
 
     return { world: newWorld, news, socialPosts, logs };
 };

@@ -5127,9 +5127,18 @@ export interface OwnedStreamingCatalogLicense {
     countryIds?: string[];
     durationWeeks: number;
     exclusivity: StreamingLicenseExclusivity;
+    /** Fully funded Original production participation; separate from a licensing offer. */
+    royaltyPurpose?: 'PRODUCER_PARTICIPATION';
+    backendBasis?: StreamingBackendBasis;
     minimumGuarantee: number;
     platformRevenueShare: number;
     licensorRevenueShare: number;
+    /** Durable earned-week guard and counters, retained even when statement history is compacted. */
+    lastRoyaltyReceiptAbsoluteWeek?: number;
+    cumulativeRoyaltyAccrued?: number;
+    cumulativeRoyaltyPaid?: number;
+    guaranteeRecoupment?: StreamingGuaranteeRecoupment;
+    backendCap?: number | null;
     signedAtAbsoluteWeek: number;
     startsAtAbsoluteWeek: number;
     expiresAtAbsoluteWeek: number;
@@ -5159,6 +5168,9 @@ export interface OwnedStreamingCatalogLicense {
 
 /** Actor-neutral canonical record shared by production and distribution views. */
 export interface StreamingRightsContract extends OwnedStreamingCatalogLicense {
+    /** Durable obligation states across full transfers, independent of pruned ledgers. */
+    transferredObligationStates?: OwnedStreamingRightsObligation[];
+    lastRoyaltySellerReceiptAbsoluteWeek?:number;
     schemaVersion: typeof STREAMING_RIGHTS_CONTRACT_SCHEMA_VERSION;
     idempotencyKey: string;
     biddingSessionId: string | null;
@@ -5421,7 +5433,8 @@ export type StreamingBiddingSessionStatus = 'LIVE' | 'CLOSING' | 'ACCEPTED' | 'L
 export type StreamingBiddingPlatformStatus = 'WAITING' | 'RESPONDING' | 'FINAL' | 'WITHDRAWN';
 export type StreamingOfferStatus = 'ACTIVE' | 'FINAL' | 'REPLACED' | 'WITHDRAWN' | 'ACCEPTED';
 export type StreamingGuaranteeRecoupment = 'NON_RECOUPABLE' | 'RECOUPABLE';
-export type StreamingBackendBasis = 'ADJUSTED_GROSS_RECEIPTS';
+export type StreamingBackendBasis = 'ADJUSTED_GROSS_RECEIPTS' | 'ADS_RENTAL_RECEIPTS';
+export type StreamingRoyaltyRevenueSource = 'SUBSCRIPTION' | 'ADVERTISING' | 'RENTAL' | 'PURCHASE' | 'SPONSORSHIP' | 'ANCILLARY';
 export type StreamingBiddingEventType = 'OPENED' | 'PITCHED' | 'REVISED' | 'FINAL' | 'WITHDREW' | 'CLOSED' | 'ACCEPTED' | 'LEFT';
 
 /** Immutable rights scope shared by every offer in one bidding room. */
@@ -5460,6 +5473,7 @@ export interface StreamingBiddingPlatformInput {
     catalogueGapMultiplier?: number;
     subscriberOpportunityMultiplier?: number;
     /** Company-specific chance (0-1) of attaching adjusted-gross participation. */
+    eligibleBackendRevenueFraction?: number;
     backendPreference?: number;
     /** Company-specific chance (0-1) of requesting a shared rather than exclusive licence. */
     sharedRightsPreference?: number;
@@ -5523,6 +5537,7 @@ export interface StreamingBiddingPlatformState {
     localizationLevelCap?: StreamingRightsLocalizationTerms;
     localizationRequirements?: StreamingLocalizationPromise[];
     catalogueComponentValues?: Record<string, number>;
+    eligibleBackendRevenueFraction?: number;
     backendPreference?: number;
     sharedRightsPreference?: number;
     availablePremiereAbsoluteWeeks?: number[];
@@ -5658,6 +5673,7 @@ export interface StreamingBuyerAuctionRival {
     color: string;
     cashAvailable: number;
     sellerValueCeiling: number;
+    eligibleBackendRevenueFraction?: number;
     preferredBackend: number;
     marketingLimit: number;
     nextActionSecond: number;
@@ -6329,6 +6345,9 @@ export interface OwnedStreamingWeeklyOperations {
     worldViewingIncrementalRevenue?: number;
     worldViewingCommercialOperatingCost?: number;
     partnerRevenueShareCost: number;
+    contractRoyaltyStatements?: Array<{contractId:string;adjustedGrossReceipts:number;grossRoyaltyAccrued:number;
+        royaltyPayable:number;cumulativeRoyaltyAccrued:number;cumulativeRoyaltyPaid:number;recoupmentRemaining:number;
+        capRemaining:number|null;lastRoyaltyReceiptAbsoluteWeek:number}>;
     infrastructureCost: number;
     leadershipCost: number;
     financingCost: number;
@@ -6336,6 +6355,15 @@ export interface OwnedStreamingWeeklyOperations {
     growthPlanCost?: number;
     rightsComplianceCost?: number;
     marketPolicyCost?: number;
+    marketIncomeTax?: number;
+    marketRevenueLevy?: number;
+    /** Frozen earned-week rates and remaining actual tax payment for later maintenance deductions. */
+    marketTaxSettlement?: {
+        schemaVersion: 1;
+        revenueLevy: number;
+        bands: Array<{preMaintenanceProfit: number; maintenanceShare: number; taxRate: number}>;
+        remainingFundedPolicyCost: number;
+    };
     marketOperatingCost?: number;
     technologyCampusCost?: number;
     productSuiteCost?: number;
@@ -6348,6 +6376,9 @@ export interface OwnedStreamingWeeklyOperations {
     totalCashCost: number;
     netCashContribution: number;
     contentAmortization: number;
+    contentAccountingVersion?: 1;
+    /** Actual maintenance cash already paid outside the core weekly transfer. */
+    additionalOperatingExpense?: number;
     accountingContribution: number;
     peakConcurrentStreams: number;
     capacityUtilizationPercent: number;
@@ -6707,6 +6738,28 @@ export interface OwnedStreamingCinematicEvent {
     factIds: string[];
 }
 
+export interface StreamingContentCostAsset {
+    id: string;
+    projectId: string;
+    title: string;
+    source: 'LICENSED_WINDOW' | 'ORIGINAL';
+    projectType: 'MOVIE' | 'SERIES';
+    genre: string;
+    costBasis: number;
+    recognizedCost: number;
+    startsAtAbsoluteWeek: number | null;
+    usefulLifeWeeks: number;
+    /** Funding already carried by a separately funded Original asset. */
+    productionFundingOffset?: number;
+}
+
+export interface StreamingContentAccountingState {
+    schemaVersion: 1;
+    lastProcessedAbsoluteWeek: number;
+    assets: StreamingContentCostAsset[];
+    unverifiedAssetIds?: string[];
+}
+
 export interface OwnedStreamingPlatformState {
     schemaVersion: number;
     lifecycle: OwnedStreamingPlatformLifecycle;
@@ -6745,6 +6798,8 @@ export interface OwnedStreamingPlatformState {
     upcomingRightsSales: StreamingUpcomingRightsSale[];
     starterCatalog: OwnedStreamingStarterCatalog | null;
     catalogLicenses: OwnedStreamingCatalogLicense[];
+    /** Non-cash content cost recognition; never a second treasury payment. */
+    contentAccounting?: StreamingContentAccountingState;
     rightsNegotiations: OwnedStreamingRightsNegotiation[];
     sublicenseDeals: OwnedStreamingSublicenseDeal[];
     rightsObligations: OwnedStreamingRightsObligation[];
@@ -7171,6 +7226,8 @@ export interface PastProject {
     totalViews?: number;
     weeklyViews?: number[];
     streamingRevenue?: number;
+    streamingRoyaltyRevenue?:number;
+    talentParticipation?:TalentParticipationPackage;
     platformProductionFunding?: number;
     studioCashAtRisk?: number;
     productionFundApplied?: number;
@@ -7884,6 +7941,14 @@ export interface XPost {
     promotionAttributionId?: string;
 }
 
+export interface TalentNegotiationState {
+    attempts: number;
+    cooldownUntilAbsoluteWeek?: number;
+    roll: number;
+    rejectedOffers: string[];
+    actorSnapshot?: Pick<NPCActor, 'tier' | 'stats' | 'traits' | 'isIndependent' | 'prestigeBias' | 'potential' | 'netWorth'>;
+}
+
 export interface StudioContract {
     id: string;
     /** Owning production house. Missing on older saves means the parent/HQ studio. */
@@ -7895,6 +7960,11 @@ export interface StudioContract {
     maintenanceFee: number;
     installmentsPaid: number;
     totalInstallments: number;
+    /** Financial progress is independent of film obligations. Legacy counts migrate without repricing. */
+    amountPaid?: number;
+    lastPaymentAbsoluteWeek?: number;
+    consumedProjectIds?: string[];
+    accountingVersion?: 1;
     moviesRemaining: number;
     totalMovies: number;
     startWeek: number;
@@ -9269,6 +9339,7 @@ export interface PlatformAiProductionOutcomeMemory {
 }
 
 export interface PlatformAiFinanceSnapshot {
+    contractRoyaltyStatements?:NonNullable<OwnedStreamingWeeklyOperations['contractRoyaltyStatements']>;
     absoluteWeek: number;
     openingCashMillions: number;
     subscriptionRevenueMillions: number;
@@ -9294,6 +9365,8 @@ export interface PlatformAiFinanceSnapshot {
     recurringEfficiency: PlatformAiRecurringEfficiencySnapshot;
     /** Exact current-week PLATFORM_TRADE seller allocations; durable authority is mirrored in the buyer decision ledger. */
     platformTradeRoyaltyAllocations?: PlatformAiTradeRoyaltyAllocation[];
+    /** Cumulative direct-store backend in full currency, separate from canonical non-store settlements. */
+    storeRoyaltyAccruals?: Array<{contractId: string; accrued: number; paid: number}>;
     operatingCostMillions: number;
     contentCostMillions: number;
     researchCostMillions: number;
@@ -9554,6 +9627,9 @@ export interface PlatformAiRuntimeState {
     releasePatternMemory: Partial<Record<PlatformAiReleasePattern, PlatformAiReleasePatternBelief>>;
     productionOutcomeMemory: PlatformAiProductionOutcomeMemory;
     financeHistory: PlatformAiFinanceSnapshot[];
+    /** Durable all-mode royalty totals; independent of compacted finance/decision histories. */
+    royaltyAccruals?: Record<string,{accrued:number;paid:number;lastReceiptAbsoluteWeek:number}>;
+    royaltySellerPaidThrough?: Record<string,number>;
     decisionHistory: PlatformAiDecisionRecord[];
     launchMarketingHistory: PlatformAiLaunchMarketingCampaign[];
     distressEpisodes: PlatformAiDistressEpisode[];
@@ -10093,6 +10169,12 @@ export interface WorldStreamingPlatformOffer {
     catalogueStrengthIndex: number;
     /** Actual playable catalogue by market; absent on legacy/AI offers. */
     catalogueStrengthByCountry?: Record<string, number>;
+    /** Paid membership appeal excludes titles available only through ads or a separate purchase. */
+    subscriptionCatalogueStrengthByCountry?: Record<string, number>;
+    /** Rights-valid transactional titles, independent of included subscription value. */
+    storeCatalogueStrengthByCountry?: Record<string, number>;
+    /** Prior delivered service and rights-specific content inputs for gross paid churn. */
+    customerExperienceByCountry?: Record<string, { quality: number; freshness: number; delivery: number; weeklyChurnRate: number }>;
     localizationStrengthIndex: number;
     reputationIndex: number;
     reliabilityIndex: number;
@@ -10208,9 +10290,14 @@ export interface WorldStreamingAudienceChoiceCountrySummary {
     playerSubscriptions: number;
     playerFreeAdHouseholds: number;
     playerStoreHouseholds: number;
+    /** Public transactional opportunities overlapping other services; not primary access or subscribers. */
+    playerSecondaryStoreHouseholds?: number;
+    /** Complementary ad discovery; overlaps primary subscription households. */
+    playerSecondaryFreeAdHouseholds?: number;
 }
 
 export interface WorldStreamingAudienceChoicePlatformSummary {
+    secondaryFreeAdHouseholds?: number;
     platformId: string;
     primarySubscriptions: number;
     secondarySubscriptions: number;
@@ -10244,6 +10331,8 @@ export interface WorldStreamingAudienceChoiceState {
         countryCount: number;
     };
     entitlements: WorldStreamingAudienceEntitlement[];
+    /** Current-week replay guard survives ownership-row compaction. Older weeks cannot be submitted. */
+    recordedTransactions?: { absoluteWeek: number; ids: string[] };
     /** Idempotency key for the latest WE6 transaction batch, never a revenue ledger. */
     settledViewingFingerprint?: string;
 }
@@ -10644,6 +10733,18 @@ export interface WorldStreamingViewingState {
     countries: Record<string, WorldStreamingViewingCountryState>;
     platforms: Record<string, WorldStreamingViewingPlatformSummary>;
     global: WorldStreamingViewingGlobalSummary;
+    /** Derived commercial spending evidence; does not credit cash or create entitlements. */
+    householdBudgets?: Array<{countryId:string;cohortId:string;monthlyBudget:number;
+        monthlySubscriptionSpend:number;weeklyDiscretionaryCents:number;spentCents:number;
+        spentByPlatformCents:Record<string,number>}>;
+    /** Funded consumer product-line receipts settled separately by company operations. */
+    householdProductRevenue?: number;
+    /** Actual household funding source retained until title/contract attribution. */
+    royaltySourceReceipts?: Array<{platformId:string;countryId:string;projectId?:string;
+        sourceKind:'SUBSCRIPTION'|'FREE_AD'|'STORE';planId:string|null;grossReceipts:number}>;
+    /** Conserved title-level billing attribution; null contract denotes owned/legacy access. */
+    royaltyReceipts?: Array<{receiptId:string;platformId:string;countryId:string;projectId:string;
+        contractId:string|null;kind:'SUBSCRIPTION'|'NON_STORE';sourceKind?:StreamingRoyaltyRevenueSource;grossReceipts:number;planId?:string}>;
     /** Current-week aggregate store sales; omitted on historical WE6 saves. */
     commercialTransactions?: Array<Omit<WorldStreamingAudienceEntitlement, 'platformId' | 'expiresAtAbsoluteWeek'> & {
         /** Source membership at purchase time; null is a public store/free-ad buyer. */
@@ -11311,6 +11412,7 @@ export interface Player {
     activeUniverseContract?: UniverseContract;
     lastForbesRank?: number;
     studioMemory: Record<StudioId, { projectOutcomes: number[] }>;
+    talentNegotiations?: Record<string, TalentNegotiationState>;
     heat: number;
     activeCases: LegalCase[];
     studio: {

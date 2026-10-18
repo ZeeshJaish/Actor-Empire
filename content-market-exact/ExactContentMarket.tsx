@@ -1030,7 +1030,7 @@ const Detail: React.FC<{
                   : 'Non-recoupable — a fee they keep'}</em>
               </div>
               <div className={css.mkctgrid}>
-                <Cell k="BACKEND" v={lot.listed.backendPct ? `${lot.listed.backendPct}%` : 'None'} />
+                <Cell k={lot.listed.royaltyPurpose ? "PRODUCER PARTICIPATION" : "BACKEND"} v={lot.listed.backendPct ? `${lot.listed.backendPct}%` : 'None'} />
                 <Cell k="BASIS" v={lot.listed.backendPct ? lot.listed.basis : '—'} />
                 <Cell k="TERM" v={termLabel(lot.listed.termWeeks)} />
                 <Cell k="RIGHTS" v={`${lot.listed.scope} · ${lot.listed.excl === 'EXCLUSIVE' ? 'exclusive' : 'shared'}`} />
@@ -1136,7 +1136,7 @@ const Redline: React.FC<{
       {/* they are sitting opposite you, and you can read them */}
       <Rep seller={lot.seller} posture={v.tone === 'good' ? 'in' : v.tone === 'warn' ? 'level' : 'back'} />
       <div className={cx(css.mksays, css['mk-' + (v.tone)])}>
-        <p>{sayOf(lot, v.tone)}</p>
+        <p>{o.backendAllowed === false ? 'This is a fixed-fee licence. Backend requires enabled advertising or rental access.' : sayOf(lot, v.tone)}</p>
         <em>{v.line}</em>
       </div>
 
@@ -1145,7 +1145,7 @@ const Redline: React.FC<{
         <div className={css.mksheethead}><b>HEADS OF TERMS</b><span>DRAFT 1</span></div>
         <div className={css.mkrow}><span>Guarantee</span>
           <b className={afford ? '' : css.mkover}>{exact(o.mg)}</b></div>
-        <div className={css.mkrow}><span>Seller backend</span><b>{o.backendPct}% · adjusted gross receipts</b></div>
+        <div className={css.mkrow}><span>Seller backend</span><b>{o.backendPct}% · {o.basis === 'Ads + rental receipts' ? 'actual ads + rental receipts' : 'adjusted gross receipts (legacy)'}</b></div>
         <div className={css.mkrow}><span>Term</span><b>{termLabel(o.termWeeks)}</b></div>
         <div className={css.mkrow}><span>Marketing</span><b>{o.marketing ? exact(o.marketing) : '—'}</b></div>
         <div className={css.mkrow}><span>Exclusivity</span>
@@ -1156,14 +1156,14 @@ const Redline: React.FC<{
       </div>
 
       <div className={css.mkbigrow}>
-        <button onClick={() => set('mg', Math.max(200_000, o.mg - 250_000))}>− 250K</button>
+        <button onClick={() => set('mg', Math.max(Math.ceil(base.mg*.62), o.mg - 250_000))}>− 250K</button>
         <button onClick={() => set('mg', o.mg + 250_000)}>+ 250K</button>
       </div>
 
       <div className={css.mkdials}>
-        <Dial label="THEY KEEP" value={`${o.backendPct}%`}
+        <Dial label="THEY KEEP" value={`${o.backendPct}%`} disabled={o.backendAllowed === false}
           dec={() => set('backendPct', Math.max(0, o.backendPct - 2))}
-          inc={() => set('backendPct', Math.min(55, o.backendPct + 2))} />
+          inc={() => set('backendPct', o.backendAllowed === false ? 0 : Math.min(20, o.backendPct + 2))} />
         <Dial label="TERM" value={`${yearsOf(o.termWeeks)}y`}
           dec={() => set('termWeeks', Math.max(52, o.termWeeks - 52))}
           inc={() => set('termWeeks', Math.min(260, o.termWeeks + 52))} />
@@ -1192,12 +1192,12 @@ const Redline: React.FC<{
   );
 };
 
-const Dial: React.FC<{ label: string; value: string; inc: () => void; dec: () => void }> =
-  ({ label, value, inc, dec }) => (
+const Dial: React.FC<{ label: string; value: string; inc: () => void; dec: () => void; disabled?: boolean }> =
+  ({ label, value, inc, dec, disabled }) => (
     <div className={css.mkdial}>
       <span>{label}</span>
       <b>{value}</b>
-      <div><button onClick={dec}>−</button><button onClick={inc}>+</button></div>
+      <div><button disabled={disabled} onClick={dec}>−</button><button disabled={disabled} onClick={inc}>+</button></div>
     </div>
   );
 

@@ -1,8 +1,10 @@
+import {configureStreamingPricingOffer} from '../services/streamingCommercialOffers';
 import assert from 'node:assert/strict';
 import { contentMarketFixture as makeContentMarketFixture } from './helpers/contentMarketFixture';
 
 const contentMarketFixture = () => {
     const player = makeContentMarketFixture();
+    player.ownedStreamingPlatform.serviceConfiguration.pricing=configureStreamingPricingOffer(player.ownedStreamingPlatform.serviceConfiguration.pricing,{kind:'CORE',coreModel:'STORE'});
     player.world.studios['seller-cm1'] = {
         ...Object.values(player.world.studios)[0], id: 'seller-cm1' as any, name: 'Fixture Seller Studio',
     };
@@ -87,8 +89,8 @@ assert.ok(Object.keys(ecosystem.operators).length >= 33, 'The world exposes the 
 assert.ok(openedSession.rivals.every(rival => ecosystem.operators[rival.platformId]), 'Every auction rival comes from the canonical ecosystem');
 assert.ok(openedSession.rivals.some(rival => !legacyBuyerIds.has(rival.platformId)),
     'Relevant regional and global operators outside the old five-platform list can enter');
-assert.ok(openedSession.bids[0].minimumGuarantee < lot.referenceValue * 0.5,
-    'An AI buyer can open with a strategic low offer instead of a forced valuation-level bid');
+assert.ok(openedSession.bids[0].minimumGuarantee < lot.referenceValue,
+    'An AI buyer can open below reference value while retaining the independent cash floor');
 
 const runFieldRevision = (currentSellerValue: number, competitorSellerValue: number) => {
     const targetRival = openedSession.rivals[0];
@@ -270,8 +272,8 @@ const privateBlocked = submitContentMarketPrivateOffer(opened.player, lot.listin
 assert.equal(privateBlocked.changed, false, 'An auction-designated listing cannot simultaneously enter private negotiation');
 assert.match(privateBlocked.detail || '', /live auction/i);
 
-assert.ok(lot.minimumGuarantee <= Math.max(100_000, lot.referenceValue * 0.03),
-    'A lot uses only a tiny technical floor, not a forced half-valuation opening bid');
+assert.ok(lot.minimumGuarantee >= lot.referenceValue*.62,
+    'A real cash floor cannot be replaced by contingent backend value');
 const leadingBeforeLowOffer = openedSession.bids.find(bid => bid.id === openedSession.leaderBidId)!;
 const lowOffer = placeStreamingBuyerAuctionBid(opened.player, openedSession.id, {
     minimumGuarantee: lot.minimumGuarantee,

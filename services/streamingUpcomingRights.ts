@@ -1,3 +1,4 @@
+import {getStreamingBuyerBackendCapability,validateNewStreamingBackendTerms} from './streamingBackendPolicy';
 import type { IndustryProductionCommitment, OwnedStreamingRightsNegotiation, Player, StreamingBuyerAuctionLot, StreamingUpcomingRightsSale } from '../types';
 import { createDeterministicId, createDeterministicRng } from './deterministicRandom';
 import { getAbsoluteWeek } from './legacyLogic';
@@ -139,6 +140,9 @@ export const settleStreamingUpcomingRightsForPlayer = (
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     const sale = platform.upcomingRightsSales.find(item => item.id === saleId);
     if (!sale || sale.status !== 'LIVE') return { player, changed: false, detail: 'This future-rights sale is no longer live.' };
+    const termsError=validateNewStreamingBackendTerms({...terms,referenceFee:sale.minimumGuarantee || 0,
+        capability:getStreamingBuyerBackendCapability(player,null,getAbsoluteWeek(player.age,player.currentWeek),sale.countryIds)});
+    if(termsError) return {player,changed:false,detail:termsError};
     const production = player.world.industryProductions?.[sale.sourceProductionId];
     if (!production || ['CANCELLED', 'TURNAROUND', 'ON_HOLD'].includes(production.status)) {
         return { player, changed: false, detail: 'The underlying production is no longer eligible.' };

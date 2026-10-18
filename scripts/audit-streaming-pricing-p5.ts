@@ -8,6 +8,7 @@ import { getWorldStreamingOffers } from '../services/worldEconomy/worldStreaming
 import { allocateStreamingAudienceChoice } from '../services/worldEconomy/worldStreamingAudienceChoice';
 import { createStreamingLicenseContract } from '../services/streamingRightsCore';
 import { getAbsoluteWeek } from '../services/legacyLogic';
+import { addStreamingAuditCatalogueTitle } from './helpers/streamingGrantedCatalogueFixture';
 
 const player = structuredClone(INITIAL_PLAYER) as Player;
 player.id = 'pricing-p5-audit';
@@ -88,10 +89,10 @@ assert.ok(cohort, 'test cohort must afford the paid plan');
 const overlay = participation.countries.US.cohorts.find(row => row.cohortId === cohort.id);
 assert.ok(overlay, 'the selected audience cohort has a participation overlay');
 const entrant = allocateStreamingAudienceChoice('US', cohort, overlay, [{
-    ...baseOffer, catalogueStrengthIndex: 25, catalogueStrengthByCountry: { US: 25 }, maturityWeeks: 0,
+    ...baseOffer, catalogueStrengthIndex: 25, catalogueStrengthByCountry: { US: 25 }, subscriptionCatalogueStrengthByCountry: { US: 25 }, maturityWeeks: 0,
 }]);
 const established = allocateStreamingAudienceChoice('US', cohort, overlay, [{
-    ...baseOffer, catalogueStrengthIndex: 90, catalogueStrengthByCountry: { US: 90 }, maturityWeeks: 104,
+    ...baseOffer, catalogueStrengthIndex: 90, catalogueStrengthByCountry: { US: 90 }, subscriptionCatalogueStrengthByCountry: { US: 90 }, maturityWeeks: 104,
 }]);
 assert.ok(entrant.primarySubscriptions < established.primarySubscriptions,
     'a new, thin-catalogue monopoly cannot automatically capture the same paying audience as an established strong service');
@@ -111,11 +112,11 @@ assert.ok(affluent, 'tier test needs a cohort able to afford both plans');
 const affluentOverlay = participation.countries.US.cohorts.find(row => row.cohortId === affluent.id);
 assert.ok(affluentOverlay);
 const identicalChoice = allocateStreamingAudienceChoice('US', affluent, affluentOverlay, [{
-    ...baseOffer, catalogueStrengthIndex: 90, catalogueStrengthByCountry: { US: 90 }, maturityWeeks: 104,
+    ...baseOffer, catalogueStrengthIndex: 90, catalogueStrengthByCountry: { US: 90 }, subscriptionCatalogueStrengthByCountry: { US: 90 }, maturityWeeks: 104,
     plans: [baseOffer.plans[0], { ...baseOffer.plans[0], id: 'PREMIERE', name: 'Premiere' }],
 }]);
 const premiumChoice = allocateStreamingAudienceChoice('US', affluent, affluentOverlay, [{
-    ...baseOffer, catalogueStrengthIndex: 90, catalogueStrengthByCountry: { US: 90 }, maturityWeeks: 104,
+    ...baseOffer, catalogueStrengthIndex: 90, catalogueStrengthByCountry: { US: 90 }, subscriptionCatalogueStrengthByCountry: { US: 90 }, maturityWeeks: 104,
     plans: [baseOffer.plans[0], { ...baseOffer.plans[0], id: 'PREMIERE', name: 'Premiere',
         monthlyPrice: 12.99, monthlyBillingPrice: 12.99, annualBillingMonthlyPrice: 12.34,
         effectiveMonthlyPrice: 12.7, appealIndex: 95 }],
@@ -127,17 +128,21 @@ assert.ok(premiumChoice.allocations.some(row => row.kind === 'SUBSCRIPTION'
     && row.planId === 'PREMIERE' && row.households > 0),
     'a valuable higher tier can win an affordable cohort without a fixed premium share');
 
-const highPrice = forecastWorldStreamingLaunchPricing(player, {
+// The price-response comparisons require a playable catalogue; keep the earlier
+// intentionally unlicensed probes empty for their territory/metadata checks.
+const commercialPlayer = structuredClone(player) as Player;
+addStreamingAuditCatalogueTitle(commercialPlayer, absoluteWeek, 'p5-commercial-film', ['SUBSCRIPTION', 'AD_SUPPORTED']);
+const highPrice = forecastWorldStreamingLaunchPricing(commercialPlayer, {
     ...pricing, plans: pricing.plans.map(plan => ({ ...plan, monthly: 78 })),
 }, ['IN']);
-const entryPrice = forecastWorldStreamingLaunchPricing(player, pricing, ['IN']);
+const entryPrice = forecastWorldStreamingLaunchPricing(commercialPlayer, pricing, ['IN']);
 assert.ok(entryPrice.subscribers > highPrice.subscribers,
     'raising entry price must not automatically create more subscribers');
 assert.ok(entryPrice.monthlySubscriptionRevenue > highPrice.monthlySubscriptionRevenue,
     'raising entry price must not automatically create more monthly-equivalent revenue');
 assert.equal(entryPrice.subscribers, entryPrice.monthlySubscribers + entryPrice.annualSubscribers,
     'monthly and annual buyer cohorts reconcile without counting a household twice');
-const free = forecastWorldStreamingLaunchPricing(player, {
+const free = forecastWorldStreamingLaunchPricing(commercialPlayer, {
     ...pricing, streams: ['ads'], plans: [], ads: { ...pricing.ads, minutesPerHour: 4 },
 }, ['US']);
 assert.equal(free.subscribers, 0, 'free entry does not produce paid subscriptions');

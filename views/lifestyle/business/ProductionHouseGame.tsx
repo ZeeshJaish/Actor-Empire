@@ -1,3 +1,4 @@
+import { calculateStudioPrestigeScore } from '../../../services/studioPrestige';
 import React, { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Player, BudgetTier, Genre, ProjectDetails, ProjectType, ActiveRelease, Commitment, Business, LocationDetails, NewsItem, XPost, StudioEquipment, Script, Writer, GameLanguage, PlatformAiPlayerCommissionOffer } from '../../../types';
@@ -227,10 +228,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
     // Calculate Awards Won
     const awardsWon = evaluationLibrary.reduce((sum, p) => sum + (p.awards?.filter(a => a.outcome === 'WON').length || 0), 0);
     
-    const breakoutCount = evaluationLibrary.filter(p => ((p.gross || 0) + (p.streamingRevenue || 0)) > 200_000_000).length;
-    const consistencyBonus = evaluationLibrary.filter(p => (p.rating || 0) >= 7.5).length * 0.8;
-    // Prestige Score (0-100): rewards quality, awards, consistency, and credible hits.
-    const prestigeScore = Math.min(100, Math.floor((avgRating * 6) + (awardsWon * 2.5) + (evaluationLibrary.length * 0.8) + (breakoutCount * 1.2) + consistencyBonus));
+    const prestigeScore = calculateStudioPrestigeScore(evaluationLibrary);
     const groupValuation = getStudioGroupValuation(player).parentCompanyValue;
     const streamingRightsCalendar = getStreamingRightsCalendar(
         player,

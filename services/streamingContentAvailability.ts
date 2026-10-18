@@ -9,12 +9,20 @@ import { normalizeStreamingRightsAccessGrant } from './streamingRightsAccessGran
 import { evaluateStreamingTitleRoute, type StreamingTitleAccessDecision, type StreamingTitleAccessRoute } from './streamingTitleAccess';
 
 export const getOwnedPlatformPackageCountryIds = (platform: OwnedStreamingPlatformState): string[] => {
-    const active = normalizeStreamingDayOneMarketIds((platform.marketOperations || [])
-        .filter(operation => operation.scope === 'COUNTRY' && operation.status !== 'EXITED' && operation.countryId
-            && (operation.status === 'ACTIVE' || operation.entryKind === 'OPENING'))
+    const operations = (platform.marketOperations || [])
+        .filter(operation => operation.scope === 'COUNTRY' && operation.countryId);
+    // Once live, an explicit market record is authoritative, including an empty
+    // ACTIVE set. Planned opening countries must never restore suspended billing.
+    if (operations.length && platform.lifecycle === 'ACTIVE') {
+        return normalizeStreamingDayOneMarketIds(operations.filter(operation => operation.status === 'ACTIVE')
+            .map(operation => operation.countryId)).sort();
+    }
+    const available = normalizeStreamingDayOneMarketIds(operations.filter(operation =>
+        operation.status === 'ACTIVE' || (operation.entryKind === 'OPENING'
+            && operation.status !== 'EXITED' && operation.status !== 'SUSPENDED'))
         .map(operation => operation.countryId));
     const planned = normalizeStreamingDayOneMarketIds(platform.identity?.dayOneMarketIds || []);
-    return (active.length ? active : planned.length ? planned : ['US', 'CA', 'MX']).slice().sort();
+    return (available.length ? available : operations.length ? [] : planned.length ? planned : ['US', 'CA', 'MX']).slice().sort();
 };
 
 export type ContentAvailability = 'IN_PRODUCTION' | 'AWAITING_AVAILABILITY' | 'READY' | 'SCHEDULED' | 'LIVE' | 'RIGHTS_EXPIRED' | 'RIGHTS_UNAVAILABLE';

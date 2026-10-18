@@ -8,6 +8,7 @@ import { getWorldStreamingOffers } from '../services/worldEconomy/worldStreaming
 import * as customerEngine from '../services/worldEconomy/worldStreamingCustomers';
 import { migratePlayerSave } from '../services/saveMigration';
 import { processOwnedStreamingPlatformWeek } from '../services/streamingWeeklyLoop';
+import { addStreamingAuditCatalogueTitle } from './helpers/streamingGrantedCatalogueFixture';
 
 const createCustomers = (customerEngine as any).createWorldStreamingCustomerState;
 const normalizeCustomers = (customerEngine as any).normalizeWorldStreamingCustomerState;
@@ -63,6 +64,7 @@ player.ownedStreamingPlatform.launchCommit = {
 };
 
 const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+addStreamingAuditCatalogueTitle(player, absoluteWeek, 'we5-membership-film');
 player.world.worldStreamingCompetition = createWorldStreamingCompetitionState(player, absoluteWeek);
 const before = JSON.stringify(player);
 const state = createCustomers(player, absoluteWeek);

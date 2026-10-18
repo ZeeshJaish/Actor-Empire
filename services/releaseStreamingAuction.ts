@@ -1,3 +1,4 @@
+import {getStreamingBuyerBackendCapability} from './streamingBackendPolicy';
 import type { Player, StreamingBiddingPlatformInput } from '../types';
 import { createDeterministicRng } from './deterministicRandom';
 import { getPlatformFundingRelationshipMultiplier } from './streamingFundingLogic';
@@ -125,6 +126,7 @@ export const buildReleaseStreamingBidderMarket = (
                     strategicCountryIds: [...(company.activeCountryIds || [])],
                     catalogueGapMultiplier: clamp(1.16 - cataloguePower / 500, 0.9, 1.16),
                     subscriberOpportunityMultiplier: clamp(0.9 + Math.min(0.28, subscribers / 1_000), 0.9, 1.18),
+                    eligibleBackendRevenueFraction: getStreamingBuyerBackendCapability(player, company.id, context.absoluteWeek, company.activeCountryIds).eligibleRevenueFraction,
                     backendPreference,
                     sharedRightsPreference,
                     availablePremiereAbsoluteWeeks,

@@ -77,8 +77,10 @@ assert.match(agreement, /computeRacks\(facility\)/);
 assert.doesNotMatch(agreement, /room move-in|group\.moveIn/,
   'uncanonical listing subtotals cannot appear beside the actual execution charge');
 const premiere = readFileSync('components/streaming-transplant/StreamingPremiereExperience.tsx', 'utf8');
-assert.match(premiere, /<span>ACCOUNTS<\/span><b>\{conc\(result\.subsGained\)\}/,
-  'opening-night cinematic counts all accounts, not only paid subscribers');
+assert.match(premiere, /committedLaunch \? 'PAID SUBSCRIBERS' : 'ACCOUNTS'/,
+  'a committed opening must identify the saved paid population; demo accounts remain separate');
+assert.match(premiere, /subsGained: commit\.initialSubscribers/,
+  'the canonical premiere must display saved launch subscribers instead of recalculating accounts');
 const buildMoney = readFileSync('components/studio-finance/components/build/StageMoney.tsx', 'utf8');
 assert.match(buildMoney, /label: 'Ways to watch'/,
   'ad-only and store-only are offers, not subscription plans on sale');

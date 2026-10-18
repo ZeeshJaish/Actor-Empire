@@ -1,3 +1,4 @@
+import {minimumStreamingLicenseFee} from './streamingBackendPolicy';
 import type {
     PlatformId,
     StreamingCataloguePackage,
@@ -110,9 +111,9 @@ const buildOffer = (input: OfferBuildInput): StreamingOfferVersion => {
     const rng = createDeterministicRng(`${input.sessionId}:${input.platform.id}:offer:${input.revision}:${input.variant}`);
     const structureRoll = rng();
     const isSeriesFunding = input.projectType === 'SERIES' && structureRoll > 0.66;
-    const hasBackend = structureRoll < clamp(input.platform.backendPreference ?? 0.5, 0.1, 0.8);
+    const hasBackend = (input.platform.eligibleBackendRevenueFraction || 0) > 0 && structureRoll < clamp(input.platform.backendPreference ?? 0.5, 0.1, 0.8);
     const backendPoints = hasBackend ? Math.round(1 + rng() * 11) : 0;
-    const guaranteeRecoupment = hasBackend && rng() > 0.52 ? 'RECOUPABLE' as const : 'NON_RECOUPABLE' as const;
+    const guaranteeRecoupment = 'NON_RECOUPABLE' as const;
     const supportedDurations = [52, 104, 156].filter(duration => duration <= input.rightsLot.maximumDurationWeeks);
     const durationWeeks = supportedDurations.length
         ? supportedDurations[Math.min(supportedDurations.length - 1, Math.floor(rng() * supportedDurations.length))]
@@ -144,11 +145,9 @@ const buildOffer = (input: OfferBuildInput): StreamingOfferVersion => {
         : 0;
     const maximumGuarantee = Math.max(0, input.platformState.fixedExposureCeiling - productionFunding - futureSeasonFunding);
     const minimumGuarantee = roundMoney(Math.min(maximumGuarantee, Math.max(1_000_000, input.guaranteeTarget)));
-    const expectedRoyaltyCost = roundMoney(input.platformState.expectedTitleGross * (backendPoints / 100));
+    const expectedRoyaltyCost = roundMoney(input.platformState.expectedTitleGross * (input.platform.eligibleBackendRevenueFraction || 0) * (backendPoints / 100));
     const fixedExposure = minimumGuarantee + productionFunding + futureSeasonFunding;
-    const backendCap = backendPoints > 0 && rng() > 0.78
-        ? roundMoney(Math.max(expectedRoyaltyCost, expectedRoyaltyCost * (1.25 + rng() * 1.5)))
-        : null;
+    const backendCap = null;
     const dealStructure: StreamingRightsDealStructure = productionFunding > 0 || futureSeasonFunding > 0
         ? 'PRE_BUY'
         : backendPoints > 0 ? 'GUARANTEE_REVENUE_SHARE' : 'FLAT_LICENSE';
@@ -168,7 +167,7 @@ const buildOffer = (input: OfferBuildInput): StreamingOfferVersion => {
         futureSeasonFunding,
         licensorRevenueShare: backendPoints,
         platformRevenueShare: 100 - backendPoints,
-        backendBasis: 'ADJUSTED_GROSS_RECEIPTS',
+        backendBasis: 'ADS_RENTAL_RECEIPTS',
         guaranteeRecoupment,
         backendCap,
         durationWeeks,
@@ -204,10 +203,11 @@ const applyCatalogueTermsToOffer = (
     if (session.subjectKind !== 'CATALOGUE_PACKAGE' || !session.cataloguePackageId || !session.catalogueComponents?.length) {
         return offer;
     }
-    const titleFloor = session.catalogueComponents.length * 1_000_000;
+    const titleFloor = session.catalogueComponents.reduce((sum,c)=>sum+Math.max(1_000_000,minimumStreamingLicenseFee(c.referenceValue)),0);
     const minimumGuarantee = Math.max(titleFloor, Math.min(state.fixedExposureCeiling, offer.minimumGuarantee));
     const allocation = allocateStreamingCatalogueGuarantee({
         totalGuarantee: minimumGuarantee,
+        minimumGuaranteesByProject:Object.fromEntries(session.catalogueComponents.map(c=>[c.sourceProjectId,minimumStreamingLicenseFee(c.referenceValue)])),
         components: session.catalogueComponents,
         platformId: state.platformId as PlatformId,
         bidderValues: state.catalogueComponentValues || Object.fromEntries(
@@ -219,6 +219,11 @@ const applyCatalogueTermsToOffer = (
         localizationRequirements: offer.localizationRequirements || [],
     });
     if (!allocation.valid) return offer;
+    allocation.rows = allocation.rows.map(row => ({...row, backendBasis: 'ADS_RENTAL_RECEIPTS',
+        licensorRevenueShare: offer.licensorRevenueShare, platformRevenueShare: offer.platformRevenueShare,
+        guaranteeRecoupment:'NON_RECOUPABLE', backendCap:null,
+        expectedRoyaltyCost: Math.round(row.minimumGuarantee * (state.eligibleBackendRevenueFraction || 0) * offer.licensorRevenueShare / 100),
+        expectedTotalCost:row.minimumGuarantee + Math.round(row.minimumGuarantee * (state.eligibleBackendRevenueFraction || 0) * offer.licensorRevenueShare / 100)}));
     const expectedRoyaltyCost = allocation.rows.reduce((sum, row) => sum + row.expectedRoyaltyCost, 0);
     const weightedBackend = minimumGuarantee > 0
         ? Math.round(allocation.rows.reduce((sum, row) => sum + row.minimumGuarantee * row.licensorRevenueShare, 0) / minimumGuarantee)
@@ -312,6 +317,7 @@ const buildPlatformState = (
             ...requirement,
             countryIds: [...requirement.countryIds].sort(),
         })) || [],
+        eligibleBackendRevenueFraction: platform.eligibleBackendRevenueFraction || 0,
         backendPreference: clamp(platform.backendPreference ?? 0.5, 0.1, 0.8),
         sharedRightsPreference: clamp(platform.sharedRightsPreference ?? 0.22, 0.05, 0.75),
         availablePremiereAbsoluteWeeks: [...(platform.availablePremiereAbsoluteWeeks || [])],
@@ -437,7 +443,7 @@ export const createStreamingCatalogueBiddingSession = (
 ): StreamingBiddingSession => {
     const cataloguePackage = input.cataloguePackage;
     if (cataloguePackage.components.length < 2) throw new Error('A catalogue package requires at least two eligible titles.');
-    const titleFloor = cataloguePackage.components.length * 1_000_000;
+    const titleFloor = cataloguePackage.components.reduce((sum,c)=>sum+Math.max(1_000_000,minimumStreamingLicenseFee(c.referenceValue)),0);
     const eligiblePlatforms = input.platforms.filter(platform => (
         platform.canStartNewBids !== false
         && platform.cashAvailable >= titleFloor
@@ -560,6 +566,7 @@ const actForPlatform = (
         relationshipMultiplier: state.relationshipMultiplier,
         localizationLevelCap: state.localizationLevelCap,
         localizationRequirements: state.localizationRequirements,
+        eligibleBackendRevenueFraction: state.eligibleBackendRevenueFraction || 0,
         backendPreference: state.backendPreference,
         sharedRightsPreference: state.sharedRightsPreference,
         availablePremiereAbsoluteWeeks: [...(state.availablePremiereAbsoluteWeeks || [])],
@@ -729,7 +736,7 @@ export const acceptStreamingBiddingOffer = (
     const acceptedSharedCount = session.offers.filter(offer => (
         offer.status === 'ACCEPTED' && offer.exclusivity === 'NON_EXCLUSIVE'
     )).length;
-    const continuesSharedLicensing = selectable.exclusivity === 'NON_EXCLUSIVE' && acceptedSharedCount < 2;
+    const continuesSharedLicensing = session.subjectKind !== 'CATALOGUE_PACKAGE' && selectable.exclusivity === 'NON_EXCLUSIVE' && acceptedSharedCount < 2;
     const lockedPremiereAbsoluteWeek = selectable.exclusivity === 'NON_EXCLUSIVE'
         ? session.lockedPremiereAbsoluteWeek ?? selectable.proposedPremiereAbsoluteWeek ?? null
         : null;

@@ -1,3 +1,4 @@
+import { repairTalentNegotiations } from './talentNegotiation';
 import { INITIAL_PLAYER, type Business, type Message, type NewsItem, type Player, type PortfolioItem, type Relationship, type ScheduledEvent, type Stock, type StockTakeoverCase } from '../types';
 import { ensureLifestyleActivityState } from './lifestyleActivities';
 import { getAbsoluteWeek, inferStreamingStartWeekAbsolute } from './legacyLogic';
@@ -66,7 +67,7 @@ import { normalizeWorldStreamingViewingState } from './worldEconomy/worldStreami
 import { normalizeWorldStreamingPlatformEconomyState } from './worldEconomy/worldStreamingPlatformEconomy';
 import { createWorldEconomyHealthSummary } from './worldEconomy/worldEconomyIntegrity';
 
-export const SAVE_MIGRATION_VERSION = 50;
+export const SAVE_MIGRATION_VERSION = 51;
 const RUNAWAY_STOCK_CASH_CEILING = 10_000_000_000_000;
 const ACQUISITION_RIVAL_BID_MAX_ROUNDS = 3;
 
@@ -1362,11 +1363,11 @@ export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
             ),
         },
     };
-    const repairedPlayer = normalizePlayerProfileAvatars(migrateLegacyCharacterIdentity(reverseLegacyImportedAcquisitionDebtCharge(
+    const repairedPlayer = repairTalentNegotiations(normalizePlayerProfileAvatars(migrateLegacyCharacterIdentity(reverseLegacyImportedAcquisitionDebtCharge(
         repairAcquiredStudioAssetPortfolios(
             repairInDevelopmentContinuationScripts(repairAcquiredStudioFinance(migratedPlayer)),
         ),
-    )));
+    ))));
     const productionHouses = repairedPlayer.businesses.filter(business => business.type === 'PRODUCTION_HOUSE');
     const parentStudio = productionHouses.find(business => (
         business.studioState?.acquisitionOrigin !== 'STUDIO_ACQUISITION'

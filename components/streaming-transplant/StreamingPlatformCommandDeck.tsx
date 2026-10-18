@@ -114,7 +114,7 @@ export interface HqState {
   treasury: number;
   /** pre-launch only */
   readiness?: { done: number; total: number };
-  nowPlaying?: { title: string; watching: number };
+  nowPlaying?: { title: string; watching: number; periodLabel?: string; headingLabel?: string };
   stats: HqStat[];
   slate: SlateItem[];
   service: ServiceTitle[];
@@ -262,10 +262,10 @@ export const PlatformHQ: React.FC<{
                 <i className={css.nowplay} />
               </span>
               <div className={css.nowtxt}>
-                <span>MOST WATCHED RIGHT NOW</span>
+                <span>{state.nowPlaying.headingLabel || 'MOST WATCHED RIGHT NOW'}</span>
                 <b>{state.nowPlaying.title}</b>
               </div>
-              <em>{count(state.nowPlaying.watching)} watching</em>
+              <em>{count(state.nowPlaying.watching)} {state.nowPlaying.periodLabel || 'watching'}</em>
             </button>
           )}
 

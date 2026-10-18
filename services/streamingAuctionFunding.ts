@@ -185,7 +185,9 @@ export const processAuctionFutureFunding = (input: Player, absoluteWeek: number)
     releaseStrategy:'STREAMING_ONLY',format,...(terms.kind!=='NEW_ORIGINAL'?{parentProjectId:obligation.sourceProjectId}:{}),
     ...(production.universeId?{universeId:production.universeId}:{}),...(terms.kind==='NEXT_SEASON'?{seasonNumber:Math.max(1,Number((parent as IndustryProject & {seasonNumber?:number})?.seasonNumber)||1)+ordinal+1}:{}),
    };
-   const license=createStreamingLicenseContract({id:createDeterministicId('auction_funded_license',production.id),sourceProject:project,
+   // Production ownership participation is a distinct, fully funded producer obligation,
+   // never an optional licensing backend inferred from this title's purchase offer.
+   const license=createStreamingLicenseContract({royaltyPurpose:'PRODUCER_PARTICIPATION',backendBasis:'ADJUSTED_GROSS_RECEIPTS',id:createDeterministicId('auction_funded_license',production.id),sourceProject:project,
     buyerPlatformId:null,platformContentPlanId:production.id,cataloguePackageId:null,licensorName:studio.name,territory:'GLOBAL',
     durationWeeks:104,exclusivity:'EXCLUSIVE',minimumGuarantee:0,platformRevenueShare:terms.platformRightsPercent,
     signedAtAbsoluteWeek:started,startsAtAbsoluteWeek:absoluteWeek,origin:'STUDIO_MARKET',sellerType:'STUDIO',sellerPlatformId:null,

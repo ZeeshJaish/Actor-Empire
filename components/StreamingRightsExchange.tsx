@@ -406,7 +406,7 @@ export default function StreamingRightsExchange({
                   </> : null}
                   <label className="is-money"><span>{selectedIsExactTransfer ? 'Transfer price' : selectedNegotiation.kind === 'SUBLICENSE_OUT' ? 'Upfront asking price' : 'Minimum guarantee'}</span><input type="number" min={0} step={250000} value={terms.minimumGuarantee} onChange={event => setTerms({ ...terms, minimumGuarantee: Number(event.target.value) })} /><small>{formatMoney(terms.minimumGuarantee)}</small></label>
                   {!selectedIsExactTransfer ? <>
-                  <label><span>{selectedNegotiation.kind === 'SUBLICENSE_OUT' ? 'Your revenue share' : 'Platform revenue share'}</span><input type="range" min={45} max={90} value={terms.platformRevenueShare} onChange={event => setTerms({ ...terms, platformRevenueShare: Number(event.target.value) })} /><small>{terms.platformRevenueShare}% / {100 - terms.platformRevenueShare}%</small></label>
+                  <label><span>{selectedNegotiation.kind === 'SUBLICENSE_OUT' ? 'Seller backend · actual ads + rentals' : 'Platform retained share'}</span><input type="range" min={0} max={20} value={100 - terms.platformRevenueShare} onChange={event => setTerms({ ...terms, platformRevenueShare: 100 - Number(event.target.value) })} /><small>{terms.platformRevenueShare}% / {100 - terms.platformRevenueShare}%</small></label>
                   <label className="is-money"><span>Marketing guarantee</span><input type="number" min={0} step={250000} value={terms.marketingGuarantee} onChange={event => setTerms({ ...terms, marketingGuarantee: Number(event.target.value) })} /><small>{formatMoney(terms.marketingGuarantee)}</small></label>
                   </> : null}
                 </div>
@@ -431,7 +431,7 @@ export default function StreamingRightsExchange({
                     </button>
                   ))}
                   <span><ShieldCheck size={16} /> Cancellation penalty {formatMoney(terms.cancellationPenalty)}</span>
-                  <span><UsersRound size={16} /> Audience target {terms.viewershipBonusThreshold.toLocaleString()} accounts</span>
+                  <span><UsersRound size={16} /> Seller backend applies to this title’s actual ads + rental receipts</span>
                 </div> : <div className="rights-clause-board is-transfer"><ShieldCheck size={16} /><span>No studio consent, notice, or transfer participation. The original backend remains attached.</span></div>}
                 {selectedNegotiation.status === 'COUNTERED' ? (
                   <div className="rights-counteroffer">

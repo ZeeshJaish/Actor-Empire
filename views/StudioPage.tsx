@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
-import { Player, NPCActor, StudioContract, ContractType, PaymentMode } from '../types';
-import { Users, Briefcase, Star, TrendingUp, DollarSign, X, Check, AlertCircle, Info, Clock, Calendar, Film, ShieldAlert, PenTool } from 'lucide-react';
+import { getTalentNegotiationActor, getTalentNegotiationState, negotiateTalentContract } from '../services/talentNegotiation';
+import React, { useRef, useState } from 'react';
+import { Player, NPCActor, PaymentMode } from '../types';
+import { Users, Star, TrendingUp, DollarSign, X, Check, Info, Film, ShieldAlert, PenTool } from 'lucide-react';
 import { getAvailableTalent, NPC_DATABASE } from '../services/npcLogic';
-import { calculateNPCAsk, evaluateOffer, createContract, getTalentNegotiationProfile } from '../services/talentService';
-import { getPlayerLanguage, t } from '../services/i18n';
+import { calculateNPCAsk } from '../services/talentService';
 import { getStudioGroup } from '../services/studioGroup';
-import { mergeParentStudioTalentRosters } from '../services/talentRoster';
+import { hasTalentUses, mergeParentStudioTalentRosters } from '../services/talentRoster';
 
 interface StudioPageProps {
     player: Player;
@@ -26,8 +26,6 @@ export const StudioPage: React.FC<StudioPageProps> = ({ player, studioId, onUpda
     const studio = player.businesses.find(b => b.type === 'PRODUCTION_HOUSE' && b.id === studioId)
         || studioGroup.parentStudio;
     const isPrimaryStudio = Boolean(studio && studioGroup.parentStudio?.id === studio.id);
-    const language = getPlayerLanguage(player);
-    const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
     const signedContracts = isPrimaryStudio && studio
         ? mergeParentStudioTalentRosters(
             studio.id,
@@ -36,14 +34,12 @@ export const StudioPage: React.FC<StudioPageProps> = ({ player, studioId, onUpda
         )
         : (studio?.studioState?.talentRoster || []).filter(contract => contract.studioId === studio?.id);
     
-    // Initialize memory if needed
-    const studioMemory = player.studioMemory || {};
-    const cooldowns = studioMemory.cooldowns || {};
-    const attempts = studioMemory.attempts || {};
-
+    const latestPlayer = useRef(player);
+    const renderedPlayer = useRef(player);
+    if (renderedPlayer.current !== player) { renderedPlayer.current = player; latestPlayer.current = player; }
     const availableActors = getAvailableTalent(player.currentWeek, 'ACTOR', player.flags.extraNPCs || [])
-        .filter(npc => !signedContracts.some(c => c.npcId === npc.id))
-        .filter(npc => !(cooldowns[npc.id] && cooldowns[npc.id] > player.currentWeek));
+        .filter(npc => !signedContracts.some(c => c.npcId === npc.id && hasTalentUses(c)))
+        .filter(npc => !studio || getTalentNegotiationState(player, studio.id, npc.id).attempts < 3);
 
     const handlePaymentModeChange = (newMode: PaymentMode) => {
         if (newMode === paymentMode) return;
@@ -63,135 +59,19 @@ export const StudioPage: React.FC<StudioPageProps> = ({ player, studioId, onUpda
 
     const handleNegotiate = () => {
         if (!selectedNPC || !studio) return;
-        
-        const offerAmount = parseInt(offerAmountStr.replace(/,/g, '')) || 0;
-        
-        const result = evaluateOffer(
-            selectedNPC, 
-            negotiationDuration, 
-            offerAmount,
-            paymentMode,
-            player.stats.fame, 
-            studio.stats.valuation || 0,
-            language
-        );
-
-        if (
-            result.success
-            && paymentMode === 'UPFRONT'
-            && !isPrimaryStudio
-            && result.totalContractValue > studio.balance
-        ) {
-            setNegotiationResult({
-                success: false,
-                message: `${studio.name} needs $${result.totalContractValue.toLocaleString()} in its own treasury to sign this deal. Add capital in Finance, then try again.`,
-            });
-            return;
-        }
-
-        setNegotiationResult(result);
-
-        const updatedPlayer = { ...player };
-        if (!updatedPlayer.studioMemory) updatedPlayer.studioMemory = {};
-        if (!updatedPlayer.studioMemory.attempts) updatedPlayer.studioMemory.attempts = {};
-        if (!updatedPlayer.studioMemory.cooldowns) updatedPlayer.studioMemory.cooldowns = {};
-
-        if (result.success && result.maintenanceFee !== undefined) {
-            const newContract: StudioContract = {
-                ...createContract(
-                selectedNPC.id,
-                'MOVIE_DEAL',
-                paymentMode,
-                negotiationDuration,
-                result.totalContractValue,
-                result.maintenanceFee,
-                player.currentWeek
-                ),
-                studioId: studio.id,
-            };
-
-            // The legacy global roster is the parent/HQ mirror only. Subsidiary
-            // contracts stay on their own studioState and treasury.
-            if (isPrimaryStudio) {
-                if (!updatedPlayer.studio) updatedPlayer.studio = { isUnlocked: true, baseType: 'GARAGE', talentRoster: [], lastTalentRefreshWeek: 0 };
-                if (!updatedPlayer.studio.talentRoster) updatedPlayer.studio.talentRoster = [];
-                updatedPlayer.studio.talentRoster.push(newContract);
-            }
-
-            updatedPlayer.businesses = updatedPlayer.businesses.map(b => {
-                if (b.id === studio.id) {
-                    const studioState = b.studioState || { scripts: [], concepts: [], writers: [], ipMarket: [], lastMarketRefreshWeek: 0, lastWriterRefreshWeek: 0 };
-                    const upfrontCost = paymentMode === 'UPFRONT' ? result.totalContractValue : 0;
-                    return {
-                        ...b,
-                        balance: isPrimaryStudio ? b.balance : b.balance - upfrontCost,
-                        studioState: {
-                            ...studioState,
-                            talentRoster: [
-                                ...(isPrimaryStudio
-                                    ? (studioState.talentRoster || []).filter(contract => contract.id !== newContract.id)
-                                    : (studioState.talentRoster || []).filter(contract => contract.studioId === studio.id)),
-                                newContract,
-                            ],
-                            financeLedger: upfrontCost > 0 && !isPrimaryStudio
-                                ? [
-                                    {
-                                        id: `studio_talent_upfront_${studio.id}_${newContract.id}`,
-                                        week: player.currentWeek,
-                                        year: player.age,
-                                        amount: -upfrontCost,
-                                        type: 'PRODUCTION_SPEND' as const,
-                                        label: `${selectedNPC.name} talent contract`,
-                                    },
-                                    ...(studioState.financeLedger || []),
-                                ].slice(0, 200)
-                                : studioState.financeLedger,
-                        }
-                    };
-                }
-                return b;
-            });
-            
-            // Pay upfront if applicable
-            if (paymentMode === 'UPFRONT' && isPrimaryStudio) {
-                updatedPlayer.money -= result.totalContractValue;
-                updatedPlayer.finance.history.unshift({
-                    id: `tx_upfront_${Date.now()}`,
-                    week: player.currentWeek,
-                    year: player.age,
-                    amount: -result.totalContractValue,
-                    category: 'EXPENSE',
-                    description: tr('studio.talent.contractUpfront', { name: selectedNPC.name })
-                });
-            }
-
-            // Clear attempts on success
-            delete updatedPlayer.studioMemory.attempts[selectedNPC.id];
-            
-            onUpdatePlayer(updatedPlayer);
-        } else {
-            // Failed attempt
-            const currentAttempts = updatedPlayer.studioMemory.attempts[selectedNPC.id] || 0;
-            const newAttempts = currentAttempts + 1;
-            updatedPlayer.studioMemory.attempts[selectedNPC.id] = newAttempts;
-            
-            if (newAttempts >= 3) {
-                // Cooldown for 12 weeks
-                updatedPlayer.studioMemory.cooldowns[selectedNPC.id] = player.currentWeek + 12;
-                delete updatedPlayer.studioMemory.attempts[selectedNPC.id];
-            }
-            
-            onUpdatePlayer(updatedPlayer);
-        }
+        const offerAmount = Number(offerAmountStr.replace(/,/g, ''));
+        const outcome = negotiateTalentContract(latestPlayer.current, studio.id, selectedNPC, negotiationDuration, offerAmount, paymentMode);
+        latestPlayer.current = outcome.player;
+        setNegotiationResult(outcome.result);
+        onUpdatePlayer(outcome.player);
     };
 
     const getNPCById = (id: string) => {
         return [...availableActors, ...NPC_DATABASE, ...(player.flags.extraNPCs || [])].find(n => n.id === id);
     };
 
-    const ask = selectedNPC ? calculateNPCAsk(selectedNPC, negotiationDuration) : null;
-    const negotiationProfile = selectedNPC ? getTalentNegotiationProfile(selectedNPC, language) : null;
-    const currentAttempts = selectedNPC ? (attempts[selectedNPC.id] || 0) : 0;
+    const ask = selectedNPC && studio ? calculateNPCAsk(getTalentNegotiationActor(player, studio.id, selectedNPC), negotiationDuration) : null;
+    const currentAttempts = selectedNPC && studio ? getTalentNegotiationState(player, studio.id, selectedNPC.id).attempts : 0;
     const attemptsLeft = 3 - currentAttempts;
 
     return (
@@ -259,11 +139,11 @@ export const StudioPage: React.FC<StudioPageProps> = ({ player, studioId, onUpda
                                                     <Film size={10}/> {contract.moviesRemaining}/{contract.totalMovies} Movies Left
                                                 </span>
                                                 <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest bg-zinc-800 px-2 py-1 rounded-lg flex items-center gap-1">
-                                                    <DollarSign size={10}/> ${contract.maintenanceFee.toLocaleString()}/wk Upkeep
+                                                    <DollarSign size={10}/> ${(hasTalentUses(contract) ? contract.maintenanceFee : 0).toLocaleString()}/wk Upkeep
                                                 </span>
                                                 {contract.paymentMode === 'WEEKLY_INSTALLMENTS' && contract.installmentsPaid < contract.totalInstallments && (
                                                     <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest bg-blue-500/10 px-2 py-1 rounded-lg flex items-center gap-1">
-                                                        Installments: {contract.installmentsPaid}/{contract.totalInstallments}
+                                                        Installments: {contract.installmentsPaid}/{contract.totalInstallments}{!hasTalentUses(contract) ? ' · Payments continue' : ''}
                                                     </span>
                                                 )}
                                             </div>
@@ -357,18 +237,6 @@ export const StudioPage: React.FC<StudioPageProps> = ({ player, studioId, onUpda
                                     </div>
 
                                     <div className="space-y-4 font-sans">
-                                        {negotiationProfile && (
-                                            <div className="bg-amber-50 border border-amber-200 rounded p-3">
-                                                <div className="flex items-start gap-2">
-                                                    <Info size={15} className="text-amber-700 shrink-0 mt-0.5" />
-                                                    <div>
-                                                        <div className="text-[10px] font-black text-amber-800 uppercase tracking-widest">Negotiation Read: {negotiationProfile.label}</div>
-                                                        <p className="text-xs text-amber-900/80 mt-1 leading-relaxed">{negotiationProfile.summary} Market ask is a guide, not a guaranteed yes.</p>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
-
                                         {/* Terms */}
                                         <div>
                                             <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-1 block">1. Commitment (Movies)</label>
@@ -436,7 +304,7 @@ export const StudioPage: React.FC<StudioPageProps> = ({ player, studioId, onUpda
                                     </div>
                                     <button 
                                         onClick={handleNegotiate}
-                                        disabled={!offerAmountStr}
+                                        disabled={!offerAmountStr || attemptsLeft <= 0}
                                         className="px-6 py-2 bg-zinc-900 text-white font-bold uppercase tracking-widest rounded hover:bg-zinc-800 transition-all disabled:opacity-50 flex items-center gap-2 shadow-md"
                                     >
                                         <PenTool size={16} /> Sign & Offer

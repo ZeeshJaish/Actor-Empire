@@ -202,4 +202,12 @@ assert(controlledBidRelease?.distributionPhase === 'STREAMING_BIDDING', 'Control
 assert(controlledBidRelease?.bids?.length === 3, 'Controlled subsidiary offers must remain available for the Release Wizard.');
 assert(controlledDealEntries.length === 0, 'Controlled subsidiaries must not auto-credit a deal before the player accepts it.');
 
+const malformedBidPlayer=makePostTheatricalBidPlayer('INDEPENDENT_LABEL','malformed');
+malformedBidPlayer.activeReleases[0].bids=[{platformId:'APPLE_TV',upfront:42_000_000,royalty:10,duration:52,fundingAmount:-50_000_000}];
+const malformedClosed=await processGameWeek(malformedBidPlayer);
+assert(!malformedClosed.player.businesses[0].studioState?.financeLedger?.some(row=>row.type==='STREAMING_DEAL'&&row.projectId==='qa_malformed_movie'),'Negative funding must never mint buyer cash or seller receipts.');
+assert(!malformedClosed.player.activeReleases.find(row=>row.id==='qa_malformed_movie')?.streamingContractId,'Malformed bid must not sign a contract.');
+const controlledBuyerCash=controlledBidWeek.player.world.platforms!.APPLE_TV.ai!.financeHistory.at(-1)!.openingCashMillions;
+const acceptedBuyerCash=independentBidWeek.player.world.platforms!.APPLE_TV.ai!.financeHistory.at(-1)!.openingCashMillions;
+assert(Math.abs(controlledBuyerCash-acceptedBuyerCash-42)<.000001,'A $42M fixed fee must reduce buyer cash by42M, not42million millions.');
 console.log('Subsidiary streaming audit passed.');

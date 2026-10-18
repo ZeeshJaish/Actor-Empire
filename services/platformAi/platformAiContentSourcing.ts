@@ -1,3 +1,4 @@
+import {streamingBackendPercentForBuyer} from '../streamingBackendPolicy';
 import type {
     Genre,
     IndustryProject,
@@ -768,7 +769,7 @@ export const commitPlatformContentCandidate = (
             minimumGuarantee: millionsToFullCurrency(perProjectCost),
             platformRevenueShare: input.candidate.source === 'OWNED_STUDIO_TRANSFER'
                 ? 100
-                : catalogueRow?.platformRevenueShare || 70,
+                : 100 - streamingBackendPercentForBuyer({...input.player,world:input.world},input.platformId,input.absoluteWeek,Math.min(20,100-(catalogueRow?.platformRevenueShare ?? 90)),requestedCountryIds),
             signedAtAbsoluteWeek: input.absoluteWeek,
             startsAtAbsoluteWeek: input.absoluteWeek,
             origin: input.candidate.source === 'OWNED_STUDIO_TRANSFER'

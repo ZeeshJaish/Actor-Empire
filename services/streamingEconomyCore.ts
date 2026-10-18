@@ -1,5 +1,7 @@
 import { isStreamingLicenseActiveAt } from './streamingRightsCore';
-import type { StreamingCatalogLicenseStatus } from '../types';
+import type { StreamingBackendBasis, StreamingRoyaltyRevenueSource, StreamingCatalogLicenseStatus } from '../types';
+import { attributeStreamingTitleRevenue, calculateStreamingContractRoyalty } from './streamingContractSettlement';
+import type { StreamingGuaranteeRecoupment, StreamingTitleRevenueSignal } from '../types';
 
 const bounded = (value: unknown, minimum = 0, maximum = Number.MAX_SAFE_INTEGER): number => {
     const numeric = Number(value);
@@ -47,48 +49,83 @@ export interface StreamingRevenueShareLicense {
     licensorRevenueShare: number;
     origin?: string;
     permanentPurchase?: boolean;
+    backendBasis?: StreamingBackendBasis;
+    minimumGuarantee?: number;
+    guaranteeRecoupment?: StreamingGuaranteeRecoupment;
+    backendCap?: number | null;
+    cumulativeRoyaltyAccrued?: number;
+    cumulativeRoyaltyPaid?: number;
+    lastRoyaltyReceiptAbsoluteWeek?: number;
 }
 
-export interface StreamingPartnerRevenueShareInput {
+/** One finite receipt pool, including owned/zero-backend titles. No signal invents no contribution. */
+export const allocateStreamingSubscriptionReceipts = (input: {
     weeklySubscriptionRevenueFullCurrency: number;
+    titles: Array<StreamingTitleRevenueSignal & {contractId: string | null}>;
+}) => {
+    const seen = new Set<string>();
+    const titles = input.titles.filter(title => {
+        if (!title.projectId || seen.has(title.projectId)) return false;
+        seen.add(title.projectId);
+        return [title.viewingAccounts, title.watchHours, title.subscriberAcquisition, title.subscriberRetention]
+            .some(value => Number.isFinite(value) && value > 0);
+    });
+    return attributeStreamingTitleRevenue({subscriptionRevenue: bounded(input.weeklySubscriptionRevenueFullCurrency), titles})
+        .map((row, index) => ({...row, contractId: titles[index].contractId}));
+};
+
+/** All modes earned by one contract in one week consume its advance/cap together. */
+export const calculateStreamingSignedRoyaltyAllocations = (input: {
     licenses: StreamingRevenueShareLicense[];
-    availableTitleCount: number;
+    receipts: Array<{receiptId: string; contractId: string; grossReceipts: number; sourceKind?: StreamingRoyaltyRevenueSource}>;
     absoluteWeek: number;
-    /** When supplied, only canonical titles already released on the service may participate. */
-    eligibleSourceProjectIds?: string[];
+}) => {
+    const licenses = new Map(input.licenses.map(row => [row.id, row]));
+    const seen = new Set<string>();
+    const receipts = input.receipts.filter(row => {
+        if (!row.receiptId || seen.has(row.receiptId) || !Number.isSafeInteger(row.grossReceipts) || row.grossReceipts <= 0) return false;
+        seen.add(row.receiptId);
+        const license = licenses.get(row.contractId);
+        return license?.backendBasis !== 'ADS_RENTAL_RECEIPTS' || row.sourceKind === 'ADVERTISING' || row.sourceKind === 'RENTAL';
+    });
+    const allocations = calculateStreamingStoreRevenueShareAllocations({
+        licenses: input.licenses.filter(license => (license.lastRoyaltyReceiptAbsoluteWeek ?? -1) < input.absoluteWeek
+            && license.startsAtAbsoluteWeek <= input.absoluteWeek && input.absoluteWeek < license.expiresAtAbsoluteWeek),
+        receipts, absoluteWeek: input.absoluteWeek,
+    });
+    return allocations.map(row => ({...row, adjustedGrossReceipts:receipts.filter(receipt=>receipt.contractId===row.contractId)
+        .reduce((sum,receipt)=>sum+receipt.grossReceipts,0),lastRoyaltyReceiptAbsoluteWeek: input.absoluteWeek}));
+};
+
+export interface StreamingStoreRevenueShareInput {
+    licenses: StreamingRevenueShareLicense[];
+    /** Each receipt is attributed to the exact country/mode contract that authorized the sale. */
+    receipts: Array<{contractId: string; grossReceipts: number}>;
+    absoluteWeek: number;
 }
 
-/** Shared player/AI rights-share semantics. Only one live third-party right per canonical title participates. */
-export const calculateStreamingPartnerRevenueShareFullCurrency = (
-    input: StreamingPartnerRevenueShareInput,
-): number => {
-    const seenProjects = new Set<string>();
-    const eligibleProjects = input.eligibleSourceProjectIds
-        ? new Set(input.eligibleSourceProjectIds.filter(Boolean))
-        : null;
-    const active = input.licenses.filter(license => {
-        if (
-            license.status !== 'ACTIVE'
-            || !isStreamingLicenseActiveAt(license, input.absoluteWeek)
-            || license.origin === 'OWNED_STUDIO_TRANSFER'
-            || license.permanentPurchase
-            || !license.sourceProjectId
-            || eligibleProjects !== null && !eligibleProjects.has(license.sourceProjectId)
-            || seenProjects.has(license.sourceProjectId)
-        ) return false;
-        seenProjects.add(license.sourceProjectId);
-        return true;
+export const calculateStreamingStoreRevenueShareAllocations = (input: StreamingStoreRevenueShareInput) => {
+    const grossByContract = new Map<string, number>();
+    for (const row of input.receipts) grossByContract.set(row.contractId,
+        (grossByContract.get(row.contractId) || 0) + bounded(row.grossReceipts));
+    return [...grossByContract].flatMap(([contractId, grossReceipts]) => {
+        const license = input.licenses.find(row => row.id === contractId);
+        if (!license || license.status !== 'ACTIVE' || !isStreamingLicenseActiveAt(license, input.absoluteWeek)
+            || license.origin === 'OWNED_STUDIO_TRANSFER' || license.permanentPurchase) return [];
+        return [{contractId, ...calculateStreamingContractRoyalty({
+            adjustedGrossReceipts: grossReceipts,
+            licensorRevenueShare: license.licensorRevenueShare,
+            minimumGuarantee: license.minimumGuarantee || 0,
+            guaranteeRecoupment: license.guaranteeRecoupment || 'NON_RECOUPABLE',
+            backendCap: license.backendCap ?? null,
+            cumulativeRoyaltyAccrued: license.cumulativeRoyaltyAccrued || 0,
+            cumulativeRoyaltyPaid: license.cumulativeRoyaltyPaid || 0,
+        })}];
     });
-    if (!active.length) return 0;
-    const averageLicensorShare = active.reduce((sum, license) => (
-        sum + bounded(license.licensorRevenueShare, 0, 100)
-    ), 0) / active.length / 100;
-    const licensedViewingWeight = Math.min(
-        0.45,
-        active.length / Math.max(1, Math.round(bounded(input.availableTitleCount))),
-    );
-    return bounded(input.weeklySubscriptionRevenueFullCurrency) * averageLicensorShare * licensedViewingWeight;
 };
+
+export const calculateStreamingStoreRevenueShareFullCurrency = (input: StreamingStoreRevenueShareInput): number =>
+    calculateStreamingStoreRevenueShareAllocations(input).reduce((sum, row) => sum + row.royaltyPayable, 0);
 
 export interface StreamingRunwayInput {
     cash: number;

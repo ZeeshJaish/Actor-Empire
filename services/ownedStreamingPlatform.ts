@@ -1,4 +1,6 @@
 import { normalizeAuctionFutureFunding } from './streamingAuctionTerms';
+import {normalizeStreamingContractRoyaltyStatements} from './streamingContractSettlement';
+import { normalizeStreamingContentAccounting } from './streamingContentAccounting';
 import {
     createInitialOwnedStreamingPlatformState,
     OWNED_STREAMING_PLATFORM_SCHEMA_VERSION,
@@ -2841,14 +2843,14 @@ const normalizeCatalogSetupDraft = (value: unknown): OwnedStreamingCatalogSetupD
         durationWeeks: Math.round(clamp(source.durationWeeks, 52, 156, 104)),
         exclusivity: isOneOf(source.exclusivity, LICENSE_EXCLUSIVITY, 'NON_EXCLUSIVE'),
         minimumGuarantee: Math.round(clamp(source.minimumGuarantee, 0, Number.MAX_SAFE_INTEGER)),
-        platformRevenueShare: Math.round(clamp(source.platformRevenueShare, 50, 90, 70)),
+        platformRevenueShare: Math.round(clamp(source.platformRevenueShare, 80, 100, 100)),
         negotiationStatus: isOneOf(source.negotiationStatus, CATALOG_NEGOTIATION_STATUSES, 'BUILDING'),
         counterMinimumGuarantee: counterMinimumGuarantee === null || counterMinimumGuarantee === undefined
             ? null
             : Math.round(clamp(counterMinimumGuarantee, 0, Number.MAX_SAFE_INTEGER)),
         counterPlatformRevenueShare: counterPlatformRevenueShare === null || counterPlatformRevenueShare === undefined
             ? null
-            : Math.round(clamp(counterPlatformRevenueShare, 50, 90, 70)),
+            : Math.round(clamp(counterPlatformRevenueShare, 80, 100, 100)),
         negotiationRound: Math.round(clamp(source.negotiationRound, 0, 3)),
         updatedAtAbsoluteWeek: Math.max(0, Math.round(clamp(source.updatedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
         ...([1, 2, 3].includes(Number(source.quoteVersion))
@@ -2895,6 +2897,13 @@ const normalizeCatalogLicense = (value: unknown): OwnedStreamingCatalogLicense |
         minimumGuarantee: Math.round(clamp(source.minimumGuarantee, 0, Number.MAX_SAFE_INTEGER)),
         platformRevenueShare,
         licensorRevenueShare: 100 - platformRevenueShare,
+        ...(source.cumulativeRoyaltyAccrued !== undefined ? {cumulativeRoyaltyAccrued: Math.round(clamp(source.cumulativeRoyaltyAccrued, 0, Number.MAX_SAFE_INTEGER))} : {}),
+        ...(source.royaltyPurpose==='PRODUCER_PARTICIPATION'?{royaltyPurpose:'PRODUCER_PARTICIPATION' as const}:{}),
+        backendBasis: source.backendBasis === 'ADS_RENTAL_RECEIPTS' ? 'ADS_RENTAL_RECEIPTS' : 'ADJUSTED_GROSS_RECEIPTS',
+        ...(source.cumulativeRoyaltyPaid !== undefined ? {cumulativeRoyaltyPaid: Math.round(clamp(source.cumulativeRoyaltyPaid, 0, Number.MAX_SAFE_INTEGER))} : {}),
+        ...(source.lastRoyaltyReceiptAbsoluteWeek !== undefined ? {lastRoyaltyReceiptAbsoluteWeek: Math.round(clamp(source.lastRoyaltyReceiptAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))} : {}),
+        ...(source.guaranteeRecoupment !== undefined ? {guaranteeRecoupment: source.guaranteeRecoupment === 'RECOUPABLE' ? 'RECOUPABLE' as const : 'NON_RECOUPABLE' as const} : {}),
+        ...(source.backendCap !== undefined ? {backendCap: source.backendCap === null ? null : Math.round(clamp(source.backendCap, 0, Number.MAX_SAFE_INTEGER))} : {}),
         signedAtAbsoluteWeek,
         startsAtAbsoluteWeek,
         expiresAtAbsoluteWeek,
@@ -2974,7 +2983,7 @@ const normalizeRightsNegotiation = (value: unknown): OwnedStreamingRightsNegotia
         status: isOneOf(source.status, RIGHTS_NEGOTIATION_STATUSES, 'OPEN'),
         round: Math.round(clamp(source.round, 0, 3)),
         counterMinimumGuarantee: source.counterMinimumGuarantee == null ? null : Math.round(clamp(source.counterMinimumGuarantee, 0, Number.MAX_SAFE_INTEGER)),
-        counterPlatformRevenueShare: source.counterPlatformRevenueShare == null ? null : Math.round(clamp(source.counterPlatformRevenueShare, 45, 90, 70)),
+        counterPlatformRevenueShare: source.counterPlatformRevenueShare == null ? null : Math.round(clamp(source.counterPlatformRevenueShare, 1, 100, 100)),
         createdAtAbsoluteWeek: Math.max(0, Math.round(clamp(source.createdAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
         updatedAtAbsoluteWeek: Math.max(0, Math.round(clamp(source.updatedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
         expiresAtAbsoluteWeek: Math.max(0, Math.round(clamp(source.expiresAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
@@ -3150,6 +3159,7 @@ const normalizeBuyerAuctionSession = (value: unknown): StreamingBuyerAuctionSess
             cashAvailable: Math.round(clamp(rival.cashAvailable, 0, 100_000_000_000)),
             sellerValueCeiling: Math.round(clamp(rival.sellerValueCeiling, 0, 100_000_000_000)),
             preferredBackend: Math.round(clamp(rival.preferredBackend, 0, 40)),
+            ...(rival.eligibleBackendRevenueFraction == null ? {} : {eligibleBackendRevenueFraction: clamp(rival.eligibleBackendRevenueFraction, 0, 1)}),
             marketingLimit: Math.round(clamp(rival.marketingLimit, 0, 2_000_000_000)),
             nextActionSecond: Math.max(1, Math.round(clamp(rival.nextActionSecond, 1, 75))),
             revision: Math.max(0, Math.round(clamp(rival.revision, 0, 20))),
@@ -3591,6 +3601,7 @@ const normalizeWeeklyOperations = (value: unknown): OwnedStreamingWeeklyOperatio
         worldViewingCommercialOperatingCost: source.worldViewingCommercialOperatingCost === undefined
             ? undefined : Math.round(clamp(source.worldViewingCommercialOperatingCost, 0, Number.MAX_SAFE_INTEGER)),
         partnerRevenueShareCost: Math.round(clamp(source.partnerRevenueShareCost, 0, Number.MAX_SAFE_INTEGER)),
+        contractRoyaltyStatements:normalizeStreamingContractRoyaltyStatements(source.contractRoyaltyStatements),
         infrastructureCost: Math.round(clamp(source.infrastructureCost, 0, Number.MAX_SAFE_INTEGER)),
         leadershipCost: Math.round(clamp(source.leadershipCost, 0, Number.MAX_SAFE_INTEGER)),
         financingCost: Math.round(clamp(source.financingCost, 0, Number.MAX_SAFE_INTEGER)),
@@ -3598,6 +3609,20 @@ const normalizeWeeklyOperations = (value: unknown): OwnedStreamingWeeklyOperatio
         growthPlanCost: Math.round(clamp(source.growthPlanCost, 0, Number.MAX_SAFE_INTEGER)),
         rightsComplianceCost: Math.round(clamp(source.rightsComplianceCost, 0, Number.MAX_SAFE_INTEGER)),
         marketPolicyCost: Math.round(clamp(source.marketPolicyCost, 0, Number.MAX_SAFE_INTEGER)),
+        marketIncomeTax: source.marketIncomeTax === undefined ? undefined : Math.round(clamp(source.marketIncomeTax, 0, Number.MAX_SAFE_INTEGER)),
+        marketRevenueLevy: source.marketRevenueLevy === undefined ? undefined : Math.round(clamp(source.marketRevenueLevy, 0, Number.MAX_SAFE_INTEGER)),
+        marketTaxSettlement: (() => {
+            const assessment = asRecord(source.marketTaxSettlement);
+            if (assessment.schemaVersion !== 1 || !Array.isArray(assessment.bands)) return undefined;
+            return {schemaVersion: 1 as const,
+                revenueLevy: Math.round(clamp(assessment.revenueLevy, 0, Number.MAX_SAFE_INTEGER)),
+                remainingFundedPolicyCost: Math.round(clamp(assessment.remainingFundedPolicyCost, 0, Number.MAX_SAFE_INTEGER)),
+                bands: assessment.bands.slice(0, 300).map(value => {
+                    const band = asRecord(value);
+                    return {preMaintenanceProfit: clamp(band.preMaintenanceProfit, -Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER),
+                        maintenanceShare: clamp(band.maintenanceShare, 0, 1), taxRate: clamp(band.taxRate, 0, 1)};
+                })};
+        })(),
         marketOperatingCost: Math.round(clamp(source.marketOperatingCost, 0, Number.MAX_SAFE_INTEGER)),
         technologyCampusCost: Math.round(clamp(source.technologyCampusCost, 0, Number.MAX_SAFE_INTEGER)),
         productSuiteCost: Math.round(clamp(source.productSuiteCost, 0, Number.MAX_SAFE_INTEGER)),
@@ -3615,6 +3640,9 @@ const normalizeWeeklyOperations = (value: unknown): OwnedStreamingWeeklyOperatio
             0,
         )),
         contentAmortization: Math.round(clamp(source.contentAmortization, 0, Number.MAX_SAFE_INTEGER)),
+        contentAccountingVersion: source.contentAccountingVersion === 1 ? 1 : undefined,
+        additionalOperatingExpense: source.additionalOperatingExpense === undefined ? undefined
+            : Math.round(clamp(source.additionalOperatingExpense, 0, Number.MAX_SAFE_INTEGER)),
         accountingContribution: Math.round(clamp(
             source.accountingContribution,
             -Number.MAX_SAFE_INTEGER,
@@ -4103,6 +4131,7 @@ export const normalizeOwnedStreamingPlatformState = (
             obligation => obligation.id,
         ).slice(-160),
         originalCommissionDraft: normalizeOriginalCommissionDraft(source.originalCommissionDraft),
+        contentAccounting: normalizeStreamingContentAccounting(source.contentAccounting),
         originalCommissions: dedupeByKey(
             asArray<unknown>(source.originalCommissions)
                 .map(normalizeOriginalCommission)

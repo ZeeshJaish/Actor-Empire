@@ -1,3 +1,5 @@
+import { createContract } from '../services/talentService';
+import { talentAmountOutstanding } from '../services/talentRoster';
 import { strict as assert } from 'node:assert';
 import type {
     BackgroundCastingPlan,
@@ -5,6 +7,7 @@ import type {
     Commitment,
     Player,
     Script,
+    StudioContract,
 } from '../types';
 import { buildGreenlightBuzz } from '../views/lifestyle/business/greenlightBuzz';
 import {
@@ -235,3 +238,77 @@ assert(firstTweet);
 assert.match(firstTweet.data.content, /Audit Director/);
 
 console.log('Greenlight project builder audit passed: package, funding, and launch buzz preserve their core outputs.');
+
+// A contracted performer stays financially payable after the final Greenlight use.
+const contractActor = { id: 'actor_contract_qa', name: 'Contract Actor', occupation: 'ACTOR', tier: 'ESTABLISHED', stats: { talent: 80, fame: 60 } };
+let contractRoster: StudioContract[] = [{ ...createContract(contractActor.id, 'MOVIE_DEAL', 'WEEKLY_INSTALLMENTS', 3, 52_000_007, 5000, 12), studioId: studio.id }];
+const untouched = createContract('unused_actor', 'MOVIE_DEAL', 'UPFRONT', 2, 1000, 500, 12);
+for (let index = 0; index < 3; index++) {
+    const contractPlayer = { ...player, flags: { ...player.flags, extraNPCs: [contractActor] }, studio: { ...player.studio, talentRoster: contractRoster } } as Player;
+    const built = buildGreenlightProject({ ...projectInput,
+        player: contractPlayer, studioTalentRoster: [...contractRoster, untouched], isPrimaryStudio: true,
+        castList: [
+            { id: 'lead', role: 'Lead', roleType: 'LEAD', actorId: contractActor.id, actorName: contractActor.name, salary: 0 },
+            { id: 'support', role: 'Supporting', roleType: 'SUPPORTING', actorId: contractActor.id, actorName: contractActor.name, salary: 0 },
+        ], now: () => 5000 + index,
+    });
+    assert.equal(built.safeMovieCastList[0].salary, 0);
+    assert.equal(built.updatedStudioTalentRoster.find(c => c.npcId === 'unused_actor')?.moviesRemaining, 2);
+    contractRoster = built.updatedStudioTalentRoster.filter(c => c.npcId === contractActor.id);
+    assert.equal(contractRoster[0].moviesRemaining, 2 - index);
+    assert.deepEqual(built.updatedPlayerTalentRoster, built.updatedStudioTalentRoster);
+}
+assert.equal(contractRoster[0].status, 'EXPIRED');
+assert.equal(talentAmountOutstanding(contractRoster[0]), 52_000_007);
+console.log('Greenlight contract lifecycle passed: one use per project, zero extra salary, last use retains unpaid EMI.');
+
+// Exercise the real signing -> Greenlight builder -> week-engine transaction chain.
+const { INITIAL_PLAYER } = await import('../types');
+const { createBusiness } = await import('../services/businessLogic');
+const { migratePlayerSave } = await import('../services/saveMigration');
+const { negotiateTalentContract } = await import('../services/talentNegotiation');
+const { calculateNPCAsk } = await import('../services/talentService');
+const { processGameWeek } = await import('../services/gameLoop');
+const { prepareVerifiedPlayerForPersistence } = await import('../services/savePreparation');
+let live = structuredClone(INITIAL_PLAYER);
+live.id = 'talent_full_flow_qa'; live.name = 'Talent QA'; live.age = 30; live.currentWeek = 49; live.money = 5_000_000_000;
+live.pendingEvents = []; live.scheduledEvents = []; live.pendingEvent = null; live.commitments = []; live.activeReleases = [];
+live.logs = []; live.news = []; live.inbox = []; live.studio.isUnlocked = true;
+const liveStudio = createBusiness('QA Pictures', 'PRODUCTION_HOUSE', 'MAJOR_STUDIO', {} as any, '🎬', 49);
+liveStudio.id = 'ui_hq'; liveStudio.balance = 1_000_000_000;
+liveStudio.studioState!.scripts = [script];
+live.businesses = [liveStudio];
+const liveActor = { ...contractActor, gender: 'FEMALE', handle: '@qa', avatar: '', prestigeBias: 'MIXED', openness: 50, netWorth: 100_000, traits: [], bio: 'Contract verification actor', potential: 80 } as any;
+live = migratePlayerSave(live);
+const fullAsk = calculateNPCAsk(liveActor, 1);
+const signed = negotiateTalentContract(live, liveStudio.id, liveActor, 1, Math.ceil(fullAsk.weeklyInstallment * 1.5), 'WEEKLY_INSTALLMENTS');
+assert.equal(signed.result.success, true);
+assert.equal(signed.player.money, live.money);
+live = signed.player;
+const liveProject = buildGreenlightProject({ ...projectInput, player: live, studio: live.businesses[0],
+    isPrimaryStudio: true, studioTalentRoster: live.studio.talentRoster,
+    castList: [{ id: 'lead', role: 'Lead', roleType: 'LEAD', actorId: liveActor.id, actorName: liveActor.name, salary: 0 }], now: () => 90125 });
+const liveFunding = prepareGreenlightFunding({ player: live, studio: live.businesses[0], studioCashRequirement: liveProject.studioCashRequirement,
+    newCommitment: liveProject.newCommitment, finalInvestorRaised: 0, greenlightPackageBudget: liveProject.greenlightPackageBudget,
+    isCreatingNewUniverse: false, normalizedWorldUniverses: {}, finalUniverseId: undefined, newUniverseName: '', randomUniverseColor: '#2563eb' });
+live = { ...live, commitments: [liveFunding.fundedCommitment], studio: { ...live.studio, talentRoster: liveProject.updatedPlayerTalentRoster },
+    businesses: live.businesses.map(b => ({ ...b, balance: liveFunding.newStudioBalance, studioState: { ...b.studioState!, talentRoster: liveProject.updatedStudioTalentRoster,
+        scripts: liveProject.updatedScripts, concepts: liveProject.updatedConcepts, productionFund: liveFunding.newProductionFund } })) };
+assert.equal(live.studio.talentRoster[0].moviesRemaining, 0);
+assert.equal(live.studio.talentRoster[0].amountPaid, 0);
+assert.equal(live.commitments[0].projectDetails!.castList![0].salary, 0);
+const prepared = prepareVerifiedPlayerForPersistence(live, 'MANUAL');
+assert.equal(prepared.player.studio.talentRoster[0].totalAmount, live.studio.talentRoster[0].totalAmount);
+if (process.argv.includes('--write-ui-fixture')) {
+    const { writeFileSync } = await import('node:fs');
+    writeFileSync('/tmp/talent-exhausted-ui-fixture.json', JSON.stringify(prepared.player));
+}
+let paidLive = (await processGameWeek(JSON.parse(JSON.stringify(prepared.player)))).player;
+assert.equal(paidLive.studio.talentRoster[0].installmentsPaid, 1);
+assert.equal(paidLive.studio.talentRoster[0].moviesRemaining, 0);
+assert.equal(paidLive.studio.talentRoster[0].amountPaid, Math.ceil(fullAsk.weeklyInstallment * 1.5));
+assert.equal(paidLive.finance.history.filter(tx => tx.description.startsWith('Talent Maintenance')).length, 0);
+assert.equal(paidLive.businesses[0].studioState!.talentRoster![0].installmentsPaid, 1);
+paidLive = migratePlayerSave(JSON.parse(JSON.stringify(paidLive)));
+assert.equal(paidLive.studio.talentRoster[0].installmentsPaid, 1);
+console.log('Full talent flow passed: immutable signing -> zero cast salary -> funded Greenlight -> last use -> verified save preparation -> EMI after exhaustion -> migration/reload.');

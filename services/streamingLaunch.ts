@@ -21,9 +21,10 @@ import { getStreamingOriginalLiveStatus } from './streamingOriginals';
 import { resolveOwnedStreamingReach } from './streamingProgression';
 import { getStreamingLaunchDefinitionSignature } from './streamingLaunchProgram';
 import { getStreamingOpeningProgrammeView } from './streamingOpeningProgramme';
-import { getStreamingBlendedMonthlyPrice } from './streamingPricingEconomy';
 import { getStreamingOpeningCatalogueView } from './streamingOpeningCatalogue';
 import { projectStreamingCommercialOffers } from './streamingCommercialOffers';
+import { stageWorldStreamingOpeningOffer } from './worldEconomy/worldStreamingOpening';
+import { createOpeningWorldStreamingCustomerState } from './worldEconomy/worldStreamingCustomers';
 
 export type StreamingLaunchReadinessTone = 'READY' | 'WATCH' | 'BLOCKED';
 
@@ -78,7 +79,7 @@ const clamp = (value: number, min: number, max: number): number => Math.max(min,
 const roundCapacity = (value: number): number => Math.max(0, Math.round(value / 1_000) * 1_000);
 const roundMoney = (value: number): number => Math.max(0, Math.round(value / 10_000) * 10_000);
 
-/** Opening reach is not automatically a paid subscriber count for free or transactional offers. */
+/** Legacy estimate for compatibility. New launch transactions use canonical customer choices. */
 export const calculateOpeningPaidSubscriberSeed = (
     pricing: OwnedStreamingPricingConfiguration,
     likelyConcurrentStreams: number,
@@ -419,12 +420,6 @@ export const commitOwnedStreamingLaunch = (
             ? 'PRESSURED_OPENING'
             : 'DEGRADED_OPENING';
     const conversionMultiplier = capacityPlan === 'STAGGERED_PREMIERE' ? 0.92 : 1;
-    const initialSubscribers = calculateOpeningPaidSubscriberSeed(
-        platform.serviceConfiguration.pricing,
-        option.effectiveLikelyConcurrentStreams,
-        readiness.score,
-        conversionMultiplier,
-    );
     const openingDemandIndex = clamp(Math.round(
         48
         + readiness.openingTitleCount * 4
@@ -442,7 +437,7 @@ export const commitOwnedStreamingLaunch = (
         forecastHighConcurrentStreams: readiness.forecastHighConcurrentStreams,
         protectedPeakConcurrentStreams: option.protectedPeakConcurrentStreams,
         launchHeadroomPercent: option.headroomPercent,
-        initialSubscribers,
+        initialSubscribers: 0,
         openingDemandIndex,
         playbackSuccessRate: Math.round(playbackSuccessRate * 100) / 100,
         outcomeTier,
@@ -450,6 +445,10 @@ export const commitOwnedStreamingLaunch = (
         openingOriginalTitle: readiness.openingOriginalTitle,
         marketingForecastSnapshotId: platform.launchMarketingPlan?.forecastSnapshot.id || null,
     };
+    const openingPlayer = stageWorldStreamingOpeningOffer({ ...player, ownedStreamingPlatform: { ...platform, launchCommit } }, absoluteWeek);
+    const openingCustomers = createOpeningWorldStreamingCustomerState(player, openingPlayer, absoluteWeek, conversionMultiplier);
+    const initialSubscribers = openingCustomers.global.playerEndingPaidAccounts;
+    launchCommit.initialSubscribers = initialSubscribers;
     const launchLedger: OwnedStreamingLedgerEntry = {
         id: createDeterministicId('streaming_event', platform.simulationSeed, idempotencyKey),
         idempotencyKey,
@@ -465,7 +464,7 @@ export const commitOwnedStreamingLaunch = (
             outcomeTier,
         },
     };
-    const weightedArpu = initialSubscribers > 0 ? getStreamingBlendedMonthlyPrice(platform) : 0;
+    const weightedArpu = initialSubscribers > 0 ? openingCustomers.global.playerMonthlySubscriptionRevenue / initialSubscribers : 0;
     const withLaunchFacts = compactOwnedStreamingPlatformForPersistence({
         ...platform,
         launchCommit,
@@ -505,6 +504,7 @@ export const commitOwnedStreamingLaunch = (
     const settledMarketing = settleOwnedStreamingLaunchMarketingAtOpening({
         ...player,
         ownedStreamingPlatform: withCinematic,
+        world: { ...player.world, worldStreamingCustomers: openingCustomers },
     });
     return {
         player: settledMarketing.player,

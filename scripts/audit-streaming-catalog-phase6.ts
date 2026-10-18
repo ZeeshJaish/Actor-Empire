@@ -154,7 +154,7 @@ draft = {
     ...draft,
     currentStep: 3,
     minimumGuarantee: quote.minimumGuarantee,
-    platformRevenueShare: Math.min(90, quote.targetPlatformRevenueShare + 8),
+    platformRevenueShare: 100,
 };
 
 const saved = saveStreamingCatalogDraft(fixture, draft);

@@ -64,6 +64,7 @@ export const createC6QaCareer = (stage: 'OPENING_NIGHT' | 'BUILD' | 'PRICING' = 
         directorId: 'c6-director', directorName: 'Test Director', reviews: 'QA fixture.',
     }] as any;
     const license = createStreamingLicenseContract({
+        backendBasis: 'ADJUSTED_GROSS_RECEIPTS',
         id: 'c6-qa-license', sourceProject: { id: 'c6-qa-title', title: 'The First Signal' },
         buyerPlatformId: null, platformContentPlanId: null, cataloguePackageId: null,
         licensorName: 'C6 QA Studio', territory: 'GLOBAL', durationWeeks: 52,

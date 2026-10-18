@@ -12,6 +12,7 @@ import {
     streamingBillingPathPrice,
 } from '../services/streamingPricingEconomy';
 import { forecastWorldStreamingBuildDemand, forecastWorldStreamingLaunchPricing } from '../services/worldEconomy/worldStreamingPricingForecast';
+import { createC6QaCareer } from '../lab/c6QaCareer';
 import { getWorldStreamingOffers } from '../services/worldEconomy/worldStreamingOffers';
 import { createWorldStreamingCustomerState } from '../services/worldEconomy/worldStreamingCustomers';
 import { normalizeStreamingPlatformEcosystem } from '../services/streamingPlatformEcosystem';
@@ -19,6 +20,8 @@ import { saveStreamingPricingPlan } from '../services/streamingLaunchProgram';
 import { saveOwnedStreamingLaunchMarketingDraft } from '../services/streamingLaunchMarketingLifecycle';
 import { forecastPricing, type PricingSettings } from '../components/studio-finance/finance/launch';
 import { PlanPriceEditorControl, PlanPricePaths } from '../components/studio-finance/components/launch/StepPricing';
+import { getAbsoluteWeek } from '../services/legacyLogic';
+import { addStreamingAuditCatalogueTitle } from './helpers/streamingGrantedCatalogueFixture';
 
 const basePricing: OwnedStreamingPricingConfiguration = {
     streams: ['subs', 'ads'],
@@ -71,6 +74,7 @@ player.ownedStreamingPlatform.identity = {
     dayOneMarketIds: ['US', 'IN'], launchServerCityId: null, foundedAtAbsoluteWeek: 100,
 };
 player.ownedStreamingPlatform.technologyLevels.ADVERTISING_COMMERCE = 20;
+addStreamingAuditCatalogueTitle(player, getAbsoluteWeek(player.age, player.currentWeek), 'pricing-world-film');
 
 const normalForecast = forecastWorldStreamingLaunchPricing(player, basePricing, ['US', 'IN']);
 const targetedPricing: OwnedStreamingPricingConfiguration = {
@@ -288,8 +292,11 @@ const storeOnlyPricing = normalizeStreamingPricingConfiguration({ ...basePricing
 const expensiveStorePricing = normalizeStreamingPricingConfiguration({ ...storeOnlyPricing,
     rentals: { ...storeOnlyPricing.rentals, rent: 10_000, buy: 10_000 },
 });
-const normalStoreWorld = forecastWorldStreamingLaunchPricing(player, storeOnlyPricing, ['US', 'IN']);
-const expensiveStoreWorld = forecastWorldStreamingLaunchPricing(player, expensiveStorePricing, ['US', 'IN']);
+assert.equal(forecastWorldStreamingLaunchPricing(player,storeOnlyPricing,['US','IN']).estimatedWeeklyRentalRevenueIfPlayable,0,
+    'a proposal with no eligible saved title cannot invent store revenue');
+const storeForecastPlayer=createC6QaCareer();
+const normalStoreWorld = forecastWorldStreamingLaunchPricing(storeForecastPlayer, storeOnlyPricing, ['US']);
+const expensiveStoreWorld = forecastWorldStreamingLaunchPricing(storeForecastPlayer, expensiveStorePricing, ['US']);
 const normalStorePanel = forecastPricing(storeOnlyPricing as PricingSettings, 1_000_000,
     { rivalAveragePrice: 12, reachRate: .5 }, [], normalStoreWorld);
 const expensiveStorePanel = forecastPricing(expensiveStorePricing as PricingSettings, 1_000_000,
