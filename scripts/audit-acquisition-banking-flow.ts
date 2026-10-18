@@ -1,0 +1,55 @@
+import assert from 'node:assert/strict';
+import { INITIAL_PLAYER, type Player } from '../types';
+import { createBusiness } from '../services/businessLogic';
+import { getStudioTreasuryWithdrawalQuote, performStudioTreasuryTransfer } from '../services/studioGroup';
+import { getEstimatedNetWorth, getAverageWeeklyCashFlow, getAbsoluteBorrowingCeiling, getOutstandingLoanBalance } from '../services/loanLogic';
+import { issuePersonalLoan, repayPersonalLoan } from '../services/playerBanking';
+import { buildForbesStudioProfile } from '../services/forbesStudioProfile';
+import { submitOpeningOffer, resolveStudioAcquisitionResponses, getAcquisitionCase, completeAcquisitionTransaction } from '../services/studioAcquisition';
+import { getStudioOwnershipPercent } from '../services/studioOwnership';
+import { getAcquisitionDebtSummary, payDownAcquisitionDebt } from '../services/acquisitionDebt';
+import { migratePlayerSave } from '../services/saveMigration';
+import { processGameWeek } from '../services/gameLoop';
+import { initializeStocks, getCorporateStockDividendReceipts } from '../services/stockLogic';
+
+let checks = 0;
+const check = (name: string, run: () => void) => { run(); checks++; console.log('PASS', name); };
+const fixture = (): Player => {
+ const p = structuredClone(INITIAL_PLAYER); Object.assign(p,{id:'banking-full-flow',age:36,currentWeek:22,money:200_000_000,flags:{},portfolio:[],stocks:[],stockTakeovers:[]});
+ p.finance={history:[],yearly:[],loans:[],credit:{successfulPayments:0,missedPayments:0,defaults:0,totalBorrowed:0,totalRepaid:0}};
+ p.businesses=['HQ','Source'].map((name,index)=>{const b=createBusiness(name,'PRODUCTION_HOUSE','MAJOR_STUDIO',{} as any,'🎬',1,36);b.id=name;b.balance=index?800_000_000:10_000_000;b.stats.valuation=index?1_000_000_000:50_000_000;return b;});
+ p.businesses[1].config.productionType='Acquired Studio';Object.assign(p.businesses[1].studioState!,{acquisitionOrigin:'STUDIO_ACQUISITION',operatingModel:'CONTROLLED_SUBSIDIARY',acquiredYear:35,acquiredWeek:1});
+ return p;
+};
+const initial=fixture(); const beforeWealth=getEstimatedNetWorth(initial); const beforeLimit=getAbsoluteBorrowingCeiling(initial);
+const withdrawn=performStudioTreasuryTransfer({player:initial,studioId:'Source',action:'WITHDRAW',counterparty:'PERSONAL',amount:500_000_000});assert.ok(withdrawn.success,withdrawn.reason);
+let p=withdrawn.player;
+check('actual $500M withdrawal preserves wealth and borrowing capacity',()=>{assert.equal(p.money,700_000_000);assert.equal(getEstimatedNetWorth(p),beforeWealth);assert.equal(getAbsoluteBorrowingCeiling(p),beforeLimit);assert.deepEqual(getAverageWeeklyCashFlow(p),getAverageWeeklyCashFlow(initial));assert.equal(issuePersonalLoan(p,500_000_000,52).success,false);});
+const issued=issuePersonalLoan(p,50_000_000,52);assert.ok(issued.success,issued.reason);const loanId=issued.loan!.id;const rate=issued.loan!.annualInterestRate;p=issued.player;
+check('valid loan credits cash once and retains matching debt',()=>{assert.equal(p.money,750_000_000);assert.equal(p.finance.loans[0].principal,50_000_000);assert.equal(getEstimatedNetWorth(p)-getOutstandingLoanBalance(p),beforeWealth);assert.equal(getAverageWeeklyCashFlow(p).income,0);});
+const profile=buildForbesStudioProfile({studio:{id:'FlowTarget',name:'FlowTarget',valuation:.05,cashReserve:18,reputation:70,recentHits:0,archetype:'PRESTIGE'},rank:1,worldProjects:[],universes:{}});
+const offered=submitOpeningOffer({player:p,profile,offerType:'AGGRESSIVE',offerAmount:55_000_000,funding:{source:'PERSONAL'}});assert.ok(offered.success,offered.reason);
+p={...offered.player,currentWeek:24};p=resolveStudioAcquisitionResponses(p);assert.equal(getAcquisitionCase(p,profile.id)?.status,'ACCEPTED');
+const closed=completeAcquisitionTransaction({player:p,profile});assert.ok(closed.success,closed.reason);p=closed.player;const target=p.businesses.find(b=>b.id===profile.id)!;
+check('real submitted accepted acquisition debits exact purchase and retains inherited debt',()=>{assert.equal(p.money,695_000_000);assert.equal(target.balance,18_000_000);assert.equal(getStudioOwnershipPercent(p,target),100);assert.ok(getAcquisitionDebtSummary(p).totalRemainingPrincipal>0);assert.equal(completeAcquisitionTransaction({player:p,profile}).success,false);});
+const debt=getAcquisitionDebtSummary(p).totalRemainingPrincipal;
+const quote=getStudioTreasuryWithdrawalQuote(p,target);assert.ok(quote.maxOwnerProceeds>0);
+const distributed=performStudioTreasuryTransfer({player:p,studioId:target.id,action:'WITHDRAW',counterparty:'PERSONAL',amount:quote.maxOwnerProceeds});assert.ok(distributed.success,distributed.reason);p=distributed.player;
+const repaid=repayPersonalLoan(p,loanId,'BALANCE');assert.ok(repaid.success,repaid.reason);p=repaid.player;
+check('new studio withdrawal pays bank principal without deleting company liabilities',()=>{assert.equal(p.money,645_000_000+quote.maxOwnerProceeds);assert.equal(p.finance.loans[0].principal,0);assert.equal(p.finance.loans[0].annualInterestRate,rate);assert.equal(getAcquisitionDebtSummary(p).totalRemainingPrincipal,debt);assert.equal(getAverageWeeklyCashFlow(p).income,0);assert.equal(repayPersonalLoan(p,loanId,'BALANCE').success,false);});
+const paid=payDownAcquisitionDebt(p,debt);assert.ok(paid.success,paid.reason);p=paid.player;
+check('inherited company principal is paid separately exactly once',()=>{assert.equal(p.money,645_000_000+quote.maxOwnerProceeds-debt);assert.equal(getAcquisitionDebtSummary(p).totalRemainingPrincipal,0);assert.equal(payDownAcquisitionDebt(p,debt).success,false);assert.equal(getAverageWeeklyCashFlow(p).expenses,0);});
+const migrated=migratePlayerSave(JSON.parse(JSON.stringify(p)));
+check('save reload retains balances ownership loan rates and capital classification',()=>{assert.equal(migrated.money,p.money);assert.equal(migrated.finance.loans[0].annualInterestRate,rate);assert.equal(migrated.finance.loans[0].principal,0);assert.equal(migrated.businesses.find(b=>b.id===target.id)!.balance,p.businesses.find(b=>b.id===target.id)!.balance);assert.equal(getStudioOwnershipPercent(migrated,migrated.businesses.find(b=>b.id===target.id)!),100);assert.equal(getAverageWeeklyCashFlow(migrated).income,0);});
+
+const dividendFixture=fixture();dividendFixture.currentWeek=12;dividendFixture.stocks=initializeStocks();dividendFixture.portfolio=[{stockId:'stk_apple',shares:100_000,averageCost:100,totalInvested:10_000_000,equityFunding:[{ownerStudioId:'Source',shares:100_000}]}];
+const nextWeek=await processGameWeek(dividendFixture);
+check('actual weekly engine posts corporate public dividends once to company ledger',()=>{
+ const next=nextWeek.player;const expected=getCorporateStockDividendReceipts(next,dividendFixture.currentWeek);assert.ok(expected.length,'exercise payout week');
+ const entries=next.businesses.find(b=>b.id==='Source')!.studioState!.financeLedger.filter(e=>e.id.startsWith('corporate_stock_DIVIDEND_'));
+ assert.equal(entries.length,expected.length);assert.equal(entries.reduce((sum,e)=>sum+e.amount,0),expected.reduce((sum,e)=>sum+e.amount,0));
+ assert.equal(next.finance.history.filter(e=>e.description==='Stock Dividends').length,0);
+});
+const afterReloadWeek=await processGameWeek(migratePlayerSave(JSON.parse(JSON.stringify(nextWeek.player))));
+check('next week after save reload does not duplicate corporate dividend',()=>{const entries=afterReloadWeek.player.businesses.find(b=>b.id==='Source')!.studioState!.financeLedger.filter(e=>e.id.startsWith('corporate_stock_DIVIDEND_'));assert.equal(entries.length,1);});
+console.log(`Acquisition banking end-to-end audit passed (${checks} checks).`);

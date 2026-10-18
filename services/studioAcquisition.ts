@@ -1,7 +1,7 @@
 import type { Business, BusinessStaff, GameLanguage, NewsItem, Player, XPost } from '../types';
 import type { ForbesStudioProfile, StudioAcquisitionState } from './forbesStudioProfile';
 import { createDefaultStudioState } from './businessLogic';
-import { getCompanyEquityPositions, getCompanyPosition } from './companyPosition';
+import { getCompanyEquityPositions, getCompanyEquityFunding, getCompanyPosition } from './companyPosition';
 import {
     calculateStockTradeQuote,
     executeStockTrade,
@@ -18,6 +18,8 @@ import {
 } from './studioAcquisitionAssets';
 import { materializeStudioOwnership } from './industryWorld/studioOwnershipMaterializer';
 import { getGenderedAvatar } from './npcLogic';
+import { captureStudioEquityCashBasis } from './studioEquityCash';
+import { getStudioSaleTreasuryLock } from './studioGroup';
 
 export type AcquisitionCaseStatus = 'DRAFT' | 'OFFER_SUBMITTED' | 'COUNTERED' | 'RIVAL_BID' | 'ACCEPTED' | 'REJECTED' | 'CLOSED' | 'ACQUIRED';
 export type AcquisitionOfferType = 'CONSERVATIVE' | 'FAIR' | 'AGGRESSIVE' | 'MINORITY';
@@ -747,6 +749,8 @@ export const getFundingOptions = ({
     const studios = (player.businesses || []).filter(business => business.type === 'PRODUCTION_HOUSE');
     for (const business of studios) {
         const balance = Math.max(0, business.balance || 0);
+        const saleLock = getStudioSaleTreasuryLock(player, business.id);
+        const merged = business.studioState?.operatingModel === 'FULL_MERGER' || business.isActive === false;
         const complianceRisk = calculateStudioComplianceRisk({
             business,
             profile,
@@ -760,11 +764,11 @@ export const getFundingOptions = ({
             label: t(language, 'services.studioAcquisition.funding.studio.label', { studio: business.name }),
             balance,
             remainingBalance: balance - safeAmount,
-            affordable: balance >= safeAmount,
+            affordable: balance >= safeAmount && !saleLock && !merged,
             complianceRisk,
             complianceBand: getComplianceBand(complianceRisk),
             taxTreatment: t(language, 'services.studioAcquisition.funding.studio.taxTreatment'),
-            unavailableReason: balance >= safeAmount ? undefined : t(language, 'services.studioAcquisition.funding.studio.unavailable'),
+            unavailableReason: saleLock || (merged ? 'This studio is not an active funding company.' : balance >= safeAmount ? undefined : t(language, 'services.studioAcquisition.funding.studio.unavailable')),
         });
     }
     return options;
@@ -834,7 +838,7 @@ const deductImmediateExpense = (
         ...player,
         businesses: player.businesses.map(business => (
             business.id === funding.businessId
-                ? { ...business, balance: business.balance - amount }
+                ? { ...captureStudioEquityCashBasis(business), balance: business.balance - amount }
                 : business
         )),
     };
@@ -956,6 +960,7 @@ const buildAcquiredStudioBusiness = ({
         studioState: {
             ...studioState,
             acquisitionOrigin: 'STUDIO_ACQUISITION',
+            equityOwnerStudioId: closing.outcome === 'FULL_BUYOUT' && closing.funding.source === 'STUDIO' ? closing.funding.businessId : undefined,
             acquiredWeek: player.currentWeek,
             acquiredYear: player.age,
             acquiredAbsoluteWeek: ((Math.max(1, player.age) - 1) * 52) + Math.max(0, player.currentWeek - 1),
@@ -1827,6 +1832,13 @@ export const completeStudioAcquisition = ({
         }
         : chargedPlayer;
     const acquiredBusiness = buildAcquiredStudioBusiness({ player: convertedPlayer, profile, closing });
+    if (controlConversion?.kind === 'PRIVATE_STAKE_TO_CONTROL') {
+        acquiredBusiness.studioState!.equityOwnerStudioId = undefined;
+        acquiredBusiness.studioState!.equityFunding = [
+            ...getCompanyEquityPositions(player).filter(position => position.studioId === profile.id).flatMap(position => getCompanyEquityFunding(player, position)),
+            ...(funding.source === 'STUDIO' && funding.businessId ? [{ ownerStudioId: funding.businessId, percent: controlConversion.remainingPercent }] : []),
+        ];
+    }
     const acquiredCase: AcquisitionCase = {
         ...acquisitionCase,
         status: 'ACQUIRED',
@@ -2078,6 +2090,10 @@ const completeMinorityStudioInvestment = ({
     const nextPosition = {
         studioId: profile.id,
         studioName: profile.name,
+        equityFunding: [
+            ...previousPositions.filter(position => position.studioId === profile.id).flatMap(position => getCompanyEquityFunding(player, position)),
+            ...(funding.source === 'STUDIO' && funding.businessId ? [{ ownerStudioId: funding.businessId, percent: Math.min(purchasedPercent, Math.max(0, 49 - existingPercent)) }] : []),
+        ],
         percent: Math.min(49, existingPercent + purchasedPercent),
         investedAmount: previousPositions
             .filter(position => position.studioId === profile.id)
@@ -2192,6 +2208,8 @@ const completePublicTenderAcquisition = ({
         ...tradeResult.player,
         money: chargedPlayer.money,
         businesses: chargedPlayer.businesses,
+        portfolio: tradeResult.player.portfolio.map(holding => holding.stockId === stock.id && funding.source === 'STUDIO' && funding.businessId
+            ? { ...holding, equityFunding: [...(holding.equityFunding || []), { ownerStudioId: funding.businessId, shares: quote.shares }] } : holding),
         flags: chargedPlayer.flags,
         inbox: chargedPlayer.inbox,
         news: tradeResult.player.news,
@@ -2200,6 +2218,12 @@ const completePublicTenderAcquisition = ({
     const controlResult = completeStockControlAcquisition({ player: tenderedPlayer, profile });
     if (!controlResult.success || !controlResult.acquisitionCase?.closing) return controlResult;
 
+    if (controlResult.acquiredBusiness?.studioState && funding.source === 'STUDIO' && funding.businessId) {
+        controlResult.acquiredBusiness.studioState.equityFunding = [
+            ...(controlResult.acquiredBusiness.studioState.equityFunding || []),
+            { ownerStudioId: funding.businessId, percent: quote.shares / outstandingShares * 100 },
+        ];
+    }
     const closing = {
         ...controlResult.acquisitionCase.closing,
         finalPrice,

@@ -19,7 +19,9 @@ import type {
 } from '../types';
 import { normalizeStudioState } from './businessLogic';
 import { t } from './i18n';
-import { getStudioOwnershipPercent } from './studioOwnership';
+import { getStudioOwnershipPercent, getStudioEquityDescendantIds, getStudioEquityFunding } from './studioOwnership';
+import { captureStudioEquityCashBasis } from './studioEquityCash';
+import { retainBankTransactionHistory } from './bankTransactionHistory';
 
 export interface OperatingModelDefinition {
     id: SubsidiaryOperatingModel;
@@ -150,6 +152,7 @@ const createPersonalTransaction = ({
     amount,
     category: amount >= 0 ? 'BUSINESS' : 'ASSET',
     description: label,
+    cashFlowType: 'CAPITAL_TRANSFER',
 });
 
 const OPERATING_MODEL_TEMPLATES: Array<Pick<OperatingModelDefinition, 'id' | 'accent'>> = [
@@ -476,13 +479,13 @@ export const getStudioTreasuryWithdrawalQuote = (
 };
 
 /** Manual capital movements freeze both endpoints while a buyer relies on the sale balance sheet. */
-export const getStudioSaleTreasuryLock = (player: Pick<Player, 'businesses'>, studioId: string): string | null => {
+export const getStudioSaleTreasuryLock = (player: Pick<Player, 'businesses'> & Partial<Pick<Player, 'flags'>>, studioId: string): string | null => {
     const studio = player.businesses.find(business => business.id === studioId && business.type === 'PRODUCTION_HOUSE');
     if (!studio) return null;
     const listing = player.businesses.find(candidate => {
         const deck = candidate.studioState?.saleDeck;
         if (candidate.type !== 'PRODUCTION_HOUSE' || !deck || deck.status === 'CLOSED' || deck.status === 'WITHDRAWN') return false;
-        if (candidate.id === studioId) return true;
+        if (getStudioEquityDescendantIds({ ...player, flags: player.flags || {} }, candidate.id).includes(studioId)) return true;
         const isParentPackage = !isAcquiredStudio(candidate) && candidate.studioState?.operatingModel !== 'FULL_MERGER';
         return isParentPackage && isAcquiredStudio(studio) && studio.isActive !== false;
     });
@@ -535,12 +538,14 @@ export const performStudioTreasuryTransfer = ({
     const safeAmount = Math.floor(Number(amount) || 0);
     if (safeAmount <= 0) return { success: false, player, reason: 'INVALID_AMOUNT' };
 
-    const studio = player.businesses.find(business => business.id === studioId && business.type === 'PRODUCTION_HOUSE');
+    const foundStudio = player.businesses.find(business => business.id === studioId && business.type === 'PRODUCTION_HOUSE');
+    const studio = foundStudio ? captureStudioEquityCashBasis(foundStudio) : undefined;
     if (!studio?.studioState) return { success: false, player, reason: 'STUDIO_NOT_FOUND' };
     if (!isAcquiredStudio(studio) && counterparty === 'HQ') return { success: false, player, studio, reason: 'NOT_ACQUIRED_STUDIO' };
     if (studio.studioState.operatingModel === 'FULL_MERGER') return { success: false, player, studio, reason: 'MERGED_STUDIO' };
 
-    const parentStudio = counterparty === 'HQ' ? getParentStudio(player, studioId) : undefined;
+    const foundParentStudio = counterparty === 'HQ' ? getParentStudio(player, studioId) : undefined;
+    const parentStudio = foundParentStudio ? captureStudioEquityCashBasis(foundParentStudio) : undefined;
     if (counterparty === 'HQ' && !parentStudio?.studioState) {
         return { success: false, player, studio, reason: 'HQ_NOT_FOUND' };
     }
@@ -673,7 +678,7 @@ export const performStudioTreasuryTransfer = ({
         businesses: updatedBusinesses,
         finance: player.finance ? {
             ...player.finance,
-            history: financeHistory.slice(0, 200),
+            history: retainBankTransactionHistory(financeHistory),
         } : player.finance,
         logs: [logEntry, ...(player.logs || [])].slice(0, 50),
     };
@@ -691,6 +696,12 @@ export const getStudioFullMergerBlocker = (player: Player, studio: Business): st
     const parent = getParentStudio(player, studio.id);
     const saleLock = getStudioSaleTreasuryLock(player, studio.id) || (parent ? getStudioSaleTreasuryLock(player, parent.id) : null);
     if (saleLock) return saleLock;
+    if (getStudioEquityFunding(player, studio).length) {
+        return 'Corporate-owned subsidiaries must stay within their funding company. Use an ownership-aware studio sale to exit.';
+    }
+    if (getStudioEquityDescendantIds(player, studio.id).length > 1) {
+        return 'Sell or restructure the funded subsidiaries before merging their holding company.';
+    }
     if (getStudioOwnershipPercent(player, studio) < 100) {
         return 'Full merger requires 100% ownership. Buy the remaining shares first, or keep this studio as a subsidiary.';
     }

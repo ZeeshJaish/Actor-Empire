@@ -1,8 +1,11 @@
 import type { Player } from '../types';
 import type { ForbesStudioProfile } from './forbesStudioProfile';
 import { getStockOwnershipPercent } from './stockLogic';
+import { getStudioOwnershipPercent } from './studioOwnership';
 
 export interface CompanyEquityPosition {
+    /** Absolute company percentage held by each corporate funding source. */
+    equityFunding?: Array<{ ownerStudioId: string; percent: number }>;
     studioId: string;
     studioName?: string;
     percent: number;
@@ -68,6 +71,40 @@ export const getCompanyEquityPositions = (player: Pick<Player, 'flags'>): Compan
             && position.percent > 0
         ))
         : []
+);
+
+/** Recover only a single completed minority closing; never invent a missing holder. */
+export const getCompanyEquityFunding = (player: Pick<Player, 'flags'> & Partial<Pick<Player, 'businesses'>>, position: CompanyEquityPosition): NonNullable<CompanyEquityPosition['equityFunding']> => {
+    if (position.equityFunding) return position.equityFunding;
+    const cases = (Array.isArray(player.flags?.studioAcquisitionCases) ? player.flags.studioAcquisitionCases : [])
+        .filter((entry: any) => entry?.status === 'ACQUIRED' && entry.studioId === position.studioId && entry.closing?.outcome === 'MINORITY_STAKE');
+    if (cases.length !== 1 || cases[0].closing.funding?.source !== 'STUDIO') return [];
+    const closing = cases[0].closing;
+    const ownerStudioId = String(closing.funding.businessId || '');
+    const sameOriginalInvestment = Math.abs(Number(closing.finalPrice || 0) - position.investedAmount) <= 1;
+    if (!sameOriginalInvestment || (player.businesses && !player.businesses.some(business => business.id === ownerStudioId))) return [];
+    return ownerStudioId ? [{ ownerStudioId, percent: position.percent }] : [];
+};
+
+export const getCompanyEquityBeneficialPercent = (player: Player, position: CompanyEquityPosition): number => {
+    let remaining = position.percent;
+    let beneficial = 0;
+    for (const allocation of getCompanyEquityFunding(player, position)) {
+        const percent = Math.min(remaining, Math.max(0, Number(allocation.percent) || 0));
+        remaining -= percent;
+        const owner = player.businesses.find(business => business.id === allocation.ownerStudioId);
+        if (owner) beneficial += percent * getStudioOwnershipPercent(player, owner) / 100;
+    }
+    return remaining + beneficial;
+};
+
+export const getStudioCorporatePrivateHoldings = (player: Pick<Player, 'flags'>, studioId: string) => (
+    getCompanyEquityPositions(player).flatMap(position => {
+        const percent = Math.min(position.percent, getCompanyEquityFunding(player, position)
+            .filter(allocation => allocation.ownerStudioId === studioId).reduce((sum, allocation) => sum + Math.max(0, allocation.percent), 0));
+        return percent > 0 ? [{ studioId: position.studioId, percent,
+            value: Math.max(0, Number(position.currentCompanyValuation || position.entryCompanyValuation || 0)) * percent / 100 }] : [];
+    })
 );
 
 export const getStrategicStakeThreshold = (

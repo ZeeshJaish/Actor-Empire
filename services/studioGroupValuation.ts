@@ -2,8 +2,12 @@ import type { Business, Player, Stock } from '../types';
 import { getAcquisitionDebtSummary } from './acquisitionDebt';
 import { getStudioGroup } from './studioGroup';
 import { getStudioOwnershipPercent } from './studioOwnership';
+import { getStudioStandaloneEquityValue } from './studioEquityCash';
+import { getStudioCorporatePrivateHoldings } from './companyPosition';
 
-const getStandaloneValue = (business: Business) => Math.max(
+const getStandaloneValue = (business: Business) => business.type === 'PRODUCTION_HOUSE'
+    ? getStudioStandaloneEquityValue(business)
+    : Math.max(
     0,
     Number(business.stats?.valuation || 0),
     Number(business.balance || 0),
@@ -44,11 +48,24 @@ export interface StudioGroupValuation {
 
 export const getStudioGroupValuation = (player: Player): StudioGroupValuation => {
     const group = getStudioGroup(player);
-    const hqOperatingValue = group.parentStudio ? getStandaloneValue(group.parentStudio) : 0;
+    const controlledCompanyIds = new Set(group.allStudios.map(studio => studio.id));
+    for (const acquisitionCase of Array.isArray(player.flags?.studioAcquisitionCases) ? player.flags.studioAcquisitionCases : []) {
+        if (controlledCompanyIds.has(acquisitionCase?.closing?.acquiredBusinessId)) controlledCompanyIds.add(acquisitionCase.studioId);
+    }
+    const getStudioValue = (studio: Business) => getStandaloneValue(studio)
+        + getStudioCorporatePrivateHoldings(player, studio.id)
+            // Controlled operating assets are already valued as group banners.
+            .filter(holding => !controlledCompanyIds.has(holding.studioId))
+            .reduce((sum, holding) => sum + holding.value, 0);
+    const hqOperatingValue = group.parentStudio ? getStudioValue(group.parentStudio) : 0;
     const hqWeeklyResult = Number(group.parentStudio?.stats?.weeklyProfit || 0);
+    // Saves can own an acquired studio without a separate founder HQ. The
+    // display parent is not necessarily wholly owned by the player.
+    const hqOwnershipShare = group.parentStudio ? getStudioOwnershipPercent(player, group.parentStudio) / 100 : 0;
+    const hqAttributableValue = hqOperatingValue * hqOwnershipShare;
     const activeSubsidiaries = group.subsidiaries.filter(studio => studio.id !== group.parentStudio?.id);
     const holdings = activeSubsidiaries.map(studio => {
-        const standaloneValue = getStandaloneValue(studio);
+        const standaloneValue = getStudioValue(studio);
         const ownershipPercent = getStudioOwnershipPercent(player, studio);
         const ownershipShare = ownershipPercent / 100;
         const weeklyResult = Number(studio.stats?.weeklyProfit || 0);
@@ -65,12 +82,12 @@ export const getStudioGroupValuation = (player: Player): StudioGroupValuation =>
     const parentHoldingsValue = holdings.reduce((sum, holding) => sum + holding.attributableValue, 0);
     const minorityInterest = holdings.reduce(
         (sum, holding) => sum + Math.max(0, holding.standaloneValue - holding.attributableValue),
-        0,
+        Math.max(0, hqOperatingValue - hqAttributableValue),
     );
     const acquisitionDebtSummary = getAcquisitionDebtSummary(player);
     const acquisitionDebt = acquisitionDebtSummary.totalRemainingPrincipal;
     const groupWeeklyResult = hqWeeklyResult + holdings.reduce((sum, holding) => sum + holding.weeklyResult, 0);
-    const ownerWeeklyResult = hqWeeklyResult
+    const ownerWeeklyResult = (hqWeeklyResult * hqOwnershipShare)
         + holdings.reduce((sum, holding) => sum + holding.attributableWeeklyResult, 0)
         - acquisitionDebtSummary.weeklyInterestDue;
 
@@ -78,7 +95,7 @@ export const getStudioGroupValuation = (player: Player): StudioGroupValuation =>
         hqOperatingValue,
         parentHoldingsValue,
         acquisitionDebt,
-        parentCompanyValue: Math.max(0, hqOperatingValue + parentHoldingsValue - acquisitionDebt),
+        parentCompanyValue: Math.max(0, hqAttributableValue + parentHoldingsValue - acquisitionDebt),
         groupOperatingValue: hqOperatingValue + holdings.reduce((sum, holding) => sum + holding.standaloneValue, 0),
         minorityInterest,
         groupCapital: group.allStudios.reduce((sum, studio) => sum + Number(studio.balance || 0), 0),

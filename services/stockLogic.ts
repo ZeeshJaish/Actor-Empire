@@ -1,6 +1,8 @@
 
 import { Stock, Player, PortfolioItem, NewsItem } from '../types';
 import { getStudioStockPerformanceMultiplier } from './studioEcosystem';
+import { creditCorporateStockReceipt, getStockHoldingAllocations, splitStockReceipt } from './stockCashOwnership';
+import { getStudioSaleTreasuryLock } from './studioGroup';
 
 const KNOWN_OUTSTANDING_SHARES: Record<string, number> = {
     stk_apple: 15_300_000_000,
@@ -198,7 +200,7 @@ export interface StockTradeResult {
     success: boolean;
     player: Player;
     quote?: StockTradeQuote;
-    reason?: 'STOCK_NOT_FOUND' | 'INVALID_AMOUNT' | 'INSUFFICIENT_CASH' | 'INSUFFICIENT_SHARES';
+    reason?: 'STOCK_NOT_FOUND' | 'INVALID_AMOUNT' | 'INSUFFICIENT_CASH' | 'INSUFFICIENT_SHARES' | 'OWNER_NOT_FOUND' | 'LIVE_SALE_LISTING';
 }
 
 export type StockShareIssueReason =
@@ -423,6 +425,7 @@ export const executeStockTrade = (
         const totalInvested = existingInvested + quote.estimatedValue;
         const nextShares = existingShares + shares;
         const nextHolding: PortfolioItem = {
+            ...holding,
             stockId,
             shares: nextShares,
             totalInvested,
@@ -459,6 +462,14 @@ export const executeStockTrade = (
     }
 
     if (!holding || holding.shares < shares) return { success: false, player, quote, reason: 'INSUFFICIENT_SHARES' };
+    const split = splitStockReceipt(holding, shares, quote.estimatedValue);
+    const corporateReceipts = split.receipts.filter(row => row.ownerStudioId && row.soldShares > 0);
+    if (corporateReceipts.some(row => !player.businesses.some(business => business.id === row.ownerStudioId && business.type === 'PRODUCTION_HOUSE'))) {
+        return { success: false, player, quote, reason: 'OWNER_NOT_FOUND' };
+    }
+    if (corporateReceipts.some(row => getStudioSaleTreasuryLock(player, row.ownerStudioId))) {
+        return { success: false, player, quote, reason: 'LIVE_SALE_LISTING' };
+    }
     const averageCost = holding.averageCost || quote.currentPrice;
     const nextShares = holding.shares - shares;
     const remainingInvested = Math.max(0, (holding.totalInvested ?? (holding.shares * averageCost)) - (averageCost * shares));
@@ -470,15 +481,18 @@ export const executeStockTrade = (
                 shares: nextShares,
                 totalInvested: remainingInvested,
                 averageCost,
+                equityFunding: split.remainingFunding,
             }
             : item);
 
+    let creditedPlayer = player;
+    for (const receipt of corporateReceipts) creditedPlayer = creditCorporateStockReceipt(creditedPlayer, receipt.ownerStudioId, receipt.proceeds, 'SALE', stockId);
     return {
         success: true,
         quote,
         player: {
-            ...player,
-            money: player.money + quote.estimatedValue,
+            ...creditedPlayer,
+            money: player.money + (split.receipts.find(row => !row.ownerStudioId)?.proceeds || 0),
             stocks: player.stocks.map(candidate => candidate.id === stockId
                 ? {
                     ...candidate,
@@ -695,10 +709,27 @@ export const getDividendPayout = (
         const stock = stocks.find(s => s.id === item.stockId);
         if (stock && player && (isStockRetiredByMerger(player, stock) || isStockRetiredBySale(player, stock))) return;
         if (stock && stock.dividendYield > 0 && stock.lastDividendPayoutWeek === week) {
-            total += player
+            const gross = player
                 ? getEstimatedAnnualDividend(player, stock, item.shares) / 4
                 : ((normalizeStockPrice(stock, stock.price) * stock.dividendYield * item.shares) / 4);
+            const allocations = getStockHoldingAllocations(item);
+            total += allocations.corporate.length
+                ? (splitStockReceipt(item, item.shares, Math.floor(gross)).receipts.find(row => !row.ownerStudioId)?.proceeds || 0)
+                : gross;
         }
     });
     return Math.floor(total);
+};
+
+export const getCorporateStockDividendReceipts = (player: Player, week: number): Array<{ ownerStudioId: string; stockId: string; amount: number }> => {
+    const receipts: Array<{ ownerStudioId: string; stockId: string; amount: number }> = [];
+    for (const item of player.portfolio) {
+        const stock = player.stocks.find(candidate => candidate.id === item.stockId);
+        if (!stock || stock.dividendYield <= 0 || stock.lastDividendPayoutWeek !== week
+            || isStockRetiredByMerger(player, stock) || isStockRetiredBySale(player, stock)) continue;
+        const amount = Math.floor(getEstimatedAnnualDividend(player, stock, item.shares) / 4);
+        const split = splitStockReceipt(item, item.shares, amount);
+        for (const row of split.receipts) if (row.ownerStudioId && row.proceeds > 0) receipts.push({ ownerStudioId: row.ownerStudioId, stockId: stock.id, amount: row.proceeds });
+    }
+    return receipts;
 };

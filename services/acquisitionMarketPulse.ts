@@ -1,6 +1,7 @@
 import type { Business, NewsItem, Player, XPost } from '../types';
 import type { AcquisitionCase } from './studioAcquisition';
 import { getWorldReactionState, type WorldReactionState } from './worldReactions';
+import { applyStudioOperatingValuationMultiplier } from './studioEquityCash';
 
 export type AcquisitionMarketMood = 'EUPHORIC' | 'CONFIDENT' | 'NERVOUS' | 'BACKLASH';
 
@@ -186,15 +187,14 @@ const applyBusinessPulse = (
     const valuationMultiplier = 1 + (state.franchiseValueDelta * 0.0025) + (confidenceDelta * 0.0012);
     return businesses.map(business => {
         if (business.type !== 'PRODUCTION_HOUSE' || !affectedIds.has(business.id)) return business;
-        return {
+        return applyStudioOperatingValuationMultiplier({
             ...business,
             stats: {
                 ...business.stats,
                 investorConfidence: clamp((business.stats.investorConfidence ?? 55) + confidenceDelta, 0, 100),
                 studioMomentum: clamp((business.stats.studioMomentum ?? business.stats.hype ?? 55) + Math.max(-5, Math.min(8, state.franchiseValueDelta / 2)), 0, 100),
-                valuation: Math.max(0, round((business.stats.valuation || 0) * valuationMultiplier)),
             },
-        };
+        }, valuationMultiplier);
     });
 };
 

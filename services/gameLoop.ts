@@ -1,4 +1,7 @@
 import { recordStudioSaleEarnings } from './studioSaleHistory';
+import { retainBankTransactionHistory } from './bankTransactionHistory';
+import { getCorporateStockDividendReceipts } from './stockLogic';
+import { creditCorporateStockReceipt } from './stockCashOwnership';
 import { hasTalentUses, mergeParentStudioTalentRosters, settleTalentContractWeek, talentAmountOutstanding } from './talentRoster';
 import {streamingBackendPercentForBuyer} from './streamingBackendPolicy';
 
@@ -1983,7 +1986,7 @@ export const processGameWeek = async (
             category,
             description
         });
-        if (nextPlayer.finance.history.length > 200) nextPlayer.finance.history.pop();
+        nextPlayer.finance.history = retainBankTransactionHistory(nextPlayer.finance.history);
     };
 
     // --- 0.55 PERSONAL LOANS ---
@@ -2232,6 +2235,7 @@ export const processGameWeek = async (
 
     // Calculate Dividends
     const dividends = getDividendPayout(nextPlayer.portfolio, nextPlayer.stocks, nextPlayer.currentWeek, nextPlayer);
+    const corporateStockDividends = getCorporateStockDividendReceipts(nextPlayer, nextPlayer.currentWeek);
     if (dividends > 0) {
         addTransaction(dividends, 'DIVIDEND', 'Stock Dividends');
         logsToAdd.push({ msg: `💰 Stock Dividends Received: $${dividends.toLocaleString()}`, type: 'positive' });
@@ -4864,7 +4868,7 @@ export const processGameWeek = async (
                         brandHealth: clampPercent((releaseStudio.stats.brandHealth ?? 50) + episodeImpact.studioReputationModifier),
                         hype: clampPercent((releaseStudio.stats.hype ?? 0) + Math.max(-4, Math.min(6, episodeImpact.franchiseValueModifier))),
                     };
-                    releaseStudio.stats.valuation = recalculateBusinessValuation(releaseStudio, nextPlayer).stats.valuation;
+                    Object.assign(releaseStudio, recalculateBusinessValuation(releaseStudio, nextPlayer));
                 }
 
                 nextPlayer.stats.reputation = clampPercent(nextPlayer.stats.reputation + episodeImpact.studioReputationModifier);
@@ -5410,7 +5414,7 @@ export const processGameWeek = async (
 	                        playerStudio.studioState = rememberedStudio.studioState;
 	                    }
 	                }
-	                playerStudio.stats.valuation = recalculateBusinessValuation(playerStudio, nextPlayer).stats.valuation;
+	                Object.assign(playerStudio, recalculateBusinessValuation(playerStudio, nextPlayer));
 	            }
 
             const theatricalAudienceReception = buildAudienceReception(
@@ -5824,7 +5828,7 @@ export const processGameWeek = async (
                     label: `${rel.name} autonomous streaming deal`,
                     projectId: rel.id,
                 });
-                streamingStudio.stats.valuation = recalculateBusinessValuation(streamingStudio, nextPlayer).stats.valuation;
+                Object.assign(streamingStudio, recalculateBusinessValuation(streamingStudio, nextPlayer));
             }
             let weeklyStreamingRevenue = 0;
             let investorStreamingPayout = 0;
@@ -5901,7 +5905,7 @@ export const processGameWeek = async (
                             projectId: rel.id
                         });
                     }
-                    playerStudio.stats.valuation = recalculateBusinessValuation(playerStudio, nextPlayer).stats.valuation;
+                    Object.assign(playerStudio, recalculateBusinessValuation(playerStudio, nextPlayer));
                 }
             }
             const newStreamingRoyaltyRevenue = inferredRoyaltyRevenue + weeklyStreamingRevenue;
@@ -6007,7 +6011,7 @@ export const processGameWeek = async (
 	                        streamingStudio.studioState = rememberedStudio.studioState;
 	                    }
 	                }
-	                streamingStudio.stats.valuation = recalculateBusinessValuation(streamingStudio, nextPlayer).stats.valuation;
+	                Object.assign(streamingStudio, recalculateBusinessValuation(streamingStudio, nextPlayer));
 	            }
 
             const streamingAudienceReception = buildAudienceReception(
@@ -7237,6 +7241,11 @@ export const processGameWeek = async (
         subsidiaries: nextPlayer.businesses?.filter(business => (business as any).parentStudioId).length || 0,
     });
 
+    // Corporate dividends belong to company shareholders. Post after weekly operations
+    // reset their scalar statistics, before recording the completed earnings statement.
+    for (const receipt of corporateStockDividends) {
+        nextPlayer = creditCorporateStockReceipt(nextPlayer, receipt.ownerStudioId, receipt.amount, 'DIVIDEND', receipt.stockId);
+    }
     // Persist the full completed-week statement after theatrical, soundtrack, platform and subsidiary flows.
     nextPlayer = recordStudioSaleEarnings(nextPlayer, targetAbsoluteWeek, player);
 

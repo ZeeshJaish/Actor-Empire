@@ -1,4 +1,5 @@
 import type { NewsItem, Player, Transaction, XPost } from '../types';
+import { retainBankTransactionHistory } from './bankTransactionHistory';
 import { getPlayerLanguage, t } from './i18n';
 
 export type AcquisitionDebtStatus = 'ACTIVE' | 'PAID_OFF';
@@ -243,7 +244,7 @@ export const getAcquisitionDebtSummary = (player: Player): AcquisitionDebtSummar
     };
 };
 
-const addTransaction = (player: Player, amount: number, description: string): Player => {
+const addTransaction = (player: Player, amount: number, description: string, cashFlowType: Transaction['cashFlowType']): Player => {
     const safeAmount = Math.trunc(amount);
     if (safeAmount === 0) return player;
     const transaction: Transaction = {
@@ -252,13 +253,14 @@ const addTransaction = (player: Player, amount: number, description: string): Pl
         year: player.age,
         amount: safeAmount,
         category: 'EXPENSE',
+        cashFlowType,
         description,
     };
     return {
         ...player,
         finance: {
             ...player.finance,
-            history: [transaction, ...(player.finance?.history || [])].slice(0, 200),
+            history: retainBankTransactionHistory([transaction, ...(player.finance?.history || [])]),
         },
     };
 };
@@ -353,7 +355,7 @@ export const processAcquisitionDebtService = (player: Player): AcquisitionDebtSe
         },
     };
     if (servicedAmount > 0) {
-        nextPlayer = addTransaction(nextPlayer, -servicedAmount, t(language, 'services.acquisitionDebt.transaction.interest'));
+        nextPlayer = addTransaction(nextPlayer, -servicedAmount, t(language, 'services.acquisitionDebt.transaction.interest'), 'OPERATING');
     }
 
     summary = getAcquisitionDebtSummary(nextPlayer);
@@ -450,7 +452,7 @@ export const payDownAcquisitionDebt = (player: Player, amount: number, studioId?
         },
     };
     const language = getPlayerLanguage(nextPlayer);
-    nextPlayer = addTransaction(nextPlayer, -paidAmount, t(language, 'services.acquisitionDebt.transaction.paydown'));
+    nextPlayer = addTransaction(nextPlayer, -paidAmount, t(language, 'services.acquisitionDebt.transaction.paydown'), 'FINANCING');
     nextPlayer = {
         ...nextPlayer,
         logs: [{

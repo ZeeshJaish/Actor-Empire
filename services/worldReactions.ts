@@ -2,6 +2,7 @@ import type { Business, LifeEvent, LifeEventImpactResult, NewsItem, Player, Sche
 import { queueAcquisitionPressureEvent } from './acquisitionEventCadence';
 import { getAcquisitionDebtSummary } from './acquisitionDebt';
 import { getPlayerLanguage, t } from './i18n';
+import { applyStudioOperatingValuationMultiplier } from './studioEquityCash';
 
 export interface WorldReactionState {
     lastProcessedWeek: number;
@@ -460,19 +461,18 @@ const rebalanceStudios = (studios: Business[], state: WorldReactionState) => (
         const confidenceDrop = state.antiMonopolyPressure >= 35 ? Math.max(1, round(pressure * 6)) : 0;
         const valuationMultiplier = 1 + ((state.franchiseValuePressure * 0.0009) - (state.valuationPressure * 0.00055));
         const moraleDrop = state.employeeDepartureRisk >= 35 ? Math.max(1, round(state.employeeDepartureRisk / 22)) : 0;
-        return {
+        return applyStudioOperatingValuationMultiplier({
             ...studio,
             stats: {
                 ...studio.stats,
                 investorConfidence: clamp((studio.stats.investorConfidence ?? 55) - confidenceDrop, 5, 100),
                 riskLevel: clamp((studio.stats.riskLevel || 0) + Math.max(0, round(pressure * 3)), 0, 100),
-                valuation: Math.max(0, Math.round((studio.stats.valuation || 0) * valuationMultiplier)),
             },
             staff: (studio.staff || []).map(staff => ({
                 ...staff,
                 morale: clamp((staff.morale || 50) - moraleDrop, 0, 100),
             })),
-        };
+        }, valuationMultiplier);
     })
 );
 

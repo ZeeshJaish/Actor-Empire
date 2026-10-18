@@ -17,7 +17,11 @@ import {
 } from './acquisitionDebt';
 import { BUSINESS_BLUEPRINTS } from './businessLogic';
 import { getAbsoluteWeek } from './legacyLogic';
-import { getStudioOwnershipPercent } from './studioOwnership';
+import { getStudioOwnershipPercent, getStudioEquityDescendantIds, getStudioEquityFunding, getStudioHeldEquityPercent } from './studioOwnership';
+import { getCompanyEquityPositions, getCompanyEquityFunding, getStudioCorporatePrivateHoldings } from './companyPosition';
+import { getStockHoldingAllocations } from './stockCashOwnership';
+import { normalizeStockPrice } from './stockLogic';
+import { captureStudioEquityCashBasis } from './studioEquityCash';
 import { getStudioSaleEarnings, getStudioSaleHoldingPeriod } from './studioSaleHistory';
 import { dematerializeStudioOwnership } from './industryWorld/studioOwnershipMaterializer';
 
@@ -185,6 +189,10 @@ const getIncludedStudioIds = (player: Player, studio: Business): string[] => {
             }
         });
     }
+    [...ids].forEach(id => getStudioEquityDescendantIds(player, id).forEach(descendant => {
+        const business = player.businesses.find(candidate => candidate.id === descendant);
+        if (business?.isActive !== false && business?.studioState?.operatingModel !== 'FULL_MERGER') ids.add(descendant);
+    }));
     return Array.from(ids);
 };
 
@@ -339,6 +347,17 @@ const getStudioQualityScore = (business: Business) => {
     return (momentum * 0.34) + (brand * 0.36) + (confidence * 0.3);
 };
 
+/** Controlled studios are valued through their operating assets, never their own stock twice. */
+const getCorporateStockAssets = (player: Player, ownerStudioId: string) => (
+    (player.portfolio || []).flatMap(holding => {
+        const stock = (player.stocks || []).find(candidate => candidate.id === holding.stockId);
+        if (!stock || (stock.relatedStudioId && player.businesses.some(business => business.id === stock.relatedStudioId))) return [];
+        const shares = getStockHoldingAllocations(holding).corporate.filter(allocation => allocation.ownerStudioId === ownerStudioId)
+            .reduce((sum, allocation) => sum + allocation.shares, 0);
+        return shares > 0 ? [{ stockId: stock.id, shares, value: shares * normalizeStockPrice(stock, stock.price) }] : [];
+    })
+);
+
 const getStudioValuationPart = (
     player: Player,
     studio: Business,
@@ -354,6 +373,12 @@ const getStudioValuationPart = (
     const revenueMultiple = 1.35 + (qualityScore / 100) * 2.1;
     const profitPremium = annualProfit > 0 ? annualProfit * (2.5 + (qualityScore / 35)) : annualProfit * 0.5;
     const balanceValue = Math.max(0, Number(studio.balance || 0));
+    const privateHoldingsValue = getStudioCorporatePrivateHoldings(player, studio.id)
+        .filter(holding => !player.businesses.some(business => business.id === holding.studioId)
+            && !(Array.isArray(player.flags?.studioAcquisitionCases) ? player.flags.studioAcquisitionCases : []).some((entry: any) =>
+                entry?.studioId === holding.studioId && player.businesses.some(business => business.id === entry.closing?.acquiredBusinessId)))
+        .reduce((sum, holding) => sum + holding.value, 0);
+    const corporateStockValue = getCorporateStockAssets(player, studio.id).reduce((sum, holding) => sum + holding.value, 0);
     const state = studio.studioState;
     const facilities = Object.values(state?.departments || {}).reduce((sum, level) => sum + Math.max(0, level), 0) * 350_000
         + Object.values(state?.equipment || {}).reduce((sum, level) => sum + Math.max(0, level), 0) * 600_000;
@@ -361,7 +386,7 @@ const getStudioValuationPart = (
     const baseCost = BUSINESS_BLUEPRINTS.PRODUCTION_HOUSE.baseCost;
     const tangibleAssets = baseCost * 0.42 * Math.max(1, Number(studio.stats.locations || 1)) + facilities + development;
     const brandValue = baseCost * 0.3 * qualityScore / 100;
-    const operatingValue = balanceValue + Math.max(MIN_STUDIO_SALE_VALUE,
+    const operatingValue = balanceValue + privateHoldingsValue + corporateStockValue + Math.max(MIN_STUDIO_SALE_VALUE,
         annualRevenue * revenueMultiple + profitPremium + tangibleAssets + brandValue + catalogValue);
     // Keep the historical display field without using a contaminated lifetime/
     // latest-week valuation as a price floor.
@@ -737,32 +762,75 @@ const applyOfferEconomics = (
 
 const getPackageCash = (valuation: StudioSaleValuation) => valuation.includedStudios.reduce((sum, part) => sum + part.cash, 0);
 
+const allocateCorporateSaleReceipt = (
+    player: Player, studio: Business, amount: number, included: Set<string>, corporate: Map<string, number>, visited = new Set<string>(),
+): number => {
+    if (visited.has(studio.id) || amount === 0) return 0;
+    const nextVisited = new Set(visited).add(studio.id);
+    let directPercent = getStudioHeldEquityPercent(player, studio);
+    let personal = 0;
+    for (const allocation of getStudioEquityFunding(player, studio)) {
+        const percent = Math.min(directPercent, Math.max(0, Number(allocation.percent) || 0));
+        directPercent -= percent;
+        const owner = player.businesses.find(business => business.id === allocation.ownerStudioId);
+        if (!owner) continue;
+        const proceeds = amount * percent / 100;
+        if (included.has(owner.id)) personal += allocateCorporateSaleReceipt(player, owner, proceeds, included, corporate, nextVisited);
+        else corporate.set(owner.id, (corporate.get(owner.id) || 0) + proceeds);
+    }
+    return personal + amount * directPercent / 100;
+};
+
+const creditSaleCorporateReceipts = (player: Player, receipts: Array<{ ownerStudioId: string; amount: number }>, isRoyalty = false): Player => ({
+    ...player,
+    businesses: player.businesses.map(business => {
+        const amount = receipts.filter(receipt => receipt.ownerStudioId === business.id).reduce((sum, receipt) => sum + receipt.amount, 0);
+        if (amount <= 0) return business;
+        const captured = captureStudioEquityCashBasis(business);
+        return { ...captured, balance: business.balance + amount, studioState: captured.studioState ? { ...captured.studioState,
+            financeLedger: [{ id: `studio_sale_corporate_${business.id}_${player.age}_${player.currentWeek}_${Date.now()}`, week: player.currentWeek, year: player.age,
+                amount, type: isRoyalty ? 'INVESTMENT_RETURN' as const : 'CAPITAL_INJECTION' as const,
+                label: isRoyalty ? 'Subsidiary sale royalty receipt' : 'Subsidiary sale proceeds' }, ...(captured.studioState.financeLedger || [])].slice(0, 200) } : undefined };
+    }),
+});
+
 const applySellerEntitlement = (player: Player, studio: Business, offer: StudioSaleOffer): StudioSaleOffer => {
     const valuation = getStudioSaleValuation(player, studio);
     const packageCash = getPackageCash(valuation);
     const enterpriseWeight = valuation.includedStudios.reduce((sum, part) => sum + Math.max(0, part.estimatedValue - part.cash), 0);
     const companyCash = offer.companyCashAtClose ?? offer.cashAtClose;
     const payoff = Math.max(0, offer.amount - offer.bankerFee - companyCash);
+    const included = new Set(valuation.includedStudioIds);
+    const corporateCash = new Map<string, number>();
+    const corporateRoyalty = new Map<string, number>();
+    const companyRoyalty = estimateRoyaltyValue(Math.max(0, offer.amount - getPackageCash(valuation)), offer.royaltyPercent, offer.royaltyWeeks);
+    let personalRoyalty = 0;
+    let beneficialCash = 0;
     const entitlement = valuation.includedStudios.reduce((sum, part) => {
         const valueWeight = enterpriseWeight > 0 ? Math.max(0, part.estimatedValue - part.cash) / enterpriseWeight : 1 / valuation.includedStudios.length;
         const grossPrice = part.cash + Math.max(0, offer.amount - packageCash) * valueWeight;
         const allocatedFee = offer.amount > 0 ? offer.bankerFee * grossPrice / offer.amount : 0;
         const debtPayoff = valuation.debt > 0 ? payoff * part.debt / valuation.debt : 0;
-        return sum + (grossPrice - allocatedFee - debtPayoff) * part.ownershipPercent / 100;
+        const business = player.businesses.find(candidate => candidate.id === part.id)!;
+        personalRoyalty += allocateCorporateSaleReceipt(player, business, companyRoyalty * valueWeight, included, corporateRoyalty);
+        const netPrice = grossPrice - allocatedFee - debtPayoff;
+        beneficialCash += netPrice * part.ownershipPercent / 100;
+        return sum + allocateCorporateSaleReceipt(player, business, netPrice, included, corporateCash);
     }, 0);
-    const sellerCash = Math.round(clamp(entitlement, 0, companyCash));
-    const equityPercent = companyCash > 0 ? sellerCash / companyCash * 100
+    // Keep signed debt offsets across bundled banners. Clipping an underwater
+    // banner before routing its receipts would recreate its debt as free cash.
+    const signedCorporate = [...corporateCash.values()].reduce((sum, amount) => sum + amount, 0);
+    const netReceiptBudget = Math.min(companyCash, Math.max(0, entitlement + signedCorporate));
+    const positiveReceipts = Math.max(0, entitlement) + [...corporateCash.values()].reduce((sum, amount) => sum + Math.max(0, amount), 0);
+    const receiptScale = positiveReceipts > 0 ? Math.min(1, netReceiptBudget / positiveReceipts) : 0;
+    const sellerCash = Math.floor(Math.max(0, entitlement) * receiptScale);
+    const equityPercent = companyCash > 0 ? clamp(beneficialCash / companyCash * 100, 0, 100)
         : valuation.includedStudios.reduce((sum, part) => sum + Math.max(0, part.estimatedValue - part.cash) * part.ownershipPercent, 0) / Math.max(1, enterpriseWeight);
-    const companyRoyalty = estimateRoyaltyValue(Math.max(0, offer.amount - getPackageCash(valuation)), offer.royaltyPercent, offer.royaltyWeeks);
-    // Future royalties are contingent enterprise income, not the cash/debt
-    // closing waterfall. Minority interests survive an underwater cash exit.
-    const ownedEnterprise = valuation.includedStudios.reduce((sum, part) => (
-        sum + Math.max(0, part.estimatedValue - part.cash) * part.ownershipPercent / 100
-    ), 0);
-    const royaltyOwnership = enterpriseWeight > 0 ? ownedEnterprise / enterpriseWeight : equityPercent / 100;
     return { ...offer, companyCashAtClose: companyCash, sellerOwnershipPercent: equityPercent,
         cashAtClose: sellerCash, royaltyCompanyEstimate: companyRoyalty,
-        royaltyEstimate: Math.round(companyRoyalty * royaltyOwnership) };
+        corporateCashAtClose: [...corporateCash].filter(([, amount]) => amount > 0).map(([ownerStudioId, amount]) => ({ ownerStudioId, amount: Math.floor(amount * receiptScale) })),
+        corporateRoyaltyEstimate: [...corporateRoyalty].map(([ownerStudioId, amount]) => ({ ownerStudioId, amount: Math.floor(amount) })),
+        royaltyEstimate: Math.round(personalRoyalty) };
 };
 
 const makeSaleSnapshot = (player: Player, studio: Business): NonNullable<StudioSaleDeck['saleSnapshot']> => ({
@@ -776,6 +844,8 @@ const makeSaleSnapshot = (player: Player, studio: Business): NonNullable<StudioS
                 equipment: business.studioState?.equipment, scripts: business.studioState?.scripts,
                 concepts: business.studioState?.concepts, ownedRights: business.studioState?.ownedRights,
                 purchasedIPTitles: business.studioState?.purchasedIPTitles,
+                corporatePrivateHoldings: getStudioCorporatePrivateHoldings(player, id),
+                corporateStockAssets: getCorporateStockAssets(player, id),
                 catalogue: getCatalogValue(player, [id]), quality: getStudioQualityScore(business),
                 locations: business.stats.locations, earnings: getStudioSaleEarnings(player, business) }),
         };
@@ -1393,7 +1463,7 @@ const makeSaleMessage = (
     id: `msg_studio_sale_${studio.id}_${player.age}_${player.currentWeek}`,
     sender: 'Deal Counsel',
     subject: `${studio.name} sale closed`,
-    text: `${offer.buyerName} has completed the transfer. ${formatMoney(offer.cashAtClose)} was wired to your personal account after debt assumptions and banker fees. ${makeNameRightsSummary(studio, offer, terms)}. ${makeCatalogSummary(studio, offer, terms, catalogTargetName)}.${offer.royaltyPercent > 0 ? ` Royalty collections will post weekly for ${offer.royaltyWeeks} weeks.` : ''}`,
+    text: `${offer.buyerName} has completed the transfer. ${formatMoney(offer.cashAtClose)} was wired to your personal account after debt assumptions and banker fees.${(offer.corporateCashAtClose || []).length ? ` Corporate holders received ${formatMoney((offer.corporateCashAtClose || []).reduce((sum, receipt) => sum + receipt.amount, 0))} in their studio treasuries.` : ''} ${makeNameRightsSummary(studio, offer, terms)}. ${makeCatalogSummary(studio, offer, terms, catalogTargetName)}.${offer.royaltyPercent > 0 ? ` Royalty collections will post weekly for ${offer.royaltyWeeks} weeks.` : ''}`,
     type: 'SYSTEM',
     data: {
         studioSale: true,
@@ -1436,7 +1506,7 @@ const makeRoyaltyContract = (
     offer: StudioSaleOffer,
     includedStudioIds: string[],
 ) => {
-    if (offer.royaltyPercent <= 0 || offer.royaltyWeeks <= 0 || offer.royaltyEstimate <= 0) return null;
+    if (offer.royaltyPercent <= 0 || offer.royaltyWeeks <= 0 || (offer.royaltyEstimate <= 0 && !(offer.corporateRoyaltyEstimate || []).some(receipt => receipt.amount > 0))) return null;
     return {
         id: `studio_sale_royalty_${studio.id}_${player.age}_${player.currentWeek}`,
         sourceStudioId: studio.id,
@@ -1445,6 +1515,7 @@ const makeRoyaltyContract = (
         buyerName: offer.buyerName,
         royaltyPercent: offer.royaltyPercent,
         weeklyBase: Math.round(offer.royaltyEstimate / Math.max(1, offer.royaltyWeeks)),
+        corporateWeeklyBase: (offer.corporateRoyaltyEstimate || []).map(receipt => ({ ownerStudioId: receipt.ownerStudioId, amount: Math.round(receipt.amount / Math.max(1, offer.royaltyWeeks)) })),
         weeksRemaining: offer.royaltyWeeks,
         totalCollected: 0,
         startedWeek: player.currentWeek,
@@ -1499,13 +1570,22 @@ export const completeStudioSaleTransfer = (
     const catalogRetention = moveRetainedCatalogToParent(nextPlayer, studio, includedStudioIds, transferTerms);
     nextPlayer = catalogRetention.player;
     const royaltyContract = makeRoyaltyContract(nextPlayer, studio, offer, includedStudioIds);
+    nextPlayer = creditSaleCorporateReceipts(nextPlayer, offer.corporateCashAtClose || []);
     const logType: 'positive' | 'neutral' = offer.amount >= deck.minimumPrice ? 'positive' : 'neutral';
     nextPlayer = {
         ...nextPlayer,
         money: Math.max(0, Math.trunc((nextPlayer.money || 0) + offer.cashAtClose)),
         businesses: (nextPlayer.businesses || []).filter(business => !includedSet.has(business.id)),
         stocks: (nextPlayer.stocks || []).filter(stock => !(stock.relatedStudioId && includedSet.has(stock.relatedStudioId))),
-        portfolio: (nextPlayer.portfolio || []).filter(item => !relatedStockIds.has(item.stockId)),
+        portfolio: (nextPlayer.portfolio || []).flatMap(item => {
+            if (relatedStockIds.has(item.stockId)) return [];
+            const allocations = getStockHoldingAllocations(item);
+            const transferredShares = allocations.corporate.filter(allocation => includedSet.has(allocation.ownerStudioId)).reduce((sum, allocation) => sum + allocation.shares, 0);
+            if (!transferredShares) return [item];
+            const shares = Math.max(0, item.shares - transferredShares);
+            return shares > 0 ? [{ ...item, shares, totalInvested: item.totalInvested === undefined ? undefined : item.totalInvested * shares / item.shares,
+                equityFunding: allocations.corporate.filter(allocation => !includedSet.has(allocation.ownerStudioId)) }] : [];
+        }),
         stockTakeovers: (nextPlayer.stockTakeovers || []).filter(takeover => (
             !(
                 (takeover.relatedStudioId && includedSet.has(takeover.relatedStudioId))
@@ -1531,6 +1611,14 @@ export const completeStudioSaleTransfer = (
         }, ...(nextPlayer.logs || [])].slice(0, 120),
         flags: {
             ...nextPlayer.flags,
+            companyEquityPositions: getCompanyEquityPositions(nextPlayer).flatMap(position => {
+                const funding = getCompanyEquityFunding(nextPlayer, position);
+                const transferred = Math.min(position.percent, funding.filter(owner => includedSet.has(owner.ownerStudioId)).reduce((sum, owner) => sum + owner.percent, 0));
+                if (transferred <= 0) return [position];
+                const retained = position.percent - transferred;
+                return retained > 0.0001 ? [{ ...position, percent: retained, equityFunding: funding.filter(owner => !includedSet.has(owner.ownerStudioId)),
+                    investedAmount: position.investedAmount * retained / position.percent, exit: undefined }] : [];
+            }),
             studioSaleHistory: [{
                 deck: closedDeck,
                 soldStudioIds: includedStudioIds,
@@ -1547,7 +1635,8 @@ export const completeStudioSaleTransfer = (
             }, ...((nextPlayer.flags?.studioSaleHistory || []) as any[])].slice(0, 40),
             studioSaleRoyalties: [
                 ...(royaltyContract ? [royaltyContract] : []),
-                ...((nextPlayer.flags?.studioSaleRoyalties || []) as any[]),
+                ...((nextPlayer.flags?.studioSaleRoyalties || []) as any[]).map(contract => ({ ...contract,
+                    corporateWeeklyBase: Array.isArray(contract.corporateWeeklyBase) ? contract.corporateWeeklyBase.filter((receipt: any) => !includedSet.has(String(receipt.ownerStudioId))) : contract.corporateWeeklyBase })),
             ].slice(0, 40),
             soldStudioIds: {
                 ...(nextPlayer.flags?.soldStudioIds || {}),
@@ -1582,26 +1671,36 @@ export const processStudioSaleRoyalties = (player: Player): Player => {
     if (player.flags?.studioSaleRoyaltiesLastProcessedWeekKey === weekKey) return player;
 
     let totalPayout = 0;
+    const corporateReceipts: Array<{ ownerStudioId: string; amount: number }> = [];
     const updatedContracts = contracts.map(contract => {
         const weeksRemaining = Math.max(0, Math.round(Number(contract.weeksRemaining || 0)));
         const weeklyBase = Math.max(0, Math.round(Number(contract.weeklyBase || 0)));
-        if (weeksRemaining <= 0 || weeklyBase <= 0) return { ...contract, weeksRemaining: 0 };
+        const corporateBase = Array.isArray(contract.corporateWeeklyBase) ? contract.corporateWeeklyBase : [];
+        if (weeksRemaining <= 0 || (weeklyBase <= 0 && !corporateBase.some((receipt: any) => Number(receipt.amount) > 0))) return { ...contract, weeksRemaining: 0 };
         const rng = makeRng(`${contract.id}:${weekKey}`);
-        const payout = Math.round(weeklyBase * (0.85 + (rng() * 0.3)));
+        const multiplier = 0.85 + (rng() * 0.3);
+        const payout = Math.round(weeklyBase * multiplier);
+        let corporateCollected = 0;
+        corporateBase.forEach((receipt: any) => {
+            const amount = Math.round(Math.max(0, Number(receipt.amount) || 0) * multiplier);
+            corporateReceipts.push({ ownerStudioId: String(receipt.ownerStudioId), amount });
+            if (player.businesses.some(business => business.id === receipt.ownerStudioId)) corporateCollected += amount;
+        });
         totalPayout += payout;
         return {
             ...contract,
             weeksRemaining: weeksRemaining - 1,
-            totalCollected: Math.round(Number(contract.totalCollected || 0) + payout),
+            totalCollected: Math.round(Number(contract.totalCollected || 0) + payout + corporateCollected),
             lastCollectedWeek: player.currentWeek,
             lastCollectedYear: player.age,
         };
     });
 
+    const corporatePlayer = creditSaleCorporateReceipts(player, corporateReceipts, true);
     const activeContracts = updatedContracts.filter(contract => Math.max(0, Number(contract.weeksRemaining || 0)) > 0);
     if (totalPayout <= 0) {
         return {
-            ...player,
+            ...corporatePlayer,
             flags: {
                 ...player.flags,
                 studioSaleRoyalties: activeContracts,
@@ -1612,7 +1711,7 @@ export const processStudioSaleRoyalties = (player: Player): Player => {
 
     const shouldLog = player.currentWeek % 4 === 0 || activeContracts.length < updatedContracts.length;
     return {
-        ...player,
+        ...corporatePlayer,
         money: Math.max(0, Math.trunc((player.money || 0) + totalPayout)),
         finance: {
             ...player.finance,

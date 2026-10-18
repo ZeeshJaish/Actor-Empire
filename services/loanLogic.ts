@@ -1,3 +1,7 @@
+import { getStockHoldingAllocations } from './stockCashOwnership';
+import { getStudioOwnershipPercent } from './studioOwnership';
+import { isOperatingBankTransaction } from './bankTransactionHistory';
+export { isOperatingBankTransaction } from './bankTransactionHistory';
 import { Player, PlayerLoan } from '../types';
 import { getAbsoluteWeek } from './legacyLogic';
 import { isStockRetiredByMerger, normalizeStockPrice } from './stockLogic';
@@ -25,7 +29,12 @@ export const getEstimatedNetWorth = (player: Player): number => {
     const portfolioValue = (player.portfolio || []).reduce((sum, holding) => {
         const stock = (player.stocks || []).find(s => s.id === holding.stockId);
         if (!stock || isStockRetiredByMerger(player, stock) || isStockRepresentedByControlledStudio(player, stock)) return sum;
-        return sum + Math.max(0, normalizeStockPrice(stock, stock.price) * toFinite(holding.shares));
+        const allocations = getStockHoldingAllocations(holding);
+        const beneficialShares = allocations.personalShares + allocations.corporate.reduce((shares, allocation) => {
+            const owner = (player.businesses || []).find(business => business.id === allocation.ownerStudioId);
+            return shares + (owner ? allocation.shares * getStudioOwnershipPercent(player, owner) / 100 : 0);
+        }, 0);
+        return sum + Math.max(0, normalizeStockPrice(stock, stock.price) * beneficialShares);
     }, 0);
     const businessValue = getPlayerBusinessEquityValue(player);
     return cash + assetValue + portfolioValue + businessValue;
@@ -33,12 +42,14 @@ export const getEstimatedNetWorth = (player: Player): number => {
 
 export const getAverageWeeklyCashFlow = (player: Player, lookbackWeeks = 26) => {
     const currentAbsoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+    const windowWeeks = Number.isFinite(lookbackWeeks) ? Math.max(1, Math.floor(lookbackWeeks)) : 26;
     const recentTransactions = (player.finance?.history || []).filter(tx => {
-        const absoluteWeek = getAbsoluteWeek(tx.year, tx.week);
-        return currentAbsoluteWeek - absoluteWeek < lookbackWeeks;
+        if (!Number.isFinite(tx.year) || !Number.isFinite(tx.week) || !isOperatingBankTransaction(tx)) return false;
+        const weeksAgo = currentAbsoluteWeek - getAbsoluteWeek(tx.year, tx.week);
+        return weeksAgo >= 0 && weeksAgo < windowWeeks;
     });
 
-    const weeksObserved = Math.max(8, Math.min(lookbackWeeks, currentAbsoluteWeek + 1));
+    const weeksObserved = Math.max(8, Math.min(windowWeeks, currentAbsoluteWeek + 1));
     const income = recentTransactions.filter(tx => tx.amount > 0).reduce((sum, tx) => sum + tx.amount, 0);
     const expenses = recentTransactions.filter(tx => tx.amount < 0).reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
 

@@ -989,6 +989,12 @@ export const StudioSaleRoom: React.FC<StudioSaleRoomProps> = ({
                         <MiniMetric label="Est. Stream" value={formatMoney(offer.royaltyEstimate)} tone="text-zinc-300" />
                     </div>
 
+                    {(offer.corporateCashAtClose || []).map(receipt => (
+                        <p key={receipt.ownerStudioId} className="mt-2 text-[10px] font-bold text-sky-200">Company proceeds: {formatMoney(receipt.amount)} to {player.businesses.find(business => business.id === receipt.ownerStudioId)?.name || 'corporate owner'}.</p>
+                    ))}
+                    {(offer.corporateRoyaltyEstimate || []).map(receipt => (
+                        <p key={receipt.ownerStudioId} className="mt-1 text-[10px] font-bold text-violet-200">Estimated company royalty: {formatMoney(receipt.amount)}.</p>
+                    ))}
                     <p className="mt-2.5 text-[10px] font-bold leading-relaxed text-zinc-400">Buyer plans to {offer.buyerIntent}.</p>
                     <div className="mt-2 grid gap-1.5">
                         {offer.conditions.slice(0, 3).map(condition => (
@@ -1189,6 +1195,9 @@ export const StudioSaleRoom: React.FC<StudioSaleRoomProps> = ({
                         <span className="shrink-0 text-[8px] font-black uppercase tracking-[0.1em] text-amber-300/60">Your proceeds</span>
                         <span className="min-w-0 truncate text-right font-mono text-[13px] font-black text-amber-200">{formatMoneyInput(acceptedOffer.cashAtClose)}</span>
                     </div>
+                    {(acceptedOffer.corporateCashAtClose || []).map(receipt => (
+                        <p key={receipt.ownerStudioId} className="mt-2 text-[10px] font-bold text-sky-200">Company proceeds: {formatMoneyInput(receipt.amount)} to {player.businesses.find(business => business.id === receipt.ownerStudioId)?.name || 'corporate owner'}.</p>
+                    ))}
                     {(acceptedOffer.sellerOwnershipPercent ?? 100) < 100 ? (
                         <p className="mt-2 text-[10px] font-bold text-sky-200">Your equity share: {(acceptedOffer.sellerOwnershipPercent ?? 100).toFixed(1)}%. The remaining equity proceeds belong to outside shareholders.</p>
                     ) : null}

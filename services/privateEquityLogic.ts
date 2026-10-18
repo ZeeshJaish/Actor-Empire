@@ -1,7 +1,10 @@
 import type { Player, Transaction } from '../types';
 import { getAbsoluteWeek } from './legacyLogic';
+import { getStudioSaleTreasuryLock } from './studioGroup';
+import { captureStudioEquityCashBasis } from './studioEquityCash';
 import {
     getCompanyEquityPositions,
+    getCompanyEquityFunding,
     type CompanyEquityPosition,
 } from './companyPosition';
 
@@ -142,6 +145,7 @@ export const normalizeCompanyEquityPositions = (
 
         const position: CompanyEquityPosition = {
             ...rawPosition,
+            equityFunding: getCompanyEquityFunding(player, rawPosition),
             studioId: String(rawPosition.studioId),
             studioName: String(rawPosition.studioName || acquisitionCase?.studioName || 'Private Studio'),
             percent: roundPercent(percent),
@@ -288,11 +292,33 @@ const reviewPosition = (
     };
 };
 
+/** Corporate proceeds stay with the company that funded the investment. */
+const routeEquityProceeds = (player: Player, position: CompanyEquityPosition, amount: number, isDividend = false): { player: Player; personalProceeds: number } => {
+    let allocatedPercent = 0;
+    let corporateProceeds = 0;
+    const credits = new Map<string, number>();
+    for (const allocation of getCompanyEquityFunding(player, position)) {
+        const percent = Math.min(Math.max(0, position.percent - allocatedPercent), Math.max(0, allocation.percent));
+        allocatedPercent += percent;
+        const proceeds = Math.floor(amount * percent / Math.max(0.0001, position.percent));
+        corporateProceeds += proceeds;
+        credits.set(allocation.ownerStudioId, (credits.get(allocation.ownerStudioId) || 0) + proceeds);
+    }
+    return { player: { ...player, businesses: player.businesses.map(business => credits.has(business.id)
+        ? { ...captureStudioEquityCashBasis(business), balance: business.balance + credits.get(business.id)!,
+            studioState: business.studioState ? { ...captureStudioEquityCashBasis(business).studioState!,
+                financeLedger: [{ id: `equity_proceeds_${position.studioId}_${business.id}_${player.age}_${player.currentWeek}_${Date.now()}`,
+                    week: player.currentWeek, year: player.age, amount: credits.get(business.id)!,
+                    type: isDividend ? 'INVESTMENT_RETURN' as const : 'CAPITAL_INJECTION' as const, label: `${position.studioName || position.studioId} investment ${isDividend ? 'dividend' : 'exit proceeds'}` },
+                    ...(business.studioState.financeLedger || [])].slice(0, 200) } : undefined } : business) }, personalProceeds: Math.max(0, amount - corporateProceeds) };
+};
+
 export const processPrivateEquityWeek = (
     player: Player,
 ): { player: Player; events: PrivateEquityWeekEvent[] } => {
     const currentAbsoluteWeek = absoluteWeek(player);
     const events: PrivateEquityWeekEvent[] = [];
+    let updatedPlayer = player;
     const positions = normalizeCompanyEquityPositions(player).map(originalPosition => {
         let position = originalPosition;
         const reviewsDue = Math.min(
@@ -304,7 +330,9 @@ export const processPrivateEquityWeek = (
             const reviewAbsoluteWeek = (position.lastReviewAbsoluteWeek || currentAbsoluteWeek) + PRIVATE_EQUITY_REVIEW_WEEKS;
             const result = reviewPosition(position, reviewAbsoluteWeek);
             position = result.position;
-            events.push(result.event);
+            const routed = routeEquityProceeds(updatedPlayer, position, result.distribution, true);
+            updatedPlayer = routed.player;
+            events.push({ ...result.event, amount: result.distribution > 0 ? routed.personalProceeds : undefined });
         }
 
         if (position.exit?.status === 'MARKETING' && currentAbsoluteWeek >= position.exit.offerReadyAbsoluteWeek) {
@@ -338,7 +366,7 @@ export const processPrivateEquityWeek = (
     });
 
     return {
-        player: writePositions(player, positions),
+        player: writePositions(updatedPlayer, positions),
         events,
     };
 };
@@ -469,6 +497,10 @@ export const acceptPrivateEquityExit = ({
         return { success: false, player, position, reason: 'OFFER_EXPIRED' };
     }
 
+    const corporateHolders = getCompanyEquityFunding(player, position);
+    if (corporateHolders.some(owner => !player.businesses.some(business => business.id === owner.ownerStudioId)
+        || getStudioSaleTreasuryLock(player, owner.ownerStudioId))) return { success: false, player, position, reason: 'INVALID_POSITION' };
+
     const soldPercent = clamp(position.exit.percentForSale, 0.01, position.percent);
     const remainingPercent = roundPercent(Math.max(0, position.percent - soldPercent));
     const saleRatio = clamp(soldPercent / position.percent, 0, 1);
@@ -479,6 +511,7 @@ export const acceptPrivateEquityExit = ({
         ? {
             ...position,
             percent: remainingPercent,
+            equityFunding: corporateHolders.map(owner => ({ ...owner, percent: owner.percent * (1 - saleRatio) })),
             investedAmount: Math.round(position.investedAmount * (1 - saleRatio)),
             exit: undefined,
             nextExitEligibleAbsoluteWeek: currentAbsoluteWeek + PRIVATE_EQUITY_DECLINE_COOLDOWN_WEEKS,
@@ -522,10 +555,11 @@ export const acceptPrivateEquityExit = ({
                     reapproachAfterYear: player.age + Math.floor((player.currentWeek - 1 + PRIVATE_EQUITY_EXIT_LOCK_WEEKS) / 52),
                 }
         ));
-    const transaction = createExitTransaction(player, proceeds, studioName);
+    const routed = routeEquityProceeds(player, position, proceeds);
+    const transaction = createExitTransaction(player, routed.personalProceeds, studioName);
     const nextPlayer = writePositions({
-        ...player,
-        money: Number(player.money || 0) + proceeds,
+        ...routed.player,
+        money: Number(player.money || 0) + routed.personalProceeds,
         finance: {
             ...player.finance,
             history: [transaction, ...(player.finance?.history || [])].slice(0, 200),

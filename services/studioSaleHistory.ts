@@ -51,7 +51,7 @@ const normalizeRows = (rows: EarningsWeek[], now: number): EarningsWeek[] => {
     return [...byWeek.values()].sort((a, b) => b.absoluteWeek - a.absoluteWeek);
 };
 
-const RECEIPT_TYPES = new Set<StudioFinanceEntry['type']>(['THEATRICAL', 'STREAMING_DEAL', 'STREAMING_ROYALTY', 'SOUNDTRACK', 'UNIVERSE']);
+const RECEIPT_TYPES = new Set<StudioFinanceEntry['type']>(['THEATRICAL', 'STREAMING_DEAL', 'STREAMING_ROYALTY', 'SOUNDTRACK', 'UNIVERSE', 'INVESTMENT_RETURN']);
 
 /** Legacy fallback uses recorded evidence only. Capital/funding and synthetic acquisition forecasts are excluded. */
 const getLegacyRows = (player: Pick<Player, 'age' | 'currentWeek'>, studio: Business): EarningsWeek[] => {

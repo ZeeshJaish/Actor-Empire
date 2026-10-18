@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { OutsideProductionInvestment, Player, PlayerLoan, Transaction } from '../../types';
+import React, { useMemo, useRef, useState } from 'react';
+import { OutsideProductionInvestment, Player, PlayerLoan } from '../../types';
 import { formatMoney } from '../../services/formatUtils';
 import {
   ArrowLeft,
@@ -17,7 +17,6 @@ import {
 } from 'lucide-react';
 import {
   calculateWeeklyLoanPayment,
-  createPlayerLoan,
   getAbsoluteBorrowingCeiling,
   getAverageWeeklyCashFlow,
   getCreditScore,
@@ -30,7 +29,8 @@ import {
   getSafeBorrowingCapacity,
   getWeeklyDebtBurden,
 } from '../../services/loanLogic';
-import { getAbsoluteWeek } from '../../services/legacyLogic';
+import { isOperatingBankTransaction } from '../../services/bankTransactionHistory';
+import { issuePersonalLoan, repayPersonalLoan } from '../../services/playerBanking';
 import { getPlayerLanguage, t } from '../../services/i18n';
 
 interface BankAppProps {
@@ -78,11 +78,12 @@ export const BankApp: React.FC<BankAppProps> = ({ player, onBack, onUpdatePlayer
   const yearData = useMemo(() => {
     if (selectedYear === player.age) {
       const ytdTx = player.finance.history.filter(t => t.year === selectedYear);
-      const income = ytdTx.filter(t => t.amount > 0 && t.category !== 'LOAN').reduce((sum, t) => sum + t.amount, 0);
-      const expense = ytdTx.filter(t => t.amount < 0).reduce((sum, t) => sum + Math.abs(t.amount), 0);
+      const operatingTx = ytdTx.filter(isOperatingBankTransaction);
+      const income = operatingTx.filter(t => t.amount > 0).reduce((sum, t) => sum + t.amount, 0);
+      const expense = operatingTx.filter(t => t.amount < 0).reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
       const breakdown = INCOME_CATEGORIES.map(cat => {
-        const amount = ytdTx.filter(t => t.amount > 0 && t.category === cat).reduce((sum, t) => sum + t.amount, 0);
+        const amount = operatingTx.filter(t => t.amount > 0 && t.category === cat).reduce((sum, t) => sum + t.amount, 0);
         return { label: cat, amount, percent: income > 0 ? (amount / income) * 100 : 0 };
       }).sort((a, b) => b.amount - a.amount);
 
@@ -109,13 +110,6 @@ export const BankApp: React.FC<BankAppProps> = ({ player, onBack, onUpdatePlayer
     () => (player.finance.loans || []).filter(loan => loan.status !== 'PAID' && loan.principal > 0),
     [player.finance.loans]
   );
-  const financeCredit = player.finance.credit || {
-    successfulPayments: 0,
-    missedPayments: 0,
-    defaults: 0,
-    totalBorrowed: 0,
-    totalRepaid: 0,
-  };
 
   const creditScore = useMemo(() => getCreditScore(player), [player]);
   const creditTier = getCreditTier(creditScore);
@@ -187,123 +181,32 @@ export const BankApp: React.FC<BankAppProps> = ({ player, onBack, onUpdatePlayer
     /Producer (investment|payout):/i.test(tx.description)
   );
 
+  const currentPlayer = useRef(player);
+  currentPlayer.current = player;
+  const applyBankResult = (nextPlayer: Player) => {
+    currentPlayer.current = nextPlayer;
+    onUpdatePlayer(nextPlayer);
+  };
   const handleApplyForLoan = () => {
-    if (requestTooSmall) {
-      setLoanFeedback({ tone: 'error', text: tr('bank.requestTooSmall') });
+    const result = issuePersonalLoan(currentPlayer.current, requestedAmount, selectedTermWeeks);
+    if (!result.success || !result.loan) {
+      setLoanFeedback({ tone: 'error', text: tr(result.reason === 'INVALID_AMOUNT' ? 'bank.requestTooSmall' : 'bank.requestTooLarge') });
       return;
     }
-    if (requestTooLarge || approvalOdds <= 0) {
-      setLoanFeedback({ tone: 'error', text: tr('bank.requestTooLarge') });
-      return;
-    }
-
-    const loan = createPlayerLoan(player, requestedAmount, selectedTermWeeks);
-    const updatedPlayer: Player = {
-      ...player,
-      money: player.money + requestedAmount,
-      finance: {
-        ...player.finance,
-        loans: [...(player.finance.loans || []), loan],
-        credit: {
-          ...financeCredit,
-          totalBorrowed: (financeCredit.totalBorrowed || 0) + requestedAmount,
-          lastLoanAbsoluteWeek: getAbsoluteWeek(player.age, player.currentWeek),
-        },
-        history: [
-          {
-            id: `tx_loan_issue_${Date.now()}`,
-            week: player.currentWeek,
-            year: player.age,
-            amount: requestedAmount,
-            category: 'LOAN',
-            description: `${loan.lenderName} personal loan funded`,
-          },
-          ...player.finance.history,
-        ].slice(0, 200),
-      },
-      logs: [
-        ...player.logs,
-        {
-          week: player.currentWeek,
-          year: player.age,
-          type: 'neutral',
-          message: `🏦 Approved ${formatMoney(requestedAmount)} from ${loan.lenderName}. Weekly payment: ${formatMoney(loan.weeklyPayment)} for ${selectedTermWeeks} weeks.`,
-        },
-      ],
-    };
-
-    onUpdatePlayer(updatedPlayer);
-    setLoanFeedback({
-      tone: 'success',
-      text: `${loan.lenderName} approved ${formatMoney(requestedAmount)}. First repayment is ${formatMoney(loan.weeklyPayment)} next week.`,
-    });
+    applyBankResult(result.player);
+    setLoanFeedback({ tone: 'success', text: `${result.loan.lenderName} approved ${formatMoney(requestedAmount)}. First repayment is ${formatMoney(result.loan.weeklyPayment)} next week.` });
   };
 
   const handleManualLoanPayment = (loan: PlayerLoan, mode: 'SCHEDULED' | 'BALANCE') => {
-    const balance = Math.max(0, Math.floor(loan.principal));
-    const requestedPayment = mode === 'BALANCE' ? balance : Math.min(balance, Math.max(1, Math.floor(loan.weeklyPayment)));
-    const payment = Math.min(balance, requestedPayment);
-
-    if (payment <= 0) return;
-    if (player.money < payment) {
-      setLoanFeedback({ tone: 'error', text: tr('bank.notEnoughCash') });
+    const result = repayPersonalLoan(currentPlayer.current, loan.id, mode);
+    if (!result.success) {
+      if (result.reason === 'INSUFFICIENT_CASH') setLoanFeedback({ tone: 'error', text: tr('bank.notEnoughCash') });
       return;
     }
-
-    const nextPrincipal = Math.max(0, balance - payment);
-    const paidOff = nextPrincipal <= 0;
-    const now = Date.now();
-    const updatedPlayer: Player = {
-      ...player,
-      money: player.money - payment,
-      finance: {
-        ...player.finance,
-        loans: (player.finance.loans || []).map(existingLoan => {
-          if (existingLoan.id !== loan.id) return existingLoan;
-          return {
-            ...existingLoan,
-            principal: nextPrincipal,
-            weeksRemaining: paidOff ? 0 : existingLoan.weeksRemaining,
-            successfulPayments: existingLoan.successfulPayments + 1,
-            status: paidOff ? 'PAID' : existingLoan.status,
-          };
-        }),
-        credit: {
-          ...financeCredit,
-          successfulPayments: (financeCredit.successfulPayments || 0) + 1,
-          totalRepaid: (financeCredit.totalRepaid || 0) + payment,
-        },
-        history: [
-          {
-            id: `tx_loan_manual_${loan.id}_${now}`,
-            week: player.currentWeek,
-            year: player.age,
-            amount: -payment,
-            category: 'LOAN',
-            description: `${loan.lenderName} manual loan payment`,
-          },
-          ...player.finance.history,
-        ].slice(0, 200),
-      },
-      logs: [
-        ...player.logs,
-        {
-          week: player.currentWeek,
-          year: player.age,
-          type: paidOff ? 'positive' : 'neutral',
-          message: paidOff
-            ? `🏦 ${loan.lenderName} loan fully paid.`
-            : `🏦 Paid ${formatMoney(payment)} to ${loan.lenderName}.`,
-        },
-      ],
-    };
-
-    onUpdatePlayer(updatedPlayer);
-    setLoanFeedback({
-      tone: 'success',
-      text: paidOff
-        ? tr('bank.loanFullyPaid', { lender: loan.lenderName })
-        : tr('bank.loanPaymentMade', { amount: formatMoney(payment), lender: loan.lenderName }),
+    applyBankResult(result.player);
+    setLoanFeedback({ tone: 'success', text: result.paidOff
+      ? tr('bank.loanFullyPaid', { lender: loan.lenderName })
+      : tr('bank.loanPaymentMade', { amount: formatMoney(result.payment || 0), lender: loan.lenderName }),
     });
   };
 

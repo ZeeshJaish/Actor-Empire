@@ -7,6 +7,7 @@ import { advanceRightsNegotiations } from './rightsNegotiation';
 import { t } from './i18n';
 import { getStudioAnnualInfrastructureOverhead } from './studioProductionEconomy';
 import { getAbsoluteWeek } from './legacyLogic';
+import { captureStudioEquityCashBasis, resetStudioEquityCashBasis } from './studioEquityCash';
 
 export interface BusinessBlueprint {
     type: BusinessType;
@@ -675,14 +676,19 @@ const getBusinessValuation = (business: Business, player?: Player): number => {
         : 1;
     const riskMultiplier = Math.max(0.65, Math.min(1.15, 0.9 + (consistency * 0.18) - downsidePressure)) * marketTrustMultiplier;
 
-    const valuation = Math.floor((assetBase + earningsValue + brandValue + studioAssetValue + studioCashValue + studioRevenueValue + studioLibraryValue) * riskMultiplier);
+    // Cash is a dollar-for-dollar asset, regardless of studio reputation/risk.
+    // Applying the operating multiple to cash lets a transfer across wallets
+    // change bank collateral when the next weekly appraisal runs.
+    const valuation = Math.floor((assetBase + earningsValue + brandValue + studioAssetValue + studioRevenueValue + studioLibraryValue) * riskMultiplier) + studioCashValue;
     const productionHouseFloor = business.type === 'PRODUCTION_HOUSE'
-        ? Math.max(blueprint.baseCost, studioCashValue)
+        // Creation allocates 20% of setup value to opening cash. Preserve the
+        // remaining 80% asset floor independently of later distributions.
+        ? (blueprint.baseCost * 0.8) + studioCashValue
         : 0;
     return Math.max(Math.floor(assetBase), valuation, productionHouseFloor);
 };
 
-export const recalculateBusinessValuation = (business: Business, player?: Player): Business => ({
+export const recalculateBusinessValuation = (business: Business, player?: Player): Business => resetStudioEquityCashBasis({
     ...business,
     stats: {
         ...business.stats,
@@ -1269,6 +1275,9 @@ export const processBusinessWeek = (
     b.stats.lifetimeRevenue += revenue;
     
     b.stats.valuation = getBusinessValuation(b);
+    if (b.type === 'PRODUCTION_HOUSE' && b.studioState) {
+        b.studioState = resetStudioEquityCashBasis(b).studioState;
+    }
     
     // 5. PRODUCTION HOUSE SPECIFIC: SCRIPT DEVELOPMENT
     if (b.type === 'PRODUCTION_HOUSE' && b.studioState) {
@@ -1441,13 +1450,13 @@ export const promoteBusiness = (business: Business, campaignId: string, language
 };
 
 export const injectCapital = (business: Business, amount: number): Business => {
-    const b = { ...business };
+    const b = { ...captureStudioEquityCashBasis(business) };
     b.balance += amount;
     return b;
 };
 
 export const withdrawCapital = (business: Business, amount: number): { updated: Business, success: boolean } => {
-    const b = { ...business };
+    const b = { ...captureStudioEquityCashBasis(business) };
     if (b.balance < amount) return { updated: b, success: false };
     b.balance -= amount;
     return { updated: b, success: true };

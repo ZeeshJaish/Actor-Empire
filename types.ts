@@ -1922,6 +1922,9 @@ export interface StudioSaleOffer {
     /** Net company equity before allocating proceeds to the seller ownership. */
     companyCashAtClose?: number;
     sellerOwnershipPercent?: number;
+    /** Corporate holders receive their proceeds in their own treasury. */
+    corporateCashAtClose?: Array<{ ownerStudioId: string; amount: number }>;
+    corporateRoyaltyEstimate?: Array<{ ownerStudioId: string; amount: number }>;
     debtAssumed: number;
     bankerFee: number;
     royaltyPercent: number;
@@ -1974,6 +1977,12 @@ export interface OwnedRightDevelopmentChoice {
 }
 
 export interface StudioState {
+    /** Direct corporate equity holder. Beneficial ownership follows this live studio. */
+    equityOwnerStudioId?: string;
+    /** Absolute target-equity percentages paid for by corporate holders (mixed funding). */
+    equityFunding?: Array<{ ownerStudioId: string; percent: number }>;
+    /** Cash anchor keeps internal capital movements from inventing asset value. */
+    equityCashBasis?: { recordedValuation: number; cashBalance: number };
     scripts: Script[];
     concepts: ProjectConcept[]; // NEW: Drafts
     writers: Writer[];
@@ -2145,7 +2154,7 @@ export interface StudioFinanceEntry {
     week: number;
     year: number;
     amount: number;
-    type: 'THEATRICAL' | 'STREAMING_DEAL' | 'STREAMING_ROYALTY' | 'SOUNDTRACK' | 'TALENT_BACKEND' | 'UNIVERSE' | 'CAPITAL_INJECTION' | 'CAPITAL_WITHDRAWAL' | 'PRODUCTION_SPEND' | 'FUNDING_SURPLUS' | 'INVESTOR_FUNDING' | 'INVESTOR_PAYOUT' | 'ACQUISITION_MERGER' | 'IP_ACQUISITION' | 'STUDIO_SALE' | 'REBRAND' | 'LEGAL';
+    type: 'INVESTMENT_RETURN' | 'THEATRICAL' | 'STREAMING_DEAL' | 'STREAMING_ROYALTY' | 'SOUNDTRACK' | 'TALENT_BACKEND' | 'UNIVERSE' | 'CAPITAL_INJECTION' | 'CAPITAL_WITHDRAWAL' | 'PRODUCTION_SPEND' | 'FUNDING_SURPLUS' | 'INVESTOR_FUNDING' | 'INVESTOR_PAYOUT' | 'ACQUISITION_MERGER' | 'IP_ACQUISITION' | 'STUDIO_SALE' | 'REBRAND' | 'LEGAL';
     label: string;
     projectId?: string;
 }
@@ -8166,6 +8175,8 @@ export interface StockTakeoverCase {
 }
 
 export interface PortfolioItem {
+    /** Corporate-funded shares remain assets of their funding studio. */
+    equityFunding?: Array<{ ownerStudioId: string; shares: number }>;
     stockId: string;
     shares: number;
     averageCost?: number;
@@ -8179,6 +8190,7 @@ export interface Transaction {
     amount: number;
     category: TransactionCategory;
     description: string;
+    cashFlowType?: 'OPERATING' | 'CAPITAL_TRANSFER' | 'FINANCING' | 'ASSET_DISPOSAL';
 }
 
 export interface PlayerLoan {
@@ -8205,6 +8217,7 @@ export interface CreditHistory {
     totalBorrowed: number;
     totalRepaid: number;
     lastLoanAbsoluteWeek?: number;
+    lastManualPaymentAbsoluteWeek?: number;
 }
 
 export interface YearlyFinance {
