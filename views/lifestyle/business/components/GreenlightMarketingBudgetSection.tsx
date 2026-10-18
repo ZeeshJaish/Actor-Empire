@@ -74,9 +74,28 @@ export const GreenlightMarketingBudgetSection: React.FC<GreenlightMarketingBudge
                 >
                     {translate('greenlight.marketing.custom')}
                 </button>
-                <div className="flex-1">
+                <div className="min-w-0 flex-1 space-y-3">
+                    <label className="block text-[10px] font-bold text-zinc-300">
+                        {translate('projectCost.exactMarketingAmount')}
+                        <input
+                            type="number"
+                            inputMode="numeric"
+                            min="0"
+                            max={maxMarketingBudget}
+                            step="1"
+                            value={reservedMarketingBudget}
+                            onChange={event => {
+                                const value = Number(event.target.value);
+                                onPresetChange('CUSTOM');
+                                onReservedBudgetChange(Math.min(maxMarketingBudget, Math.max(0, Number.isFinite(value) ? Math.floor(value) : 0)));
+                            }}
+                            className="mt-2 min-h-11 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 font-mono text-base text-white focus:border-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-400"
+                        />
+                    </label>
+                    <p className="text-[10px] leading-relaxed text-zinc-400">{translate('projectCost.exactMarketingHelp')}</p>
                     <input
                         type="range"
+                        aria-label={translate('greenlight.marketing.reservedCampaignBudget')}
                         min="0"
                         max={maxMarketingBudget}
                         step="50000"

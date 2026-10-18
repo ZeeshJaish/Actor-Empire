@@ -305,11 +305,11 @@ export const GreenlightConfirmationStep: React.FC<GreenlightConfirmationStepProp
                         <h3 className="text-[10px] font-bold text-amber-500 uppercase tracking-widest mb-3 border-b border-amber-500/20 pb-1">Release Reserve</h3>
                         <div className="space-y-2 text-sm">
                             <div className="flex justify-between items-center">
-                                <span className="text-zinc-300">Production Budget</span>
+                                <span className="text-zinc-300">Production (includes music)</span>
                                 <span className="font-mono text-white">{formatMoney(budgetBreakdown.total + musicBudget)}</span>
                             </div>
                             <div className="flex justify-between items-center">
-                                <span className="text-zinc-300">Campaign Pool</span>
+                                <span className="text-zinc-300">Marketing Reserved</span>
                                 <span className="font-mono text-amber-300">{formatMoney(reservedMarketingBudget)}</span>
                             </div>
                             <p className="text-[10px] text-zinc-500 leading-relaxed">
@@ -320,7 +320,7 @@ export const GreenlightConfirmationStep: React.FC<GreenlightConfirmationStepProp
 
                     <div className="bg-zinc-950 rounded-lg p-4 flex justify-between items-center border border-zinc-800 mt-4">
                         <div>
-                            <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Total Package</div>
+                            <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Total Project Budget</div>
                             <div className="text-xs text-zinc-600">Production, music, and reserved marketing</div>
                         </div>
                         <div className="text-right">

@@ -18,6 +18,8 @@ import { resolveProjectType } from '../../../../services/businessLogic';
 import { getProjectAlumniStories } from '../../../../services/livingEnsemble';
 import { resolveStreamingPlatformBrandById } from '../../../../services/streamingPlatformBrandRegistry';
 import { getStreamingRightsProjectLine } from '../../../../components/StreamingRightsCalendar';
+import { getProjectCostSummary } from '../../../../services/projectCostPresentation';
+import { ProjectCostCard } from './ProjectCostCard';
 
 const formatMoney = (val: number) => {
     if (val === 0) return '$0';
@@ -854,12 +856,7 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
 
                                  {/* Quick Stats */}
                                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:col-span-2">
-                                    <div className="p-5 sm:p-6 bg-white/[0.03] rounded-3xl border border-white/5 backdrop-blur-sm flex flex-col justify-center h-[120px]">
-                                        <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">{tr('projectDashboard.metric.productionCost')}</div>
-                                        <div className="text-2xl sm:text-3xl font-bold text-white tracking-tight truncate">
-                                            {formatMoney(project.projectDetails?.estimatedBudget || project.budget || 0)}
-                                        </div>
-                                    </div>
+                                    <ProjectCostCard summary={getProjectCostSummary(project)} translate={tr} formatMoney={formatMoney} />
                                     <div className="p-5 sm:p-6 bg-white/[0.03] rounded-3xl border border-white/5 backdrop-blur-sm flex flex-col justify-center h-[120px]">
                                         <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">{tr('projectDashboard.metric.buzzLevel')}</div>
                                         <div className="flex items-baseline gap-1 overflow-hidden">

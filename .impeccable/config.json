@@ -38,6 +38,15 @@
         ],
         "createdAt": "2026-10-16T06:25:51.447Z",
         "reason": "Agent verified: .pnpress::before draws radial dots at varied repeat sizes as newspaper paper fibre, as the source comment states; it contains no two-axis grid-line gradients."
+      },
+      {
+        "rule": "gray-on-color",
+        "value": "*",
+        "files": [
+          "views/lifestyle/business/components/ProjectDashboardModal.tsx"
+        ],
+        "createdAt": "2026-10-18T19:41:50.616Z",
+        "reason": "False positive on the pre-existing funding explanation Got it button: slate-950 text on sky-300 is intentionally high contrast (approximately 12 to 1). No changed budget-card text has this combination."
       }
     ]
   }
