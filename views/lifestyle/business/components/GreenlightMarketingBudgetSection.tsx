@@ -53,11 +53,11 @@ export const GreenlightMarketingBudgetSection: React.FC<GreenlightMarketingBudge
                             onPresetChange(option.id);
                             onReservedBudgetChange(amount);
                         }}
-                        className={`p-4 rounded-xl border text-left transition-all ${isSelected ? 'bg-amber-500/10 border-amber-400 text-white shadow-[0_0_20px_rgba(245,158,11,0.18)]' : 'bg-zinc-900/80 border-zinc-800 text-zinc-400 hover:border-amber-500/40 hover:text-white'}`}
+                        className={`min-w-0 p-3 sm:p-4 rounded-xl border text-left transition-all ${isSelected ? 'bg-amber-500/10 border-amber-400 text-white shadow-[0_0_20px_rgba(245,158,11,0.18)]' : 'bg-zinc-900/80 border-zinc-800 text-zinc-400 hover:border-amber-500/40 hover:text-white'}`}
                     >
-                        <div className="flex items-center justify-between gap-2">
-                            <div className="text-[11px] font-black uppercase tracking-widest">{translate(`greenlight.marketing.preset.${option.id}.label`)}</div>
-                            <div className="font-mono text-xs font-black text-amber-300">{formatMoney(amount)}</div>
+                        <div className="flex min-w-0 flex-wrap items-start justify-between gap-x-2 gap-y-1">
+                            <div className="min-w-0 break-words text-[11px] font-black uppercase tracking-widest">{translate(`greenlight.marketing.preset.${option.id}.label`)}</div>
+                            <div className="min-w-0 break-words font-mono text-xs font-black text-amber-300">{formatMoney(amount)}</div>
                         </div>
                         <div className="mt-2 text-[10px] text-zinc-500 leading-tight">{translate(`greenlight.marketing.preset.${option.id}.note`)}</div>
                     </button>

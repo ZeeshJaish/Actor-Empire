@@ -24,7 +24,9 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   const url = `http://127.0.0.1:${server.address().port}`;
   const browser = await chromium.launch({ headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || 'chrome' });
   try {
-    for (const width of [320, 390, 1280]) {
+    const layoutOnly = process.argv.includes('--layout-only');
+    const widths = process.env.BUDGET_VIEWPORTS ? process.env.BUDGET_VIEWPORTS.split(',').map(Number) : layoutOnly ? [320, 360, 390, 768, 1280] : [320, 390, 1280];
+    for (const width of widths) {
       console.log('START', width);
       const mobile = width < 600;
       const context = await browser.newContext({ viewport: { width, height: mobile ? 844 : 900 }, isMobile: mobile, hasTouch: mobile });
@@ -37,6 +39,19 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
       const input = page.getByRole('spinbutton', { name: 'Exact marketing amount ($)' });
       await input.waitFor();
       assert.equal(await input.getAttribute('inputmode'), 'numeric');
+      const presetOverflow = await page.getByRole('button', { name: /^(LEAN|STANDARD|HEAVY|EVENT)/i }).evaluateAll(buttons => buttons.flatMap(button => {
+        const box = button.getBoundingClientRect();
+        const walker = document.createTreeWalker(button, NodeFilter.SHOW_TEXT);
+        const failures = [];
+        while (walker.nextNode()) {
+          const node = walker.currentNode;
+          if (!node.textContent.trim()) continue;
+          const range = document.createRange(); range.selectNodeContents(node);
+          for (const rect of range.getClientRects()) if (rect.left < box.left - 1 || rect.right > box.right + 1 || rect.bottom > box.bottom + 1) failures.push(node.textContent.trim());
+        }
+        return failures;
+      }));
+      assert.deepEqual(presetOverflow, [], 'Every preset label, amount and note must fit inside its card');
       const max = Number(await input.getAttribute('max'));
       await input.fill('-1'); assert.equal(await input.inputValue(), '0');
       await input.fill(String(max + 1_000_000)); assert.equal(Number(await input.inputValue()), max);
@@ -53,9 +68,41 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         const box = row.getBoundingClientRect();
         return !!document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2)?.closest('[data-testid=planning-cost-card]');
       }), true, 'Planning breakdown total must remain above the step navigation');
+      assert.equal(await planning.evaluate(button => {
+        const outer = button.getBoundingClientRect();
+        const detail = button.lastElementChild.getBoundingClientRect();
+        return detail.left >= outer.left - 1 && detail.right <= outer.right + 1 && detail.top >= outer.top - 1 && detail.bottom <= outer.bottom + 1;
+      }), true, 'Planning breakdown must stay inside its own cost card');
+      const clippedDetailText = await planning.evaluate(button => {
+        const box = button.getBoundingClientRect();
+        const walker = document.createTreeWalker(button.lastElementChild, NodeFilter.SHOW_TEXT);
+        const clipped = [];
+        while (walker.nextNode()) {
+          const node = walker.currentNode;
+          if (!node.textContent.trim()) continue;
+          const range = document.createRange(); range.selectNodeContents(node);
+          for (const rect of range.getClientRects()) if (rect.left < box.left - 1 || rect.right > box.right + 1 || rect.top < box.top - 1 || rect.bottom > box.bottom + 1) clipped.push(node.textContent.trim());
+        }
+        return clipped;
+      });
+      assert.deepEqual(clippedDetailText, [], 'Contained details must fit their text, not hide overflowing rows');
       await page.screenshot({ path: path.join(artifacts, `planning-breakdown-${width}.png`) });
       if (mobile) await planning.tap(); else { await page.mouse.move(0, 400); await planning.press('Escape'); }
       assert.equal(await planning.getAttribute('aria-expanded'), 'false');
+      if (layoutOnly) {
+        await input.evaluate(element => element.scrollIntoView({ block: 'center' }));
+        await page.waitForFunction(() => getComputedStyle(document.querySelector('[data-testid=planning-cost-card] > span:first-child')).opacity === '1');
+        assert.equal(await input.evaluate(element => {
+          const box = element.getBoundingClientRect();
+          return document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2) === element;
+        }), true, 'Custom keypad field must be reachable above the fixed action bar');
+        await page.screenshot({ path: path.join(artifacts, `marketing-input-${width}.png`) });
+        assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
+        assert.deepEqual(errors, []);
+        console.log(`PASS ${width}px: preset text containment, in-card breakdown, tap/hover close, keypad and page width`);
+        await context.close();
+        continue;
+      }
       await page.getByRole('button', { name: 'Review Project', exact: true }).click();
       // Draft persistence goes through the real wizard's saveDraft/onUpdatePlayer.
       await page.evaluate(() => window.budgetSaveFinished);

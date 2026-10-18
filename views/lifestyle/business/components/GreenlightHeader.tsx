@@ -98,7 +98,7 @@ export const GreenlightHeader: React.FC<GreenlightHeaderProps> = ({
                             </div>
                         </div>
 
-                        <div className="relative z-30 bg-black/60 px-3 py-2 sm:px-5 sm:py-3 rounded-2xl border border-emerald-500/20 backdrop-blur-xl flex flex-col items-end shadow-2xl min-w-[110px] sm:min-w-[160px]" data-greenlight-budget>
+                        <div className="relative bg-black/60 px-3 py-2 sm:px-5 sm:py-3 rounded-2xl border border-emerald-500/20 backdrop-blur-xl flex flex-col items-end shadow-2xl min-w-[110px] sm:min-w-[160px]" data-greenlight-budget>
                             <ProjectCostCard compact translate={translate} formatMoney={formatMoney}
                                 title={platformCommissionBudget ? 'Production Package' : undefined}
                                 valueLabel={platformCommissionBudget ? `${formatMoney(platformCommissionBudget.packageBudget)} / ${formatMoney(platformCommissionBudget.productionCap)}` : undefined}
