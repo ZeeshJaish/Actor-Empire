@@ -27,3 +27,5 @@ Browser harness uses isolated IndexedDB data with real game components and migra
 ## Design-hook triage
 
 The existing funding explanation button uses slate-950 text on sky-300 at approximately 12.1:1 contrast. The gray-on-color finding on that unchanged button is a false positive. The detector only supports a file-scoped exception for this rule; that exception and its reason are recorded in `.impeccable/config.json`. The button design is preserved. The new budget card and input have no outstanding deterministic design findings.
+
+The subsequent Stop-hook palette finding points to the existing director-avatar purple/indigo gradient, identical in pre-budget commit `333cbfa` and paired with the established Key Talent heading/director role accent. This is preserved talent styling, outside the budget change. A file-scoped `ai-color-palette` exception records that evidence; no palette or runtime UI was changed for this finding.

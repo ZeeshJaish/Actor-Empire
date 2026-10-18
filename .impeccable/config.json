@@ -47,6 +47,15 @@
         ],
         "createdAt": "2026-10-18T19:41:50.616Z",
         "reason": "False positive on the pre-existing funding explanation Got it button: slate-950 text on sky-300 is intentionally high contrast (approximately 12 to 1). No changed budget-card text has this combination."
+      },
+      {
+        "rule": "ai-color-palette",
+        "value": "*",
+        "files": [
+          "views/lifestyle/business/components/ProjectDashboardModal.tsx"
+        ],
+        "createdAt": "2026-10-18T19:52:32.696Z",
+        "reason": "Agent verified the director-avatar purple/indigo gradient is byte-identical in pre-budget commit 333cbfa and matches the existing Key Talent heading and director role accent. Preserve this established talent styling; the budget feature introduced no purple palette."
       }
     ]
   }
