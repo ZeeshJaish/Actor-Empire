@@ -1,8 +1,8 @@
 import type { Player } from '../../types';
 import { getAbsoluteWeek } from '../../services/legacyLogic';
 import { normalizeOwnedStreamingPlatformState } from '../../services/ownedStreamingPlatform';
-import { resolveStreamingCatalogTitle } from '../../services/streamingCatalog';
-import { getStreamingPlayableCatalogProjectIds, getStreamingContentAvailability, CONTENT_AVAILABILITY_LABELS } from '../../services/streamingContentAvailability';
+import { getStreamingPlayableCatalogProjectIds, getStreamingContentAvailability, CONTENT_AVAILABILITY_LABELS,
+  getStreamingCatalogueReadContext, resolveStreamingCatalogueReadTitle, type StreamingCatalogueReadContext } from '../../services/streamingContentAvailability';
 import { getOwnedPlatformPackageCountryIds } from '../../services/streamingContentAvailability';
 import { getStreamingPublicMarkets } from '../../services/streamingPublicMarkets';
 import { getStreamingAudienceMarket } from '../../services/streamingAudienceMarket';
@@ -18,20 +18,21 @@ const clamp = (value: number, min: number, max: number) => Math.min(max, Math.ma
 const hueOf = (key: string) => [...key].reduce((sum, character) => ((sum * 31) + character.charCodeAt(0)) % 360, 53);
 const movement = (current: number, previous: number) => previous === 0 ? 0 : ((current - previous) / Math.abs(previous)) * 100;
 
-export const createCanonicalContentDeskState = (player: Player): ContentDeskState => {
-  const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+export const createCanonicalContentDeskState = (player: Player, preparedContext?: StreamingCatalogueReadContext): ContentDeskState => {
+  const context = getStreamingCatalogueReadContext(player, preparedContext);
+  const { platform } = context;
   const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
   const latestPerformance = platform.weeklyHistory.at(-1)?.operations?.titlePerformance ?? [];
   const performanceByProject = new Map(latestPerformance.map(item => [item.projectId, item]));
   const projectIds = [...new Set([...platform.catalogProjectIds, ...platform.originalCommissions.flatMap(c => c.canonicalProjectId ? [c.canonicalProjectId] : [])])];
   const countries = getOwnedPlatformPackageCountryIds(platform);
   const titles = projectIds.flatMap(projectId => {
-    const title = resolveStreamingCatalogTitle(player, projectId);
+    const title = resolveStreamingCatalogueReadTitle(context, projectId);
     if (!title) return [];
     const license = platform.catalogLicenses.find(item => item.sourceProjectId === projectId && item.status === 'ACTIVE' && item.startsAtAbsoluteWeek <= absoluteWeek && item.expiresAtAbsoluteWeek > absoluteWeek);
     const original = platform.originalCommissions.find(item => item.canonicalProjectId === projectId);
     const performance = performanceByProject.get(projectId);
-    const availability = getStreamingContentAvailability(player, projectId, countries);
+    const availability = getStreamingContentAvailability(player, projectId, countries, false, context);
     const status = CONTENT_AVAILABILITY_LABELS[availability.status].toUpperCase() as ContentDeskState['titles'][number]['status'];
     return [{
       id: projectId,
@@ -400,16 +401,17 @@ export const createCanonicalBoardroomState = (player: Player): BoardroomState =>
   };
 };
 
-export const createCanonicalViewerState = (player: Player): AppState => {
-  const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+export const createCanonicalViewerState = (player: Player, preparedContext?: StreamingCatalogueReadContext): AppState => {
+  const context = getStreamingCatalogueReadContext(player, preparedContext);
+  const { platform } = context;
   const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
   const latest = platform.weeklyHistory.at(-1);
   const performance = latest?.operations?.titlePerformance ?? [];
   const ranked = performance.filter(item => item.viewingAccounts > 0).sort((a, b) => b.viewingAccounts - a.viewingAccounts);
   const countries = getOwnedPlatformPackageCountryIds(platform);
-  const titles = getStreamingPlayableCatalogProjectIds(player).flatMap(projectId => {
-    const title = resolveStreamingCatalogTitle(player, projectId);
-    if (!title || !getStreamingContentAvailability(player, projectId, countries).available) return [];
+  const titles = getStreamingPlayableCatalogProjectIds(player, context).flatMap(projectId => {
+    const title = resolveStreamingCatalogueReadTitle(context, projectId);
+    if (!title || !getStreamingContentAvailability(player, projectId, countries, true, context).available) return [];
     const result = performance.find(item => item.projectId === projectId);
     const rank = ranked.findIndex(item => item.projectId === projectId);
     const license = platform.catalogLicenses.find(item => item.sourceProjectId === projectId && item.status === 'ACTIVE');

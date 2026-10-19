@@ -4,6 +4,12 @@
   "version": "1.0.25",
   "type": "module",
   "scripts": {
+    "audit:streaming-active-screen": "esbuild scripts/audit-streaming-active-screen.tsx --bundle --platform=node --format=cjs --loader:.csv=text --loader:.css=empty --outfile=/tmp/audit-streaming-active-screen.cjs && node /tmp/audit-streaming-active-screen.cjs",
+    "audit:streaming-world-offer-read-context": "esbuild scripts/audit-streaming-world-offer-read-context.ts --bundle --platform=node --format=cjs --loader:.csv=text --outfile=/tmp/audit-streaming-world-offer-read-context.cjs && node /tmp/audit-streaming-world-offer-read-context.cjs",
+    "audit:streaming-catalogue-read-context": "esbuild scripts/audit-streaming-catalogue-read-context.ts --bundle --platform=node --format=cjs --loader:.csv=text --loader:.css=empty --outfile=/tmp/audit-streaming-catalogue-read-context.cjs && node /tmp/audit-streaming-catalogue-read-context.cjs",
+    "audit:streaming-presentation-inputs": "esbuild scripts/audit-streaming-presentation-inputs.ts --bundle --platform=node --format=cjs --loader:.csv=text --outfile=/tmp/audit-streaming-presentation-inputs.cjs && node /tmp/audit-streaming-presentation-inputs.cjs",
+    "audit:streaming-wizard-navigation": "esbuild scripts/audit-streaming-wizard-navigation.tsx --bundle --platform=node --format=cjs --loader:.csv=text --loader:.css=empty --outfile=/tmp/audit-streaming-wizard-navigation.cjs && node /tmp/audit-streaming-wizard-navigation.cjs",
+    "benchmark:streaming-catalogue-scale": "esbuild scripts/benchmark-streaming-catalogue-scale.tsx --bundle --platform=node --format=cjs --loader:.csv=text --loader:.css=empty --outfile=/tmp/benchmark-streaming-catalogue-scale.cjs && node /tmp/benchmark-streaming-catalogue-scale.cjs",
     "audit:streaming-tap-performance": "esbuild scripts/audit-streaming-tap-performance.tsx --bundle --platform=node --format=cjs --loader:.csv=text --loader:.css=empty --outfile=/tmp/audit-streaming-tap-performance.cjs && node /tmp/audit-streaming-tap-performance.cjs",
     "benchmark:streaming-tap-lag": "esbuild scripts/benchmark-streaming-tap-lag.tsx --bundle --platform=node --format=cjs --loader:.csv=text --loader:.css=empty --outfile=/tmp/benchmark-streaming-tap-lag.cjs && node /tmp/benchmark-streaming-tap-lag.cjs",
     "audit:streaming-finite-market": "esbuild scripts/audit-streaming-finite-market.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-streaming-finite-market.mjs && node /tmp/audit-streaming-finite-market.mjs",

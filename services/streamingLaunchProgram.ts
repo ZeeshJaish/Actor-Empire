@@ -16,6 +16,7 @@ import {
     normalizeOwnedStreamingPlatformState,
 } from './ownedStreamingPlatform';
 import { getStreamingOpeningCatalogueView } from './streamingOpeningCatalogue';
+import { getStreamingCatalogueReadContext, readStreamingCatalogueDerivedView, type StreamingCatalogueReadContext } from './streamingContentAvailability';
 import {
     getStreamingStorefrontDefinition,
     getStreamingStorefrontLockReason,
@@ -313,14 +314,17 @@ export const setStreamingDefineLaunchStep = (
     player: Player,
     step: StreamingDefineLaunchStepId,
 ): Player => {
-    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
-    if (!platform.identity) return player;
+    // The UI receives a canonical player from the save boundary. Navigation
+    // changes no domain configuration, so keep rights/country references warm
+    // and let the normal durable-save path persist this small intent update.
+    const platform = player.ownedStreamingPlatform;
+    if (!platform.identity || platform.launchProgram.defineCurrentStep === step) return player;
     return {
         ...player,
-        ownedStreamingPlatform: compactOwnedStreamingPlatformForPersistence({
+        ownedStreamingPlatform: {
             ...platform,
             launchProgram: { ...platform.launchProgram, defineCurrentStep: step },
-        }, player.id),
+        },
     };
 };
 
@@ -695,8 +699,8 @@ const hasPositiveFundingHistory = (player: Player): boolean => {
         || Boolean(platform.infrastructureSetup || platform.starterCatalog || platform.launchCommit);
 };
 
-export const getStreamingLaunchProgramView = (player: Player): StreamingLaunchProgramView => {
-    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+const buildStreamingLaunchProgramView = (player: Player, context: StreamingCatalogueReadContext): StreamingLaunchProgramView => {
+    const { platform } = context;
     const budget = getStreamingLaunchBudgetView(player);
     const openingMarkets = platform.marketOperations.filter(operation => (
         operation.scope === 'COUNTRY' && operation.entryKind === 'OPENING' && operation.status !== 'EXITED'
@@ -719,7 +723,7 @@ export const getStreamingLaunchProgramView = (player: Player): StreamingLaunchPr
         && platform.serviceConfiguration.pricing.streams.length
         && (!platform.serviceConfiguration.pricing.streams.includes('subs') || platform.serviceConfiguration.pricing.plans.length),
     );
-    const catalogueCoverage = getStreamingOpeningCatalogueView(player);
+    const catalogueCoverage = getStreamingOpeningCatalogueView(player, context);
     const hasCatalogue = Boolean(platform.starterCatalog && catalogueCoverage.titles.some(title => title.available));
     const launchDefinitionSignature = getStreamingLaunchDefinitionSignature(player);
     const blueprintSaved = Boolean(
@@ -972,6 +976,11 @@ export const getStreamingLaunchProgramView = (player: Player): StreamingLaunchPr
                     : 'This is the clearest next step on the critical path to Opening Night.',
         } : null,
     };
+};
+
+export const getStreamingLaunchProgramView = (player: Player, preparedContext?: StreamingCatalogueReadContext): StreamingLaunchProgramView => {
+    const context = getStreamingCatalogueReadContext(player, preparedContext);
+    return readStreamingCatalogueDerivedView(context, getStreamingLaunchProgramView, () => buildStreamingLaunchProgramView(player, context));
 };
 
 export interface PlanStreamingLaunchCostInput {

@@ -3,16 +3,12 @@ import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import '../../index.css';
 import StreamingPlatformHQ from '../../components/StreamingPlatformHQ';
-import { filedMarketFixture } from '../helpers/streamingFiledMarketFixture';
-import { getContentMarketListings, purchaseContentMarketListing } from '../../services/streamingContentMarket';
+import { streamingCatalogueScaleFixture } from '../helpers/streamingCatalogueScaleFixture';
 
-const makePlayer = () => {
-    const player = filedMarketFixture();
-    const listing = getContentMarketListings(player)[0];
-    const purchased = purchaseContentMarketListing(player, listing.id, listing.signature);
-    if (!purchased.changed) throw new Error(purchased.detail);
-    return purchased.player;
-};
+const parameters = new URLSearchParams(location.search);
+const titleCount = parameters.get('titles') === '104' ? 104 : 52;
+const startInRoom = parameters.get('room') === '1';
+const makePlayer = () => streamingCatalogueScaleFixture(titleCount, Date.now()).player;
 
 const measurements: { action: string; nextPaintMs: number }[] = [];
 const longTasks: number[] = [];
@@ -41,10 +37,11 @@ document.addEventListener('click', event => {
 function Fixture() {
     const [player, setPlayer] = useState(makePlayer);
     return <>
-        <StreamingPlatformHQ player={player} onUpdatePlayer={setPlayer} onTrustedMarketUpdate={setPlayer} onBack={() => {}} />
+        <StreamingPlatformHQ player={player} onUpdatePlayer={setPlayer} onTrustedMarketUpdate={setPlayer} onBack={() => {}}
+            initialContentMarketOfferId={startInRoom ? player.ownedStreamingPlatform.buyerAuctionSessions[0]?.id : undefined} />
         <details style={{ position: 'fixed', left: 8, bottom: 8, zIndex: 99999, maxHeight: '40vh', overflow: 'auto', maxWidth: 300,
             background: '#10141e', color: '#fff', padding: 10, font: '12px system-ui' }}>
-            <summary>Disposable performance QA · 197 filed · 1 licensed</summary>
+            <summary>Disposable performance QA · 197 filed · {titleCount} licensed</summary>
             <p>Memory only. No actual save is read or written. Double-frame timings are lab observations, not field INP.</p>
             <button onClick={() => { measurements.length = 0; longTasks.length = 0; showMetrics(); }}>Reset metrics</button>
             <pre id="tap-metrics" />

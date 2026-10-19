@@ -1,7 +1,7 @@
 import type { Player } from '../types';
 import type { StreamingOpeningTitleCoverage } from './streamingOpeningCatalogue';
-import { getStreamingContentAvailability } from './streamingContentAvailability';
-import { resolveStreamingCatalogTitle } from './streamingCatalog';
+import { getStreamingContentAvailability, getStreamingCatalogueReadContext,
+    resolveStreamingCatalogueReadTitle, type StreamingCatalogueReadContext } from './streamingContentAvailability';
 
 export interface StreamingAnchorCandidate {
     id: string;
@@ -62,11 +62,13 @@ export const rankStreamingLaunchAnchors = (
     player: Player,
     titles: StreamingOpeningTitleCoverage[],
     limit = 4,
+    preparedContext?: StreamingCatalogueReadContext,
 ): StreamingOpeningTitleCoverage[] => {
+    const context = getStreamingCatalogueReadContext(player, preparedContext);
     const platform = player.ownedStreamingPlatform;
     const byId = new Map(titles.map(title => [title.projectId, title]));
     const candidates = titles.map(title => {
-        const canonical = resolveStreamingCatalogTitle(player, title.projectId);
+        const canonical = resolveStreamingCatalogueReadTitle(context, title.projectId);
         const scheduled = platform.launchSlate?.entries.find(entry => entry.projectId === title.projectId);
         return {
             id: title.projectId,
@@ -75,7 +77,7 @@ export const rankStreamingLaunchAnchors = (
             format: title.projectType,
             source: title.source,
             rating: canonical?.rating ?? null,
-            coveredMarketCount: getStreamingContentAvailability(player, title.projectId).coveredCountryIds.length,
+            coveredMarketCount: getStreamingContentAvailability(player, title.projectId, undefined, false, context).coveredCountryIds.length,
             scheduledWeek: scheduled?.launchWeek ?? null,
         } satisfies StreamingAnchorCandidate;
     });

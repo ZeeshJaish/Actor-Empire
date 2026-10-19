@@ -21,6 +21,7 @@ import {
 import { beginStreamingMarketClearance } from './streamingMarkets';
 import { quoteStreamingMarketFilingEnergy } from './streamingMarketFilingQuote';
 import { reserveOwnedStreamingLaunchMarketing } from './streamingLaunchMarketingLifecycle';
+import { getStreamingCatalogueReadContext, readStreamingCatalogueDerivedView, type StreamingCatalogueReadContext } from './streamingContentAvailability';
 
 export type StreamingOpeningWorkstreamId =
     | 'INFRASTRUCTURE'
@@ -294,8 +295,8 @@ const physicalRackCount = (setup: OwnedStreamingInfrastructureSetup): number => 
         .reduce((sum, facility) => sum + facility.installedRacks, 0)
     : setup.networkPlacements.reduce((sum, placement) => sum + placement.racks, 0);
 
-export const getStreamingOpeningProgrammeView = (player: Player): StreamingOpeningProgrammeView => {
-    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+const buildStreamingOpeningProgrammeView = (player: Player, context: StreamingCatalogueReadContext): StreamingOpeningProgrammeView => {
+    const { platform } = context;
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
     const commission = platform.openingProgrammeCommission || legacyCommission(player);
     const setup = platform.infrastructureSetup;
@@ -308,7 +309,7 @@ export const getStreamingOpeningProgrammeView = (player: Player): StreamingOpeni
         releasedCapital: setup?.capitalInvested || 0, workstreams: [],
     };
     if (!commission || !setup) return {
-        state: getStreamingLaunchProgramView(player).status === 'READY' ? 'READY_TO_COMMISSION' : 'DRAFT',
+        state: getStreamingLaunchProgramView(player, context).status === 'READY' ? 'READY_TO_COMMISSION' : 'DRAFT',
         commissioned: false, commission: null, absoluteWeek, earliestOpeningAbsoluteWeek: null,
         dateCertainty: 'ESTIMATE', controllingWorkstreamId: null, remainingWeeks: 0,
         cityCount: 0, rackCount: 0, releasedCapital: 0, workstreams: [],
@@ -371,6 +372,11 @@ export const getStreamingOpeningProgrammeView = (player: Player): StreamingOpeni
         releasedCapital: setup.capitalInvested,
         workstreams,
     };
+};
+
+export const getStreamingOpeningProgrammeView = (player: Player, preparedContext?: StreamingCatalogueReadContext): StreamingOpeningProgrammeView => {
+    const context = getStreamingCatalogueReadContext(player, preparedContext);
+    return readStreamingCatalogueDerivedView(context, getStreamingOpeningProgrammeView, () => buildStreamingOpeningProgrammeView(player, context));
 };
 
 export const getStreamingOpeningProgrammeFocus = (

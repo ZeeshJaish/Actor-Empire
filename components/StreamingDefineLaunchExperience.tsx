@@ -43,6 +43,8 @@ import {
   setStreamingDefineLaunchStep,
 } from '../services/streamingLaunchProgram';
 import { getStreamingOpeningCatalogueView } from '../services/streamingOpeningCatalogue';
+import { createStreamingCatalogueReadContext, type StreamingCatalogueReadContext } from '../services/streamingContentAvailability';
+import { reuseStreamingPresentationSource } from '../services/streamingPresentationInputs';
 import { rankStreamingLaunchAnchors } from '../services/streamingCatalogueAnchors';
 import { getEligibleOwnedStreamingTitles, getStreamingLicenseOpportunities } from '../services/streamingCatalog';
 import {
@@ -229,11 +231,11 @@ export const buildStreamingLaunchCountry = (market: typeof STREAMING_WORLD_MARKE
   };
 };
 
-const buildCatalogue = (player: Player): CatalogueState => {
-  const view = getStreamingOpeningCatalogueView(player);
+const buildCatalogue = (player: Player, context: StreamingCatalogueReadContext): CatalogueState => {
+  const view = getStreamingOpeningCatalogueView(player, context);
   const platform = player.ownedStreamingPlatform;
   const available = view.titles.filter(title => title.available);
-  const anchors = rankStreamingLaunchAnchors(player, available, 4);
+  const anchors = rankStreamingLaunchAnchors(player, available, 4, context);
   const titles = available.length;
   const hours = available.reduce((total, title) => total + title.hours, 0);
   const depthGuide = platform.starterCatalog?.packageId === 'BROAD_APPEAL' ? 80 : platform.starterCatalog?.packageId === 'PRESTIGE_VAULT' ? 30 : 40;
@@ -303,9 +305,10 @@ const buildCapabilityLocks = (player: Player): Record<string, string> => {
 };
 
 const buildLaunchData = (player: Player): LaunchData => {
+  const context = createStreamingCatalogueReadContext(player);
   const platform = player.ownedStreamingPlatform;
   const budget = getStreamingLaunchBudgetView(player);
-  const launchView = getStreamingLaunchProgramView(player);
+  const launchView = getStreamingLaunchProgramView(player, context);
   const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
   const worldPopulation = normalizeWorldPopulationState(player.world.worldPopulation, absoluteWeek);
   const worldAudienceEconomy = normalizeWorldAudienceEconomyState(
@@ -366,7 +369,7 @@ const buildLaunchData = (player: Player): LaunchData => {
         : undefined,
     };
   });
-  const catalogueBase = buildCatalogue(player);
+  const catalogueBase = buildCatalogue(player, context);
   const posterSources = [
     ...(player.pastProjects || []),
     ...player.businesses.flatMap(business => business.studioState?.scripts || []),
@@ -534,8 +537,17 @@ const buildLaunchData = (player: Player): LaunchData => {
   };
 };
 
+/** Keep read projections warm only across free navigation/draft intent changes.
+ * Every other canonical field, including future rights fields, invalidates it. */
+export const reuseStreamingLaunchProjectionSource = (previous: Player, current: Player): Player => (
+  reuseStreamingPresentationSource(previous, current, 'WIZARD')
+);
+
 function OpeningLaunchExperience(props: Props) {
-  const data = useMemo(() => buildLaunchData(props.player), [props.player]);
+  const projectionSourceRef = useRef(props.player);
+  const projectionSource = reuseStreamingLaunchProjectionSource(projectionSourceRef.current, props.player);
+  projectionSourceRef.current = projectionSource;
+  const data = useMemo(() => buildLaunchData(projectionSource), [projectionSource]);
   const platform = props.player.ownedStreamingPlatform;
   const currentPlayerRef = useRef(props.player);
   useEffect(() => { currentPlayerRef.current = props.player; }, [props.player]);
@@ -581,7 +593,7 @@ function OpeningLaunchExperience(props: Props) {
       cities,
       redundancy: !hasPlan ? 'Not planned' : cities >= 2 ? 'Redundant' : 'Single point',
     });
-  }, [platform, props.player]);
+  }, [projectionSource]);
 
   const update = (next: Player) => {
     const checkpoint = checkpointStreamingLaunchBlueprint(next);
@@ -644,7 +656,7 @@ function OpeningLaunchExperience(props: Props) {
   // Pricing autosave replaces the platform object, but does not change the
   // audience/rights context. A value signature keeps that world forecast warm
   // until a relevant market, catalogue, technology or world-week change.
-  const forecastContextKey = JSON.stringify({
+  const forecastContextKey = useMemo(() => JSON.stringify({
     playerId: props.player.id, age: props.player.age, week: props.player.currentWeek,
     identity: platform.identity,
     markets: platform.marketOperations,
@@ -654,12 +666,12 @@ function OpeningLaunchExperience(props: Props) {
     technology: platform.technologyLevels,
     products: platform.productLines,
     storefront: platform.serviceConfiguration.storefrontLayoutId,
-  });
+  }), [projectionSource]);
 
   return (
     <LaunchWizard
       data={data}
-      forecastWorldState={props.player.world}
+      forecastWorldState={projectionSource.world}
       forecastContextKey={forecastContextKey}
       initialStep={STEP_FROM_CANONICAL[currentStep] || 'markets'}
       initialDraft={restoredDraft}
@@ -668,7 +680,15 @@ function OpeningLaunchExperience(props: Props) {
       onDraftChange={persistDraft}
       onExit={props.onClose}
       onOpenStudioFinance={props.onOpenFinance}
-      onStepChange={(step) => update(setStreamingDefineLaunchStep(props.player, STEP_TO_CANONICAL[step]))}
+      onStepChange={(step) => {
+        const current = currentPlayerRef.current;
+        const next = setStreamingDefineLaunchStep(current, STEP_TO_CANONICAL[step]);
+        if (next === current) return;
+        // Moving between pages is already local in LaunchWizard. Persist that
+        // intent immediately without re-running the paid-action blueprint check.
+        currentPlayerRef.current = next;
+        props.onUpdatePlayer(next);
+      }}
       onSaveFootprint={(countryIds) => {
         const result = saveStreamingMarketPlan(currentPlayerRef.current, countryIds, 'OPENING');
         if (result.changed) update(result.player);

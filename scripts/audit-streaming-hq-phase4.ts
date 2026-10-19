@@ -167,7 +167,7 @@ const hqSource = `${componentSource}\n${serviceSource}`;
  * PENDING instead of rendering a zero that reads like a measurement.
  */
 assert(
-    componentSource.includes("platform.launchCommit ? formatMoney(platform.metrics.averageRevenuePerUser) : 'PENDING'")
+    componentSource.includes("readPlatform.launchCommit ? formatMoney(readPlatform.metrics.averageRevenuePerUser) : 'PENDING'")
     && componentSource.includes("'good' : 'pending'"),
     'Pre-launch metrics must render as pending rather than as fake zeroes.',
 );

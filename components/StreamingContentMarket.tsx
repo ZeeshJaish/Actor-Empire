@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { reuseStreamingPresentationSource } from '../services/streamingPresentationInputs';
 import { ArrowLeft, Bell, BellOff, CalendarDays, Check, ChevronDown, ChevronRight, Clock3, FileSignature, Film, Gavel, Handshake, LibraryBig, Search, Sparkles, Wallet, X } from 'lucide-react';
 import type { OwnedStreamingRightsNegotiation, Player } from '../types';
 import AccessibleDialog from './AccessibleDialog';
@@ -155,6 +156,10 @@ function ContentMarketGate({ player, funds, listingPrices, owned, liveRooms, bra
 }
 
 export default function StreamingContentMarket({ player, brand, onUpdatePlayer, onClose, onOpenFinance, onCommission, onReview, returnToLaunch, initialTab, onResumeLegacy, onExistingNegotiations, initialOfferId, initialAuctionId }: Props) {
+    const projectionSourceRef = useRef(player);
+    const readPlayer = reuseStreamingPresentationSource(projectionSourceRef.current, player);
+    projectionSourceRef.current = readPlayer;
+    const readPlatform = readPlayer.ownedStreamingPlatform;
     const platform = player.ownedStreamingPlatform;
     const [draft, setDraft] = useState<Draft>(() => initialAuctionId
         ? { ...(platform.contentMarketDraft || { search: '', ownedIds: [] }), tab: 'AUCTIONS', selectedId: initialAuctionId }
@@ -181,25 +186,25 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
     // The room reads its persisted session directly. Rebuilding the entire
     // storefront on every bid/timer tick blocked feedback behind unrelated work.
     const posterById = useMemo(() => inAuctionRoom ? new Map<string, string>() : new Map(
-        [...(player.pastProjects || []), ...player.businesses.flatMap(business => business.studioState?.scripts || [])]
+        [...(readPlayer.pastProjects || []), ...readPlayer.businesses.flatMap(business => business.studioState?.scripts || [])]
             .flatMap(source => source.customPoster ? [[String(source.id), source.customPoster] as const] : []),
-    ), [player, inAuctionRoom]);
+    ), [readPlayer, inAuctionRoom]);
     const marketSnapshot = useMemo(() => {
         if (inAuctionRoom) return null;
-        const listings = getContentMarketListings(player);
-        const collections = getContentMarketCollections(player);
-        const libraryTitles = getHistoricalCatalogueTitles(player);
-        const assignments = getContentMarketAuctionAssignments(player, { listings, collections });
+        const listings = getContentMarketListings(readPlayer);
+        const collections = getContentMarketCollections(readPlayer);
+        const libraryTitles = getHistoricalCatalogueTitles(readPlayer);
+        const assignments = getContentMarketAuctionAssignments(readPlayer, { listings, collections });
         return {
             listings, collections, libraryTitles, assignments,
-            opportunityOffers: getStreamingOpportunityCards(player, { includeCollections: false }).individuals,
-            supplySummary: getContentMarketSupplySummary(player, { listings, collections, assignments,
+            opportunityOffers: getStreamingOpportunityCards(readPlayer, { includeCollections: false }).individuals,
+            supplySummary: getContentMarketSupplySummary(readPlayer, { listings, collections, assignments,
                 sharedLibraryTitles: libraryTitles.length }),
-            auctionLots: getStreamingBuyerAuctionLots(player, { listings, collections, assignments }),
-            upcomingSales: getStreamingUpcomingRightsSales(player),
-            owned: getContentMarketOwnedTitles(player),
+            auctionLots: getStreamingBuyerAuctionLots(readPlayer, { listings, collections, assignments }),
+            upcomingSales: getStreamingUpcomingRightsSales(readPlayer),
+            owned: getContentMarketOwnedTitles(readPlayer),
         };
-    }, [player, inAuctionRoom]);
+    }, [readPlayer, inAuctionRoom]);
     const { listings = [], collections = [], libraryTitles = [], opportunityOffers = [], supplySummary = null,
         auctionLots = [], upcomingSales = [], owned = [] } = marketSnapshot || {};
     const auctionListingIds = useMemo(() => new Set(auctionLots.filter(lot => lot.listingKind === 'TITLE').map(lot => lot.listingId)), [auctionLots]);
@@ -222,7 +227,7 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
     const selectedUpcoming = upcomingSales.find(sale => sale.id === draft.selectedId) || null;
     const selectedUpcomingLot = auctionLots.find(lot => lot.upcomingRightsSaleId === selectedUpcoming?.id) || null;
     const funds = inAuctionRoom ? 0 : getContentMarketFunds(player);
-    const scoutQuote = useMemo(() => inAuctionRoom ? null : getStreamingPaidScoutQuote(player), [player, inAuctionRoom]);
+    const scoutQuote = useMemo(() => inAuctionRoom ? null : getStreamingPaidScoutQuote(readPlayer), [readPlayer, inAuctionRoom]);
     useEffect(() => { scoutLock.current = false; }, [scoutQuote?.cycle, scoutQuote?.completedInCycle]);
     const patch = (value: Partial<Draft>) => { setDraft(d => ({ ...d, ...value })); setFeedback(''); };
     const persistDraft = () => persistContentMarketDraft(player, draft, onUpdatePlayer);
@@ -252,7 +257,7 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
     const librarySearchActive = Boolean(query || libraryGenre || libraryLanguage || libraryProducer
         || libraryQuality || libraryYears || marqueeOnly);
     const libraryResults = useMemo(() => !librarySearchActive || draft.tab === 'COLLECTIONS' || draft.tab === 'OWNED'
-        ? [] : searchContentMarketLibrary(player, {
+        ? [] : searchContentMarketLibrary(readPlayer, {
             query: draft.search,
             projectType: draft.tab === 'MOVIE' || draft.tab === 'SERIES' ? draft.tab : undefined,
             genre: libraryGenre || undefined,
@@ -262,7 +267,7 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
             releasedAfterYear: libraryYears ? Math.max(1, player.age - libraryYears + 1) : undefined,
             catalogueTier: marqueeOnly ? 'MARQUEE' : undefined,
             limit: 100,
-        }), [player, draft.search, draft.tab, librarySearchActive, libraryGenre,
+        }), [readPlayer, draft.search, draft.tab, librarySearchActive, libraryGenre,
             libraryLanguage, libraryProducer, libraryQuality, libraryYears, marqueeOnly]);
     const libraryGenres = useMemo(() => [...new Set(libraryTitles.map(title => title.genre))].sort(), [libraryTitles]);
     const libraryLanguages = useMemo(() => [...new Set(libraryTitles.map(title => title.originalLanguageId))].sort(), [libraryTitles]);
@@ -276,8 +281,8 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
     const detail = selected || collection || auctionLot || selectedUpcoming;
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
     const marketPacing = player.world.historicalCatalogue?.marketPacing;
-    const playableTitleCount = useMemo(() => marketPacing && !inAuctionRoom ? countActuallyPlayableMarketTitles(player) : 0,
-        [player, marketPacing, inAuctionRoom]);
+    const playableTitleCount = useMemo(() => marketPacing && !inAuctionRoom ? countActuallyPlayableMarketTitles(readPlayer) : 0,
+        [readPlayer, marketPacing, inAuctionRoom]);
     const firstLookWeeksRemaining = marketPacing
         ? Math.max(0, 12 - (absoluteWeek - marketPacing.anchorAbsoluteWeek)) : 0;
     const firstLookActive = firstLookWeeksRemaining > 0 && playableTitleCount < 25;
@@ -356,17 +361,17 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
         if (result.changed) onUpdatePlayer(result.player);
         setFeedback(result.detail);
     };
-    const exactLots = useMemo(() => inAuctionRoom ? [] : buildExactContentMarketLots(player, {
+    const exactLots = useMemo(() => inAuctionRoom ? [] : buildExactContentMarketLots(readPlayer, {
         listings,
         collections,
         opportunityOffers,
-        auctionLots: auctionLots.filter(lot => !platform.buyerAuctionSessions.some(session => session.lot.id === lot.id && session.status !== 'LIVE')),
+        auctionLots: auctionLots.filter(lot => !readPlatform.buyerAuctionSessions.some(session => session.lot.id === lot.id && session.status !== 'LIVE')),
         upcomingSales,
         ownedTitles: owned,
         libraryTitles,
-    }), [player, listings, collections, opportunityOffers, auctionLots, upcomingSales, owned, libraryTitles, platform.buyerAuctionSessions, inAuctionRoom]);
-    const searchExactLibrary = (search: string, filters: SharedLibraryFilters): SharedLibraryResult[] => (
-        searchContentMarketLibrary(player, {
+    }), [readPlayer, listings, collections, opportunityOffers, auctionLots, upcomingSales, owned, libraryTitles, readPlatform.buyerAuctionSessions, inAuctionRoom]);
+    const searchExactLibrary = useCallback((search: string, filters: SharedLibraryFilters): SharedLibraryResult[] => (
+        searchContentMarketLibrary(readPlayer, {
             query: search,
             projectType: filters.projectType || undefined,
             genre: filters.genre || undefined,
@@ -391,7 +396,7 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
                 lotId: lot?.id || null,
             };
         })
-    );
+    ), [readPlayer, auctionLots, exactLots]);
     const exactInitialScene: MarketScene = atGate ? 'GATE'
         : draft.tab === 'OWNED' || draft.selectedId === '__open_studio__' ? 'STUDIO'
             : exactLots.some(lot => lot.id === draft.selectedId) ? 'DETAIL' : 'MARKET';

@@ -17,7 +17,7 @@ import {
     normalizeStreamingPricingConfiguration,
 } from '../streamingPricingEconomy';
 import { createAiStreamingCommercialConfiguration } from './worldStreamingCommercialEconomy';
-import { evaluatePlayerStreamingTitleRoute, getOwnedPlatformPackageCountryIds } from '../streamingContentAvailability';
+import { createStreamingTitleRouteReadBatch, evaluatePlayerStreamingTitleRoute, getOwnedPlatformPackageCountryIds } from '../streamingContentAvailability';
 import { getEligibleOwnedStreamingTitles } from '../streamingCatalog';
 import { getOwnedStreamingProgramEntries } from '../streamingOriginals';
 import { deriveStreamingNetworkCoverage } from '../streamingNetworkCoverage';
@@ -111,7 +111,7 @@ const createPlayerOffer = (player: Player, absoluteWeek: number): WorldStreaming
             ? [{ kind: 'RENTAL' as const }, { kind: 'PURCHASE' as const }] : []),
     ];
     const routePlayer = { ...player, ownedStreamingPlatform: platform };
-    const preparedRoute = { platform, ownedTitleIds: eligibleOwnedIds };
+    const readTitleRoute = createStreamingTitleRouteReadBatch(routePlayer, absoluteWeek, platform, eligibleOwnedIds);
     const playableIds = new Set<string>();
     const subscriptionCatalogueStrengthByCountry: Record<string, number> = {};
     const storeCatalogueStrengthByCountry: Record<string, number> = {};
@@ -127,17 +127,17 @@ const createPlayerOffer = (player: Player, absoluteWeek: number): WorldStreaming
         const subscriptionPlayable = new Set<string>();
         const playable = titleIds.filter(projectId => {
             const paid = routes.filter(route => route.kind === 'SUBSCRIPTION').some(route => (
-                evaluatePlayerStreamingTitleRoute(routePlayer, projectId, countryId, absoluteWeek, route, preparedRoute).allowed
+                readTitleRoute(projectId, countryId, route).allowed
             ));
             if (paid) subscriptionPlayable.add(projectId);
             return paid || routes.filter(route => route.kind !== 'SUBSCRIPTION').some(route => (
-                evaluatePlayerStreamingTitleRoute(routePlayer, projectId, countryId, absoluteWeek, route, preparedRoute).allowed
+                readTitleRoute(projectId, countryId, route).allowed
             ));
         });
         const playableSet = new Set(playable);
         playable.forEach(id => playableIds.add(id));
-        const storePlayable=playable.filter(projectId=>evaluatePlayerStreamingTitleRoute(routePlayer,projectId,countryId,absoluteWeek,{kind:'RENTAL'},preparedRoute).allowed
-            || evaluatePlayerStreamingTitleRoute(routePlayer,projectId,countryId,absoluteWeek,{kind:'PURCHASE'},preparedRoute).allowed);
+        const storePlayable=playable.filter(projectId=>readTitleRoute(projectId,countryId,{kind:'RENTAL'}).allowed
+            || readTitleRoute(projectId,countryId,{kind:'PURCHASE'}).allowed);
         storeCatalogueStrengthByCountry[countryId]=streamingCatalogueValue(storePlayable.map(id=>facts.get(id)!)).strength;
         const paidValue = streamingCatalogueValue([...subscriptionPlayable].map(id => facts.get(id)!));
         const value = streamingCatalogueValue(playable.map(id => facts.get(id)!));

@@ -22,6 +22,7 @@ import { resolveOwnedStreamingReach } from './streamingProgression';
 import { getStreamingLaunchDefinitionSignature } from './streamingLaunchProgram';
 import { getStreamingOpeningProgrammeView } from './streamingOpeningProgramme';
 import { getStreamingOpeningCatalogueView } from './streamingOpeningCatalogue';
+import { getStreamingCatalogueReadContext, readStreamingCatalogueDerivedView, type StreamingCatalogueReadContext } from './streamingContentAvailability';
 import { projectStreamingCommercialOffers } from './streamingCommercialOffers';
 import { stageWorldStreamingOpeningOffer } from './worldEconomy/worldStreamingOpening';
 import { createOpeningWorldStreamingCustomerState } from './worldEconomy/worldStreamingCustomers';
@@ -160,8 +161,8 @@ const getCapacityOption = (
     };
 };
 
-export const getStreamingLaunchReadiness = (player: Player): StreamingLaunchReadiness => {
-    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+const buildStreamingLaunchReadiness = (player: Player, context: StreamingCatalogueReadContext): StreamingLaunchReadiness => {
+    const { platform } = context;
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
     const reach = resolveOwnedStreamingReach(platform);
     const setup = platform.infrastructureSetup;
@@ -173,7 +174,7 @@ export const getStreamingLaunchReadiness = (player: Player): StreamingLaunchRead
         platform.launchProgram.lastBlueprintSignature
         && platform.launchProgram.lastBlueprintSignature === getStreamingLaunchDefinitionSignature(player),
     );
-    const openingProgramme = getStreamingOpeningProgrammeView(player);
+    const openingProgramme = getStreamingOpeningProgrammeView(player, context);
 
     items.push(createItem(
         'opening-programme',
@@ -282,7 +283,7 @@ export const getStreamingLaunchReadiness = (player: Player): StreamingLaunchRead
         'CONTENT',
     ));
 
-    const openingCatalogue = getStreamingOpeningCatalogueView(player);
+    const openingCatalogue = getStreamingOpeningCatalogueView(player, context);
     const missingOfferCountries = openingCatalogue.countries.filter(country => !country.launchGateReady);
     const hasOpeningOffer = openingCatalogue.countries.length > 0 && missingOfferCountries.length === 0;
     items.push(createItem(
@@ -380,6 +381,11 @@ export const getStreamingLaunchReadiness = (player: Player): StreamingLaunchRead
         weeklyOperatingCost,
         runwayWeeks,
     };
+};
+
+export const getStreamingLaunchReadiness = (player: Player, preparedContext?: StreamingCatalogueReadContext): StreamingLaunchReadiness => {
+    const context = getStreamingCatalogueReadContext(player, preparedContext);
+    return readStreamingCatalogueDerivedView(context, getStreamingLaunchReadiness, () => buildStreamingLaunchReadiness(player, context));
 };
 
 export const commitOwnedStreamingLaunch = (

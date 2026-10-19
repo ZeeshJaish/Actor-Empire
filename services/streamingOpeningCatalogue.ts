@@ -4,6 +4,7 @@ import type {
     OwnedStreamingLedgerEntry,
     OwnedStreamingLocalizationJob,
     OwnedStreamingMarketOperation,
+    OwnedStreamingPlatformState,
     OwnedStreamingTitleLanguageAsset,
     Player,
 } from '../types';
@@ -19,7 +20,8 @@ import {
     resolveStreamingGlobalLocalizationCapability,
     resolveStreamingLocalizationTiers,
 } from './streamingLocalizationCapabilities';
-import { getStreamingContentAvailability, type ContentAvailability } from './streamingContentAvailability';
+import { getStreamingContentAvailability, getStreamingCatalogueReadContext, readStreamingCatalogueDerivedView,
+    resolveStreamingCatalogueReadTitle, type ContentAvailability, type StreamingCatalogueReadContext } from './streamingContentAvailability';
 
 export type StreamingLocalizationDelivery = 'OUTSOURCE' | 'IN_HOUSE';
 export type StreamingCatalogueMetadataStatus = 'READY' | 'IN_REVIEW' | 'PLANNED';
@@ -96,8 +98,8 @@ const STRATEGY_LABELS: Record<string, string> = {
     PRESTIGE_VAULT: 'Prestige Vault',
 };
 
-const openingOperations = (player: Player): OwnedStreamingMarketOperation[] => {
-    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+const openingOperations = (player: Player, preparedPlatform?: OwnedStreamingPlatformState): OwnedStreamingMarketOperation[] => {
+    const platform = preparedPlatform || normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     return platform.marketOperations.filter(operation => (
         operation.scope === 'COUNTRY'
         && operation.entryKind === 'OPENING'
@@ -106,8 +108,8 @@ const openingOperations = (player: Player): OwnedStreamingMarketOperation[] => {
     ));
 };
 
-const activeLicenseFor = (player: Player, projectId: string): OwnedStreamingCatalogLicense | null => {
-    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+const activeLicenseFor = (player: Player, projectId: string, preparedPlatform?: OwnedStreamingPlatformState): OwnedStreamingCatalogLicense | null => {
+    const platform = preparedPlatform || normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
     return platform.catalogLicenses.find(license => (
         license.sourceProjectId === projectId
@@ -178,11 +180,11 @@ const reachForLanguage = (
     return preference === 'ORIGINAL_AUDIO' ? 0.72 : 0.24;
 };
 
-export const getStreamingOpeningCatalogueView = (player: Player): StreamingOpeningCatalogueView => {
-    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+const buildStreamingOpeningCatalogueView = (player: Player, context: StreamingCatalogueReadContext): StreamingOpeningCatalogueView => {
+    const { platform } = context;
     const globalLocalization = resolveStreamingGlobalLocalizationCapability(platform);
     const activeLanguages = new Set(globalLocalization.activeLanguageIds);
-    const operations = openingOperations(player);
+    const operations = openingOperations(player, platform);
     const openingCountryIds = operations.map(operation => operation.countryId!);
     const ownedIds = new Set(platform.starterCatalog?.ownedProjectIds || []);
     const originalIds = new Set(platform.originalCommissions.flatMap(commission => commission.canonicalProjectId ? [commission.canonicalProjectId] : []));
@@ -193,8 +195,8 @@ export const getStreamingOpeningCatalogueView = (player: Player): StreamingOpeni
         ...originalIds,
     ]));
     const baseTitles = titleIds.map(projectId => {
-        const title = resolveStreamingCatalogTitle(player, projectId);
-        const license = activeLicenseFor(player, projectId);
+        const title = resolveStreamingCatalogueReadTitle(context, projectId);
+        const license = activeLicenseFor(player, projectId, platform);
         const source: StreamingOpeningTitleCoverage['source'] = originalIds.has(projectId)
             ? 'ORIGINAL'
             : ownedIds.has(projectId) || title?.source === 'OWNED_LIBRARY'
@@ -207,7 +209,7 @@ export const getStreamingOpeningCatalogueView = (player: Player): StreamingOpeni
             genre: title?.genre || license?.genre || 'Unknown',
             source,
             license,
-            access: getStreamingContentAvailability(player, projectId, openingCountryIds),
+            access: getStreamingContentAvailability(player, projectId, openingCountryIds, true, context),
         };
     });
     const allLanguages = Array.from(new Set(operations.flatMap(operation => (
@@ -321,6 +323,11 @@ export const getStreamingOpeningCatalogueView = (player: Player): StreamingOpeni
         launchBlockers,
         qualityWarnings,
     };
+};
+
+export const getStreamingOpeningCatalogueView = (player: Player, preparedContext?: StreamingCatalogueReadContext): StreamingOpeningCatalogueView => {
+    const context = getStreamingCatalogueReadContext(player, preparedContext);
+    return readStreamingCatalogueDerivedView(context, getStreamingOpeningCatalogueView, () => buildStreamingOpeningCatalogueView(player, context));
 };
 
 export const getStreamingLocalizationQuote = (

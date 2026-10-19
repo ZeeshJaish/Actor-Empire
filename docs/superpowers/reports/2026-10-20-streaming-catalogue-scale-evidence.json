@@ -1,0 +1,840 @@
+{
+  "baseline": "693c84d5da7f5978bfaaa49ac6d2486ea906e085",
+  "method": "One warmup, three measured CPU/SSR samples per case; same current normal-service fixture with baseline production source overlay. Browser double-frame observations exclude fixture construction and career persistence; not field INP.",
+  "before": [
+    {
+      "label": "before",
+      "countriesFiled": 197,
+      "licensedTitles": 52,
+      "availabilityHash": "7332986fa7c4146fceadfe479d85a203cecb7b9aa00bc4506fd7a7ae87ec006b",
+      "openingCatalogueHash": "3f84b6d9921e56a045a085b57609231e3a26ab17de2227e8ceda1dd53471f57e",
+      "launchReadinessHash": "f9ad422e48405c1562c122dec4b7577e4fdf3c445aa28868c8d6bd9bf1b7ef63",
+      "hq": {
+        "medianMs": 2086.38,
+        "minMs": 2061.8,
+        "maxMs": 2110.12,
+        "samples": [
+          2061.8,
+          2086.38,
+          2110.12
+        ]
+      },
+      "hqWithRoom": {
+        "medianMs": 2061.35,
+        "minMs": 2025.21,
+        "maxMs": 2137.54,
+        "samples": [
+          2025.21,
+          2061.35,
+          2137.54
+        ]
+      },
+      "hqWithRoomAfterTick": {
+        "medianMs": 2055.81,
+        "minMs": 2042.68,
+        "maxMs": 2117.07,
+        "samples": [
+          2042.68,
+          2055.81,
+          2117.07
+        ]
+      },
+      "isolatedRoom": {
+        "medianMs": 2.52,
+        "minMs": 2.05,
+        "maxMs": 2.78,
+        "samples": [
+          2.05,
+          2.52,
+          2.78
+        ]
+      },
+      "wizard": {
+        "medianMs": 536.29,
+        "minMs": 535.62,
+        "maxMs": 542.32,
+        "samples": [
+          535.62,
+          536.29,
+          542.32
+        ]
+      },
+      "stepSave": {
+        "medianMs": 1.31,
+        "minMs": 1.28,
+        "maxMs": 1.34,
+        "samples": [
+          1.28,
+          1.31,
+          1.34
+        ]
+      }
+    },
+    {
+      "label": "before",
+      "countriesFiled": 197,
+      "licensedTitles": 104,
+      "availabilityHash": "431b4a6c4008e1dd35b0f2f0309d01945e3e120c8bac2aef2e63629bfffda7c9",
+      "openingCatalogueHash": "61cc9e8ce3481c7394ef23f44426fb8ad7e4bcb0b7c3825546c6bba42af3cede",
+      "launchReadinessHash": "f9ad422e48405c1562c122dec4b7577e4fdf3c445aa28868c8d6bd9bf1b7ef63",
+      "hq": {
+        "medianMs": 4968.68,
+        "minMs": 4878.7,
+        "maxMs": 5055.31,
+        "samples": [
+          4878.7,
+          4968.68,
+          5055.31
+        ]
+      },
+      "hqWithRoom": {
+        "medianMs": 5077.18,
+        "minMs": 5042.28,
+        "maxMs": 5118.7,
+        "samples": [
+          5042.28,
+          5077.18,
+          5118.7
+        ]
+      },
+      "hqWithRoomAfterTick": {
+        "medianMs": 4901.28,
+        "minMs": 4829.85,
+        "maxMs": 4929.69,
+        "samples": [
+          4829.85,
+          4901.28,
+          4929.69
+        ]
+      },
+      "isolatedRoom": {
+        "medianMs": 3.41,
+        "minMs": 3.08,
+        "maxMs": 3.65,
+        "samples": [
+          3.08,
+          3.41,
+          3.65
+        ]
+      },
+      "wizard": {
+        "medianMs": 1327.49,
+        "minMs": 1289.02,
+        "maxMs": 1455.04,
+        "samples": [
+          1289.02,
+          1327.49,
+          1455.04
+        ]
+      },
+      "stepSave": {
+        "medianMs": 2.2,
+        "minMs": 2,
+        "maxMs": 2.84,
+        "samples": [
+          2,
+          2.2,
+          2.84
+        ]
+      }
+    }
+  ],
+  "after": [
+    {
+      "label": "after",
+      "countriesFiled": 197,
+      "licensedTitles": 52,
+      "availabilityHash": "7332986fa7c4146fceadfe479d85a203cecb7b9aa00bc4506fd7a7ae87ec006b",
+      "openingCatalogueHash": "3f84b6d9921e56a045a085b57609231e3a26ab17de2227e8ceda1dd53471f57e",
+      "launchReadinessHash": "f9ad422e48405c1562c122dec4b7577e4fdf3c445aa28868c8d6bd9bf1b7ef63",
+      "hq": {
+        "medianMs": 59.86,
+        "minMs": 58.64,
+        "maxMs": 60.99,
+        "samples": [
+          58.64,
+          59.86,
+          60.99
+        ]
+      },
+      "hqWithRoom": {
+        "medianMs": 5.62,
+        "minMs": 5.54,
+        "maxMs": 6.01,
+        "samples": [
+          5.54,
+          5.62,
+          6.01
+        ]
+      },
+      "hqWithRoomAfterTick": {
+        "medianMs": 5.63,
+        "minMs": 5.38,
+        "maxMs": 7.57,
+        "samples": [
+          5.38,
+          5.63,
+          7.57
+        ]
+      },
+      "isolatedRoom": {
+        "medianMs": 2.39,
+        "minMs": 2.16,
+        "maxMs": 2.44,
+        "samples": [
+          2.16,
+          2.39,
+          2.44
+        ]
+      },
+      "wizard": {
+        "medianMs": 78.85,
+        "minMs": 76.32,
+        "maxMs": 79.15,
+        "samples": [
+          76.32,
+          78.85,
+          79.15
+        ]
+      },
+      "stepSave": {
+        "medianMs": 0,
+        "minMs": 0,
+        "maxMs": 0,
+        "samples": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "label": "after",
+      "countriesFiled": 197,
+      "licensedTitles": 104,
+      "availabilityHash": "431b4a6c4008e1dd35b0f2f0309d01945e3e120c8bac2aef2e63629bfffda7c9",
+      "openingCatalogueHash": "61cc9e8ce3481c7394ef23f44426fb8ad7e4bcb0b7c3825546c6bba42af3cede",
+      "launchReadinessHash": "f9ad422e48405c1562c122dec4b7577e4fdf3c445aa28868c8d6bd9bf1b7ef63",
+      "hq": {
+        "medianMs": 103.29,
+        "minMs": 103.27,
+        "maxMs": 105.67,
+        "samples": [
+          103.27,
+          103.29,
+          105.67
+        ]
+      },
+      "hqWithRoom": {
+        "medianMs": 7.86,
+        "minMs": 7.31,
+        "maxMs": 8.62,
+        "samples": [
+          7.31,
+          7.86,
+          8.62
+        ]
+      },
+      "hqWithRoomAfterTick": {
+        "medianMs": 7.63,
+        "minMs": 7.52,
+        "maxMs": 8.47,
+        "samples": [
+          7.52,
+          7.63,
+          8.47
+        ]
+      },
+      "isolatedRoom": {
+        "medianMs": 3.11,
+        "minMs": 3.04,
+        "maxMs": 3.16,
+        "samples": [
+          3.04,
+          3.11,
+          3.16
+        ]
+      },
+      "wizard": {
+        "medianMs": 109.6,
+        "minMs": 107.01,
+        "maxMs": 142.1,
+        "samples": [
+          107.01,
+          109.6,
+          142.1
+        ]
+      },
+      "stepSave": {
+        "medianMs": 0,
+        "minMs": 0,
+        "maxMs": 0,
+        "samples": [
+          0,
+          0,
+          0
+        ]
+      }
+    }
+  ],
+  "forecastHashesUnchanged": [
+    {
+      "titles": 52,
+      "forecastHash": "4691cd50aa85392c3e3a88c69166ab4380c53faed75fe354071493201351b51b"
+    },
+    {
+      "titles": 104,
+      "forecastHash": "ffec2621a9a951499a5fb5e2e019e784af0421ac1456ae7d13d00954e914ef73"
+    }
+  ],
+  "browser": {
+    "streaming-wizard-104-browser": {
+      "mode": "production",
+      "samples": [
+        {
+          "action": "Reset metrics",
+          "nextPaintMs": 11.2
+        },
+        {
+          "action": "Define the Launch. 2 of 7 checks cleared. Next: Market clearance.",
+          "nextPaintMs": 208.2
+        },
+        {
+          "action": "Commission the ident",
+          "nextPaintMs": 91.5
+        },
+        {
+          "action": "Assemble opening night",
+          "nextPaintMs": 17
+        },
+        {
+          "action": "Assemble opening night",
+          "nextPaintMs": 12.8
+        },
+        {
+          "action": "Price the service",
+          "nextPaintMs": 19.3
+        },
+        {
+          "action": "Review the launch blueprint",
+          "nextPaintMs": 19.1
+        },
+        {
+          "action": "Choose opening markets",
+          "nextPaintMs": 21.6
+        },
+        {
+          "action": "Clear the markets",
+          "nextPaintMs": 36
+        },
+        {
+          "action": "Commission the ident",
+          "nextPaintMs": 19.5
+        },
+        {
+          "action": "Design the front page",
+          "nextPaintMs": 27
+        },
+        {
+          "action": "Assemble opening night",
+          "nextPaintMs": 14.7
+        },
+        {
+          "action": "Price the service",
+          "nextPaintMs": 12.3
+        },
+        {
+          "action": "Review the launch blueprint",
+          "nextPaintMs": 21
+        },
+        {
+          "action": "Choose opening markets",
+          "nextPaintMs": 14.3
+        },
+        {
+          "action": "Clear the markets",
+          "nextPaintMs": 34.1
+        }
+      ],
+      "longTasks": [
+        193,
+        89,
+        160
+      ]
+    },
+    "streaming-market-52-browser": {
+      "mode": "production",
+      "samples": [
+        {
+          "action": "Reset metrics",
+          "nextPaintMs": 12.7
+        },
+        {
+          "action": "Midnight Crimson Garden Beyond the Sea \u00b7 FIXED-PRICE LICENCE \u00b7 Marvel Studios",
+          "nextPaintMs": 27.8
+        },
+        {
+          "action": "Deal",
+          "nextPaintMs": 10.9
+        },
+        {
+          "action": "Interest",
+          "nextPaintMs": 12.9
+        },
+        {
+          "action": "Rights",
+          "nextPaintMs": 10.6
+        },
+        {
+          "action": "Deal",
+          "nextPaintMs": 14.6
+        },
+        {
+          "action": "Interest",
+          "nextPaintMs": 11.3
+        },
+        {
+          "action": "Rights",
+          "nextPaintMs": 9.9
+        },
+        {
+          "action": "Deal",
+          "nextPaintMs": 13.4
+        },
+        {
+          "action": "Interest",
+          "nextPaintMs": 12.5
+        },
+        {
+          "action": "Rights",
+          "nextPaintMs": 10.2
+        }
+      ],
+      "longTasks": []
+    },
+    "streaming-room-104-browser": {
+      "mode": "production",
+      "samples": [
+        {
+          "action": "Reset metrics",
+          "nextPaintMs": 11.2
+        },
+        {
+          "action": "Increase upfront bid",
+          "nextPaintMs": 10.9
+        },
+        {
+          "action": "Decrease upfront bid",
+          "nextPaintMs": 5.3
+        },
+        {
+          "action": "Increase upfront bid",
+          "nextPaintMs": 14.2
+        },
+        {
+          "action": "Decrease upfront bid",
+          "nextPaintMs": 4.3
+        },
+        {
+          "action": "Increase upfront bid",
+          "nextPaintMs": 12.4
+        },
+        {
+          "action": "Decrease upfront bid",
+          "nextPaintMs": 13.4
+        },
+        {
+          "action": "Increase upfront bid",
+          "nextPaintMs": 12.1
+        },
+        {
+          "action": "Decrease upfront bid",
+          "nextPaintMs": 7
+        },
+        {
+          "action": "Increase upfront bid",
+          "nextPaintMs": 16.9
+        },
+        {
+          "action": "Decrease upfront bid",
+          "nextPaintMs": 6
+        }
+      ],
+      "longTasks": []
+    },
+    "streaming-wizard-52-browser": {
+      "mode": "production",
+      "samples": [
+        {
+          "action": "Reset metrics",
+          "nextPaintMs": 11.7
+        },
+        {
+          "action": "Define the Launch. 2 of 7 checks cleared. Next: Market clearance.",
+          "nextPaintMs": 149.6
+        },
+        {
+          "action": "Commission the ident",
+          "nextPaintMs": 52.4
+        },
+        {
+          "action": "Design the front page",
+          "nextPaintMs": 27.1
+        },
+        {
+          "action": "Design the front page",
+          "nextPaintMs": 9.2
+        },
+        {
+          "action": "Price the service",
+          "nextPaintMs": 14.5
+        },
+        {
+          "action": "Review the launch blueprint",
+          "nextPaintMs": 17
+        },
+        {
+          "action": "Choose opening markets",
+          "nextPaintMs": 18.4
+        },
+        {
+          "action": "Clear the markets",
+          "nextPaintMs": 32.5
+        },
+        {
+          "action": "Commission the ident",
+          "nextPaintMs": 12.5
+        },
+        {
+          "action": "Design the front page",
+          "nextPaintMs": 13.1
+        },
+        {
+          "action": "Assemble opening night",
+          "nextPaintMs": 12.9
+        },
+        {
+          "action": "Price the service",
+          "nextPaintMs": 12
+        },
+        {
+          "action": "Review the launch blueprint",
+          "nextPaintMs": 13.5
+        },
+        {
+          "action": "Choose opening markets",
+          "nextPaintMs": 13.6
+        },
+        {
+          "action": "Clear the markets",
+          "nextPaintMs": 30.6
+        }
+      ],
+      "longTasks": [
+        136,
+        50,
+        96
+      ]
+    },
+    "streaming-market-104-browser": {
+      "mode": "production",
+      "samples": [
+        {
+          "action": "Reset metrics",
+          "nextPaintMs": 16
+        },
+        {
+          "action": "BEYONDMOUNTAIN ATNIGHTUNIVERSALPICTURESCOLLECTIONWILDCRIMSONCROSSINGTHE SECONDCR",
+          "nextPaintMs": 24.1
+        },
+        {
+          "action": "The Second Crimson Crossing Beyond the Sea \u00b7 FIXED-PRICE LICENCE \u00b7 Pixar",
+          "nextPaintMs": 29.3
+        },
+        {
+          "action": "Deal",
+          "nextPaintMs": 11.5
+        },
+        {
+          "action": "Interest",
+          "nextPaintMs": 10.9
+        },
+        {
+          "action": "Rights",
+          "nextPaintMs": 13.2
+        },
+        {
+          "action": "Deal",
+          "nextPaintMs": 16.3
+        },
+        {
+          "action": "Interest",
+          "nextPaintMs": 10.5
+        },
+        {
+          "action": "Rights",
+          "nextPaintMs": 9.8
+        },
+        {
+          "action": "Deal",
+          "nextPaintMs": 12.9
+        },
+        {
+          "action": "Interest",
+          "nextPaintMs": 13
+        },
+        {
+          "action": "Rights",
+          "nextPaintMs": 10.4
+        }
+      ],
+      "longTasks": []
+    },
+    "streaming-build-104-browser": {
+      "mode": "production",
+      "samples": [
+        {
+          "action": "Reset metrics",
+          "nextPaintMs": 12.7
+        },
+        {
+          "action": "Build the Platform. 0 of 6 checks cleared. Next: Network blueprint.",
+          "nextPaintMs": 445
+        },
+        {
+          "action": "One more Scout in North America",
+          "nextPaintMs": 23
+        },
+        {
+          "action": "One fewer Scout in North America",
+          "nextPaintMs": 12.8
+        },
+        {
+          "action": "One more Scout in North America",
+          "nextPaintMs": 12.3
+        },
+        {
+          "action": "One fewer Scout in North America",
+          "nextPaintMs": 100
+        },
+        {
+          "action": "One more Scout in North America",
+          "nextPaintMs": 98.9
+        },
+        {
+          "action": "One fewer Scout in North America",
+          "nextPaintMs": 10.2
+        },
+        {
+          "action": "One more Scout in North America",
+          "nextPaintMs": 98.8
+        }
+      ],
+      "longTasks": [
+        438,
+        422,
+        97,
+        92,
+        89,
+        87,
+        86,
+        86
+      ]
+    },
+    "streaming-room-52-browser": {
+      "mode": "production",
+      "samples": [
+        {
+          "action": "Reset metrics",
+          "nextPaintMs": 9.3
+        },
+        {
+          "action": "Increase upfront bid",
+          "nextPaintMs": 11.9
+        },
+        {
+          "action": "Decrease upfront bid",
+          "nextPaintMs": 2.8
+        },
+        {
+          "action": "Increase upfront bid",
+          "nextPaintMs": 13
+        },
+        {
+          "action": "Decrease upfront bid",
+          "nextPaintMs": 7.6
+        },
+        {
+          "action": "Increase upfront bid",
+          "nextPaintMs": 12.8
+        },
+        {
+          "action": "Decrease upfront bid",
+          "nextPaintMs": 6.8
+        },
+        {
+          "action": "Increase upfront bid",
+          "nextPaintMs": 12.6
+        },
+        {
+          "action": "Decrease upfront bid",
+          "nextPaintMs": 6
+        },
+        {
+          "action": "Increase upfront bid",
+          "nextPaintMs": 13.1
+        },
+        {
+          "action": "Decrease upfront bid",
+          "nextPaintMs": 3.1
+        }
+      ],
+      "longTasks": []
+    }
+  },
+  "audits": [
+    {
+      "suite": "audit:streaming-active-screen",
+      "exitCode": 0
+    },
+    {
+      "suite": "audit:streaming-catalogue-read-context",
+      "exitCode": 0
+    },
+    {
+      "suite": "audit:streaming-presentation-inputs",
+      "exitCode": 0
+    },
+    {
+      "suite": "audit:streaming-wizard-navigation",
+      "exitCode": 0
+    },
+    {
+      "suite": "audit:streaming-tap-performance",
+      "exitCode": 0
+    },
+    {
+      "suite": "audit:streaming-original-readiness-repair",
+      "exitCode": 0
+    },
+    {
+      "suite": "audit:streaming-original-playback-repair",
+      "exitCode": 0
+    },
+    {
+      "suite": "audit:streaming-ads-rental-integration",
+      "exitCode": 0
+    },
+    {
+      "suite": "audit:streaming-auction-repairs",
+      "exitCode": 0
+    },
+    {
+      "suite": "audit:streaming-collection-auction-repairs",
+      "exitCode": 0
+    },
+    {
+      "suite": "audit:content-market-cm3",
+      "exitCode": 0
+    },
+    {
+      "suite": "audit:streaming-hq-phase4",
+      "exitCode": 0
+    },
+    {
+      "suite": "audit:streaming-launch-draft-continuity",
+      "exitCode": 0
+    },
+    {
+      "suite": "audit:player-ui-state",
+      "exitCode": 0
+    },
+    {
+      "suite": "audit:streaming-launch-s3-energy",
+      "exitCode": 0
+    },
+    {
+      "suite": "audit:streaming-launch-s3-ui",
+      "exitCode": 0
+    },
+    {
+      "suite": "audit:streaming-launch-s5-ui",
+      "exitCode": 0
+    },
+    {
+      "suite": "audit:streaming-launch-s5-performance",
+      "exitCode": 0
+    },
+    {
+      "suite": "audit:streaming-build-world",
+      "exitCode": 0
+    },
+    {
+      "suite": "audit:streaming-build-test-autosave-gates",
+      "exitCode": 0
+    },
+    {
+      "suite": "audit:streaming-rights-compatibility-phase3",
+      "exitCode": 0
+    },
+    {
+      "suite": "audit:save-integrity",
+      "exitCode": 0
+    },
+    {
+      "suite": "audit:save-migration",
+      "exitCode": 0
+    },
+    {
+      "suite": "audit:save-generations",
+      "exitCode": 0
+    },
+    {
+      "suite": "audit:streaming-commercial-c2",
+      "exitCode": 0
+    },
+    {
+      "suite": "audit:streaming-commercial-c3",
+      "exitCode": 0
+    },
+    {
+      "suite": "audit:streaming-commercial-c4",
+      "exitCode": 0
+    },
+    {
+      "suite": "audit:streaming-commercial-c5",
+      "exitCode": 0
+    },
+    {
+      "suite": "audit:streaming-commercial-c6",
+      "exitCode": 0
+    },
+    {
+      "suite": "audit:world-streaming-we4",
+      "exitCode": 0
+    },
+    {
+      "suite": "audit:world-streaming-we5",
+      "exitCode": 0
+    },
+    {
+      "suite": "audit:world-streaming-we6",
+      "exitCode": 0
+    },
+    {
+      "suite": "audit:streaming-economy-balance-fixes",
+      "exitCode": 1
+    },
+    {
+      "suite": "audit:streaming-world-offer-read-context",
+      "exitCode": 0
+    }
+  ],
+  "existingEconomyFailure": {
+    "baselineEqualsCurrent": true,
+    "checks": 246,
+    "failures": [
+      "forecast reserves the final non-owner across rental and purchase"
+    ]
+  }
+}

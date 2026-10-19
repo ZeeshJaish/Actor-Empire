@@ -32,6 +32,56 @@ export const CONTENT_AVAILABILITY_LABELS: Record<ContentAvailability, string> = 
     SCHEDULED: 'Scheduled', LIVE: 'Live', RIGHTS_EXPIRED: 'Rights expired', RIGHTS_UNAVAILABLE: 'Rights unavailable',
 };
 
+export interface StreamingContentAvailabilityView {
+    source: 'ORIGINAL' | 'OWNED' | 'LICENSED';
+    status: ContentAvailability;
+    available: boolean;
+    coveredCountryIds: string[];
+    hours: number;
+    estimated: boolean;
+    routesByCountry: Record<string, Record<string, StreamingTitleAccessDecision>>;
+}
+
+/** A single current read batch. Never persist this or carry it across mutations. */
+export interface StreamingCatalogueReadContext {
+    readonly player: Player;
+    readonly platform: OwnedStreamingPlatformState;
+    readonly absoluteWeek: number;
+    readonly packageCountryIds: string[];
+    readonly activeCountryIds: ReadonlySet<string>;
+    readonly offer: ReturnType<typeof projectStreamingCommercialOffers>;
+    readonly titles: Map<string, ReturnType<typeof resolveStreamingCatalogTitle>>;
+    readonly availability: Map<string, StreamingContentAvailabilityView>;
+    readonly derivedViews: Map<object, unknown>;
+}
+
+export const createStreamingCatalogueReadContext = (player: Player): StreamingCatalogueReadContext => {
+    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+    const packageCountryIds = getOwnedPlatformPackageCountryIds(platform);
+    return {
+        player, platform, absoluteWeek: getAbsoluteWeek(player.age, player.currentWeek), packageCountryIds,
+        activeCountryIds: new Set(packageCountryIds),
+        offer: projectStreamingCommercialOffers(platform.serviceConfiguration.pricing),
+        titles: new Map(), availability: new Map(), derivedViews: new Map(),
+    };
+};
+
+/** Defaults remain fresh, including callers that mutate a fixture/save in place. */
+export const getStreamingCatalogueReadContext = (player: Player, prepared?: StreamingCatalogueReadContext): StreamingCatalogueReadContext => (
+    prepared?.player === player ? prepared : createStreamingCatalogueReadContext(player)
+);
+
+export const resolveStreamingCatalogueReadTitle = (context: StreamingCatalogueReadContext, projectId: string) => {
+    if (!context.titles.has(projectId)) context.titles.set(projectId, resolveStreamingCatalogTitle(context.player, projectId, context.platform));
+    return context.titles.get(projectId)!;
+};
+
+/** Reuse expensive derived views only inside the caller-owned current batch. */
+export const readStreamingCatalogueDerivedView = <T>(context: StreamingCatalogueReadContext, key: object, read: () => T): T => {
+    if (!context.derivedViews.has(key)) context.derivedViews.set(key, read());
+    return context.derivedViews.get(key) as T;
+};
+
 /** Re-evaluate studio access against grants elsewhere, including old saved imports. */
 export const getOwnedTitleCountryAccess = (player: Player, projectId: string, countryIds: string[], absoluteWeek?: number) => {
     const week = absoluteWeek ?? getAbsoluteWeek(player.age, player.currentWeek);
@@ -154,16 +204,50 @@ export const evaluatePlayerStreamingTitleRoute = (
     return denial || evaluateStreamingTitleRoute({ ...base, position: null });
 };
 
+/** One synchronous offer/forecast read. Never persist or reuse after a mutation;
+ * transactions still evaluate their current player independently. */
+export const createStreamingTitleRouteReadBatch = (
+    player: Player,
+    absoluteWeek: number,
+    platform: OwnedStreamingPlatformState,
+    ownedTitleIds: ReadonlySet<string>,
+) => {
+    const countryIds = getOwnedPlatformPackageCountryIds(platform);
+    const activeCountryIds = new Set(countryIds);
+    const offer = projectStreamingCommercialOffers(platform.serviceConfiguration.pricing);
+    const titles = new Map<string, ReturnType<typeof prepareTitleRouteContext>>();
+    const ownedCountries = new Map<string, ReadonlySet<string>>();
+    return (projectId: string, countryId: string, route: StreamingTitleAccessRoute) => {
+        if (!titles.has(projectId)) {
+            const title = prepareTitleRouteContext(player, projectId, absoluteWeek, platform, ownedTitleIds.has(projectId));
+            titles.set(projectId, title);
+            if (title.owned) ownedCountries.set(projectId, new Set(getOwnedTitleCountryAccess(player, projectId, countryIds, absoluteWeek)));
+        }
+        return evaluatePlayerStreamingTitleRoute(player, projectId, countryId, absoluteWeek, route, {
+            platform, ownedTitleIds, offer, activeCountryIds, title: titles.get(projectId),
+            // Outside the prepared footprint retain the canonical owned-position
+            // metadata even though the market itself will deny playback.
+            ownedCountryIds: activeCountryIds.has(countryId) ? ownedCountries.get(projectId) : undefined,
+        });
+    };
+};
+
 export const getStreamingContentAvailability = (
     player: Player,
     projectId: string,
-    countries = getOwnedPlatformPackageCountryIds(player.ownedStreamingPlatform),
+    countries?: string[],
     includeRoutes = true,
-) => {
-    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
-    const week = getAbsoluteWeek(player.age, player.currentWeek);
+    preparedContext?: StreamingCatalogueReadContext,
+): StreamingContentAvailabilityView => {
+    const context = getStreamingCatalogueReadContext(player, preparedContext);
+    const { platform, absoluteWeek: week } = context;
+    // Preserve explicit caller order: legacy domestic coverage uses its first country.
+    countries ??= getOwnedPlatformPackageCountryIds(player.ownedStreamingPlatform);
+    const key = JSON.stringify([projectId, countries, includeRoutes]);
+    const existing = context.availability.get(key);
+    if (existing) return existing;
     const commission = platform.originalCommissions.find(c => c.canonicalProjectId === projectId);
-    const title = resolveStreamingCatalogTitle(player, projectId);
+    const title = resolveStreamingCatalogueReadTitle(context, projectId);
     const source = commission ? 'ORIGINAL' as const : title?.source === 'OWNED_LIBRARY' ? 'OWNED' as const : 'LICENSED' as const;
     const licenses = platform.catalogLicenses.filter(l => l.sourceProjectId === projectId);
     const active = licenses.filter(l => l.status === 'ACTIVE' && l.startsAtAbsoluteWeek <= week && l.expiresAtAbsoluteWeek > week);
@@ -198,12 +282,12 @@ export const getStreamingContentAvailability = (
     // All plans/countries in this read share one current platform snapshot.
     // Re-normalizing its 197 countries for each route made even a one-title HQ
     // take seconds. Nothing is cached across reads or rights/configuration changes.
-    const offer = projectStreamingCommercialOffers(platform.serviceConfiguration.pricing);
+    const offer = context.offer;
     const prepared = {
         platform,
         ownedTitleIds: new Set(owned ? [projectId] : []),
         offer,
-        activeCountryIds: new Set(getOwnedPlatformPackageCountryIds(platform)),
+        activeCountryIds: context.activeCountryIds,
         title: prepareTitleRouteContext(player, projectId, week, platform, owned, readyProduction),
         ownedCountryIds: new Set(owned ? coveredCountryIds : []),
     };
@@ -221,14 +305,17 @@ export const getStreamingContentAvailability = (
         }
         routesByCountry[countryId] = routeRows;
     }
-    return { source, status, available, coveredCountryIds, hours, estimated, routesByCountry };
+    const result = { source, status, available, coveredCountryIds, hours, estimated, routesByCountry };
+    context.availability.set(key, result);
+    return result;
 };
 
 /** Viewer previews obey the same current rights, premiere and delivery gates as gameplay. */
-export const getStreamingPlayableCatalogProjectIds = (player: Player): string[] => {
-    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+export const getStreamingPlayableCatalogProjectIds = (player: Player, preparedContext?: StreamingCatalogueReadContext): string[] => {
+    const context = getStreamingCatalogueReadContext(player, preparedContext);
+    const { platform } = context;
     return getStreamingCatalogProjectIds(platform).filter(projectId => {
-        const availability = getStreamingContentAvailability(player, projectId);
+        const availability = getStreamingContentAvailability(player, projectId, undefined, true, context);
         return availability.available && Object.values(availability.routesByCountry).some(routes =>
             Object.values(routes).some(route => route.allowed));
     });

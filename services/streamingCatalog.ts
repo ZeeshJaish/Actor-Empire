@@ -5,6 +5,7 @@ import type {
     OwnedStreamingCatalogLicense,
     OwnedStreamingCatalogSetupDraft,
     OwnedStreamingLedgerEntry,
+    OwnedStreamingPlatformState,
     PastProject,
     Player,
     StreamingLicenseExclusivity,
@@ -346,6 +347,7 @@ export const getStreamingMarketCandidateCompatibility = (
 export const resolveStreamingCatalogTitle = (
     player: Player,
     projectId: string,
+    preparedPlatform?: OwnedStreamingPlatformState,
 ): StreamingCatalogTitle | null => {
     const ownedStudioNames = getOwnedStudioNames(player);
     const worldStudioNames = new Map(
@@ -369,10 +371,10 @@ export const resolveStreamingCatalogTitle = (
             studioId: commission.producerStudioId, studioName: commission.producerStudioName,
             source: 'OWNED_LIBRARY' as const,
         };
-        const license = normalizeOwnedStreamingPlatformState(
+        const license = (preparedPlatform || normalizeOwnedStreamingPlatformState(
             player.ownedStreamingPlatform,
             player.id,
-        ).catalogLicenses.find(item => item.sourceProjectId === projectId);
+        )).catalogLicenses.find(item => item.sourceProjectId === projectId);
         if (license) return {
             id: license.sourceProjectId,
             title: license.titleAtSigning,
