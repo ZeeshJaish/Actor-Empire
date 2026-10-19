@@ -1,4 +1,4 @@
-import type {OwnedStreamingPricingConfiguration, Player, StreamingRightsAccessGrant, StreamingBackendBasis} from '../types';
+import type {OwnedStreamingPlatformState, OwnedStreamingPricingConfiguration, Player, StreamingRightsAccessGrant, StreamingBackendBasis} from '../types';
 import {normalizeOwnedStreamingPlatformState} from './ownedStreamingPlatform';
 import {normalizeStreamingPricingConfiguration} from './streamingPricingEconomy';
 import {getOwnedPlatformPackageCountryIds} from './streamingContentAvailability';
@@ -22,15 +22,17 @@ export const streamingBackendCapability = (pricing: OwnedStreamingPricingConfigu
         / (pricing.streams.includes('subs') ? 1 : .6);
     return {advertising, rental, eligibleRevenueFraction: Math.min(1, eligibleRevenueFraction)};
 };
+/** A prepared platform is local to one synchronous quote batch, never a saved eligibility cache. */
 export const getStreamingBuyerBackendCapability = (player: Pick<Player,'world'> & Partial<Pick<Player,'ownedStreamingPlatform'|'id'>>,
-    platformId: string | null, week: number, countryIds: string[] = [], grant?: StreamingRightsAccessGrant | null): StreamingBackendCapability => {
+    platformId: string | null, week: number, countryIds: string[] = [], grant?: StreamingRightsAccessGrant | null,
+    preparedPlatform?: OwnedStreamingPlatformState): StreamingBackendCapability => {
     if (platformId && platformId !== 'PLAYER') {
         const offer = getWorldStreamingBuyerCommercialOffer(player as Player, platformId, week);
         if (!offer) return {advertising:false,rental:false,eligibleRevenueFraction:0};
         return streamingBackendCapability(offer.commercialConfiguration, grant,
             !countryIds.length || countryIds.some(id=>offer.activeCountryIds.includes(id)));
     }
-    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+    const platform = preparedPlatform || normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     const active = getOwnedPlatformPackageCountryIds(platform);
     return streamingBackendCapability(normalizeStreamingPricingConfiguration(platform.serviceConfiguration.pricing), grant,
         ['ACTIVE','FOUNDING'].includes(platform.lifecycle) && active.length > 0
@@ -49,7 +51,8 @@ export const validateNewStreamingBackendTerms = (input: {minimumGuarantee:number
 
 /** Generated offers fail closed when there is no eligible running business. */
 export const streamingBackendPercentForBuyer = (player: Pick<Player,'world'> & Partial<Pick<Player,'ownedStreamingPlatform'|'id'>>,
-    platformId:string|null, week:number, proposed:number, countries:string[]=[], grant?:StreamingRightsAccessGrant|null):number => {
-    const capability=getStreamingBuyerBackendCapability(player,platformId,week,countries,grant);
+    platformId:string|null, week:number, proposed:number, countries:string[]=[], grant?:StreamingRightsAccessGrant|null,
+    preparedPlatform?:OwnedStreamingPlatformState):number => {
+    const capability=getStreamingBuyerBackendCapability(player,platformId,week,countries,grant,preparedPlatform);
     return capability.advertising || capability.rental ? Math.max(0,Math.min(MAX_NEW_STREAMING_BACKEND_PERCENT,Math.round(proposed))) : 0;
 };

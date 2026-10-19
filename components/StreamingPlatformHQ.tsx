@@ -1092,7 +1092,14 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
     });
   }, [latestWeeklySnapshot, platform]);
 
-  const persist = (nextPlayer: Player) => onUpdatePlayer?.(nextPlayer);
+  const persist = (nextPlayer: Player) => {
+    if (nextPlayer !== player) onUpdatePlayer?.(nextPlayer);
+  };
+  // These callers use canonical streaming services against the migrated live
+  // player. Preserve normal autosave while avoiding load/import migration on taps.
+  const persistCanonical = (nextPlayer: Player) => {
+    if (nextPlayer !== player) (onTrustedMarketUpdate || onUpdatePlayer)?.(nextPlayer);
+  };
 
   const canonicalInfrastructureDraft = (
     selection: StreamingBuildSelection = buildSelection,
@@ -1158,7 +1165,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
     if (!buildMarketAccess.editable) return;
     setBuildSelection(nextSelection);
     if (!onUpdatePlayer) return;
-    persist(saveStreamingInfrastructureDraft(player, canonicalInfrastructureDraft(nextSelection, false)));
+    persistCanonical(saveStreamingInfrastructureDraft(player, canonicalInfrastructureDraft(nextSelection, false)));
   };
 
   const updateLaunchMarketing = (patch: Partial<OwnedStreamingLaunchMarketingDraft>) => {
@@ -1169,7 +1176,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
       return;
     }
     setBuildRunResult(null);
-    persist(saved.player);
+    persistCanonical(saved.player);
   };
 
   const recordBuildRehearsal = (result: StreamingBuildRunResult | null, testedSelection = buildSelection) => {
@@ -1217,7 +1224,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
       completedAtAbsoluteWeek: buildAbsoluteWeek,
     };
     setBuildSelection(testedSelection);
-    persist(saveStreamingInfrastructureRehearsal(player, draft, rehearsal));
+    persistCanonical(saveStreamingInfrastructureRehearsal(player, draft, rehearsal));
   };
 
   const prepareCinematicBuild = (selection: StreamingBuildSelection = buildSelection) => {
@@ -1352,7 +1359,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
 
   const selectSection = (section: StreamingHqSection) => {
     setActiveSection(section);
-    persist(visitStreamingHqSection(player, section));
+    persistCanonical(visitStreamingHqSection(player, section));
     mainRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -1360,12 +1367,12 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
     setShowWelcome(false);
     setShowTourComplete(false);
     setActiveSection('HOME');
-    persist(beginStreamingHqTour(player));
+    persistCanonical(beginStreamingHqTour(player));
   };
 
   const skipTour = () => {
     setShowWelcome(false);
-    persist(skipStreamingHqTour(player));
+    persistCanonical(skipStreamingHqTour(player));
   };
 
   /* NO ENTRY POINT. Its only caller was the "Replay HQ orientation" button in
@@ -1377,14 +1384,14 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
   const replayTour = () => {
     setActiveSection('HOME');
     setShowTourComplete(false);
-    persist(replayStreamingHqTour(player));
+    persistCanonical(replayStreamingHqTour(player));
     mainRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const nextTourStep = () => {
     const currentStep = onboarding.currentStep;
     const nextStep = currentStep + 1;
-    persist(advanceStreamingHqTour(player));
+    persistCanonical(advanceStreamingHqTour(player));
     if (nextStep >= STREAMING_HQ_TOUR_STEPS.length) {
       setShowTourComplete(true);
       return;
@@ -1980,7 +1987,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
     return (
       <StreamingDefineLaunchWizard
         player={player}
-        onUpdatePlayer={persist}
+        onUpdatePlayer={persistCanonical}
         onClose={() => setShowDefineLaunch(false)}
         onOpenFinance={() => {
           setShowDefineLaunch(false);

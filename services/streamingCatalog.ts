@@ -286,8 +286,9 @@ export const getStreamingLicenseCandidatePool = (player: Player): StreamingCatal
 };
 
 export const getStreamingLicenseOpportunities = (player: Player, includeLiveAuctionReferences = false): StreamingCatalogTitle[] => {
+    const context = createStreamingMarketCompatibilityContext(player);
     const candidates = getStreamingLicenseCandidatePool(player)
-        .filter(title => getStreamingMarketCandidateCompatibility(player, title).available);
+        .filter(title => getStreamingMarketCandidateCompatibility(player, title, context).available);
     const snapshot = getStreamingMarketDiscovery(player);
     const byId = new Map(candidates.map(title => [title.id, title]));
     const selectedIds = snapshot?.titleIds || selectStreamingMarketTitles(player, candidates).map(title => title.id);
@@ -300,11 +301,13 @@ export const getStreamingLicenseOpportunities = (player: Player, includeLiveAuct
     return [...new Set([...selectedIds, ...liveIds])].flatMap(id => byId.has(id) ? [byId.get(id)!] : []);
 };
 
-/** The exact default inbound scope used before a title joins the rotating direct shelf. */
-export const getStreamingMarketCandidateCompatibility = (
-    player: Player,
-    title: StreamingCatalogTitle,
-) => {
+interface StreamingMarketCompatibilityContext {
+    countryIds: string[];
+    absoluteWeek: number;
+}
+
+/** One normalized context per discovery batch; never retained across player changes. */
+const createStreamingMarketCompatibilityContext = (player: Player): StreamingMarketCompatibilityContext => {
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     const activeCountries = normalizeStreamingDayOneMarketIds((platform.marketOperations || [])
         .filter(operation => operation.scope === 'COUNTRY' && operation.countryId
@@ -315,8 +318,17 @@ export const getStreamingMarketCandidateCompatibility = (
         : normalizeStreamingDayOneMarketIds(platform.identity?.dayOneMarketIds || []).length
             ? normalizeStreamingDayOneMarketIds(platform.identity?.dayOneMarketIds || [])
             : ['US', 'CA', 'MX']).slice().sort();
+    return { countryIds, absoluteWeek: getAbsoluteWeek(player.age, player.currentWeek) };
+};
+
+/** The exact default inbound scope used before a title joins the rotating direct shelf. */
+export const getStreamingMarketCandidateCompatibility = (
+    player: Player,
+    title: StreamingCatalogTitle,
+    context: StreamingMarketCompatibilityContext = createStreamingMarketCompatibilityContext(player),
+) => {
     const territory: StreamingLicenseTerritory = (title.rating || 0) >= 8 ? 'GLOBAL' : 'MULTI_REGION';
-    const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+    const { countryIds, absoluteWeek } = context;
     return resolveStreamingRightsCompatibility({
         world: player.world,
         sourceProjectId: title.id,

@@ -289,11 +289,18 @@ const updateHqOnboarding = (
         return player;
     }
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+    const current = platform.hqOnboarding;
+    const next = update(current, absoluteWeek);
+    if (next.status === current.status && next.currentStep === current.currentStep
+        && next.startedAtAbsoluteWeek === current.startedAtAbsoluteWeek
+        && next.completedAtAbsoluteWeek === current.completedAtAbsoluteWeek
+        && next.visitedSections.length === current.visitedSections.length
+        && next.visitedSections.every((section, index) => section === current.visitedSections[index])) return player;
     return {
         ...player,
         ownedStreamingPlatform: compactOwnedStreamingPlatformForPersistence({
             ...platform,
-            hqOnboarding: update(platform.hqOnboarding, absoluteWeek),
+            hqOnboarding: next,
         }, player.id),
     };
 };

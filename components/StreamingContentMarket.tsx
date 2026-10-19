@@ -192,7 +192,7 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
         const assignments = getContentMarketAuctionAssignments(player, { listings, collections });
         return {
             listings, collections, libraryTitles, assignments,
-            opportunityOffers: getStreamingOpportunityCards(player).individuals,
+            opportunityOffers: getStreamingOpportunityCards(player, { includeCollections: false }).individuals,
             supplySummary: getContentMarketSupplySummary(player, { listings, collections, assignments,
                 sharedLibraryTitles: libraryTitles.length }),
             auctionLots: getStreamingBuyerAuctionLots(player, { listings, collections, assignments }),

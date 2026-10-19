@@ -112,7 +112,7 @@ export const buildStreamingOpportunityOffer = (
 };
 
 /** The UI reads this saved snapshot; it never generates or rerolls on mount. */
-export const getStreamingOpportunityCards = (player: Player) => {
+export const getStreamingOpportunityCards = (player: Player, options: { includeCollections?: boolean } = {}) => {
     const state = player.world.streamingOpportunityMarket;
     if (!state || state.schemaVersion !== 1
         || state.cycle !== getStreamingMarketCycle(getAbsoluteWeek(player.age, player.currentWeek))) {
@@ -120,7 +120,7 @@ export const getStreamingOpportunityCards = (player: Player) => {
     }
     const collectionIds = new Set([...state.collectionIds,
         ...(Array.isArray(state.scoutedCollectionIds) ? state.scoutedCollectionIds : [])]);
-    const collections = getStreamingCataloguePackageOpportunities(player)
+    const collections = options.includeCollections === false ? [] : getStreamingCataloguePackageOpportunities(player)
         .filter(collection => collectionIds.has(collection.id));
     return { individuals: [...state.offers,
         ...(Array.isArray(state.scoutedOffers) ? state.scoutedOffers : [])], collections };

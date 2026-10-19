@@ -699,7 +699,7 @@ export const getStreamingCataloguePackageOpportunities = (
             localizationRequirements: [],
         });
         if (!allocation.valid) return [];
-        allocation.rows=allocation.rows.map(row=>{const pct=streamingBackendPercentForBuyer(player,null,absoluteWeek,row.licensorRevenueShare,row.countryIds);
+        allocation.rows=allocation.rows.map(row=>{const pct=streamingBackendPercentForBuyer(player,null,absoluteWeek,row.licensorRevenueShare,row.countryIds,undefined,platform);
             const expectedRoyaltyCost=pct>0?Math.round(row.expectedRoyaltyCost*pct/Math.max(1,row.licensorRevenueShare)):0;
             return {...row,licensorRevenueShare:pct,platformRevenueShare:100-pct,backendBasis:'ADS_RENTAL_RECEIPTS',guaranteeRecoupment:'NON_RECOUPABLE',backendCap:null,
                 expectedRoyaltyCost,expectedTotalCost:row.minimumGuarantee+expectedRoyaltyCost};});

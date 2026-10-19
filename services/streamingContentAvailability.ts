@@ -46,6 +46,44 @@ export const getOwnedTitleCountryAccess = (player: Player, projectId: string, co
         }).available));
 };
 
+/** Current title-level inputs shared only within one synchronous route matrix. */
+const prepareTitleRouteContext = (
+    player: Player,
+    projectId: string,
+    absoluteWeek: number,
+    platform: OwnedStreamingPlatformState,
+    ownedTitle: boolean,
+    readyProduction?: boolean,
+) => {
+    const commission = platform.originalCommissions.find(item => item.canonicalProjectId === projectId);
+    const ready = readyProduction ?? resolveStreamingProductionReadiness(player, projectId, commission).ready;
+    const slate = platform.launchSlate?.entries.find(entry => entry.projectId === projectId);
+    const slateReleaseAtAbsoluteWeek = slate && platform.launchCommit
+        ? platform.launchCommit.committedAtAbsoluteWeek + slate.launchWeek - 1 : absoluteWeek;
+    const licenses = platform.catalogLicenses.filter(license => license.sourceProjectId === projectId)
+        .sort((left, right) => right.startsAtAbsoluteWeek - left.startsAtAbsoluteWeek || left.id.localeCompare(right.id));
+    const licensedPositions = licenses.map(licence => {
+        const canonical = player.world.streamingRightsContracts?.[licence.id];
+        return {
+            contractId: canonical?.id || licence.id,
+            territory: canonical?.territory || licence.territory,
+            countryIds: canonical?.countryIds || licence.countryIds || [],
+            startsAtAbsoluteWeek: canonical?.startsAtAbsoluteWeek ?? licence.startsAtAbsoluteWeek,
+            expiresAtAbsoluteWeek: canonical?.expiresAtAbsoluteWeek ?? licence.expiresAtAbsoluteWeek,
+            status: canonical?.status || licence.status,
+            accessGrant: normalizeStreamingRightsAccessGrant(canonical?.accessGrant || licence.accessGrant) || {
+                schemaVersion: 1 as const, modes: [], earlyWindowWeeks: 0,
+                purchaseFulfillment: 'NONE' as const, source: 'LEGACY_SNAPSHOT' as const,
+            },
+        };
+    });
+    return {
+        projectId, absoluteWeek, owned: Boolean(commission || ownedTitle), licensedPositions,
+        productionReadyAtAbsoluteWeek: ready ? Math.max(0, commission?.localization?.readyAtAbsoluteWeek || 0) : Number.MAX_SAFE_INTEGER,
+        generalReleaseAtAbsoluteWeek: commission?.releasePlan?.premiereAtAbsoluteWeek ?? slateReleaseAtAbsoluteWeek,
+    };
+};
+
 /** Adapts existing canonical/buyer-local title positions to the shared C2 rule. */
 export const evaluatePlayerStreamingTitleRoute = (
     player: Player,
@@ -53,24 +91,23 @@ export const evaluatePlayerStreamingTitleRoute = (
     countryId: string,
     absoluteWeek: number,
     route: StreamingTitleAccessRoute,
-    prepared?: { platform: OwnedStreamingPlatformState; ownedTitleIds: ReadonlySet<string> },
+    prepared?: {
+        platform: OwnedStreamingPlatformState;
+        ownedTitleIds: ReadonlySet<string>;
+        offer?: ReturnType<typeof projectStreamingCommercialOffers>;
+        activeCountryIds?: ReadonlySet<string>;
+        title?: ReturnType<typeof prepareTitleRouteContext>;
+        ownedCountryIds?: ReadonlySet<string>;
+    },
 ): StreamingTitleAccessDecision => {
     const platform = prepared?.platform || normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
-    const offer = projectStreamingCommercialOffers(platform.serviceConfiguration.pricing);
-    const commission = platform.originalCommissions.find(item => item.canonicalProjectId === projectId);
-    const ready = resolveStreamingProductionReadiness(player, projectId, commission).ready;
-    const slate = platform.launchSlate?.entries.find(entry => entry.projectId === projectId);
-    const slateReleaseAtAbsoluteWeek = slate && platform.launchCommit
-        ? platform.launchCommit.committedAtAbsoluteWeek + slate.launchWeek - 1
-        : absoluteWeek;
-    const generalReleaseAtAbsoluteWeek = commission?.releasePlan?.premiereAtAbsoluteWeek
-        ?? slateReleaseAtAbsoluteWeek;
-    const owned = Boolean(commission || (prepared
-        ? prepared.ownedTitleIds.has(projectId)
-        : resolveStreamingCatalogTitle(player, projectId)?.source === 'OWNED_LIBRARY'));
-    const licenses = platform.catalogLicenses.filter(license => license.sourceProjectId === projectId)
-        .sort((left, right) => right.startsAtAbsoluteWeek - left.startsAtAbsoluteWeek || left.id.localeCompare(right.id));
-    const canUseOwnedPosition = owned && getOwnedTitleCountryAccess(player, projectId, [countryId], absoluteWeek).includes(countryId);
+    const offer = prepared?.offer || projectStreamingCommercialOffers(platform.serviceConfiguration.pricing);
+    const hasPreparedTitle = prepared?.title?.projectId === projectId && prepared.title.absoluteWeek === absoluteWeek;
+    const title = hasPreparedTitle ? prepared!.title! : prepareTitleRouteContext(player, projectId, absoluteWeek, platform,
+        prepared ? prepared.ownedTitleIds.has(projectId) : resolveStreamingCatalogTitle(player, projectId)?.source === 'OWNED_LIBRARY');
+    const canUseOwnedPosition = title.owned && (hasPreparedTitle && prepared?.ownedCountryIds
+        ? prepared.ownedCountryIds.has(countryId)
+        : getOwnedTitleCountryAccess(player, projectId, [countryId], absoluteWeek).includes(countryId));
     const configuredModes = [
         ...(offer.subscriptions.length ? ['SUBSCRIPTION' as const] : []),
         ...(offer.freeAdOffer ? ['AD_SUPPORTED' as const] : []),
@@ -91,25 +128,7 @@ export const evaluatePlayerStreamingTitleRoute = (
             source: 'EXPLICIT' as const,
         },
     } : null;
-    const licensedPositions = licenses.map(licence => {
-        const canonical = player.world.streamingRightsContracts?.[licence.id];
-        return {
-            contractId: canonical?.id || licence.id,
-            territory: canonical?.territory || licence.territory,
-            countryIds: canonical?.countryIds || licence.countryIds || [],
-            startsAtAbsoluteWeek: canonical?.startsAtAbsoluteWeek ?? licence.startsAtAbsoluteWeek,
-            expiresAtAbsoluteWeek: canonical?.expiresAtAbsoluteWeek ?? licence.expiresAtAbsoluteWeek,
-            status: canonical?.status || licence.status,
-            accessGrant: normalizeStreamingRightsAccessGrant(canonical?.accessGrant || licence.accessGrant) || {
-            schemaVersion: 1 as const,
-            modes: [],
-            earlyWindowWeeks: 0,
-            purchaseFulfillment: 'NONE' as const,
-            source: 'LEGACY_SNAPSHOT' as const,
-            },
-        };
-    });
-    const positions = [...(ownedPosition ? [ownedPosition] : []), ...licensedPositions]
+    const positions = [...(ownedPosition ? [ownedPosition] : []), ...title.licensedPositions]
         .sort((left, right) => (
             Number(right.territory === 'GLOBAL' || right.countryIds.includes(countryId))
             - Number(left.territory === 'GLOBAL' || left.countryIds.includes(countryId))
@@ -118,11 +137,11 @@ export const evaluatePlayerStreamingTitleRoute = (
         titleId: projectId,
         countryId,
         absoluteWeek,
-        productionReadyAtAbsoluteWeek: ready
-            ? Math.max(0, commission?.localization?.readyAtAbsoluteWeek || 0)
-            : Number.MAX_SAFE_INTEGER,
-        generalReleaseAtAbsoluteWeek,
-        marketActive: getOwnedPlatformPackageCountryIds(platform).includes(countryId),
+        productionReadyAtAbsoluteWeek: title.productionReadyAtAbsoluteWeek,
+        generalReleaseAtAbsoluteWeek: title.generalReleaseAtAbsoluteWeek,
+        marketActive: prepared?.activeCountryIds
+            ? prepared.activeCountryIds.has(countryId)
+            : getOwnedPlatformPackageCountryIds(platform).includes(countryId),
         offer,
         route,
     };
@@ -176,18 +195,29 @@ export const getStreamingContentAvailability = (
     const estimated = !(runtime > 0 || (isSeries && episodeMinutes > 0));
     const hours = runtime > 0 ? runtime / 60 : isSeries ? Math.max(1, episodes) * (episodeMinutes || 45) / 60 : 2;
     const routesByCountry: Record<string, Record<string, StreamingTitleAccessDecision>> = {};
+    // All plans/countries in this read share one current platform snapshot.
+    // Re-normalizing its 197 countries for each route made even a one-title HQ
+    // take seconds. Nothing is cached across reads or rights/configuration changes.
+    const offer = projectStreamingCommercialOffers(platform.serviceConfiguration.pricing);
+    const prepared = {
+        platform,
+        ownedTitleIds: new Set(owned ? [projectId] : []),
+        offer,
+        activeCountryIds: new Set(getOwnedPlatformPackageCountryIds(platform)),
+        title: prepareTitleRouteContext(player, projectId, week, platform, owned, readyProduction),
+        ownedCountryIds: new Set(owned ? coveredCountryIds : []),
+    };
     for (const countryId of includeRoutes ? countries : []) {
         const routeRows: Record<string, StreamingTitleAccessDecision> = {};
-        const offer = projectStreamingCommercialOffers(platform.serviceConfiguration.pricing);
         for (const plan of offer.subscriptions) {
             routeRows[`SUBSCRIPTION:${plan.id}`] = evaluatePlayerStreamingTitleRoute(player, projectId, countryId, week,
-                { kind: 'SUBSCRIPTION', planId: plan.id });
+                { kind: 'SUBSCRIPTION', planId: plan.id }, prepared);
         }
         routeRows.SUBSCRIPTION = routeRows[`SUBSCRIPTION:${offer.subscriptions[0]?.id}`]
             || evaluatePlayerStreamingTitleRoute(player, projectId, countryId, week,
-                { kind: 'SUBSCRIPTION', planId: '' });
+                { kind: 'SUBSCRIPTION', planId: '' }, prepared);
         for (const kind of ['AD_SUPPORTED', 'RENTAL', 'PURCHASE'] as const) {
-            routeRows[kind] = evaluatePlayerStreamingTitleRoute(player, projectId, countryId, week, { kind });
+            routeRows[kind] = evaluatePlayerStreamingTitleRoute(player, projectId, countryId, week, { kind }, prepared);
         }
         routesByCountry[countryId] = routeRows;
     }

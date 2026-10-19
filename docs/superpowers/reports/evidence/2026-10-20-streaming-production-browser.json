@@ -1,0 +1,85 @@
+{
+  "mode": "production",
+  "samples": [
+    {
+      "action": "Reset metrics",
+      "nextPaintMs": 10.7
+    },
+    {
+      "action": "Define the Launch. 2 of 7 checks cleared. Next: Market clearance.",
+      "nextPaintMs": 84.1
+    },
+    {
+      "action": "Commission the ident",
+      "nextPaintMs": 326.8
+    },
+    {
+      "action": "Design the front page",
+      "nextPaintMs": 166.9
+    },
+    {
+      "action": "Price the service",
+      "nextPaintMs": 151.2
+    },
+    {
+      "action": "Back",
+      "nextPaintMs": 10.6
+    },
+    {
+      "action": "CONTENT MARKET",
+      "nextPaintMs": 157.4
+    },
+    {
+      "action": "BEYONDMOUNTAIN ATNIGHTUNIVERSALPICTURESCOLLECTIONMIDNIGHTCRIMSONGARDENBLUECRIMSO",
+      "nextPaintMs": 68.3
+    },
+    {
+      "action": "Beyond Mountain at Night · LIVE BIDDING · Artisan Pictures",
+      "nextPaintMs": 30.1
+    },
+    {
+      "action": "ENTER LIVE BID",
+      "nextPaintMs": 294.3
+    },
+    {
+      "action": "Increase upfront bid",
+      "nextPaintMs": 11.7
+    },
+    {
+      "action": "Leave auction room",
+      "nextPaintMs": 123
+    }
+  ],
+  "longTasks": [
+    160,
+    149,
+    154,
+    59,
+    229,
+    220,
+    284,
+    103,
+    104,
+    99,
+    101,
+    100,
+    106,
+    98,
+    107,
+    107,
+    105,
+    99,
+    98,
+    106,
+    105,
+    103,
+    98,
+    97,
+    104,
+    100,
+    107,
+    105,
+    118,
+    204
+  ]
+}

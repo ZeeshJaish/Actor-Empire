@@ -250,9 +250,11 @@ export const getStreamingBuyerAuctionLots = (
 const getAuctionSourceAccessGrant = (player: Player, lot: StreamingBuyerAuctionLot) => {
     const sourceLicense = lot.sourceLicenseId ? player.ownedStreamingPlatform.catalogLicenses.find(row => row.id === lot.sourceLicenseId) : null;
     const sourceContract = lot.sourceLicenseId ? Object.values(player.world.streamingRightsContracts || {}).find(row => row.id === lot.sourceLicenseId) : null;
-    const listing = lot.listingKind === 'TITLE' && !lot.upcomingRightsSaleId
-        ? getContentMarketListings(player).find(row => row.id === lot.listingId) : null;
-    return sourceLicense?.accessGrant || sourceContract?.accessGrant || listing?.terms.accessGrant;
+    // Fresh studio listings use createDefaultStreamingRightsTerms, which has no
+    // inherited grant. Their offered access is created when the deal is signed.
+    // Reading that undefined default must not rebuild the entire public shelf on
+    // every room render. Inherited grants remain authoritative and are read fresh.
+    return sourceLicense?.accessGrant || sourceContract?.accessGrant;
 };
 
 export const getStreamingBuyerAuctionBackendCapability = (player: Player, lot: StreamingBuyerAuctionLot, platformId: string | null = null) => {
