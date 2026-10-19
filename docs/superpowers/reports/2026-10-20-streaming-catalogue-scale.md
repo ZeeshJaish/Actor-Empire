@@ -43,7 +43,7 @@ Build’s first open remains heavier: 445 ms at 104 titles in the final producti
 
 One expanded economy audit remains failing: `audit:streaming-economy-balance-fixes`, case `forecast reserves the final non-owner across rental and purchase` (52,617 vs 1). Running the identical audit against the production source of `693c84d` produces the exact same complete result JSON, including this failure. It predates this repair. No economy formulas were changed to silence it.
 
-Review identified hidden-overlay and welcome-backdrop issues plus a legacy draft-presence invalidation edge; all three were corrected. No remaining findings from the focused static reviews. Existing design-hook Inter/accent-border findings were left unchanged; no CSS/design changes or suppressions were introduced.
+Review identified hidden-overlay and welcome-backdrop issues plus a legacy draft-presence invalidation edge; all three were corrected. No remaining findings from the focused static reviews. Follow-up design-hook triage preserved the existing CSS: four Inter body-font warnings received value-specific exceptions scoped to these two stylesheets, and the two 2px contract/status-message rails received a side-tab exception scoped only to streaming-content-market.css. Reasons are recorded in .impeccable/config.json. A pre-existing decorative-grid advisory in streaming-hq.css remains standing; no runtime UI/design changes were made.
 
 ## Implementation boundaries
 

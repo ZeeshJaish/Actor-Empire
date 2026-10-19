@@ -38,6 +38,25 @@
         ],
         "createdAt": "2026-10-16T06:25:51.447Z",
         "reason": "Agent verified: .pnpress::before draws radial dots at varied repeat sizes as newspaper paper fibre, as the source comment states; it contains no two-axis grid-line gradients."
+      },
+      {
+        "rule": "overused-font",
+        "value": "inter",
+        "files": [
+          "styles/streaming-content-market.css",
+          "styles/streaming-hq.css"
+        ],
+        "createdAt": "2026-10-19T23:01:38.467Z",
+        "reason": "Agent review: Inter is the incumbent streaming body typeface paired with Anton display headings; preserve the existing type system in this performance-only repair."
+      },
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "styles/streaming-content-market.css"
+        ],
+        "createdAt": "2026-10-19T23:01:38.531Z",
+        "reason": "Agent review: the two 2px borders mark contract-redlining guidance and transaction status/results notices, including role=status feedback; these are purposeful message rails rather than decorative card tabs."
       }
     ]
   }
