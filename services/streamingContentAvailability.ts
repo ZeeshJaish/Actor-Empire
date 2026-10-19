@@ -1,12 +1,13 @@
 import type { OwnedStreamingPlatformState, Player } from '../types';
 import { getAbsoluteWeek } from './legacyLogic';
 import { normalizeOwnedStreamingPlatformState } from './ownedStreamingPlatform';
-import { resolveStreamingCatalogTitle } from './streamingCatalog';
+import { getStreamingCatalogProjectIds, resolveStreamingCatalogTitle } from './streamingCatalog';
 import { resolveStreamingRightsCompatibility } from './streamingRightsCompatibility';
 import { normalizeStreamingDayOneMarketIds } from './streamingDayOneMarkets';
 import { projectStreamingCommercialOffers } from './streamingCommercialOffers';
 import { normalizeStreamingRightsAccessGrant } from './streamingRightsAccessGrant';
 import { evaluateStreamingTitleRoute, type StreamingTitleAccessDecision, type StreamingTitleAccessRoute } from './streamingTitleAccess';
+import { resolveStreamingProductionReadiness } from './streamingProductionReadiness';
 
 export const getOwnedPlatformPackageCountryIds = (platform: OwnedStreamingPlatformState): string[] => {
     const operations = (platform.marketOperations || [])
@@ -57,14 +58,13 @@ export const evaluatePlayerStreamingTitleRoute = (
     const platform = prepared?.platform || normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     const offer = projectStreamingCommercialOffers(platform.serviceConfiguration.pricing);
     const commission = platform.originalCommissions.find(item => item.canonicalProjectId === projectId);
-    const production = Object.values(player.world.industryProductions || {})
-        .find(item => item.canonicalProjectId === projectId);
-    const ready = (!commission || ['DELIVERED', 'RELEASED'].includes(commission.status))
-        && (!production || ['DELIVERED', 'AWAITING_RELEASE', 'RELEASED'].includes(production.status));
+    const ready = resolveStreamingProductionReadiness(player, projectId, commission).ready;
     const slate = platform.launchSlate?.entries.find(entry => entry.projectId === projectId);
-    const generalReleaseAtAbsoluteWeek = slate && platform.launchCommit
+    const slateReleaseAtAbsoluteWeek = slate && platform.launchCommit
         ? platform.launchCommit.committedAtAbsoluteWeek + slate.launchWeek - 1
         : absoluteWeek;
+    const generalReleaseAtAbsoluteWeek = commission?.releasePlan?.premiereAtAbsoluteWeek
+        ?? slateReleaseAtAbsoluteWeek;
     const owned = Boolean(commission || (prepared
         ? prepared.ownedTitleIds.has(projectId)
         : resolveStreamingCatalogTitle(player, projectId)?.source === 'OWNED_LIBRARY'));
@@ -118,7 +118,9 @@ export const evaluatePlayerStreamingTitleRoute = (
         titleId: projectId,
         countryId,
         absoluteWeek,
-        productionReadyAtAbsoluteWeek: ready ? 0 : Number.MAX_SAFE_INTEGER,
+        productionReadyAtAbsoluteWeek: ready
+            ? Math.max(0, commission?.localization?.readyAtAbsoluteWeek || 0)
+            : Number.MAX_SAFE_INTEGER,
         generalReleaseAtAbsoluteWeek,
         marketActive: getOwnedPlatformPackageCountryIds(platform).includes(countryId),
         offer,
@@ -142,8 +144,6 @@ export const getStreamingContentAvailability = (
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     const week = getAbsoluteWeek(player.age, player.currentWeek);
     const commission = platform.originalCommissions.find(c => c.canonicalProjectId === projectId);
-    const industryProduction = Object.values(player.world.industryProductions || {})
-        .find(production => production.canonicalProjectId === projectId);
     const title = resolveStreamingCatalogTitle(player, projectId);
     const source = commission ? 'ORIGINAL' as const : title?.source === 'OWNED_LIBRARY' ? 'OWNED' as const : 'LICENSED' as const;
     const licenses = platform.catalogLicenses.filter(l => l.sourceProjectId === projectId);
@@ -152,21 +152,21 @@ export const getStreamingContentAvailability = (
     const coveredCountryIds = owned ? getOwnedTitleCountryAccess(player, projectId, countries) : countries.filter(country => active.some(l =>
         l.territory === 'GLOBAL' || (l.countryIds?.length ? l.countryIds.includes(country)
             : l.territory === 'MULTI_REGION' || country === countries[0])));
-    const commissionReady = !commission || ['DELIVERED', 'RELEASED'].includes(commission.status);
-    const industryProductionReady = !industryProduction
-        || ['DELIVERED', 'AWAITING_RELEASE', 'RELEASED'].includes(industryProduction.status);
-    const readyProduction = commissionReady && industryProductionReady;
+    const readiness = resolveStreamingProductionReadiness(player, projectId, commission);
+    const readyProduction = readiness.ready;
     const available = readyProduction && (owned || active.length > 0) && (!countries.length || coveredCountryIds.length > 0);
     const slate = platform.launchSlate?.entries.find(e => e.projectId === projectId);
     const programWeek = platform.launchCommit
         ? Math.max(1, week - platform.launchCommit.committedAtAbsoluteWeek + 1)
         : platform.weeklyHistory.at(-1)?.operations?.programWeek || 0;
-    const released = commission?.status === 'RELEASED' || Boolean(slate && platform.lifecycle === 'ACTIVE' && slate.launchWeek <= programWeek);
+    const released = commission?.releasePlan
+        ? platform.lifecycle === 'ACTIVE' && commission.releasePlan.premiereAtAbsoluteWeek <= week
+        : Boolean(commission && readiness.status === 'RELEASED') || Boolean(slate && platform.lifecycle === 'ACTIVE' && slate.launchWeek <= programWeek);
     const status: ContentAvailability = !readyProduction ? 'IN_PRODUCTION'
         : !owned && !active.length ? licenses.some(l => l.status === 'ACTIVE' && l.startsAtAbsoluteWeek > week)
             ? 'AWAITING_AVAILABILITY' : 'RIGHTS_EXPIRED'
         : !available ? 'RIGHTS_UNAVAILABLE'
-        : released ? 'LIVE' : slate ? 'SCHEDULED' : 'READY';
+        : released ? 'LIVE' : slate || commission?.releasePlan ? 'SCHEDULED' : 'READY';
     const raw = (player.pastProjects || []).find(p => p.id === projectId) as any
         || player.world.projects.find(p => p.id === projectId) as any;
     const runtime = Number(raw?.runtimeMinutes || raw?.projectDetails?.runtimeMinutes || 0);
@@ -192,4 +192,14 @@ export const getStreamingContentAvailability = (
         routesByCountry[countryId] = routeRows;
     }
     return { source, status, available, coveredCountryIds, hours, estimated, routesByCountry };
+};
+
+/** Viewer previews obey the same current rights, premiere and delivery gates as gameplay. */
+export const getStreamingPlayableCatalogProjectIds = (player: Player): string[] => {
+    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+    return getStreamingCatalogProjectIds(platform).filter(projectId => {
+        const availability = getStreamingContentAvailability(player, projectId);
+        return availability.available && Object.values(availability.routesByCountry).some(routes =>
+            Object.values(routes).some(route => route.allowed));
+    });
 };

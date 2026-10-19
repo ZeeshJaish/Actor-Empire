@@ -168,7 +168,7 @@ export const getStreamingOpeningCommissionQuote = (
         infrastructureDueNow: forecast.transactionCost,
         marketFilingDueNow,
         marketingReservation,
-        filingEnergy: quoteStreamingMarketFilingEnergy(unfiled.length),
+        filingEnergy: quoteStreamingMarketFilingEnergy(unfiled.map(operation => operation.countryId!)),
         totalCashRequired: forecast.transactionCost + marketFilingDueNow + marketingReservation,
         ready: blockers.length === 0,
         blockers,

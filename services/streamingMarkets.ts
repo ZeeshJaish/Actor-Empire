@@ -1,4 +1,4 @@
-import {calculateStreamingMarketPolicyCharges,type StreamingTaxExpenseBasis} from './streamingMarketEconomics';
+import {calculateStreamingCountryServiceCost,calculateStreamingMarketPolicyCharges,type StreamingTaxExpenseBasis} from './streamingMarketEconomics';
 import type {
     NewsItem,
     OwnedStreamingCostCommitment,
@@ -28,9 +28,9 @@ import {
 } from './streamingMarketsCore';
 
 /** Filing is a founder action, not a weekly chore. Government review then
-    advances automatically with the game clock. Follow-up paperwork costs less
-    attention than opening or reopening a complete country file. */
-export const STREAMING_MARKET_REQUIREMENT_ENERGY = 3;
+    advances automatically with the game clock. Follow-up paperwork has a fixed
+    attention cost in addition to any explicitly requested compliance payment. */
+export const STREAMING_MARKET_REQUIREMENT_ENERGY = 5;
 export const STREAMING_MARKET_REAPPLICATION_ENERGY = 5;
 
 const countryName = (operation: OwnedStreamingMarketOperation): string => operation.countryProfile?.country || operation.countryId || operation.scopeId;
@@ -148,7 +148,7 @@ export const beginStreamingMarketClearance = (player: Player, countryIds: string
     const targets = platform.marketOperations.filter(operation => operation.entryKind === entryKind && Boolean(operation.countryId && selected.has(operation.countryId)) && ['PLANNED', 'AWAITING_FUNDING'].includes(operation.status) && operation.clearance?.outcome !== 'ADDITIONAL_REQUIREMENT');
     if (!platform.identity || !targets.length) return { player, changed: false, reason: platform.identity ? 'ALREADY_STARTED' : 'INVALID_STATE', shortfall: 0, amount: 0 };
     const amount = targets.reduce((sum, operation) => sum + operation.plannedCosts.total, 0);
-    const energyCost = quoteStreamingMarketFilingEnergy(targets.length);
+    const energyCost = quoteStreamingMarketFilingEnergy(targets.map(operation => operation.countryId!));
     if (player.energy.current < energyCost) {
         return { player, changed: false, reason: 'INSUFFICIENT_ENERGY', shortfall: energyCost - player.energy.current, amount, energyCost };
     }
@@ -191,7 +191,7 @@ export const beginStreamingMarketClearance = (player: Player, countryIds: string
 export const resolveStreamingMarketRequirement = (player: Player, operationIdValue: string): StreamingMarketMutationResult => {
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     const operation = platform.marketOperations.find(item => item.id === operationIdValue);
-    if (!operation?.clearance || operation.clearance.outcome !== 'ADDITIONAL_REQUIREMENT') return { player, changed: false, reason: 'INVALID_STATE', shortfall: 0, amount: 0 };
+    if (!operation?.clearance || operation.status !== 'AWAITING_FUNDING' || operation.clearance.outcome !== 'ADDITIONAL_REQUIREMENT') return { player, changed: false, reason: 'INVALID_STATE', shortfall: 0, amount: 0 };
     const amount = operation.clearance.additionalPayment;
     if (platform.treasuryCash < amount) return { player, changed: false, reason: 'INSUFFICIENT_TREASURY', shortfall: amount - platform.treasuryCash, amount };
     if (player.energy.current < STREAMING_MARKET_REQUIREMENT_ENERGY) {
@@ -319,10 +319,10 @@ export const advanceStreamingMarketClearances = (player: Player): StreamingMarke
 };
 
 export interface StreamingMarketOperatingCostView { marketOperatingCost:number; marketPolicyCost:number; marketIncomeTax:number; marketRevenueLevy:number; total:number; activeCountryCount:number }
-/** Fixed market operations, a receipts levy and income tax on earned contribution. */
+/** Served-country operations, a receipts levy and income tax on earned contribution. */
 export const calculateStreamingMarketOperatingCosts=(platform:Pick<OwnedStreamingPlatformState,'marketOperations'>,weeklyRevenue:number,basis:StreamingTaxExpenseBasis={}):StreamingMarketOperatingCostView=>{
     const active=platform.marketOperations.filter(x=>x.scope==='COUNTRY'&&x.status==='ACTIVE'&&x.countryProfile&&x.policySnapshot);
-    const marketOperatingCost=Math.round(active.reduce((sum,x)=>sum+x.weeklyOperatingCost,0));
+    const marketOperatingCost=Math.round(active.reduce((sum,x)=>sum+calculateStreamingCountryServiceCost(x,basis.countryActiveAudience?.[x.countryId!]),0));
     const charges=calculateStreamingMarketPolicyCharges(active,weeklyRevenue,{...basis,deductibleOperatingCost:(basis.deductibleOperatingCost||0)+marketOperatingCost});
     return {marketOperatingCost,marketPolicyCost:charges.policyCost,marketIncomeTax:charges.incomeTax,marketRevenueLevy:charges.revenueLevy,total:marketOperatingCost+charges.policyCost,activeCountryCount:active.length};
 };

@@ -38,6 +38,7 @@ interface Props {
   player: Player;
   onUpdatePlayer: (player: Player) => void;
   onClose: () => void;
+  onOpenProductionHouse?: () => void;
   onStartProduction: (target: { studioId: string; scriptId: string; commissionId: string }) => void;
 }
 
@@ -63,6 +64,7 @@ export default function StreamingOriginalCommissioning({
   onUpdatePlayer,
   onClose,
   onStartProduction,
+  onOpenProductionHouse,
 }: Props) {
   const platform = player.ownedStreamingPlatform;
   const isFirstOriginal = platform.originalCommissions.length === 0;
@@ -274,7 +276,11 @@ export default function StreamingOriginalCommissioning({
                 <section className="streaming-blocker-card">
                   <Building2 size={25} />
                   <h2>A producing company is required.</h2>
-                  <p>Found or acquire a production house so this commissioned Original can enter the real Greenlight and production workflow.</p>
+                  <p>A delivered Original is required for Opening Night. Found or acquire a production house to produce it. Founding a new studio costs $50M in personal cash, separate from platform funds.</p>
+                  {onOpenProductionHouse && <button type="button" onClick={() => {
+                    onUpdatePlayer(saveStreamingOriginalDraft(player, draft));
+                    onOpenProductionHouse();
+                  }}>Save brief and open Production House</button>}
                 </section>
               )}
               <section className="streaming-budget-card">

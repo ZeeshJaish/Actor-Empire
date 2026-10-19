@@ -2,12 +2,14 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { Player, StreamingBuyerAuctionSession, StreamingAuctionFutureFundingTerms } from '../types';
 import {
     advanceStreamingBuyerAuction,
+    getStreamingBuyerAuctionBackendCapability,
     calculateStreamingBuyerAuctionSellerValue,
     getStreamingBuyerAuctionLeader,
     placeStreamingBuyerAuctionBid,
     reconcileStreamingBuyerAuction,
     withdrawStreamingBuyerAuctionBid,
 } from '../services/streamingBuyerAuctions';
+import { resolveAuctionContinuation } from '../services/streamingAuctionTerms';
 import { activateAuctionFutureFunding } from '../services/streamingAuctionFunding';
 import { getContentMarketFunds } from '../services/streamingContentMarket';
 import css from '../content-market-exact/ContentMarket.module.css';
@@ -43,7 +45,7 @@ export default function StreamingBuyerAuctionRoom({ player, session, onUpdatePla
     const [productionFunding, setProductionFunding] = useState(0);
     const [futureGreenlight, setFutureGreenlight] = useState(false);
     const [futureFunding, setFutureFunding] = useState<StreamingAuctionFutureFundingTerms>({
-        kind: 'NEW_ORIGINAL', count: 1,
+        kind: session.lot.projectType === 'SERIES' ? 'NEXT_SEASON' : 'SEQUEL', count: 1,
         budgetPerProject: Math.max(1_000_000, session.lot.allowedTerms.futureGreenlightReserve),
         format: 'ANY', commitment: 'FIRM', deadlineWeeks: 52, platformRightsPercent: 100,
     });
@@ -69,13 +71,19 @@ export default function StreamingBuyerAuctionRoom({ player, session, onUpdatePla
         return () => window.clearInterval(timer);
     }, [session.id]);
 
+    const backendCapability = getStreamingBuyerAuctionBackendCapability(player, session.lot);
+    const backendAvailable = backendCapability.advertising || backendCapability.rental;
+    const backendReason = 'Backend unavailable: enable advertising or rental in an eligible market with matching title rights.';
+    const offeredBackend = backendAvailable ? backend : 0;
+    useEffect(() => { if (!backendAvailable) setBackend(0); }, [backendAvailable]);
+    const continuation = resolveAuctionContinuation(player,session.lot.sourceProjectId,session.lot.title,session.lot.projectType);
     const playerBid = session.playerBidId ? session.bids.find(bid => bid.id === session.playerBidId) || null : null;
     const previewTerms = {
-        minimumGuarantee: upfront, licensorRevenueShare: backend, marketingGuarantee: 0,
+        minimumGuarantee: upfront, licensorRevenueShare: offeredBackend, marketingGuarantee: 0,
         futureGreenlight, productionFunding: session.lot.upcomingRightsSaleId ? productionFunding : 0,
         ...(futureGreenlight ? { futureFunding } : {}),
     };
-    const previewValue = calculateStreamingBuyerAuctionSellerValue(session.lot, previewTerms);
+    const previewValue = calculateStreamingBuyerAuctionSellerValue(session.lot, previewTerms, 1, backendCapability.eligibleRevenueFraction);
     const firmFutureReserve = futureGreenlight && futureFunding.commitment === 'FIRM'
         ? futureFunding.count * futureFunding.budgetPerProject : 0;
     const guaranteedExposure = upfront + previewTerms.productionFunding + firmFutureReserve;
@@ -229,12 +237,13 @@ export default function StreamingBuyerAuctionRoom({ player, session, onUpdatePla
                     })}
                     {!activeBids.length && <p className={css.mkempty}>Nothing has been tabled yet.</p>}
                 </div>
-                {feedback && <p className={css.mkbriefopen} role="status">{feedback}</p>}
             </div>
 
             <section className={css.mkmaker} aria-label="Auction offer console">
+                {!backendAvailable && <p className={css.mkbidfeedback}>{backendReason}</p>}
+                {feedback && <p className={css.mkbidfeedback} role="status" aria-live="polite">{feedback}</p>}
                 <button className={css.mkmyterms} type="button" onClick={() => setTermsOpen(true)}>
-                    <span>{backend ? `${backend}% backend` : 'no backend'}</span>
+                    <span>{offeredBackend ? `${offeredBackend}% backend` : 'no backend'}</span>
                     {previewTerms.productionFunding > 0 && <span>{money(previewTerms.productionFunding)} production</span>}
                     <span>{futureGreenlight ? fundingLabel(futureFunding) : 'no future funding'}</span>
                     <i>edit</i>
@@ -255,21 +264,21 @@ export default function StreamingBuyerAuctionRoom({ player, session, onUpdatePla
                     <div className={css.mkfhead}><b>YOUR TERMS</b><button type="button" onClick={() => setTermsOpen(false)}>Done</button></div>
                     <div className={css.mktermrows}>
                         <div className={css.mkbackendrow}>
-                            <span><b>Backend</b><small>{backend ? 'One share of this title’s actual ads + rental receipts' : 'Off · no revenue share offered'}</small></span>
-                            <div><button type="button" aria-label="Decrease backend share" disabled={backend === 0} onClick={() => setBackend(Math.max(0, backend - 1))}>−</button><b>{backend}%</b><button type="button" aria-label="Increase backend share" disabled={backend >= session.lot.allowedTerms.backendMaximum} onClick={() => setBackend(Math.min(session.lot.allowedTerms.backendMaximum, backend + 1))}>+</button></div>
+                            <span><b>Backend</b><small>{!backendAvailable ? backendReason : backend ? 'One share of this title’s actual ads + rental receipts' : 'Off · no revenue share offered'}</small></span>
+                            <div><button type="button" aria-label="Decrease backend share" disabled={!backendAvailable || backend === 0} onClick={() => setBackend(Math.max(0, backend - 1))}>−</button><b>{backend}%</b><button type="button" aria-label="Increase backend share" disabled={!backendAvailable || backend >= session.lot.allowedTerms.backendMaximum} onClick={() => setBackend(Math.min(session.lot.allowedTerms.backendMaximum, backend + 1))}>+</button></div>
                         </div>
                         {session.lot.upcomingRightsSaleId && <label className={css.mkfundingfield}>Current production funding ($M)<input type="number" min="0" step="0.1" value={productionFunding / 1_000_000} onChange={event => setProductionFunding(Math.max(0, Number(event.target.value) || 0) * 1_000_000)} /><small>Additional funding for this title's production.</small></label>}
                     </div>
                     {session.lot.allowedTerms.futureGreenlightAllowed && <div className={css.mkfunding}>
-                        <label className={css.mkfundingtoggle}><input type="checkbox" checked={futureGreenlight} onChange={event => setFutureGreenlight(event.target.checked)} /><span><b>Offer future project funding</b><small>Let the seller make another title for your platform.</small></span></label>
+                        <label className={css.mkfundingtoggle}><input type="checkbox" checked={futureGreenlight} onChange={event => setFutureGreenlight(event.target.checked)} /><span><b>Offer future project funding</b><small>Fund only this film’s sequel or this series’s next season.</small></span></label>
                         {futureGreenlight && <>
                             <div className={css.mkfundinggrid}>
-                                <label className={css.mkfundingfield}>Project<select value={futureFunding.kind} onChange={event => setFutureFunding(previous => ({ ...previous, kind: event.target.value as StreamingAuctionFutureFundingTerms['kind'] }))}><option value="NEW_ORIGINAL">New original</option>{session.lot.projectType === 'MOVIE' && <option value="SEQUEL">Sequel</option>}{session.lot.projectType === 'SERIES' && <option value="NEXT_SEASON">Next season</option>}</select></label>
+                                <label className={css.mkfundingfield}>Project<select value={futureFunding.kind} onChange={event => setFutureFunding(previous => ({ ...previous, kind: event.target.value as StreamingAuctionFutureFundingTerms['kind'] }))}>{session.lot.projectType === 'MOVIE' && <option value="SEQUEL">Sequel</option>}{session.lot.projectType === 'SERIES' && <option value="NEXT_SEASON">Next season</option>}</select></label>
                                 <label className={css.mkfundingfield}>Number of titles<select value={futureFunding.count} onChange={event => setFutureFunding(previous => ({ ...previous, count: Number(event.target.value) }))}>{[1, 2, 3].map(count => <option key={count} value={count}>{count}</option>)}</select></label>
                                 <label className={css.mkfundingfield}>Funding per title ($M)<input type="number" min="0.1" step="0.1" value={futureFunding.budgetPerProject / 1_000_000} onChange={event => setFutureFunding(previous => ({ ...previous, budgetPerProject: Math.max(0, Number(event.target.value) || 0) * 1_000_000 }))} /></label>
                                 <label className={css.mkfundingfield}>Format<select value={futureFunding.format} onChange={event => setFutureFunding(previous => ({ ...previous, format: event.target.value as StreamingAuctionFutureFundingTerms['format'] }))}><option value="ANY">Any format</option><option value="LIVE_ACTION">Live action</option><option value="ANIMATED">Animated</option><option value="ANIME">Anime</option></select></label>
                             </div>
-                            <p className={css.mkfundingnote}>{money(futureFunding.count * futureFunding.budgetPerProject)} total funding · delivery within 52 weeks of signing.</p>
+                            <p className={css.mkfundingnote}>{money(futureFunding.count * futureFunding.budgetPerProject)} total funding · {continuation.baseTitle}{session.lot.projectType === 'SERIES' ? ' · seasons' : ' · parts'} {continuation.firstInstallmentNumber}{futureFunding.count > 1 ? `–${continuation.firstInstallmentNumber + futureFunding.count - 1}` : ''} · delivery within 52 weeks of signing.</p>
                         </>}
                     </div>}
                     {playerBid && <button className={css.mkfclear} type="button" onClick={withdraw}>Withdraw your standing contract</button>}

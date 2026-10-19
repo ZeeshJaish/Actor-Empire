@@ -1,4 +1,4 @@
-import type { IndustryProductionCommitment, IndustryProject, OwnedStreamingOriginalCommission, OwnedStreamingRightsObligation, Player, ProjectFormat } from '../types';
+import type { StreamingAuctionFutureFundingTerms, IndustryProductionCommitment, IndustryProject, OwnedStreamingOriginalCommission, OwnedStreamingRightsObligation, Player, ProjectFormat } from '../types';
 import { createDeterministicId } from './deterministicRandom';
 import { createProductionCalendar } from './productionCalendar';
 import { upsertCanonicalIndustryProduction } from './industryProductions';
@@ -7,16 +7,10 @@ import { reserveProjectTalentBookings, releaseProjectTalentBookings } from './ta
 import { createStreamingLicenseContract, createStreamingRightsContractFromLicense, registerStreamingRightsContract } from './streamingRightsCore';
 import { getAbsoluteWeek } from './legacyLogic';
 import { resolveStreamingCatalogTitle } from './streamingCatalog';
+import { resolveAuctionContinuation } from './streamingAuctionTerms';
 
-export interface AuctionFutureFundingTerms {
- kind: 'NEW_ORIGINAL' | 'SEQUEL' | 'NEXT_SEASON';
- count: number;
- budgetPerProject: number;
- format: 'ANY' | 'LIVE_ACTION' | 'ANIMATED' | 'ANIME';
- commitment: 'FIRM' | 'OPTION';
- deadlineWeeks: number;
- platformRightsPercent: number;
-}
+export type AuctionFutureFundingTerms = StreamingAuctionFutureFundingTerms;
+
 type FundingObligation = OwnedStreamingRightsObligation & {
  futureFunding?: AuctionFutureFundingTerms;
  sourceAuctionId?: string;
@@ -102,6 +96,17 @@ export const processAuctionFutureFunding = (input: Player, absoluteWeek: number)
   const catalogueParent=resolveStreamingCatalogTitle(player,obligation.sourceProjectId);
   if(!studio || !producerId || !catalogueParent)continue;
   if(terms.kind==='SEQUEL' && catalogueParent.projectType!=='MOVIE' || terms.kind==='NEXT_SEASON' && catalogueParent.projectType!=='SERIES')continue;
+  const firstFunded = obligation.fundedProductionIds?.[0] ? player.world.industryProductions?.[obligation.fundedProductionIds[0]] : null;
+  const firstCommission = firstFunded ? player.ownedStreamingPlatform.originalCommissions.find(row => row.canonicalProjectId === firstFunded.canonicalProjectId) : null;
+  const savedOrdinal = terms.kind==='NEXT_SEASON' ? firstCommission?.seasonNumber : Number(firstFunded?.title.match(/\s+(\d+)$/)?.[1]);
+  const continuation = terms.kind==='NEW_ORIGINAL' ? null : {
+   ...resolveAuctionContinuation(player,obligation.sourceProjectId,catalogueParent.title,catalogueParent.projectType),
+   ...terms,
+   // Older in-flight orders already assigned their installments when production began.
+   // Do not advance their numbering merely because their own commissions now exist.
+   ...(!terms.firstInstallmentNumber && firstFunded && Number.isSafeInteger(savedOrdinal) && Number(savedOrdinal)>1
+    ? {firstInstallmentNumber:Number(savedOrdinal)}:{}),
+  };
   const started=obligation.fundingActivatedAtAbsoluteWeek ?? Math.max(0,Number(obligation.createdAtAbsoluteWeek ?? absoluteWeek));
   if(absoluteWeek<started)continue;
   if(!obligation.fundedProductionIds?.length) {
@@ -122,7 +127,7 @@ export const processAuctionFutureFunding = (input: Player, absoluteWeek: number)
      producerStudioId:producerId,productionCalendar:calendar,actorIds:[talent.leadActor.id],directorIds:[talent.director.id],allowOverlaps:true});
     const isSeries=terms.kind==='NEXT_SEASON' || (terms.kind==='NEW_ORIGINAL' && catalogueParent.projectType==='SERIES');
     const title=terms.kind==='NEW_ORIGINAL'?`${studio.name} Original ${index+1}`
-     :`${catalogueParent.title} ${isSeries?'Season':'Sequel'} ${index+2}`;
+     :`${continuation!.baseTitle}${isSeries?' Season':''} ${continuation!.firstInstallmentNumber!+index}`;
     const production:IndustryProductionCommitment={id,canonicalProjectId:projectId,title,projectType:isSeries?'SERIES':'MOVIE',
      genre:catalogueParent.genre as any,producerStudioId:producerId,source:'PLATFORM_COMMISSION',status:'PRE_PRODUCTION',
      productionCalendar:calendar,budgetMillions:terms.budgetPerProject/1_000_000,paidMillions:0,talentBookingIds:booking.bookingIds,
@@ -139,7 +144,7 @@ export const processAuctionFutureFunding = (input: Player, absoluteWeek: number)
    }
    // Talent/canonical creation and escrow spending form one immutable action.
    if(ids.length!==terms.count)continue;
-   obligation={...obligation,fundingActivatedAtAbsoluteWeek:started,fundedProductionIds:ids};
+   obligation={...obligation,...(continuation ? {futureFunding:{...terms,...continuation}}:{}),fundingActivatedAtAbsoluteWeek:started,fundedProductionIds:ids};
    player={...player,world,ownedStreamingPlatform:{...player.ownedStreamingPlatform,
     treasuryCash:player.ownedStreamingPlatform.treasuryCash-amount(terms),
     originalCommissions:[...player.ownedStreamingPlatform.originalCommissions,...ids.map((id,index):OwnedStreamingOriginalCommission=>{
@@ -152,8 +157,8 @@ export const processAuctionFutureFunding = (input: Player, absoluteWeek: number)
       productionBudgetCap:terms.budgetPerProject,productionFundingApplied:terms.budgetPerProject,status:'IN_PRODUCTION',
       commissionedAtAbsoluteWeek:started,greenlitAtAbsoluteWeek:absoluteWeek,
       parentCommissionId:terms.kind!=='NEW_ORIGINAL'?parentCommission?.id||null:null,
-      lineageId:terms.kind!=='NEW_ORIGINAL'?parentCommission?.lineageId||obligation.sourceProjectId:production.canonicalProjectId,
-      seasonNumber:terms.kind==='NEXT_SEASON'?Math.max(1,Number((parent as IndustryProject & {seasonNumber?:number})?.seasonNumber)||1)+index+1:1,
+      lineageId:terms.kind!=='NEW_ORIGINAL'?continuation!.lineageId:production.canonicalProjectId,
+      seasonNumber:terms.kind==='NEXT_SEASON'?continuation!.firstInstallmentNumber!+index:1,
       contract:{platformRightsPercent:terms.platformRightsPercent,producerBackendPercent:100-terms.platformRightsPercent,exclusiveWindowWeeks:104,sequelRightsIncluded:false},
       releasePlan:null,localization:null,lifecycleDecision:null};
     })],
@@ -176,14 +181,14 @@ export const processAuctionFutureFunding = (input: Player, absoluteWeek: number)
    const execution=production.aiExecution!;
    const ordinal=(obligation.fundedProductionIds||[]).indexOf(productionId);
    const format:ProjectFormat=terms.format==='ANY'?'LIVE_ACTION':terms.format;
-   const project:IndustryProject & {format:ProjectFormat;parentProjectId?:string;seasonNumber?:number}={
+   const project:IndustryProject & {format:ProjectFormat;parentProjectId?:string;seasonNumber?:number;installmentNumber?:number;franchiseId?:string}={
     id:production.canonicalProjectId,title:production.title,genre:production.genre,mediaType:production.projectType,
     studioId:producerId,physicalProducerStudioId:producerId,budgetTier:production.budgetMillions>=150?'BLOCKBUSTER':production.budgetMillions>=80?'HIGH':production.budgetMillions>=30?'MID':'LOW',
     quality:Math.round(execution.qualityForecast),rating:Math.round((4+execution.qualityForecast/20)*10)/10,boxOffice:0,
     year:Math.floor(absoluteWeek/52)+1,weekReleased:absoluteWeek%52+1,leadActorId:execution.leadActorId!,leadActorName:execution.leadActorName!,
     directorId:execution.directorId!,directorName:execution.directorName!,writerName:production.writerName,reviews:'Platform-funded original production',
-    releaseStrategy:'STREAMING_ONLY',format,...(terms.kind!=='NEW_ORIGINAL'?{parentProjectId:obligation.sourceProjectId}:{}),
-    ...(production.universeId?{universeId:production.universeId}:{}),...(terms.kind==='NEXT_SEASON'?{seasonNumber:Math.max(1,Number((parent as IndustryProject & {seasonNumber?:number})?.seasonNumber)||1)+ordinal+1}:{}),
+    releaseStrategy:'STREAMING_ONLY',format,...(terms.kind!=='NEW_ORIGINAL'?{parentProjectId:continuation!.parentProjectId,franchiseId:continuation!.lineageId,installmentNumber:continuation!.firstInstallmentNumber!+ordinal}:{}),
+    ...(production.universeId?{universeId:production.universeId}:{}),...(terms.kind==='NEXT_SEASON'?{seasonNumber:continuation!.firstInstallmentNumber!+ordinal}:{}),
    };
    // Production ownership participation is a distinct, fully funded producer obligation,
    // never an optional licensing backend inferred from this title's purchase offer.

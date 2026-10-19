@@ -11,6 +11,7 @@ import {
   evaluateStreamingEligibility,
 } from '../services/streamingEligibility';
 import {
+  getStreamingFounderCredits,
   incorporateOwnedStreamingPlatform,
   saveStreamingFoundingDraft,
   STREAMING_INCORPORATION_ECONOMY,
@@ -296,7 +297,7 @@ export default function StreamingFoundingJourney({
             fame: workingPlayer.stats.fame,
             reputation: workingPlayer.stats.reputation,
             liquid: formatMoney(workingPlayer.money),
-            credits: config.starterTitles.slice(0, 3).map(title => title.name),
+            credits: getStreamingFounderCredits(workingPlayer),
           }}
           onDone={() => setScene('WIZARD')}
         />

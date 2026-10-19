@@ -1142,7 +1142,7 @@ const Redline: React.FC<{
 
       {/* the term sheet on the table between you */}
       <div className={css.mksheet}>
-        <div className={css.mksheethead}><b>HEADS OF TERMS</b><span>DRAFT 1</span></div>
+        <div className={css.mksheethead}><b>HEADS OF TERMS</b><span>DRAFT · NOT SIGNED</span></div>
         <div className={css.mkrow}><span>Guarantee</span>
           <b className={afford ? '' : css.mkover}>{exact(o.mg)}</b></div>
         <div className={css.mkrow}><span>Seller backend</span><b>{o.backendPct}% · {o.basis === 'Ads + rental receipts' ? 'actual ads + rental receipts' : 'adjusted gross receipts (legacy)'}</b></div>

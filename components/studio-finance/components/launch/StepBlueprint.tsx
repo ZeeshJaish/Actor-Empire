@@ -131,7 +131,7 @@ export function StepBlueprint({ data, draft, chosen, treasury, free, gap, handle
             ? `All ${checks.length} decisions are settled. Build the Platform can start from this.`
             : state === 'blocked'
               ? `${done} of ${checks.length} settled · ${blocking} ${blocking === 1 ? 'thing still blocks' : 'things still block'} opening night.`
-              : `${done} of ${checks.length} settled · nothing is blocking, and the gaps will be felt on the first weekend.`}
+              : `${done} of ${checks.length} settled · finish the remaining decisions and clearance checks before opening night.`}
         </p>
       </section>
 

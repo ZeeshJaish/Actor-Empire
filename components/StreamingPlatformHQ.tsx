@@ -24,6 +24,7 @@ import {
 import { markOwnedStreamingCinematicStatus } from '../services/ownedStreamingPlatform';
 import StreamingCatalogSetup from './StreamingCatalogSetup';
 import StreamingOriginalCommissioning from './StreamingOriginalCommissioning';
+import StreamingLaunchBlueprintReview from './StreamingLaunchBlueprintReview';
 import StreamingSlatePlanner from './StreamingSlatePlanner';
 import StreamingViewerMode from './StreamingViewerMode';
 import StreamingLaunchAftermathPanel from './StreamingLaunchAftermathPanel';
@@ -105,6 +106,7 @@ import {
 import {
   STREAMING_LICENSE_TERRITORIES,
   STREAMING_STARTER_CATALOG_PACKAGES,
+  getStreamingCatalogProjectIds,
   getEligibleOwnedStreamingTitles,
   getStreamingCatalogLicenseStatus,
   resolveStreamingCatalogTitle,
@@ -112,6 +114,7 @@ import {
 import { getAbsoluteWeek } from '../services/legacyLogic';
 import { updateWorldStreamingCustomerAccessPolicy } from '../services/worldEconomy/worldStreamingCustomers';
 import { forecastWorldStreamingBuildDemand } from '../services/worldEconomy/worldStreamingPricingForecast';
+import { getStreamingContentAvailability, getStreamingPlayableCatalogProjectIds } from '../services/streamingContentAvailability';
 import { getStreamingOriginalLiveStatus } from '../services/streamingOriginals';
 import { getStreamingTechnologyCampus } from '../services/streamingTechnologyCampus';
 import { getStreamingProductSuite } from '../services/streamingProductSuite';
@@ -142,6 +145,7 @@ import {
 import { reconstructStreamingRegionPlans } from '../services/streamingRegionalNetworkPlan';
 import { commitOwnedStreamingLaunch, getStreamingLaunchReadiness } from '../services/streamingLaunch';
 import {
+  checkpointStreamingLaunchBlueprint,
   isStreamingDefineLaunchWizardMilestone,
   getStreamingLaunchBudgetView,
   getStreamingLaunchDefinitionSignature,
@@ -193,6 +197,7 @@ interface Props {
   onTrustedMarketUpdate?: (player: Player) => void;
   onBack: () => void;
   onReturnToGame?: () => void;
+  onOpenProductionHouse?: () => void;
   onOpenOriginalProduction?: (target: { studioId: string; scriptId: string; commissionId: string }) => void;
   onOpenBank?: () => void;
   initialDestination?: 'HOME' | 'FINANCE';
@@ -290,7 +295,7 @@ function EmptyState({
   );
 }
 
-export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedMarketUpdate, onBack, onReturnToGame, onOpenOriginalProduction, onOpenBank, initialDestination = 'HOME', initialContentMarketOfferId, onContentMarketOfferConsumed }: Props) {
+export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedMarketUpdate, onBack, onReturnToGame, onOpenOriginalProduction, onOpenProductionHouse, onOpenBank, initialDestination = 'HOME', initialContentMarketOfferId, onContentMarketOfferConsumed }: Props) {
   const platform = player.ownedStreamingPlatform;
   const constructionSetup = platform.pendingInfrastructureSetup
     || (!platform.launchCommit ? platform.infrastructureSetup : null);
@@ -363,6 +368,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
   const [defineLaunchInitialStep, setDefineLaunchInitialStep] = useState<StreamingDefineLaunchStepId | undefined>(undefined);
   const [defineLaunchInitialSheet, setDefineLaunchInitialSheet] = useState<'money' | 'plan' | undefined>(undefined);
   const [showCinematicBuild, setShowCinematicBuild] = useState(false);
+  const [showLaunchBlueprintReview, setShowLaunchBlueprintReview] = useState(false);
   const [showOpeningProgramme, setShowOpeningProgramme] = useState(false);
   const [openingProgrammeFocus, setOpeningProgrammeFocus] = useState<StreamingOpeningProgrammeFocus>('OVERVIEW');
   const [buildInitialSheet, setBuildInitialSheet] = useState<'money' | 'build' | undefined>(undefined);
@@ -545,27 +551,29 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
       DELIVERED: 0.86,
       RELEASED: 1,
     };
-    const originalStage: Record<string, 'COMMISSIONED' | 'IN PRODUCTION' | 'DELIVERED' | 'SCHEDULED'> = {
+    const originalStage: Record<string, 'COMMISSIONED' | 'IN PRODUCTION' | 'DELIVERED' | 'SCHEDULED' | 'LIVE'> = {
       READY_FOR_GREENLIGHT: 'COMMISSIONED',
       GREENLIT: 'COMMISSIONED',
       IN_PRODUCTION: 'IN PRODUCTION',
       DELIVERED: 'DELIVERED',
-      RELEASED: 'SCHEDULED',
+      RELEASED: 'LIVE',
     };
     const slate = platform.originalCommissions.slice(-5).reverse().map(commission => {
       const programmed = platform.launchSlate?.entries.find(entry => entry.projectId === commission.canonicalProjectId);
+      const status = getStreamingOriginalLiveStatus(player, commission);
+      const live = commission.canonicalProjectId && getStreamingContentAvailability(player, commission.canonicalProjectId).status === 'LIVE';
       return {
         id: commission.id,
         title: commission.title,
         kind: 'ORIGINAL' as const,
-        stage: programmed ? 'SCHEDULED' as const : originalStage[commission.status],
-        progress: programmed ? Math.max(originalProgress[commission.status], 0.9) : originalProgress[commission.status],
+        stage: live ? 'LIVE' as const : programmed && ['DELIVERED', 'RELEASED'].includes(status) ? 'SCHEDULED' as const : originalStage[status],
+        progress: originalProgress[status],
         budget: commission.productionBudgetCap,
         releaseWeek: programmed?.launchWeek,
         hue: stableHue(commission.id),
       };
     });
-    const service = platform.catalogProjectIds.slice(0, 8).map(projectId => {
+    const service = getStreamingPlayableCatalogProjectIds(player).slice(0, 8).map(projectId => {
       const title = resolveStreamingCatalogTitle(player, projectId);
       if (!title) return null;
       const performance = performanceByProject.get(projectId);
@@ -573,7 +581,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
       const isOriginal = platform.originalCommissions.some(item => item.canonicalProjectId === projectId);
       const completionRate = performance?.completionRate ?? 0;
       const completion = completionRate <= 1 ? completionRate * 100 : completionRate;
-      const status: StreamingCommandServiceTitle['status'] = !performance
+      const status: StreamingCommandServiceTitle['status'] = !performance || performance.viewingAccounts <= 0
         ? 'STEADY'
         : performance.viewingAccounts === mostWatched?.viewingAccounts
           ? 'TOP 10'
@@ -587,7 +595,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
         title: title.title,
         kind: `${isOriginal ? 'Original' : license ? 'Licensed' : 'Library'} · ${title.projectType === 'SERIES' ? 'Series' : 'Film'}`,
         status,
-        rating: clamp(title.rating ?? ((performance?.satisfactionScore ?? 72) / 10), 0, 10),
+        rating: title.rating !== null ? clamp(title.rating, 0, 10) : performance && performance.viewingAccounts > 0 ? clamp(performance.satisfactionScore / 10, 0, 10) : null,
         views: performance?.viewingAccounts ?? 0,
         completion: clamp(Math.round(completion), 0, 100),
         expiresIn: license && license.windowType !== 'PERMANENT'
@@ -714,7 +722,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
       ] : [
         {
           id: 'CONTENT', label: 'CONTENT', sub: 'Catalogue, deals, Originals & performance',
-          statLabel: 'CATALOGUE', stat: `${(platform.catalogProjectIds || []).length} TITLES`,
+          statLabel: 'CATALOGUE', stat: `${getStreamingCatalogProjectIds(platform).length} TITLES`,
           pressure: !platform.starterCatalog ? 'urgent' : (platform.originalCommissions || []).length === 0 ? 'watch' : 'calm',
           note: !platform.starterCatalog ? 'The opening shelves are empty.' : undefined,
           chips: [
@@ -1029,6 +1037,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
     ));
     return {
       title: commit?.openingOriginalTitle || launchReadiness.openingOriginalTitle,
+      projectType: platform.originalCommissions.find(item => item.title === (commit?.openingOriginalTitle || launchReadiness.openingOriginalTitle))?.projectType,
       halls: halls.map((placement, index) => ({
         id: placement.cityId,
         label: placement.cityId.replace(/_/g, ' '),
@@ -1738,6 +1747,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
 
   const openLaunchDestination = (destination: StreamingLaunchDestination) => {
     if (openingProgramme.commissioned && !platform.launchCommit) {
+      if (destination === 'LAUNCH_BLUEPRINT') { setShowLaunchBlueprintReview(true); return; }
       setOpeningProgrammeFocus(getStreamingOpeningProgrammeFocus(destination));
       setShowOpeningProgramme(true);
       return;
@@ -1778,7 +1788,8 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
       }}
       onOpenLaunchTrack={track => {
         if (openingProgramme.commissioned && !platform.launchCommit) {
-          setOpeningProgrammeFocus(track === 'BUILD_PLATFORM' ? 'INFRASTRUCTURE' : 'LAUNCH_PLAN');
+          if (track === 'DEFINE_LAUNCH') { setShowLaunchBlueprintReview(true); return; }
+          setOpeningProgrammeFocus('INFRASTRUCTURE');
           setShowOpeningProgramme(true);
           return;
         }
@@ -1926,19 +1937,29 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
     return renderHome();
   };
 
+  if (showLaunchBlueprintReview && !platform.launchCommit) {
+    return <StreamingLaunchBlueprintReview player={player} brand={commandDeckBrand}
+      onBack={() => setShowLaunchBlueprintReview(false)}
+      onRefresh={() => {
+        const result = checkpointStreamingLaunchBlueprint(player);
+        if (result.changed) persist(result.player);
+      }} />;
+  }
+
   if (openingProgramme.commissioned && !platform.launchCommit
     && (showOpeningProgramme || showCinematicBuild || showDefineLaunch)) {
     return (
       <StreamingOpeningProgramme
         brand={commandDeckBrand}
         view={openingProgramme}
+        launchReadiness={launchReadiness}
         focus={openingProgrammeFocus}
         onBack={() => {
           setShowOpeningProgramme(false);
           setShowCinematicBuild(false);
           setShowDefineLaunch(false);
         }}
-        onOpenCommissionedPlan={() => setOpeningProgrammeFocus('INFRASTRUCTURE')}
+        onOpenCommissionedPlan={() => setShowLaunchBlueprintReview(true)}
         onResolveClearance={(operationId) => {
           const operation = player.ownedStreamingPlatform.marketOperations.find(item => item.id === operationId);
           if (!operation?.clearance) return;
@@ -2395,6 +2416,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
       ) : null}
       {showOriginalCommissioning ? (
         <StreamingOriginalCommissioning
+          onOpenProductionHouse={onOpenProductionHouse ? () => { setShowOriginalCommissioning(false); onOpenProductionHouse(); } : undefined}
           brand={commandDeckBrand}
           player={player}
           onUpdatePlayer={onUpdatePlayer!}

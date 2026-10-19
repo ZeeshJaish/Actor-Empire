@@ -1,6 +1,6 @@
-import {getStreamingBuyerBackendCapability, streamingBackendPercentForBuyer, validateNewStreamingBackendTerms, minimumStreamingLicenseFee} from './streamingBackendPolicy';
+import {getStreamingBuyerBackendCapability, validateNewStreamingBackendTerms, minimumStreamingLicenseFee} from './streamingBackendPolicy';
 import { processAuctionFutureFunding } from './streamingAuctionFunding';
-import { normalizeAuctionFutureFunding } from './streamingAuctionTerms';
+import { normalizeAuctionFutureFunding, resolveAuctionContinuation } from './streamingAuctionTerms';
 import type {
     StreamingAuctionFutureFundingTerms,
     OwnedStreamingCostCommitment,
@@ -19,6 +19,7 @@ import { getStreamingMarketCycle } from './streamingMarketSupply';
 import { compactOwnedStreamingPlatformForPersistence, normalizeOwnedStreamingPlatformState } from './ownedStreamingPlatform';
 import {
     establishContentMarketCatalogue,
+    prepareContentMarketDiscovery,
     getContentMarketAuctionCollections,
     getContentMarketAuctionListings,
     getContentMarketCollections,
@@ -33,6 +34,7 @@ import {
     signStreamingRightsDeal,
 } from './streamingRightsMarketplace';
 import { registerProductionStreamingRightsContract } from './streamingRightsCore';
+import { resolveStreamingRightsCompatibility } from './streamingRightsCompatibility';
 import { resolveStreamingOperatorBrand } from './streamingPlatformBrandRegistry';
 import { normalizeStreamingPlatformEcosystem } from './streamingPlatformEcosystem';
 import { resolveStreamingOfferRevision } from './streamingOfferRevisionIntelligence';
@@ -89,8 +91,13 @@ const upsertSession = (
 ): Player => {
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     const sessions = [...platform.buyerAuctionSessions.filter(item => item.id !== session.id), session];
+    const snapshot = session.lot.listingKind === 'CATALOGUE_PACKAGE' ? player.world.streamingCataloguePackages?.[session.lot.listingId] : null;
+    const releaseSnapshot = session.status !== 'LIVE' && snapshot?.biddingSessionId === session.id && snapshot.lifecycle !== 'SIGNED';
     return {
         ...player,
+        ...(releaseSnapshot ? {world:{...player.world,streamingCataloguePackages:{...player.world.streamingCataloguePackages,
+            [snapshot.id]:{...snapshot,lifecycle:session.status === 'INVALIDATED' ? 'INVALIDATED' as const : 'WITHDRAWN' as const},
+        }}}:{}),
         ownedStreamingPlatform: compactOwnedStreamingPlatformForPersistence({
             ...platform,
             ...additionalPlatformPatch,
@@ -239,11 +246,26 @@ export const getStreamingBuyerAuctionLots = (
     return [...titleLots, ...packageLots, ...getStreamingUpcomingRightsAuctionLots(player)];
 };
 
+/** New offers use current service/territory and the source title's actual licensed modes. */
+const getAuctionSourceAccessGrant = (player: Player, lot: StreamingBuyerAuctionLot) => {
+    const sourceLicense = lot.sourceLicenseId ? player.ownedStreamingPlatform.catalogLicenses.find(row => row.id === lot.sourceLicenseId) : null;
+    const sourceContract = lot.sourceLicenseId ? Object.values(player.world.streamingRightsContracts || {}).find(row => row.id === lot.sourceLicenseId) : null;
+    const listing = lot.listingKind === 'TITLE' && !lot.upcomingRightsSaleId
+        ? getContentMarketListings(player).find(row => row.id === lot.listingId) : null;
+    return sourceLicense?.accessGrant || sourceContract?.accessGrant || listing?.terms.accessGrant;
+};
+
+export const getStreamingBuyerAuctionBackendCapability = (player: Player, lot: StreamingBuyerAuctionLot, platformId: string | null = null) => {
+    const capability = getStreamingBuyerBackendCapability(player,platformId,getAbsoluteWeek(player.age,player.currentWeek),lot.countryIds,getAuctionSourceAccessGrant(player,lot));
+    return lot.windowType === 'PERMANENT' ? {advertising:false,rental:false,eligibleRevenueFraction:0} : capability;
+};
+
 const buildRivals = (player: Player, lot: StreamingBuyerAuctionLot, sessionId: string): StreamingBuyerAuctionRival[] => {
     const acquired = new Set(normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id).corporateDevelopment.acquiredPlatformIds);
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
     const ecosystem = normalizeStreamingPlatformEcosystem(player.world.streamingPlatformEcosystem, absoluteWeek);
     const lotCountries = new Set(lot.countryIds);
+    const sourceGrant = getAuctionSourceAccessGrant(player,lot);
     return Object.values(ecosystem.operators)
         .filter(operator => !acquired.has(operator.id as PlatformId)
             && (operator.lifecycle === 'ACTIVE' || operator.lifecycle === 'DISTRESSED')
@@ -267,6 +289,8 @@ const buildRivals = (player: Player, lot: StreamingBuyerAuctionLot, sessionId: s
                 lot.referenceValue * (0.35 + strategicFit * 0.85 + rng() * 0.25) * distressMultiplier,
             ));
             const brand = resolveStreamingOperatorBrand(operator.id, operator.name, operator.brand);
+            const backendCapability = lot.windowType === 'PERMANENT' ? {advertising:false,rental:false,eligibleRevenueFraction:0}
+                : getStreamingBuyerBackendCapability(player,operator.id,absoluteWeek,lot.countryIds,sourceGrant);
             return {
                 bidderId: `ai-platform:${operator.id}`,
                 platformId: operator.id,
@@ -274,8 +298,8 @@ const buildRivals = (player: Player, lot: StreamingBuyerAuctionLot, sessionId: s
                 color: brand.primaryColor,
                 cashAvailable,
                 sellerValueCeiling,
-                eligibleBackendRevenueFraction: getStreamingBuyerBackendCapability(player,operator.id,absoluteWeek,lot.countryIds).eligibleRevenueFraction,
-                preferredBackend: streamingBackendPercentForBuyer(player,operator.id,absoluteWeek,Math.round(clamp(2+rng()*7,lot.allowedTerms.backendMinimum,lot.allowedTerms.backendMaximum)),lot.countryIds),
+                eligibleBackendRevenueFraction: backendCapability.eligibleRevenueFraction,
+                preferredBackend: backendCapability.eligibleRevenueFraction > 0 ? Math.round(clamp(2+rng()*7,lot.allowedTerms.backendMinimum,lot.allowedTerms.backendMaximum)) : 0,
                 marketingLimit: money(Math.min(lot.allowedTerms.marketingMaximum, lot.referenceValue * (0.03 + rng() * 0.12))),
                 nextActionSecond: 0,
                 revision: 0,
@@ -348,13 +372,13 @@ export const openStreamingBuyerAuction = (
     nowMs = Date.now(),
 ): StreamingBuyerAuctionActionResult => {
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+    const existing = platform.buyerAuctionSessions.find(session => session.lot.id === lotId);
+    if (existing) return { player, changed: false, session: existing, reason: existing.status === 'LIVE' ? undefined : 'NOT_LIVE' };
+    player = prepareContentMarketDiscovery(player);
     const lot = getStreamingBuyerAuctionLots(player).find(candidate => candidate.id === lotId);
     if (!lot) return { player, changed: false, reason: 'NOT_FOUND', detail: 'This auction lot is no longer available.' };
-    const existing = platform.buyerAuctionSessions.find(session => session.lot.id === lot.id);
-    if (existing) return { player, changed: false, session: existing, reason: existing.status === 'LIVE' ? undefined : 'NOT_LIVE' };
     const sessionId = createDeterministicId('streaming_buyer_auction', platform.simulationSeed, lot.id);
     const rivals = buildRivals(player, lot, sessionId);
-    if (rivals.length < 2) return { player, changed: false, reason: 'NOT_FOUND', detail: 'Not enough funded buyers entered this auction.' };
     let session: StreamingBuyerAuctionSession = {
         id: sessionId,
         idempotencyKey: `streaming-buyer-auction:${lot.id}`,
@@ -379,12 +403,13 @@ export const openStreamingBuyerAuction = (
         outcomeMessageId: null,
     };
     const openingRival = rivals[rivals.length - 1];
-    const openingRng = createDeterministicRng(`${session.id}:${openingRival.platformId}:opening-posture`);
-    const openingBid = buildRivalBid(session, openingRival, Math.min(
+    if (openingRival) {
+        const openingRng = createDeterministicRng(`${session.id}:${openingRival.platformId}:opening-posture`);
+        const openingBid = buildRivalBid(session, openingRival, Math.min(
         openingRival.sellerValueCeiling,
         lot.reserveSellerValue * (0.28 + openingRng() * 0.38),
     ));
-    session = withLeader({
+        session = withLeader({
         ...session,
         bids: [openingBid],
         events: [...session.events, auctionEvent(session.id, 'RIVAL_BID', 0, openingRival.bidderId, openingBid.id, 1)],
@@ -392,6 +417,14 @@ export const openStreamingBuyerAuction = (
             ? { ...rival, status: 'ACTIVE', revision: 1, currentBidId: openingBid.id, nextActionSecond: RIVAL_COOLDOWN_SECONDS }
             : rival),
     });
+    }
+    if (lot.listingKind === 'CATALOGUE_PACKAGE') {
+        const collection = getContentMarketCollections(player).find(item => item.id === lot.listingId);
+        if (!collection || collection.signature !== lot.listingSignature) return {player,changed:false,reason:'RIGHTS_UNAVAILABLE',detail:'The complete collection is no longer available.'};
+        player = {...player,world:{...player.world,streamingCataloguePackages:{...player.world.streamingCataloguePackages,
+            [collection.id]:{...collection.package,biddingSessionId:session.id},
+        }}};
+    }
     return { player: upsertSession(player, session), changed: true, session };
 };
 
@@ -464,7 +497,7 @@ export const placeStreamingBuyerAuctionBid = (
         productionFunding: money(rawTerms.productionFunding || 0),
         futureFunding: rawTerms.futureFunding ? {...rawTerms.futureFunding} : undefined,
     };
-    const capability = getStreamingBuyerBackendCapability(player,null,getAbsoluteWeek(player.age,player.currentWeek),session.lot.countryIds);
+    const capability = getStreamingBuyerAuctionBackendCapability(player,session.lot);
     const termsError = validateNewStreamingBackendTerms({...rawTerms,referenceFee:session.lot.referenceValue,capability});
     if (termsError) return {player,changed:false,session,reason:'INVALID_TERMS',detail:termsError};
     const allowed = session.lot.allowedTerms;
@@ -477,7 +510,6 @@ export const placeStreamingBuyerAuctionBid = (
         || !Number.isFinite(Number(rawTerms.productionFunding || 0))
         || Number(rawTerms.productionFunding || 0) < 0
         || terms.minimumGuarantee < session.lot.minimumGuarantee
-        || terms.minimumGuarantee > session.lot.referenceValue * 2.5
         || terms.licensorRevenueShare < allowed.backendMinimum
         || terms.licensorRevenueShare > allowed.backendMaximum
         || terms.marketingGuarantee < 0
@@ -486,7 +518,7 @@ export const placeStreamingBuyerAuctionBid = (
     ) return { player, changed: false, session, reason: 'INVALID_TERMS', detail: 'One or more terms fall outside the seller’s auction rules.' };
     const future = terms.futureFunding;
     if (future && (
-        !['NEW_ORIGINAL', 'SEQUEL', 'NEXT_SEASON'].includes(future.kind)
+        !['SEQUEL', 'NEXT_SEASON'].includes(future.kind)
         || (future.kind === 'SEQUEL' && session.lot.projectType !== 'MOVIE')
         || (future.kind === 'NEXT_SEASON' && session.lot.projectType !== 'SERIES')
         || !Number.isInteger(future.count) || future.count < 1 || future.count > 3
@@ -495,8 +527,11 @@ export const placeStreamingBuyerAuctionBid = (
         || !['FIRM', 'OPTION'].includes(future.commitment)
         || future.deadlineWeeks !== 52
         || !Number.isInteger(future.platformRightsPercent) || future.platformRightsPercent < 1 || future.platformRightsPercent > 100
-    )) return {player, changed:false, session, reason:'INVALID_TERMS', detail:'Choose a valid future production, budget, rights share and 52-week deadline.'};
-    terms.futureFunding = normalizeAuctionFutureFunding(terms.futureFunding);
+    )) return {player, changed:false, session, reason:'INVALID_TERMS', detail:'Future funding must be a sequel to this film or the next season of this series, with a valid budget, rights share and 52-week deadline.'};
+    terms.futureFunding = normalizeAuctionFutureFunding(terms.futureFunding ? {
+        ...terms.futureFunding,
+        ...resolveAuctionContinuation(player,session.lot.sourceProjectId,session.lot.title,session.lot.projectType),
+    } : undefined);
     const guaranteedExposure = terms.minimumGuarantee + terms.productionFunding
         + (future?.commitment === 'FIRM' ? future.count * future.budgetPerProject : 0);
     const existingCommitment = platform.costCommitments.find(item => item.sourceReferenceId === session.id && item.status === 'COMMITTED');
@@ -648,7 +683,7 @@ const finishPlayerWin = (
     if (session.lot.listingKind === 'CATALOGUE_PACKAGE') {
         const collection = getContentMarketCollections(staged, session.lot.listingId).find(item => item.id === session.lot.listingId);
         if (!collection || collection.signature !== session.lot.listingSignature) {
-            const invalid = { ...session, status: 'INVALIDATED' as const, resultReason: 'The collection changed before settlement. Your commitment was released.' };
+            const invalid = { ...session, status: 'INVALIDATED' as const, resultReason: 'The complete saved collection snapshot is unavailable or changed. Your commitment was released.' };
             return { player: upsertSession(staged, invalid), changed: true, session: invalid, reason: 'RIGHTS_UNAVAILABLE' };
         }
         const signedPackage = signOwnedStreamingCataloguePackage(staged, collection.id, {
@@ -698,7 +733,7 @@ const finishPlayerWin = (
         }
         signedPlayer = settled.player;
     } else {
-        const listing = getContentMarketListings(staged).find(item => item.id === session.lot.listingId);
+        const listing = getContentMarketListings(staged, session.lot.listingId).find(item => item.id === session.lot.listingId);
         if (!listing || listing.signature !== session.lot.listingSignature) {
             const invalid = { ...session, status: 'INVALIDATED' as const, resultReason: 'The rights changed before settlement. Your commitment was released.' };
             return { player: upsertSession(staged, invalid), changed: true, session: invalid, reason: 'RIGHTS_UNAVAILABLE' };
@@ -712,7 +747,7 @@ const finishPlayerWin = (
             viewershipBonusThreshold:0, viewershipBonusAmount:0,
             renewalOption:false, sublicensingAllowed:false, sequelRightsIncluded:false,
             cancellationPenalty:0,
-        });
+        }, session.id);
         if (!opened.changed || !opened.negotiation) {
             const invalid = { ...session, status: 'INVALIDATED' as const, resultReason: opened.detail || 'The rights became unavailable before settlement.' };
             return { player: upsertSession(staged, invalid), changed: true, session: invalid, reason: 'RIGHTS_UNAVAILABLE' };
@@ -855,20 +890,44 @@ const finishAiWin = (
         return {player:upsertSession(player,invalid,{costCommitments:terminalCommitments(player,session,'CANCELLED')}),changed:true,session:invalid,reason:'INVALID_TERMS'};}
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
     if (session.lot.listingKind === 'CATALOGUE_PACKAGE' && winner.platformId) {
-        const collection = getContentMarketCollections(player).find(item => item.id === session.lot.listingId);
+        const collection = getContentMarketCollections(player, session.lot.listingId).find(item => item.id === session.lot.listingId);
         if (!collection || collection.signature !== session.lot.listingSignature) {
-            const invalid = { ...session, status: 'INVALIDATED' as const, resultReason: 'The collection changed before settlement. Your commitment was released.' };
+            const invalid = { ...session, status: 'INVALIDATED' as const, resultReason: 'The complete saved collection snapshot is unavailable or changed. Your commitment was released.' };
             return { player: upsertSession(player, invalid, { costCommitments: terminalCommitments(player, session, 'CANCELLED') }), changed: true, session: invalid, reason: 'RIGHTS_UNAVAILABLE' };
         }
         const originalTotal = Math.max(1, collection.rows.reduce((sum, row) => sum + row.minimumGuarantee, 0));
+        const operator = normalizeStreamingPlatformEcosystem(player.world.streamingPlatformEcosystem,absoluteWeek).operators[winner.platformId];
+        if (!operator || !['ACTIVE','DISTRESSED'].includes(operator.lifecycle) || operator.cashMillions * 1_000_000 < winner.guaranteedExposure) {
+            const invalid = {...session,status:'INVALIDATED' as const,resultReason:'The winning buyer no longer has the cash to fund the complete collection. Your commitment was released.'};
+            return {player:upsertSession(player,invalid,{costCommitments:terminalCommitments(player,session,'CANCELLED')}),changed:true,session:invalid,reason:'INSUFFICIENT_TREASURY'};
+        }
         let allocated = 0;
+        const fundedRows = collection.rows.map((row,index) => {
+            const guarantee = index === collection.rows.length - 1 ? Math.max(0,winner.minimumGuarantee-allocated)
+                : Math.floor((winner.minimumGuarantee*row.minimumGuarantee/originalTotal)/100_000)*100_000;
+            allocated += guarantee;
+            return {...row,minimumGuarantee:guarantee,licensorRevenueShare:winner.licensorRevenueShare,platformRevenueShare:100-winner.licensorRevenueShare};
+        });
+        const effectiveStart = Math.max(absoluteWeek,collection.package.startsAtAbsoluteWeek);
+        for (const row of fundedRows) {
+            const original = collection.rows.find(item=>item.componentProjectId===row.componentProjectId)!;
+            const originalExpiry = collection.package.startsAtAbsoluteWeek + row.durationWeeks;
+            const termsError = validateNewStreamingBackendTerms({minimumGuarantee:row.minimumGuarantee,licensorRevenueShare:winner.licensorRevenueShare,
+                referenceFee:original.minimumGuarantee,capability:getStreamingBuyerBackendCapability(player,winner.platformId,absoluteWeek,row.countryIds)});
+            const compatibility = resolveStreamingRightsCompatibility({world:player.world,sourceProjectId:row.componentProjectId,
+                buyerPlatformId:winner.platformId,sellerPartyId:collection.package.seller.id,territory:row.territory,countryIds:row.countryIds,
+                startsAtAbsoluteWeek:effectiveStart,expiresAtAbsoluteWeek:originalExpiry,
+                windowType:row.windowType,exclusivity:row.exclusivity});
+            if (termsError || effectiveStart >= originalExpiry || !compatibility.available) {
+                const invalid = {...session,status:'INVALIDATED' as const,resultReason:termsError || (effectiveStart >= originalExpiry ? 'The original collection window has expired.' : compatibility.summary)};
+                return {player:upsertSession(player,invalid,{costCommitments:terminalCommitments(player,session,'CANCELLED')}),changed:true,session:invalid,reason:'RIGHTS_UNAVAILABLE'};
+            }
+        }
         let registeredPlayer = player;
         let registeredCount = 0;
-        collection.rows.forEach((row, index) => {
-            const guarantee = index === collection.rows.length - 1
-                ? Math.max(0, winner.minimumGuarantee - allocated)
-                : Math.floor((winner.minimumGuarantee * row.minimumGuarantee / originalTotal) / 100_000) * 100_000;
-            allocated += guarantee;
+        const componentContractIds: string[] = [];
+        fundedRows.forEach(row => {
+            const guarantee = row.minimumGuarantee;
             const component = collection.package.components.find(item => item.sourceProjectId === row.componentProjectId);
             if (!component) return;
             const result = registerProductionStreamingRightsContract(registeredPlayer, {
@@ -888,13 +947,14 @@ const finishAiWin = (
                 countryIds: row.countryIds,
                 exclusivity: row.exclusivity,
                 signedAtAbsoluteWeek: absoluteWeek,
-                startsAtAbsoluteWeek: collection.package.startsAtAbsoluteWeek,
-                durationWeeks: row.durationWeeks,
+                startsAtAbsoluteWeek: effectiveStart,
+                durationWeeks: collection.package.startsAtAbsoluteWeek + row.durationWeeks - effectiveStart,
                 windowType: row.windowType,
             });
             if (result.changed && result.contract) {
                 registeredPlayer = result.player;
                 registeredCount += 1;
+                componentContractIds.push(result.contract.id);
             }
         });
         if (registeredCount !== collection.rows.length) {
@@ -908,6 +968,10 @@ const finishAiWin = (
             bids: session.bids.map(bid => ({ ...bid, status: bid.id === winner.id ? 'WON' as const : 'LOST' as const })),
             events: [...session.events, auctionEvent(session.id, 'SETTLED', session.activeSecondsElapsed, winner.bidderId, winner.id, session.events.length)],
         };
+        registeredPlayer = {...registeredPlayer,world:{...registeredPlayer.world,streamingCataloguePackages:{...registeredPlayer.world.streamingCataloguePackages,
+            [collection.id]:{...collection.package,lifecycle:'SIGNED',signedAtAbsoluteWeek:absoluteWeek,totalGuarantee:winner.minimumGuarantee,
+                acceptedTerms:fundedRows,componentContractIds,totalExpectedExposure:winner.guaranteedExposure},
+        }}};
         const chargedPlayer = chargeAiAuctionWinner(registeredPlayer, winner);
         const result = {
             ...chargedPlayer,

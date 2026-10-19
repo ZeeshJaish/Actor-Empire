@@ -23,7 +23,7 @@ import { SequelSetupModal } from './components/SequelSetupModal';
 import { markGameCheckpoint } from '../../../services/firebaseService';
 import { discardUnreleasedScript, renameStudioProjectTitle } from '../../../services/projectNaming';
 import { getProjectReleaseLabel, getProjectReleaseSortValue, getProjectReleaseTiming } from '../../../services/releaseTiming';
-import { getReleaseDisplayPhase, getReleaseProgressWeek } from '../../../services/releasePresentation';
+import { getCommitmentDisplayPhase, getReleaseDisplayPhase, getReleaseProgressWeek } from '../../../services/releasePresentation';
 import { createContinuationScript, getContinuationEligibility, getContinuationScriptBaseline } from '../../../services/sequelFlow';
 import { suggestReturningBackendDemand } from '../../../services/talentParticipation';
 import { getStudioGroup, getStudioSaleTreasuryLock, getStudioLiquidationBlocker, performStudioTreasuryTransfer } from '../../../services/studioGroup';
@@ -891,7 +891,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
         if (commitment) {
             return {
                 ...commitment,
-                phase: commitment.projectDetails?.releaseStrategy ? 'PLANNED RELEASE' : 'AWAITING RELEASE',
+                phase: getCommitmentDisplayPhase(commitment),
             };
         }
         

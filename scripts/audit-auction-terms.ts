@@ -24,12 +24,13 @@ assert.equal(bid.session!.roomSecondsRemaining,5,'A valid late bid adds three us
 assert.equal(bid.session!.hardClosesAtSecond,48);
 const duplicate=placeStreamingBuyerAuctionBid(bid.player,session.id,terms,2001);
 assert.equal(duplicate.changed,false,'An unchanged bid cannot extend or create another revision');
-const funded={...terms,futureGreenlight:true,futureFunding:{kind:'NEW_ORIGINAL' as const,count:2,budgetPerProject:2_000_000,format:'ANIMATED' as const,commitment:'FIRM' as const,deadlineWeeks:52,platformRightsPercent:85}};
+const funded={...terms,futureGreenlight:true,futureFunding:{kind:(lot.projectType==='SERIES'?'NEXT_SEASON':'SEQUEL') as 'NEXT_SEASON'|'SEQUEL',count:2,budgetPerProject:2_000_000,format:'ANIMATED' as const,commitment:'FIRM' as const,deadlineWeeks:52,platformRightsPercent:85}};
 const future=placeStreamingBuyerAuctionBid(bid.player,session.id,funded,2002);
 assert.ok(future.changed);
 assert.equal(future.session!.bids.at(-1)!.guaranteedExposure,terms.minimumGuarantee+4_000_000);
 const roundtrip=normalizeOwnedStreamingPlatformState(JSON.parse(JSON.stringify(future.player.ownedStreamingPlatform)),future.player.id);
-assert.deepEqual(roundtrip.buyerAuctionSessions[0].bids.at(-1)!.futureFunding,funded.futureFunding);
+assert.deepEqual(roundtrip.buyerAuctionSessions[0].bids.at(-1)!.futureFunding,future.session!.bids.at(-1)!.futureFunding);
+assert.equal(roundtrip.buyerAuctionSessions[0].bids.at(-1)!.futureFunding!.parentProjectId,lot.sourceProjectId);
 const optional=placeStreamingBuyerAuctionBid(future.player,session.id,{...funded,futureFunding:{...funded.futureFunding,commitment:'OPTION'}},2003);
 assert.ok(optional.changed);
 assert.equal(optional.session!.bids.at(-1)!.guaranteedExposure,terms.minimumGuarantee);

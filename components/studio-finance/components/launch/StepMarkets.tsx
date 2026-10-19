@@ -60,12 +60,12 @@ export function StepMarkets({ data, draft, patch, chosen, handlers }: StepProps)
      North America goes from twenty-three cards to five. Africa from fifty-four
      to nine. The bloc survives as the badge on each card and as the thing the
      tail is grouped by — which is what it was actually for. */
-  const heroes = useMemo(() => inRegion.filter((c) => c.authored !== false).sort(bySize), [inRegion]);
+  const heroes = useMemo(() => inRegion.filter((c) => (c.featured ?? c.authored !== false)).sort(bySize), [inRegion]);
 
   const groups = useMemo(() => {
     const order: string[] = [];
     const byId = new Map<string, { id: string; name: string; countries: Country[] }>();
-    inRegion.filter((c) => c.authored === false).forEach((country) => {
+    inRegion.filter((c) => !(c.featured ?? c.authored !== false)).forEach((country) => {
       const id = country.subRegionId ?? country.region;
       if (!byId.has(id)) {
         byId.set(id, { id, name: country.subRegion ?? country.region, countries: [] });
@@ -111,7 +111,7 @@ export function StepMarkets({ data, draft, patch, chosen, handlers }: StepProps)
 
   /* One quote for one filing action, counting only markets not yet filed.
      Clearance and the transaction use the same canonical quote function. */
-  const energyFor = (countries: Country[]) => quoteStreamingMarketFilingEnergy(unfiled(countries).length);
+  const energyFor = (countries: Country[]) => quoteStreamingMarketFilingEnergy(unfiled(countries).map(country => country.id));
 
   return (
     <>
@@ -201,7 +201,7 @@ export function StepMarkets({ data, draft, patch, chosen, handlers }: StepProps)
                     {DIFFICULTY_LABEL[country.difficulty]}
                   </span>
                   {(clearanceByCountry.get(country.id) ?? 'NOT_FILED') === 'NOT_FILED' &&
-                    <span className="lw-chip is-plain">5E to file alone</span>}
+                    <span className="lw-chip is-plain">{quoteStreamingMarketFilingEnergy([country.id])}E to file</span>}
                 </div>
 
                 <div className="lw-country-actions">

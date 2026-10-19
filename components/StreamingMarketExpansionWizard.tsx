@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { ArrowLeft, BadgeCheck, Check, ChevronRight, Clock3, Film, Globe2, Landmark, LayoutGrid, Music2, Sparkles, WalletCards, X } from 'lucide-react';
 import type { Player, StreamingDefineLaunchStepId, StreamingIdentPackageId, StreamingSoundIdentKey } from '../types';
 import {
-  STREAMING_DAY_ONE_MARKETS,
+  STREAMING_WORLD_MARKETS,
   STREAMING_DAY_ONE_REGION_LABELS,
   STREAMING_DAY_ONE_REGION_ORDER,
   getStreamingCountryMarketProfile,
@@ -12,6 +12,8 @@ import {
 } from '../services/streamingDayOneMarkets';
 import {
   beginStreamingMarketClearance,
+  STREAMING_MARKET_REQUIREMENT_ENERGY,
+  STREAMING_MARKET_REAPPLICATION_ENERGY,
   getStreamingMarketClearanceView,
   resolveStreamingMarketRequirement,
   resumeStreamingMarketClearance,
@@ -25,6 +27,7 @@ import {
   saveStreamingStorefrontPlan,
   setStreamingDefineLaunchStep,
 } from '../services/streamingLaunchProgram';
+import { quoteStreamingMarketFilingEnergy } from '../services/streamingMarketFilingQuote';
 import { getAbsoluteWeek } from '../services/legacyLogic';
 import { getVisibleStreamingCompaniesForMarket } from '../services/streamingPlatformEcosystem';
 import { resolveStreamingPlatformBrandById } from '../services/streamingPlatformBrandRegistry';
@@ -66,12 +69,12 @@ const audience = (value: number) => value >= 1_000_000
 export default function StreamingDefineLaunchWizard({ player, onUpdatePlayer, onClose, onOpenFinance, onOpenCatalogue, onOpenBuild, onOpenPricing, mode = 'OPENING', initialStep }: Props) {
   const platform = player.ownedStreamingPlatform;
   const view = useMemo(() => getStreamingLaunchProgramView(player), [player]);
-  const [step, setStep] = useState<StreamingDefineLaunchStepId>(mode === 'EXPANSION' ? 'MARKETS' : initialStep || platform.launchProgram.defineCurrentStep || 'FUND');
+  const [step, setStep] = useState<StreamingDefineLaunchStepId>(initialStep || (mode === 'EXPANSION' ? 'MARKETS' : platform.launchProgram.defineCurrentStep || 'FUND'));
   const existingOpeningIds = platform.marketOperations
     .filter(operation => operation.entryKind === mode && operation.countryId && operation.status !== 'EXITED')
     .map(operation => operation.countryId!);
   const [selectedMarketIds, setSelectedMarketIds] = useState<string[]>(existingOpeningIds);
-  const [region, setRegion] = useState(STREAMING_DAY_ONE_REGION_ORDER.find(id => STREAMING_DAY_ONE_MARKETS.some(market => market.regionId === id && selectedMarketIds.includes(market.id))) || 'NORTH_AMERICA');
+  const [region, setRegion] = useState(STREAMING_DAY_ONE_REGION_ORDER.find(id => STREAMING_WORLD_MARKETS.some(market => market.regionId === id && selectedMarketIds.includes(market.id))) || 'NORTH_AMERICA');
   const [soundIdentKey, setSoundIdentKey] = useState<StreamingSoundIdentKey>(platform.serviceConfiguration.soundIdentKey || 'PULSE');
   const [identPackageId, setIdentPackageId] = useState<StreamingIdentPackageId>(platform.serviceConfiguration.identPackageId || 'STANDARD');
   const [storefrontLayoutId, setStorefrontLayoutId] = useState(platform.serviceConfiguration.storefrontLayoutId || 'CINEMA');
@@ -81,12 +84,16 @@ export default function StreamingDefineLaunchWizard({ player, onUpdatePlayer, on
   const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
   const currentIndex = STEPS.findIndex(item => item.id === step);
   const marketOperations = platform.marketOperations.filter(operation => operation.entryKind === mode && operation.status !== 'EXITED');
+  const unfiled = marketOperations.filter(operation => ['PLANNED', 'AWAITING_FUNDING'].includes(operation.status)
+    && operation.clearance?.outcome !== 'ADDITIONAL_REQUIREMENT');
+  const filingEnergy = quoteStreamingMarketFilingEnergy(unfiled.map(operation => operation.countryId!));
+  const filingCash = unfiled.reduce((sum, operation) => sum + operation.plannedCosts.total, 0);
   const plannedMarketCost = selectedMarketIds.reduce((sum, id) => {
-    const market = STREAMING_DAY_ONE_MARKETS.find(item => item.id === id);
+    const market = STREAMING_WORLD_MARKETS.find(item => item.id === id);
     return sum + (market?.openingRightsEstimate || 0) + getStreamingMarketEntryProfile(id).plannedOverheadEstimate;
   }, 0);
   const selectedMarketSummary = summarizeStreamingDayOneMarkets(selectedMarketIds);
-  const regionMarketIds = STREAMING_DAY_ONE_MARKETS.filter(market => market.regionId === region).map(market => market.id);
+  const regionMarketIds = STREAMING_WORLD_MARKETS.filter(market => market.regionId === region).map(market => market.id);
   const selectedRegionIds = selectedMarketIds.filter(id => regionMarketIds.includes(id));
   const selectedRegionSummary = summarizeStreamingDayOneMarkets(selectedRegionIds);
 
@@ -100,7 +107,7 @@ export default function StreamingDefineLaunchWizard({ player, onUpdatePlayer, on
   const back = () => currentIndex > 0 ? go(STEPS[currentIndex - 1].id) : onClose();
   const toggleMarket = (id: string) => setSelectedMarketIds(current => current.includes(id) ? current.filter(item => item !== id) : [...current, id]);
   const addAllRegionMarkets = () => {
-    const availableIds = STREAMING_DAY_ONE_MARKETS
+    const availableIds = STREAMING_WORLD_MARKETS
       .filter(market => market.regionId === region)
       .filter(market => !platform.marketOperations.some(operation => operation.entryKind !== mode && operation.countryId === market.id && operation.status !== 'EXITED'))
       .map(market => market.id);
@@ -116,9 +123,10 @@ export default function StreamingDefineLaunchWizard({ player, onUpdatePlayer, on
     setFeedback(`${mode === 'OPENING' ? 'Opening-market' : 'Expansion'} plan saved. No money has moved.`);
   };
 
-  const beginClearance = () => {
-    const result = beginStreamingMarketClearance(player, selectedMarketIds, mode);
+  const beginClearance = (countryIds: string[]) => {
+    const result = beginStreamingMarketClearance(player, countryIds, mode);
     onUpdatePlayer(result.player);
+    if (result.reason === 'INSUFFICIENT_ENERGY') return setFeedback(`${result.shortfall}E short. File affordable countries individually or return after restoring energy.`);
     if (result.reason === 'INSUFFICIENT_TREASURY') return setFeedback(`Company treasury is short by ${money(result.shortfall)}. Fund it in Studio Finance.`);
     if (!result.changed) return setFeedback('These markets are already in review or cleared.');
     setFeedback(`${money(result.amount)} paid. Government review is now running in parallel.`);
@@ -127,6 +135,7 @@ export default function StreamingDefineLaunchWizard({ player, onUpdatePlayer, on
   const resolveRequirement = (operationId: string) => {
     const result = resolveStreamingMarketRequirement(player, operationId);
     if (result.reason === 'INSUFFICIENT_TREASURY') return setFeedback(`Company treasury is short by ${money(result.shortfall)}. Fund it in Studio Finance.`);
+    if (result.reason === 'INSUFFICIENT_ENERGY') return setFeedback(`${result.shortfall}E short for this follow-up.`);
     if (!result.changed) return setFeedback('This government request is no longer actionable.');
     onUpdatePlayer(result.player);
     setFeedback(`${money(result.amount)} paid. The revised filing is back in review.`);
@@ -134,6 +143,7 @@ export default function StreamingDefineLaunchWizard({ player, onUpdatePlayer, on
 
   const reapply = (operationId: string) => {
     const result = resumeStreamingMarketClearance(player, operationId);
+    if (result.reason === 'INSUFFICIENT_ENERGY') return setFeedback(`${result.shortfall}E short to refile.`);
     if (result.reason === 'TOO_EARLY') return setFeedback('The cooling period is still active. Advance the game week and return here.');
     if (!result.changed) return setFeedback('This file cannot be resubmitted yet.');
     onUpdatePlayer(result.player);
@@ -173,7 +183,7 @@ export default function StreamingDefineLaunchWizard({ player, onUpdatePlayer, on
       <div className="dlw-region-tabs">{STREAMING_DAY_ONE_REGION_ORDER.map(id => <button key={id} className={region === id ? 'is-active' : ''} onClick={() => setRegion(id)}>{STREAMING_DAY_ONE_REGION_LABELS[id]}</button>)}</div>
       <div className="dlw-market-region-head"><span><small>MARKET VIEW</small><b>{STREAMING_DAY_ONE_REGION_LABELS[region]}</b></span><button type="button" onClick={addAllRegionMarkets}>ADD ALL {regionMarketIds.length}</button></div>
       <p className="dlw-market-guide">Swipe through the countries. Review the audience, rivals, rights, languages and government terms before adding them.</p>
-      <div className="dlw-market-rail">{STREAMING_DAY_ONE_MARKETS.filter(market => market.regionId === region).map(market => {
+      <div className="dlw-market-rail">{STREAMING_WORLD_MARKETS.filter(market => market.regionId === region).map(market => {
         const selected = selectedMarketIds.includes(market.id);
         const alreadyOperating = platform.marketOperations.some(operation => operation.entryKind !== mode && operation.countryId === market.id && operation.status !== 'EXITED');
         const profile = getStreamingMarketEntryProfile(market.id);
@@ -184,7 +194,7 @@ export default function StreamingDefineLaunchWizard({ player, onUpdatePlayer, on
           <div className="dlw-market-hero">
             <StreamingCountryFlagArt marketId={market.id} className="dlw-market-art" /><span className="dlw-market-shade" />
             <span className="dlw-market-check">{alreadyOperating ? <BadgeCheck size={14} /> : selected ? <Check size={14} /> : '+'}</span>
-            <div className="dlw-market-title"><small>{alreadyOperating ? 'ALREADY OPERATING' : `${market.competition} MARKET`}</small><strong>{market.country}</strong><em>{market.id} · {market.launchDifficulty} LAUNCH</em></div>
+            <div className="dlw-market-title"><small>{alreadyOperating ? 'ALREADY OPERATING' : `${market.competition} MARKET`}</small><strong>{market.country}</strong><em>{market.id} · {market.launchDifficulty} LAUNCH · {quoteStreamingMarketFilingEnergy([market.id])}E</em></div>
           </div>
           <div className="dlw-market-audience"><div><strong>{audience(market.streamingAudience)}</strong><span>STREAMING VIEWERS</span></div><div><strong>+{market.annualGrowthPercent}%</strong><span>YEARLY GROWTH</span></div></div>
           <p className="dlw-market-note">{market.marketNote}</p>
@@ -217,26 +227,39 @@ export default function StreamingDefineLaunchWizard({ player, onUpdatePlayer, on
     if (step === 'CLEARANCE') return <>
       <span className="dlw-kicker">MISSION 03 · GOVERNMENT REVIEW</span><h2>Clear every opening market.</h2><p>Rights access and regulatory setup are paid now. Review takes 4–6 game weeks, but the rest of both launch missions stays open.</p>
       <div className="dlw-clear-list">{marketOperations.length ? marketOperations.map(operation => {
-        const market = STREAMING_DAY_ONE_MARKETS.find(item => item.id === operation.countryId);
+        const market = STREAMING_WORLD_MARKETS.find(item => item.id === operation.countryId);
         const profile = operation.countryProfile;
         const clearance = getStreamingMarketClearanceView(operation, absoluteWeek);
         const stages = ['APPLICATION_FILED', 'RIGHTS_VERIFICATION', 'REGULATORY_REVIEW', 'CONSUMER_DATA_COMPLIANCE', 'FINAL_APPROVAL'];
         const currentStage = clearance.stage ? stages.indexOf(clearance.stage) : -1;
         return <article className={`dlw-clear-file is-${operation.status.toLowerCase()}`} key={operation.id}>
           <header><StreamingCountryFlagArt marketId={operation.countryId || ''} /><span><small>{operation.entryKind === 'OPENING' ? 'OPENING FILE' : 'EXPANSION FILE'}</small><b>{profile?.country || market?.country || operation.scopeId}</b></span><em>{operation.status.replaceAll('_', ' ')}</em></header>
+          {unfiled.some(item => item.id === operation.id) && <button
+            disabled={player.energy.current < quoteStreamingMarketFilingEnergy([operation.countryId!]) || platform.treasuryCash < operation.plannedCosts.total}
+            onClick={() => beginClearance([operation.countryId!])}>
+            File {profile?.country || market?.country || operation.scopeId} · {money(operation.plannedCosts.total)} · {quoteStreamingMarketFilingEnergy([operation.countryId!])}E
+          </button>}
           {operation.clearance ? <>
             <div className="dlw-clear-stage"><span><b>{clearance.stageLabel}</b><small>{clearance.outcome && clearance.outcome !== 'PENDING' ? clearance.outcome.replaceAll('_', ' ') : clearance.remainingWeeks === 0 ? 'Decision due' : `${clearance.remainingWeeks ?? '—'} weeks remaining`}</small></span><strong>{Math.round(clearance.progressPercent)}%</strong></div>
             <div className="dlw-clear-progress"><i style={{ width: `${clearance.progressPercent}%` }} /></div>
             <div className="dlw-clear-dots">{stages.map((stageName, index) => <i key={stageName} className={index <= currentStage ? 'is-done' : ''} title={stageName.replaceAll('_', ' ')} />)}</div>
             {clearance.condition && <p>{clearance.condition}</p>}
-            {clearance.actionRequired === 'PAY_REQUIREMENT' && <button onClick={() => resolveRequirement(operation.id)}>SUBMIT REQUIREMENT · {money(clearance.additionalPayment)}</button>}
-            {clearance.actionRequired === 'REAPPLY' && <button onClick={() => reapply(operation.id)}>FILE REVISED APPLICATION</button>}
+            {clearance.actionRequired === 'PAY_REQUIREMENT' && <button disabled={player.energy.current < STREAMING_MARKET_REQUIREMENT_ENERGY || platform.treasuryCash < clearance.additionalPayment} onClick={() => resolveRequirement(operation.id)}>SUBMIT REQUIREMENT · {money(clearance.additionalPayment)} · {STREAMING_MARKET_REQUIREMENT_ENERGY}E</button>}
+            {clearance.actionRequired === 'REAPPLY' && <button disabled={player.energy.current < STREAMING_MARKET_REAPPLICATION_ENERGY || (operation.clearance?.resumeAllowedAtAbsoluteWeek || 0) > absoluteWeek} onClick={() => reapply(operation.id)}>FILE REVISED APPLICATION · {STREAMING_MARKET_REAPPLICATION_ENERGY}E</button>}
           </> : <div className="dlw-clear-preview"><span>{profile?.complianceRequirements.slice(0, 2).join(' · ') || getStreamingMarketEntryProfile(operation.countryId || '').clearances.join(' · ')}</span><b>{money(operation.plannedCosts.total)}</b></div>}
           <details><summary>Country terms <span>＋</span></summary><div><b>{profile?.taxBaselinePercent ?? 0}% tax · {profile?.streamingLevyBaselinePercent ?? 0}% levy</b><small>{profile?.localContentObligationPercent ?? 0}% local-content obligation · {profile?.privacyComplianceLevel || 'STANDARD'} privacy</small><small>{profile?.languageDistribution.map(language => `${language.language} ${language.audiencePercent}%`).join(' · ')}</small></div></details>
         </article>;
       }) : <div className="dlw-empty">Choose and save Opening Markets first.</div>}</div>
       <div className="dlw-callout"><Clock3 size={18} /><span><b>Parallel work stays open</b><small>Ident, storefront, catalogue and infrastructure can progress during review.</small></span></div>
-      {marketOperations.some(operation => ['PLANNED', 'AWAITING_FUNDING'].includes(operation.status) && operation.clearance?.outcome !== 'ADDITIONAL_REQUIREMENT') && <button className="dlw-primary" onClick={beginClearance}>BEGIN MARKET ENTRY · {money(marketOperations.filter(operation => ['PLANNED', 'AWAITING_FUNDING'].includes(operation.status) && operation.clearance?.outcome !== 'ADDITIONAL_REQUIREMENT').reduce((sum, operation) => sum + operation.plannedCosts.total, 0))}</button>}
+      {unfiled.length > 0 && <>
+        <button className="dlw-primary" disabled={player.energy.current < filingEnergy || platform.treasuryCash < filingCash}
+          onClick={() => beginClearance(unfiled.map(operation => operation.countryId!))}>
+          {player.energy.current < filingEnergy ? `${filingEnergy - player.energy.current}E short to file all ${unfiled.length}`
+            : platform.treasuryCash < filingCash ? `${money(filingCash - platform.treasuryCash)} short to file all ${unfiled.length}`
+            : `File all ${unfiled.length} · ${money(filingCash)} · ${filingEnergy}E`}
+        </button>
+        <p>File countries individually when the full batch exceeds your energy or treasury. Submitted reviews continue independently.</p>
+      </>}
       {mode === 'OPENING' ? <button className="dlw-text" onClick={() => go('IDENTITY')}>Continue while review runs <ChevronRight size={15} /></button> : <button className="dlw-text" onClick={onClose}>Return to Audience <ChevronRight size={15} /></button>}
     </>;
 

@@ -51,12 +51,12 @@ export function StepClearance({ data, draft, chosen, free, handlers }: StepProps
   const needsYou = states.filter((s) => NEEDS_PLAYER.includes(s)).length;
   const unfiled = chosen.filter((c) => stateOf(c.id).outcome === 'NOT_FILED');
   const due = unfiled.reduce((sum, c) => sum + c.rightsEstimate + c.complianceCost, 0);
-  const filingEnergy = quoteStreamingMarketFilingEnergy(unfiled.length);
-  const singleFilingEnergy = quoteStreamingMarketFilingEnergy(1);
+  const filingEnergy = quoteStreamingMarketFilingEnergy(unfiled.map(country => country.id));
   const short = Math.max(0, due - free);
 
   const active = chosen.find((c) => c.id === openId) ?? chosen[0];
   const state = stateOf(active.id);
+  const singleFilingEnergy = quoteStreamingMarketFilingEnergy([active.id]);
   const outcome = OUTCOME[state.outcome];
   const stageIndex = CLEARANCE_STAGES.findIndex((s) => s.id === state.stage);
   const walking = state.outcome !== 'NOT_FILED';

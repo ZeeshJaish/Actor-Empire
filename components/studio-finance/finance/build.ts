@@ -576,7 +576,7 @@ export interface RehearsalResult {
   failed: string[];
   /** Per country and per room, so a verdict can be argued with. */
   countries: Array<{ name: string; code: string; demand: number; failedPct: number; state: ServiceState }>;
-  rooms: Array<{ city: string; load: number; limiting: Limiting; failedPct: number }>;
+  rooms: Array<{ id?: string; city: string; load: number; limiting: Limiting; failedPct: number }>;
 }
 
 /* --- the whole thing ------------------------------------------------------------- */

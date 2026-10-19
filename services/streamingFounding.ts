@@ -443,3 +443,9 @@ export const incorporateOwnedStreamingPlatform = (
         })),
     };
 };
+
+/** Credits come only from the founder's real released work. */
+export const getStreamingFounderCredits = (player: Pick<Player, 'pastProjects' | 'activeReleases'>): string[] => [...new Set([
+    ...(player.activeReleases || []).map(project => project.projectDetails?.title),
+    ...(player.pastProjects || []).map(project => project.name),
+].filter((title): title is string => Boolean(title?.trim())))].slice(0, 3);

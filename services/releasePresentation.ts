@@ -29,3 +29,13 @@ export const getReleaseProgressWeek = (project: {
     }
     return week(project.weekNum) || week(project.projectDetails?.weekNum);
 };
+
+/** A release plan never replaces the stage of an unfinished production. */
+export const getCommitmentDisplayPhase = (project: { projectPhase?: string; projectDetails?: { releaseStrategy?: unknown } }): string => {
+    const phase = project.projectPhase;
+    if (phase === 'PRE_PRODUCTION' || phase === 'AUDITION') return 'PRE-PRODUCTION';
+    if (phase === 'PRODUCTION') return 'PRODUCTION';
+    if (phase === 'POST_PRODUCTION') return 'POST-PRODUCTION';
+    if (phase === 'PLANNING' || phase === 'DEVELOPMENT') return 'PLANNING';
+    return project.projectDetails?.releaseStrategy ? 'PLANNED RELEASE' : 'AWAITING RELEASE';
+};

@@ -188,7 +188,9 @@ export function FlagField({ code, src, variant = 'icon' }: Props) {
         {/* Large cards use the original cinematic field only. The supplied SVG
             is deliberately reserved for compact selectors and Language, where
             its native flag-card proportions belong. */}
-        {needsWideField ? (
+        {key === 'PK' || key === 'BD' ? (
+          <CountryFlagSvg code={key} className="sf-flag sf-flag--field-base" fit="stretch" />
+        ) : needsWideField ? (
           <span className={`sf-flag-wide-field sf-flag-wide-field--${key.toLowerCase()}`}>
             {key !== 'KE' && <span className="sf-flag-wide-field__roundel" />}
           </span>

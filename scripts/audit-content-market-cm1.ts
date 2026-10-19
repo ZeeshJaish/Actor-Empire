@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { contentMarketFixture } from './helpers/contentMarketFixture';
 import { getContentMarketListings, getContentMarketCollections, purchaseContentMarketListing, purchaseContentMarketCollection,
-    getContentMarketOwnedTitles, linkContentMarketOwnedTitles, getContentMarketAuctionCollections } from '../services/streamingContentMarket';
+    getContentMarketOwnedTitles, linkContentMarketOwnedTitles, getContentMarketAuctionCollections, getContentMarketAuctionAssignments } from '../services/streamingContentMarket';
 import { getStreamingContentAvailability } from '../services/streamingContentAvailability';
 import { getAbsoluteWeek } from '../services/legacyLogic';
 import { normalizeOwnedStreamingPlatformState } from '../services/ownedStreamingPlatform';
@@ -22,7 +22,11 @@ assert.ok(p.ownedStreamingPlatform.starterCatalog);
 assert.deepEqual(p.ownedStreamingPlatform.catalogLicenses[0].countryIds, ['IN', 'US']);
 assert.equal(purchaseContentMarketListing(p, first.id, first.signature).changed, false, 'Double click cannot charge twice');
 offers = getContentMarketListings(p);
-result = purchaseContentMarketListing(p, offers[0].id, offers[0].signature);
+// A frozen live-auction title remains an auction after the leading fixed card sells.
+const remainingAuctions = getContentMarketAuctionAssignments(p).listingIds;
+const second = offers.find(offer => !remainingAuctions.has(offer.id))!;
+assert.ok(second, 'A second fixed-price licence remains in this finite shelf');
+result = purchaseContentMarketListing(p, second.id, second.signature);
 assert.ok(result.changed, 'Second pre-launch purchase works'); p = result.player;
 const imported = linkContentMarketOwnedTitles(p, ['owned-cm1']);
 assert.ok(imported.changed); p = imported.player;

@@ -178,7 +178,8 @@ check('live licensed rental backend reconciles to the full signed transaction sh
     const gross=state.revenue.rentalRevenue+state.revenue.purchaseRevenue;
     assert.ok(gross>0);
     assert.equal(storeWeek.ownedStreamingPlatform.weeklyHistory.at(-1)!.operations!.partnerRevenueShareCost,
-        state.titlePerformance.reduce((sum,title)=>sum+Math.round((title.revenue.rentalRevenue+title.revenue.purchaseRevenue)*share),0));
+        state.titlePerformance.filter(title => storeWeek.ownedStreamingPlatform.catalogLicenses.some(license => license.sourceProjectId === title.projectId))
+            .reduce((sum,title)=>sum+Math.round((title.revenue.rentalRevenue+title.revenue.purchaseRevenue)*share),0));
 });
 check('store royalties preserve recoupment, backend caps and exempt buyouts',()=>{
     const license=royaltyPlayer.ownedStreamingPlatform.catalogLicenses[0];

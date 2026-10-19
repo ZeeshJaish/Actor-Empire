@@ -83,6 +83,7 @@ assert.match(actionMarkup, /Resolve government request/);
 
 const readyMarkup = renderToStaticMarkup(<StreamingOpeningProgramme
     {...props}
+    launchReadiness={{ canLaunch: true, blockerCount: 0, items: [] }}
     view={{ ...baseView, state: 'READY_TO_OPEN', remainingWeeks: 0, controllingWorkstreamId: null,
         workstreams: baseView.workstreams.map(item => ({ ...item, controlsDate: false, status: item.id === 'REHEARSAL' ? 'PASSED' : 'READY' })) }}
 />);

@@ -1,4 +1,4 @@
-import {calculateStreamingMarketPolicyCharges} from '../streamingMarketEconomics';
+import {calculateStreamingCountryServiceCost,getStreamingCountryServedAudience,calculateStreamingMarketPolicyCharges} from '../streamingMarketEconomics';
 import type {
     OwnedStreamingMarketOperation,
     PlatformAiDecisionRecord,
@@ -477,7 +477,7 @@ export const calculatePlatformAiWeeklyEconomy = (
         ? fullCurrencyToMillions(platformViewingRevenue.commercialOperatingCost)
         : 0;
     const marketOperatingCostMillions = roundMillions(markets.reduce((sum, operation) => (
-        sum + fullCurrencyToMillions(safe(operation.weeklyOperatingCost))
+        sum + fullCurrencyToMillions(calculateStreamingCountryServiceCost(operation,getStreamingCountryServedAudience(input.player,platform.id,operation.countryId!,input.absoluteWeek,1)))
     ), 0));
     const standardEligibleRecurringCostMillions = roundMillions(
         deliveryCostMillions + baseOperationsCostMillions + marketOperatingCostMillions + commercialOperatingCostMillions,

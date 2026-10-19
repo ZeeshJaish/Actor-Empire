@@ -131,7 +131,9 @@ await check('paid-tier advertising counts while its membership fee stays analyti
  const receipts=p.world.worldStreamingViewing!.royaltyReceipts!.filter(row=>row.platformId==='PLAYER');
  assert.ok(receipts.some(row=>row.sourceKind==='SUBSCRIPTION'&&row.grossReceipts>0));
  assert.ok(receipts.some(row=>row.sourceKind==='ADVERTISING'&&row.planId&&row.grossReceipts>0));
- const adsByContract=new Map<string,number>();for(const row of receipts.filter(row=>row.sourceKind==='ADVERTISING'&&row.contractId))adsByContract.set(row.contractId!,(adsByContract.get(row.contractId!)||0)+row.grossReceipts);
+ // The completed Original is now playable too. Its owned receipts do not carry the eight licensed titles' 10% seller share.
+ const signedIds=new Set(p.ownedStreamingPlatform.catalogLicenses.map(license=>license.id));
+ const adsByContract=new Map<string,number>();for(const row of receipts.filter(row=>row.sourceKind==='ADVERTISING'&&row.contractId&&signedIds.has(row.contractId)))adsByContract.set(row.contractId!,(adsByContract.get(row.contractId!)||0)+row.grossReceipts);
  assert.equal(op.partnerRevenueShareCost,[...adsByContract.values()].reduce((sum,gross)=>sum+Math.round(gross*.1),0));
 });
 await check('paid legacy bonus survives local history pruning before its first resale',async()=>{

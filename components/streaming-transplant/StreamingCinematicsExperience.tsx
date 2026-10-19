@@ -268,7 +268,7 @@ export const MachineWakesUp: React.FC<{
                 ))}
                 <div className={cx(css.dfield, css.credits)} style={{ animationDelay: '1.15s' }}>
                   <span>NOTABLE CREDITS</span>
-                  <b>{applicant.credits.slice(0, 3).join(' · ')}</b>
+                  <b>{applicant.credits.slice(0, 3).join(' · ') || 'No released credits yet'}</b>
                 </div>
               </div>
             </div>

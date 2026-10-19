@@ -49,6 +49,7 @@ interface Props {
   commercialPolicy?: StreamingCommercialPolicy;
   entitlementStatus?: StreamingEntitlementStatus;
   onRetryAccess?: () => void;
+  onOpenProductionHouse?: () => void;
   onOpenOriginalProduction?: (target: { studioId: string; scriptId: string; commissionId: string }) => void;
   onOpenBank?: () => void;
   initialDestination?: 'HOME' | 'FINANCE';
@@ -184,6 +185,7 @@ export default function StreamingLockedScreen({
   entitlementStatus = 'GRANTED',
   onRetryAccess,
   onOpenOriginalProduction,
+  onOpenProductionHouse,
   onOpenBank,
   initialDestination = 'HOME',
   initialContentMarketOfferId,
@@ -283,6 +285,7 @@ export default function StreamingLockedScreen({
         onTrustedMarketUpdate={onTrustedMarketUpdate}
         onBack={onBack}
         onReturnToGame={onReturnToGame}
+        onOpenProductionHouse={onOpenProductionHouse}
         onOpenOriginalProduction={onOpenOriginalProduction}
         onOpenBank={onOpenBank}
         initialDestination={headquartersDestination}
@@ -443,6 +446,7 @@ export default function StreamingLockedScreen({
             <li><span>01</span><div><strong>Create the identity</strong><p>Name the platform, shape its mark and sound, and decide what viewers should expect.</p></div></li>
             <li><span>02</span><div><strong>Incorporate the company</strong><p>You begin as Founder, Owner and CEO with 100% control and no forced partner.</p></div></li>
             <li><span>03</span><div><strong>Walk into an empty HQ</strong><p>Capacity, reach and technology are earned through real purchases—not selected from a launch menu.</p></div></li>
+            <li><span>04</span><div><strong>Produce your opening Original</strong><p>Opening Night requires a delivered Original from a production house you own. A new production house costs $50M in personal cash, separate from the $85M incorporation and your platform treasury. Plan this funding before incorporating.</p></div></li>
           </ol>
         </section>
       </main>

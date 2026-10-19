@@ -81,7 +81,7 @@ assert.equal(openedSession.status, 'LIVE');
 assert.equal(openedSession.roomSecondsRemaining, 15, 'The shared room begins at 15 seconds');
 assert.equal(openedSession.hardClosesAtSecond, 45, 'The room starts with a 45-second base cap before bounded late extensions');
 assert.deepEqual(openedSession.lot.countryIds, lot.countryIds, 'Opening cannot mutate the lot scope');
-assert.ok(openedSession.rivals.length >= 2, 'At least two funded AI rivals enter a live room');
+assert.ok(openedSession.rivals.length >= 2, 'This well-funded fixture attracts multiple genuine rivals; entry itself has no rival minimum');
 assert.ok(openedSession.rivals.every(rival => rival.sellerValueCeiling > 0), 'Rival valuation ceilings are fixed when the room opens');
 const legacyBuyerIds = new Set(['NETFLIX', 'APPLE_TV', 'DISNEY_PLUS', 'HULU', 'YOUTUBE']);
 const ecosystem = normalizeStreamingPlatformEcosystem(opened.player.world.streamingPlatformEcosystem, 1);
@@ -292,7 +292,7 @@ const bidTerms = {
     licensorRevenueShare: Math.min(lot.allowedTerms.backendMaximum, lot.allowedTerms.backendMinimum + 3),
     marketingGuarantee: 0,
     futureGreenlight: true,
-    futureFunding: { kind: 'NEW_ORIGINAL' as const, count: 1, budgetPerProject: 2_000_000,
+    futureFunding: { kind: 'SEQUEL' as const, count: 1, budgetPerProject: 2_000_000,
         format: 'ANY' as const, commitment: 'FIRM' as const, deadlineWeeks: 52, platformRightsPercent: 85 },
 };
 const placed = placeStreamingBuyerAuctionBid(opened.player, openedSession.id, bidTerms, 1_001_000);
@@ -360,7 +360,7 @@ const runToClose = (minimumGuarantee: number) => {
         licensorRevenueShare: activeLot.allowedTerms.backendMaximum,
         marketingGuarantee: 0,
         futureGreenlight: true,
-        futureFunding: { kind: 'NEW_ORIGINAL' as const, count: 1, budgetPerProject: 2_000_000,
+        futureFunding: { kind: 'SEQUEL' as const, count: 1, budgetPerProject: 2_000_000,
             format: 'ANY' as const, commitment: 'FIRM' as const, deadlineWeeks: 52, platformRightsPercent: 85 },
     }, 2_001_000);
     assert.ok(bid.changed);

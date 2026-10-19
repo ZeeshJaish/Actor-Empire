@@ -31,7 +31,7 @@ import type {
 
 export type SlateStage =
   | 'COMMISSIONED' | 'IN PRODUCTION' | 'DELIVERED' | 'SCHEDULED'
-  | 'NEGOTIATING' | 'SIGNED';
+  | 'NEGOTIATING' | 'SIGNED' | 'LIVE';
 
 export interface SlateItem {
   id: string;
@@ -52,7 +52,7 @@ export interface ServiceTitle {
   title: string;
   kind: string;              // "Original · Film", "Licensed · Series"
   status: ServiceStatus;
-  rating: number;            // 0-10
+  rating: number | null;     // 0-10; null until rated
   views: number;             // lifetime views
   completion: number;        // 0-100
   /** licensed titles only — weeks until the window closes */
@@ -367,7 +367,7 @@ export const PlatformHQ: React.FC<{
                 <span className={cx(css.statuschip, css[state.live ? t.status.replace(/\s/g, '').toLowerCase() : 'staged'])}>
                   {state.live ? t.status : 'STAGED'}
                 </span>
-                <span className={css.ratechip}>★ {t.rating.toFixed(1)}</span>
+                <span className={css.ratechip}>{t.rating === null ? 'NOT YET RATED' : `★ ${t.rating.toFixed(1)}`}</span>
                 <span className={css.ghost} style={{ fontFamily: tf.stack }}>{t.title}</span>
                 <div className={css.cardfoot}>
                   <b className={css.ctitle}>{t.title}</b>

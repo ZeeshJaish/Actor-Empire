@@ -18,6 +18,7 @@ import {
     getProductionLocation,
     getStreamingDataCenterCost,
 } from './productionLocations';
+import { deriveStreamingConstructionSchedule } from './streamingNetworkConstruction';
 import { createDeterministicId } from './deterministicRandom';
 import { getAbsoluteWeek } from './legacyLogic';
 import {
@@ -727,7 +728,9 @@ const getConfigurationValues = (
             backupCoveragePercent: physicalSummary.backupCoveragePercent,
             physicalLimitingFactors: physicalSummary.limitingFactors,
             staffRequired: Math.max(2, Math.ceil(rackCount * 1.15 + network.length * 1.5)),
-            buildWeeks: clamp(Math.ceil(physicalBuildWeeks * strategy.build), 4, 15),
+            buildWeeks: canonicalQuote
+                ? deriveStreamingConstructionSchedule({ facilities: canonicalFacilities, absoluteWeek: 0 }).weeks
+                : clamp(Math.ceil(physicalBuildWeeks * strategy.build), 4, 15),
             technicalDebt: 0,
         };
     }

@@ -84,7 +84,7 @@ const funded: Player = {
 };
 const clearanceStart = beginStreamingMarketClearance(funded, ['US'], 'OPENING');
 assert(clearanceStart.changed && clearanceStart.reason === 'STARTED', 'Confirming market entry should start clearance.');
-assert(clearanceStart.energyCost === 5 && clearanceStart.player.energy.current === funded.energy.current - 5, 'A country filing should consume the disclosed one-time 5 energy and never create weekly busywork.');
+assert(clearanceStart.energyCost === 10 && clearanceStart.player.energy.current === funded.energy.current - 10, 'A major US filing should consume the disclosed one-time 10 energy and never create weekly busywork.');
 const startedOperation = clearanceStart.player.ownedStreamingPlatform.marketOperations.find(operation => operation.countryId === 'US');
 assert(startedOperation?.status === 'CLEARANCE' && startedOperation.clearance?.stage === 'APPLICATION_FILED', 'Clearance should begin as a staged government file.');
 assert(startedOperation?.policySnapshot?.nextElectionAtAbsoluteWeek, 'The live country record should schedule a future policy cycle.');
@@ -114,7 +114,7 @@ const requirementFixture: Player = {
 const resolved = resolveStreamingMarketRequirement(requirementFixture, openingOperation!.id);
 assert(resolved.changed && resolved.reason === 'RESOLVED', 'The player should be able to fund and submit an additional government requirement.');
 assert(resolved.player.ownedStreamingPlatform.treasuryCash === 9_500_000, 'Additional requirements should debit the exact disclosed amount once.');
-assert(resolved.player.energy.current === requirementFixture.energy.current - 3, 'Submitting an additional government requirement should cost the disclosed 3 energy once.');
+assert(resolved.player.energy.current === requirementFixture.energy.current - 5, 'Submitting an additional government requirement should cost the disclosed 5 energy once.');
 assert(resolved.player.ownedStreamingPlatform.eventLedger.some(entry => entry.type === 'MARKET_REQUIREMENT_RESOLVED'), 'Requirement resolution should be auditable in Studio Finance and the event ledger.');
 assert(resolved.player.ownedStreamingPlatform.costCommitments.some(entry => entry.label.includes('additional compliance filing') && entry.paidAmount === 500_000), 'Additional government payments should appear in the unified paid launch-cost record.');
 

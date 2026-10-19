@@ -4790,6 +4790,16 @@ export const processGameWeek = async (
     });
 
     allRunning.forEach(initialRelease => {
+        // Owned-platform Originals settle viewing through the platform loop,
+        // rather than an external streaming state. Keep their real release
+        // record when handing off so catalogue and production truth survive.
+        if (initialRelease.projectDetails.hiddenStats.ownedStreamingOriginal
+            && initialRelease.distributionPhase === 'STREAMING' && !initialRelease.streaming) {
+            if (!nextPlayer.pastProjects.some(project => project.id === initialRelease.id)) {
+                nextPlayer.pastProjects.push(createPastProjectArchiveSnapshot(initialRelease, { player: nextPlayer }));
+            }
+            return;
+        }
         let rel = processPostReleaseReality(initialRelease);
         const payTalentFromReceipt = (studio: Business | undefined, source: string, studioReceipts: number) => {
             if (!studio || studioReceipts <= 0 || !rel.projectDetails.talentParticipation) return;

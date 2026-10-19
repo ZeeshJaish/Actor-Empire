@@ -503,7 +503,7 @@ const rehearsalToBuild = (result: RunResult, signature: string): RehearsalResult
   verdict: result.verdict === 'BURST' ? 'RENTED' : result.verdict,
   peak: result.peakConcurrentStreams,
   capacity: result.steadyCapacity,
-  spare: Math.max(0, result.steadyCapacity + result.burstCapacity - result.peakConcurrentStreams),
+  spare: Math.max(0, result.burstCapacity - result.peakConcurrentStreams),
   failedPct: result.failedPercent,
   catalogue: result.catalogueAvailabilityPercent / 100,
   spof: result.regionalSinglePointFailures.length,
@@ -517,6 +517,7 @@ const rehearsalToBuild = (result: RunResult, signature: string): RehearsalResult
     state: country.verdict === 'BROKE' ? 'UNSTABLE' : country.verdict === 'BURST' ? 'WATCH' : 'READY',
   })),
   rooms: result.facilities.map(facility => ({
+    id: facility.facilityId,
     city: facility.cityLabel,
     load: facility.loadPercent / 100,
     limiting: facility.limitingFactor === 'POWER' ? 'POWER'
@@ -539,7 +540,7 @@ export const rehearsalSnapshotToBuild = (
   verdict: snapshot.verdict === 'BURST' ? 'RENTED' : snapshot.verdict,
   peak: snapshot.peakConcurrentStreams,
   capacity: snapshot.steadyCapacity,
-  spare: Math.max(0, snapshot.steadyCapacity + snapshot.burstCapacity - snapshot.peakConcurrentStreams),
+  spare: Math.max(0, snapshot.burstCapacity - snapshot.peakConcurrentStreams),
   failedPct: snapshot.failedPercent,
   catalogue: snapshot.catalogueAvailabilityPercent / 100,
   spof: snapshot.regionalSinglePointFailures.length,
@@ -553,6 +554,7 @@ export const rehearsalSnapshotToBuild = (
     state: country.verdict === 'BROKE' ? 'UNSTABLE' : country.verdict === 'BURST' ? 'WATCH' : 'READY',
   })),
   rooms: snapshot.facilities.map(facility => ({
+    id: facility.facilityId,
     city: cityNameById.get(facility.cityId) || facility.cityId,
     load: facility.loadPercent / 100,
     limiting: facility.limitingFactor === 'POWER' ? 'POWER'
@@ -806,7 +808,7 @@ export const StreamingBuildWizardExperience: React.FC<StreamingBuildWizardExperi
         : 0;
       return {
         racks: build.quote.totals.racks,
-        compute: build.quote.totals.compute,
+        compute: build.facilities.filter(facility => facility.type === 'CLOUD_ALLOCATION' || facility.lease?.tenure === 'CLOUD').reduce((sum, facility) => sum + facility.installedRacks, 0),
         cities: build.quote.totals.cities,
         buildingCities: new Set(build.facilities.filter(facility => facility.type !== 'CLOUD_ALLOCATION').map(facility => facility.cityId)).size,
         capacity: build.capacity.steadyStreams,
@@ -828,7 +830,7 @@ export const StreamingBuildWizardExperience: React.FC<StreamingBuildWizardExperi
       const campaign = marketing?.draft.budgetCeiling || 0;
       const lines = [
         ...(inputs.defineLaunchPaid || []).map(item => ({ ...item, locked: true, timing: 'SETTLED' as const })),
-        { id: 'network-capex', label: 'Servers and owned property', amount: build.quote.totals.capex, note: `${build.quote.totals.racks} racks · ${build.quote.totals.compute} compute`, timing: 'COMMISSION' as const },
+        { id: 'network-capex', label: 'Servers and owned property', amount: build.quote.totals.capex, note: `${totalsFor(draft).racks} racks · ${totalsFor(draft).compute} compute`, timing: 'COMMISSION' as const },
         { id: 'network-deposits', label: 'Facility deposits', amount: build.quote.totals.deposits, note: `${build.quote.totals.rooms} rooms · ${build.quote.totals.cities} cities`, timing: 'COMMISSION' as const },
         { id: 'network-setup', label: 'Commissioning and setup', amount: build.quote.totals.setup, note: `${build.schedule.weeks} weeks to build`, timing: 'COMMISSION' as const },
         { id: 'campaign', label: 'Launch marketing ceiling', amount: campaign, note: campaign ? 'Reserved and spent across construction' : 'Organic launch', timing: 'OPENING_NIGHT' as const },

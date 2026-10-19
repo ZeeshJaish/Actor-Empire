@@ -1,15 +1,23 @@
-/** Founder attention for one explicit market-filing action.
- * Each country still has its own rights/compliance cash and review. The energy
- * discount is for preparing several new files in one action, not for belonging
- * to a named region or group.
- */
-export const STREAMING_SINGLE_MARKET_FILING_ENERGY = 5;
+import { WORLD_COUNTRY_DEFINITIONS_BY_ID } from './worldEconomy/worldCountryRegistry';
 
-export const quoteStreamingMarketFilingEnergy = (requestedCount: number): number => {
-    const count = Number.isFinite(requestedCount) ? Math.max(0, Math.floor(requestedCount)) : 0;
-    if (count === 0) return 0;
-    const additional = count - 1;
-    return Math.min(30, STREAMING_SINGLE_MARKET_FILING_ENERGY
-        + 2 * Math.min(additional, 8)
-        + Math.max(0, additional - 8));
+/** Fixed country tiers. Filing separately, by group or together costs the same.
+ * These IDs are balance decisions, independent of UI layout and live audience.
+ */
+const MAJOR_MARKETS = new Set(['US', 'MX', 'BR', 'DE', 'IN', 'JP', 'ID', 'CN', 'RU', 'PK', 'BD']);
+const FEATURED_MARKETS = new Set(['CA', 'AR', 'CL', 'CO', 'GB', 'FR', 'IT', 'ES', 'EG', 'NG', 'KE', 'ZA', 'KR', 'PH', 'TH', 'AU', 'NZ']);
+
+export const getStreamingCountryFilingEnergy = (countryId: string): number => {
+    const id = String(countryId || '').trim().toUpperCase();
+    if (!Object.prototype.hasOwnProperty.call(WORLD_COUNTRY_DEFINITIONS_BY_ID, id)) return 0;
+    return MAJOR_MARKETS.has(id) ? 10 : FEATURED_MARKETS.has(id) ? 5 : 2;
 };
+
+export const hasDetailedStreamingMarketCard = (countryId: string): boolean => (
+    getStreamingCountryFilingEnergy(countryId) >= 5
+);
+
+/** Callers pass only countries still awaiting their first application. */
+export const quoteStreamingMarketFilingEnergy = (countryIds: readonly string[]): number => (
+    [...new Set(countryIds.map(id => String(id || '').trim().toUpperCase()))]
+        .reduce((total, id) => total + getStreamingCountryFilingEnergy(id), 0)
+);

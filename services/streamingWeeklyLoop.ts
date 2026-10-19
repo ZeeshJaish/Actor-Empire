@@ -19,6 +19,7 @@ import {
     compactOwnedStreamingPlatformForPersistence,
     normalizeOwnedStreamingPlatformState,
 } from './ownedStreamingPlatform';
+import { resolveStreamingProductionReadiness } from './streamingProductionReadiness';
 import { getOwnedStreamingProgramEntries } from './streamingOriginals';
 import { commitStreamingQuarterSeasonCycle } from './streamingQuarterSeason';
 import { evaluateStreamingRightsCompliance, processStreamingPrivateOffersWeek } from './streamingRightsMarketplace';
@@ -76,7 +77,7 @@ import { processOwnedStreamingLaunchMarketingWeek } from './streamingLaunchMarke
 import { fibreWeeklyHoldCost } from './streamingFibreLadder';
 import { recognizeStreamingContentCost } from './streamingContentAccounting';
 import { getStreamingAdditionalOperatingExpense } from './streamingOperatingExpenses';
-import { createStreamingMarketTaxAssessment } from './streamingMarketEconomics';
+import { createStreamingMarketTaxAssessment, getStreamingCountryServedAudience } from './streamingMarketEconomics';
 import { finalizeStreamingMaintenanceTax } from './streamingMarketTaxSettlement';
 import { completeDueStreamingInfrastructureExpansion } from './streamingInfrastructure';
 import {
@@ -855,7 +856,8 @@ export const processOwnedStreamingPlatformWeek = (
         const viewing=player.world.worldStreamingViewing?.countries?.[countryId]?.platformPerformance?.PLAYER;
         return [countryId,(customer?.monthlySubscriptionRevenue||0)/4.33+(viewing?.revenue.totalIncrementalRevenue||0)];
     }));
-    const taxBasis={deductibleOperatingCost,contentAmortization,countryRevenues,
+    const countryActiveAudience=Object.fromEntries(platform.marketOperations.filter(row=>row.countryId).map(row=>[row.countryId!,getStreamingCountryServedAudience(player,'PLAYER',row.countryId!,absoluteWeek)]));
+    const taxBasis={deductibleOperatingCost,contentAmortization,countryRevenues,countryActiveAudience,
         additionalOperatingExpense:getStreamingAdditionalOperatingExpense(platform,absoluteWeek)};
     const marketCosts=calculateStreamingMarketOperatingCosts(platform,totalOperatingRevenue,taxBasis);
     const marketPolicyCost=marketCosts.marketPolicyCost;
@@ -1508,6 +1510,12 @@ export const processOwnedStreamingPlatformWeek = (
     ));
     const weeklyCommittedPlatform = compactOwnedStreamingPlatformForPersistence({
         ...platform,
+        // Persist verified release truth so recovery does not depend on a
+        // bounded event ledger retaining a legacy authorization forever.
+        originalCommissions: platform.originalCommissions.map(commission =>
+            commission.canonicalProjectId
+                && resolveStreamingProductionReadiness(player, commission.canonicalProjectId, commission).status === 'RELEASED'
+                ? { ...commission, status: 'RELEASED' as const } : commission),
         contentAccounting: contentRecognition.state,
         catalogLicenses: platform.catalogLicenses.map(license=>{
             const allocation=contractRoyaltyAllocations.find(row=>row.contractId===license.id);

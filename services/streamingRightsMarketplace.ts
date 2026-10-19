@@ -35,6 +35,7 @@ import {
 } from './streamingCatalog';
 import {
     getStreamingMarketCycle,
+    getStreamingMarketDiscovery,
     getStreamingMarketSupplyProfile,
     selectStreamingMarketTitles,
 } from './streamingMarketSupply';
@@ -67,6 +68,7 @@ import {
     settleStreamingRightsTransfer,
 } from './streamingRightsTransactions';
 import { createStreamingRightsAccessGrantForOffer, intersectStreamingRightsAccessGrants, normalizeStreamingRightsAccessGrant } from './streamingRightsAccessGrant';
+import { getContentMarketListings, isContentMarketAuctionListing } from './streamingContentMarket';
 
 export type StreamingRightsOpportunityKind = 'STUDIO_ACQUISITION' | 'PLATFORM_TRADE' | 'SUBLICENSE_OUT' | 'TRANSFER_OUT';
 
@@ -255,7 +257,9 @@ export const processStreamingPrivateOffersWeek = (
                 + Math.min(0.05, relationshipWins * 0.015);
             const heatThreshold = current.marketHeat === 'HOT' ? 0.98 : current.marketHeat === 'ACTIVE' ? 0.91 : 0.84;
             const score = economics + clauses + (rng() - 0.5) * 0.06;
-            if (score >= heatThreshold) {
+            const matchesAdvertisedTerms = Boolean(current.advertisedTermsSignature)
+                && current.advertisedTermsSignature === privateOfferTermsSignature(platform, current);
+            if (matchesAdvertisedTerms || score >= heatThreshold) {
                 status = 'READY_TO_SIGN';
                 responseStatus = 'SELLER_ACCEPTED';
                 signingDeadlineAbsoluteWeek = absoluteWeek + 3;
@@ -387,7 +391,7 @@ const buildOpportunity = (
     };
 };
 
-export const getStreamingRightsOpportunities = (player: Player): StreamingRightsOpportunity[] => {
+export const getStreamingRightsOpportunities = (player: Player, includeLiveAuctionReferences = false): StreamingRightsOpportunity[] => {
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     if (!['FOUNDING', 'ACTIVE'].includes(platform.lifecycle)) return [];
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
@@ -396,7 +400,7 @@ export const getStreamingRightsOpportunities = (player: Player): StreamingRights
             .filter(project => Boolean(project.streamingPlatform))
             .map(project => [project.id, project]),
     );
-    const inbound = getStreamingLicenseOpportunities(player).map(title => {
+    const inbound = getStreamingLicenseOpportunities(player, includeLiveAuctionReferences).map(title => {
         const tradedTitle = platformTitles.get(title.id);
         const sellerPlatformId = tradedTitle?.streamingPlatform || null;
         if (sellerPlatformId) return null;
@@ -546,7 +550,7 @@ export const getStreamingRightsOpportunities = (player: Player): StreamingRights
                 || (opportunity.kind === 'TRANSFER_OUT' && negotiation.kind === 'TRANSFER_OUT')
             )
         )))
-        .slice(0, 18);
+        .slice(0, 18 + (includeLiveAuctionReferences ? platform.buyerAuctionSessions.filter(session => session.status === 'LIVE' && session.lot.listingKind === 'TITLE').length : 0));
 };
 
 export interface StreamingCataloguePackageOpportunity {
@@ -588,10 +592,28 @@ export const getStreamingCataloguePackageOpportunities = (
     const sourceProjectById = new Map((player.world.projects || []).map(project => [project.id, project]));
     const settlementSession = options.includeReservedOpportunityId
         ? platform.buyerAuctionSessions.find(session => (
-            session.lot.listingKind === 'CATALOGUE_PACKAGE'
+            session.status === 'LIVE' && session.lot.listingKind === 'CATALOGUE_PACKAGE'
             && session.lot.listingId === options.includeReservedOpportunityId
         ))
         : null;
+    if (options.includeReservedOpportunityId) {
+        const frozen = normalizeStreamingCataloguePackageRegistry(player.world.streamingCataloguePackages)[options.includeReservedOpportunityId];
+        if (settlementSession || frozen?.biddingSessionId) {
+            // Auction settlement must use the complete saved room proposal, never rebuild
+            // a smaller/new-cycle collection from whichever titles remain discoverable.
+            if (!settlementSession || !frozen || frozen.lifecycle !== 'READY' || frozen.biddingSessionId !== settlementSession.id) return [];
+            const expected = [...(settlementSession.lot.catalogueComponentIds || [])].sort();
+            const componentIds = frozen.components.map(component => component.sourceProjectId).sort();
+            const rowIds = frozen.acceptedTerms.map(row => row.componentProjectId).sort();
+            if (expected.length < 3 || expected.length > 50 || new Set(expected).size !== expected.length
+                || JSON.stringify(expected) !== JSON.stringify(componentIds) || JSON.stringify(expected) !== JSON.stringify(rowIds)
+                || frozen.acceptedTerms.some(row => !Number.isSafeInteger(row.minimumGuarantee) || row.minimumGuarantee < 0
+                    || !Number.isSafeInteger(row.durationWeeks) || row.durationWeeks < 1 || row.durationWeeks > frozen.maximumDurationWeeks)
+                || frozen.acceptedTerms.reduce((sum,row) => sum + row.minimumGuarantee,0) !== frozen.totalGuarantee) return [];
+            return [{id:frozen.id,package:frozen,rows:frozen.acceptedTerms,totalGuarantee:frozen.totalGuarantee,
+                sellerName:frozen.seller.name,marketHeat:'ACTIVE'}];
+        }
+    }
     const settlementProjectIds = new Set(settlementSession?.lot.catalogueComponentIds || []);
     const reservedProjectIds = new Set([
         ...platform.rightsNegotiations
@@ -611,7 +633,11 @@ export const getStreamingCataloguePackageOpportunities = (
         ))
         .forEach(title => groups.set(title.studioId, [...(groups.get(title.studioId) || []), title]));
     return [...groups.entries()].flatMap(([studioId, titles]) => {
-        const selected = selectStreamingMarketTitles(player, titles, supplyProfile.collectionMaximumSize);
+        const frozenIds = getStreamingMarketDiscovery(player)?.collectionTitleIdsBySeller?.[studioId];
+        const titleById = new Map(titles.map(title => [title.id, title]));
+        const selected = frozenIds
+            ? frozenIds.flatMap(id => titleById.has(id) ? [titleById.get(id)!] : [])
+            : selectStreamingMarketTitles(player, titles, supplyProfile.collectionMaximumSize);
         const compatibleTitles: StreamingCatalogTitle[] = [];
         const components = selected.flatMap(title => {
             const sourceProject = sourceProjectById.get(title.id);
@@ -771,12 +797,17 @@ export const signOwnedStreamingCataloguePackage = (
             capability:getStreamingBuyerBackendCapability(player,null,getAbsoluteWeek(player.age,player.currentWeek),row.countryIds,grant)});
         if(error) return {player,changed:false,contracts:[],package:opportunity.package,reason:'INVALID_TERMS',detail:error};
     }
-    if (platform.treasuryCash < totalGuarantee) {
+    const committedCash = platform.costCommitments.filter(item => item.status === 'COMMITTED')
+        .reduce((sum,item) => sum + Math.max(0,item.committedAmount-item.paidAmount),0);
+    if (platform.treasuryCash - committedCash < totalGuarantee) {
         return { player, changed: false, contracts: [], package: opportunity.package, reason: 'INSUFFICIENT_TREASURY' };
     }
     if (!options.skipEnergyCost && player.energy.current < PHASE_ONE_ENERGY_COSTS.STREAMING_DEAL_ACCEPT) {
         return { player, changed: false, contracts: [], package: opportunity.package, reason: 'INSUFFICIENT_ENERGY' };
     }
+    const effectiveStart = Math.max(opportunity.package.startsAtAbsoluteWeek,getAbsoluteWeek(player.age,player.currentWeek));
+    if (effectiveRows.some(row => effectiveStart >= opportunity.package.startsAtAbsoluteWeek + row.durationWeeks))
+        return {player,changed:false,contracts:[],package:opportunity.package,reason:'RIGHTS_UNAVAILABLE',detail:'The original collection window has expired.'};
     for (const row of effectiveRows) {
         const compatibility = resolveStreamingRightsCompatibility({
             world: player.world,
@@ -785,7 +816,7 @@ export const signOwnedStreamingCataloguePackage = (
             sellerPartyId: opportunity.package.seller.id,
             territory: row.territory,
             countryIds: row.countryIds,
-            startsAtAbsoluteWeek: opportunity.package.startsAtAbsoluteWeek,
+            startsAtAbsoluteWeek: effectiveStart,
             expiresAtAbsoluteWeek: opportunity.package.startsAtAbsoluteWeek + row.durationWeeks,
             windowType: row.windowType,
             exclusivity: row.exclusivity,
@@ -810,12 +841,12 @@ export const signOwnedStreamingCataloguePackage = (
             licensorName: opportunity.package.seller.name,
             territory: row.territory,
             countryIds: row.countryIds,
-            durationWeeks: row.durationWeeks,
+            durationWeeks: opportunity.package.startsAtAbsoluteWeek + row.durationWeeks - effectiveStart,
             exclusivity: row.exclusivity,
             minimumGuarantee: row.minimumGuarantee,
             platformRevenueShare: row.platformRevenueShare,
-            signedAtAbsoluteWeek: opportunity.package.createdAtAbsoluteWeek,
-            startsAtAbsoluteWeek: opportunity.package.startsAtAbsoluteWeek,
+            signedAtAbsoluteWeek: getAbsoluteWeek(player.age,player.currentWeek),
+            startsAtAbsoluteWeek: effectiveStart,
             origin: 'CATALOGUE_ACQUISITION',
             sellerType: 'STUDIO',
             sellerPlatformId: null,
@@ -837,7 +868,7 @@ export const signOwnedStreamingCataloguePackage = (
             seller: opportunity.package.seller,
             buyer: { type: 'PLAYER_PLATFORM', id: buyerId, name: identity?.name || 'Your platform', platformId: null },
             guaranteeDisposition: 'PAID',
-            settledAtAbsoluteWeek: opportunity.package.createdAtAbsoluteWeek,
+            settledAtAbsoluteWeek: getAbsoluteWeek(player.age,player.currentWeek),
             localization: row.localization,
             localizationRequirements: row.localizationRequirements,
             guaranteeRecoupment: row.guaranteeRecoupment,
@@ -854,7 +885,7 @@ export const signOwnedStreamingCataloguePackage = (
     const signedPackage: StreamingCataloguePackage = {
         ...opportunity.package,
         lifecycle: 'SIGNED',
-        signedAtAbsoluteWeek: opportunity.package.createdAtAbsoluteWeek,
+        signedAtAbsoluteWeek: getAbsoluteWeek(player.age,player.currentWeek),
         totalGuarantee,
         totalExpectedExposure: effectiveRows.reduce((sum, row) => sum + row.expectedTotalCost, 0),
         acceptedTerms: effectiveRows,
@@ -863,7 +894,7 @@ export const signOwnedStreamingCataloguePackage = (
     const ledger: OwnedStreamingLedgerEntry = {
         id: createDeterministicId('streaming_event', platform.simulationSeed, `${opportunity.id}:signed`),
         idempotencyKey: `${opportunity.id}:signed`,
-        absoluteWeek: opportunity.package.createdAtAbsoluteWeek,
+        absoluteWeek: getAbsoluteWeek(player.age,player.currentWeek),
         type: 'LICENSE_SIGNED',
         summary: `${signedPackage.name} joined the catalogue through ${contracts.length} title contracts.`,
         source: 'PLAYER_ACTION',
@@ -964,6 +995,17 @@ const requestedAccessGrantForTerms = (
     };
 };
 
+/** Compare every economic clause and exact viewer/country scope, not an acceptance boolean a revision can retain. */
+const privateOfferTermsSignature = (platform: OwnedStreamingPlatformState, input: StreamingRightsTermsInput): string => {
+    const terms = normalizeTerms(input);
+    const grant = requestedAccessGrantForTerms(platform, terms);
+    return JSON.stringify({...terms,
+        countryIds: terms.territory === 'GLOBAL' ? [] : normalizeStreamingDayOneMarketIds(terms.countryIds).sort(),
+        accessGrant: {modes: grant.modes.slice().sort(), earlyWindowWeeks: grant.earlyWindowWeeks,
+            purchaseFulfillment: grant.purchaseFulfillment},
+    });
+};
+
 const FALLBACK_MARKET_IDS = ['US', 'CA', 'MX'];
 
 const getNegotiationCountrySnapshot = (
@@ -988,10 +1030,15 @@ export const openStreamingRightsNegotiation = (
     player: Player,
     opportunityId: string,
     inputTerms?: StreamingRightsTermsInput,
+    settlementAuctionSessionId?: string,
 ): StreamingRightsActionResult => {
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     if (!['FOUNDING', 'ACTIVE'].includes(platform.lifecycle)) return { player, changed: false, reason: 'NOT_ACTIVE' };
-    const opportunity = getStreamingRightsOpportunities(player).find(item => item.id === opportunityId);
+    const reservedSettlement = Boolean(settlementAuctionSessionId && platform.buyerAuctionSessions.some(session => (
+        session.id === settlementAuctionSessionId && session.status === 'LIVE'
+        && session.lot.listingKind === 'TITLE' && session.lot.listingId === opportunityId
+    )));
+    const opportunity = getStreamingRightsOpportunities(player, reservedSettlement).find(item => item.id === opportunityId);
     if (!opportunity) return { player, changed: false, reason: 'NOT_FOUND' };
     if (opportunity.incompatibilityDetail) {
         return {
@@ -1096,6 +1143,16 @@ export const openStreamingPrivateOffer = (
     opportunityId: string,
     inputTerms: StreamingRightsTermsInput,
 ): StreamingRightsActionResult => {
+    const advertised = getContentMarketListings(player).find(listing => listing.id === opportunityId);
+    const inheritedGrant = advertised?.sourceLicenseId ? normalizeStreamingRightsAccessGrant(
+        advertised.inheritedContract?.accessGrant
+        || player.ownedStreamingPlatform.catalogLicenses.find(license => license.id === advertised.sourceLicenseId)?.accessGrant,
+    ) || {schemaVersion: 1 as const, modes: [] as StreamingTitleAccessMode[], earlyWindowWeeks: 0,
+        purchaseFulfillment: 'NONE' as const, source: 'EXPLICIT' as const} : null;
+    const advertisedTermsSignature = advertised && !isContentMarketAuctionListing(player, opportunityId)
+        ? privateOfferTermsSignature(player.ownedStreamingPlatform, {...advertised.terms, countryIds: advertised.countryIds,
+            ...(inheritedGrant ? {accessGrant: inheritedGrant} : {})})
+        : undefined;
     const opened = openStreamingRightsNegotiation(player, opportunityId, inputTerms);
     if (!opened.changed || !opened.negotiation) return opened;
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
@@ -1104,6 +1161,7 @@ export const openStreamingPrivateOffer = (
     const responseDueAbsoluteWeek = absoluteWeek + 2 + (responseRng() >= 0.5 ? 1 : 0);
     const negotiation: OwnedStreamingRightsNegotiation = {
         ...opened.negotiation,
+        ...(advertisedTermsSignature ? {advertisedTermsSignature} : {}),
         proposalVersion: 1,
         submittedAtAbsoluteWeek: absoluteWeek,
         responseDueAbsoluteWeek,

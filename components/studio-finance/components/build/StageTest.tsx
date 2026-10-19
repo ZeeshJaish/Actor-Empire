@@ -397,7 +397,7 @@ export function StageTest({ data, draft, totals, services, handlers, onJump }: S
           <Bars items={[
             { label: 'Peak hit', value: compactCount(result.peak), fill: result.peak / Math.max(1, result.peak, result.capacity), tone: result.verdict === 'BROKE' ? 'bad' : 'flat' },
             { label: 'Carried', value: compactCount(result.capacity), fill: result.capacity / Math.max(1, result.peak, result.capacity), tone: 'good' },
-            { label: 'Spare', value: compactCount(result.spare), fill: Math.max(0, result.spare) / Math.max(1, result.peak, result.capacity), tone: result.spare > 0 ? 'good' : 'bad' },
+            { label: 'Burst headroom', value: compactCount(result.spare), fill: Math.max(0, result.spare) / Math.max(1, result.peak, result.capacity), tone: result.spare > 0 ? 'good' : 'bad' },
           ]} />
 
           {result.spof > 0 && (
@@ -430,8 +430,8 @@ export function StageTest({ data, draft, totals, services, handlers, onJump }: S
 
           {hotRooms.length > 0 && (
             <ul className="bw-evidence-rooms" aria-label="The rooms under most load">
-              {hotRooms.map((room) => (
-                <li key={`${room.city}-${room.limiting}`}>
+              {hotRooms.map((room, index) => (
+                <li key={room.id || `${room.city}-${room.limiting}-${index}`}>
                   <b>{room.city}</b>
                   <span className="bw-evidence-load" aria-hidden="true">
                     <i className={room.load >= 1 ? 'is-bad' : room.load >= 0.85 ? 'is-warn' : 'is-good'} style={{ width: `${Math.min(100, room.load * 100)}%` }} />

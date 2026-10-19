@@ -18,6 +18,18 @@ export const getStreamingMarketCycle = (absoluteWeek: number): number => (
     Math.max(0, Math.floor(absoluteWeek / 3))
 );
 
+export const getStreamingMarketDiscovery = (player: Player) => {
+    const state = player.world.streamingOpportunityMarket;
+    if (state?.cycle !== getStreamingMarketCycle(getAbsoluteWeek(player.age, player.currentWeek))) return null;
+    const snapshot = state.discovery;
+    if (!snapshot) return null;
+    if (![snapshot.titleIds, snapshot.listingIds, snapshot.auctionListingIds, snapshot.auctionCollectionIds]
+        .every(ids => Array.isArray(ids) && ids.every(id => typeof id === 'string'))) {
+        throw new Error('Damaged streaming discovery snapshot; preserve the save for recovery.');
+    }
+    return snapshot;
+};
+
 export const getStreamingMarketSupplyProfile = (player: Player): StreamingMarketSupplyProfile => {
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
     const incorporationWeek = Number(player.ownedStreamingPlatform?.foundingProfile?.incorporatedAtAbsoluteWeek);

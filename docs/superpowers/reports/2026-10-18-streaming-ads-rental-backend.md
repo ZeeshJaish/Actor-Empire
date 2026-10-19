@@ -1,3 +1,5 @@
+> Financial update: this earlier integration report used a QA fixture with zero country-entry/operating cost. For complete-cost profit and payback, use [the newer full-cost report](2026-10-18-streaming-model-profit-payback.md). The earlier figures are retained as historical diagnostics.
+
 # Streaming fixed-fee + single ads/rental backend verification
 
 18 October 2026. Local Actor Empire simulation; measured deterministic results, not a live revenue forecast.

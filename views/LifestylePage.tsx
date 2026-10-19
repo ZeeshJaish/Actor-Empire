@@ -312,6 +312,7 @@ export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem,
           initialDestination={streamingDestination}
           initialContentMarketOfferId={initialStreamingContentOfferId}
           onContentMarketOfferConsumed={onStreamingContentOfferConsumed}
+          onOpenProductionHouse={handleProductionClick}
           onOpenOriginalProduction={target => {
               setStreamingOriginalTarget(target);
               setView('PRODUCTION_GAME');

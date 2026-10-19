@@ -2,7 +2,7 @@ import type { Player } from '../../types';
 import { getAbsoluteWeek } from '../../services/legacyLogic';
 import { normalizeOwnedStreamingPlatformState } from '../../services/ownedStreamingPlatform';
 import { resolveStreamingCatalogTitle } from '../../services/streamingCatalog';
-import { getStreamingContentAvailability, CONTENT_AVAILABILITY_LABELS } from '../../services/streamingContentAvailability';
+import { getStreamingPlayableCatalogProjectIds, getStreamingContentAvailability, CONTENT_AVAILABILITY_LABELS } from '../../services/streamingContentAvailability';
 import { getOwnedPlatformPackageCountryIds } from '../../services/streamingContentAvailability';
 import { getStreamingPublicMarkets } from '../../services/streamingPublicMarkets';
 import { getStreamingAudienceMarket } from '../../services/streamingAudienceMarket';
@@ -405,9 +405,9 @@ export const createCanonicalViewerState = (player: Player): AppState => {
   const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
   const latest = platform.weeklyHistory.at(-1);
   const performance = latest?.operations?.titlePerformance ?? [];
-  const ranked = [...performance].sort((a, b) => b.viewingAccounts - a.viewingAccounts);
+  const ranked = performance.filter(item => item.viewingAccounts > 0).sort((a, b) => b.viewingAccounts - a.viewingAccounts);
   const countries = getOwnedPlatformPackageCountryIds(platform);
-  const titles = platform.catalogProjectIds.flatMap(projectId => {
+  const titles = getStreamingPlayableCatalogProjectIds(player).flatMap(projectId => {
     const title = resolveStreamingCatalogTitle(player, projectId);
     if (!title || !getStreamingContentAvailability(player, projectId, countries).available) return [];
     const result = performance.find(item => item.projectId === projectId);
@@ -423,7 +423,7 @@ export const createCanonicalViewerState = (player: Player): AppState => {
       genre: title.genre,
       hue: hueOf(projectId),
       logline: `${title.genre} ${title.projectType === 'SERIES' ? 'series' : 'film'} from ${title.studioName}.`,
-      progress: result ? clamp(Math.round(result.completionRate), 0, 99) : undefined,
+      progress: result && result.viewingAccounts > 0 ? clamp(Math.round(result.completionRate), 0, 99) : undefined,
       leavingInWeeks: license ? Math.max(0, license.expiresAtAbsoluteWeek - absoluteWeek) : undefined,
       rank: rank >= 0 && rank < 10 ? rank + 1 : undefined,
       newThisWeek: Boolean(slateEntry && latest?.operations?.programWeek === slateEntry.launchWeek),

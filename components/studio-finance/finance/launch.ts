@@ -96,11 +96,11 @@ export interface Country {
       Europe holds forty-six countries and Africa fifty-four. */
   subRegionId?: string;
   subRegion?: string;
-  /** True when this market's entry was written by hand rather than derived from
-      the world registry. It is also the test for whether there is flag art and a
-      full dossier to show, so it decides which of the two cards this country
-      gets in the picker. */
+  /** True when the economy entry was written by hand rather than derived from
+      the world registry. Detailed card presentation is tracked separately. */
   authored?: boolean;
+  /** Detailed card presentation; independent of authored economy data. */
+  featured?: boolean;
   flagSrc?: string;
   competition: Competition;
   difficulty: Difficulty;

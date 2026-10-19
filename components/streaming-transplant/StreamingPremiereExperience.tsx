@@ -40,6 +40,7 @@ export interface PremiereCheck { id: string; label: string; ok: boolean; note: s
 
 export interface PremiereInputs {
   title: string;
+  projectType?: 'MOVIE' | 'SERIES';
   halls: PremiereHall[];
   ceiling: number;
   burstCeiling: number;
@@ -337,7 +338,7 @@ const secondaryFor = (r: PremiereResult, inp: PremiereInputs) => {
   } else {
     out.push({
       kicker: 'MARKET', head: 'Rivals watch the number',
-      line: `${conc(r.subsGained)} accounts in a single evening resets what a launch is expected to deliver.`,
+      line: r.subsGained > 0 ? `${r.subsGained.toLocaleString()} paid accounts were recorded at opening.` : 'The service is open. Its first processed game week will show audience growth and billing.',
     });
     out.push({
       kicker: 'NEXT', head: 'Week two is the real test',
@@ -599,7 +600,7 @@ export const PremiereNight: React.FC<{
                       <>
                         <i className={css.playglyph} />
                         <b>{inputs.title}</b>
-                        <span>S1 E1 · playing</span>
+                        <span>{inputs.projectType === 'MOVIE' ? 'Film · playing' : inputs.projectType === 'SERIES' ? 'S1 E1 · playing' : 'Playing'}</span>
                       </>
                     )}
                   </div>

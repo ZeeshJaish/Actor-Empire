@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
+import {createStreamingCountryMarketOperation,startStreamingMarketOperation} from '../services/streamingMarketsCore';
 import {getStreamingCountryAdMarket} from '../services/worldEconomy/worldStreamingAdMarket';
-import {writeFileSync,mkdirSync,readFileSync} from 'node:fs';
+import {writeFileSync,mkdirSync} from 'node:fs';
 import {dirname} from 'node:path';
 import {createC6QaCareer} from '../lab/c6QaCareer';
 import {configureStreamingPricingOffer} from '../services/streamingCommercialOffers';
@@ -18,7 +19,7 @@ import {getAbsoluteWeek} from '../services/legacyLogic';
 import {STREAMING_INCORPORATION_ECONOMY} from '../services/streamingEconomy';
 import type {Player} from '../types';
 type Core='SUBSCRIPTION'|'ADVERTISING'|'STORE';
-type Config={id:string;replace?:boolean;window?:'FIRST_WINDOW'|'SECOND_WINDOW';racks?:number;core:Core;catalog:number;price?:number;buy?:number;quality?:number;seed?:number;weeks?:number;mg?:number;annual?:number;intro?:number;genres?:number;shock?:'REMOVE'|'HIKE'|'REFRESH'|'REPLACE_HIT'|'CLEARANCE'|'OUTAGE';};
+type Config={id:string;replace?:boolean;fullMarketCost?:boolean;diagnosticOnly?:boolean;window?:'FIRST_WINDOW'|'SECOND_WINDOW';racks?:number;core:Core;catalog:number;price?:number;buy?:number;quality?:number;seed?:number;weeks?:number;mg?:number;annual?:number;intro?:number;genres?:number;};
 const mode=process.argv[2]||'after';
 let rng=191018;Math.random=()=>{rng=(Math.imul(rng,1664525)+1013904223)>>>0;return rng/4294967296;};
 Date.now=()=>1792320000000;
@@ -80,31 +81,25 @@ function fixture(c:Config){
   s.treasuryCash=3_000_000_000-rightsCash-networkQuote.dueNow-5_000_000;
  }
 
+ let marketEntryCash=0;
+ if(c.fullMarketCost){
+  const planned=createStreamingCountryMarketOperation({seed:s.simulationSeed,countryId:'US',entryKind:'OPENING',absoluteWeek:week-8,source:'PLAYER_ACTION'})!;
+  const filed=startStreamingMarketOperation(planned,week-7);
+  s.marketOperations=[{...filed,status:'READY',approvalReadyAtAbsoluteWeek:week-5}];
+  marketEntryCash=filed.committedCosts.total;s.treasuryCash-=marketEntryCash;
+ }
  const foundationCash=STREAMING_INCORPORATION_ECONOMY.setupCostsConsumed;
  if(s.foundingProfile)s.foundingProfile={...s.foundingProfile,incorporationModel:'FIXED_V8_ZERO_TREASURY',setupCostsConsumed:foundationCash,openingTreasuryCash:0}; s.treasuryCash-=foundationCash;
  s.launchProgram.lastBlueprintSignature=getStreamingLaunchDefinitionSignature(p);
  const launch=commitOwnedStreamingLaunch(p,'STANDARD');assert.ok(launch.changed,'Launch '+c.id+' '+launch.reason);
- return {p:launch.player,opening:launch.launchCommit!.initialSubscribers,rightsCash,networkQuote,quoteRows,foundationCash};
-}
-function mutate(p:Player,c:Config,n:number){
- const s=p.ownedStreamingPlatform;
- if(n===14&&c.shock==='REMOVE'){s.catalogProjectIds=[];s.catalogLicenses=[];s.starterCatalog=null;s.originalCommissions=[];s.launchSlate!.entries=[];}
- if(n===14&&c.shock==='HIKE')s.serviceConfiguration.pricing.plans.forEach(x=>x.monthly=79);
- if(n===14&&c.shock==='CLEARANCE')s.marketOperations.forEach(x=>x.status='SUSPENDED');
- if(n===14&&c.shock==='OUTAGE')s.capacity={baselineConcurrentStreams:100,burstConcurrentStreams:200};
- if(c.shock==='REFRESH'&&n%4===0){
-  // Replace one old title, keeping breadth, genre, rights cost and price fixed.
-  const id=s.catalogProjectIds[0];const title=p.world.projects.find(x=>x.id===id) as any;
-  title.quality=95;title.rating=9.5;title.boxOffice=300_000_000;title.weekReleased=p.currentWeek;
-  const entry=s.launchSlate!.entries.find(x=>x.projectId===id)!;entry.launchWeek=n;
- }
- if(c.shock==='REPLACE_HIT'&&n===14){for(const title of p.world.projects as any[]){title.quality=95;title.rating=9.5;title.boxOffice=300_000_000;}}
+ return {p:launch.player,opening:launch.launchCommit!.initialSubscribers,rightsCash,networkQuote,quoteRows,foundationCash,marketEntryCash};
 }
 async function run(c:Config){
- let {p,opening,rightsCash,networkQuote,quoteRows,foundationCash}=fixture(c);let replacementRightsCash=0;const replacementTemplates=structuredClone(p.world.projects);const replacementSlate=structuredClone(p.ownedStreamingPlatform.launchSlate!.entries.find(row=>row.source==='LICENSED_WINDOW')!);const startTreasury=p.ownedStreamingPlatform.treasuryCash;const weeks=c.weeks??26;const weekly:any[]=[];
+ rng=191018; // Each case starts independently, matching isolated runner processes.
+ let {p,opening,rightsCash,networkQuote,quoteRows,foundationCash,marketEntryCash}=fixture(c);let replacementRightsCash=0;const replacementTemplates=structuredClone(p.world.projects);const replacementSlate=structuredClone(p.ownedStreamingPlatform.launchSlate!.entries.find(row=>row.source==='LICENSED_WINDOW')!);const startTreasury=p.ownedStreamingPlatform.treasuryCash;const weeks=c.weeks??26;const weekly:any[]=[];
  for(let n=1;n<=weeks;n++){
-  mutate(p,c,n);const cashBefore=p.ownedStreamingPlatform.treasuryCash;
-  if(n===105 && (c as any).replace){
+  const cashBefore=p.ownedStreamingPlatform.treasuryCash;
+  if(n===105 && c.replace){
 
    p.ownedStreamingPlatform.launchSlate!.entries=p.ownedStreamingPlatform.launchSlate!.entries.filter(row=>row.source==='ORIGINAL');
    const s=p.ownedStreamingPlatform,oldIds=replacementTemplates.map(row=>row.id),nextWeek=getAbsoluteWeek(p.age,p.currentWeek)+1;
@@ -176,8 +171,9 @@ async function run(c:Config){
   });
  }
  const tail=weekly.slice(-4);const sum=(key:string)=>weekly.reduce((t,x)=>t+x[key],0);const avg=(key:string)=>tail.reduce((t,x)=>t+x[key],0)/tail.length;
- const result={firstCashPaybackWeek:weekly.find(x=>x.treasury>=3_000_000_000)?.week??null,financeProfit:sum('accountingNet')-sum('additionalOperatingExpense'),netCashAfterAllInvestment:p.ownedStreamingPlatform.treasuryCash-3_000_000_000,config:c,opening,rightsCash,networkQuote,quoteRows,foundationCash,replacementRightsCash,originalCash:5_000_000,startTreasury,endTreasury:p.ownedStreamingPlatform.treasuryCash,final:weekly.at(-1),summary:{totalRevenue:sum('revenue'),totalOpNet:sum('opNet'),totalAccountingNet:sum('accountingNet'),totalNonOperating:sum('nonOperatingDelta'),totalCashDelta:sum('treasuryDelta'),cashAfterRights:sum('treasuryDelta')-rightsCash,cashAfterRightsAndNetwork:sum('treasuryDelta')-rightsCash-(networkQuote?.dueNow||0)-5_000_000,totalJoins:sum('joins'),totalCancellations:sum('cancels'),zeroCancelWeeks:weekly.filter(x=>x.cancels===0).length,profitableWeeks:weekly.filter(x=>x.opNet>0).length,firstProfitWeek:weekly.find(x=>x.opNet>0)?.week??null,tailRevenue:avg('revenue'),tailOpNet:avg('opNet'),tailCashDelta:avg('treasuryDelta'),tailAccountingNet:avg('accountingNet'),tailChurn:avg('churn'),tailPlayback:avg('playback')},weekly};
- rows.push(result);writeFileSync(output,JSON.stringify({mode,checks,rows},null,2));console.log(JSON.stringify({id:c.id,opening,paid:result.final.paid,revenue:Math.round(result.summary.tailRevenue),opNet:Math.round(result.summary.tailOpNet),cashAfterRights:result.summary.cashAfterRights,cancels:result.summary.totalCancellations,playback:result.summary.tailPlayback}));
+ const sustainedCashPaybackWeek=weekly.find((row,index)=>row.treasury>=3_000_000_000 && weekly.slice(index).every(point=>point.treasury>=3_000_000_000))?.week??null;
+ const result={sustainedCashPaybackWeek,costCoverage:c.diagnosticOnly?'ISOLATED_ZERO_COUNTRY_OVERHEAD_DIAGNOSTIC':'FULL_COUNTRY_FEES_AND_SERVICE_COST',firstCashPaybackWeek:weekly.find(x=>x.treasury>=3_000_000_000)?.week??null,financeProfit:sum('accountingNet')-sum('additionalOperatingExpense'),netCashAfterAllInvestment:p.ownedStreamingPlatform.treasuryCash-3_000_000_000,config:c,opening,rightsCash,networkQuote,quoteRows,foundationCash,marketEntryCash,replacementRightsCash,originalCash:5_000_000,startTreasury,endTreasury:p.ownedStreamingPlatform.treasuryCash,final:weekly.at(-1),summary:{totalRevenue:sum('revenue'),totalOpNet:sum('opNet'),totalAccountingNet:sum('accountingNet'),totalNonOperating:sum('nonOperatingDelta'),totalCashDelta:sum('treasuryDelta'),totalJoins:sum('joins'),totalCancellations:sum('cancels'),zeroCancelWeeks:weekly.filter(x=>x.cancels===0).length,profitableWeeks:weekly.filter(x=>x.opNet>0).length,firstProfitWeek:weekly.find(x=>x.opNet>0)?.week??null,tailRevenue:avg('revenue'),tailOpNet:avg('opNet'),tailCashDelta:avg('treasuryDelta'),tailAccountingNet:avg('accountingNet'),tailChurn:avg('churn'),tailPlayback:avg('playback')},weekly};
+ rows.push(result);writeFileSync(output,JSON.stringify({mode,checks,rows},null,2));console.log(JSON.stringify({id:c.id,actualWeeks:weekly.length,costCoverage:result.costCoverage,totalRevenue:result.summary.totalRevenue,financeProfit:result.financeProfit,netCashAfterAllInvestment:result.netCashAfterAllInvestment,firstCashPaybackWeek:result.firstCashPaybackWeek,sustainedCashPaybackWeek:result.sustainedCashPaybackWeek}));
 }
 const configs:Config[]=[
   {
@@ -189,7 +185,8 @@ const configs:Config[]=[
     "weeks": 104,
     "racks": 3,
     "genres": 17,
-    "window": "FIRST_WINDOW"
+    "window": "FIRST_WINDOW",
+    "diagnosticOnly": true
   },
   {
     "id": "ADS-104",
@@ -200,7 +197,8 @@ const configs:Config[]=[
     "weeks": 104,
     "racks": 3,
     "genres": 17,
-    "window": "FIRST_WINDOW"
+    "window": "FIRST_WINDOW",
+    "diagnosticOnly": true
   },
   {
     "id": "SUB-15",
@@ -211,7 +209,8 @@ const configs:Config[]=[
     "weeks": 104,
     "racks": 3,
     "genres": 17,
-    "window": "FIRST_WINDOW"
+    "window": "FIRST_WINDOW",
+    "diagnosticOnly": true
   },
   {
     "id": "SUB-6",
@@ -222,7 +221,8 @@ const configs:Config[]=[
     "weeks": 212,
     "racks": 3,
     "genres": 17,
-    "window": "FIRST_WINDOW"
+    "window": "FIRST_WINDOW",
+    "diagnosticOnly": true
   },
   {
     "id": "ADS-6",
@@ -233,7 +233,8 @@ const configs:Config[]=[
     "weeks": 212,
     "racks": 3,
     "genres": 17,
-    "window": "SECOND_WINDOW"
+    "window": "SECOND_WINDOW",
+    "diagnosticOnly": true
   },
   {
     "id": "SUB-LOW",
@@ -244,7 +245,8 @@ const configs:Config[]=[
     "weeks": 52,
     "racks": 3,
     "genres": 17,
-    "window": "FIRST_WINDOW"
+    "window": "FIRST_WINDOW",
+    "diagnosticOnly": true
   },
   {
     "id": "RENT-6",
@@ -255,7 +257,8 @@ const configs:Config[]=[
     "weeks": 104,
     "racks": 3,
     "genres": 17,
-    "window": "SECOND_WINDOW"
+    "window": "SECOND_WINDOW",
+    "diagnosticOnly": true
   },
   {
     "id": "SUB-VALUE",
@@ -266,7 +269,8 @@ const configs:Config[]=[
     "weeks": 212,
     "racks": 3,
     "genres": 17,
-    "window": "FIRST_WINDOW"
+    "window": "FIRST_WINDOW",
+    "diagnosticOnly": true
   },
   {
     "id": "ADS-REFRESH",
@@ -278,7 +282,8 @@ const configs:Config[]=[
     "racks": 3,
     "genres": 17,
     "window": "SECOND_WINDOW",
-    "replace": true
+    "replace": true,
+    "diagnosticOnly": true
   },
   {
     "id": "ADS-REFRESH-260",
@@ -290,10 +295,78 @@ const configs:Config[]=[
     "racks": 3,
     "genres": 17,
     "window": "SECOND_WINDOW",
+    "replace": true,
+    "diagnosticOnly": true
+  },
+  {
+    "id": "SUB-US-FULL",
+    "core": "SUBSCRIPTION",
+    "catalog": 12,
+    "price": 7.99,
+    "quality": 95,
+    "weeks": 104,
+    "racks": 3,
+    "genres": 17,
+    "window": "FIRST_WINDOW",
+    "fullMarketCost": true,
+    "diagnosticOnly": false
+  },
+  {
+    "id": "ADS-US-FULL",
+    "core": "ADVERTISING",
+    "catalog": 12,
+    "price": 4,
+    "quality": 95,
+    "weeks": 104,
+    "racks": 3,
+    "genres": 17,
+    "window": "FIRST_WINDOW",
+    "fullMarketCost": true,
+    "diagnosticOnly": false
+  },
+  {
+    "id": "RENT-US-FULL",
+    "core": "STORE",
+    "catalog": 6,
+    "price": 2.99,
+    "quality": 95,
+    "weeks": 104,
+    "racks": 3,
+    "genres": 17,
+    "window": "SECOND_WINDOW",
+    "fullMarketCost": true,
+    "diagnosticOnly": false
+  },
+  {
+    "id": "ADS-US-REFRESH",
+    "core": "ADVERTISING",
+    "catalog": 6,
+    "price": 6,
+    "quality": 95,
+    "weeks": 260,
+    "racks": 3,
+    "genres": 17,
+    "window": "SECOND_WINDOW",
+    "replace": true,
+    "diagnosticOnly": false,
+    "fullMarketCost": true
+  },
+  {
+    "id": "RENT-US-REFRESH",
+    "core": "STORE",
+    "catalog": 6,
+    "price": 2.99,
+    "quality": 95,
+    "weeks": 212,
+    "racks": 3,
+    "genres": 17,
+    "window": "SECOND_WINDOW",
+    "fullMarketCost": true,
+    "diagnosticOnly": false,
     "replace": true
   }
 ];
-const selected=configs.filter(c=>!process.argv[3]||c.id===process.argv[3]);
+const selected=configs.filter(c=>process.argv[3]?c.id===process.argv[3]:!c.diagnosticOnly);
 assert.ok(selected.length>0,'Unknown balance scenario: '+process.argv[3]);
 for(const c of selected)await run(c);
 writeFileSync(output,JSON.stringify({mode,checks,rows},null,2));if(checks.some(x=>x.status==='FAIL'))process.exitCode=1;

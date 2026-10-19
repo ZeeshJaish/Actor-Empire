@@ -15,7 +15,8 @@ import {
 import { resolveStreamingRightsCompatibility } from './streamingRightsCompatibility';
 import { getOwnedTitleCountryAccess } from './streamingContentAvailability';
 import { createDeterministicId, hashDeterministicSeed } from './deterministicRandom';
-import { getStreamingMarketSupplyProfile } from './streamingMarketSupply';
+import { getStreamingMarketSupplyProfile, getStreamingMarketCycle, getStreamingMarketDiscovery } from './streamingMarketSupply';
+import { advanceStreamingOpportunityMarket } from './streamingOpportunityMarket';
 
 export { followStreamingUpcomingRightsSale, getStreamingUpcomingRightsSales, processStreamingUpcomingRightsWeek } from './streamingUpcomingRights';
 
@@ -25,11 +26,18 @@ export const getContentMarketFunds = (player: Player): number => {
     return Math.max(0, p.treasuryCash - committed);
 };
 
-export const getContentMarketListings = (player: Player) => {
+export const getContentMarketListings = (player: Player, includeReservedListingId?: string) => {
     const p = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     const week = getAbsoluteWeek(player.age, player.currentWeek);
     const countries = getOwnedPlatformPackageCountryIds(p);
-    return getStreamingRightsOpportunities(player).filter(o => ['STUDIO_ACQUISITION', 'PLATFORM_TRADE'].includes(o.kind)).map(o => {
+    const discovery = getStreamingMarketDiscovery(player);
+    const reservedId = includeReservedListingId && p.buyerAuctionSessions.some(session => session.status === 'LIVE'
+        && session.lot.listingKind === 'TITLE' && session.lot.listingId === includeReservedListingId)
+        ? includeReservedListingId : null;
+    const closedIds = new Set(p.buyerAuctionSessions.filter(session => session.status !== 'LIVE'
+        && getStreamingMarketCycle(session.openedAtAbsoluteWeek) === getStreamingMarketCycle(week)).map(session => session.lot.listingId));
+    return getStreamingRightsOpportunities(player, Boolean(reservedId)).filter(o => ['STUDIO_ACQUISITION', 'PLATFORM_TRADE'].includes(o.kind))
+        .filter(o => (!discovery || discovery.listingIds.includes(o.id) || o.id === reservedId) && !closedIds.has(o.id)).map(o => {
         const terms = { ...createDefaultStreamingRightsTerms(o), minimumGuarantee: o.quote.suggestedGuarantee,
             platformRevenueShare: o.sourceLicenseId ? 100 - o.inheritedLicensorRevenueShare : 100-streamingBackendPercentForBuyer(player,null,week,100-o.quote.targetPlatformRevenueShare,countries),
             marketingGuarantee: 0, viewershipBonusThreshold: 0, viewershipBonusAmount: 0,
@@ -137,6 +145,16 @@ export const getContentMarketAuctionAssignments = (
 ): ContentMarketAuctionAssignments => {
     const profile = getStreamingMarketSupplyProfile(player);
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+    const discovery = getStreamingMarketDiscovery(player);
+    if (discovery) {
+        const listingIds = new Set((prepared?.listings || getContentMarketListings(player)).map(item => item.id));
+        const collectionIds = new Set((prepared?.collections || getContentMarketCollections(player)).map(item => item.id));
+        return { listingIds: new Set(discovery.auctionListingIds.filter(id => listingIds.has(id))),
+            collectionIds: new Set(discovery.auctionCollectionIds.filter(id => collectionIds.has(id))) };
+    }
+    const priorRooms = platform.buyerAuctionSessions.filter(session => !session.lot.upcomingRightsSaleId
+        && getStreamingMarketCycle(session.openedAtAbsoluteWeek) === profile.cycle);
+    const remainingSlots = Math.max(0, profile.auctionLimit - priorRooms.length);
     const liveProjectIds = new Set(platform.buyerAuctionSessions
         .filter(session => session.status === 'LIVE')
         .map(session => session.lot.sourceProjectId));
@@ -163,22 +181,42 @@ export const getContentMarketAuctionAssignments = (
         .map(listing => ({ kind: 'TITLE' as const, id: listing.id }));
     const collectionCandidates = collections.map(collection => ({ kind: 'COLLECTION' as const, id: collection.id }));
     const selected: Array<{ kind: 'TITLE' | 'COLLECTION'; id: string }> = [];
-    if (titleCandidates.length) {
+    if (titleCandidates.length && remainingSlots > 0) {
         selected.push(titleCandidates.slice().sort((left, right) => score('TITLE', right.id) - score('TITLE', left.id) || left.id.localeCompare(right.id))[0]);
     }
-    if (collectionCandidates.length && selected.length < profile.auctionLimit) {
+    if (collectionCandidates.length && selected.length < remainingSlots) {
         selected.push(collectionCandidates.slice().sort((left, right) => score('COLLECTION', right.id) - score('COLLECTION', left.id) || left.id.localeCompare(right.id))[0]);
     }
     const selectedKeys = new Set(selected.map(item => `${item.kind}:${item.id}`));
     const remaining = [...titleCandidates, ...collectionCandidates]
         .filter(item => !selectedKeys.has(`${item.kind}:${item.id}`))
         .sort((left, right) => score(right.kind, right.id) - score(left.kind, left.id) || left.id.localeCompare(right.id));
-    selected.push(...remaining.slice(0, Math.max(0, profile.auctionLimit - selected.length)));
+    selected.push(...remaining.slice(0, Math.max(0, remainingSlots - selected.length)));
+    selected.push(...priorRooms.map(session => ({kind: session.lot.listingKind === 'CATALOGUE_PACKAGE' ? 'COLLECTION' as const : 'TITLE' as const,
+        id: session.lot.listingId})));
     return {
         listingIds: new Set(selected.filter(item => item.kind === 'TITLE').map(item => item.id)),
         collectionIds: new Set(selected.filter(item => item.kind === 'COLLECTION').map(item => item.id)),
     };
 };
+
+/** Called only by a persisted transition (founding, migration, rollover or a market action). Reads never refill. */
+export const freezeContentMarketDiscovery = (player: Player): Player => {
+    const state = player.world.streamingOpportunityMarket;
+    if (!state || state.cycle !== getStreamingMarketSupplyProfile(player).cycle || getStreamingMarketDiscovery(player)) return player;
+    const listings = getContentMarketListings(player);
+    const collections = getContentMarketCollections(player);
+    const assignments = getContentMarketAuctionAssignments(player, {listings, collections});
+    return {...player, world: {...player.world, streamingOpportunityMarket: {...state,
+        discovery: {titleIds: [...new Set(listings.map(item => item.title.id))],
+            listingIds: listings.map(item => item.id), auctionListingIds: [...assignments.listingIds],
+            auctionCollectionIds: [...assignments.collectionIds],
+            collectionTitleIdsBySeller: Object.fromEntries(collections.map(item => [item.package.seller.id,
+                item.package.components.map(component => component.sourceProjectId)]))},
+    }}};
+};
+
+export const prepareContentMarketDiscovery = (player: Player): Player => advanceStreamingOpportunityMarket(player);
 
 export const getContentMarketAuctionListings = (player: Player) => {
     const assignments = getContentMarketAuctionAssignments(player);
@@ -197,7 +235,7 @@ export const submitContentMarketPrivateOffer = (
     terms: StreamingRightsTermsInput,
 ): StreamingRightsActionResult => isContentMarketAuctionListing(player, listingId)
     ? { player, changed: false, reason: 'NOT_READY', detail: 'These rights are assigned to a live auction. Enter the auction room to compete.' }
-    : openStreamingPrivateOffer(player, listingId, terms);
+    : openStreamingPrivateOffer(prepareContentMarketDiscovery(player), listingId, terms);
 
 export const getContentMarketCollections = (player: Player, includeReservedOpportunityId?: string) => {
     const savedIds = player.world.streamingOpportunityMarket?.cycle === getStreamingMarketSupplyProfile(player).cycle
@@ -205,11 +243,17 @@ export const getContentMarketCollections = (player: Player, includeReservedOppor
             ...(Array.isArray(player.world.streamingOpportunityMarket.scoutedCollectionIds)
                 ? player.world.streamingOpportunityMarket.scoutedCollectionIds : [])])
         : null;
+    const closedIds = new Set(player.ownedStreamingPlatform.buyerAuctionSessions.filter(session => session.status !== 'LIVE'
+        && getStreamingMarketCycle(session.openedAtAbsoluteWeek) === getStreamingMarketSupplyProfile(player).cycle).map(session => session.lot.listingId));
     return getStreamingCataloguePackageOpportunities(player, {
         includeReservedOpportunityId,
     }).filter(opportunity => !savedIds || savedIds.has(opportunity.id)
-        || opportunity.id === includeReservedOpportunityId).map(o => ({
-        ...o, signature: JSON.stringify([o.id, o.totalGuarantee, o.rows]),
+        || opportunity.id === includeReservedOpportunityId)
+        .filter(opportunity => opportunity.id === includeReservedOpportunityId || !closedIds.has(opportunity.id)).map(o => ({
+        ...o, signature: createDeterministicId('collection-snapshot-v1', JSON.stringify([
+            o.id, o.totalGuarantee, o.rows, o.package.components, o.package.startsAtAbsoluteWeek,
+            o.package.maximumDurationWeeks, o.package.requestedCountryIds,
+        ])),
     }));
 };
 
@@ -301,6 +345,7 @@ export const linkContentMarketOwnedTitles = (player: Player, ids: string[]) => {
 };
 
 export const purchaseContentMarketListing = (player: Player, id: string, signature: string) => {
+    player = prepareContentMarketDiscovery(player);
     const listing = getContentMarketListings(player).find(o => o.id === id);
     const fail = (detail: string) => ({ player, changed: false, detail });
     if (!listing || listing.signature !== signature) return fail('This listing changed. Review the current terms.');
@@ -318,6 +363,7 @@ export const purchaseContentMarketListing = (player: Player, id: string, signatu
 };
 
 export const purchaseContentMarketCollection = (player: Player, id: string, signature: string) => {
+    player = prepareContentMarketDiscovery(player);
     const listing = getContentMarketCollections(player).find(o => o.id === id);
     const fail = (detail: string) => ({ player, changed: false, detail });
     if (!listing || listing.signature !== signature) return fail('This collection changed. Review the current terms.');

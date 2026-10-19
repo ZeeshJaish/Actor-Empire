@@ -18,6 +18,7 @@ import {
   getStreamingMarketEntryProfile,
   isAuthoredStreamingMarket,
 } from '../services/streamingDayOneMarkets';
+import { hasDetailedStreamingMarketCard } from '../services/streamingMarketFilingQuote';
 import { getStreamingMarketSubRegion } from '../services/streamingMarketSubRegions';
 import {
   beginStreamingMarketClearance,
@@ -170,7 +171,7 @@ const mapClearanceOutcome = (outcome?: string | null, additionalPayment = 0): Cl
 const viewersPerStreamingHousehold = (growth: typeof STREAMING_DAY_ONE_MARKETS[number]['growth']) =>
   growth === 'FAST' ? 2.2 : growth === 'STEADY' ? 2.05 : 1.95;
 
-const buildCountry = (market: typeof STREAMING_WORLD_MARKETS[number]): Country => {
+export const buildStreamingLaunchCountry = (market: typeof STREAMING_WORLD_MARKETS[number]): Country => {
   const profile = getStreamingCountryMarketProfile(market.id);
   const entry = getStreamingMarketEntryProfile(market.id);
   const languages = profile?.languageDistribution.length
@@ -188,6 +189,7 @@ const buildCountry = (market: typeof STREAMING_WORLD_MARKETS[number]): Country =
     subRegionId: getStreamingMarketSubRegion(market.id)?.id,
     subRegion: getStreamingMarketSubRegion(market.id)?.name,
     authored: isAuthoredStreamingMarket(market.id),
+    featured: hasDetailedStreamingMarketCard(market.id),
     competition: market.competition,
     difficulty: market.launchDifficulty === 'EASY' ? 'LOW' : market.launchDifficulty === 'MODERATE' ? 'MODERATE' : 'HIGH',
     audience: market.streamingAudience,
@@ -323,7 +325,7 @@ const buildLaunchData = (player: Player): LaunchData => {
      the catalogue. The authored twenty-four keep their written entries; the
      rest are derived from the world registry the game already holds. */
   const countries = STREAMING_WORLD_MARKETS.map(market => {
-    const country = buildCountry(market);
+    const country = buildStreamingLaunchCountry(market);
     const audience = worldAudienceEconomy.countries[market.id];
     const participation = worldAudienceParticipation.countries[market.id];
     return {
@@ -471,10 +473,10 @@ const buildLaunchData = (player: Player): LaunchData => {
     selectedCountryIds: opening.map(operation => operation.countryId!),
     clearance,
     identSounds: [
+      { id: 'silent', name: 'Silent', description: 'Motion only' },
       { id: 'pulse', name: 'Pulse', description: 'Two low beats' },
       { id: 'ascent', name: 'Ascent', description: 'A rising figure' },
       { id: 'premiere', name: 'Premiere', description: 'Orchestral swell' },
-      { id: 'silent', name: 'Silent', description: 'Motion only' },
       { id: 'choir', name: 'Choir', description: 'One held voice' },
       { id: 'machine', name: 'Machine', description: 'Metal and air' },
       { id: 'spark', name: 'Spark', description: 'Bright glass notes' },

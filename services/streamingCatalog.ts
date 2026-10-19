@@ -21,7 +21,7 @@ import {
     createStreamingRightsContractFromLicense,
     registerStreamingRightsContract,
 } from './streamingRightsCore';
-import { getStreamingMarketCycle, selectStreamingMarketTitles } from './streamingMarketSupply';
+import { getStreamingMarketCycle, getStreamingMarketDiscovery, selectStreamingMarketTitles } from './streamingMarketSupply';
 import { getHistoricalCatalogueTitles, resolveHistoricalCatalogueTitle } from './historicalCatalogue';
 import { normalizeStreamingDayOneMarketIds } from './streamingDayOneMarkets';
 import { resolveStreamingRightsCompatibility } from './streamingRightsCompatibility';
@@ -285,9 +285,19 @@ export const getStreamingLicenseCandidatePool = (player: Player): StreamingCatal
         ));
 };
 
-export const getStreamingLicenseOpportunities = (player: Player): StreamingCatalogTitle[] => {
-    return selectStreamingMarketTitles(player, getStreamingLicenseCandidatePool(player)
-        .filter(title => getStreamingMarketCandidateCompatibility(player, title).available));
+export const getStreamingLicenseOpportunities = (player: Player, includeLiveAuctionReferences = false): StreamingCatalogTitle[] => {
+    const candidates = getStreamingLicenseCandidatePool(player)
+        .filter(title => getStreamingMarketCandidateCompatibility(player, title).available);
+    const snapshot = getStreamingMarketDiscovery(player);
+    const byId = new Map(candidates.map(title => [title.id, title]));
+    const selectedIds = snapshot?.titleIds || selectStreamingMarketTitles(player, candidates).map(title => title.id);
+    // An already-open room retains its source across a public rotation. The
+    // public storefront still filters to its saved cycle IDs; this is a
+    // settlement reference, not a free discovery/replenishment path.
+    const liveIds = includeLiveAuctionReferences ? player.ownedStreamingPlatform.buyerAuctionSessions
+        .filter(session => session.status === 'LIVE' && session.lot.listingKind === 'TITLE')
+        .map(session => session.lot.sourceProjectId) : [];
+    return [...new Set([...selectedIds, ...liveIds])].flatMap(id => byId.has(id) ? [byId.get(id)!] : []);
 };
 
 /** The exact default inbound scope used before a title joins the rotating direct shelf. */
@@ -849,3 +859,9 @@ export const signStreamingStarterCatalog = (
         changed: true,
     };
 };
+
+/** Originals are catalogue references even before a separate library import. */
+export const getStreamingCatalogProjectIds = (platform: Player['ownedStreamingPlatform']): string[] => [...new Set([
+    ...platform.catalogProjectIds,
+    ...platform.originalCommissions.flatMap(commission => commission.canonicalProjectId ? [commission.canonicalProjectId] : []),
+])];

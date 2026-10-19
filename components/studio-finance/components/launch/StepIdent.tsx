@@ -50,7 +50,7 @@ export function StepIdent({ data, draft, patch, handlers }: StepProps) {
   const [uploadError, setUploadError] = useState('');
   const [confirmRemove, setConfirmRemove] = useState(false);
   const uploadRef = useRef<HTMLInputElement>(null);
-  const sound = (draft.soundId ?? 'pulse') as StreamingIdentPreviewId;
+  const sound = (draft.soundId ?? 'silent') as StreamingIdentPreviewId;
   const rhythm = RHYTHM[sound] ?? RHYTHM.pulse;
   const pack = data.identPackages.find((p) => p.id === draft.packageId);
   const previewPack = data.identPackages.find((p) => p.id === previewPackageId) || pack;
@@ -87,8 +87,8 @@ export function StepIdent({ data, draft, patch, handlers }: StepProps) {
 
   /* A draft restored from a previous session can still name an ident the
      platform never recorded, so the two are reconciled on mount — but only
-     onto a real, unlocked choice the player actually made. It never invents
-     one, so arriving with nothing chosen leaves the stage open. */
+     onto a real, unlocked choice. Fresh drafts start with the included silent
+     ident; saved player selections take precedence over those defaults. */
   useEffect(() => {
     if (!draft.soundId || !draft.packageId || packageLock) return;
     if (draft.soundId === data.ident.soundId && draft.packageId === data.ident.packageId) return;

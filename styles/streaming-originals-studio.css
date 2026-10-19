@@ -1,4 +1,8 @@
 .originals-studio-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  overflow: hidden;
   --originals-ink: #f7f5ff;
   --originals-muted: #aaa5bd;
   --originals-violet: #9275ff;
@@ -14,6 +18,9 @@
 .originals-studio-shell {
   width: min(100%, 1180px);
   height: min(100dvh, 980px);
+  min-width: 0;
+  max-height: 100%;
+  box-sizing: border-box;
   margin: auto;
   color: var(--originals-ink);
   background: #08080d;
@@ -56,6 +63,7 @@
 }
 
 .originals-studio-header {
+  flex: 0 0 auto;
   min-height: 68px;
   padding: max(10px, env(safe-area-inset-top)) 16px 10px;
   border-bottom: 1px solid var(--originals-line);
@@ -114,6 +122,10 @@
 }
 
 .originals-studio-main {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 12px 12px calc(34px + env(safe-area-inset-bottom));

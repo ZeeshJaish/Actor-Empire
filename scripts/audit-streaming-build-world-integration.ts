@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createC6QaCareer } from '../lab/c6QaCareer';
 import {
     INITIAL_PLAYER,
     type OwnedStreamingPricingConfiguration,
@@ -31,10 +32,11 @@ const pricing: OwnedStreamingPricingConfiguration = {
     patron: { monthly: 10 },
 };
 
-const player = structuredClone(INITIAL_PLAYER) as Player;
+// Demand is conditional on a playable offer; use real eligible catalogue rights.
+const player = createC6QaCareer();
+player.ownedStreamingPlatform.infrastructureSetup = null;
+player.ownedStreamingPlatform.infrastructureSetupDraft = null;
 player.id = 'build-world-integration';
-player.age = 32;
-player.currentWeek = 20;
 player.ownedStreamingPlatform.lifecycle = 'FOUNDING';
 player.ownedStreamingPlatform.identity = {
     name: 'Empire+', slug: 'empire-plus', primaryColor: '#6d4aff', secondaryColor: '#111827',

@@ -52,19 +52,21 @@ export function LaunchWizard({ data, initialStep = 'markets', initialDraft, init
   const [stepId, setStepId] = useState<LaunchStepId>(initialStep);
   const [openSheet, setOpenSheet] = useState<'money' | 'plan' | null>(initialSheet ?? null);
   const [pricingGesture, setPricingGesture] = useState<{ settings: PricingSettings; active: boolean } | null>(null);
-  const [draft, setDraft] = useState<LaunchDraft>(() => resolveLaunchDraftAfterDetour({
+  const [draft, setDraft] = useState<LaunchDraft>(() => {
+    const restored = resolveLaunchDraftAfterDetour({
       selectedCountryIds: data.selectedCountryIds,
-      /* No default selection. An unconfigured platform carries no ident, and the
-         wizard must not invent one: the step previews a kit so you can see what
-         it is, but nothing is chosen until the player chooses it. Seeding these
-         once made the stage complete itself on arrival, which reported a
-         decision nobody had taken. */
       soundId: data.ident.soundId,
       packageId: data.ident.packageId,
       customAudio: data.ident.customAudio,
       storefrontId: data.offer.storefrontId,
       pricing: data.pricing,
-    }, initialDraft));
+    }, initialDraft);
+    return {
+      ...restored,
+      soundId: restored.soundId ?? data.ident.soundId ?? 'silent',
+      packageId: restored.packageId ?? data.ident.packageId ?? 'sting',
+    };
+  });
   const initialAutosaveSent = useRef(false);
   const trackRef = useRef<HTMLElement>(null);
 

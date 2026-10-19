@@ -5053,6 +5053,14 @@ export interface StreamingOpportunityMarketState {
     offers: StreamingOpportunityOffer[];
     /** References to existing rights-valid collection opportunities, not copied films. */
     collectionIds: string[];
+    /** Frozen public discovery for this cycle. Missing in old saves; initialized once without changing deals. */
+    discovery?: {
+        titleIds: string[];
+        listingIds: string[];
+        auctionListingIds: string[];
+        auctionCollectionIds: string[];
+        collectionTitleIdsBySeller?: Record<string, string[]>;
+    };
     /** Private, unsigned player-first scouting shelf; expires with this cycle. */
     scoutedOffers?: StreamingOpportunityOffer[];
     scoutedCollectionIds?: string[];
@@ -5620,6 +5628,11 @@ export interface StreamingAuctionFutureFundingTerms {
     commitment: 'FIRM' | 'OPTION';
     deadlineWeeks: number;
     platformRightsPercent: number;
+    /** Frozen continuation identity for new promises; absent on pre-existing signed agreements. */
+    parentProjectId?: string;
+    lineageId?: string;
+    firstInstallmentNumber?: number;
+    baseTitle?: string;
 }
 
 export interface StreamingBuyerAuctionAllowedTerms {
@@ -5986,6 +5999,8 @@ export interface OwnedStreamingRightsNegotiation {
     processedProposalVersion?: number | null;
     signingDeadlineAbsoluteWeek?: number | null;
     responseMessageId?: string | null;
+    /** Exact advertised fixed-price terms at initial submission, for delayed acceptance parity. */
+    advertisedTermsSignature?: string;
     /** Earliest canonical availability for a pre-release acquisition. */
     availabilityAtAbsoluteWeek?: number | null;
     /** Future-release sale that opened this term sheet. */

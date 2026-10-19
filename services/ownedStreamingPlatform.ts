@@ -510,6 +510,11 @@ const LEDGER_EVENT_TYPES: OwnedStreamingLedgerEventType[] = [
     'LICENSE_SIGNED',
     'ORIGINAL_COMMISSIONED',
     'ORIGINAL_GREENLIT',
+    'ORIGINAL_LOCALIZATION_COMMITTED',
+    'TITLE_LOCALIZATION_COMMITTED',
+    'TITLE_LOCALIZATION_READY',
+    'ORIGINAL_RELEASE_AUTHORIZED',
+    'ORIGINAL_LIFECYCLE_DECIDED',
     'LAUNCH_SLATE_PROGRAMMED',
     'LAUNCH_COMMITTED',
     'LIFECYCLE_CHANGED',
@@ -2996,6 +3001,8 @@ const normalizeRightsNegotiation = (value: unknown): OwnedStreamingRightsNegotia
         processedProposalVersion: source.processedProposalVersion == null ? null : Math.max(1, Math.round(clamp(source.processedProposalVersion, 1, 1000, 1))),
         signingDeadlineAbsoluteWeek: source.signingDeadlineAbsoluteWeek == null ? null : Math.max(0, Math.round(clamp(source.signingDeadlineAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
         responseMessageId: cleanText(source.responseMessageId, '', 180) || null,
+        ...(typeof source.advertisedTermsSignature === 'string' && source.advertisedTermsSignature.length <= 8192
+            ? {advertisedTermsSignature: source.advertisedTermsSignature} : {}),
         availabilityAtAbsoluteWeek: source.availabilityAtAbsoluteWeek == null
             ? null
             : Math.max(0, Math.round(clamp(source.availabilityAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
@@ -3117,7 +3124,7 @@ const normalizeBuyerAuctionSession = (value: unknown): StreamingBuyerAuctionSess
         notice: cleanText(lotSource.notice, '', 280) || null,
         cataloguePackageId: cleanText(lotSource.cataloguePackageId, '', 180) || null,
         upcomingRightsSaleId: cleanText(lotSource.upcomingRightsSaleId, '', 180) || null,
-        catalogueComponentIds: uniqueStrings(lotSource.catalogueComponentIds, 40),
+        catalogueComponentIds: uniqueStrings(lotSource.catalogueComponentIds, 50),
     } satisfies StreamingBuyerAuctionSession['lot'];
     if (!lot.countryIds.length || lot.allowedTerms.backendMaximum < lot.allowedTerms.backendMinimum) return null;
     const bidIds = new Set<string>();

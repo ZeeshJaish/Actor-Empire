@@ -9,6 +9,7 @@ import { configureStreamingPricingOffer } from '../../services/streamingCommerci
 import { getStreamingLaunchDefinitionSignature } from '../../services/streamingLaunchProgram';
 import { normalizeOwnedStreamingPlatformState } from '../../services/ownedStreamingPlatform';
 import { processGameWeek } from '../../services/gameLoop';
+import { advanceStreamingOpportunityMarket } from '../../services/streamingOpportunityMarket';
 
 function createQaPlayer() {
   const query = new URLSearchParams(location.search);
@@ -24,7 +25,7 @@ function createQaPlayer() {
   }
   player.money = 900_000_000;
   player.ownedStreamingPlatform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
-  return player;
+  return advanceStreamingOpportunityMarket(player);
 }
 
 function Fixture() {

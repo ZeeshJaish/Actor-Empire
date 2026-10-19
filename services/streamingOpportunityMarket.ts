@@ -5,6 +5,7 @@ import { getAbsoluteWeek } from './legacyLogic';
 import { NPC_DATABASE } from './npcLogic';
 import { WRITER_NPC_LIBRARY } from './writerNpcLibrary';
 import { getStreamingMarketCycle } from './streamingMarketSupply';
+import { freezeContentMarketDiscovery } from './streamingContentMarket';
 import { getStreamingCataloguePackageOpportunities } from './streamingRightsMarketplace';
 import { getActiveStreamingQuoteVersion, getStreamingLicenseQuote } from './streamingCatalog';
 import { normalizeOwnedStreamingPlatformState, compactOwnedStreamingPlatformForPersistence } from './ownedStreamingPlatform';
@@ -136,10 +137,10 @@ export const advanceStreamingOpportunityMarket = (
         || !Array.isArray(prior.collectionIds) || typeof prior.sellerReceipts !== 'object')) {
         throw new Error('Unsupported or damaged streaming opportunity market; preserve the save for recovery.');
     }
-    if (prior?.cycle === cycle) return player;
+    if (prior?.cycle === cycle) return freezeContentMarketDiscovery(player);
     const collectionIds = getStreamingCataloguePackageOpportunities(player)
         .slice(0, 5).map(collection => collection.id);
-    return { ...player, world: { ...player.world, streamingOpportunityMarket: {
+    return freezeContentMarketDiscovery({ ...player, world: { ...player.world, streamingOpportunityMarket: {
         schemaVersion: 1,
         cycle,
         openedAtAbsoluteWeek: absoluteWeek,
@@ -151,7 +152,7 @@ export const advanceStreamingOpportunityMarket = (
         sellerReceipts: prior?.sellerReceipts || {},
         lastRivalCycle: prior?.lastRivalCycle ?? null,
         lastRivalPublicWeek: null,
-    } } };
+    } } });
 };
 
 export interface StreamingOpportunityPurchaseResult {

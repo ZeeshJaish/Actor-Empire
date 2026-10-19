@@ -3,7 +3,7 @@ import test from 'node:test';
 import { INITIAL_PLAYER, type Player } from '../types';
 import { createDefaultStreamingFoundingDraft, incorporateOwnedStreamingPlatform, saveStreamingFoundingDraft } from '../services/streamingFounding';
 import { contributeStreamingFounderCapital } from '../services/streamingCompany';
-import { beginStreamingMarketClearance, saveStreamingMarketPlan } from '../services/streamingMarkets';
+import { beginStreamingMarketClearance, saveStreamingMarketPlan, resolveStreamingMarketRequirement } from '../services/streamingMarkets';
 import { STREAMING_MARKET_SUB_REGIONS } from '../services/streamingMarketSubRegions';
 import { quoteStreamingMarketFilingEnergy } from '../services/streamingMarketFilingQuote';
 
@@ -26,101 +26,129 @@ const founder = (): Player => {
   return funded.player;
 };
 
-test('filing the 13 Caribbean countries together charges the approved 25E rather than 65E', () => {
-  const caribbean = STREAMING_MARKET_SUB_REGIONS.find(group => group.id === 'CARIBBEAN');
-  assert.equal(caribbean?.countryIds.length, 13);
-  const planned = saveStreamingMarketPlan(founder(), caribbean!.countryIds);
-  assert.equal(planned.reason, 'SAVED');
-  const beforeEnergy = planned.player.energy.current;
-  const beforeTreasury = planned.player.ownedStreamingPlatform.treasuryCash;
-  const filing = beginStreamingMarketClearance(planned.player, caribbean!.countryIds);
-  assert.equal(filing.reason, 'STARTED');
-  assert.equal(filing.energyCost, 25);
-  assert.equal(filing.player.energy.current, beforeEnergy - 25);
-  assert.equal(filing.player.ownedStreamingPlatform.treasuryCash, beforeTreasury - filing.amount);
-  assert.equal(filing.player.ownedStreamingPlatform.marketOperations.filter(operation => operation.status === 'CLEARANCE').length, 13);
+import { WORLD_COUNTRY_DEFINITIONS } from '../services/worldEconomy/worldCountryRegistry';
+
+const allIds = WORLD_COUNTRY_DEFINITIONS.map(country => country.id);
+
+test('country quotes total 533E, deduplicate targets, and do not depend on batch boundaries', () => {
+  assert.equal(quoteStreamingMarketFilingEnergy(allIds), 533);
+  assert.equal(quoteStreamingMarketFilingEnergy(['US', 'IN', 'CN', 'RU', 'PK', 'BD']), 60);
+  assert.equal(quoteStreamingMarketFilingEnergy(['CA', 'GB', 'FR']), 15);
+  assert.equal(quoteStreamingMarketFilingEnergy(['JM', 'NP']), 4);
+  assert.equal(quoteStreamingMarketFilingEnergy(['US', 'US', ' us ', '??']), 10);
+  assert.equal(quoteStreamingMarketFilingEnergy([]), 0);
+  assert.equal(allIds.reduce((sum, id) => sum + quoteStreamingMarketFilingEnergy([id]), 0), 533);
+  assert.equal(STREAMING_MARKET_SUB_REGIONS.reduce((sum, group) => sum + quoteStreamingMarketFilingEnergy(group.countryIds), 0), 533);
 });
 
-test('the approved action curve is finite, monotone and capped for large batches', () => {
-  const samples: Array<[number, number]> = [[0, 0], [1, 5], [2, 7], [7, 17], [9, 21], [13, 25], [18, 30], [23, 30], [40, 30]];
-  samples.forEach(([count, energy]) => assert.equal(quoteStreamingMarketFilingEnergy(count), energy, `${count} countries`));
-  assert.equal(quoteStreamingMarketFilingEnergy(Number.NaN), 0);
-  assert.equal(quoteStreamingMarketFilingEnergy(-2), 0);
-  assert.equal(quoteStreamingMarketFilingEnergy(13.9), 25);
-});
-
-test('partial filing charges only current unfiled targets and repeating a request charges nothing', () => {
-  const ids = STREAMING_MARKET_SUB_REGIONS.find(group => group.id === 'CARIBBEAN')!.countryIds;
+test('individual, group and mixed filing settle identical energy and money', () => {
+  const ids = ['US', 'CA', 'JM']; // 10 + 5 + 2 = 17
   const planned = saveStreamingMarketPlan(founder(), ids).player;
-  const first = beginStreamingMarketClearance(planned, ids.slice(0, 4));
-  assert.equal(first.reason, 'STARTED');
-  assert.equal(first.energyCost, 11);
-  const second = beginStreamingMarketClearance(clone(first.player), ids);
-  assert.equal(second.reason, 'STARTED');
-  assert.equal(second.energyCost, 21, 'Only the nine remaining files receive a batch quote.');
-  assert.equal(second.player.energy.current, planned.energy.current - 32);
-  const again = beginStreamingMarketClearance(second.player, ids);
+  const batch = beginStreamingMarketClearance(clone(planned), ids);
+  assert.equal(batch.energyCost, 17);
+  let individual = clone(planned);
+  for (const id of ids) {
+    const result = beginStreamingMarketClearance(individual, [id]);
+    assert.equal(result.reason, 'STARTED'); individual = result.player;
+  }
+  assert.equal(individual.energy.current, planned.energy.current - 17);
+  assert.equal(individual.energy.current, batch.player.energy.current);
+  assert.equal(individual.ownedStreamingPlatform.treasuryCash, batch.player.ownedStreamingPlatform.treasuryCash);
+  const again = beginStreamingMarketClearance(individual, ids);
   assert.equal(again.reason, 'ALREADY_STARTED');
-  assert.equal(again.changed, false);
-  assert.equal(again.player.energy.current, second.player.energy.current);
-  assert.equal(again.player.ownedStreamingPlatform.treasuryCash, second.player.ownedStreamingPlatform.treasuryCash);
-  const expectedCash = planned.ownedStreamingPlatform.marketOperations
-    .filter(operation => ids.includes(operation.countryId || ''))
-    .reduce((sum, operation) => sum + operation.plannedCosts.total, 0);
-  assert.equal(planned.ownedStreamingPlatform.treasuryCash - second.player.ownedStreamingPlatform.treasuryCash, expectedCash);
+  assert.equal(again.player.energy.current, individual.energy.current);
+  assert.equal(again.player.ownedStreamingPlatform.treasuryCash, individual.ownedStreamingPlatform.treasuryCash);
 });
 
-test('the 23-market North America action fits the 30E cap and energy shortfall is non-mutating', () => {
-  const ids = STREAMING_MARKET_SUB_REGIONS.filter(group => group.regionId === 'NORTH_AMERICA').flatMap(group => group.countryIds);
-  assert.equal(ids.length, 23);
-  const planned = saveStreamingMarketPlan(founder(), ids).player;
-  const shortPlayer = clone(planned);
-  shortPlayer.energy.current = 29;
-  const blocked = beginStreamingMarketClearance(shortPlayer, ids);
+test('insufficient batch energy leaves countries unfiled while affordable individual filings remain possible', () => {
+  const planned = saveStreamingMarketPlan(founder(), allIds).player;
+  planned.energy.current = 70;
+  const before = JSON.stringify(planned);
+  const blocked = beginStreamingMarketClearance(planned, allIds);
   assert.equal(blocked.reason, 'INSUFFICIENT_ENERGY');
-  assert.equal(blocked.energyCost, 30);
-  assert.equal(blocked.shortfall, 1);
-  assert.equal(blocked.changed, false);
-  assert.equal(blocked.player.energy.current, 29);
-  assert.equal(blocked.player.ownedStreamingPlatform.treasuryCash, planned.ownedStreamingPlatform.treasuryCash);
-  const justEnough = clone(planned);
-  justEnough.energy.current = 30;
-  const filed = beginStreamingMarketClearance(justEnough, ids);
-  assert.equal(filed.reason, 'STARTED');
-  assert.equal(filed.energyCost, 30);
-  assert.equal(filed.player.energy.current, 0);
+  assert.equal(blocked.energyCost, 533); assert.equal(blocked.shortfall, 463);
+  assert.equal(JSON.stringify(planned), before);
+  const first = beginStreamingMarketClearance(planned, ['CN']);
+  assert.equal(first.reason, 'STARTED'); assert.equal(first.player.energy.current, 60);
+  const rest = beginStreamingMarketClearance(first.player, allIds);
+  assert.equal(rest.energyCost, 523); assert.equal(rest.reason, 'INSUFFICIENT_ENERGY');
 });
 
-test('zero energy or missing treasury cannot partially file a country batch', () => {
-  const ids = STREAMING_MARKET_SUB_REGIONS.find(group => group.id === 'CARIBBEAN')!.countryIds;
-  const planned = saveStreamingMarketPlan(founder(), ids).player;
-  const noEnergy = clone(planned);
-  noEnergy.energy.current = 0;
-  const attentionBlocked = beginStreamingMarketClearance(noEnergy, ids);
-  assert.equal(attentionBlocked.reason, 'INSUFFICIENT_ENERGY');
-  assert.equal(attentionBlocked.changed, false);
-  assert.equal(attentionBlocked.shortfall, 25);
-  assert.equal(attentionBlocked.player.ownedStreamingPlatform.marketOperations.filter(operation => operation.status === 'CLEARANCE').length, 0);
-
-  const noTreasury = clone(planned);
-  noTreasury.ownedStreamingPlatform.treasuryCash = 0;
-  const cashBlocked = beginStreamingMarketClearance(noTreasury, ids);
-  assert.equal(cashBlocked.reason, 'INSUFFICIENT_TREASURY');
-  assert.equal(cashBlocked.player.energy.current, planned.energy.current);
-  assert.equal(cashBlocked.player.ownedStreamingPlatform.marketOperations.filter(operation => operation.status === 'CLEARANCE').length, 0);
+test('remaining countries can be added later without charging already filed countries again', () => {
+  let p = saveStreamingMarketPlan(founder(), ['US']).player;
+  p = beginStreamingMarketClearance(p, ['US']).player;
+  const prior = p.ownedStreamingPlatform.marketOperations.find(x => x.countryId === 'US')!;
+  p = saveStreamingMarketPlan(p, ['US', 'NP', 'BD']).player;
+  const result = beginStreamingMarketClearance(p, ['US', 'NP', 'BD']);
+  assert.equal(result.reason, 'STARTED'); assert.equal(result.energyCost, 12);
+  assert.deepEqual(result.player.ownedStreamingPlatform.marketOperations.find(x => x.countryId === 'US'), prior);
 });
 
-test('the same action discount applies across regions without a group-specific operation', () => {
-  const ids = ['US', 'BR', 'DE'];
-  const planned = saveStreamingMarketPlan(founder(), ids).player;
-  const filed = beginStreamingMarketClearance(planned, ids);
-  assert.equal(filed.reason, 'STARTED');
-  assert.equal(filed.energyCost, 9);
-  assert.equal(filed.player.energy.current, planned.energy.current - 9);
-  assert.deepEqual(
-    filed.player.ownedStreamingPlatform.marketOperations
-      .filter(operation => ids.includes(operation.countryId || '') && operation.status === 'CLEARANCE')
-      .map(operation => operation.countryId).sort(),
-    [...ids].sort(),
-  );
+test('missing cash does not spend energy or start review', () => {
+  const p = saveStreamingMarketPlan(founder(), ['CN']).player;
+  p.ownedStreamingPlatform.treasuryCash = 0;
+  const result = beginStreamingMarketClearance(p, ['CN']);
+  assert.equal(result.reason, 'INSUFFICIENT_TREASURY');
+  assert.equal(result.player.energy.current, p.energy.current);
+  assert.equal(result.player.ownedStreamingPlatform.marketOperations.filter(x => x.status === 'CLEARANCE').length, 0);
+});
+
+test('additional compliance costs 5E plus the requested money exactly once, including after reload', () => {
+  let p = saveStreamingMarketPlan(founder(), ['BD']).player;
+  p = beginStreamingMarketClearance(p, ['BD']).player;
+  const op = p.ownedStreamingPlatform.marketOperations.find(x => x.countryId === 'BD')!;
+  op.status = 'AWAITING_FUNDING'; op.clearance!.outcome = 'ADDITIONAL_REQUIREMENT';
+  op.clearance!.additionalPayment = 250_000;
+  const cash = p.ownedStreamingPlatform.treasuryCash;
+  const energy = p.energy.current;
+  const shortEnergy = clone(p); shortEnergy.energy.current = 4;
+  const blocked = resolveStreamingMarketRequirement(shortEnergy, op.id);
+  assert.equal(blocked.reason, 'INSUFFICIENT_ENERGY');
+  assert.equal(blocked.player.ownedStreamingPlatform.treasuryCash, cash);
+  const noCash = clone(p); noCash.ownedStreamingPlatform.treasuryCash = 249_999;
+  assert.equal(resolveStreamingMarketRequirement(noCash, op.id).reason, 'INSUFFICIENT_TREASURY');
+  const result = resolveStreamingMarketRequirement(p, op.id);
+  assert.equal(result.reason, 'RESOLVED'); assert.equal(result.energyCost, 5);
+  assert.equal(result.player.energy.current, energy - 5);
+  assert.equal(result.player.ownedStreamingPlatform.treasuryCash, cash - 250_000);
+  const repeat = resolveStreamingMarketRequirement(clone(result.player), op.id);
+  assert.equal(repeat.changed, false);
+  assert.equal(repeat.player.energy.current, energy - 5);
+  assert.equal(repeat.player.ownedStreamingPlatform.treasuryCash, cash - 250_000);
+});
+
+
+test('an inconsistent follow-up state cannot deduct payment without resuming a real request', () => {
+  let p = saveStreamingMarketPlan(founder(), ['BD']).player;
+  p = beginStreamingMarketClearance(p, ['BD']).player;
+  const op = p.ownedStreamingPlatform.marketOperations.find(x => x.countryId === 'BD')!;
+  op.clearance!.outcome = 'ADDITIONAL_REQUIREMENT';
+  op.clearance!.additionalPayment = 250_000;
+  const result = resolveStreamingMarketRequirement(p, op.id);
+  assert.equal(result.changed, false);
+  assert.equal(result.player.energy.current, p.energy.current);
+  assert.equal(result.player.ownedStreamingPlatform.treasuryCash, p.ownedStreamingPlatform.treasuryCash);
+});
+
+
+test('funded global filing and all geographic group filings settle the same 533E and country fees', () => {
+  const planned = saveStreamingMarketPlan(founder(), allIds).player;
+  planned.energy.current = 533;
+  planned.flags.weeklyBaseEnergyRemaining = 100;
+  planned.flags.bonusEnergyBank = 433;
+  const fee = planned.ownedStreamingPlatform.marketOperations.reduce((sum, x) => sum + x.plannedCosts.total, 0);
+  planned.ownedStreamingPlatform.treasuryCash = fee + 1_000_000;
+  const batch = beginStreamingMarketClearance(clone(planned), allIds);
+  assert.equal(batch.reason, 'STARTED'); assert.equal(batch.energyCost, 533);
+  assert.equal(batch.player.energy.current, 0);
+  assert.equal(batch.player.ownedStreamingPlatform.marketOperations.filter(x => x.status === 'CLEARANCE').length, 197);
+  assert.equal(batch.player.ownedStreamingPlatform.treasuryCash, 1_000_000);
+  let grouped = clone(planned);
+  for (const group of STREAMING_MARKET_SUB_REGIONS) {
+    const result = beginStreamingMarketClearance(grouped, group.countryIds);
+    assert.equal(result.reason, 'STARTED', group.id); grouped = clone(result.player);
+  }
+  assert.equal(grouped.energy.current, 0);
+  assert.equal(grouped.ownedStreamingPlatform.treasuryCash, 1_000_000);
+  assert.equal(grouped.ownedStreamingPlatform.marketOperations.filter(x => x.status === 'CLEARANCE').length, 197);
 });

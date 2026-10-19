@@ -921,3 +921,5 @@
 .mkwrap .mkbackendrow button{width:36px;min-height:44px;border:1px solid rgba(255,255,255,.12);border-radius:8px;background:rgba(255,255,255,.04);color:#eeeef5;font-size:19px}
 .mkwrap .mkbackendrow button:disabled{opacity:.3;cursor:default}
 .mkwrap .mkbackendrow button:focus-visible{outline:2px solid var(--epx-auction-own,#8d7bff);outline-offset:2px}
+
+.mkwrap .mkbidfeedback{margin:0 0 8px;color:#ececf4;font-size:11px;line-height:1.45;overflow-wrap:anywhere}

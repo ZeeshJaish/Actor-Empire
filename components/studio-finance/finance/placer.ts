@@ -825,8 +825,9 @@ export function regionReport(data: BuildData, draft: BuildDraft, services: reado
   const served = here.reduce((sum, service) => sum + (countryServiceCoverageValid(service) ? service.coveredPeak : 0), 0);
   const reached = here.reduce((sum, service) => sum + (countryServiceCoverageValid(service) ? service.peak * service.reachedShare : 0), 0);
   const cloudServed = here.reduce((sum, service) => sum + (countryServiceCoverageValid(service) ? service.peak * (service.cloudServedShare ?? 0) : 0), 0);
-  const once = rooms.reduce((sum, room) => sum + facilityCapitalCost(data, room), 0) + rackSpend({ facilities: rooms } as BuildDraft);
-  const weekly = rooms.reduce((sum, room) => sum + facilityWeeklyRent(data, room) + room.opCost, 0);
+  const canonicalQuote = data.canonical?.quote?.(draft).regions.find(item => item.regionId === region.id);
+  const once = canonicalQuote?.dueNow ?? rooms.reduce((sum, room) => sum + facilityCapitalCost(data, room), 0) + rackSpend({ facilities: rooms } as BuildDraft);
+  const weekly = canonicalQuote?.weeklyTotal ?? rooms.reduce((sum, room) => sum + facilityWeeklyRent(data, room) + room.opCost, 0);
   const readyWeeks = rooms.reduce((longest, room) => Math.max(longest, listingFor(data, room)?.provisioningWeeks ?? 0), 0);
   const unservableMarkets = unservableIn(data, region);
   const unservableIds = new Set(unservableMarkets.map(market => market.id));
