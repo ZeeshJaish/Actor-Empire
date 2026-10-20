@@ -8,6 +8,7 @@ import { projectStreamingCommercialOffers } from './streamingCommercialOffers';
 import { normalizeStreamingRightsAccessGrant } from './streamingRightsAccessGrant';
 import { evaluateStreamingTitleRoute, type StreamingTitleAccessDecision, type StreamingTitleAccessRoute } from './streamingTitleAccess';
 import { resolveStreamingProductionReadiness } from './streamingProductionReadiness';
+import { reuseStreamingPresentationSource } from './streamingPresentationInputs';
 
 export const getOwnedPlatformPackageCountryIds = (platform: OwnedStreamingPlatformState): string[] => {
     const operations = (platform.marketOperations || [])
@@ -53,16 +54,26 @@ export interface StreamingCatalogueReadContext {
     readonly titles: Map<string, ReturnType<typeof resolveStreamingCatalogTitle>>;
     readonly availability: Map<string, StreamingContentAvailabilityView>;
     readonly derivedViews: Map<object, unknown>;
+    readonly catalogueViews: Map<object, unknown>;
 }
 
-export const createStreamingCatalogueReadContext = (player: Player): StreamingCatalogueReadContext => {
+export const createStreamingCatalogueReadContext = (
+    player: Player, previous?: StreamingCatalogueReadContext,
+): StreamingCatalogueReadContext => {
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     const packageCountryIds = getOwnedPlatformPackageCountryIds(platform);
+    // Only an explicitly supplied immutable UI snapshot can carry catalogue
+    // results forward. Draft network drawings are not catalogue/rights inputs;
+    // current launch/network models still receive a new platform and view map.
+    const reusable = previous && reuseStreamingPresentationSource(previous.player, player, 'BUILD_FORECAST') === previous.player;
     return {
         player, platform, absoluteWeek: getAbsoluteWeek(player.age, player.currentWeek), packageCountryIds,
         activeCountryIds: new Set(packageCountryIds),
         offer: projectStreamingCommercialOffers(platform.serviceConfiguration.pricing),
-        titles: new Map(), availability: new Map(), derivedViews: new Map(),
+        titles: reusable ? previous.titles : new Map(),
+        availability: reusable ? previous.availability : new Map(),
+        catalogueViews: reusable ? previous.catalogueViews : new Map(),
+        derivedViews: new Map(),
     };
 };
 
@@ -77,9 +88,12 @@ export const resolveStreamingCatalogueReadTitle = (context: StreamingCatalogueRe
 };
 
 /** Reuse expensive derived views only inside the caller-owned current batch. */
-export const readStreamingCatalogueDerivedView = <T>(context: StreamingCatalogueReadContext, key: object, read: () => T): T => {
-    if (!context.derivedViews.has(key)) context.derivedViews.set(key, read());
-    return context.derivedViews.get(key) as T;
+export const readStreamingCatalogueDerivedView = <T>(
+    context: StreamingCatalogueReadContext, key: object, read: () => T, catalogueOnly = false,
+): T => {
+    const views = catalogueOnly ? context.catalogueViews : context.derivedViews;
+    if (!views.has(key)) views.set(key, read());
+    return views.get(key) as T;
 };
 
 /** Re-evaluate studio access against grants elsewhere, including old saved imports. */
@@ -217,18 +231,31 @@ export const createStreamingTitleRouteReadBatch = (
     const offer = projectStreamingCommercialOffers(platform.serviceConfiguration.pricing);
     const titles = new Map<string, ReturnType<typeof prepareTitleRouteContext>>();
     const ownedCountries = new Map<string, ReadonlySet<string>>();
+    const worldwideDecisions = new Map<string, Map<string, StreamingTitleAccessDecision>>();
     return (projectId: string, countryId: string, route: StreamingTitleAccessRoute) => {
         if (!titles.has(projectId)) {
             const title = prepareTitleRouteContext(player, projectId, absoluteWeek, platform, ownedTitleIds.has(projectId));
             titles.set(projectId, title);
             if (title.owned) ownedCountries.set(projectId, new Set(getOwnedTitleCountryAccess(player, projectId, countryIds, absoluteWeek)));
+            // For exclusively GLOBAL licensed positions the only country input
+            // to the canonical evaluator is marketActive. Owned or territorial
+            // positions must still resolve their exact country independently.
+            if (!title.owned && title.licensedPositions.every(position => position.territory === 'GLOBAL')) {
+                worldwideDecisions.set(projectId, new Map());
+            }
         }
-        return evaluatePlayerStreamingTitleRoute(player, projectId, countryId, absoluteWeek, route, {
+        const worldwide = worldwideDecisions.get(projectId);
+        const key = worldwide ? JSON.stringify([route, activeCountryIds.has(countryId)]) : '';
+        const cached = worldwide?.get(key);
+        if (cached) return cached;
+        const decision = evaluatePlayerStreamingTitleRoute(player, projectId, countryId, absoluteWeek, route, {
             platform, ownedTitleIds, offer, activeCountryIds, title: titles.get(projectId),
             // Outside the prepared footprint retain the canonical owned-position
             // metadata even though the market itself will deny playback.
             ownedCountryIds: activeCountryIds.has(countryId) ? ownedCountries.get(projectId) : undefined,
         });
+        worldwide?.set(key, decision);
+        return decision;
     };
 };
 
@@ -282,28 +309,30 @@ export const getStreamingContentAvailability = (
     // All plans/countries in this read share one current platform snapshot.
     // Re-normalizing its 197 countries for each route made even a one-title HQ
     // take seconds. Nothing is cached across reads or rights/configuration changes.
-    const offer = context.offer;
-    const prepared = {
-        platform,
-        ownedTitleIds: new Set(owned ? [projectId] : []),
-        offer,
-        activeCountryIds: context.activeCountryIds,
-        title: prepareTitleRouteContext(player, projectId, week, platform, owned, readyProduction),
-        ownedCountryIds: new Set(owned ? coveredCountryIds : []),
-    };
-    for (const countryId of includeRoutes ? countries : []) {
-        const routeRows: Record<string, StreamingTitleAccessDecision> = {};
-        for (const plan of offer.subscriptions) {
-            routeRows[`SUBSCRIPTION:${plan.id}`] = evaluatePlayerStreamingTitleRoute(player, projectId, countryId, week,
-                { kind: 'SUBSCRIPTION', planId: plan.id }, prepared);
+    if (includeRoutes) {
+        const offer = context.offer;
+        const prepared = {
+            platform,
+            ownedTitleIds: new Set(owned ? [projectId] : []),
+            offer,
+            activeCountryIds: context.activeCountryIds,
+            title: prepareTitleRouteContext(player, projectId, week, platform, owned, readyProduction),
+            ownedCountryIds: new Set(owned ? coveredCountryIds : []),
+        };
+        for (const countryId of countries) {
+            const routeRows: Record<string, StreamingTitleAccessDecision> = {};
+            for (const plan of offer.subscriptions) {
+                routeRows[`SUBSCRIPTION:${plan.id}`] = evaluatePlayerStreamingTitleRoute(player, projectId, countryId, week,
+                    { kind: 'SUBSCRIPTION', planId: plan.id }, prepared);
+            }
+            routeRows.SUBSCRIPTION = routeRows[`SUBSCRIPTION:${offer.subscriptions[0]?.id}`]
+                || evaluatePlayerStreamingTitleRoute(player, projectId, countryId, week,
+                    { kind: 'SUBSCRIPTION', planId: '' }, prepared);
+            for (const kind of ['AD_SUPPORTED', 'RENTAL', 'PURCHASE'] as const) {
+                routeRows[kind] = evaluatePlayerStreamingTitleRoute(player, projectId, countryId, week, { kind }, prepared);
+            }
+            routesByCountry[countryId] = routeRows;
         }
-        routeRows.SUBSCRIPTION = routeRows[`SUBSCRIPTION:${offer.subscriptions[0]?.id}`]
-            || evaluatePlayerStreamingTitleRoute(player, projectId, countryId, week,
-                { kind: 'SUBSCRIPTION', planId: '' }, prepared);
-        for (const kind of ['AD_SUPPORTED', 'RENTAL', 'PURCHASE'] as const) {
-            routeRows[kind] = evaluatePlayerStreamingTitleRoute(player, projectId, countryId, week, { kind }, prepared);
-        }
-        routesByCountry[countryId] = routeRows;
     }
     const result = { source, status, available, coveredCountryIds, hours, estimated, routesByCountry };
     context.availability.set(key, result);
@@ -311,12 +340,31 @@ export const getStreamingContentAvailability = (
 };
 
 /** Viewer previews obey the same current rights, premiere and delivery gates as gameplay. */
-export const getStreamingPlayableCatalogProjectIds = (player: Player, preparedContext?: StreamingCatalogueReadContext): string[] => {
+export const getStreamingPlayableCatalogProjectIds = (
+    player: Player, preparedContext?: StreamingCatalogueReadContext, limit = Infinity,
+): string[] => {
+    if (limit <= 0 || Number.isNaN(limit)) return [];
     const context = getStreamingCatalogueReadContext(player, preparedContext);
     const { platform } = context;
-    return getStreamingCatalogProjectIds(platform).filter(projectId => {
-        const availability = getStreamingContentAvailability(player, projectId, undefined, true, context);
-        return availability.available && Object.values(availability.routesByCountry).some(routes =>
-            Object.values(routes).some(route => route.allowed));
-    });
+    const ownedIds = new Set<string>();
+    const readRoute = createStreamingTitleRouteReadBatch(player, context.absoluteWeek, platform, ownedIds);
+    const routes: StreamingTitleAccessRoute[] = [
+        ...(context.offer.subscriptions.length ? context.offer.subscriptions.map(plan => (
+            { kind: 'SUBSCRIPTION' as const, planId: plan.id }
+        )) : [{ kind: 'SUBSCRIPTION' as const, planId: '' }]),
+        { kind: 'AD_SUPPORTED' }, { kind: 'RENTAL' }, { kind: 'PURCHASE' },
+    ];
+    const playable: string[] = [];
+    for (const projectId of getStreamingCatalogProjectIds(platform)) {
+        const availability = getStreamingContentAvailability(player, projectId, undefined, false, context);
+        if (!availability.available) continue;
+        if (availability.source !== 'LICENSED') ownedIds.add(projectId);
+        // This consumer needs any playable route, not a full matrix for every
+        // title/country. Every attempted route still uses canonical validation.
+        if (context.packageCountryIds.some(countryId => routes.some(route => readRoute(projectId, countryId, route).allowed))) {
+            playable.push(projectId);
+            if (playable.length >= limit) break;
+        }
+    }
+    return playable;
 };

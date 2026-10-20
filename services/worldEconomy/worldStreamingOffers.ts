@@ -8,7 +8,6 @@ import type {
     WorldStreamingPlatformOffer,
 } from '../../types';
 import { createDeterministicId } from '../deterministicRandom';
-import { normalizeOwnedStreamingPlatformState } from '../ownedStreamingPlatform';
 import { normalizeStreamingPlatformEcosystem } from '../streamingPlatformEcosystem';
 import {
     effectiveMonthlyStreamingPlanPrice,
@@ -17,7 +16,8 @@ import {
     normalizeStreamingPricingConfiguration,
 } from '../streamingPricingEconomy';
 import { createAiStreamingCommercialConfiguration } from './worldStreamingCommercialEconomy';
-import { createStreamingTitleRouteReadBatch, evaluatePlayerStreamingTitleRoute, getOwnedPlatformPackageCountryIds } from '../streamingContentAvailability';
+import { createStreamingTitleRouteReadBatch, getOwnedPlatformPackageCountryIds, getStreamingCatalogueReadContext,
+    type StreamingCatalogueReadContext } from '../streamingContentAvailability';
 import { getEligibleOwnedStreamingTitles } from '../streamingCatalog';
 import { getOwnedStreamingProgramEntries } from '../streamingOriginals';
 import { deriveStreamingNetworkCoverage } from '../streamingNetworkCoverage';
@@ -69,8 +69,9 @@ const planAppeal = (featureIds: string[], ads: boolean, earlyPlayable = false): 
     100,
 ));
 
-const createPlayerOffer = (player: Player, absoluteWeek: number): WorldStreamingPlatformOffer | null => {
-    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+const createPlayerOffer = (player: Player, absoluteWeek: number, preparedContext?: StreamingCatalogueReadContext): WorldStreamingPlatformOffer | null => {
+    const context = getStreamingCatalogueReadContext(player, preparedContext);
+    const { platform } = context;
     if (platform.lifecycle !== 'ACTIVE' || !platform.identity) return null;
     const pricing = normalizeStreamingPricingConfiguration(platform.serviceConfiguration.pricing);
     if (!pricing.streams.length) return null;
@@ -91,7 +92,7 @@ const createPlayerOffer = (player: Player, absoluteWeek: number): WorldStreaming
         ? configuredCountryIds.filter(countryId => (routeCoverage.get(countryId) || 0) > 0)
         : configuredCountryIds;
     if (!activeCountryIds.length) return null;
-    const programEntries = getOwnedStreamingProgramEntries({ ...player, ownedStreamingPlatform: platform });
+    const programEntries = getOwnedStreamingProgramEntries(player, context);
     const programWeekForEntries = Math.max(1, absoluteWeek - (platform.launchCommit?.committedAtAbsoluteWeek || absoluteWeek) + 1);
     const entries = programEntries.filter(entry => entry.launchWeek <= programWeekForEntries);
     const eligibleOwnedIds = new Set(getEligibleOwnedStreamingTitles(player).map(title => title.id));
@@ -117,8 +118,9 @@ const createPlayerOffer = (player: Player, absoluteWeek: number): WorldStreaming
     const storeCatalogueStrengthByCountry: Record<string, number> = {};
     const deliveredService = streamingDeliveredService(routePlayer, absoluteWeek);
     const customerExperienceByCountry: NonNullable<WorldStreamingPlatformOffer['customerExperienceByCountry']> = {};
+    const entryByProject = new Map(programEntries.map(entry => [entry.projectId, entry]));
     const facts = new Map(titleIds.map(projectId => {
-        const entry = programEntries.find(row => row.projectId === projectId);
+        const entry = entryByProject.get(projectId);
         return [projectId, { quality: streamingTitleQuality(routePlayer, projectId),
             weeksAvailable: entry ? streamingTitleWeeksAvailable(routePlayer, entry, absoluteWeek) : 52,
             genre: entry?.genre || 'UNKNOWN' }];
@@ -212,9 +214,7 @@ const createPlayerOffer = (player: Player, absoluteWeek: number): WorldStreaming
         ads: plan.ads,
         appealIndex: planAppeal(plan.featureIds, plan.ads, plan.featureIds.includes('early')
             && upcomingEntries.some(entry => activeCountryIds.some(countryId => (
-                evaluatePlayerStreamingTitleRoute({ ...player, ownedStreamingPlatform: platform },
-                    entry.projectId, countryId, absoluteWeek,
-                    { kind: 'SUBSCRIPTION', planId: plan.id }).allowed
+                readTitleRoute(entry.projectId, countryId, { kind: 'SUBSCRIPTION', planId: plan.id }).allowed
             )))),
     }));
     const sourceFingerprint = createDeterministicId('world-streaming-player-offer', platform.serviceConfiguration.revision,
@@ -380,13 +380,13 @@ const createAiOffer = (player: Player, operator: StreamingEcosystemOperator, abs
     };
 };
 
-export const getWorldStreamingOffers = (player: Player, absoluteWeek: number): WorldStreamingOfferRegistry => {
+export const getWorldStreamingOffers = (player: Player, absoluteWeek: number, preparedContext?: StreamingCatalogueReadContext): WorldStreamingOfferRegistry => {
     const week = Math.max(0, Math.round(Number(absoluteWeek) || 0));
     const ecosystem = normalizeStreamingPlatformEcosystem(player.world.streamingPlatformEcosystem, week);
     const offers = Object.values(ecosystem.operators)
         .map(operator => createAiOffer(player, operator, week))
         .filter((offer): offer is WorldStreamingPlatformOffer => Boolean(offer));
-    const playerOffer = createPlayerOffer(player, week);
+    const playerOffer = createPlayerOffer(player, week, preparedContext);
     if (playerOffer) offers.push(playerOffer);
     offers.sort((left, right) => left.platformId.localeCompare(right.platformId));
     const countryIds = new Set(offers.flatMap(offer => offer.activeCountryIds));

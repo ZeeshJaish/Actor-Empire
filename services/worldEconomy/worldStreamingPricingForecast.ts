@@ -22,7 +22,8 @@ import { projectStreamingCommercialOffers } from '../streamingCommercialOffers';
 import { stageWorldStreamingOpeningOffer } from './worldStreamingOpening';
 import { deriveStreamingNetworkCoverage } from '../streamingNetworkCoverage';
 import { getOwnedStreamingProgramEntries } from '../streamingOriginals';
-import { evaluatePlayerStreamingTitleRoute } from '../streamingContentAvailability';
+import { createStreamingCatalogueReadContext, createStreamingTitleRouteReadBatch } from '../streamingContentAvailability';
+import { getEligibleOwnedStreamingTitles } from '../streamingCatalog';
 import { streamingTitleQuality, streamingTitleWeeksAvailable } from './worldStreamingContentValue';
 
 export interface WorldStreamingLaunchPricingForecast {
@@ -166,8 +167,11 @@ export const forecastWorldStreamingLaunchPricing = (
     };
     const previewPlayer = platform.lifecycle === 'ACTIVE' && platform.launchCommit
         ? previewBase : stageWorldStreamingOpeningOffer(previewBase, absoluteWeek);
-    const programEntries = getOwnedStreamingProgramEntries(previewPlayer);
-    const registry = getWorldStreamingOffers(previewPlayer, absoluteWeek);
+    const context = createStreamingCatalogueReadContext(previewPlayer);
+    const programEntries = getOwnedStreamingProgramEntries(previewPlayer, context);
+    const registry = getWorldStreamingOffers(previewPlayer, absoluteWeek, context);
+    const readTitleRoute = createStreamingTitleRouteReadBatch(previewPlayer, absoluteWeek, context.platform,
+        new Set(getEligibleOwnedStreamingTitles(previewPlayer).map(title => title.id)));
     // The saved platform normalizer bounds day-one markets and network coverage
     // may narrow them further. Forecast only the countries where the same player
     // offer used by live customer choice is actually available.
@@ -288,8 +292,7 @@ export const forecastWorldStreamingLaunchPricing = (
         const estimateStoreBuyers = (kind: 'RENTAL' | 'PURCHASE'): number => {
             if (!pricing.streams.includes('rentals')) return 0;
             const price = kind === 'RENTAL' ? pricing.rentals.rent : pricing.rentals.buy;
-            const titles = programEntries.filter(entry=>evaluatePlayerStreamingTitleRoute(
-                previewPlayer,entry.projectId,countryId,absoluteWeek,{kind}).allowed);
+            const titles = programEntries.filter(entry=>readTitleRoute(entry.projectId,countryId,{kind}).allowed);
             if(!titles.length) return 0;
             const quality=titles.reduce((sum,title)=>sum+streamingTitleQuality(previewPlayer,title.projectId),0)/titles.length;
             const weeksAvailable=titles.reduce((sum,title)=>sum+streamingTitleWeeksAvailable(previewPlayer,title,absoluteWeek),0)/titles.length;
@@ -297,8 +300,7 @@ export const forecastWorldStreamingLaunchPricing = (
                 const permitted=storeEligibility?.kind!=='MEMBERSHIP_PLANS'
                     || (source.kind==='SUBSCRIPTION' && storeEligibility.planIds.includes(source.planId || ''));
                 if(!permitted || source.remainingMonthlyBudget<price) return false;
-                return source.kind==='STORE' || !evaluatePlayerStreamingTitleRoute(
-                    previewPlayer,titleId,countryId,absoluteWeek,source.kind==='FREE_AD'
+                return source.kind==='STORE' || !readTitleRoute(titleId,countryId,source.kind==='FREE_AD'
                         ? {kind:'AD_SUPPORTED'} : {kind:'SUBSCRIPTION',planId:source.planId || ''}).allowed;
             };
             const sources=storeSources.filter(source=>titles.some(title=>canBuyTitle(source,title.projectId)));

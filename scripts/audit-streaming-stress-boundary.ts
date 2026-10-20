@@ -4,6 +4,8 @@ import {normalizeOwnedStreamingPlatformState} from '../services/ownedStreamingPl
 import {getStreamingOpeningCatalogueView} from '../services/streamingOpeningCatalogue';
 import type {Player} from '../types';
 import {getAbsoluteWeek} from '../services/legacyLogic';
+import assert from 'node:assert/strict';
+import {advanceStreamingBuyerAuction} from '../services/streamingBuyerAuctions';
 const player=JSON.parse(readFileSync('/tmp/streaming-stress-1040-player.json','utf8')) as Player;
 const migrated=migratePlayerSave(JSON.parse(JSON.stringify(player)));
 const normalized=normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform,player.id);
@@ -12,6 +14,9 @@ const referenceIds=new Set(normalized.catalogProjectIds);
 const licensedIds=new Set(normalized.catalogLicenses.map(license=>license.sourceProjectId));
 const week=getAbsoluteWeek(player.age,player.currentWeek);
 const dropped=player.ownedStreamingPlatform.catalogLicenses.filter(license=>!licensedIds.has(license.sourceProjectId));
+const session=player.ownedStreamingPlatform.buyerAuctionSessions.find(row=>row.status==='LIVE');
+assert.ok(session,'The boundary fixture must contain its normal live auction.');
+const ticked=advanceStreamingBuyerAuction(JSON.parse(JSON.stringify(player)),session.id,1,2000).player;
 const result={expectedTitles:1040,inputReferences:player.ownedStreamingPlatform.catalogProjectIds.length,
     inputLicenses:player.ownedStreamingPlatform.catalogLicenses.length,
     inputDistinctTitles:new Set(player.ownedStreamingPlatform.catalogLicenses.map(license=>license.sourceProjectId)).size,
@@ -25,7 +30,24 @@ const result={expectedTitles:1040,inputReferences:player.ownedStreamingPlatform.
     }).length,
     droppedExamples:dropped.slice(0,3).map(license=>({id:license.id,title:license.titleAtSigning,
         canonicalContractRetained:Boolean(migrated.world.streamingRightsContracts?.[license.id])})),
-    all1040Retained:migrated.ownedStreamingPlatform.catalogProjectIds.length===1040&&migrated.ownedStreamingPlatform.catalogLicenses.length===1040};
+    afterTickReferences:ticked.ownedStreamingPlatform.catalogProjectIds.length,
+    afterTickLicenses:ticked.ownedStreamingPlatform.catalogLicenses.length,
+    all1040Retained:migrated.ownedStreamingPlatform.catalogProjectIds.length===1040&&migrated.ownedStreamingPlatform.catalogLicenses.length===1040
+        &&ticked.ownedStreamingPlatform.catalogProjectIds.length===1040&&ticked.ownedStreamingPlatform.catalogLicenses.length===1040};
 writeFileSync('/tmp/streaming-stress-1040-boundary.json',JSON.stringify(result,null,2));
 console.log(JSON.stringify({...result,referencesWithoutLocalLicense:result.referencesWithoutLocalLicense.length,localLicensesWithoutReference:result.localLicensesWithoutReference.length}));
-if(!result.all1040Retained)process.exitCode=1;
+assert.equal(result.inputReferences,1040);
+assert.equal(result.inputLicenses,1040);
+assert.equal(result.inputDistinctTitles,1040);
+assert.equal(result.reloadedReferences,1040,'A normal load must retain every acquired title reference.');
+assert.equal(result.reloadedLicenses,1040,'A normal load must retain every acquired local entitlement.');
+assert.equal(result.reloadedOpeningTitles,1040,'The opening catalogue must project every retained title.');
+assert.equal(result.afterTickReferences,1040,'The real auction timer must retain every acquired title reference.');
+assert.equal(result.afterTickLicenses,1040,'The real auction timer must retain every acquired local entitlement.');
+assert.equal(result.droppedLicensesWithActiveCanonicalContract,0);
+assert.deepEqual(result.referencesWithoutLocalLicense,[]);
+assert.deepEqual(result.localLicensesWithoutReference,[]);
+assert.equal(migrated.ownedStreamingPlatform.treasuryCash,player.ownedStreamingPlatform.treasuryCash);
+assert.equal(ticked.ownedStreamingPlatform.treasuryCash,player.ownedStreamingPlatform.treasuryCash);
+assert.deepEqual(JSON.parse(JSON.stringify(migrated.world.streamingRightsContracts)),player.world.streamingRightsContracts);
+assert.deepEqual(ticked.world.streamingRightsContracts,player.world.streamingRightsContracts);

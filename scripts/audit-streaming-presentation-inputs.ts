@@ -4,6 +4,7 @@ import { prepareTrustedMarketUpdateForUi } from '../services/playerUiState';
 import { reuseStreamingPresentationSource } from '../services/streamingPresentationInputs';
 import { getStreamingBuyerAuctionLots, openStreamingBuyerAuction, advanceStreamingBuyerAuction, placeStreamingBuyerAuctionBid } from '../services/streamingBuyerAuctions';
 import { createDefaultStreamingInfrastructureDraft } from '../services/streamingInfrastructure';
+import { getStreamingBuildMarketAccess } from '../services/streamingBuildMarketAccess';
 
 const player = prepareTrustedMarketUpdateForUi(filedMarketFixture());
 const updated = (patch: object) => prepareTrustedMarketUpdateForUi({ ...player, ownedStreamingPlatform: { ...player.ownedStreamingPlatform, ...patch } });
@@ -22,6 +23,10 @@ const week = { ...player, currentWeek: player.currentWeek + 1 };
 assert.equal(reuseStreamingPresentationSource(player, week), week, 'Week changes must invalidate windows/readiness.');
 const future = updated({ futureCanonicalField: 1 });
 assert.equal(reuseStreamingPresentationSource(player, future), future, 'Future canonical fields must not be silently ignored.');
+const markets = updated({ marketOperations: player.ownedStreamingPlatform.marketOperations.slice(1) });
+const world = { ...player, world: { ...player.world, projects: player.world.projects.slice(1) } };
+assert.equal(reuseStreamingPresentationSource(player, markets), markets, 'A changed market footprint must invalidate readers.');
+assert.equal(reuseStreamingPresentationSource(player, world), world, 'A changed game world must invalidate readers.');
 const lot = getStreamingBuyerAuctionLots(player).find(row => row.listingKind === 'TITLE')!;
 const opened = openStreamingBuyerAuction(player, lot.id, 1_000);
 assert.ok(opened.session);
@@ -47,11 +52,31 @@ const networkDraftOnly = updated({ infrastructureSetupDraft: {
 assert.equal(reuseStreamingPresentationSource(networkBase, networkDraftOnly, 'BUILD_FORECAST'), networkBase,
     'Uncommissioned network drawings cannot alter the world customer forecast.');
 const withoutDraft = { ...networkBase, ownedStreamingPlatform: { ...networkBase.ownedStreamingPlatform, infrastructureSetupDraft: null } };
-assert.equal(reuseStreamingPresentationSource(networkBase, withoutDraft, 'BUILD_FORECAST'), withoutDraft,
-    'Legacy opening footprint must invalidate when draft existence changes.');
-for (const changed of [cash, rights, pricing, week, future]) assert.equal(
+assert.equal(getStreamingBuildMarketAccess(withoutDraft).source, 'FILED_OPERATIONS');
+assert.equal(getStreamingBuildMarketAccess(withoutDraft).countryIds.length, 197);
+assert.equal(reuseStreamingPresentationSource(withoutDraft, networkBase, 'BUILD_FORECAST'), withoutDraft,
+    'The first network drawing must not invalidate the unchanged 197-country filed footprint.');
+assert.equal(reuseStreamingPresentationSource(networkBase, withoutDraft, 'BUILD_FORECAST'), networkBase,
+    'Removing a drawing must not invalidate an unchanged filed footprint.');
+const legacy = { ...player, ownedStreamingPlatform: {
+    ...player.ownedStreamingPlatform,
+    identity: { ...player.ownedStreamingPlatform.identity!, dayOneMarketIds: ['US', 'IN'] },
+    marketOperations: player.ownedStreamingPlatform.marketOperations.filter(operation => ['US', 'IN'].includes(operation.countryId!))
+        .map(operation => ({ ...operation, source: 'LEGACY_DAY_ONE' as const, status: 'PLANNED' as const,
+            committedAtAbsoluteWeek: null, clearance: null })),
+    infrastructureSetupDraft: null, infrastructureSetup: null, pendingInfrastructureSetup: null,
+} };
+const legacyWithDraft = { ...legacy, ownedStreamingPlatform: {
+    ...legacy.ownedStreamingPlatform, infrastructureSetupDraft: networkBase.ownedStreamingPlatform.infrastructureSetupDraft,
+} };
+assert.equal(getStreamingBuildMarketAccess(legacy).source, 'NONE');
+assert.equal(getStreamingBuildMarketAccess(legacyWithDraft).source, 'LEGACY_OPENING_IDS');
+assert.deepEqual(getStreamingBuildMarketAccess(legacyWithDraft).countryIds, ['IN', 'US']);
+assert.equal(reuseStreamingPresentationSource(legacy, legacyWithDraft, 'BUILD_FORECAST'), legacyWithDraft,
+    'The first drawing must invalidate a true legacy opening footprint when it exposes inherited countries.');
+for (const changed of [cash, rights, pricing, week, future, markets, world]) assert.equal(
     reuseStreamingPresentationSource(player, changed, 'BUILD_FORECAST'), changed,
     'Build forecast reuse must invalidate canonical economy/rights/configuration changes.');
 assert.equal(reuseStreamingPresentationSource(player, networkDraftOnly), networkDraftOnly,
     'Normal HQ/readiness must still see the current network drawing.');
-console.log(JSON.stringify({ passed: 14 }));
+console.log(JSON.stringify({ passed: 19 }));

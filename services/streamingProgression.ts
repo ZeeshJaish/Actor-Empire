@@ -68,10 +68,10 @@ const resolvePlatform = (
     return normalizeOwnedStreamingPlatformState(input);
 };
 
-export const resolveOwnedStreamingReach = (
-    input: Player | OwnedStreamingPlatformState,
+/** Pure read for a platform normalized by the caller's current read boundary. */
+export const resolveCanonicalOwnedStreamingReach = (
+    platform: OwnedStreamingPlatformState,
 ): StreamingReachResolution => {
-    const platform = resolvePlatform(input);
     const incorporated = Boolean(
         platform.identity
         && platform.foundingProfile
@@ -157,6 +157,10 @@ export const resolveOwnedStreamingReach = (
             : [],
     };
 };
+
+export const resolveOwnedStreamingReach = (
+    input: Player | OwnedStreamingPlatformState,
+): StreamingReachResolution => resolveCanonicalOwnedStreamingReach(resolvePlatform(input));
 
 export const getStreamingReachConfigurationKey = (
     reach: StreamingReachResolution,

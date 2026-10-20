@@ -2,7 +2,7 @@ import {streamingBackendPercentForBuyer} from './streamingBackendPolicy';
 import type { Player, StreamingStarterCatalogPackageId } from '../types';
 import { getAbsoluteWeek } from './legacyLogic';
 import { compactOwnedStreamingPlatformForPersistence, normalizeOwnedStreamingPlatformState } from './ownedStreamingPlatform';
-import { getEligibleOwnedStreamingTitles, getStreamingMarketCandidateCompatibility,
+import { createStreamingMarketCompatibilityContext, getEligibleOwnedStreamingTitles, getStreamingMarketCandidateCompatibility,
     resolveStreamingCatalogTitle, STREAMING_STARTER_CATALOG_PACKAGES } from './streamingCatalog';
 import { getHistoricalCatalogueTitles } from './historicalCatalogue';
 import {
@@ -85,6 +85,8 @@ export const searchContentMarketLibrary = (
     const query = (options.query || '').trim().toLocaleLowerCase();
     const limit = Math.max(0, Math.min(100, Math.floor(options.limit ?? 30)));
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+    // One current read batch for this search; purchases resolve current terms independently.
+    const compatibilityContext = createStreamingMarketCompatibilityContext(player, platform);
     const ownedIds = new Set(platform.catalogProjectIds);
     const ownedStudioIds = new Set((player.businesses || [])
         .filter(business => business.type === 'PRODUCTION_HOUSE').map(business => business.id));
@@ -104,14 +106,14 @@ export const searchContentMarketLibrary = (
         .sort((left, right) => right.rating - left.rating || left.id.localeCompare(right.id))
         .slice(0, limit)
         .map(source => {
-            const title = resolveStreamingCatalogTitle(player, source.id)!;
+            const title = resolveStreamingCatalogTitle(player, source.id, platform)!;
             if (ownedIds.has(source.id) || ownedStudioIds.has(source.studioId)) {
                 return { title, status: 'OWNED' as const, reason: 'Already in your catalogue or studio library.', listingId: null };
             }
             if (player.world.legacyStreamingRightsHolds?.[source.id]) {
                 return { title, status: 'UNRESOLVED' as const, reason: 'Past streaming rights need reconciliation.', listingId: null };
             }
-            const compatibility = getStreamingMarketCandidateCompatibility(player, title);
+            const compatibility = getStreamingMarketCandidateCompatibility(player, title, compatibilityContext);
             if (!compatibility.available) {
                 return { title, status: 'HELD' as const, reason: compatibility.summary, listingId: null };
             }

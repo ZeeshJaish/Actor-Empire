@@ -137,6 +137,7 @@ import {
   createDefaultStreamingInfrastructureDraft,
   getSuggestedStreamingNetworkPlacements,
   getStreamingInfrastructureForecast,
+  getCanonicalStreamingInfrastructureDraftForecast,
   saveStreamingInfrastructureRehearsal,
   saveStreamingInfrastructureDraft,
 } from '../services/streamingInfrastructure';
@@ -306,7 +307,12 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
   buildForecastSourceRef.current = buildForecastPlayer;
   const readPlatform = readPlayer.ownedStreamingPlatform;
   const readIdentity = readPlatform.identity!;
-  const catalogueContext = useStreamingView(() => createStreamingCatalogueReadContext(readPlayer), [readPlayer]);
+  const catalogueContextRef = useRef<ReturnType<typeof createStreamingCatalogueReadContext> | undefined>(undefined);
+  const catalogueContext = useStreamingView(() => {
+    const context = createStreamingCatalogueReadContext(readPlayer, catalogueContextRef.current);
+    catalogueContextRef.current = context;
+    return context;
+  }, [readPlayer]);
   const platform = player.ownedStreamingPlatform;
   const constructionSetup = platform.pendingInfrastructureSetup
     || (!platform.launchCommit ? platform.infrastructureSetup : null);
@@ -314,7 +320,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
   const snapshot = useStreamingView(() => getStreamingHqSnapshot(readPlayer), [readPlayer]);
   const launchProgram = useStreamingView(() => getStreamingLaunchProgramView(readPlayer, catalogueContext()), [readPlayer]);
   const openingProgramme = useStreamingView(() => getStreamingOpeningProgrammeView(readPlayer, catalogueContext()), [readPlayer]);
-  const launchBudget = useStreamingView(() => getStreamingLaunchBudgetView(readPlayer), [readPlayer]);
+  const launchBudget = useStreamingView(() => getStreamingLaunchBudgetView(readPlayer, catalogueContext()), [readPlayer]);
   const technologyCampus = useStreamingView(() => getStreamingTechnologyCampus(readPlayer), [readPlayer]);
   const productSuite = useStreamingView(() => getStreamingProductSuite(readPlayer), [readPlayer]);
   const openingCatalogue = useStreamingView(() => getStreamingOpeningCatalogueView(readPlayer, catalogueContext()), [readPlayer]);
@@ -585,7 +591,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
         hue: stableHue(commission.id),
       };
     });
-    const service = getStreamingPlayableCatalogProjectIds(readPlayer, catalogueContext()).slice(0, 8).map(projectId => {
+    const service = getStreamingPlayableCatalogProjectIds(readPlayer, catalogueContext(), 8).map(projectId => {
       const title = resolveStreamingCatalogTitle(readPlayer, projectId);
       if (!title) return null;
       const performance = performanceByProject.get(projectId);
@@ -2051,7 +2057,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
         sel={buildSelection}
         result={buildRunResult}
         savedRehearsal={platform.infrastructureSetupDraft?.lastLaunchRehearsal}
-        rehearsalConfigurationSignature={prepareCinematicBuild().forecast.configurationSignature}
+        rehearsalConfigurationSignature={getCanonicalStreamingInfrastructureDraftForecast(player, canonicalInfrastructureDraft()).configurationSignature}
         built={builtPlacements()}
         builtFacilities={builtFacilities()}
         construction={constructionSetup ? {

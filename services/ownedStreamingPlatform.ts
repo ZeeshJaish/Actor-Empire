@@ -206,7 +206,9 @@ export const OWNED_STREAMING_WEEKLY_DECISION_LIMIT = 104;
 export const OWNED_STREAMING_GROWTH_ACTION_LIMIT = 104;
 export const OWNED_STREAMING_CYCLE_REVIEW_LIMIT = 40;
 export const OWNED_STREAMING_MILESTONE_LIMIT = 80;
-export const OWNED_STREAMING_CATALOG_REFERENCE_LIMIT = 1_000;
+export const OWNED_STREAMING_CATALOG_DRAFT_REFERENCE_LIMIT = 1_000;
+/** Compatibility name for the planning-draft bound. Durable entitlements are not capped. */
+export const OWNED_STREAMING_CATALOG_REFERENCE_LIMIT = OWNED_STREAMING_CATALOG_DRAFT_REFERENCE_LIMIT;
 export const OWNED_STREAMING_EXECUTIVE_APPOINTMENT_LIMIT = 24;
 export const OWNED_STREAMING_CAPITAL_ACTION_LIMIT = 80;
 export const OWNED_STREAMING_LOAN_LIMIT = 12;
@@ -579,11 +581,12 @@ const cleanText = (value: unknown, fallback = '', maxLength = 160): string => (
         : fallback
 );
 const cleanCustomMarkDataUrl = cleanStreamingBrandMarkDataUrl;
-const uniqueStrings = (value: unknown, limit: number): string[] => Array.from(new Set(
-    asArray<unknown>(value)
+const uniqueStrings = (value: unknown, limit?: number): string[] => {
+    const strings = Array.from(new Set(asArray<unknown>(value)
         .map(item => cleanText(item, '', 180))
-        .filter(Boolean),
-)).slice(-limit);
+        .filter(Boolean)));
+    return limit === undefined ? strings : strings.slice(-limit);
+};
 const isOneOf = <T extends string>(value: unknown, choices: readonly T[], fallback: T): T => (
     choices.includes(value as T) ? value as T : fallback
 );
@@ -2349,7 +2352,7 @@ const normalizeLaunchRehearsalSnapshot = (
     };
 };
 
-const normalizeInfrastructureSetupDraft = (
+export const normalizeInfrastructureSetupDraft = (
     value: unknown,
 ): OwnedStreamingInfrastructureSetupDraft | null => {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
@@ -2841,7 +2844,7 @@ const normalizeCatalogSetupDraft = (value: unknown): OwnedStreamingCatalogSetupD
     const counterPlatformRevenueShare = source.counterPlatformRevenueShare;
     return {
         currentStep: Math.round(clamp(source.currentStep, 0, 4)),
-        selectedOwnedProjectIds: uniqueStrings(source.selectedOwnedProjectIds, OWNED_STREAMING_CATALOG_REFERENCE_LIMIT),
+        selectedOwnedProjectIds: uniqueStrings(source.selectedOwnedProjectIds, OWNED_STREAMING_CATALOG_DRAFT_REFERENCE_LIMIT),
         packageId: isOneOf(source.packageId, STARTER_CATALOG_PACKAGE_IDS, 'CURATED_PREMIERE'),
         opportunityProjectId: opportunityProjectId || null,
         territory: isOneOf(source.territory, LICENSE_TERRITORIES, 'MULTI_REGION'),
@@ -2868,8 +2871,8 @@ const normalizeStarterCatalog = (value: unknown): OwnedStreamingStarterCatalog |
     const source = asRecord(value);
     return {
         packageId: isOneOf(source.packageId, STARTER_CATALOG_PACKAGE_IDS, 'CURATED_PREMIERE'),
-        ownedProjectIds: uniqueStrings(source.ownedProjectIds, OWNED_STREAMING_CATALOG_REFERENCE_LIMIT),
-        licensedProjectIds: uniqueStrings(source.licensedProjectIds, OWNED_STREAMING_CATALOG_REFERENCE_LIMIT),
+        ownedProjectIds: uniqueStrings(source.ownedProjectIds),
+        licensedProjectIds: uniqueStrings(source.licensedProjectIds),
         establishedAtAbsoluteWeek: Math.max(0, Math.round(clamp(source.establishedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
     };
 };
@@ -2896,7 +2899,9 @@ const normalizeCatalogLicense = (value: unknown): OwnedStreamingCatalogLicense |
         genre: cleanText(source.genre, 'Licensed', 80),
         licensorName: cleanText(source.licensorName, 'Rights holder', 140),
         territory: isOneOf(source.territory, LICENSE_TERRITORIES, 'MULTI_REGION'),
-        countryIds: uniqueStrings(source.countryIds, 80),
+        // Preserve the existing country-string validation and legacy snapshots;
+        // a registry whitelist must not erase paid history or broaden a scope.
+        countryIds: uniqueStrings(source.countryIds),
         durationWeeks,
         exclusivity: isOneOf(source.exclusivity, LICENSE_EXCLUSIVITY, 'NON_EXCLUSIVE'),
         minimumGuarantee: Math.round(clamp(source.minimumGuarantee, 0, Number.MAX_SAFE_INTEGER)),
@@ -4030,6 +4035,31 @@ export const normalizeOwnedStreamingPlatformState = (
     const legacyLaunchServerCityId = cleanText(identitySource.launchServerCityId, '', 24) || null;
     if (normalizedIdentity && legacyLaunchServerCityId) normalizedIdentity.launchServerCityId = legacyLaunchServerCityId;
 
+    // Acquired rights are durable records rather than rolling UI/history data.
+    // Keep every valid entitlement, including expired/transferred records used
+    // by renewals and accounting. Only a current position can repair a missing
+    // licensed reference; expiry/transfer deliberately removes those links.
+    const starterCatalog = normalizeStarterCatalog(source.starterCatalog);
+    const catalogLicenses = dedupeByKey(
+        asArray<unknown>(source.catalogLicenses)
+            .map(normalizeCatalogLicense)
+            .filter((license): license is OwnedStreamingCatalogLicense => Boolean(license)),
+        license => license.id,
+    );
+    const activeLicensedProjectIds = new Set(catalogLicenses
+        .filter(license => license.status === 'ACTIVE')
+        .map(license => license.sourceProjectId));
+    const terminalOnlyProjectIds = new Set(catalogLicenses
+        .filter(license => license.status !== 'ACTIVE' && !activeLicensedProjectIds.has(license.sourceProjectId))
+        .map(license => license.sourceProjectId));
+    const catalogProjectIds = uniqueStrings([
+        ...uniqueStrings(source.catalogProjectIds),
+        // Explicit owned-library links do not depend on an external licence.
+        ...(starterCatalog?.ownedProjectIds || []),
+        ...(starterCatalog?.licensedProjectIds || []).filter(id => !terminalOnlyProjectIds.has(id)),
+        ...activeLicensedProjectIds,
+    ]);
+
     return {
         schemaVersion: OWNED_STREAMING_PLATFORM_SCHEMA_VERSION,
         lifecycle: isOneOf(source.lifecycle, LIFECYCLES, defaults.lifecycle),
@@ -4112,13 +4142,8 @@ export const normalizeOwnedStreamingPlatformState = (
                 .filter((sale): sale is StreamingUpcomingRightsSale => Boolean(sale)),
             sale => sale.id,
         ).slice(-80),
-        starterCatalog: normalizeStarterCatalog(source.starterCatalog),
-        catalogLicenses: dedupeByKey(
-            asArray<unknown>(source.catalogLicenses)
-                .map(normalizeCatalogLicense)
-                .filter((license): license is OwnedStreamingCatalogLicense => Boolean(license)),
-            license => license.id,
-        ).slice(-OWNED_STREAMING_CATALOG_REFERENCE_LIMIT),
+        starterCatalog,
+        catalogLicenses,
         rightsNegotiations: dedupeByKey(
             asArray<unknown>(source.rightsNegotiations)
                 .map(normalizeRightsNegotiation)
@@ -4166,7 +4191,7 @@ export const normalizeOwnedStreamingPlatformState = (
         ) as Record<StreamingTechnologyBranch, number>,
         metrics: normalizeMetrics(source.metrics),
         audienceAccessPolicy: normalizeAudienceAccessPolicy(source.audienceAccessPolicy),
-        catalogProjectIds: uniqueStrings(source.catalogProjectIds, OWNED_STREAMING_CATALOG_REFERENCE_LIMIT),
+        catalogProjectIds,
         simulationSeed: cleanText(source.simulationSeed, defaults.simulationSeed, 120) || defaults.simulationSeed,
         lastProcessedAbsoluteWeek: source.lastProcessedAbsoluteWeek === null || source.lastProcessedAbsoluteWeek === undefined
             ? null

@@ -5,7 +5,7 @@ import {createStreamingLicenseContract,createStreamingRightsContractFromLicense}
 
 /** Disposable boundary/stress data only. Starts with 104 normal acquisitions,
  * then seeds distinct released historical titles with explicit canonical grants.
- * Deliberately does not compact: the test must expose the current 1,000 cap. */
+ * Deliberately does not compact: the test must expose any lossy persistence boundary. */
 export const streamingCatalogueStressFixture=(titleCount=1040,nowMs=1000)=>{
     if(!Number.isInteger(titleCount)||titleCount<104||titleCount>1040) throw new Error('Stress fixture supports 104–1040 titles.');
     const {player,session}=streamingCatalogueScaleFixture(104,nowMs);

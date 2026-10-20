@@ -21,7 +21,9 @@ import {
     resolveStreamingLocalizationTiers,
 } from './streamingLocalizationCapabilities';
 import { getStreamingContentAvailability, getStreamingCatalogueReadContext, readStreamingCatalogueDerivedView,
-    resolveStreamingCatalogueReadTitle, type ContentAvailability, type StreamingCatalogueReadContext } from './streamingContentAvailability';
+    resolveStreamingCatalogueReadTitle, createStreamingTitleRouteReadBatch,
+    type ContentAvailability, type StreamingCatalogueReadContext } from './streamingContentAvailability';
+import type { StreamingTitleAccessRoute } from './streamingTitleAccess';
 
 export type StreamingLocalizationDelivery = 'OUTSOURCE' | 'IN_HOUSE';
 export type StreamingCatalogueMetadataStatus = 'READY' | 'IN_REVIEW' | 'PLANNED';
@@ -149,12 +151,12 @@ const isOriginalLanguage = (language: string): boolean => normalizeStreamingLang
 
 const qualitySatisfied = (
     preference: OwnedStreamingCountryMarketProfile['localizationPreference'],
-    language: string,
+    originalLanguage: boolean,
     asset: OwnedStreamingTitleLanguageAsset | null,
     subtitleLevel: 0 | 1 | 2 | 3 = 0,
     dubbingLevel: 0 | 1 | 2 | 3 = 0,
 ): boolean => {
-    if (isOriginalLanguage(language)) return true;
+    if (originalLanguage) return true;
     const subtitlesReady = Boolean(asset?.subtitleReady) || subtitleLevel > 0;
     const dubbingReady = Boolean(asset?.dubReady) || dubbingLevel > 0;
     if (preference === 'DUB_FIRST') return dubbingReady;
@@ -164,12 +166,12 @@ const qualitySatisfied = (
 
 const reachForLanguage = (
     preference: OwnedStreamingCountryMarketProfile['localizationPreference'],
-    language: string,
+    originalLanguage: boolean,
     asset: OwnedStreamingTitleLanguageAsset | null,
     subtitleLevel: 0 | 1 | 2 | 3 = 0,
     dubbingLevel: 0 | 1 | 2 | 3 = 0,
 ): number => {
-    if (isOriginalLanguage(language)) return 1;
+    if (originalLanguage) return 1;
     if (asset?.dubReady) return 1;
     if (asset?.subtitleReady) return preference === 'DUB_FIRST' ? 0.68 : 0.94;
     if (dubbingLevel > 0) return ([0, 0.84, 0.94, 1] as const)[dubbingLevel];
@@ -202,6 +204,7 @@ const buildStreamingOpeningCatalogueView = (player: Player, context: StreamingCa
             : ownedIds.has(projectId) || title?.source === 'OWNED_LIBRARY'
                 ? 'OWNED'
                 : 'LICENSED';
+        const access = getStreamingContentAvailability(player, projectId, openingCountryIds, false, context);
         return {
             projectId,
             title: title?.title || license?.titleAtSigning || 'Untitled',
@@ -209,12 +212,35 @@ const buildStreamingOpeningCatalogueView = (player: Player, context: StreamingCa
             genre: title?.genre || license?.genre || 'Unknown',
             source,
             license,
-            access: getStreamingContentAvailability(player, projectId, openingCountryIds, true, context),
+            access,
+            coveredCountries: new Set(access.coveredCountryIds),
         };
     });
+    const readTitleRoute = createStreamingTitleRouteReadBatch(player, context.absoluteWeek, platform,
+        new Set(baseTitles.filter(title => title.access.source !== 'LICENSED').map(title => title.projectId)));
+    const firstSubscriptionRoute: StreamingTitleAccessRoute = { kind: 'SUBSCRIPTION', planId: context.offer.subscriptions[0]?.id || '' };
+    const remainingRoutes: StreamingTitleAccessRoute[] = [
+        ...context.offer.subscriptions.slice(1).map(plan => ({ kind: 'SUBSCRIPTION' as const, planId: plan.id })),
+        { kind: 'AD_SUPPORTED' }, { kind: 'RENTAL' }, { kind: 'PURCHASE' },
+    ];
     const allLanguages = Array.from(new Set(operations.flatMap(operation => (
         operation.countryProfile?.languageDistribution.map(item => item.language) || []
     ))));
+    const languageInputs = new Map(allLanguages.map(language => {
+        const normalized = normalizeStreamingLanguageId(language);
+        const active = activeLanguages.has(normalized);
+        return [language, { normalized, original: normalized === 'english',
+            subtitleLevel: active ? globalLocalization.subtitleLevel : 0,
+            dubbingLevel: active ? globalLocalization.dubbingLevel : 0 }] as const;
+    }));
+    const assetsByTitle = new Map<string, Map<string, OwnedStreamingTitleLanguageAsset>>();
+    platform.localizationOperations.titleLanguageAssets.forEach(asset => {
+        const languages = assetsByTitle.get(asset.titleId) || new Map<string, OwnedStreamingTitleLanguageAsset>();
+        const normalized = normalizeStreamingLanguageId(asset.languageId);
+        // Match the existing first matching asset, including legacy duplicates.
+        if (!languages.has(normalized)) languages.set(normalized, asset);
+        assetsByTitle.set(asset.titleId, languages);
+    });
     const titles: StreamingOpeningTitleCoverage[] = baseTitles.map(title => ({
         projectId: title.projectId,
         title: title.title,
@@ -227,25 +253,21 @@ const buildStreamingOpeningCatalogueView = (player: Player, context: StreamingCa
         hours: title.access.hours,
         hoursEstimated: title.access.estimated,
         subtitleLanguagesReady: allLanguages.filter(language => {
-            const normalized = normalizeStreamingLanguageId(language);
-            return isOriginalLanguage(language)
-                || Boolean(getAsset(platform.localizationOperations.titleLanguageAssets, title.projectId, language)?.subtitleReady)
-                || (globalLocalization.subtitleLevel > 0 && activeLanguages.has(normalized));
+            const input = languageInputs.get(language)!;
+            return input.original
+                || Boolean(assetsByTitle.get(title.projectId)?.get(input.normalized)?.subtitleReady)
+                || input.subtitleLevel > 0;
         }),
         dubLanguagesReady: allLanguages.filter(language => {
-            const normalized = normalizeStreamingLanguageId(language);
-            return isOriginalLanguage(language)
-                || Boolean(getAsset(platform.localizationOperations.titleLanguageAssets, title.projectId, language)?.dubReady)
-                || (globalLocalization.dubbingLevel > 0 && activeLanguages.has(normalized));
+            const input = languageInputs.get(language)!;
+            return input.original
+                || Boolean(assetsByTitle.get(title.projectId)?.get(input.normalized)?.dubReady)
+                || input.dubbingLevel > 0;
         }),
     }));
 
     const countries = operations.map((operation): StreamingOpeningCountryCoverage => {
         const profile = operation.countryProfile!;
-        const availableTitles = baseTitles.filter(title => title.access.available
-            && title.access.coveredCountryIds.includes(operation.countryId!)
-            && Object.values(title.access.routesByCountry[operation.countryId!] || {}).some(route => route.allowed));
-        const missingRightsTitles = baseTitles.filter(title => !availableTitles.includes(title)).map(title => title.title);
         const reasonLabel = (reasonCode: string): string => ({
             TERRITORY_DENIED: 'Not licensed in this country',
             RIGHTS_MISSING: 'No rights agreement',
@@ -256,25 +278,35 @@ const buildStreamingOpeningCatalogueView = (player: Player, context: StreamingCa
             MODE_NOT_GRANTED: 'Offer not included in the rights agreement',
             MARKET_INACTIVE: 'Market not active',
         } as Record<string, string>)[reasonCode] || 'No playable offer here';
-        const missingRightsDetails = baseTitles.filter(title => !availableTitles.includes(title)).map(title => {
-            const routes = title.access.routesByCountry[operation.countryId!] || {};
-            const denial = routes.SUBSCRIPTION || routes.AD_SUPPORTED || routes.RENTAL || routes.PURCHASE;
-            return `${title.title}: ${reasonLabel(denial?.reasonCode || 'RIGHTS_MISSING')}`;
+        const availableTitles: typeof baseTitles = [];
+        const missingRightsTitles: string[] = [];
+        const missingRightsDetails: string[] = [];
+        baseTitles.forEach(title => {
+            // The previous full matrix always explained missing coverage using
+            // SUBSCRIPTION (the first plan, or the empty-plan fallback). Keep
+            // that decision even if another route grants country playback.
+            const first = readTitleRoute(title.projectId, operation.countryId!, firstSubscriptionRoute);
+            const playable = title.access.available && title.coveredCountries.has(operation.countryId!)
+                && (first.allowed || remainingRoutes.some(route => readTitleRoute(title.projectId, operation.countryId!, route).allowed));
+            if (playable) availableTitles.push(title);
+            else {
+                missingRightsTitles.push(title.title);
+                missingRightsDetails.push(`${title.title}: ${reasonLabel(first.reasonCode)}`);
+            }
         });
         const totalChecks = Math.max(1, availableTitles.length * Math.max(1, profile.languageDistribution.length));
         let subtitles = 0;
         let dubs = 0;
         let qualityChecks = 0;
         let reachWeighted = 0;
-        availableTitles.forEach(title => profile.languageDistribution.forEach(language => {
-            const asset = getAsset(platform.localizationOperations.titleLanguageAssets, title.projectId, language.language);
-            const languageActive = activeLanguages.has(normalizeStreamingLanguageId(language.language));
-            const subtitleLevel = languageActive ? globalLocalization.subtitleLevel : 0;
-            const dubbingLevel = languageActive ? globalLocalization.dubbingLevel : 0;
-            if (isOriginalLanguage(language.language) || asset?.subtitleReady || subtitleLevel > 0) subtitles += 1;
-            if (isOriginalLanguage(language.language) || asset?.dubReady || dubbingLevel > 0) dubs += 1;
-            if (qualitySatisfied(profile.localizationPreference, language.language, asset, subtitleLevel, dubbingLevel)) qualityChecks += 1;
-            reachWeighted += language.audiencePercent * reachForLanguage(profile.localizationPreference, language.language, asset, subtitleLevel, dubbingLevel);
+        const countryLanguages = profile.languageDistribution.map(language => ({ ...language, input: languageInputs.get(language.language)! }));
+        availableTitles.forEach(title => countryLanguages.forEach(language => {
+            const { normalized, original, subtitleLevel, dubbingLevel } = language.input;
+            const asset = assetsByTitle.get(title.projectId)?.get(normalized) || null;
+            if (original || asset?.subtitleReady || subtitleLevel > 0) subtitles += 1;
+            if (original || asset?.dubReady || dubbingLevel > 0) dubs += 1;
+            if (qualitySatisfied(profile.localizationPreference, original, asset, subtitleLevel, dubbingLevel)) qualityChecks += 1;
+            reachWeighted += language.audiencePercent * reachForLanguage(profile.localizationPreference, original, asset, subtitleLevel, dubbingLevel);
         }));
         const titleCount = baseTitles.length;
         return {
@@ -327,7 +359,7 @@ const buildStreamingOpeningCatalogueView = (player: Player, context: StreamingCa
 
 export const getStreamingOpeningCatalogueView = (player: Player, preparedContext?: StreamingCatalogueReadContext): StreamingOpeningCatalogueView => {
     const context = getStreamingCatalogueReadContext(player, preparedContext);
-    return readStreamingCatalogueDerivedView(context, getStreamingOpeningCatalogueView, () => buildStreamingOpeningCatalogueView(player, context));
+    return readStreamingCatalogueDerivedView(context, getStreamingOpeningCatalogueView, () => buildStreamingOpeningCatalogueView(player, context), true);
 };
 
 export const getStreamingLocalizationQuote = (

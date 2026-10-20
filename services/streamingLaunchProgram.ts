@@ -162,8 +162,8 @@ export interface StreamingOpeningMarketDecisionState {
     unfiledOperationIds: string[];
 }
 
-export const getStreamingOpeningMarketDecisionState = (player: Player): StreamingOpeningMarketDecisionState => {
-    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+export const getStreamingOpeningMarketDecisionState = (player: Player, context?: StreamingCatalogueReadContext): StreamingOpeningMarketDecisionState => {
+    const platform = context?.player === player ? context.platform : normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     const operations = platform.marketOperations.filter(operation => (
         operation.scope === 'COUNTRY'
         && operation.entryKind === 'OPENING'
@@ -230,8 +230,8 @@ export interface StreamingIdentPurchaseView {
 
 /** Ident packages are owned only inside the current launch campaign. Legacy
  * pre-campaign payments are attributed to the configuration they purchased. */
-export const getStreamingIdentPurchaseView = (player: Player): StreamingIdentPurchaseView => {
-    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+export const getStreamingIdentPurchaseView = (player: Player, context?: StreamingCatalogueReadContext): StreamingIdentPurchaseView => {
+    const platform = context?.player === player ? context.platform : normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     const campaignId = getIdentCampaignId(platform);
     const prefix = `service-ident:${campaignId}:`;
     const paidByPackage: Partial<Record<StreamingIdentPackageId, number>> = { STANDARD: 0 };
@@ -263,8 +263,8 @@ export const getStreamingIdentPurchaseView = (player: Player): StreamingIdentPur
     return { campaignId, purchasedPackageIds, paidByPackage, totalPaid };
 };
 
-export const getStreamingLaunchDefinitionSignature = (player: Player): string => {
-    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+export const getStreamingLaunchDefinitionSignature = (player: Player, context?: StreamingCatalogueReadContext): string => {
+    const platform = context?.player === player ? context.platform : normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     const markets = platform.marketOperations
         .filter(operation => operation.entryKind === 'OPENING' && operation.status !== 'EXITED')
         .map(operation => `${operation.countryId}:${operation.status}:${operation.plannedCosts.total}:${operation.policySnapshot?.revision || 0}:${operation.countryProfile?.recommendedNetworkFootprint.edgeSites || 0}:${operation.countryProfile?.recommendedNetworkFootprint.peakConcurrentStreams || 0}`)
@@ -634,8 +634,8 @@ export const checkpointStreamingLaunchBlueprint = (player: Player): StreamingLau
 /** Compatibility alias for older surfaces; new UI checkpoints automatically. */
 export const saveStreamingLaunchBlueprint = checkpointStreamingLaunchBlueprint;
 
-export const getStreamingLaunchBudgetView = (player: Player): StreamingLaunchBudgetView => {
-    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+export const getStreamingLaunchBudgetView = (player: Player, context?: StreamingCatalogueReadContext): StreamingLaunchBudgetView => {
+    const platform = context?.player === player ? context.platform : normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     const commitmentSourceIds = new Set(platform.costCommitments.map(item => item.sourceReferenceId).filter(Boolean));
     const unmirroredMarketPlan = platform.marketOperations
         .filter(operation => !commitmentSourceIds.has(operation.id) && !['ACTIVE', 'EXITED'].includes(operation.status))
@@ -687,8 +687,7 @@ interface MilestoneDefinition {
     blocker?: string | null;
 }
 
-const hasPositiveFundingHistory = (player: Player): boolean => {
-    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+const hasPositiveFundingHistory = (platform: NormalizedStreamingPlatform): boolean => {
     return platform.treasuryCash > 0
         || platform.finance.capitalActions.some(action => action.treasuryDelta > 0)
         || platform.costCommitments.some(item => ['COMMITTED', 'PAID', 'MIGRATED'].includes(item.status))
@@ -701,14 +700,14 @@ const hasPositiveFundingHistory = (player: Player): boolean => {
 
 const buildStreamingLaunchProgramView = (player: Player, context: StreamingCatalogueReadContext): StreamingLaunchProgramView => {
     const { platform } = context;
-    const budget = getStreamingLaunchBudgetView(player);
+    const budget = getStreamingLaunchBudgetView(player, context);
     const openingMarkets = platform.marketOperations.filter(operation => (
         operation.scope === 'COUNTRY' && operation.entryKind === 'OPENING' && operation.status !== 'EXITED'
     ));
-    const marketDecision = getStreamingOpeningMarketDecisionState(player);
+    const marketDecision = getStreamingOpeningMarketDecisionState(player, context);
     const marketsChosen = openingMarkets.length > 0;
     const marketsCleared = marketDecision.reviewComplete;
-    const identPurchases = getStreamingIdentPurchaseView(player);
+    const identPurchases = getStreamingIdentPurchaseView(player, context);
     const activeIdentPackage = platform.serviceConfiguration.identPackageId;
     const hasIdent = Boolean(
         platform.serviceConfiguration.soundIdentKey
@@ -725,7 +724,7 @@ const buildStreamingLaunchProgramView = (player: Player, context: StreamingCatal
     );
     const catalogueCoverage = getStreamingOpeningCatalogueView(player, context);
     const hasCatalogue = Boolean(platform.starterCatalog && catalogueCoverage.titles.some(title => title.available));
-    const launchDefinitionSignature = getStreamingLaunchDefinitionSignature(player);
+    const launchDefinitionSignature = getStreamingLaunchDefinitionSignature(player, context);
     const blueprintSaved = Boolean(
         platform.launchProgram.lastBlueprintSignature
         && platform.launchProgram.lastBlueprintSignature === launchDefinitionSignature,
@@ -755,7 +754,7 @@ const buildStreamingLaunchProgramView = (player: Player, context: StreamingCatal
         || facilities.some(facility => Boolean(facility.physical)),
     );
     const isCommissioned = Boolean(commissioned);
-    const draftForecast = draft ? getStreamingInfrastructureForecast(player, draft) : null;
+    const draftForecast = draft ? getStreamingInfrastructureForecast(player, draft, context) : null;
     const rehearsalEvidence = draft?.lastLaunchRehearsal || commissioned?.loadTest.launchRehearsal;
     const rehearsalSignature = draftForecast?.configurationSignature || commissioned?.loadTest.configurationSignature;
     const currentBuildRehearsal = Boolean(
@@ -766,7 +765,7 @@ const buildStreamingLaunchProgramView = (player: Player, context: StreamingCatal
     );
     const rehearsed = currentBuildRehearsal || Boolean(platform.launchProgram.lastRehearsalSignature || platform.launchCommit);
     const launched = Boolean(platform.launchCommit);
-    const funded = hasPositiveFundingHistory(player);
+    const funded = hasPositiveFundingHistory(platform);
 
     const definitions: MilestoneDefinition[] = [
         {

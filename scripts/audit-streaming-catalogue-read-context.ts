@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { createStreamingCatalogueReadContext, getStreamingContentAvailability } from '../services/streamingContentAvailability';
+import { createStreamingCatalogueReadContext, createStreamingTitleRouteReadBatch, getStreamingContentAvailability, getStreamingPlayableCatalogProjectIds } from '../services/streamingContentAvailability';
 import { getStreamingOpeningCatalogueView } from '../services/streamingOpeningCatalogue';
 import { createCanonicalContentDeskState, createCanonicalViewerState } from '../components/streaming-transplant/createCanonicalStreamingPresentation';
 import { filedMarketFixture } from './helpers/streamingFiledMarketFixture';
@@ -120,6 +120,60 @@ check('a context from another player snapshot cannot mask changed rights', () =>
     const next = structuredClone(player);
     next.ownedStreamingPlatform.catalogLicenses[0].expiresAtAbsoluteWeek = 0;
     assert.equal(read(next, 'catalogue-context-0', ['US'], true, context).available, false);
+});
+
+check('one worldwide licensed read reuses identical active-country decisions while fresh territorial grants stay separate', () => {
+    const player = fixture(1);
+    const context = createContext(player);
+    const readRoute = createStreamingTitleRouteReadBatch(player, context.absoluteWeek, context.platform, new Set());
+    const decisions = context.packageCountryIds.map(country => readRoute('catalogue-context-0', country,
+        { kind: 'SUBSCRIPTION', planId: context.offer.subscriptions[0].id }));
+    assert.ok(decisions.every(row => row.allowed));
+    assert.equal(new Set(decisions).size, 1, 'a worldwide licence must not allocate 197 equivalent route decisions');
+    assert.equal(readRoute('catalogue-context-0', 'NOT_A_MARKET',
+        { kind: 'SUBSCRIPTION', planId: context.offer.subscriptions[0].id }).allowed, false);
+    const licence = player.ownedStreamingPlatform.catalogLicenses[0];
+    const contract = createStreamingRightsContractFromLicense({ license: licence,
+        buyer: { type: 'PLAYER_PLATFORM', id: player.ownedStreamingPlatform.identity!.slug, name: 'Empire+', platformId: null },
+        guaranteeDisposition: 'PAID', settledAtAbsoluteWeek: context.absoluteWeek });
+    contract.territory = 'DOMESTIC'; contract.countryIds = ['IN'];
+    player.world.streamingRightsContracts = { [contract.id]: contract };
+    const territorial = createStreamingTitleRouteReadBatch(player, context.absoluteWeek, createContext(player).platform, new Set());
+    assert.equal(territorial('catalogue-context-0', 'US', { kind: 'SUBSCRIPTION', planId: context.offer.subscriptions[0].id }).allowed, false);
+    assert.equal(territorial('catalogue-context-0', 'IN', { kind: 'SUBSCRIPTION', planId: context.offer.subscriptions[0].id }).allowed, true);
+});
+
+check('a bounded viewer preview checks only its eight playable titles without full route matrices', () => {
+    const player = fixture(52);
+    const context = createContext(player);
+    const preview = getStreamingPlayableCatalogProjectIds(player, context, 8);
+    assert.deepEqual(preview, Array.from({ length: 8 }, (_, index) => `catalogue-context-${index}`));
+    assert.ok(context.availability.size <= 8, 'an eight-title preview must not prepare the remaining library');
+    assert.ok([...context.availability.values()].every(row => Object.keys(row.routesByCountry).length === 0),
+        'playable ID projection must short-circuit canonical routes instead of allocating every country matrix');
+});
+
+check('short-circuit viewer projection equals full current route decisions after canonical grant changes', () => {
+    const player = fixture(4);
+    const week = getAbsoluteWeek(player.age, player.currentWeek);
+    const licence = player.ownedStreamingPlatform.catalogLicenses[0];
+    const contract = createStreamingRightsContractFromLicense({ license: licence,
+        buyer: { type: 'PLAYER_PLATFORM', id: player.ownedStreamingPlatform.identity!.slug, name: 'Empire+', platformId: null },
+        guaranteeDisposition: 'PAID', settledAtAbsoluteWeek: week });
+    player.world.streamingRightsContracts = { [contract.id]: contract };
+    const expected = () => player.ownedStreamingPlatform.catalogProjectIds.filter(id => {
+        const row = read(player, id);
+        return row.available && Object.values(row.routesByCountry).some(routes => Object.values(routes).some(route => route.allowed));
+    });
+    assert.deepEqual(getStreamingPlayableCatalogProjectIds(player), expected());
+    contract.accessGrant!.modes = [];
+    assert.deepEqual(getStreamingPlayableCatalogProjectIds(player), ['catalogue-context-1', 'catalogue-context-2', 'catalogue-context-3']);
+    assert.deepEqual(getStreamingPlayableCatalogProjectIds(player), expected());
+    contract.accessGrant!.modes = ['SUBSCRIPTION']; contract.territory = 'DOMESTIC'; contract.countryIds = ['IN'];
+    assert.deepEqual(getStreamingPlayableCatalogProjectIds(player), expected());
+    player.ownedStreamingPlatform.marketOperations = player.ownedStreamingPlatform.marketOperations.filter(row => row.countryId === 'US');
+    player.ownedStreamingPlatform.identity!.dayOneMarketIds = ['US'];
+    assert.deepEqual(getStreamingPlayableCatalogProjectIds(player), expected());
 });
 
 if (process.argv.includes('--hash')) {

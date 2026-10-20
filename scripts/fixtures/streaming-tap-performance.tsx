@@ -34,6 +34,15 @@ document.addEventListener('click', event => {
         showMetrics();
     }));
 }, true);
+document.addEventListener('input', event => {
+    if (!(event.target instanceof HTMLInputElement)) return;
+    const action = `Input: ${event.target.getAttribute('aria-label') || event.target.placeholder || event.target.type}`;
+    const started = performance.now();
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+        measurements.push({ action, nextPaintMs: +(performance.now() - started).toFixed(1) });
+        showMetrics();
+    }));
+}, true);
 
 function Fixture({initialPlayer}: {initialPlayer?:Player}) {
     const [player, setPlayer] = useState(() => initialPlayer || makePlayer());

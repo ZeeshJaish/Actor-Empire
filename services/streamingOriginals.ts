@@ -16,7 +16,8 @@ import type {
 } from '../types';
 import { createDeterministicId } from './deterministicRandom';
 import { getAbsoluteWeek } from './legacyLogic';
-import { getStreamingContentAvailability } from './streamingContentAvailability';
+import { getStreamingContentAvailability, getStreamingCatalogueReadContext, readStreamingCatalogueDerivedView,
+    type StreamingCatalogueReadContext } from './streamingContentAvailability';
 import { resolveStreamingProductionReadiness } from './streamingProductionReadiness';
 import {
     compactOwnedStreamingPlatformForPersistence,
@@ -492,26 +493,28 @@ export const getStreamingOriginalLiveStatus = (
  * enter the same weekly, analytics and promotion systems without copying a
  * project, cast, budget or release result.
  */
-export const getOwnedStreamingProgramEntries = (player: Player): OwnedStreamingSlateEntry[] => {
-    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+const buildOwnedStreamingProgramEntries = (player: Player, context: StreamingCatalogueReadContext): OwnedStreamingSlateEntry[] => {
+    const { platform } = context;
     const launchAbsoluteWeek = platform.launchCommit?.committedAtAbsoluteWeek ?? null;
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
-    const activeLicensedProjectIds = new Set(platform.catalogLicenses
-        .filter(license => (
+    const activeLicenses = platform.catalogLicenses.filter(license => (
             license.status === 'ACTIVE'
             && license.startsAtAbsoluteWeek <= absoluteWeek
             && getStreamingCatalogLicenseStatus(license, absoluteWeek) === 'ACTIVE'
-        ))
-        .map(license => license.sourceProjectId));
+        ));
+    const latestActiveLicenseByProject = new Map<string, typeof activeLicenses[number]>();
+    activeLicenses.forEach(license => {
+        const previous = latestActiveLicenseByProject.get(license.sourceProjectId);
+        if (!previous || license.startsAtAbsoluteWeek > previous.startsAtAbsoluteWeek
+            || (license.startsAtAbsoluteWeek === previous.startsAtAbsoluteWeek && license.id.localeCompare(previous.id) < 0)) {
+            latestActiveLicenseByProject.set(license.sourceProjectId, license);
+        }
+    });
     const openingEntries = (platform.launchSlate?.entries || [])
-        .filter(entry => entry.source !== 'LICENSED_WINDOW' || activeLicensedProjectIds.has(entry.projectId))
+        .filter(entry => entry.source !== 'LICENSED_WINDOW' || latestActiveLicenseByProject.has(entry.projectId))
         .map(entry => {
             if (entry.source !== 'LICENSED_WINDOW') return entry;
-            const license = platform.catalogLicenses.filter(item => (
-                item.sourceProjectId === entry.projectId && item.status === 'ACTIVE'
-                && item.startsAtAbsoluteWeek <= absoluteWeek
-                && getStreamingCatalogLicenseStatus(item, absoluteWeek) === 'ACTIVE'
-            )).sort((left,right)=>right.startsAtAbsoluteWeek-left.startsAtAbsoluteWeek || left.id.localeCompare(right.id))[0];
+            const license = latestActiveLicenseByProject.get(entry.projectId);
             return license ? {
                 ...entry,
                 projectType: license.projectType || entry.projectType,
@@ -551,14 +554,8 @@ export const getOwnedStreamingProgramEntries = (player: Player): OwnedStreamingS
         });
     const laterLicensedEntries = launchAbsoluteWeek === null
         ? []
-        : platform.catalogLicenses.flatMap((license): OwnedStreamingSlateEntry[] => {
-            if (
-                license.origin === 'STARTER'
-                ||
-                license.status !== 'ACTIVE'
-                || license.startsAtAbsoluteWeek > absoluteWeek
-                || getStreamingCatalogLicenseStatus(license, absoluteWeek) !== 'ACTIVE'
-            ) return [];
+        : activeLicenses.flatMap((license): OwnedStreamingSlateEntry[] => {
+            if (license.origin === 'STARTER') return [];
             const projectType = license.projectType || 'MOVIE';
             return [{
                 id: createDeterministicId(
@@ -577,10 +574,19 @@ export const getOwnedStreamingProgramEntries = (player: Player): OwnedStreamingS
                 marketingPlan: 'LEAN',
             }];
         });
-    return [...openingEntries, ...scheduledOriginals, ...laterLicensedEntries].filter((entry, index, all) => (
-        all.findIndex(candidate => candidate.projectId === entry.projectId) === index
-        && getStreamingContentAvailability(player, entry.projectId).available
-    )).sort((left, right) => left.launchWeek - right.launchWeek);
+    const seenProjectIds = new Set<string>();
+    return [...openingEntries, ...scheduledOriginals, ...laterLicensedEntries].filter(entry => {
+        if (seenProjectIds.has(entry.projectId)) return false;
+        seenProjectIds.add(entry.projectId);
+        // This programme reader consumes title-level readiness only. Offer and
+        // playback callers still validate each current country/route themselves.
+        return getStreamingContentAvailability(player, entry.projectId, undefined, false, context).available;
+    }).sort((left, right) => left.launchWeek - right.launchWeek);
+};
+
+export const getOwnedStreamingProgramEntries = (player: Player, preparedContext?: StreamingCatalogueReadContext): OwnedStreamingSlateEntry[] => {
+    const context = getStreamingCatalogueReadContext(player, preparedContext);
+    return readStreamingCatalogueDerivedView(context, getOwnedStreamingProgramEntries, () => buildOwnedStreamingProgramEntries(player, context));
 };
 
 export const getStreamingSlateCandidates = (player: Player): StreamingSlateCandidate[] => {

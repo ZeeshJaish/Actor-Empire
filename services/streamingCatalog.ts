@@ -308,8 +308,11 @@ interface StreamingMarketCompatibilityContext {
 }
 
 /** One normalized context per discovery batch; never retained across player changes. */
-const createStreamingMarketCompatibilityContext = (player: Player): StreamingMarketCompatibilityContext => {
-    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+export const createStreamingMarketCompatibilityContext = (
+    player: Player,
+    preparedPlatform?: OwnedStreamingPlatformState,
+): StreamingMarketCompatibilityContext => {
+    const platform = preparedPlatform || normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     const activeCountries = normalizeStreamingDayOneMarketIds((platform.marketOperations || [])
         .filter(operation => operation.scope === 'COUNTRY' && operation.countryId
             && operation.status !== 'EXITED'

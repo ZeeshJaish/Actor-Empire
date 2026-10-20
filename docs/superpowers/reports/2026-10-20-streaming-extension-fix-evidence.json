@@ -1,0 +1,731 @@
+{
+  "date": "2026-10-20",
+  "checkpointCommit": "9d770f3",
+  "checkpointTag": "checkpoint-lazy-load-extension-fix",
+  "baselineSource": "8d761d8 (same production source as 9d770f3)",
+  "input": {
+    "sha256": "f62e4cb54f867fd1e6d40b72aa169d2167c64e596f70da075199350bfa12f13c",
+    "bytes": 10566888,
+    "kind": "104 normal acquisitions plus 936 bulk-seeded distinct titles and explicit canonical GLOBAL contracts",
+    "actualCareerSeeded": false
+  },
+  "protocol": {
+    "browser": "Codex desktop in-app browser; production Vite preview; no throttling",
+    "timing": "event to double requestAnimationFrame; not field INP or full action completion",
+    "longTasks": "separate observer window, including work after first paint",
+    "persistence": "QA onUpdatePlayer updates memory; excludes App persistence. Actual Anshu save separately smoke-tested through normal UI",
+    "sampleCount": "CPU one warmup plus three samples; browser one observed flow per case, finite repeated taps",
+    "cpuJobsDuringBrowserHeadlines": false,
+    "marketCapture": "market and room recorded before final launch-helper-only batching; launch and Build retested on frozen final source"
+  },
+  "baseline": {
+    "cpuMedianMs": {
+      "hq": 948.23,
+      "wizard": 785.05,
+      "hqWithRoom": 20.88,
+      "hqWithRoomAfterTick": 19.69,
+      "isolatedRoom": 7.57
+    },
+    "browser": {
+      "marketEntryPaintMs": 309.4,
+      "searchLongTaskMs": 864,
+      "defineEntryPaintMs": 2466.7,
+      "buildEntryPaintMs": 5442.1,
+      "buildEntryLongTaskMs": 5437,
+      "buildFirstDraftPaintMs": 35.7,
+      "buildFirstDraftLongTaskMs": 5608,
+      "warmBuildLongTasksMs": [
+        601,
+        664,
+        670,
+        709
+      ],
+      "warmDefinePaintRangeMs": [
+        54.5,
+        215.8
+      ],
+      "bidPaintRangeMs": [
+        5.4,
+        13.7
+      ]
+    },
+    "retainedAfterTick": 1000,
+    "lostLocalLicenses": 40
+  },
+  "after": {
+    "node": {
+      "phase": "measurements",
+      "diagnostics": {
+        "requested": 1040,
+        "countries": 197,
+        "fixtureConstructionMs": 518.2,
+        "planningDraftReferenceLimit": 1000,
+        "input": {
+          "references": 1040,
+          "licenses": 1040,
+          "distinctTitles": 1040,
+          "canonicalContracts": 1064
+        },
+        "normalized": {
+          "references": 1040,
+          "licenses": 1040,
+          "distinctTitles": 1040,
+          "canonicalContracts": 1064
+        },
+        "migrated": {
+          "references": 1040,
+          "licenses": 1040,
+          "distinctTitles": 1040,
+          "canonicalContracts": 1064
+        },
+        "afterAuctionTick": {
+          "references": 1040,
+          "licenses": 1040,
+          "distinctTitles": 1040,
+          "canonicalContracts": 1064
+        },
+        "normalizedLostReferences": 0,
+        "normalizedLostLicenseIds": 0,
+        "opening": {
+          "titles": 1040,
+          "available": 1040,
+          "rightsReadyCountries": 197
+        },
+        "inputSerializedBytes": 10566888
+      },
+      "measurements": {
+        "hq": {
+          "medianMs": 182.49,
+          "minMs": 181.63,
+          "maxMs": 183.21,
+          "samples": [
+            181.63,
+            182.49,
+            183.21
+          ]
+        },
+        "hqWithRoom": {
+          "medianMs": 25.14,
+          "minMs": 24.75,
+          "maxMs": 26.45,
+          "samples": [
+            24.75,
+            25.14,
+            26.45
+          ]
+        },
+        "hqWithRoomAfterTick": {
+          "medianMs": 25.07,
+          "minMs": 25,
+          "maxMs": 27.55,
+          "samples": [
+            25,
+            25.07,
+            27.55
+          ]
+        },
+        "isolatedRoom": {
+          "medianMs": 9,
+          "minMs": 8.86,
+          "maxMs": 12.45,
+          "samples": [
+            8.86,
+            9,
+            12.45
+          ]
+        },
+        "wizard": {
+          "medianMs": 219.24,
+          "minMs": 212.76,
+          "maxMs": 221.81,
+          "samples": [
+            212.76,
+            219.24,
+            221.81
+          ]
+        }
+      },
+      "memoryMiB": {
+        "rss": 793.9,
+        "heapTotal": 589.9,
+        "heapUsed": 458.8,
+        "external": 1.6,
+        "arrayBuffers": 0
+      }
+    },
+    "browser": {
+      "marketEntry1040": {
+        "mode": "production",
+        "samples": [
+          {
+            "action": "CONTENT MARKET",
+            "nextPaintMs": 163.4
+          }
+        ],
+        "longTasks": [
+          160
+        ]
+      },
+      "marketSearch1040": {
+        "mode": "production",
+        "samples": [
+          {
+            "action": "Input: Search the market",
+            "nextPaintMs": 134.3
+          }
+        ],
+        "longTasks": [
+          111
+        ]
+      },
+      "marketDetail1040": {
+        "mode": "production",
+        "samples": [
+          {
+            "action": "Input: Search the market",
+            "nextPaintMs": 134.3
+          },
+          {
+            "action": "Clear",
+            "nextPaintMs": 18.6
+          },
+          {
+            "action": "The Second Crimson Crossing Beyond the Sea \u00b7 FIXED-PRICE LICENCE \u00b7 Pixar",
+            "nextPaintMs": 43.2
+          },
+          {
+            "action": "Deal",
+            "nextPaintMs": 11.8
+          },
+          {
+            "action": "Interest",
+            "nextPaintMs": 13.6
+          },
+          {
+            "action": "Rights",
+            "nextPaintMs": 11.7
+          },
+          {
+            "action": "Deal",
+            "nextPaintMs": 13.3
+          },
+          {
+            "action": "Interest",
+            "nextPaintMs": 12.6
+          },
+          {
+            "action": "Rights",
+            "nextPaintMs": 13
+          }
+        ],
+        "longTasks": [
+          111
+        ]
+      },
+      "define1040": {
+        "mode": "production",
+        "samples": [
+          {
+            "action": "Define the Launch. 2 of 7 checks cleared. Next: Market clearance.",
+            "nextPaintMs": 596.8
+          },
+          {
+            "action": "Commission the ident",
+            "nextPaintMs": 379.8
+          },
+          {
+            "action": "Design the front page",
+            "nextPaintMs": 30.3
+          },
+          {
+            "action": "Assemble opening night",
+            "nextPaintMs": 27.8
+          },
+          {
+            "action": "Price the service",
+            "nextPaintMs": 25.9
+          },
+          {
+            "action": "Review the launch blueprint",
+            "nextPaintMs": 30.9
+          },
+          {
+            "action": "Choose opening markets",
+            "nextPaintMs": 32.2
+          },
+          {
+            "action": "Clear the markets",
+            "nextPaintMs": 44.4
+          }
+        ],
+        "longTasks": [
+          311,
+          271,
+          112,
+          265
+        ]
+      },
+      "buildEntry1040": {
+        "mode": "production",
+        "samples": [
+          {
+            "action": "Build the Platform. 0 of 6 checks cleared. Next: Network blueprint.",
+            "nextPaintMs": 396.4
+          }
+        ],
+        "longTasks": [
+          392
+        ]
+      },
+      "buildFirstDraft1040": {
+        "mode": "production",
+        "samples": [
+          {
+            "action": "One more Workhorse in North America",
+            "nextPaintMs": 28.8
+          }
+        ],
+        "longTasks": [
+          419
+        ]
+      },
+      "buildWarm1040": {
+        "mode": "production",
+        "samples": [
+          {
+            "action": "One more Workhorse in North America",
+            "nextPaintMs": 14.8
+          },
+          {
+            "action": "One fewer Workhorse in North America",
+            "nextPaintMs": 14.8
+          },
+          {
+            "action": "One more Workhorse in North America",
+            "nextPaintMs": 13.6
+          },
+          {
+            "action": "One fewer Workhorse in North America",
+            "nextPaintMs": 13.5
+          },
+          {
+            "action": "One more Workhorse in North America",
+            "nextPaintMs": 13.4
+          },
+          {
+            "action": "One fewer Workhorse in North America",
+            "nextPaintMs": 13.2
+          }
+        ],
+        "longTasks": [
+          84,
+          69,
+          64,
+          65,
+          61,
+          63
+        ]
+      },
+      "buildStages1040": {
+        "mode": "production",
+        "samples": [
+          {
+            "action": "Money stage, not complete; Settled",
+            "nextPaintMs": 18.7
+          },
+          {
+            "action": "Test stage, not complete; Not started",
+            "nextPaintMs": 18.5
+          },
+          {
+            "action": "Launch stage, not complete; In progress",
+            "nextPaintMs": 12.4
+          }
+        ],
+        "longTasks": []
+      },
+      "room1040": {
+        "mode": "production",
+        "samples": [
+          {
+            "action": "Increase upfront bid",
+            "nextPaintMs": 9.1
+          },
+          {
+            "action": "Decrease upfront bid",
+            "nextPaintMs": 9.9
+          },
+          {
+            "action": "Increase upfront bid",
+            "nextPaintMs": 14.4
+          },
+          {
+            "action": "Decrease upfront bid",
+            "nextPaintMs": 12.6
+          },
+          {
+            "action": "Increase upfront bid",
+            "nextPaintMs": 9.8
+          },
+          {
+            "action": "Decrease upfront bid",
+            "nextPaintMs": 6.4
+          },
+          {
+            "action": "Increase upfront bid",
+            "nextPaintMs": 15.3
+          },
+          {
+            "action": "Decrease upfront bid",
+            "nextPaintMs": 7.2
+          },
+          {
+            "action": "Increase upfront bid",
+            "nextPaintMs": 14.3
+          },
+          {
+            "action": "Decrease upfront bid",
+            "nextPaintMs": 7.6
+          }
+        ],
+        "longTasks": []
+      },
+      "define104": {
+        "mode": "production",
+        "samples": [
+          {
+            "action": "Define the Launch. 2 of 7 checks cleared. Next: Market clearance.",
+            "nextPaintMs": 169.3
+          },
+          {
+            "action": "Commission the ident",
+            "nextPaintMs": 54.4
+          },
+          {
+            "action": "Design the front page",
+            "nextPaintMs": 30.9
+          },
+          {
+            "action": "Assemble opening night",
+            "nextPaintMs": 21.5
+          },
+          {
+            "action": "Price the service",
+            "nextPaintMs": 22
+          },
+          {
+            "action": "Review the launch blueprint",
+            "nextPaintMs": 26.4
+          },
+          {
+            "action": "Choose opening markets",
+            "nextPaintMs": 28.2
+          }
+        ],
+        "longTasks": [
+          134,
+          52,
+          97
+        ]
+      },
+      "buildEntry104": {
+        "mode": "production",
+        "samples": [
+          {
+            "action": "Build the Platform. 0 of 6 checks cleared. Next: Network blueprint.",
+            "nextPaintMs": 199.5
+          }
+        ],
+        "longTasks": [
+          195
+        ]
+      },
+      "buildEdits104": {
+        "mode": "production",
+        "samples": [
+          {
+            "action": "One more Workhorse in North America",
+            "nextPaintMs": 17.1
+          },
+          {
+            "action": "One more Workhorse in North America",
+            "nextPaintMs": 57.5
+          },
+          {
+            "action": "One fewer Workhorse in North America",
+            "nextPaintMs": 54.7
+          },
+          {
+            "action": "One more Workhorse in North America",
+            "nextPaintMs": 59.5
+          }
+        ],
+        "longTasks": [
+          52
+        ]
+      }
+    }
+  },
+  "actualSaveSmoke": {
+    "name": "Anshu bisnoi",
+    "slot": 2,
+    "year": 15,
+    "week": 1,
+    "titles": 52,
+    "filedCountries": 197,
+    "clearedCountries": 0,
+    "treasuryLabel": "$39995.3B",
+    "defineChecks": "3/7",
+    "buildChecks": "0/6",
+    "readiness": "4/15",
+    "definePagesVisited": 7,
+    "buildStagesVisited": 4,
+    "marketSearchResults": 100,
+    "purchaseOrCommissionPerformed": false,
+    "weekAdvanced": false,
+    "browserConsoleErrors": [],
+    "handoff": "Streaming HQ at http://localhost:5174/"
+  },
+  "equivalence": {
+    "programmeOffersForecast": "56714979d3ea707b3dbed5e061bc7fc5f3a4653c1c823657dc16ace71f414208",
+    "openingCoverage1040": "9a6b8e8a6029e8c98c371e1e036296c808ab534b75224ccc5e628bfd56cfe7e8",
+    "infrastructureTenVariants": "68fc85bbf779122e22044a13dd2b3a15bc6f0271504011ecc8a4c97e7b6a3db6",
+    "launch128And1040": "23b91d9fa38334b4dba966cc171482d0048f8f77d81d4cce280aa0268244cb9f"
+  },
+  "verification": {
+    "frozenBuildAndTypes": [
+      {
+        "name": "typecheck",
+        "exitCode": 0,
+        "seconds": 68.28,
+        "log": "/tmp/extension-frozen-typecheck.log"
+      },
+      {
+        "name": "build",
+        "exitCode": 0,
+        "seconds": 22.49,
+        "log": "/tmp/extension-frozen-build.log"
+      },
+      {
+        "name": "focused-safety",
+        "exitCode": 0,
+        "seconds": 14.17,
+        "log": "/tmp/extension-frozen-focused-safety.log"
+      }
+    ],
+    "targetedAudits": [
+      {
+        "name": "audit:streaming-build-catalogue-reuse",
+        "exitCode": 0,
+        "seconds": 0.86,
+        "log": "/tmp/extension-final-audit-streaming-build-catalogue-reuse.log"
+      },
+      {
+        "name": "audit:streaming-catalogue-retention",
+        "exitCode": 0,
+        "seconds": 16.4,
+        "log": "/tmp/extension-frozen-audit-streaming-catalogue-retention.log"
+      },
+      {
+        "name": "audit:streaming-programme-read-batch",
+        "exitCode": 0,
+        "seconds": 2.31,
+        "log": "/tmp/extension-final-audit-streaming-programme-read-batch.log"
+      },
+      {
+        "name": "audit:streaming-market-search-read-context",
+        "exitCode": 0,
+        "seconds": 1.73,
+        "log": "/tmp/extension-final-audit-streaming-market-search-read-context.log"
+      },
+      {
+        "name": "audit:streaming-playable-projection",
+        "exitCode": 0,
+        "seconds": 1.11,
+        "log": "/tmp/extension-final-audit-streaming-playable-projection.log"
+      },
+      {
+        "name": "audit:streaming-opening-coverage-batch",
+        "exitCode": 0,
+        "seconds": 2.56,
+        "log": "/tmp/extension-final-audit-streaming-opening-coverage-batch.log"
+      },
+      {
+        "name": "audit:streaming-stress-boundary",
+        "exitCode": 0,
+        "seconds": 0.94,
+        "log": "/tmp/extension-final-audit-streaming-stress-boundary.log"
+      },
+      {
+        "name": "audit:streaming-active-screen",
+        "exitCode": 0,
+        "seconds": 8.82,
+        "log": "/tmp/extension-final-audit-streaming-active-screen.log"
+      },
+      {
+        "name": "audit:streaming-catalogue-read-context",
+        "exitCode": 0,
+        "log": "/tmp/extension-frozen-focused-safety.log"
+      },
+      {
+        "name": "audit:streaming-world-offer-read-context",
+        "exitCode": 0,
+        "seconds": 7.18,
+        "log": "/tmp/extension-final-audit-streaming-world-offer-read-context.log"
+      },
+      {
+        "name": "audit:streaming-presentation-inputs",
+        "exitCode": 0,
+        "log": "/tmp/extension-frozen-focused-safety.log"
+      },
+      {
+        "name": "audit:streaming-wizard-navigation",
+        "exitCode": 0,
+        "seconds": 1.31,
+        "log": "/tmp/extension-final-audit-streaming-wizard-navigation.log"
+      },
+      {
+        "name": "audit:save-integrity",
+        "exitCode": 0,
+        "seconds": 0.17,
+        "log": "/tmp/extension-final-audit-save-integrity.log"
+      },
+      {
+        "name": "audit:save-migration",
+        "exitCode": 0,
+        "log": "/tmp/extension-frozen-focused-safety.log"
+      },
+      {
+        "name": "audit:save-generations",
+        "exitCode": 0,
+        "log": "/tmp/extension-frozen-focused-safety.log"
+      },
+      {
+        "name": "audit:streaming-rights-compatibility-phase3",
+        "exitCode": 0,
+        "seconds": 0.25,
+        "log": "/tmp/extension-frozen-audit-streaming-rights-compatibility-phase3.log"
+      },
+      {
+        "name": "audit:streaming-rights-calendar-phase4",
+        "exitCode": 0,
+        "seconds": 2.62,
+        "log": "/tmp/extension-final-audit-streaming-rights-calendar-phase4.log"
+      },
+      {
+        "name": "audit:streaming-rights-transactions-phase6",
+        "exitCode": 0,
+        "seconds": 1.0,
+        "log": "/tmp/extension-frozen-audit-streaming-rights-transactions-phase6.log"
+      },
+      {
+        "name": "audit:streaming-build-test-autosave-gates",
+        "exitCode": 0,
+        "log": "/tmp/extension-frozen-focused-safety.log"
+      },
+      {
+        "name": "audit:streaming-build-world",
+        "exitCode": 0,
+        "seconds": 0.43,
+        "log": "/tmp/extension-final-audit-streaming-build-world.log"
+      },
+      {
+        "name": "audit:streaming-launch-draft-continuity",
+        "exitCode": 0,
+        "seconds": 0.11,
+        "log": "/tmp/extension-final-audit-streaming-launch-draft-continuity.log"
+      },
+      {
+        "name": "audit:streaming-original-readiness-repair",
+        "exitCode": 0,
+        "seconds": 0.16,
+        "log": "/tmp/extension-final-audit-streaming-original-readiness-repair.log"
+      },
+      {
+        "name": "audit:streaming-original-playback-repair",
+        "exitCode": 0,
+        "seconds": 3.97,
+        "log": "/tmp/extension-final-audit-streaming-original-playback-repair.log"
+      },
+      {
+        "name": "audit:streaming-commercial-c2",
+        "exitCode": 0,
+        "seconds": 1.22,
+        "log": "/tmp/extension-frozen-audit-streaming-commercial-c2.log"
+      },
+      {
+        "name": "audit:streaming-commercial-c4",
+        "exitCode": 0,
+        "seconds": 6.05,
+        "log": "/tmp/extension-frozen-audit-streaming-commercial-c4.log"
+      },
+      {
+        "name": "audit:content-market-cm3",
+        "exitCode": 0,
+        "seconds": 0.41,
+        "log": "/tmp/extension-final-audit-content-market-cm3.log"
+      },
+      {
+        "name": "audit:historical-market-phase5-6",
+        "exitCode": 0,
+        "seconds": 1.78,
+        "log": "/tmp/extension-final-audit-historical-market-phase5-6.log"
+      },
+      {
+        "name": "audit:streaming-worldwide-route-batch",
+        "exitCode": 0,
+        "seconds": 1.18,
+        "log": "/tmp/extension-frozen-audit-streaming-worldwide-route-batch.log"
+      },
+      {
+        "name": "audit:streaming-economy-balance-fixes",
+        "exitCode": 1,
+        "seconds": 45.11,
+        "log": "/tmp/extension-final-audit-streaming-economy-balance-fixes.log"
+      },
+      {
+        "name": "audit:streaming-launch-read-batch",
+        "exitCode": 0,
+        "log": "/tmp/extension-frozen-focused-safety.log"
+      },
+      {
+        "name": "audit:streaming-infrastructure-read-forecast",
+        "exitCode": 0,
+        "log": "/tmp/extension-frozen-focused-safety.log"
+      },
+      {
+        "name": "audit:streaming-launch-s1-rehearsal",
+        "exitCode": 0,
+        "log": "/tmp/extension-frozen-focused-safety.log"
+      },
+      {
+        "name": "audit:streaming-infrastructure-phase5",
+        "exitCode": 0,
+        "log": "/tmp/extension-final-release-build-safety.log"
+      }
+    ],
+    "knownStandingFailure": {
+      "suite": "audit:streaming-economy-balance-fixes",
+      "passed": 245,
+      "total": 246,
+      "case": "forecast reserves the final non-owner across rental and purchase",
+      "actual": 52617,
+      "expected": 1,
+      "attribution": "independently reproduced before extension fix; economy unchanged"
+    }
+  },
+  "limits": [
+    "Cold 1040 Define entry still 596.8ms; cold Build 396.4ms; first raw seeded draft has a later 419ms task. These do not pass a universal 100ms interaction budget.",
+    "Historical already-truncated licence economics/country snapshots are not invented from partial local projections.",
+    "Not a native-device, field-INP, full-game economy or multiweek release signoff."
+  ],
+  "review": [
+    "Independent reviews covered retention/terminal licences, unknown legacy country rows, global-route cache boundaries, immutable Build source invalidation, public forecast parity and stale rights transactions.",
+    "Root checked final optional launch context identity guards and full-output fingerprints."
+  ],
+  "designHook": {
+    "fixed": 0,
+    "newSuppressions": 0,
+    "preserved": "Existing narrow typography/status-rail exceptions from 8d761d8; no CSS changes. Existing decorative-grid advisory left standing."
+  }
+}

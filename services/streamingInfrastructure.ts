@@ -21,13 +21,15 @@ import {
 import { deriveStreamingConstructionSchedule } from './streamingNetworkConstruction';
 import { createDeterministicId } from './deterministicRandom';
 import { getAbsoluteWeek } from './legacyLogic';
+import type { StreamingCatalogueReadContext } from './streamingContentAvailability';
 import {
     compactOwnedStreamingPlatformForPersistence,
+    normalizeInfrastructureSetupDraft,
     normalizeOwnedStreamingPlatformState,
 } from './ownedStreamingPlatform';
 import {
     getStreamingReachConfigurationKey,
-    resolveOwnedStreamingReach,
+    resolveCanonicalOwnedStreamingReach,
 } from './streamingProgression';
 import {
     getRecommendedStreamingCoreCityIds,
@@ -533,10 +535,10 @@ export const getSuggestedStreamingNetworkPlacements = (
     return sanitizeNetworkPlacements(placements);
 };
 
-export const createDefaultStreamingInfrastructureDraft = (
+const createDefaultStreamingInfrastructureDraftFromPlatform = (
     player: Player,
+    platform: OwnedStreamingPlatformState,
 ): OwnedStreamingInfrastructureSetupDraft => {
-    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     // A live change order is the editable drawing until it becomes operational.
     // The active setup must remain untouched so gameplay continues to use the
     // network that is actually carrying viewers.
@@ -582,6 +584,12 @@ export const createDefaultStreamingInfrastructureDraft = (
         updatedAtAbsoluteWeek: getAbsoluteWeek(player.age, player.currentWeek),
     };
 };
+
+export const createDefaultStreamingInfrastructureDraft = (
+    player: Player,
+): OwnedStreamingInfrastructureSetupDraft => createDefaultStreamingInfrastructureDraftFromPlatform(
+    player, normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id),
+);
 
 const getConfigurationValues = (
     draft: OwnedStreamingInfrastructureSetupDraft,
@@ -816,18 +824,18 @@ const getInfrastructureTechnologyFloor = (
             : 10,
 });
 
-export const getStreamingInfrastructureForecast = (
+const getStreamingInfrastructureForecastFromPlatform = (
     player: Player,
+    platform: OwnedStreamingPlatformState,
     inputDraft?: OwnedStreamingInfrastructureSetupDraft | null,
 ): StreamingInfrastructureForecast => {
-    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
-    const draft = inputDraft || platform.infrastructureSetupDraft || createDefaultStreamingInfrastructureDraft(player);
+    const draft = inputDraft || platform.infrastructureSetupDraft || createDefaultStreamingInfrastructureDraftFromPlatform(player, platform);
     const configuration = getConfigurationValues(draft);
     const technologyFloor = getInfrastructureTechnologyFloor(
         configuration.baselineConcurrentStreams,
         configuration.reliabilityTarget,
     );
-    const reach = resolveOwnedStreamingReach({
+    const reach = resolveCanonicalOwnedStreamingReach({
         ...platform,
         capacity: {
             baselineConcurrentStreams: configuration.baselineConcurrentStreams,
@@ -970,6 +978,14 @@ export const getStreamingInfrastructureForecast = (
     };
 };
 
+export const getStreamingInfrastructureForecast = (
+    player: Player,
+    inputDraft?: OwnedStreamingInfrastructureSetupDraft | null,
+    context?: StreamingCatalogueReadContext,
+): StreamingInfrastructureForecast => getStreamingInfrastructureForecastFromPlatform(
+    player, context?.player === player ? context.platform : normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id), inputDraft,
+);
+
 export const validateStreamingInfrastructureDraft = (
     player: Player,
     inputDraft?: OwnedStreamingInfrastructureSetupDraft | null,
@@ -1033,14 +1049,13 @@ export const validateStreamingInfrastructureDraft = (
     return { valid: issues.length === 0, issues, forecast };
 };
 
-export const saveStreamingInfrastructureDraft = (
+const createStreamingInfrastructureDraftForSave = (
     player: Player,
     inputDraft: OwnedStreamingInfrastructureSetupDraft,
-): Player => {
-    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
-    if (!['FOUNDING', 'ACTIVE'].includes(platform.lifecycle) || !platform.identity || !platform.foundingProfile) return player;
+    platform: OwnedStreamingPlatformState,
+): OwnedStreamingInfrastructureSetupDraft => {
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
-    const defaults = createDefaultStreamingInfrastructureDraft(player);
+    const defaults = createDefaultStreamingInfrastructureDraftFromPlatform(player, platform);
     const draft: OwnedStreamingInfrastructureSetupDraft = {
         currentStep: Math.max(0, Math.min(4, Math.round(Number(inputDraft.currentStep) || 0))),
         strategy: ['CLOUD_FIRST', 'OWNED_INFRASTRUCTURE', 'HYBRID'].includes(inputDraft.strategy)
@@ -1082,6 +1097,31 @@ export const saveStreamingInfrastructureDraft = (
             : undefined,
         updatedAtAbsoluteWeek: absoluteWeek,
     };
+    return draft;
+};
+
+/** Read the exact forecast a canonical draft save would produce, without
+ * changing the player, compacting unrelated records, or recording evidence. */
+export const getCanonicalStreamingInfrastructureDraftForecast = (
+    player: Player,
+    inputDraft: OwnedStreamingInfrastructureSetupDraft,
+): StreamingInfrastructureForecast => {
+    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+    if (!['FOUNDING', 'ACTIVE'].includes(platform.lifecycle) || !platform.identity || !platform.foundingProfile) {
+        return getStreamingInfrastructureForecastFromPlatform(player, platform,
+            player.ownedStreamingPlatform.infrastructureSetupDraft || inputDraft);
+    }
+    const draft = normalizeInfrastructureSetupDraft(createStreamingInfrastructureDraftForSave(player, inputDraft, platform))!;
+    return getStreamingInfrastructureForecastFromPlatform(player, { ...platform, infrastructureSetupDraft: draft }, draft);
+};
+
+export const saveStreamingInfrastructureDraft = (
+    player: Player,
+    inputDraft: OwnedStreamingInfrastructureSetupDraft,
+): Player => {
+    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+    if (!['FOUNDING', 'ACTIVE'].includes(platform.lifecycle) || !platform.identity || !platform.foundingProfile) return player;
+    const draft = createStreamingInfrastructureDraftForSave(player, inputDraft, platform);
     return {
         ...player,
         ownedStreamingPlatform: compactOwnedStreamingPlatformForPersistence({

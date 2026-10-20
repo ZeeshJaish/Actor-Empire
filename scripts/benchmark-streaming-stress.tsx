@@ -1,16 +1,24 @@
 import React from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
-import {writeFileSync} from 'node:fs';
+import {readFileSync,writeFileSync} from 'node:fs';
 import {performance} from 'node:perf_hooks';
 import {streamingCatalogueStressFixture} from './helpers/streamingCatalogueStressFixture';
-import {normalizeOwnedStreamingPlatformState,OWNED_STREAMING_CATALOG_REFERENCE_LIMIT} from '../services/ownedStreamingPlatform';
+import {normalizeOwnedStreamingPlatformState,OWNED_STREAMING_CATALOG_DRAFT_REFERENCE_LIMIT} from '../services/ownedStreamingPlatform';
 import {migratePlayerSave} from '../services/saveMigration';
 import {getStreamingOpeningCatalogueView} from '../services/streamingOpeningCatalogue';
 import {advanceStreamingBuyerAuction} from '../services/streamingBuyerAuctions';
 import HQ from '../components/StreamingPlatformHQ';
 import Define from '../components/StreamingDefineLaunchExperience';
 import Room from '../components/StreamingBuyerAuctionRoom';
-const start=performance.now();const {player,session}=streamingCatalogueStressFixture();
+const start=performance.now();
+const fixturePath=process.argv.find(arg=>arg.startsWith('--fixture='))?.slice('--fixture='.length);
+const prepared=fixturePath ? (()=>{
+    const player=JSON.parse(readFileSync(fixturePath,'utf8')) as ReturnType<typeof streamingCatalogueStressFixture>['player'];
+    const session=player.ownedStreamingPlatform.buyerAuctionSessions.find(row=>row.status==='LIVE');
+    if(!session)throw new Error('The supplied stress fixture needs its reserved live auction.');
+    return {player,session};
+})() : streamingCatalogueStressFixture();
+const {player,session}=prepared;
 const count=(p:typeof player)=>({references:p.ownedStreamingPlatform.catalogProjectIds.length,
     licenses:p.ownedStreamingPlatform.catalogLicenses.length,
     distinctTitles:new Set(p.ownedStreamingPlatform.catalogLicenses.map(l=>l.sourceProjectId)).size,
@@ -24,7 +32,7 @@ const measure=(read:()=>unknown)=>{read();const samples=Array.from({length:3},()
 return {medianMs:samples[1],minMs:samples[0],maxMs:samples[2],samples}};
 const lost=(left:string[],right:string[])=>{const set=new Set(right);return left.filter(id=>!set.has(id)).length};
 const diagnostics={requested:1040,countries:player.ownedStreamingPlatform.marketOperations.length,fixtureConstructionMs:+(performance.now()-start).toFixed(1),
-    referenceLimit:OWNED_STREAMING_CATALOG_REFERENCE_LIMIT,input:count(player),normalized:count(normalized),migrated:count(migrated),afterAuctionTick:count(tick.player),
+    planningDraftReferenceLimit:OWNED_STREAMING_CATALOG_DRAFT_REFERENCE_LIMIT,input:count(player),normalized:count(normalized),migrated:count(migrated),afterAuctionTick:count(tick.player),
     normalizedLostReferences:lost(player.ownedStreamingPlatform.catalogProjectIds,normalized.ownedStreamingPlatform.catalogProjectIds),
     normalizedLostLicenseIds:lost(player.ownedStreamingPlatform.catalogLicenses.map(l=>l.id),normalized.ownedStreamingPlatform.catalogLicenses.map(l=>l.id)),
     opening:{titles:coverage.titles.length,available:coverage.titles.filter(t=>t.available).length,rightsReadyCountries:coverage.rightsReadyCountryCount},

@@ -1,4 +1,5 @@
 import type { Player } from '../types';
+import { getStreamingBuildMarketAccess } from './streamingBuildMarketAccess';
 
 const sameFieldsExcept = (left: object, right: object, excluded: readonly string[]) => {
     const keys = Object.keys(left).filter(key => !excluded.includes(key));
@@ -22,9 +23,9 @@ const platformInputs = (player: Player, mode: StreamingPresentationMode) => {
         // rights. An uncommissioned network drawing is not an economy input.
         const { infrastructureSetupDraft: _networkDraft, ...forecast } = platform;
         return JSON.stringify({ ...forecast, launchProgram: program,
-            // Legacy pre-filing careers use draft existence to expose their
-            // inherited opening footprint. Preserve that boundary transition.
-            hasInfrastructureSetupDraft: Boolean(_networkDraft),
+            // A draft exposes inherited countries only for legacy pre-filing
+            // careers. Filed markets keep the same footprint on their first edit.
+            buildCountryIds: getStreamingBuildMarketAccess(player).countryIds,
         });
     }
     const { contentMarketDraft: _marketDraft, buyerAuctionSessions, ...hq } = platform;
