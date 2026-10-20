@@ -12,6 +12,7 @@ import {
 import { resolveAuctionContinuation } from '../services/streamingAuctionTerms';
 import { activateAuctionFutureFunding } from '../services/streamingAuctionFunding';
 import { getContentMarketFunds } from '../services/streamingContentMarket';
+import { reuseStreamingPresentationSource } from '../services/streamingPresentationInputs';
 import css from '../content-market-exact/ContentMarket.module.css';
 import { cx } from '../content-market-exact/cx';
 import { OfferUsdInput } from '../content-market-exact/OfferControls';
@@ -37,6 +38,12 @@ export default function StreamingBuyerAuctionRoom({ player, session, onUpdatePla
     const updateRef = useRef(onUpdatePlayer);
     playerRef.current = player;
     updateRef.current = onUpdatePlayer;
+    // One caller-owned immutable presentation snapshot. Actions below always
+    // use playerRef.current; no cached capability can authorize a transaction.
+    const presentationRef = useRef(player);
+    const readPlayer = reuseStreamingPresentationSource(presentationRef.current, player, 'AUCTION_ROOM');
+    presentationRef.current = readPlayer;
+    const lotKey = JSON.stringify(session.lot);
     const leader = getStreamingBuyerAuctionLeader(session);
     const startingUpfront = Math.min(
         session.lot.referenceValue * 2.2,
@@ -68,21 +75,24 @@ export default function StreamingBuyerAuctionRoom({ player, session, onUpdatePla
     const [expandedBidId, setExpandedBidId] = useState<string | null>(null);
 
     useEffect(() => {
+        if (session.status !== 'LIVE') return;
         const restored = reconcileStreamingBuyerAuction(playerRef.current, session.id, Date.now());
         if (restored.changed) updateRef.current(restored.player);
+        if (restored.session?.status !== 'LIVE') return;
         const timer = window.setInterval(() => {
             const result = advanceStreamingBuyerAuction(playerRef.current, session.id, 1, Date.now());
             if (result.changed) updateRef.current(result.player);
+            if (result.session?.status !== 'LIVE') window.clearInterval(timer);
         }, 1_000);
         return () => window.clearInterval(timer);
-    }, [session.id]);
+    }, [session.id, session.status]);
 
-    const backendCapability = useMemo(() => getStreamingBuyerAuctionBackendCapability(player, session.lot), [player, session.lot]);
+    const backendCapability = useMemo(() => getStreamingBuyerAuctionBackendCapability(readPlayer, session.lot), [readPlayer, lotKey]);
     const backendAvailable = backendCapability.advertising || backendCapability.rental;
     const backendReason = 'Backend unavailable: enable advertising or rental in an eligible market with matching title rights.';
     const offeredBackend = backendAvailable ? backend : 0;
     useEffect(() => { if (!backendAvailable) setBackend(0); }, [backendAvailable]);
-    const continuation = useMemo(() => resolveAuctionContinuation(player, session.lot.sourceProjectId, session.lot.title, session.lot.projectType), [player, session.lot]);
+    const continuation = useMemo(() => resolveAuctionContinuation(readPlayer, session.lot.sourceProjectId, session.lot.title, session.lot.projectType), [readPlayer, lotKey]);
     const playerBid = session.playerBidId ? session.bids.find(bid => bid.id === session.playerBidId) || null : null;
     const previewTerms = {
         minimumGuarantee: upfront, licensorRevenueShare: offeredBackend, marketingGuarantee: 0,
@@ -93,7 +103,7 @@ export default function StreamingBuyerAuctionRoom({ player, session, onUpdatePla
     const firmFutureReserve = futureGreenlight && futureFunding.commitment === 'FIRM'
         ? futureFunding.count * futureFunding.budgetPerProject : 0;
     const guaranteedExposure = upfront + previewTerms.productionFunding + firmFutureReserve;
-    const availableFunds = useMemo(() => getContentMarketFunds(player), [player]);
+    const availableFunds = useMemo(() => getContentMarketFunds(readPlayer), [readPlayer]);
     const funds = availableFunds + (playerBid?.guaranteedExposure || 0);
     const validFutureFunding = !futureGreenlight || futureFunding.budgetPerProject >= 100_000;
     const canBid = parsedUpfront.value !== null && upfront % 100_000 === 0 && validFutureFunding && session.status === 'LIVE' && guaranteedExposure <= funds && upfront >= session.lot.minimumGuarantee;

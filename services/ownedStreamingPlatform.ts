@@ -3219,6 +3219,14 @@ const normalizeBuyerAuctionSession = (value: unknown): StreamingBuyerAuctionSess
     };
 };
 
+/** Clock updates validate only their own bounded state. Unrelated catalogue
+ * data stays intact; bid/withdraw/settlement still normalize their full inputs. */
+export const normalizeStreamingBuyerAuctionSessions = (value: unknown): StreamingBuyerAuctionSession[] => dedupeByKey(
+    asArray<unknown>(value).map(normalizeBuyerAuctionSession)
+        .filter((session): session is StreamingBuyerAuctionSession => Boolean(session)),
+    session => session.id,
+).slice(-40);
+
 const normalizeUpcomingRightsSale = (value: unknown): StreamingUpcomingRightsSale | null => {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
     const source = asRecord(value);
@@ -4131,12 +4139,7 @@ export const normalizeOwnedStreamingPlatformState = (
             selectedId: typeof source.contentMarketDraft.selectedId === 'string' ? source.contentMarketDraft.selectedId.slice(0, 200) : null,
             ownedIds: Array.isArray(source.contentMarketDraft.ownedIds) ? Array.from(new Set<string>(source.contentMarketDraft.ownedIds.filter((id: unknown) => typeof id === 'string'))).slice(0, 500) : [],
         } : null,
-        buyerAuctionSessions: dedupeByKey(
-            asArray<unknown>(source.buyerAuctionSessions)
-                .map(normalizeBuyerAuctionSession)
-                .filter((session): session is StreamingBuyerAuctionSession => Boolean(session)),
-            session => session.id,
-        ).slice(-40),
+        buyerAuctionSessions: normalizeStreamingBuyerAuctionSessions(source.buyerAuctionSessions),
         upcomingRightsSales: dedupeByKey(
             asArray<unknown>(source.upcomingRightsSales)
                 .map(normalizeUpcomingRightsSale)

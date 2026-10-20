@@ -16,7 +16,7 @@ import type {
 import { createDeterministicId, createDeterministicRng } from './deterministicRandom';
 import { getAbsoluteWeek } from './legacyLogic';
 import { getStreamingMarketCycle } from './streamingMarketSupply';
-import { compactOwnedStreamingPlatformForPersistence, normalizeOwnedStreamingPlatformState } from './ownedStreamingPlatform';
+import { compactOwnedStreamingPlatformForPersistence, normalizeOwnedStreamingPlatformState, normalizeStreamingBuyerAuctionSessions } from './ownedStreamingPlatform';
 import {
     establishContentMarketCatalogue,
     prepareContentMarketDiscovery,
@@ -1078,8 +1078,10 @@ export const advanceStreamingBuyerAuction = (
     seconds = 1,
     nowMs = Date.now(),
 ): StreamingBuyerAuctionActionResult => {
-    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
-    let session = platform.buyerAuctionSessions.find(item => item.id === sessionId);
+    // The live clock/rival simulation reads only saved session state. Parse it
+    // fresh even for mutable/legacy callers, without walking unrelated licences.
+    const sessions = normalizeStreamingBuyerAuctionSessions(player.ownedStreamingPlatform?.buyerAuctionSessions);
+    let session = sessions.find(item => item.id === sessionId);
     if (!session) return { player, changed: false, reason: 'NOT_FOUND' };
     if (session.status !== 'LIVE') return { player, changed: false, session, reason: 'NOT_LIVE' };
     const count = Math.round(clamp(seconds, 0, ROOM_ABSOLUTE_CAP_SECONDS));
@@ -1101,7 +1103,13 @@ export const advanceStreamingBuyerAuction = (
             return closeStreamingBuyerAuction(upsertSession(player, session), session);
         }
     }
-    return { player: upsertSession(player, session), changed: count > 0, session };
+    return {
+        player: { ...player, ownedStreamingPlatform: {
+            ...player.ownedStreamingPlatform,
+            buyerAuctionSessions: normalizeStreamingBuyerAuctionSessions([...sessions.filter(item => item.id !== sessionId), session]),
+        } },
+        changed: count > 0, session,
+    };
 };
 
 export const reconcileStreamingBuyerAuction = (
@@ -1109,8 +1117,8 @@ export const reconcileStreamingBuyerAuction = (
     sessionId: string,
     nowMs = Date.now(),
 ): StreamingBuyerAuctionActionResult => {
-    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
-    const session = platform.buyerAuctionSessions.find(item => item.id === sessionId);
+    const session = normalizeStreamingBuyerAuctionSessions(player.ownedStreamingPlatform?.buyerAuctionSessions)
+        .find(item => item.id === sessionId);
     if (!session) return { player, changed: false, reason: 'NOT_FOUND' };
     if (session.status !== 'LIVE') return { player, changed: false, session, reason: 'NOT_LIVE' };
     const elapsed = Math.round(clamp(Math.floor((nowMs - session.lastRealtimeAtMs) / 1_000), 0, ROOM_ABSOLUTE_CAP_SECONDS));

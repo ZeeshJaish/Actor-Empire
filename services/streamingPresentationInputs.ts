@@ -37,7 +37,7 @@ const sameProjectInputs = (left: Player['pastProjects'], right: Player['pastProj
         sameFieldsExcept(project, right[index], ['awards']) && sameValue(project.awards, right[index].awards)
     ));
 
-type StreamingPresentationMode = 'HQ' | 'WIZARD' | 'BUILD_FORECAST';
+type StreamingPresentationMode = 'HQ' | 'WIZARD' | 'BUILD_FORECAST' | 'AUCTION_ROOM';
 const sameValueFields = (left: object, right: object) => {
     // The normalizer materializes these optional keys as undefined. Their
     // absence and undefined state have identical reads; a real value counts.
@@ -52,6 +52,12 @@ const sameValueFields = (left: object, right: object) => {
 };
 
 const platformInputs = (player: Player, mode: StreamingPresentationMode) => {
+    if (mode === 'AUCTION_ROOM') {
+        // The room receives the current lot/session separately. All finance,
+        // rights, service and continuation inputs still invalidate its reads.
+        const { buyerAuctionSessions: _sessions, ...platform } = player.ownedStreamingPlatform;
+        return { platform, program: {} };
+    }
     const { launchProgram, ...platform } = player.ownedStreamingPlatform;
     const { defineCurrentStep: _step, defineDraft: _draft, ...program } = launchProgram;
     if (mode === 'WIZARD') return { platform, program };
@@ -84,7 +90,8 @@ export const reuseStreamingPresentationSource = (
     previous: Player, current: Player, mode: StreamingPresentationMode = 'HQ',
 ): Player => {
     if (previous === current) return previous;
-    if (!sameFieldsExcept(previous, current, ['ownedStreamingPlatform', 'world', 'pastProjects', 'awards'])
+    if (!sameFieldsExcept(previous, current, ['ownedStreamingPlatform', 'world', 'pastProjects', 'awards',
+        ...(mode === 'AUCTION_ROOM' ? ['inbox'] : [])])
         || !sameFieldsExcept(previous.world, current.world, ['universes'])
         || !sameValue(previous.world.universes, current.world.universes)
         || !sameValue(previous.awards, current.awards)
