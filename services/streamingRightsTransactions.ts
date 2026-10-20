@@ -687,10 +687,14 @@ export const settleStreamingRightsSublicense = (
         return { player, changed: false, reason: 'INSUFFICIENT_TREASURY', detail: 'The buyer cannot fund this sublicense.' };
     }
     const startsAtAbsoluteWeek = Math.max(input.absoluteWeek, source.startsAtAbsoluteWeek);
-    const expiresAtAbsoluteWeek = Math.min(
-        source.expiresAtAbsoluteWeek,
-        startsAtAbsoluteWeek + Math.max(1, Math.round(input.durationWeeks)),
-    );
+    if (input.windowType === 'PERMANENT' && source.windowType !== 'PERMANENT') {
+        return { player, changed: false, reason: 'RIGHTS_UNAVAILABLE', detail: 'The source does not grant a permanent window.' };
+    }
+    // Permanent rights use their canonical interval for conflict checks and the receipt.
+    // The bounded negotiation duration is only a form value for that fixed window.
+    const expiresAtAbsoluteWeek = input.windowType === 'PERMANENT'
+        ? source.expiresAtAbsoluteWeek
+        : Math.min(source.expiresAtAbsoluteWeek, startsAtAbsoluteWeek + Math.max(1, Math.round(input.durationWeeks)));
     const compatibility = resolveStreamingRightsCompatibility({
         world: { streamingRightsContracts: registry },
         sourceProjectId: source.sourceProjectId,

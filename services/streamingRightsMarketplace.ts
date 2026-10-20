@@ -944,7 +944,9 @@ export const createDefaultStreamingRightsTerms = (
     opportunity: StreamingRightsOpportunity,
 ): StreamingRightsTermsInput => ({
     territory: opportunity.kind === 'SUBLICENSE_OUT' ? 'DOMESTIC' : opportunity.recommendedTerritory,
-    durationWeeks: opportunity.remainingWeeks,
+    // PERMANENT is the canonical window, not an editable MAX_SAFE week count.
+    // Keep the form value bounded; signing retains the source's perpetual scope.
+    durationWeeks: opportunity.recommendedWindow === 'PERMANENT' ? 520 : opportunity.remainingWeeks,
     exclusivity: opportunity.sourceLicenseId && opportunity.kind !== 'SUBLICENSE_OUT'
         ? opportunity.inheritedExclusivity
         : 'NON_EXCLUSIVE',
@@ -1089,6 +1091,39 @@ const validatePrivateScope = (player:Player, platform:OwnedStreamingPlatformStat
         capability:getStreamingBuyerBackendCapability(player,buyerPlatformId,getAbsoluteWeek(player.age,player.currentWeek),terms.countryIds||[],requested),
         permanentPurchase:terms.windowType==='PERMANENT'});
     return null;
+};
+
+/** Outgoing offers must still be backed by the current canonical owned grant.
+ * A catalogue projection alone cannot authorize a transfer or silently trim a sublicense.
+ */
+const validateCurrentOutgoingSource = (
+    player: Player,
+    platform: OwnedStreamingPlatformState,
+    negotiation: OwnedStreamingRightsNegotiation,
+    terms: StreamingRightsTermsInput = negotiation,
+): string | null => {
+    if (negotiation.kind !== 'SUBLICENSE_OUT' && negotiation.kind !== 'TRANSFER_OUT') return null;
+    const source = negotiation.sourceLicenseId
+        ? getStreamingRightsContract(player.world.streamingRightsContracts, negotiation.sourceLicenseId) : null;
+    if (!source || source.status !== 'ACTIVE' || source.sourceProjectId !== negotiation.sourceProjectId
+        || source.buyer.type !== 'PLAYER_PLATFORM'
+        || source.buyer.id !== (platform.identity?.slug || `player-platform:${player.id}`)
+        || getAbsoluteWeek(player.age, player.currentWeek) > source.expiresAtAbsoluteWeek)
+        return 'The canonical owned source grant is no longer available.';
+    if (negotiation.kind === 'SUBLICENSE_OUT' && !source.sublicensingAllowed)
+        return 'The source contract does not permit sublicensing.';
+    if (negotiation.kind === 'TRANSFER_OUT') {
+        const available = normalizeStreamingRightsAccessGrant(source.accessGrant);
+        const requested = normalizeStreamingRightsAccessGrant(terms.accessGrant || negotiation.accessGrant);
+        if (JSON.stringify((available?.modes || []).slice().sort()) !== JSON.stringify((requested?.modes || []).slice().sort())
+            || (available?.earlyWindowWeeks || 0) !== (requested?.earlyWindowWeeks || 0)
+            || (available?.purchaseFulfillment || 'NONE') !== (requested?.purchaseFulfillment || 'NONE'))
+            return 'The inherited viewing grant changed while this transfer was under review.';
+    }
+    // An exact transfer may carry a legacy empty viewer grant; it creates no new modes.
+    const scopeTerms = negotiation.kind === 'TRANSFER_OUT' ? {...terms, accessGrant: undefined} : terms;
+    return validatePrivateScope(player, platform, scopeTerms, source, negotiation.rivalBidAmount,
+        negotiation.buyerPlatformId, negotiation.createdAtAbsoluteWeek);
 };
 
 export const openStreamingRightsNegotiation = (
@@ -1304,6 +1339,8 @@ export const reviseStreamingRightsNegotiation = (
     if (invalidNumbers) return {player,changed:false,reason:'INVALID_TERMS',detail:invalidNumbers};
     const originalSourceError = validateCurrentOriginalPrivateSource(player,current,inputTerms);
     if (originalSourceError) return {player,changed:false,reason:'RIGHTS_UNAVAILABLE',detail:originalSourceError};
+    const outgoingSourceError = validateCurrentOutgoingSource(player,platform,current,inputTerms);
+    if (outgoingSourceError) return {player,changed:false,reason:'RIGHTS_UNAVAILABLE',detail:outgoingSourceError};
     const collectionTerms = current.collectionSnapshot ? {...inputTerms,accessGrant:inputTerms.accessGrant || current.accessGrant, countryIds:inputTerms.countryIds || current.countryIds} : inputTerms;
     const collectionError = current.collectionSnapshot ? validateCollectionPrivateTerms(player,current.collectionSnapshot,collectionTerms) : null;
     if (collectionError) return {player,changed:false,reason:'INVALID_TERMS',detail:collectionError};
@@ -1380,6 +1417,8 @@ export const submitStreamingRightsOffer = (
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     const current = platform.rightsNegotiations.find(item => item.id === negotiationId);
     if (!current || !ACTIVE_NEGOTIATION_STATUSES.has(current.status)) return { player, changed: false, reason: 'NOT_FOUND' };
+    const outgoingSourceError = validateCurrentOutgoingSource(player,platform,current);
+    if (outgoingSourceError) return {player,changed:false,reason:'RIGHTS_UNAVAILABLE',detail:outgoingSourceError};
     if (current.responseStatus === 'AWAITING_RESPONSE' && current.responseDueAbsoluteWeek != null) {
         return { player, changed: true, negotiation: current };
     }
@@ -1461,7 +1500,7 @@ export const acceptStreamingRightsCounter = (
     const week=getAbsoluteWeek(player.age,player.currentWeek);
     if (week>(current.signingDeadlineAbsoluteWeek ?? current.expiresAtAbsoluteWeek)) return {player,changed:false,reason:'NOT_READY'};
     const proposed={...current,minimumGuarantee:current.counterMinimumGuarantee,platformRevenueShare:current.counterPlatformRevenueShare};
-    const error=validateCurrentOriginalPrivateSource(player,current,proposed) || (current.collectionSnapshot ? validateCollectionPrivateTerms(player,current.collectionSnapshot,proposed)
+    const error=validateCurrentOriginalPrivateSource(player,current,proposed) || validateCurrentOutgoingSource(player,platform,current,proposed) || (current.collectionSnapshot ? validateCollectionPrivateTerms(player,current.collectionSnapshot,proposed)
         : validatePrivateScope(player,platform,proposed,current.sourceLicenseId ? getStreamingRightsContract(player.world.streamingRightsContracts,current.sourceLicenseId) : null,current.rivalBidAmount,current.buyerPlatformId,current.createdAtAbsoluteWeek));
     if(error)return {player,changed:false,reason:'INVALID_TERMS',detail:error};
     const negotiation: OwnedStreamingRightsNegotiation = {
@@ -1574,6 +1613,8 @@ export const signStreamingRightsDeal = (
     }
     const originalSourceError = validateCurrentOriginalPrivateSource(player,negotiation);
     if (originalSourceError) return {player,changed:false,reason:'RIGHTS_UNAVAILABLE',detail:originalSourceError};
+    const outgoingSourceError = validateCurrentOutgoingSource(player,platform,negotiation);
+    if (outgoingSourceError) return {player,changed:false,reason:'RIGHTS_RESTRICTED',detail:outgoingSourceError};
     if (negotiation.collectionSnapshot !== undefined) {
         const error=validateCollectionPrivateTerms(player,negotiation.collectionSnapshot!,negotiation);
         if(error)return {player,changed:false,reason:'RIGHTS_UNAVAILABLE',detail:error};
