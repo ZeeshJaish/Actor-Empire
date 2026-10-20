@@ -1,0 +1,720 @@
+{
+  "date": "2026-10-20",
+  "checkpoint": "d9887b1",
+  "rollbackTag": "checkpoint-streaming-ui-collection-performance-fix",
+  "runtimeRevision": "6a28728",
+  "finalSourceRevision": "6a28728",
+  "fixture": {
+    "sha256": "780d48300344ea931dbbb2a798865a54b0c7f8183c7209f52dc7b9a47f4f7757",
+    "titles": 5000,
+    "filedCountries": 197,
+    "worldProjects": 3983,
+    "serializedBytes": 24041588,
+    "manualAcquisitions": false
+  },
+  "before": {
+    "wizard": {
+      "mode": "production",
+      "samples": [
+        {
+          "action": "Reset metrics",
+          "nextPaintMs": 11.1
+        },
+        {
+          "action": "Build the Platform. 0 of 6 checks cleared. Next: Network blueprint.",
+          "nextPaintMs": 5858.9
+        },
+        {
+          "action": "North America23 countries \u00b7 136.8K on the nightDark\u2014nothing here yetnot set yet",
+          "nextPaintMs": 16.1
+        },
+        {
+          "action": "One more Workhorse in North America",
+          "nextPaintMs": 10984.9
+        },
+        {
+          "action": "Money stage, not complete; Settled",
+          "nextPaintMs": 25.6
+        },
+        {
+          "action": "Back",
+          "nextPaintMs": 319.1
+        },
+        {
+          "action": "Define the Launch. 2 of 7 checks cleared. Next: Market clearance.",
+          "nextPaintMs": 9458.9
+        },
+        {
+          "action": "Commission the ident",
+          "nextPaintMs": 13336.8
+        }
+      ],
+      "longTasks": [
+        5850,
+        150,
+        10830,
+        317,
+        9321,
+        114,
+        75,
+        3987,
+        9345
+      ],
+      "presentations": []
+    },
+    "bid": {
+      "mode": "production",
+      "samples": [
+        {
+          "action": "Reset metrics",
+          "nextPaintMs": 10.2
+        },
+        {
+          "action": "Increase upfront bid",
+          "nextPaintMs": 79.3
+        },
+        {
+          "action": "Decrease upfront bid",
+          "nextPaintMs": 73.7
+        },
+        {
+          "action": "Increase upfront bid",
+          "nextPaintMs": 70.9
+        },
+        {
+          "action": "Decrease upfront bid",
+          "nextPaintMs": 74.5
+        },
+        {
+          "action": "Increase upfront bid",
+          "nextPaintMs": 71.2
+        },
+        {
+          "action": "Decrease upfront bid",
+          "nextPaintMs": 74.8
+        }
+      ],
+      "longTasks": [
+        78,
+        70,
+        211,
+        109,
+        210,
+        73,
+        68,
+        204,
+        107,
+        200,
+        70,
+        71,
+        216,
+        118,
+        206,
+        73,
+        74,
+        223,
+        118,
+        209,
+        70,
+        68,
+        218,
+        114,
+        238,
+        73
+      ],
+      "presentations": []
+    },
+    "idle": {
+      "elapsedMs": 5001,
+      "viewport": {
+        "height": 852,
+        "width": 393
+      },
+      "metrics": {
+        "mode": "production",
+        "samples": [
+          {
+            "action": "Reset metrics",
+            "nextPaintMs": 18.2
+          }
+        ],
+        "longTasks": [
+          70,
+          74,
+          68,
+          73,
+          55,
+          70,
+          67,
+          73,
+          70,
+          69,
+          79,
+          73,
+          68,
+          74,
+          69,
+          69,
+          71
+        ],
+        "presentations": []
+      }
+    }
+  },
+  "after": {
+    "wizard": {
+      "revision": "6a28728",
+      "fixtureSha256": "780d48300344ea931dbbb2a798865a54b0c7f8183c7209f52dc7b9a47f4f7757",
+      "viewport": {
+        "height": 852,
+        "width": 393
+      },
+      "startup": {
+        "mode": "production",
+        "samples": [],
+        "longTasks": [
+          882,
+          316
+        ],
+        "presentations": []
+      },
+      "stages": [
+        {
+          "stage": "Build first open",
+          "metrics": {
+            "mode": "production",
+            "samples": [
+              {
+                "action": "Reset metrics",
+                "nextPaintMs": 13
+              },
+              {
+                "action": "Build the Platform. 0 of 6 checks cleared. Next: Network blueprint.",
+                "nextPaintMs": 1253.4
+              }
+            ],
+            "longTasks": [
+              1243
+            ],
+            "presentations": []
+          }
+        },
+        {
+          "stage": "Select North America",
+          "metrics": {
+            "mode": "production",
+            "samples": [
+              {
+                "action": "Reset metrics",
+                "nextPaintMs": 13
+              },
+              {
+                "action": "Build the Platform. 0 of 6 checks cleared. Next: Network blueprint.",
+                "nextPaintMs": 1253.4
+              },
+              {
+                "action": "North America23 countries \u00b7 136.8K on the nightDark\u2014nothing here yetnot set yet",
+                "nextPaintMs": 13.3
+              }
+            ],
+            "longTasks": [
+              1243
+            ],
+            "presentations": []
+          }
+        },
+        {
+          "stage": "Add Workhorse in North America",
+          "metrics": {
+            "mode": "production",
+            "samples": [
+              {
+                "action": "Reset metrics",
+                "nextPaintMs": 13
+              },
+              {
+                "action": "Build the Platform. 0 of 6 checks cleared. Next: Network blueprint.",
+                "nextPaintMs": 1253.4
+              },
+              {
+                "action": "North America23 countries \u00b7 136.8K on the nightDark\u2014nothing here yetnot set yet",
+                "nextPaintMs": 13.3
+              },
+              {
+                "action": "One more Workhorse in North America",
+                "nextPaintMs": 628.6
+              }
+            ],
+            "longTasks": [
+              1243,
+              125,
+              499
+            ],
+            "presentations": []
+          }
+        },
+        {
+          "stage": "Build Money stage",
+          "metrics": {
+            "mode": "production",
+            "samples": [
+              {
+                "action": "Reset metrics",
+                "nextPaintMs": 13
+              },
+              {
+                "action": "Build the Platform. 0 of 6 checks cleared. Next: Network blueprint.",
+                "nextPaintMs": 1253.4
+              },
+              {
+                "action": "North America23 countries \u00b7 136.8K on the nightDark\u2014nothing here yetnot set yet",
+                "nextPaintMs": 13.3
+              },
+              {
+                "action": "One more Workhorse in North America",
+                "nextPaintMs": 628.6
+              },
+              {
+                "action": "Money stage, not complete; Settled",
+                "nextPaintMs": 15.3
+              }
+            ],
+            "longTasks": [
+              1243,
+              125,
+              499
+            ],
+            "presentations": []
+          }
+        },
+        {
+          "stage": "Back to HQ",
+          "metrics": {
+            "mode": "production",
+            "samples": [
+              {
+                "action": "Reset metrics",
+                "nextPaintMs": 13
+              },
+              {
+                "action": "Build the Platform. 0 of 6 checks cleared. Next: Network blueprint.",
+                "nextPaintMs": 1253.4
+              },
+              {
+                "action": "North America23 countries \u00b7 136.8K on the nightDark\u2014nothing here yetnot set yet",
+                "nextPaintMs": 13.3
+              },
+              {
+                "action": "One more Workhorse in North America",
+                "nextPaintMs": 628.6
+              },
+              {
+                "action": "Money stage, not complete; Settled",
+                "nextPaintMs": 15.3
+              },
+              {
+                "action": "Back",
+                "nextPaintMs": 36.9
+              }
+            ],
+            "longTasks": [
+              1243,
+              125,
+              499
+            ],
+            "presentations": []
+          }
+        },
+        {
+          "stage": "Define first open",
+          "metrics": {
+            "mode": "production",
+            "samples": [
+              {
+                "action": "Reset metrics",
+                "nextPaintMs": 13
+              },
+              {
+                "action": "Build the Platform. 0 of 6 checks cleared. Next: Network blueprint.",
+                "nextPaintMs": 1253.4
+              },
+              {
+                "action": "North America23 countries \u00b7 136.8K on the nightDark\u2014nothing here yetnot set yet",
+                "nextPaintMs": 13.3
+              },
+              {
+                "action": "One more Workhorse in North America",
+                "nextPaintMs": 628.6
+              },
+              {
+                "action": "Money stage, not complete; Settled",
+                "nextPaintMs": 15.3
+              },
+              {
+                "action": "Back",
+                "nextPaintMs": 36.9
+              },
+              {
+                "action": "Define the Launch. 2 of 7 checks cleared. Next: Market clearance.",
+                "nextPaintMs": 356.4
+              }
+            ],
+            "longTasks": [
+              1243,
+              125,
+              499,
+              319,
+              57
+            ],
+            "presentations": []
+          }
+        },
+        {
+          "stage": "Define Ident step",
+          "metrics": {
+            "mode": "production",
+            "samples": [
+              {
+                "action": "Reset metrics",
+                "nextPaintMs": 13
+              },
+              {
+                "action": "Build the Platform. 0 of 6 checks cleared. Next: Network blueprint.",
+                "nextPaintMs": 1253.4
+              },
+              {
+                "action": "North America23 countries \u00b7 136.8K on the nightDark\u2014nothing here yetnot set yet",
+                "nextPaintMs": 13.3
+              },
+              {
+                "action": "One more Workhorse in North America",
+                "nextPaintMs": 628.6
+              },
+              {
+                "action": "Money stage, not complete; Settled",
+                "nextPaintMs": 15.3
+              },
+              {
+                "action": "Back",
+                "nextPaintMs": 36.9
+              },
+              {
+                "action": "Define the Launch. 2 of 7 checks cleared. Next: Market clearance.",
+                "nextPaintMs": 356.4
+              },
+              {
+                "action": "Commission the ident",
+                "nextPaintMs": 977.9
+              }
+            ],
+            "longTasks": [
+              1243,
+              125,
+              499,
+              319,
+              57,
+              396,
+              579
+            ],
+            "presentations": []
+          }
+        }
+      ]
+    },
+    "bid": {
+      "revision": "6a28728",
+      "startup": {
+        "mode": "production",
+        "samples": [],
+        "longTasks": [
+          714,
+          190,
+          75,
+          128,
+          54,
+          56,
+          55
+        ],
+        "presentations": []
+      },
+      "afterEdits": {
+        "mode": "production",
+        "samples": [
+          {
+            "action": "Reset metrics",
+            "nextPaintMs": 12.1
+          },
+          {
+            "action": "Increase upfront bid",
+            "nextPaintMs": 13.8
+          },
+          {
+            "action": "Decrease upfront bid",
+            "nextPaintMs": 13.1
+          },
+          {
+            "action": "Increase upfront bid",
+            "nextPaintMs": 15
+          },
+          {
+            "action": "Decrease upfront bid",
+            "nextPaintMs": 13.9
+          },
+          {
+            "action": "Increase upfront bid",
+            "nextPaintMs": 15.3
+          },
+          {
+            "action": "Decrease upfront bid",
+            "nextPaintMs": 13.7
+          }
+        ],
+        "longTasks": [],
+        "presentations": []
+      },
+      "idleBounded": {
+        "elapsedMs": 5001,
+        "metrics": {
+          "mode": "production",
+          "samples": [
+            {
+              "action": "Reset metrics",
+              "nextPaintMs": 10.6
+            }
+          ],
+          "longTasks": [
+            55,
+            54
+          ],
+          "presentations": []
+        }
+      }
+    }
+  },
+  "checks": [
+    {
+      "name": "collection-private",
+      "build": 0,
+      "run": 0
+    },
+    {
+      "name": "offer-ui",
+      "build": 0,
+      "run": 0
+    },
+    {
+      "name": "result-ui",
+      "build": 0,
+      "run": 0
+    },
+    {
+      "name": "read-index",
+      "build": 0,
+      "run": 0
+    },
+    {
+      "name": "retention",
+      "build": 0,
+      "run": 0
+    },
+    {
+      "name": "parity",
+      "build": 0,
+      "run": 0
+    },
+    {
+      "name": "audit:streaming-private-listed-terms",
+      "run": 0
+    },
+    {
+      "name": "audit:streaming-collection-auction-repairs",
+      "run": 0
+    },
+    {
+      "name": "audit:streaming-rights-transactions-phase6",
+      "run": 0
+    },
+    {
+      "name": "audit:streaming-rights-marketplace-phase16",
+      "run": 0
+    },
+    {
+      "name": "audit:streaming-market-presentations",
+      "run": 0
+    },
+    {
+      "name": "audit:streaming-launch-draft-continuity",
+      "run": 0
+    },
+    {
+      "name": "audit:save-generations",
+      "run": 0
+    }
+  ],
+  "retention": {
+    "passed": 21,
+    "failed": 0,
+    "titles": 5000,
+    "checks": [
+      "complete references",
+      "complete licence terms",
+      "every explicit input term",
+      "complete canonical rights",
+      "treasury unchanged"
+    ],
+    "paths": [
+      "normalization",
+      "migration reload",
+      "real auction tick"
+    ]
+  },
+  "retentionDefaultDiagnosis": {
+    "canonicalEqual": true,
+    "explicitChanged": 0,
+    "rawLicencesEqual": true,
+    "differences": [
+      {
+        "key": "marketingGuarantee",
+        "canonical": 0,
+        "count": 4896
+      },
+      {
+        "key": "viewershipBonusThreshold",
+        "canonical": 0,
+        "count": 4896
+      },
+      {
+        "key": "viewershipBonusAmount",
+        "canonical": 0,
+        "count": 4896
+      },
+      {
+        "key": "renewalOption",
+        "canonical": false,
+        "count": 4896
+      },
+      {
+        "key": "sublicensingAllowed",
+        "canonical": false,
+        "count": 4896
+      },
+      {
+        "key": "sequelRightsIncluded",
+        "canonical": false,
+        "count": 4896
+      },
+      {
+        "key": "changeOfControl",
+        "canonical": "NOTICE",
+        "count": 4896
+      },
+      {
+        "key": "cancellationPenalty",
+        "canonical": 0,
+        "count": 4896
+      },
+      {
+        "key": "renewedFromLicenseId",
+        "canonical": null,
+        "count": 4896
+      }
+    ]
+  },
+  "readParity": [
+    {
+      "count": 1040,
+      "sourceHash": "f62e4cb54f867fd1e6d40b72aa169d2167c64e596f70da075199350bfa12f13c",
+      "inputUnchanged": true,
+      "normalizedCatalogueHash": "3e00581fc3937b7676a910f50072f827530d0129a29b9cc0441115f0a5f0e1d6",
+      "rightsRegistryHash": "92e224e2f2de24bf5bb5843fe77a726ccc50c350414fe3f5e1f45bf6e6d6ae09",
+      "openingHash": "a442b848c737db2f246f343b77d9fe911656dd2565cdc863167e9921fd3da3eb",
+      "forecastHash": "02647e51578eb7897fc5299429c28da792149c865b953fc3c41896b1fa58af16",
+      "available": 1040
+    },
+    {
+      "count": 5000,
+      "sourceHash": "780d48300344ea931dbbb2a798865a54b0c7f8183c7209f52dc7b9a47f4f7757",
+      "inputUnchanged": true,
+      "normalizedCatalogueHash": "730085cbebffef57519de8af318b844a5c07ba0b6eaa8cfab00c36878f38fa72",
+      "rightsRegistryHash": "7132c0400bdb0f52a523afcfbb3369d2b292baedc4dd95186e0d114e1314667b",
+      "openingHash": "8b1c40db0957e4a8d794e34c54edf57d2687771d640b7cea8f09a23c20998554",
+      "forecastHash": "8b3875c94b6c8f8b7ed2a77bca3892d54a5ac8a2a79d08a46dba9979e9d9f7cf",
+      "available": 5000
+    }
+  ],
+  "actualCareer": {
+    "name": "Anshu bisnoi",
+    "slot": 2,
+    "age": 15,
+    "week": 1,
+    "catalogueTitles": 251,
+    "filedCountries": 197,
+    "controllerActions": "load and navigation only"
+  },
+  "limitations": [
+    "Single controlled browser observations, not field INP/percentiles.",
+    "App/disk persistence excluded from lab timings.",
+    "Physical Android/iPhone performance unmeasured.",
+    "Remaining first-open and genuine-save long tasks disclosed."
+  ],
+  "checkpointReadParityConfirmed": true,
+  "additionalChecks": {
+    "auctionTimer": {
+      "passed": 15,
+      "failures": []
+    },
+    "permanentOutgoing": {
+      "passed": 12,
+      "failures": []
+    },
+    "typecheck": {
+      "exitCode": 0
+    },
+    "productionBuild": {
+      "exitCode": 0,
+      "mainChunkKb": 14167.82,
+      "mainChunkGzipKb": 3955.84
+    }
+  },
+  "finalReview": {
+    "base": "d9887b1",
+    "initialHead": "7a361d3",
+    "critical": 0,
+    "importantFound": 1,
+    "importantAddressed": 1,
+    "minorStanding": "Read-index audit uses separately prepared pinned /tmp fixtures",
+    "fixHead": "6a28728",
+    "scopedReReview": "Approved; no new Critical, Important or Minor breakage"
+  },
+  "idleSummary": {
+    "before": {
+      "windowMs": 5001,
+      "longTasks": 17,
+      "totalLongTaskMs": 1192
+    },
+    "after": {
+      "windowMs": 5001,
+      "longTasks": 2,
+      "taskMs": [
+        55,
+        54
+      ],
+      "totalLongTaskMs": 109
+    }
+  },
+  "rulings": [
+    {
+      "decision": "Original-owner agreed collection duration begins at actual signature; no silent reply-week shortening. Fresh rights cover full interval; inherited expiry remains binding; offer lifetime is distinct from licence expiry.",
+      "costIfWrong": "Needs an explicit visible term-policy counter/revision; do not silently shorten an accepted agreement."
+    }
+  ],
+  "handoff": {
+    "url": "http://localhost:5174/",
+    "browserTab": "20",
+    "serverPid": 57591,
+    "cwd": "/Users/zeesh/Vibe code/Actor empire",
+    "implementationPushed": false,
+    "checkpointPushed": true,
+    "careerModifiedByController": false
+  }
+}
