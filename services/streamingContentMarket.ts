@@ -246,7 +246,7 @@ export const submitContentMarketPrivateOffer = (
     const collection = getContentMarketCollections(player).find(item => item.id === sourceId);
     if (collection) return isContentMarketAuctionCollection(player, sourceId)
         ? {player, changed:false, reason:'NOT_READY', detail:'This collection is assigned to a live auction.'}
-        : openStreamingCollectionPrivateOffer(player, collection, terms);
+        : openStreamingCollectionPrivateOffer(player, sourceId, terms);
     if (isContentMarketAuctionListing(player, sourceId))
         return {player, changed:false, reason:'NOT_READY', detail:'These rights are assigned to a live auction. Enter the auction room to compete.'};
     return openStreamingPrivateOffer(prepareContentMarketDiscovery(player), sourceId, terms);

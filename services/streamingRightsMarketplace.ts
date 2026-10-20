@@ -1,3 +1,4 @@
+import {resolveHistoricalCatalogueTitle} from './historicalCatalogue';
 import {allocatePrivateCollectionMoney, collectionOpportunityForNegotiation, collectionPrivateDefaults, createCollectionNegotiationSnapshot, validateCollectionPrivateTerms, validatePrivateTermsNumbers} from './streamingCollectionPrivateOffers';
 import {getStreamingBuyerBackendCapability, streamingBackendPercentForBuyer, validateNewStreamingBackendTerms, minimumStreamingLicenseFee} from './streamingBackendPolicy';
 import { getOwnedPlatformPackageCountryIds } from './streamingContentAvailability';
@@ -69,7 +70,7 @@ import {
     settleStreamingRightsTransfer,
 } from './streamingRightsTransactions';
 import { createStreamingRightsAccessGrantForOffer, intersectStreamingRightsAccessGrants, normalizeStreamingRightsAccessGrant } from './streamingRightsAccessGrant';
-import { getContentMarketListings, isContentMarketAuctionListing } from './streamingContentMarket';
+import { getContentMarketCollections, getContentMarketListings, isContentMarketAuctionCollection, isContentMarketAuctionListing } from './streamingContentMarket';
 
 export type StreamingRightsOpportunityKind = 'STUDIO_ACQUISITION' | 'PLATFORM_TRADE' | 'SUBLICENSE_OUT' | 'TRANSFER_OUT';
 
@@ -201,8 +202,10 @@ export const processStreamingPrivateOffersWeek = (
         ) return current;
 
         const privateSource=current.sourceLicenseId ? getStreamingRightsContract(player.world.streamingRightsContracts,current.sourceLicenseId) : null;
-        const sourceError=current.sourceLicenseId ? !privateSource ? 'The source grant is no longer available.'
-            : validatePrivateScope(player,platform,current,privateSource,current.rivalBidAmount,current.buyerPlatformId,current.createdAtAbsoluteWeek) : null;
+        const sourceError = validateCurrentOriginalPrivateSource(player, current) || (current.sourceLicenseId
+            ? !privateSource ? 'The source grant is no longer available.'
+                : validatePrivateScope(player,platform,current,privateSource,current.rivalBidAmount,current.buyerPlatformId,current.createdAtAbsoluteWeek)
+            : null);
         const startsAtAbsoluteWeek = absoluteWeek;
         const expiresAtAbsoluteWeek = privateSource ? privateSource.expiresAtAbsoluteWeek : current.windowType === 'PERMANENT'
             ? Number.MAX_SAFE_INTEGER
@@ -1041,6 +1044,32 @@ const getNegotiationCountrySnapshot = (
     return territory === 'DOMESTIC' ? candidates.slice(0, 1) : candidates.slice().sort();
 };
 
+/** Resolve ownership from current canonical sources, never a rotating listing or licence display fallback. */
+const validateCurrentOriginalPrivateSource = (
+    player: Player,
+    negotiation: OwnedStreamingRightsNegotiation,
+    terms: StreamingRightsTermsInput = negotiation,
+): string | null => {
+    if (!negotiation.proposalVersion || negotiation.kind !== 'ACQUIRE'
+        || negotiation.sourceLicenseId || negotiation.collectionSnapshot !== undefined) return null;
+    const worldProject = player.world.projects.find(project => String(project.id) === negotiation.sourceProjectId);
+    const careerProject = (player.pastProjects || []).find(project => String(project.id) === negotiation.sourceProjectId);
+    const historical = !worldProject && !careerProject
+        ? resolveHistoricalCatalogueTitle(player, negotiation.sourceProjectId) : null;
+    const sellerId = worldProject ? String(worldProject.studioId)
+        : careerProject ? String(careerProject.studioId || '')
+            : historical?.rightsHolderId || historical?.studioId;
+    if (!sellerId || sellerId !== negotiation.sellerId)
+        return 'The original title or its current seller is no longer available.';
+    if (terms.territory !== 'GLOBAL') {
+        const countries = terms.countryIds || negotiation.countryIds;
+        const footprint = getOwnedPlatformPackageCountryIds(player.ownedStreamingPlatform);
+        if (!countries.length || countries.some(countryId => !footprint.includes(countryId)))
+            return 'The proposed countries are no longer in the platform footprint.';
+    }
+    return null;
+};
+
 /** Reject scope loss before normalization; a submitted promise cannot silently shrink. */
 const validatePrivateScope = (player:Player, platform:OwnedStreamingPlatformState, terms:StreamingRightsTermsInput,
     sourceContract: StreamingRightsContract | OwnedStreamingPlatformState['catalogLicenses'][number] | null | undefined,
@@ -1187,17 +1216,23 @@ export const openStreamingRightsNegotiation = (
 };
 
 export const openStreamingCollectionPrivateOffer = (
-    player: Player, opportunity: StreamingCataloguePackageOpportunity, inputTerms: StreamingRightsTermsInput,
+    player: Player, source: string | StreamingCataloguePackageOpportunity, inputTerms: StreamingRightsTermsInput,
 ): StreamingRightsActionResult => {
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     if (!['FOUNDING','ACTIVE'].includes(platform.lifecycle)) return {player,changed:false,reason:'NOT_ACTIVE'};
+    // Legacy callers may supply a display object; only its ID is authoritative input.
+    const sourceId = typeof source === 'string' ? source : source.id;
+    if (isContentMarketAuctionCollection(player, sourceId))
+        return {player,changed:false,reason:'NOT_READY',detail:'This collection is assigned to a live auction.'};
+    const existing = platform.rightsNegotiations.find(n => n.collectionSnapshot?.package?.id === sourceId);
+    if (existing) return {player,changed:false,reason:'ALREADY_OPEN',negotiation:existing};
+    const opportunity = getContentMarketCollections(player).find(item => item.id === sourceId);
+    if (!opportunity) return {player,changed:false,reason:'NOT_FOUND',detail:'This collection offer is no longer available.'};
     const snapshot = createCollectionNegotiationSnapshot(player, opportunity);
     const terms = {...inputTerms, countryIds:inputTerms.countryIds || snapshot.package.requestedCountryIds,
         accessGrant:inputTerms.accessGrant || snapshot.accessGrant};
     const invalid = validateCollectionPrivateTerms(player,snapshot,terms);
     if (invalid) return {player,changed:false,reason:'INVALID_TERMS',detail:invalid};
-    const existing = platform.rightsNegotiations.find(n=>n.collectionSnapshot?.package?.id===opportunity.id);
-    if (existing) return {player,changed:false,reason:'ALREADY_OPEN',negotiation:existing};
     const committed = platform.costCommitments.filter(c=>c.status==='COMMITTED').reduce((sum,c)=>sum+Math.max(0,c.committedAmount-c.paidAmount),0);
     if (platform.treasuryCash-committed<terms.minimumGuarantee) return {player,changed:false,reason:'INSUFFICIENT_TREASURY'};
     const week=getAbsoluteWeek(player.age,player.currentWeek);
@@ -1274,6 +1309,8 @@ export const reviseStreamingRightsNegotiation = (
     if (!current || !ACTIVE_NEGOTIATION_STATUSES.has(current.status)) return { player, changed: false, reason: 'NOT_FOUND' };
     const invalidNumbers = validatePrivateTermsNumbers(inputTerms,Boolean(current.collectionSnapshot));
     if (invalidNumbers) return {player,changed:false,reason:'INVALID_TERMS',detail:invalidNumbers};
+    const originalSourceError = validateCurrentOriginalPrivateSource(player,current,inputTerms);
+    if (originalSourceError) return {player,changed:false,reason:'RIGHTS_UNAVAILABLE',detail:originalSourceError};
     const collectionTerms = current.collectionSnapshot ? {...inputTerms,accessGrant:inputTerms.accessGrant || current.accessGrant, countryIds:inputTerms.countryIds || current.countryIds} : inputTerms;
     const collectionError = current.collectionSnapshot ? validateCollectionPrivateTerms(player,current.collectionSnapshot,collectionTerms) : null;
     if (collectionError) return {player,changed:false,reason:'INVALID_TERMS',detail:collectionError};
@@ -1431,8 +1468,8 @@ export const acceptStreamingRightsCounter = (
     const week=getAbsoluteWeek(player.age,player.currentWeek);
     if (week>(current.signingDeadlineAbsoluteWeek ?? current.expiresAtAbsoluteWeek)) return {player,changed:false,reason:'NOT_READY'};
     const proposed={...current,minimumGuarantee:current.counterMinimumGuarantee,platformRevenueShare:current.counterPlatformRevenueShare};
-    const error=current.collectionSnapshot ? validateCollectionPrivateTerms(player,current.collectionSnapshot,proposed)
-        : validatePrivateScope(player,platform,proposed,current.sourceLicenseId ? getStreamingRightsContract(player.world.streamingRightsContracts,current.sourceLicenseId) : null,current.rivalBidAmount,current.buyerPlatformId,current.createdAtAbsoluteWeek);
+    const error=validateCurrentOriginalPrivateSource(player,current,proposed) || (current.collectionSnapshot ? validateCollectionPrivateTerms(player,current.collectionSnapshot,proposed)
+        : validatePrivateScope(player,platform,proposed,current.sourceLicenseId ? getStreamingRightsContract(player.world.streamingRightsContracts,current.sourceLicenseId) : null,current.rivalBidAmount,current.buyerPlatformId,current.createdAtAbsoluteWeek));
     if(error)return {player,changed:false,reason:'INVALID_TERMS',detail:error};
     const negotiation: OwnedStreamingRightsNegotiation = {
         ...current,
@@ -1542,6 +1579,8 @@ export const signStreamingRightsDeal = (
             negotiation,
         };
     }
+    const originalSourceError = validateCurrentOriginalPrivateSource(player,negotiation);
+    if (originalSourceError) return {player,changed:false,reason:'RIGHTS_UNAVAILABLE',detail:originalSourceError};
     if (negotiation.collectionSnapshot !== undefined) {
         const error=validateCollectionPrivateTerms(player,negotiation.collectionSnapshot!,negotiation);
         if(error)return {player,changed:false,reason:'RIGHTS_UNAVAILABLE',detail:error};
