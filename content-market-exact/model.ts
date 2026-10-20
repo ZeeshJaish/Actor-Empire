@@ -12,6 +12,40 @@ export const getContentMarketPostActionScene = (
   source: 'LISTING' | 'COLLECTION' | 'OPPORTUNITY' | 'STUDIO' | 'UPCOMING' | 'AUCTION' | 'OFFER',
 ): 'MARKET' | 'STUDIO' => source === 'STUDIO' ? 'STUDIO' : 'MARKET';
 
+/** The hold begins after the result has actually appeared, never while a
+ * transaction or React render is still working. Each result owns its timer. */
+export const createMarketResultPresentation = (clock: {
+  schedule: (read: () => void, delay: number) => number;
+  cancel: (id: number) => void;
+  onPresented: () => void;
+  onDismiss: () => void;
+}) => {
+  let presented = false;
+  let finished = false;
+  let timer: number | null = null;
+  const dispose = () => {
+    finished = true;
+    if (timer !== null) clock.cancel(timer);
+    timer = null;
+  };
+  const dismiss = () => {
+    if (finished || !presented) return false;
+    dispose();
+    clock.onDismiss();
+    return true;
+  };
+  return {
+    present: () => {
+      if (finished || presented) return;
+      presented = true;
+      clock.onPresented();
+      timer = clock.schedule(dismiss, 3_000);
+    },
+    skip: dismiss,
+    dispose,
+  };
+};
+
 export interface Territory {
   id: string;
   code: string;

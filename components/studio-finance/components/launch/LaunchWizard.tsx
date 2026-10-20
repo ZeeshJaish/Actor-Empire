@@ -86,7 +86,13 @@ export function LaunchWizard({ data, initialStep = 'markets', initialDraft, init
     const active = track?.querySelector<HTMLElement>('.lw-stop.is-now');
     if (!track || !active) return;
     const alignActive = () => {
-      track.scrollLeft = active.offsetLeft - (track.clientWidth - active.clientWidth) / 2;
+      // Keep the rail anchored like Build. Scroll only when the selected stop
+      // is outside the visible rail, rather than clipping earlier stops merely
+      // to center a middle step.
+      const left = active.offsetLeft;
+      const right = left + active.offsetWidth;
+      if (left < track.scrollLeft) track.scrollLeft = Math.max(0, left - 12);
+      else if (right > track.scrollLeft + track.clientWidth) track.scrollLeft = right - track.clientWidth + 12;
     };
     alignActive();
     window.addEventListener('resize', alignActive);

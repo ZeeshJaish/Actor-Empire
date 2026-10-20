@@ -36,6 +36,15 @@
 }
 .lw-count i { font-style: normal; font-size: var(--sf-t-2); color: var(--sf-fg-5); }
 
+/* One header band for Define and Build; only the title, subtitle and number
+   of stages differ. The compact deep-water chrome is the existing Build style. */
+.sf.lw .sf-head { padding-top: max(var(--sf-3), env(safe-area-inset-top)); padding-bottom: 0; }
+.sf.lw .sf-head h1 { font-size: var(--sf-t-5); }
+.sf.lw .sf-head-titles p { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.3; overflow-wrap: anywhere; }
+.sf.lw .lw-count { flex: none; white-space: nowrap; }
+.sf.lw .lw-track { padding: 10px var(--sf-4) 11px; box-shadow: 0 1px 0 rgba(226, 240, 255, 0.07); }
+.sf.lw .sf-head, .sf.lw .lw-track { position: relative; background: #0a1622; }
+
 /* The spine: eight nodes on one rail. Only the current step is named, below —
    eight labels at this width would all fall under the 11px floor. */
 

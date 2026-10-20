@@ -30,11 +30,12 @@
 import css from './ContentMarket.module.css';
 import { cx } from './cx';
 import { Poster } from './Poster';
+import AccessibleDialog from '../components/AccessibleDialog';
 import type { Brand } from '../components/streaming-transplant/StreamingBrandVisuals';
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Lot, Offer, Terms, Basis, Availability, Territory,
-  verdictOf, offerFrom, reachOf, getContentMarketPostActionScene,
+  verdictOf, offerFrom, reachOf, getContentMarketPostActionScene, createMarketResultPresentation,
   repFor, sayOf, yearsOf, termLabel,
 } from './model';
 
@@ -435,6 +436,11 @@ const Market: React.FC<{
     });
   };
   const [scoutFeedback, setScoutFeedback] = useState('');
+  useEffect(() => {
+    if (!scoutFeedback) return;
+    const timer = window.setTimeout(() => setScoutFeedback(''), 3_500);
+    return () => window.clearTimeout(timer);
+  }, [scoutFeedback]);
 
   const pool = useMemo(() => CATALOGUE.filter(l => l.mode !== 'STUDIO'), [CATALOGUE]);
   const genres = useMemo(() => [...new Set(pool.map(l => l.genre))].sort(), [pool]);
@@ -518,7 +524,7 @@ const Market: React.FC<{
 
 
       {paidScout && <section className={css.mkscout} aria-label="Private content scouting">
-        <div><b>PRIVATE SCOUTING</b><p>Find up to 25 new offers for your platform. Public listings and signed deals stay put.</p>
+        <div><b>PRIVATE SCOUTING</b><p>Find up to 25 new fixed-price offers. Public auctions rotate separately every 3 game weeks; scouting does not create new bidding rooms.</p>
           <small>Scout #{paidScout.count + 1} this cycle · free rotation in {paidScout.weeksUntilFree} {paidScout.weeksUntilFree === 1 ? 'week' : 'weeks'}</small></div>
         <button type="button" disabled={paidScout.shortfall > 0 || scouting} aria-busy={scouting} onClick={scout}>{scouting ? 'Scouting…' : confirmScout ? 'Confirm' : `Scout ${money(paidScout.price)}`}</button>
         {paidScout.shortfall > 0 && <small role="status">Platform funds short by {money(paidScout.shortfall)}.</small>}
@@ -528,6 +534,9 @@ const Market: React.FC<{
       {firstLook && <div className={css.mklibrarygrace}><b>FIRST LOOK</b><span>{firstLook.protectedTitles} titles protected from new rival bids · up to {firstLook.weeksRemaining} {firstLook.weeksRemaining === 1 ? 'week' : 'weeks'} left</span><small>Normal licence prices apply. Protection ends at 25 playable titles.</small></div>}
 
       <p className={css.mklegend}><b>Fixed-price licence</b> means sign at the listed rights terms. <b>Live bidding</b> means rivals can compete. <b>Headline</b> marks a premium title, not a buying method.</p>
+      {paidScout && !pool.some(item => item.mode === 'AUCTION') && <p className={css.mklegend} role="status">
+        No public bidding rooms are open in this cycle. The next public rotation is in {paidScout.weeksUntilFree} {paidScout.weeksUntilFree === 1 ? 'game week' : 'game weeks'}.
+      </p>}
 
       <div className={css.mksearch}>
         <input value={q} onChange={e => { setQ(e.target.value); onQueryChange?.(e.target.value); }}
@@ -1241,24 +1250,57 @@ export const ContentMarket: React.FC<{
   const [lot, setLot] = useState<Lot | null>(() => catalogue.find(item => item.id === initialLotId) || null);
   const [flash, setFlash] = useState<{ head: string; body: string; lot?: Lot; kind: 'SIGNED' | 'SENT' | 'FOLLOWED' } | null>(null);
   const [processing, setProcessing] = useState<string | null>(null);
+  const [flashPresented, setFlashPresented] = useState(false);
+  const flashArtRef = useRef<HTMLDivElement>(null);
+  const presentationRef = useRef<ReturnType<typeof createMarketResultPresentation> | null>(null);
   const [actionError, setActionError] = useState('');
   const actionPending = useRef(false);
   const actionFrame = useRef<number | null>(null);
   const actionTimer = useRef<number | null>(null);
-  const flashTimer = useRef<number | null>(null);
   useEffect(() => () => {
-    if (flashTimer.current !== null) window.clearTimeout(flashTimer.current);
     if (actionFrame.current !== null) window.cancelAnimationFrame(actionFrame.current);
     if (actionTimer.current !== null) window.clearTimeout(actionTimer.current);
   }, []);
+  useEffect(() => {
+    if (!flash) return;
+    let active = true;
+    const frames: number[] = [];
+    let fallback: number | null = null;
+    const presentation = createMarketResultPresentation({
+      schedule: (read, delay) => window.setTimeout(read, delay),
+      cancel: id => window.clearTimeout(id),
+      onPresented: () => setFlashPresented(true),
+      onDismiss: () => setFlash(current => current === flash ? null : current),
+    });
+    presentationRef.current = presentation;
+    const afterPaint = () => {
+      if (!active) return;
+      frames.push(window.requestAnimationFrame(() => {
+        frames.push(window.requestAnimationFrame(() => { if (active) presentation.present(); }));
+      }));
+    };
+    const art = flashArtRef.current;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) afterPaint();
+    else if (art && typeof art.getAnimations === 'function') {
+      const animations = art.getAnimations({ subtree: true })
+        .filter(animation => animation.effect?.getTiming().iterations !== Infinity);
+      void Promise.allSettled(animations.map(animation => animation.finished)).then(afterPaint);
+    } else fallback = window.setTimeout(afterPaint, 1_100);
+    return () => {
+      active = false;
+      presentation.dispose();
+      if (presentationRef.current === presentation) presentationRef.current = null;
+      frames.forEach(frame => window.cancelAnimationFrame(frame));
+      if (fallback !== null) window.clearTimeout(fallback);
+    };
+  }, [flash]);
 
   const settle = (head: string, body: string, kind: 'SIGNED' | 'SENT' | 'FOLLOWED' = 'SIGNED', l?: Lot) => {
+    setFlashPresented(false);
     setFlash({ head, body, kind, lot: l });
     const next = getContentMarketPostActionScene(kind === 'SENT' ? 'OFFER' : l?.sourceKind || 'LISTING');
     setScene(next);
     onNavigation?.(next, null);
-    if (flashTimer.current !== null) window.clearTimeout(flashTimer.current);
-    flashTimer.current = window.setTimeout(() => { setFlash(null); flashTimer.current = null; }, 1600);
   };
   const performAction = (label: string, action: () => { changed: boolean; detail: string } | undefined,
     onSuccess: (detail: string) => void) => {
@@ -1268,6 +1310,7 @@ export const ContentMarket: React.FC<{
     setProcessing(label);
     // Paint the pressed state before potentially expensive catalogue/accounting work.
     actionFrame.current = window.requestAnimationFrame(() => {
+      actionFrame.current = window.requestAnimationFrame(() => {
       actionFrame.current = null;
       actionTimer.current = window.setTimeout(() => {
         actionTimer.current = null;
@@ -1283,6 +1326,7 @@ export const ContentMarket: React.FC<{
           setProcessing(null);
         }
       }, 0);
+      });
     });
   };
   const take = (l: Lot) => performAction(l.mode === 'STUDIO' ? 'Adding to catalogue…' : 'Checking rights and funds…',
@@ -1298,12 +1342,18 @@ export const ContentMarket: React.FC<{
   return (
     <CatalogueContext.Provider value={catalogue}>
     <div className={css.mkwrap} data-content-market-design="zip-exact" style={{ ['--epx-mkwrap-c' as string]: c }}>
-      {processing && <div className={css.mkprocessing} role="status" aria-live="polite">{processing}</div>}
+      {processing && <AccessibleDialog className={css.mkprocessingbackdrop} aria-label={processing} onEscape={() => {}}>
+        <div className={css.mkprocessing} role="status" aria-live="polite">{processing}</div>
+      </AccessibleDialog>}
       {!processing && (actionError || feedback) && !flash && <div className={css.mkfeedback} role="status" aria-live="polite">{actionError || feedback}</div>}
       {flash && (
-        <div className={cx(css.mksigned, css['mks-' + (flash.kind.toLowerCase())])}
+        <AccessibleDialog className={cx(css.mksigned, css['mks-' + (flash.kind.toLowerCase())])}
+          aria-label={flash.kind === 'SIGNED' ? `${flash.head} acquired` : flash.head}
+          onEscape={() => { presentationRef.current?.skip(); }}
+          onClick={() => { presentationRef.current?.skip(); }}
           style={{ ['--epx-mkwrap-dh' as string]: String(flash.lot?.hue ?? 150) }}>
           <div className={css.mksignglow} />
+          <div className={css.mksigncontent} ref={flashArtRef}>
           {flash.lot && (
             <div className={css.mksignart}>
               {flash.lot.rows ? <Boxset lot={flash.lot} /> : (
@@ -1326,7 +1376,13 @@ export const ContentMarket: React.FC<{
               ? 'Your title is linked to the catalogue in its eligible streaming markets.'
               : 'The contract is registered and it is in your catalogue.'}</p>
           )}
-        </div>
+          </div>
+          <button type="button" className={css.mksignskip} disabled={!flashPresented}
+            style={{ visibility: flashPresented ? 'visible' : 'hidden' }}
+            onClick={event => { event.stopPropagation(); presentationRef.current?.skip(); }}>
+            Tap to continue
+          </button>
+        </AccessibleDialog>
       )}
       {scene === 'GATE' && (
         <Gate st={state} supplySummary={supplySummary} onBack={onBack} onCommission={onCommission}

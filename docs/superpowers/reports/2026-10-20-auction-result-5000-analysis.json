@@ -1,0 +1,205 @@
+{
+  "date": "2026-10-20",
+  "sourceBase": "2573f1e plus preserved local market UI fixes",
+  "ui": {
+    "auctionResultStates": [
+      "NO_SALE",
+      "WON",
+      "LOST",
+      "INVALIDATED",
+      "WITHDRAWN",
+      "COLLECTION"
+    ],
+    "renderTestsPassed": 6,
+    "review": "One collection labeling issue found and fixed; reviewer verified no actionable issues remain",
+    "acquiredHint": {
+      "earlyHintVisible": false,
+      "presentingLabelVisible": false,
+      "background": "transparent",
+      "border": "0px",
+      "holdAfterPresentationMs": 3001.6,
+      "realAcquisitionTitlesBefore": 1040,
+      "realAcquisitionTitlesAfter": 1041
+    }
+  },
+  "stress": {
+    "titles": 5000,
+    "filedCountries": 197,
+    "worldProjects": 3983,
+    "serializedBytes": 24041588,
+    "construction": "Pinned 1040-title fixture (104 normal acquisitions plus historical canonical grants), then 3960 distinct synthetic released projects with explicit canonical subscription licences. Memory-only QA; not 5000 manual purchases.",
+    "retention": {
+      "passed": 21,
+      "failed": 0,
+      "titles": 5000,
+      "checks": [
+        "complete references",
+        "complete licence terms",
+        "every explicit input term",
+        "complete canonical rights",
+        "treasury unchanged"
+      ],
+      "paths": [
+        "normalization",
+        "migration reload",
+        "real auction tick"
+      ]
+    },
+    "openingAvailable": 5000,
+    "wizardMeasurements": {
+      "mode": "production",
+      "samples": [
+        {
+          "action": "Reset metrics",
+          "nextPaintMs": 11.1
+        },
+        {
+          "action": "Build the Platform. 0 of 6 checks cleared. Next: Network blueprint.",
+          "nextPaintMs": 5858.9
+        },
+        {
+          "action": "North America23 countries · 136.8K on the nightDark—nothing here yetnot set yet",
+          "nextPaintMs": 16.1
+        },
+        {
+          "action": "One more Workhorse in North America",
+          "nextPaintMs": 10984.9
+        },
+        {
+          "action": "Money stage, not complete; Settled",
+          "nextPaintMs": 25.6
+        },
+        {
+          "action": "Back",
+          "nextPaintMs": 319.1
+        },
+        {
+          "action": "Define the Launch. 2 of 7 checks cleared. Next: Market clearance.",
+          "nextPaintMs": 9458.9
+        },
+        {
+          "action": "Commission the ident",
+          "nextPaintMs": 13336.8
+        }
+      ],
+      "longTasks": [
+        5850,
+        150,
+        10830,
+        317,
+        9321,
+        114,
+        75,
+        3987,
+        9345
+      ],
+      "presentations": []
+    },
+    "biddingMeasurements": {
+      "mode": "production",
+      "samples": [
+        {
+          "action": "Reset metrics",
+          "nextPaintMs": 10.2
+        },
+        {
+          "action": "Increase upfront bid",
+          "nextPaintMs": 79.3
+        },
+        {
+          "action": "Decrease upfront bid",
+          "nextPaintMs": 73.7
+        },
+        {
+          "action": "Increase upfront bid",
+          "nextPaintMs": 70.9
+        },
+        {
+          "action": "Decrease upfront bid",
+          "nextPaintMs": 74.5
+        },
+        {
+          "action": "Increase upfront bid",
+          "nextPaintMs": 71.2
+        },
+        {
+          "action": "Decrease upfront bid",
+          "nextPaintMs": 74.8
+        }
+      ],
+      "longTasks": [
+        78,
+        70,
+        211,
+        109,
+        210,
+        73,
+        68,
+        204,
+        107,
+        200,
+        70,
+        71,
+        216,
+        118,
+        206,
+        73,
+        74,
+        223,
+        118,
+        209,
+        70,
+        68,
+        218,
+        114,
+        238,
+        73
+      ],
+      "presentations": []
+    }
+  },
+  "calculationDiagnostics": {
+    "rows": [
+      {
+        "name": "opening coverage: cold shared context",
+        "ms": 4683.9
+      },
+      {
+        "name": "opening coverage: same unchanged context",
+        "ms": 0
+      },
+      {
+        "name": "opening coverage: rebuilt context",
+        "ms": 3615.5
+      },
+      {
+        "name": "world build demand forecast",
+        "ms": 4301.2
+      },
+      {
+        "name": "canonical ident step save, no disk/App persistence",
+        "ms": 0
+      }
+    ],
+    "sameResults": true,
+    "titles": 5000
+  },
+  "checks": {
+    "typecheck": "passed",
+    "productionBuild": "passed",
+    "marketPresentationAudit": "3 passed",
+    "rightsTransactionsPhase6": "passed",
+    "gitDiffCheck": "passed",
+    "designFlags": 6,
+    "designFlagsNew": 0,
+    "suppressionsAdded": 0
+  },
+  "limitations": [
+    "One measured 5000-title interaction sequence, not percentile or real-device data.",
+    "Double-frame browser lab timings exclude fixture construction and App/disk persistence.",
+    "The large fixture grows world projects as well as licence count; title count is not the only variable versus the 1040-title fixture.",
+    "Native Android/iPhone performance remains unmeasured.",
+    "Cold-open performance optimization is proposed, not implemented in this turn.",
+    "The separate bulk-owned starter draft 1000-item cap remains outside this UI task."
+  ]
+}

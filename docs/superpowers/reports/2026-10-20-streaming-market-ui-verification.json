@@ -1,0 +1,232 @@
+{
+  "date": "2026-10-20",
+  "baseCommit": "2573f1e",
+  "scope": "Streaming market feedback and presentation, world-first Build, shared wizard header; no rights/economy rule changes",
+  "tests": [
+    {
+      "name": "audit:streaming-market-presentations",
+      "exitCode": 0,
+      "seconds": 2.24,
+      "log": "/tmp/market-ui-audit-streaming-market-presentations.log"
+    },
+    {
+      "name": "audit:content-market-supply-rotation",
+      "exitCode": 0,
+      "seconds": 0.9,
+      "log": "/tmp/market-ui-audit-content-market-supply-rotation.log"
+    },
+    {
+      "name": "audit:streaming-wizard-navigation",
+      "exitCode": 0,
+      "seconds": 1.84,
+      "log": "/tmp/market-ui-audit-streaming-wizard-navigation.log"
+    },
+    {
+      "name": "audit:streaming-build-world",
+      "exitCode": 0,
+      "seconds": 0.63,
+      "log": "/tmp/market-ui-audit-streaming-build-world.log"
+    },
+    {
+      "name": "audit:streaming-build-test-autosave-gates",
+      "exitCode": 0,
+      "seconds": 0.8,
+      "log": "/tmp/market-ui-audit-streaming-build-test-autosave-gates.log"
+    },
+    {
+      "name": "audit:streaming-rights-transactions-phase6",
+      "exitCode": 0,
+      "seconds": 1.92,
+      "log": "/tmp/market-ui-audit-streaming-rights-transactions-phase6.log"
+    },
+    {
+      "name": "audit:save-generations",
+      "exitCode": 0,
+      "seconds": 0.23,
+      "log": "/tmp/market-ui-audit-save-generations.log"
+    }
+  ],
+  "typecheck": "passed",
+  "productionBuild": "passed",
+  "independentReview": "No actionable findings",
+  "bidding1040": {
+    "titles": 1040,
+    "filedCountries": 197,
+    "controlPaintMs": [
+      17.6,
+      16.4,
+      19,
+      25.4,
+      17.7,
+      17.3,
+      21.7,
+      16.5,
+      15.9,
+      18.6
+    ],
+    "medianMs": 17.7,
+    "longTasksMs": [
+      53,
+      51,
+      52,
+      51,
+      55,
+      50
+    ],
+    "validBidAccepted": true,
+    "licencesAfterBid": 1040,
+    "consoleWarningsAndErrors": []
+  },
+  "buildCold1040": {
+    "worldFirstMs": [
+      735.8,
+      739.5,
+      745.5
+    ],
+    "medianWorldFirstMs": 739.5,
+    "initialRegionControlMs": [
+      724,
+      695.8,
+      679.9
+    ],
+    "medianControlMs": 695.8,
+    "interpretation": "Same-host diagnostic control varies only initial map focus. Older 396 ms run is not comparable to this session."
+  },
+  "normal52": {
+    "filedCountries": 197,
+    "defineOpenMs": 264.9,
+    "buildOpenMs": 338.5,
+    "defineStepRangeMs": [
+      33.3,
+      72.2
+    ],
+    "buildStepRangeMs": [
+      11.4,
+      18.6
+    ],
+    "rackEditMs": [
+      37.3,
+      19.9
+    ],
+    "longTasksObserved": true
+  },
+  "acquisition": {
+    "initialTitleCount": 1040,
+    "finalTitleCount": 1041,
+    "checkingCenter": {
+      "x": 196.6667,
+      "y": 426
+    },
+    "viewportCss": {
+      "width": 393,
+      "height": 852
+    },
+    "backdrop": "rgba(0, 0, 0, 0.84)",
+    "postPresentationHoldMs": 3000.7,
+    "earlySkipDisabled": true,
+    "presentedSkipVerified": true
+  },
+  "scouting": {
+    "duplicateToastRemoved": true,
+    "dismissAfterMs": 3500,
+    "visibleStatusCount": 1,
+    "absentAfterMs": 3800,
+    "paidScoutsInServiceTest": 3,
+    "privateOffersPerScout": 20,
+    "publicAuctionIdsUnchanged": true,
+    "mainSavePaidScoutNotUsed": true
+  },
+  "responsive": [
+    {
+      "activeVisible": true,
+      "countLeft": 279.3020935058594,
+      "documentWidth": 320,
+      "headerBackground": "rgb(10, 22, 34)",
+      "titleFont": "18px",
+      "titleRight": 267.3020935058594,
+      "trackLeft": 0,
+      "viewport": {
+        "height": 740,
+        "width": 320
+      }
+    },
+    {
+      "activeVisible": true,
+      "countLeft": 352.63543701171875,
+      "documentWidth": 393,
+      "headerBackground": "rgb(10, 22, 34)",
+      "titleFont": "17px",
+      "titleRight": 340.63543701171875,
+      "trackLeft": 0,
+      "viewport": {
+        "height": 852,
+        "width": 393
+      }
+    },
+    {
+      "activeVisible": true,
+      "countLeft": 389.96875,
+      "documentWidth": 431,
+      "headerBackground": "rgb(10, 22, 34)",
+      "titleFont": "17px",
+      "titleRight": 377.96875,
+      "trackLeft": 0,
+      "viewport": {
+        "height": 932,
+        "width": 431
+      }
+    },
+    {
+      "activeVisible": true,
+      "countLeft": 731.3021240234375,
+      "documentWidth": 1024,
+      "headerBackground": "rgb(10, 22, 34)",
+      "titleFont": "17px",
+      "titleRight": 719.3020935058594,
+      "trackLeft": 0,
+      "viewport": {
+        "height": 768,
+        "width": 1024
+      }
+    }
+  ],
+  "actualSaveSmoke": {
+    "visibleCatalogueTitles": 151,
+    "filedCountries": 197,
+    "savedCompute": 206,
+    "savedSites": 32,
+    "networkShowsWorld": true,
+    "regionsCollapsed": true,
+    "defineHeaderVerified": true,
+    "marketShows55FixedPriceLots": true,
+    "publicBiddingRoomsVisible": 0,
+    "nextPublicRotationGameWeeks": 1,
+    "noPurchaseOrWeekAdvance": true
+  },
+  "knownAuditFailure": {
+    "script": "scripts/audit-content-market-interaction-fixes.tsx",
+    "sameFailureOnHEAD": true,
+    "expected": 4000000,
+    "actual": "undefined",
+    "transactionResult": {
+      "changed": false,
+      "reason": "INVALID_TERMS",
+      "detail": "A meaningful fixed upfront license fee is required independently of backend."
+    },
+    "interpretation": "Legacy controlled fixture submits a hard-coded upfront fee below the canonical independent fee floor; do not weaken validation to make it pass."
+  },
+  "designAudit": {
+    "flags": 36,
+    "flagsOnChangedLines": 0,
+    "flaggedLinesExistAtHEAD": 36,
+    "ignored": 0,
+    "handling": "Pre-existing baseline styles remain; no unrelated redesign or suppressions."
+  },
+  "limitations": [
+    "Browser production fixture excludes App persistence; lab double-frame samples are not field INP.",
+    "No Android or iPhone hardware measurements; responsive layout checks do not prove all-device performance.",
+    "Remaining heavy cold forecast/network work and 50-55 ms auction tasks are visible; no universal instant claim.",
+    "The current save has zero public rooms; its exact exhausted/filtered discovery history was not extracted. Scouting does not replenish public auction IDs.",
+    "Bulk-owned starter draft 1000-item cap identified earlier is outside these UI fixes."
+  ]
+}

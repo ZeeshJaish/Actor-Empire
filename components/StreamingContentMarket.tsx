@@ -494,7 +494,9 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
                     const result = refreshStreamingPaidScout(player);
                     if (result.changed) onUpdatePlayer(result.player);
                     else scoutLock.current = false;
-                    setFeedback(result.detail);
+                    // The scout card owns its short-lived result. A second
+                    // global copy would otherwise remain over the market.
+                    setFeedback('');
                     return { changed: result.changed, detail: result.detail };
                 } }}
             initialScene={exactInitialScene}

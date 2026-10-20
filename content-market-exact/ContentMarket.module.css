@@ -1,6 +1,8 @@
 .mkwrap{position:absolute;inset:0;overflow:hidden}
 .mkwrap .mkprocessing,.mkwrap .mkfeedback{position:absolute;z-index:120;left:50%;top:18px;transform:translateX(-50%);max-width:calc(100% - 32px);padding:10px 14px;border-radius:12px;background:#1b2324;color:#f0f5f2;border:1px solid #52635c;font-size:12px;font-weight:700;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,.45)}
 .mkwrap .mkprocessing{pointer-events:all;min-width:180px}
+.mkwrap .mkprocessingbackdrop{position:fixed;inset:0;z-index:140;display:grid;place-items:center;padding:24px;background:rgba(0,0,0,.84)}
+.mkwrap .mkprocessingbackdrop .mkprocessing{position:relative;inset:auto;transform:none;max-width:min(320px,100%);margin:0;padding:20px 24px;font-size:14px;line-height:1.5}
 .mkwrap .mkprocessing::after{content:'';display:inline-block;width:8px;height:8px;margin-left:8px;border:2px solid #8ce0b3;border-right-color:transparent;border-radius:50%;animation:epx-market-spin .65s linear infinite}
 .mkwrap .mkfeedback{top:auto;bottom:calc(18px + env(safe-area-inset-bottom));background:#2c211e;border-color:#af655b}
 .mkwrap .mkofferslink{margin-left:auto;flex-shrink:0;padding:9px 10px;border-radius:10px;border:1px solid #5f5131;background:#211d16;color:#f2d698;font-size:9px;font-weight:900;letter-spacing:.07em}
@@ -413,7 +415,7 @@
    Losing an auction got a full hammer; buying a title outright got three lines
    of text over a dimmed page. The purchase is the point of the whole screen,
    so it gets the object you just bought, lit in its own colour. */
-.mkwrap .mksigned{position:fixed;inset:0;z-index:30;display:flex;flex-direction:column;
+.mkwrap .mksigned{position:fixed;inset:0;z-index:130;display:flex;flex-direction:column;
   align-items:center;justify-content:center;padding:0 30px;text-align:center;
   background:radial-gradient(66% 40% at 50% 40%,hsl(var(--epx-mkwrap-dh) 60% 20% / .95),rgba(4,5,7,.98) 74%),
     rgba(4,5,7,.98);animation:epx-mkfade .3s both}
@@ -435,6 +437,10 @@
   letter-spacing:-.02em;color:#eceef3;font-family:ui-monospace,Menlo,monospace;margin-bottom:3px}
 .mkwrap .mksignnote{margin-top:16px;font-size:12px;line-height:1.5;color:#8b93a6;
   animation:epx-mkbodyup .5s .56s both}
+.mkwrap .mksigncontent{position:relative;display:flex;flex-direction:column;align-items:center;max-width:100%;max-height:calc(100dvh - 140px);overflow-y:auto;padding:20px 0}
+.mkwrap .mksignskip{position:relative;flex:none;margin-top:16px;min-height:44px;padding:10px 20px;border:0;border-radius:0;background:transparent;color:#b9c9c0;font-size:12px;font-weight:500}
+.mkwrap .mksignskip:focus-visible{outline:2px solid #8ce0b3;outline-offset:4px}
+@media(prefers-reduced-motion:reduce){.mkwrap .mksigned,.mkwrap .mksigned *,.mkwrap .mkprocessing::after{animation:none!important}}
 
 /* ══ THE TABLE ══════════════════════════════════════════════════════════════
    Its own register. Every other screen in here is cold glass on near-black;
@@ -923,3 +929,21 @@
 .mkwrap .mkbackendrow button:focus-visible{outline:2px solid var(--epx-auction-own,#8d7bff);outline-offset:2px}
 
 .mkwrap .mkbidfeedback{margin:0 0 8px;color:#ececf4;font-size:11px;line-height:1.45;overflow-wrap:anywhere}
+
+/* Auction outcomes keep the title and final terms visible at every size. */
+.mkwrap .mkauctionresult{overflow-y:auto;justify-content:flex-start;padding:max(28px,env(safe-area-inset-top)) 24px max(28px,env(safe-area-inset-bottom));background:#080a10}
+.mkwrap .mkresultbody{width:100%;max-width:600px;margin:auto;flex:none;text-align:left}
+.mkwrap .mkresultidentity{display:grid;grid-template-columns:112px minmax(0,1fr);align-items:center;gap:24px}
+.mkwrap .mkresultposter{width:112px}
+.mkwrap .mkresultcopy{min-width:0}
+.mkwrap .mkresultcopy h1{font-size:28px;line-height:1.15;letter-spacing:-.025em;color:#f3f5fa;margin:0}
+.mkwrap .mk-won .mkresultcopy h1{color:#9be8bc}
+.mkwrap .mkresultcopy h2{font-size:22px;line-height:1.2;letter-spacing:-.02em;overflow-wrap:anywhere;color:#f3f5fa;margin:12px 0 0}
+.mkwrap .mkresultcopy p{font-size:12px;line-height:1.5;color:#b3bdcf;margin:10px 0 0}
+.mkwrap .mkresultbuyer{display:flex;align-items:center;gap:10px;margin-top:28px;color:#d9deea;font-size:13px}
+.mkwrap .mkresultfacts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px 24px;padding:24px 0;margin:24px 0 0;border-top:1px solid #303542;border-bottom:1px solid #303542}
+.mkwrap .mkresultfacts dt{font-size:11px;line-height:1.4;color:#b3bdcf}
+.mkwrap .mkresultfacts dd{font-size:17px;line-height:1.35;font-weight:700;color:#f3f5fa;margin:5px 0 0;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.mkwrap .mkresultnote{font-size:13px;line-height:1.6;color:#b3bdcf;margin:24px 0 0;max-width:65ch}
+.mkwrap .mkresultexit{width:100%;margin-top:28px;min-height:48px;letter-spacing:.08em}
+@media(max-width:440px){.mkwrap .mkresultidentity{grid-template-columns:1fr;gap:24px;text-align:center}.mkwrap .mkresultposter{margin:0 auto}.mkwrap .mkresultbuyer{justify-content:center}.mkwrap .mkresultcopy h1{font-size:26px}.mkwrap .mkresultcopy h2{font-size:21px}}

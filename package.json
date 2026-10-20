@@ -4,6 +4,7 @@
   "version": "1.0.25",
   "type": "module",
   "scripts": {
+    "audit:streaming-market-presentations": "esbuild scripts/audit-streaming-market-presentations.tsx --bundle --platform=node --format=cjs --loader:.csv=text --loader:.css=empty --outfile=/tmp/audit-streaming-market-presentations.cjs && node /tmp/audit-streaming-market-presentations.cjs",
     "audit:streaming-build-catalogue-reuse": "esbuild scripts/audit-streaming-build-catalogue-reuse.ts --bundle --platform=node --format=cjs --loader:.csv=text --outfile=/tmp/audit-streaming-build-catalogue-reuse.cjs && node /tmp/audit-streaming-build-catalogue-reuse.cjs",
     "audit:streaming-catalogue-retention": "esbuild scripts/audit-streaming-catalogue-retention.ts --bundle --platform=node --format=cjs --loader:.csv=text --outfile=/tmp/audit-streaming-catalogue-retention.cjs && node /tmp/audit-streaming-catalogue-retention.cjs --reload --acquire",
     "audit:streaming-programme-read-batch": "esbuild scripts/audit-streaming-programme-read-batch.ts --bundle --platform=node --format=cjs --loader:.csv=text --outfile=/tmp/audit-streaming-programme-read-batch.cjs && node /tmp/audit-streaming-programme-read-batch.cjs --hash",

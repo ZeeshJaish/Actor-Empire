@@ -50,6 +50,7 @@ export default function StreamingBuyerAuctionRoom({ player, session, onUpdatePla
         format: 'ANY', commitment: 'FIRM', deadlineWeeks: 52, platformRightsPercent: 100,
     });
     const [fundingActivated, setFundingActivated] = useState(false);
+    const [fundingFeedback, setFundingFeedback] = useState('');
     const [feedback, setFeedback] = useState('');
     const [submittingBid, setSubmittingBid] = useState(false);
     const bidFrame = useRef<number | null>(null);
@@ -132,6 +133,9 @@ export default function StreamingBuyerAuctionRoom({ player, session, onUpdatePla
 
     if (session.status !== 'LIVE') {
         const won = session.status === 'WON';
+        const collection = session.lot.listingKind === 'CATALOGUE_PACKAGE';
+        const format = collection ? `Collection${session.lot.catalogueComponentIds.length ? ` · ${session.lot.catalogueComponentIds.length} titles` : ''}`
+            : session.lot.projectType === 'SERIES' ? 'Series' : 'Film';
         const winner = session.winnerBidId ? session.bids.find(bid => bid.id === session.winnerBidId) : null;
         const optionalFunding = won && winner?.futureFunding?.commitment === 'OPTION' ? winner.futureFunding : null;
         const activated = fundingActivated || player.ownedStreamingPlatform.rightsObligations?.some(
@@ -143,25 +147,45 @@ export default function StreamingBuyerAuctionRoom({ player, session, onUpdatePla
                 updateRef.current(result.player);
                 setFundingActivated(true);
             }
-            setFeedback(result.changed ? 'Funding activated. The seller will deliver the project within 52 weeks.' : result.reason === 'INSUFFICIENT_CASH' ? 'Your platform needs more available funds to activate this deal.' : result.reason === 'ALREADY_ACTIVE' ? 'This funding deal is already active.' : 'This funding deal is no longer available.');
+            setFundingFeedback(result.changed ? 'Funding activated. The seller will deliver the project within 52 weeks.' : result.reason === 'INSUFFICIENT_CASH' ? 'Your platform needs more available funds to activate this deal.' : result.reason === 'ALREADY_ACTIVE' ? 'This funding deal is already active.' : 'This funding deal is no longer available.');
         };
         return <div className={css.mkwrap} data-content-market-design="zip-exact">
             <section className={cx(css.mk, css.mkroom, css.mkauction)} style={{ ['--epx-auction-own' as string]: playerTint }} data-content-market-scene="room" role="dialog" aria-label="Live rights auction">
-                <div className={cx(css.mkverdict, css['mk-' + (won ? 'won' : 'lost')])} style={{ ['--epx-mkwrap-oh' as string]: String(titleHue) }}>
-                    <div className={css.mkgavel} />
-                    {winner && <span className={css.mkvmark}><PlatformMark name={winner.bidderName} tint={winner.isPlayer ? playerTint : session.rivals.find(rival => rival.bidderId === winner.bidderId)?.color || '#777'} /></span>}
-                    <b className={css.mkvsold}>{session.status === 'NO_SALE' ? 'NO SALE' : 'SOLD'}</b>
-                    <span className={css.mkvwho}>{won ? 'TO YOU' : winner ? `TO ${winner.bidderName.toUpperCase()}` : 'ROOM CLOSED'}</span>
-                    <div className={css.mkvprice}>{winner ? money(winner.minimumGuarantee) : '—'}</div>
-                    <p className={css.mkvnote}>{session.resultReason || (won ? 'The contract is registered in your catalogue.' : 'Nothing was charged.')}</p>
-                    {optionalFunding && <div className={css.mkfundingresult}>
-                        <b>YOUR OPTIONAL DEAL</b>
-                        <p>{fundingLabel(optionalFunding)} · {money(optionalFunding.budgetPerProject)} per title · {optionalFunding.platformRightsPercent}% platform rights</p>
-                        <p>Funding is reserved when activated and paid when production starts. The seller delivers within 52 weeks of activation.</p>
-                        <button className={css.mkfundingactivate} type="button" disabled={activated} onClick={activateFunding}>{activated ? 'FUNDING ACTIVATED' : `ACTIVATE FUNDING · ${money(optionalFunding.count * optionalFunding.budgetPerProject)}`}</button>
-                    </div>}
-                    {feedback && <p className={css.mkvnote} role="status">{feedback}</p>}
-                    <button className={css.mkmark} type="button" onClick={onExit}>RETURN TO THE MARKET</button>
+                <div className={cx(css.mkverdict, css.mkauctionresult, css['mk-' + (won ? 'won' : 'lost')])}>
+                    <div className={css.mkresultbody}>
+                        <div className={css.mkresultidentity}>
+                            <div className={css.mkresultposter}><Poster id={session.lot.sourceProjectId} title={session.lot.title} genre={collection ? 'Mixed' : session.lot.genre} hue={titleHue} size="md" stack={collection ? session.lot.catalogueComponentIds.length : undefined} /></div>
+                            <div className={css.mkresultcopy}>
+                                <h1>{won ? 'Acquired' : winner ? 'Sold' : session.status === 'NO_SALE' ? 'No sale' : session.status === 'INVALIDATED' ? 'Rights unavailable' : session.status === 'WITHDRAWN' ? 'Offer withdrawn' : 'Room closed'}</h1>
+                                <h2>{session.lot.title}</h2>
+                                <p>{session.lot.sellerName} · {format}{!collection && ` · ${session.lot.genre.replaceAll('_', ' ')}`}</p>
+                            </div>
+                        </div>
+                        {winner && <div className={css.mkresultbuyer}>
+                            <PlatformMark name={winner.bidderName} tint={winner.isPlayer ? playerTint : session.rivals.find(rival => rival.bidderId === winner.bidderId)?.color || '#777'} small />
+                            <span>{won ? 'Added to your platform' : `Acquired by ${winner.bidderName}`}</span>
+                        </div>}
+                        {winner ? <dl className={css.mkresultfacts}>
+                            <div><dt>Upfront guarantee</dt><dd>{money(winner.minimumGuarantee)}</dd></div>
+                            <div><dt>Backend share</dt><dd>{winner.licensorRevenueShare}%</dd></div>
+                            <div><dt>Rights term</dt><dd>{session.lot.durationWeeks} weeks</dd></div>
+                            <div><dt>Coverage</dt><dd>{session.lot.countryIds.length ? `${session.lot.countryIds.length} ${session.lot.countryIds.length === 1 ? 'country' : 'countries'}` : session.lot.territory === 'GLOBAL' ? 'Global' : session.lot.territory.replaceAll('_', ' ')}</dd></div>
+                            {winner.productionFunding > 0 && <div><dt>Production funding</dt><dd>{money(winner.productionFunding)}</dd></div>}
+                            {winner.futureFunding && <div><dt>Future funding</dt><dd>{fundingLabel(winner.futureFunding)} · {winner.futureFunding.commitment === 'OPTION' ? 'Optional' : 'Firm'}</dd></div>}
+                        </dl> : session.status === 'NO_SALE' && <dl className={css.mkresultfacts}>
+                            <div><dt>Rights</dt><dd>Not transferred</dd></div>
+                            <div><dt>Payment</dt><dd>None charged</dd></div>
+                        </dl>}
+                        <p className={css.mkresultnote}>{session.resultReason || (won ? 'The contract is registered in your catalogue.' : winner ? 'The seller accepted the winning contract.' : 'This room has closed. Return to the market to explore other available rights.')}</p>
+                        {optionalFunding && <div className={css.mkfundingresult}>
+                            <b>YOUR OPTIONAL DEAL</b>
+                            <p>{fundingLabel(optionalFunding)} · {money(optionalFunding.budgetPerProject)} per title · {optionalFunding.platformRightsPercent}% platform rights</p>
+                            <p>Funding is reserved when activated and paid when production starts. The seller delivers within 52 weeks of activation.</p>
+                            <button className={css.mkfundingactivate} type="button" disabled={activated} onClick={activateFunding}>{activated ? 'FUNDING ACTIVATED' : `ACTIVATE FUNDING · ${money(optionalFunding.count * optionalFunding.budgetPerProject)}`}</button>
+                        </div>}
+                        {fundingFeedback && <p className={css.mkresultnote} role="status">{fundingFeedback}</p>}
+                        <button className={cx(css.mkmark, css.mkresultexit)} type="button" onClick={onExit}>Return to the market</button>
+                    </div>
                 </div>
             </section>
         </div>;

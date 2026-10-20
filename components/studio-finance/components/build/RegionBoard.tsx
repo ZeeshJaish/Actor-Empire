@@ -59,19 +59,9 @@ export function RegionBoard({ data, draft, patch, totals, services, onStartOver 
     return () => { scroll.removeEventListener('scroll', sync); window.removeEventListener('resize', sync); };
   }, []);
   const regions = useMemo(() => openingRegions(data), [data]);
-  /* Opens on the first region with something in it — a saved network reopens
-     where the work is — and otherwise on the first region, so the page never
-     opens on a wall of closed rows. */
-  const [openId, setOpenId] = useState<string | null>(() => (
-    regions.find(region => facilitiesIn(data, draft, region.id).length > 0)?.id ?? regions[0]?.id ?? null
-  ));
-  const hadOpeningRegions = useRef(regions.length > 0);
-  useEffect(() => {
-    if (!hadOpeningRegions.current && regions.length > 0) {
-      setOpenId(regions.find(region => facilitiesIn(data, draft, region.id).length > 0)?.id ?? regions[0].id);
-    }
-    hadOpeningRegions.current = regions.length > 0;
-  }, [data, draft, regions]);
+  // Start with the complete network. A region becomes the map's focus only
+  // after the player selects its continent or opens its row.
+  const [openId, setOpenId] = useState<string | null>(null);
   const [note, setNote] = useState<{ regionId: string; text: string } | null>(null);
   /* Tapping a continent you are not opening in used to do nothing at all: the
      map reported the tap, the board found no row for it and quietly fell back
