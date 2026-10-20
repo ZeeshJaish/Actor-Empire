@@ -1,5 +1,4 @@
-import {resolveHistoricalCatalogueTitle} from './historicalCatalogue';
-import {allocatePrivateCollectionMoney, collectionOpportunityForNegotiation, collectionPrivateDefaults, createCollectionNegotiationSnapshot, validateCollectionPrivateTerms, validatePrivateTermsNumbers} from './streamingCollectionPrivateOffers';
+import {resolveStreamingOriginalRightsSellerId, allocatePrivateCollectionMoney, collectionOpportunityForNegotiation, collectionPrivateDefaults, createCollectionNegotiationSnapshot, validateCollectionPrivateTerms, validatePrivateTermsNumbers} from './streamingCollectionPrivateOffers';
 import {getStreamingBuyerBackendCapability, streamingBackendPercentForBuyer, validateNewStreamingBackendTerms, minimumStreamingLicenseFee} from './streamingBackendPolicy';
 import { getOwnedPlatformPackageCountryIds } from './streamingContentAvailability';
 import type {
@@ -1052,13 +1051,7 @@ const validateCurrentOriginalPrivateSource = (
 ): string | null => {
     if (!negotiation.proposalVersion || negotiation.kind !== 'ACQUIRE'
         || negotiation.sourceLicenseId || negotiation.collectionSnapshot !== undefined) return null;
-    const worldProject = player.world.projects.find(project => String(project.id) === negotiation.sourceProjectId);
-    const careerProject = (player.pastProjects || []).find(project => String(project.id) === negotiation.sourceProjectId);
-    const historical = !worldProject && !careerProject
-        ? resolveHistoricalCatalogueTitle(player, negotiation.sourceProjectId) : null;
-    const sellerId = worldProject ? String(worldProject.studioId)
-        : careerProject ? String(careerProject.studioId || '')
-            : historical?.rightsHolderId || historical?.studioId;
+    const sellerId = resolveStreamingOriginalRightsSellerId(player, negotiation.sourceProjectId);
     if (!sellerId || sellerId !== negotiation.sellerId)
         return 'The original title or its current seller is no longer available.';
     if (terms.territory !== 'GLOBAL') {

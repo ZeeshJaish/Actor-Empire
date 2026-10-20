@@ -1,3 +1,4 @@
+import {getStreamingPlayableCatalogProjectIds} from '../services/streamingContentAvailability';
 import { initializeHistoricalCatalogue } from '../services/historicalCatalogue';
 import { PHASE_ONE_ENERGY_COSTS } from '../services/energyCosts';
 import { processGameWeek } from '../services/gameLoop';
@@ -413,6 +414,55 @@ try {
 }
 catch (e) {
     failures.push(`actual weekly lifecycle: ${(e as Error).message}`);
+    console.error('FAIL', failures.at(-1));
+}
+try {
+    let p = contentMarketFixture();
+    p.businesses = [];
+    p.pastProjects = [];
+    p.ownedStreamingPlatform.treasuryCash = 50_000_000_000;
+    p = initializeHistoricalCatalogue(p);
+    const auctions = market.getContentMarketAuctionAssignments(p).collectionIds;
+    const collection = market.getContentMarketCollections(p).find(candidate =>
+        candidate.package.name === 'Searchlight Pictures Collection' && !auctions.has(candidate.id)
+        && candidate.package.components.every(component => !p.world.projects.some(project => project.id === component.sourceProjectId)));
+    assert.ok(collection, 'Actual advertised non-auction Searchlight historical collection exists');
+    const terms = defaults(p, collection.id);
+    const sent = market.submitContentMarketPrivateOffer(p, collection.id, terms);
+    assert.ok(sent.changed, sent.detail || sent.reason);
+    const componentIds = collection.package.components.map(component => component.sourceProjectId).sort();
+    assert.equal(sent.player.world.projects.length, p.world.projects.length, 'Submission does not materialize historical display records');
+    let current = reload(sent.player);
+    while (getAbsoluteWeek(current.age, current.currentWeek) < sent.negotiation!.responseDueAbsoluteWeek!) {
+        current = reload((await processGameWeek(current)).player);
+    }
+    const negotiation = current.ownedStreamingPlatform.rightsNegotiations.find(item => item.id === sent.negotiation!.id)!;
+    assert.equal(negotiation.responseStatus, 'SELLER_ACCEPTED', negotiation.responseReason!);
+    const changedOwner = reload(current);
+    changedOwner.world.historicalCatalogue!.producerRoster = changedOwner.world.historicalCatalogue!.producerRoster.map(producer =>
+        producer.id === collection.package.seller.id ? {...producer, id:'new-historical-owner'} : producer);
+    const refused = signStreamingRightsDeal(changedOwner, negotiation.id);
+    assert.equal(refused.changed, false, 'Historical producer owner changes invalidate the complete saved package');
+    assert.equal(refused.player, changedOwner);
+    assert.equal(refused.player.ownedStreamingPlatform.catalogLicenses.length, 0);
+    const cash = current.ownedStreamingPlatform.treasuryCash;
+    const energy = current.energy.current;
+    const signed = signStreamingRightsDeal(current, negotiation.id);
+    assert.ok(signed.changed, signed.detail || signed.reason);
+    const loaded = reload(signed.player);
+    assert.deepEqual(loaded.ownedStreamingPlatform.catalogProjectIds.slice().sort(), componentIds);
+    assert.deepEqual(loaded.ownedStreamingPlatform.catalogLicenses.map(license => license.sourceProjectId).sort(), componentIds);
+    assert.deepEqual(Object.values(loaded.world.streamingRightsContracts).filter(contract => contract.cataloguePackageId === collection.id)
+        .map(contract => contract.sourceProjectId).sort(), componentIds);
+    assert.deepEqual(getStreamingPlayableCatalogProjectIds(loaded).sort(), componentIds, 'Canonical playback recognizes every acquired historical title');
+    assert.equal(loaded.ownedStreamingPlatform.treasuryCash, cash - terms.minimumGuarantee);
+    assert.equal(loaded.energy.current, energy - PHASE_ONE_ENERGY_COSTS.STREAMING_DEAL_ACCEPT);
+    assert.equal(loaded.ownedStreamingPlatform.catalogLicenses.reduce((sum, license) => sum + license.minimumGuarantee, 0), terms.minimumGuarantee);
+    checks++;
+    console.log('PASS actual Searchlight historical wrapper -> weekly reply -> reload -> atomic playable ownership',
+        JSON.stringify({components:componentIds.length,fee:terms.minimumGuarantee}));
+} catch (error) {
+    failures.push(`historical collection lifecycle: ${(error as Error).message}`);
     console.error('FAIL', failures.at(-1));
 }
 console.log(JSON.stringify({ checks, failures }, null, 2));

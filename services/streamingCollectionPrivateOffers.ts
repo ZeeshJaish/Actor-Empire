@@ -1,3 +1,4 @@
+import {resolveHistoricalCatalogueTitle} from './historicalCatalogue';
 import type {OwnedStreamingRightsNegotiation, Player, StreamingCollectionNegotiationSnapshot, StreamingRightsAccessGrant} from '../types';
 import type {StreamingCataloguePackageOpportunity, StreamingRightsTermsInput} from './streamingRightsMarketplace';
 import {createDeterministicId} from './deterministicRandom';
@@ -6,6 +7,18 @@ import {getOwnedPlatformPackageCountryIds} from './streamingContentAvailability'
 import {resolveStreamingRightsCompatibility} from './streamingRightsCompatibility';
 import {createStreamingRightsAccessGrantForOffer} from './streamingRightsAccessGrant';
 import {getStreamingBuyerBackendCapability, validateNewStreamingBackendTerms} from './streamingBackendPolicy';
+
+/** Current original-owner authority, shared by individual and collection private offers.
+ * Catalogue licence/display fallbacks intentionally cannot establish an original seller.
+ */
+export const resolveStreamingOriginalRightsSellerId = (player: Player, projectId: string): string | null => {
+    const worldProject = player.world.projects.find(project => String(project.id) === projectId);
+    if (worldProject) return String(worldProject.studioId || '') || null;
+    const careerProject = (player.pastProjects || []).find(project => String(project.id) === projectId);
+    if (careerProject) return String(careerProject.studioId || '') || null;
+    const historical = resolveHistoricalCatalogueTitle(player, projectId);
+    return historical?.rightsHolderId || historical?.studioId || null;
+};
 
 /** Whole USD, deliberately bounded above the largest 50-title aggregate. Never clamp an offer. */
 export const MAX_PRIVATE_COLLECTION_MONEY = 5_000_000_000_000;
@@ -81,8 +94,8 @@ export const validateCollectionPrivateTerms = (player:Player,snapshot:StreamingC
         referenceFee:p.totalGuarantee,capability:getStreamingBuyerBackendCapability(player,null,week,countries,terms.accessGrant)});
     if(backend)return backend;
     for(const component of p.components){
-        const source=player.world.projects.find(project=>project.id===component.sourceProjectId);
-        if(!source || source.studioId!==p.seller.id)return 'A collection component is no longer offered by this seller.';
+        const sellerId = resolveStreamingOriginalRightsSellerId(player, component.sourceProjectId);
+        if(sellerId!==p.seller.id)return 'A collection component is no longer offered by this seller.';
         const inherited = Object.values(player.world.streamingRightsContracts || {}).some(contract=>contract.sourceProjectId===component.sourceProjectId
             && contract.status==='ACTIVE' && contract.buyer.id===p.seller.id && contract.seller.id!==p.seller.id);
         if(inherited)return 'A component now requires an inherited rights transfer; the original-studio collection cannot reissue that grant.';
