@@ -300,10 +300,10 @@ function EmptyState({
 export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedMarketUpdate, onBack, onReturnToGame, onOpenOriginalProduction, onOpenProductionHouse, onOpenBank, initialDestination = 'HOME', initialContentMarketOfferId, onContentMarketOfferConsumed }: Props) {
   const projectionSourceRef = useRef<ReturnType<typeof advanceStreamingPresentationCursor> | undefined>(undefined);
   projectionSourceRef.current = advanceStreamingPresentationCursor(projectionSourceRef.current, player);
-  const readPlayer = projectionSourceRef.current.source;
+  const readPlayer: Player = projectionSourceRef.current.source;
   const buildForecastSourceRef = useRef<ReturnType<typeof advanceStreamingPresentationCursor> | undefined>(undefined);
   buildForecastSourceRef.current = advanceStreamingPresentationCursor(buildForecastSourceRef.current, player, 'BUILD_FORECAST');
-  const buildForecastPlayer = buildForecastSourceRef.current.source;
+  const buildForecastPlayer: Player = buildForecastSourceRef.current.source;
   const readPlatform = readPlayer.ownedStreamingPlatform;
   const readIdentity = readPlatform.identity!;
   const catalogueContextRef = useRef<ReturnType<typeof createStreamingCatalogueReadContext> | undefined>(undefined);

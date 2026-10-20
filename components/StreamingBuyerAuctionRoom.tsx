@@ -42,7 +42,7 @@ export default function StreamingBuyerAuctionRoom({ player, session, onUpdatePla
     // receive the current player; no cached capability authorizes a transaction.
     const presentationRef = useRef<ReturnType<typeof advanceStreamingPresentationCursor> | undefined>(undefined);
     presentationRef.current = advanceStreamingPresentationCursor(presentationRef.current, player, 'AUCTION_ROOM');
-    const readPlayer = presentationRef.current.source;
+    const readPlayer: Player = presentationRef.current.source;
     const lotKey = JSON.stringify(session.lot);
     const leader = getStreamingBuyerAuctionLeader(session);
     const startingUpfront = Math.min(

@@ -173,7 +173,7 @@ function ContentMarketGate({ player, funds, listingPrices, owned, liveRooms, bra
 export default function StreamingContentMarket({ player, brand, onUpdatePlayer, onClose, onOpenFinance, onCommission, onReview, returnToLaunch, initialTab, onResumeLegacy, onExistingNegotiations, initialOfferId, initialAuctionId }: Props) {
     const projectionSourceRef = useRef<ReturnType<typeof advanceStreamingPresentationCursor> | undefined>(undefined);
     projectionSourceRef.current = advanceStreamingPresentationCursor(projectionSourceRef.current, player);
-    const readPlayer = projectionSourceRef.current.source;
+    const readPlayer: Player = projectionSourceRef.current.source;
     const readPlatform = readPlayer.ownedStreamingPlatform;
     const platform = player.ownedStreamingPlatform;
     const [draft, setDraft] = useState<Draft>(() => initialAuctionId
