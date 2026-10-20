@@ -1,4 +1,5 @@
 import { normalizeAuctionFutureFunding } from './streamingAuctionTerms';
+import { normalizeStreamingContentMarketDraft } from './streamingContentMarketDraft';
 import {normalizeStreamingContractRoyaltyStatements} from './streamingContractSettlement';
 import { normalizeStreamingContentAccounting } from './streamingContentAccounting';
 import {
@@ -4133,12 +4134,7 @@ export const normalizeOwnedStreamingPlatformState = (
                     ? { previousVersion: Number(asRecord(source.marketQuotePolicy).previousVersion) as 1 | 2 }
                     : {}) }
             : undefined,
-        contentMarketDraft: source.contentMarketDraft && typeof source.contentMarketDraft === 'object' ? {
-            tab: ['ALL', 'MOVIE', 'SERIES', 'COLLECTIONS', 'OWNED', 'OFFERS', 'AUCTIONS', 'UPCOMING'].includes(source.contentMarketDraft.tab) ? source.contentMarketDraft.tab : 'ALL',
-            search: String(source.contentMarketDraft.search || '').slice(0, 100),
-            selectedId: typeof source.contentMarketDraft.selectedId === 'string' ? source.contentMarketDraft.selectedId.slice(0, 200) : null,
-            ownedIds: Array.isArray(source.contentMarketDraft.ownedIds) ? Array.from(new Set<string>(source.contentMarketDraft.ownedIds.filter((id: unknown) => typeof id === 'string'))).slice(0, 500) : [],
-        } : null,
+        contentMarketDraft: normalizeStreamingContentMarketDraft(source.contentMarketDraft),
         buyerAuctionSessions: normalizeStreamingBuyerAuctionSessions(source.buyerAuctionSessions),
         upcomingRightsSales: dedupeByKey(
             asArray<unknown>(source.upcomingRightsSales)

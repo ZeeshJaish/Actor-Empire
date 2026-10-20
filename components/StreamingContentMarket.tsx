@@ -2,6 +2,7 @@ import { getStreamingRightsContract } from '../services/streamingRightsCore';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { validCollectionSnapshot } from '../services/streamingCollectionPrivateOffers';
 import { reuseStreamingPresentationSource } from '../services/streamingPresentationInputs';
+import { sameStreamingContentMarketDraft } from '../services/streamingContentMarketDraft';
 import { ArrowLeft, Bell, BellOff, CalendarDays, Check, ChevronDown, ChevronRight, Clock3, FileSignature, Film, Gavel, Handshake, LibraryBig, Search, Sparkles, Wallet, X } from 'lucide-react';
 import type { OwnedStreamingRightsNegotiation, Player } from '../types';
 import AccessibleDialog from './AccessibleDialog';
@@ -41,8 +42,7 @@ const countries = (ids: string[]) => ids.length ? ids.map(id => getStreamingDayO
 type Draft = NonNullable<Player['ownedStreamingPlatform']['contentMarketDraft']>;
 export function persistContentMarketDraft(player: Player, draft: Draft, onUpdatePlayer: (player: Player) => void): boolean {
     const savedDraft = player.ownedStreamingPlatform.contentMarketDraft;
-    if (JSON.stringify(savedDraft) === JSON.stringify(draft)
-        || (!savedDraft && draft.tab === 'ALL' && !draft.search && !draft.selectedId && !draft.ownedIds.length)) return false;
+    if (sameStreamingContentMarketDraft(savedDraft, draft)) return false;
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     onUpdatePlayer({ ...player, ownedStreamingPlatform: compactOwnedStreamingPlatformForPersistence({ ...platform, contentMarketDraft: draft }, player.id) });
     return true;
@@ -255,7 +255,7 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
     const patch = (value: Partial<Draft>) => { setDraft(d => ({ ...d, ...value })); setFeedback(''); setOfferEditor(false); setOfferTerms(null); };
     const persistDraft = () => persistContentMarketDraft(player, draft, onUpdatePlayer);
     useEffect(() => {
-        if (JSON.stringify(player.ownedStreamingPlatform.contentMarketDraft) === JSON.stringify(draft)) return;
+        if (sameStreamingContentMarketDraft(player.ownedStreamingPlatform.contentMarketDraft, draft)) return;
         draftTimer.current = window.setTimeout(persistDraft, 350);
         return () => {
             if (draftTimer.current !== null) window.clearTimeout(draftTimer.current);

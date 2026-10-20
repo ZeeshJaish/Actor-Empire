@@ -21,6 +21,7 @@ esbuild.buildSync({ ...options, stdin: { contents: `
   export * from './services/playerUiState';
   export * from './scripts/helpers/contentMarketFixture';
   export {default as Room} from './components/StreamingBuyerAuctionRoom';
+  export {default as Market, persistContentMarketDraft} from './components/StreamingContentMarket';
 `, resolveDir: process.cwd(), loader: 'ts' }, outfile: path.join(dir, 'current.cjs') });
 // Fixed pre-task implementation is an independent oracle for clock/rivals,
 // reconciliation, anti-sniping, and final canonical settlement.
@@ -31,11 +32,13 @@ esbuild.buildSync({ ...options, stdin: {
 
 let activeHarness;
 const hooks = {
+  ...require('react'),
   createElement: (type, props, ...children) => ({ type, props: { ...props, children } }),
   forwardRef: value => value,
   useRef: value => activeHarness.ref(value),
   useState: value => activeHarness.state(value),
   useMemo: (fn, deps) => activeHarness.memo(fn, deps),
+  useCallback: (fn, deps) => activeHarness.memo(() => fn, deps),
   useEffect: (fn, deps) => activeHarness.effect(fn, deps),
 };
 const load = Module._load;
@@ -49,11 +52,13 @@ const realNow = Date.now;
 Date.now = () => now;
 const timers = new Map();
 const deferred = [];
+const draftTimers = new Map();
 let timerId = 0;
 global.window = {
   setInterval: fn => { timers.set(++timerId, fn); return timerId; },
   clearInterval: id => timers.delete(id),
-  setTimeout: fn => { deferred.push(fn); return ++timerId; },
+  setTimeout: (fn, delay) => { const id = ++timerId; if (delay === 350) draftTimers.set(id, fn); else deferred.push(fn); return id; },
+  clearTimeout: id => draftTimers.delete(id),
 };
 global.requestAnimationFrame = fn => { deferred.push(fn); return ++timerId; };
 global.cancelAnimationFrame = () => {};
@@ -70,8 +75,11 @@ const harness = () => ({
       slot?.cleanup?.(); this.slots[i] = { deps, cleanup: fn() };
     }); },
   render(player, session, update = () => {}) {
+    return this.renderComponent(api.Room, { player, session, onUpdatePlayer: update, onExit() {} });
+  },
+  renderComponent(Component, props) {
     this.cursor = 0; activeHarness = this;
-    const tree = api.Room({ player, session, onUpdatePlayer: update, onExit() {} });
+    const tree = Component(props);
     this.pending.splice(0).forEach(fn => fn()); return tree;
   },
   close() { this.slots.forEach(slot => slot?.cleanup?.()); },
@@ -130,10 +138,58 @@ const failures = [];
 const check = (name, run) => {
   try { run(); passed++; console.log(`PASS ${name}`); }
   catch (error) { failures.push(name); console.error(`FAIL ${name}: ${error.message}`); }
-  finally { timers.clear(); deferred.length = 0; now = 1000; }
+  finally { timers.clear(); draftTimers.clear(); deferred.length = 0; now = 1000; }
 };
 try {
   const large = largeFixture();
+  check('actual market mount autosaves deep-linked draft once, then ignores clock updates', () => {
+    for (const initialProp of ['initialOfferId', 'initialAuctionId']) {
+      let player = { ...large.player, ownedStreamingPlatform: { ...large.player.ownedStreamingPlatform, contentMarketDraft: null } };
+      let writes = 0;
+      const parent = harness();
+      const update = next => { writes++; player = api.prepareTrustedMarketUpdateForUi(next); };
+      const render = () => parent.renderComponent(api.Market, {
+        player, brand: { name: 'Empire+', hue: 250, sat: 60, markId: 'FRAME_PLAY', typeId: 'SANS' },
+        onUpdatePlayer: update, onClose() {}, onOpenFinance() {}, onCommission() {}, onReview() {},
+        [initialProp]: large.session.id,
+      });
+      try {
+        render(); assert.equal(draftTimers.size, 1, 'Initial selected-room draft is saved');
+        for (const [id, callback] of draftTimers) { draftTimers.delete(id); callback(); }
+        render();
+        assert.equal(writes, 1);
+        assert.equal(draftTimers.size, 0, `${initialProp}: equal draft must not schedule another autosave`);
+        for (let second = 1; second <= 3; second++) {
+          player = api.advanceStreamingBuyerAuction(player, large.session.id, 1, 1000 + second * 1000).player;
+          render();
+          assert.equal(draftTimers.size, 0, 'Clock update must not reschedule a normalized identical draft');
+        }
+        assert.equal(writes, 1);
+        assert.equal(player.ownedStreamingPlatform.catalogLicenses.length, 5000);
+        assert.deepEqual(player.ownedStreamingPlatform.catalogProjectIds, large.player.ownedStreamingPlatform.catalogProjectIds);
+      } finally { parent.close(); }
+    }
+  });
+  check('draft persistence compares canonical fields independent of key order, bounds and defaults', () => {
+    let player = large.player;
+    let writes = 0;
+    const update = next => { writes++; player = next; };
+    const draft = { search: 'x'.repeat(120), ownedIds: [...Array.from({ length: 510 }, (_, index) => `owned-${index}`), 'owned-0'],
+      tab: 'AUCTIONS', selectedId: 'a'.repeat(220) };
+    assert.equal(api.persistContentMarketDraft(player, draft, update), true);
+    assert.equal(player.ownedStreamingPlatform.contentMarketDraft.search.length, 100);
+    assert.equal(player.ownedStreamingPlatform.contentMarketDraft.ownedIds.length, 500);
+    assert.equal(api.persistContentMarketDraft(player, draft, update), false, 'Canonical truncation cannot create a repeated write');
+    assert.equal(writes, 1);
+    const saved = player.ownedStreamingPlatform.contentMarketDraft;
+    assert.equal(api.persistContentMarketDraft(player, { ownedIds: saved.ownedIds, selectedId: saved.selectedId, search: saved.search, tab: saved.tab }, update), false);
+    assert.equal(api.persistContentMarketDraft(player, { ...draft, search: 'real edit' }, update), true);
+    assert.equal(writes, 2);
+    assert.equal(player.ownedStreamingPlatform.contentMarketDraft.search, 'real edit');
+    player = { ...player, ownedStreamingPlatform: { ...player.ownedStreamingPlatform, contentMarketDraft: null } };
+    assert.equal(api.persistContentMarketDraft(player, { tab: 'INVALID', search: 0, selectedId: 42, ownedIds: [42, null] }, update), false, 'Invalid values normalize to the unsaved default');
+    assert.equal(writes, 2);
+  });
   check('three live ticks preserve 5000 licences without traversing their fields', () => {
     const observed = observeLicenses(large.player);
     let player = observed.player;
