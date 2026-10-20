@@ -5,6 +5,10 @@ import type { Player } from '../types';
 import { createStreamingCatalogueReadContext, getStreamingContentAvailability, resolveStreamingCatalogueReadTitle, createStreamingTitleRouteReadBatch, evaluatePlayerStreamingTitleRoute } from '../services/streamingContentAvailability';
 import { getStreamingOpeningCatalogueView } from '../services/streamingOpeningCatalogue';
 import { forecastWorldStreamingLaunchPricing, forecastWorldStreamingBuildDemand } from '../services/worldEconomy/worldStreamingPricingForecast';
+import { createDefaultStreamingInfrastructureDraft, saveStreamingInfrastructureDraft } from '../services/streamingInfrastructure';
+import { prepareTrustedMarketUpdateForUi } from '../services/playerUiState';
+import { setStreamingDefineLaunchStep, saveStreamingDefineLaunchDraft, checkpointStreamingLaunchBlueprint } from '../services/streamingLaunchProgram';
+import * as presentationInputs from '../services/streamingPresentationInputs';
 import { reuseStreamingPresentationSource } from '../services/streamingPresentationInputs';
 import { streamingTitleQuality } from '../services/worldEconomy/worldStreamingContentValue';
 import { resolveStreamingCatalogTitle } from '../services/streamingCatalog';
@@ -133,6 +137,69 @@ check('dependent mutations invalidate current projections and defaults remain fr
     assert.equal(getStreamingContentAvailability(player, id, ['US']).available, true);
     player.ownedStreamingPlatform.catalogLicenses[0].status = 'EXPIRED';
     assert.equal(getStreamingContentAvailability(player, id, ['US']).available, false);
+});
+check('actual first and second rack saves reuse catalogue forecasts across known legacy defaults', () => {
+    const raw = structuredClone(full);
+    for (const [label, player, finish] of [
+        ['raw browser fixture', raw, (p: Player) => p],
+        ['canonical App boundary', prepareTrustedMarketUpdateForUi(raw), prepareTrustedMarketUpdateForUi],
+    ] as const) {
+        const context = createStreamingCatalogueReadContext(player);
+        const coverage = getStreamingOpeningCatalogueView(player, context);
+        const forecast = forecastWorldStreamingLaunchPricing(player, context.platform.serviceConfiguration.pricing, ['US'], context);
+        const draft = createDefaultStreamingInfrastructureDraft(player);
+        const first = finish(saveStreamingInfrastructureDraft(player, { ...draft, currentStep: 4, networkPlacements: [{ cityId: 'LA', role: 'CORE_ORIGIN', racks: 1 }] }));
+        const next = createStreamingCatalogueReadContext(first, context);
+        assert.strictEqual(getStreamingOpeningCatalogueView(first, next), coverage, `${label} first actual rack coverage`);
+        assert.strictEqual(forecastWorldStreamingLaunchPricing(first, next.platform.serviceConfiguration.pricing, ['US'], next), forecast, `${label} first actual rack forecast`);
+        assert.deepEqual(getStreamingOpeningCatalogueView(first), coverage, `${label} complete fresh post-save coverage parity`);
+        assert.deepEqual(forecastWorldStreamingLaunchPricing(first, next.platform.serviceConfiguration.pricing, ['US']), forecast, `${label} complete fresh post-save forecast parity`);
+        const second = finish(saveStreamingInfrastructureDraft(first, { ...first.ownedStreamingPlatform.infrastructureSetupDraft!, networkPlacements: [{ cityId: 'LA', role: 'CORE_ORIGIN', racks: 2 }] }));
+        const next2 = createStreamingCatalogueReadContext(second, next);
+        assert.strictEqual(forecastWorldStreamingLaunchPricing(second, next2.platform.serviceConfiguration.pricing, ['US'], next2), forecast, `${label} second actual rack`);
+        const unknown = { ...first, ownedStreamingPlatform: { ...first.ownedStreamingPlatform, catalogLicenses: first.ownedStreamingPlatform.catalogLicenses.map((row, index) => index ? row : { ...row, futureNestedTerm: 1 } as any) } };
+        assert.strictEqual(reuseStreamingPresentationSource(first, unknown, 'BUILD_FORECAST'), unknown, 'unknown licence terms invalidate');
+        const realTerm = { ...first, ownedStreamingPlatform: { ...first.ownedStreamingPlatform, catalogLicenses: first.ownedStreamingPlatform.catalogLicenses.map((row, index) => index ? row : { ...row, renewalOption: !Boolean(row.renewalOption) }) } };
+        assert.strictEqual(reuseStreamingPresentationSource(first, realTerm, 'BUILD_FORECAST'), realTerm, 'non-default licence terms invalidate');
+        const energy = { ...first, energy: { ...first.energy, current: first.energy.current - 1 } };
+        assert.strictEqual(reuseStreamingPresentationSource(first, energy, 'WIZARD'), energy, 'current energy remains a live input');
+    }
+});
+check('actual Define draft save and Ident step reuse current catalogue reads', () => {
+    const player = prepareTrustedMarketUpdateForUi(full);
+    const context = createStreamingCatalogueReadContext(player);
+    const coverage = getStreamingOpeningCatalogueView(player, context);
+    const forecast = forecastWorldStreamingLaunchPricing(player, context.platform.serviceConfiguration.pricing, ['US'], context);
+    const saved = saveStreamingDefineLaunchDraft(player, { selectedCountryIds: context.packageCountryIds, soundId: 'silent', packageId: 'sting', customAudio: null, storefrontId: null, pricing: player.ownedStreamingPlatform.serviceConfiguration.pricing, updatedAtAbsoluteWeek: context.absoluteWeek });
+    assert.equal(saved.changed, true);
+    const stepped = prepareTrustedMarketUpdateForUi(setStreamingDefineLaunchStep(saved.player, 'IDENTITY'));
+    const next = createStreamingCatalogueReadContext(stepped, context);
+    assert.strictEqual(getStreamingOpeningCatalogueView(stepped, next), coverage);
+    assert.strictEqual(forecastWorldStreamingLaunchPricing(stepped, next.platform.serviceConfiguration.pricing, ['US'], next), forecast);
+    const predicate = (presentationInputs as any).streamingLaunchDraftPricingChanged;
+    assert.equal(typeof predicate, 'function', 'a value-based pricing autosave guard is required');
+    assert.equal(predicate(player.ownedStreamingPlatform.serviceConfiguration.pricing, player.ownedStreamingPlatform.serviceConfiguration.pricing), false);
+    const copied = structuredClone(player.ownedStreamingPlatform.serviceConfiguration.pricing);
+    assert.equal(predicate(player.ownedStreamingPlatform.serviceConfiguration.pricing, copied), false, 'visible draft copying is not a new offer');
+    const condition = structuredClone(copied);
+    condition.commercialOffers!.benefits.plans[condition.plans[0].id] = { premiumAccess: true, earlyAccessWeeks: 1 };
+    assert.equal(predicate(copied, condition), true, 'actual offer conditions must save');
+    const pricing = structuredClone(player.ownedStreamingPlatform.serviceConfiguration.pricing);
+    pricing.plans[0].monthly += 1;
+    assert.equal(predicate(player.ownedStreamingPlatform.serviceConfiguration.pricing, pricing), true);
+    pricing.streams = ['rentals'];
+    assert.equal(predicate(player.ownedStreamingPlatform.serviceConfiguration.pricing, pricing), true);
+});
+check('checkpoint consumes only matching current prepared reads and retains fresh rights validation', () => {
+    const player = structuredClone(small); let conversions = 0;
+    player.world.projects.forEach(project => { const genre = project.genre; Object.defineProperty(project, 'genre', { get: () => { conversions++; return genre; }, enumerable: true }); });
+    const context = createStreamingCatalogueReadContext(player);
+    getStreamingOpeningCatalogueView(player, context); conversions = 0;
+    const checkpoint = checkpointStreamingLaunchBlueprint(player, context);
+    assert.equal(conversions, 0, 'checkpoint must not prepare the same full title batch again');
+    assert.deepEqual(checkpoint, checkpointStreamingLaunchBlueprint(player));
+    const changed = { ...player, world: { ...player.world, streamingRightsContracts: {} } };
+    assert.deepEqual(checkpointStreamingLaunchBlueprint(changed, context), checkpointStreamingLaunchBlueprint(changed), 'mismatched context must use current rights');
 });
 if (process.env.STREAMING_5000_BENCH === '1') {
     const measure = <T>(name: string, read: () => T) => { const start = performance.now(); const value = read(); console.log(JSON.stringify({ name, ms: +(performance.now() - start).toFixed(1) })); return value; };

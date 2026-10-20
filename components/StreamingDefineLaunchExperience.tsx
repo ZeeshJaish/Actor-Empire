@@ -44,7 +44,7 @@ import {
 } from '../services/streamingLaunchProgram';
 import { getStreamingOpeningCatalogueView } from '../services/streamingOpeningCatalogue';
 import { createStreamingCatalogueReadContext, getStreamingCatalogueReadContext, type StreamingCatalogueReadContext } from '../services/streamingContentAvailability';
-import { reuseStreamingPresentationSource } from '../services/streamingPresentationInputs';
+import { reuseStreamingPresentationSource, streamingLaunchDraftPricingChanged } from '../services/streamingPresentationInputs';
 import { rankStreamingLaunchAnchors } from '../services/streamingCatalogueAnchors';
 import { getEligibleOwnedStreamingTitles, getStreamingLicenseOpportunities } from '../services/streamingCatalog';
 import {
@@ -605,7 +605,7 @@ function OpeningLaunchExperience(props: Props) {
   }, [projectionSource]);
 
   const update = (next: Player) => {
-    const checkpoint = checkpointStreamingLaunchBlueprint(next);
+    const checkpoint = checkpointStreamingLaunchBlueprint(next, createStreamingCatalogueReadContext(next, catalogueContext));
     const current = checkpoint.changed ? checkpoint.player : next;
     currentPlayerRef.current = current;
     props.onUpdatePlayer(current);
@@ -643,16 +643,22 @@ function OpeningLaunchExperience(props: Props) {
     }
 
     const currentPricing = next.ownedStreamingPlatform.serviceConfiguration.pricing;
-    const currentPricingApproach = next.ownedStreamingPlatform.serviceConfiguration.pricingApproach;
     if (persisted.pricing.commercialOffers?.coreModelSelected !== false && persisted.pricing.streams.length
       && (!persisted.pricing.streams.includes('subs') || persisted.pricing.plans.length > 0)
-      && (currentPricingApproach !== 'CUSTOM' || JSON.stringify(persisted.pricing) !== JSON.stringify(currentPricing))) {
+      && streamingLaunchDraftPricingChanged(currentPricing, persisted.pricing)) {
       const pricingResult = saveStreamingPricingPlan(next, persisted.pricing);
       if (pricingResult.changed) next = pricingResult.player;
     }
 
     props.onDraftChange?.(draft);
-    if (next !== currentPlayerRef.current) update(next);
+    if (next !== currentPlayerRef.current) {
+      // Persist free draft intent without repeating the domain blueprint read.
+      // Actual market/storefront/pricing changes still checkpoint current state.
+      if (reuseStreamingPresentationSource(currentPlayerRef.current, next, 'WIZARD') === currentPlayerRef.current) {
+        currentPlayerRef.current = next;
+        props.onUpdatePlayer(next);
+      } else update(next);
+    }
   };
   const restoredDraftKey = restoredDraft ? JSON.stringify(restoredDraft) : '';
   const restoredDraftKeyRef = useRef('');

@@ -607,9 +607,10 @@ export const saveStreamingPricingPlan = (
     return { player: { ...player, ownedStreamingPlatform: nextPlatform }, changed: true, reason: 'SAVED', shortfall: 0 };
 };
 
-export const checkpointStreamingLaunchBlueprint = (player: Player): StreamingLaunchConfigurationResult => {
-    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
-    const view = getStreamingLaunchProgramView(player);
+export const checkpointStreamingLaunchBlueprint = (player: Player, preparedContext?: StreamingCatalogueReadContext): StreamingLaunchConfigurationResult => {
+    const context = getStreamingCatalogueReadContext(player, preparedContext);
+    const { platform } = context;
+    const view = getStreamingLaunchProgramView(player, context);
     const required = ['OPENING_MARKETS', 'SERVICE_IDENT', 'STOREFRONT_PRICING', 'OPENING_CATALOGUE', 'PRICING'];
     const complete = required.every(id => view.milestones.find(item => item.id === id)?.complete);
     if (!platform.identity || !complete) return { player, changed: false, reason: 'INCOMPLETE', shortfall: 0 };

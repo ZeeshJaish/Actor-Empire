@@ -1,4 +1,4 @@
-import type { Player } from '../types';
+import type { OwnedStreamingPricingConfiguration, Player } from '../types';
 import { getStreamingBuildMarketAccess } from './streamingBuildMarketAccess';
 
 const sameFieldsExcept = (left: object, right: object, excluded: readonly string[]) => {
@@ -8,6 +8,30 @@ const sameFieldsExcept = (left: object, right: object, excluded: readonly string
 };
 const sameValue = (left: unknown, right: unknown) => Object.is(left, right) || JSON.stringify(left) === JSON.stringify(right);
 
+// These optional saved terms are filled by normalizeCatalogLicense. Missing
+// and explicit defaults already produce the same current canonical read. No
+// other field (including unknown future terms) is omitted from comparison.
+const legacyLicenseDefaults: Record<string, unknown> = {
+    marketingGuarantee: 0, viewershipBonusThreshold: 0, viewershipBonusAmount: 0,
+    renewalOption: false, sublicensingAllowed: false, sequelRightsIncluded: false,
+    changeOfControl: 'NOTICE', cancellationPenalty: 0, renewedFromLicenseId: null,
+};
+const sameLicenseInputs = (left: Player['ownedStreamingPlatform']['catalogLicenses'], right: Player['ownedStreamingPlatform']['catalogLicenses']) => (
+    left.length === right.length && left.every((license, index) => {
+        const a = license as unknown as Record<string, unknown>;
+        const b = right[index] as unknown as Record<string, unknown>;
+        return [...new Set([...Object.keys(a), ...Object.keys(b)])].every(key => sameValue(
+            a[key] === undefined ? legacyLicenseDefaults[key] : a[key],
+            b[key] === undefined ? legacyLicenseDefaults[key] : b[key],
+        ));
+    })
+);
+
+/** A visible working-copy autosave is not a new commercial configuration. */
+export const streamingLaunchDraftPricingChanged = (
+    current: OwnedStreamingPricingConfiguration, proposed: OwnedStreamingPricingConfiguration,
+): boolean => !sameValue(current, proposed);
+
 const sameProjectInputs = (left: Player['pastProjects'], right: Player['pastProjects']) => left === right
     || left.length === right.length && left.every((project, index) => (
         sameFieldsExcept(project, right[index], ['awards']) && sameValue(project.awards, right[index].awards)
@@ -15,9 +39,16 @@ const sameProjectInputs = (left: Player['pastProjects'], right: Player['pastProj
 
 type StreamingPresentationMode = 'HQ' | 'WIZARD' | 'BUILD_FORECAST';
 const sameValueFields = (left: object, right: object) => {
-    const keys = Object.keys(left);
-    return keys.length === Object.keys(right).length && keys.every(key => Object.prototype.hasOwnProperty.call(right, key)
-        && sameValue((left as Record<string, unknown>)[key], (right as Record<string, unknown>)[key]));
+    // The normalizer materializes these optional keys as undefined. Their
+    // absence and undefined state have identical reads; a real value counts.
+    const keysFor = (value: object) => Object.keys(value).filter(key =>
+        !(['contentAccounting', 'serviceStandardFromWeek'].includes(key)
+            && (value as Record<string, unknown>)[key] === undefined));
+    const keys = keysFor(left);
+    return keys.length === keysFor(right).length && keys.every(key => Object.prototype.hasOwnProperty.call(right, key)
+        && (sameValue((left as Record<string, unknown>)[key], (right as Record<string, unknown>)[key])
+            || key === 'catalogLicenses' && sameLicenseInputs((left as Player['ownedStreamingPlatform']).catalogLicenses,
+                (right as Player['ownedStreamingPlatform']).catalogLicenses)));
 };
 
 const platformInputs = (player: Player, mode: StreamingPresentationMode) => {
