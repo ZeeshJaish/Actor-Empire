@@ -212,14 +212,14 @@ assert(canonicalAcquiredContract?.minimumGuarantee === acquiredLicense.minimumGu
 assert(canonicalAcquiredContract?.buyer.type === 'PLAYER_PLATFORM', 'The canonical buyer should be the player-owned streaming platform.');
 assert(acquiredLicense.sublicensingAllowed, 'Negotiated sublicensing rights should persist in the contract.');
 assert(fixture.ownedStreamingPlatform.treasuryCash === treasuryBeforeAcquisition - acquisition.minimumGuarantee, 'The guarantee should debit platform treasury exactly once.');
-assert(fixture.ownedStreamingPlatform.rightsObligations.length === 1, 'The marketing promise is tracked; new licenses have no separate success bonus.');
+assert(fixture.ownedStreamingPlatform.rightsObligations.length === 0, 'New licenses create neither marketing nor separate success-bonus obligations.');
 
 const outgoingOpportunity = getStreamingRightsOpportunities(fixture).find(item => (
     item.kind === 'SUBLICENSE_OUT' && item.sourceLicenseId === acquiredLicense.id
 ));
 assert(outgoingOpportunity, 'A sublicensable inbound contract should create a platform-to-platform sales opportunity.');
 const outgoingOpened = openStreamingRightsNegotiation(fixture, outgoingOpportunity!.id);
-assert(outgoingOpened.changed && outgoingOpened.negotiation?.buyerPlatformId, 'An outgoing sales table should snapshot a real rival platform buyer.');
+assert(outgoingOpened.changed && outgoingOpened.negotiation?.buyerPlatformId, `An outgoing sales table should snapshot a real rival platform buyer: ${outgoingOpened.reason} ${outgoingOpened.detail}`);
 fixture = driveToSignature(outgoingOpened.player, outgoingOpened.negotiation!.id);
 const outgoingReady = fixture.ownedStreamingPlatform.rightsNegotiations.find(item => item.id === outgoingOpened.negotiation!.id)!;
 assert(outgoingReady.status === 'READY_TO_SIGN', 'Outgoing negotiations should use the same competitive deal loop.');
@@ -277,6 +277,14 @@ const renewalFixture: Player = {
 const renewal = openStreamingRightsRenewal(renewalFixture, acquiredLicense.id);
 assert(renewal.changed && renewal.negotiation?.kind === 'RENEW', 'Renewal options should open a future-window negotiation inside the A4 notice window.');
 
+// Existing signed obligations must survive normalization and still enforce their promise.
+fixture.ownedStreamingPlatform = normalizeOwnedStreamingPlatformState({
+    ...fixture.ownedStreamingPlatform,
+    rightsObligations: [{id:'legacy-marketing',licenseId:acquiredLicense.id,sourceProjectId:acquiredLicense.sourceProjectId,
+        title:acquiredLicense.titleAtSigning,type:'MARKETING_SPEND',targetAmount:1_000_000,observedAmount:0,
+        dueAtAbsoluteWeek:acquiredLicense.signedAtAbsoluteWeek+4,status:'PENDING',breachPenalty:250_000,successPayment:0,resolvedAtAbsoluteWeek:null}],
+}, fixture.id);
+assert(fixture.ownedStreamingPlatform.rightsObligations[0]?.targetAmount===1_000_000, 'A saved legacy marketing promise must remain exact.');
 const complianceWeek = Math.max(...fixture.ownedStreamingPlatform.rightsObligations.map(item => item.dueAtAbsoluteWeek)) + 1;
 const compliance = evaluateStreamingRightsCompliance(fixture.ownedStreamingPlatform, complianceWeek);
 assert(compliance.platform.rightsObligations.every(item => item.status === 'BREACHED'), 'Unmet due obligations should breach from canonical evidence.');

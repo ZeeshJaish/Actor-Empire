@@ -2956,6 +2956,7 @@ const normalizeRightsNegotiation = (value: unknown): OwnedStreamingRightsNegotia
     return {
         id,
         idempotencyKey: cleanText(source.idempotencyKey, id, 180),
+        ...(source.collectionSnapshot !== undefined ? { collectionSnapshot: structuredClone(source.collectionSnapshot) } : {}),
         kind: isOneOf(source.kind, RIGHTS_NEGOTIATION_KINDS, 'ACQUIRE'),
         sourceProjectId,
         sourceLicenseId: cleanText(source.sourceLicenseId, '', 120) || null,
@@ -2973,7 +2974,7 @@ const normalizeRightsNegotiation = (value: unknown): OwnedStreamingRightsNegotia
             schemaVersion: 1 as const, modes: [], earlyWindowWeeks: 0,
             purchaseFulfillment: 'NONE' as const, source: 'LEGACY_SNAPSHOT' as const,
         } } : {}),
-        durationWeeks: Math.round(clamp(source.durationWeeks, 26, 520, 104)),
+        durationWeeks: Math.round(clamp(source.durationWeeks, 1, 520, 104)),
         exclusivity: isOneOf(source.exclusivity, LICENSE_EXCLUSIVITY, 'NON_EXCLUSIVE'),
         windowType: isOneOf(source.windowType, RIGHTS_WINDOW_TYPES, 'SECOND_WINDOW'),
         minimumGuarantee: Math.round(clamp(source.minimumGuarantee, 0, Number.MAX_SAFE_INTEGER)),

@@ -1,3 +1,4 @@
+import {collectionPrivateDefaults} from './streamingCollectionPrivateOffers';
 import {streamingBackendPercentForBuyer} from './streamingBackendPolicy';
 import type { Player, StreamingStarterCatalogPackageId } from '../types';
 import { getAbsoluteWeek } from './legacyLogic';
@@ -7,7 +8,7 @@ import { createStreamingMarketCompatibilityContext, getEligibleOwnedStreamingTit
 import { getHistoricalCatalogueTitles } from './historicalCatalogue';
 import {
     createDefaultStreamingRightsTerms, getOwnedPlatformPackageCountryIds, getStreamingRightsOpportunities,
-    getStreamingCataloguePackageOpportunities, openStreamingPrivateOffer, openStreamingRightsNegotiation, signStreamingRightsDeal,
+    getStreamingCataloguePackageOpportunities, openStreamingCollectionPrivateOffer, openStreamingPrivateOffer, openStreamingRightsNegotiation, signStreamingRightsDeal,
     signOwnedStreamingCataloguePackage,
     type StreamingRightsActionResult,
     type StreamingRightsTermsInput,
@@ -231,13 +232,25 @@ export const isContentMarketAuctionListing = (player: Player, listingId: string)
         .some(session => session.status === 'LIVE' && session.lot.listingKind === 'TITLE' && session.lot.listingId === listingId)
 );
 
+export const getContentMarketPrivateOfferDefaults = (player: Player, sourceId: string): StreamingRightsTermsInput | null => {
+    const collection = getContentMarketCollections(player).find(item => item.id === sourceId);
+    if (collection) return isContentMarketAuctionCollection(player, sourceId) ? null : collectionPrivateDefaults(player, collection);
+    const listing = getContentMarketListings(player).find(item => item.id === sourceId);
+    return listing && !isContentMarketAuctionListing(player, sourceId)
+        ? {...listing.terms, countryIds: listing.countryIds, ...(listing.inheritedContract?.accessGrant ? {accessGrant: listing.inheritedContract.accessGrant} : {})} : null;
+};
+
 export const submitContentMarketPrivateOffer = (
-    player: Player,
-    listingId: string,
-    terms: StreamingRightsTermsInput,
-): StreamingRightsActionResult => isContentMarketAuctionListing(player, listingId)
-    ? { player, changed: false, reason: 'NOT_READY', detail: 'These rights are assigned to a live auction. Enter the auction room to compete.' }
-    : openStreamingPrivateOffer(prepareContentMarketDiscovery(player), listingId, terms);
+    player: Player, sourceId: string, terms: StreamingRightsTermsInput,
+): StreamingRightsActionResult => {
+    const collection = getContentMarketCollections(player).find(item => item.id === sourceId);
+    if (collection) return isContentMarketAuctionCollection(player, sourceId)
+        ? {player, changed:false, reason:'NOT_READY', detail:'This collection is assigned to a live auction.'}
+        : openStreamingCollectionPrivateOffer(player, collection, terms);
+    if (isContentMarketAuctionListing(player, sourceId))
+        return {player, changed:false, reason:'NOT_READY', detail:'These rights are assigned to a live auction. Enter the auction room to compete.'};
+    return openStreamingPrivateOffer(prepareContentMarketDiscovery(player), sourceId, terms);
+};
 
 export const getContentMarketCollections = (player: Player, includeReservedOpportunityId?: string) => {
     const savedIds = player.world.streamingOpportunityMarket?.cycle === getStreamingMarketSupplyProfile(player).cycle

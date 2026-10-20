@@ -5946,7 +5946,16 @@ export interface StreamingRoyaltySettlement {
 
 export type StreamingRoyaltySettlementRegistry = Record<string, StreamingRoyaltySettlement>;
 
+export interface StreamingCollectionNegotiationSnapshot {
+    schemaVersion: 1;
+    package: StreamingCataloguePackage;
+    accessGrant: StreamingRightsAccessGrant;
+    signature: string;
+}
+
 export interface OwnedStreamingRightsNegotiation {
+    /** Frozen complete offer, never rebuilt from rotating public stock. */
+    collectionSnapshot?: StreamingCollectionNegotiationSnapshot;
     id: string;
     idempotencyKey: string;
     kind: StreamingRightsNegotiationKind;

@@ -51,6 +51,15 @@ check('listed platform trade keeps inherited viewer rights when buyer pricing di
  const replied=processStreamingPrivateOffersWeek(reloaded,sent.negotiation!.responseDueAbsoluteWeek!).player;
  assert.equal(replied.ownedStreamingPlatform.rightsNegotiations[0].responseStatus,'SELLER_ACCEPTED');
  assert.deepEqual(replied.ownedStreamingPlatform.rightsNegotiations[0].accessGrant?.modes,['SUBSCRIPTION']);
+ const due=sent.negotiation!.responseDueAbsoluteWeek!;
+ const atReply={...replied,age:Math.floor(due/52)+1,currentWeek:due%52+1};
+ assert.ok(signStreamingRightsDeal(atReply,sent.negotiation!.id).changed,'Unchanged inherited grant survives the review delay');
+ const changedGrant=structuredClone(atReply);
+ changedGrant.world.streamingRightsContracts['listed-trade'].accessGrant={schemaVersion:1,modes:['RENTAL'],earlyWindowWeeks:0,purchaseFulfillment:'NONE',source:'EXPLICIT'};
+ const refused=signStreamingRightsDeal(changedGrant,sent.negotiation!.id);
+ assert.equal(refused.changed,false,'Changed inherited mode grant must not silently replace the offered one');
+ assert.equal(refused.player,changedGrant);
+
 });
 check('a lower revised offer cannot inherit the advertised-term acceptance',()=>{
  const p=fixture(),l=fixed(p);const sent=submitContentMarketPrivateOffer(p,l.id,{...l.terms,countryIds:l.countryIds});
