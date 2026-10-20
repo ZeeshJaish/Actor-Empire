@@ -1,7 +1,7 @@
 import { getStreamingHqViewingSpotlight } from '../services/streamingAudienceMetrics';
 import React, { useEffect, useRef, useState } from 'react';
 import { useStreamingView } from './streaming-transplant/useStreamingView';
-import { reuseStreamingPresentationSource } from '../services/streamingPresentationInputs';
+import { advanceStreamingPresentationCursor } from '../services/streamingPresentationInputs';
 import {BadgeCheck, BarChart3, Banknote, Building2, Check, ChevronRight, CircleDot, Clapperboard, Compass, Crown, Eye, Film, Gauge, Globe2, Home, Layers3, LockKeyhole, Play, RadioTower, Rocket, Server, ShieldCheck, Sparkles, TrendingUp, UsersRound, WalletCards, X, type LucideIcon} from 'lucide-react';
 import type {
   OwnedStreamingLaunchRehearsalSnapshot,
@@ -298,12 +298,12 @@ function EmptyState({
 }
 
 export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedMarketUpdate, onBack, onReturnToGame, onOpenOriginalProduction, onOpenProductionHouse, onOpenBank, initialDestination = 'HOME', initialContentMarketOfferId, onContentMarketOfferConsumed }: Props) {
-  const projectionSourceRef = useRef(player);
-  const readPlayer = reuseStreamingPresentationSource(projectionSourceRef.current, player);
-  projectionSourceRef.current = readPlayer;
-  const buildForecastSourceRef = useRef(player);
-  const buildForecastPlayer = reuseStreamingPresentationSource(buildForecastSourceRef.current, player, 'BUILD_FORECAST');
-  buildForecastSourceRef.current = buildForecastPlayer;
+  const projectionSourceRef = useRef<ReturnType<typeof advanceStreamingPresentationCursor> | undefined>(undefined);
+  projectionSourceRef.current = advanceStreamingPresentationCursor(projectionSourceRef.current, player);
+  const readPlayer = projectionSourceRef.current.source;
+  const buildForecastSourceRef = useRef<ReturnType<typeof advanceStreamingPresentationCursor> | undefined>(undefined);
+  buildForecastSourceRef.current = advanceStreamingPresentationCursor(buildForecastSourceRef.current, player, 'BUILD_FORECAST');
+  const buildForecastPlayer = buildForecastSourceRef.current.source;
   const readPlatform = readPlayer.ownedStreamingPlatform;
   const readIdentity = readPlatform.identity!;
   const catalogueContextRef = useRef<ReturnType<typeof createStreamingCatalogueReadContext> | undefined>(undefined);

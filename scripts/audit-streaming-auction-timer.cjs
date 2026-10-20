@@ -170,6 +170,103 @@ try {
       } finally { parent.close(); }
     }
   });
+  check('actual parent compares a normalized 5000-licence clone once, then keeps clock reads bounded', () => {
+    // Match a loaded legacy save: canonical licence shape except omitted
+    // optional defaults which compaction materializes during the first draft save.
+    const platform = api.normalizeOwnedStreamingPlatformState(large.player.ownedStreamingPlatform, large.player.id);
+    const legacyLicenses = platform.catalogLicenses.map(license => {
+      const { renewalOption, viewershipBonusThreshold, viewershipBonusAmount, renewedFromLicenseId, ...legacy } = license;
+      assert.equal(renewalOption, false); assert.equal(viewershipBonusThreshold, 0);
+      assert.equal(viewershipBonusAmount, 0); assert.equal(renewedFromLicenseId, null);
+      return legacy;
+    });
+    const observed = observeLicenses({ ...large.player, ownedStreamingPlatform: {
+      ...platform, contentMarketDraft: null, catalogLicenses: legacyLicenses,
+    } });
+    let player = observed.player, writes = 0;
+    const parent = harness();
+    const update = next => { writes++; player = api.prepareTrustedMarketUpdateForUi(next); };
+    const render = () => parent.renderComponent(api.Market, {
+      player, brand: { name: 'Empire+', hue: 250, sat: 60, markId: 'FRAME_PLAY', typeId: 'SANS' },
+      onUpdatePlayer: update, onClose() {}, onOpenFinance() {}, onCommission() {}, onReview() {},
+      initialOfferId: large.session.id,
+    });
+    try {
+      render();
+      for (const [id, callback] of draftTimers) { draftTimers.delete(id); callback(); }
+      assert.equal(writes, 1);
+      assert.notEqual(player.ownedStreamingPlatform.catalogLicenses, legacyLicenses);
+      assert.ok(api.reuseStreamingPresentationSource(observed.player, player) === observed.player, 'Normalization is presentation-equivalent');
+      render(); // One allowed comparison to establish equivalent normalized input.
+      observed.reset();
+      const catalogueArrays = new Set([observed.player.ownedStreamingPlatform.catalogLicenses, player.ownedStreamingPlatform.catalogLicenses]);
+      const stringify = JSON.stringify;
+      let catalogueSerializations = 0;
+      JSON.stringify = function(value, ...args) {
+        if (catalogueArrays.has(value)) catalogueSerializations++;
+        return stringify.call(this, value, ...args);
+      };
+      try {
+        for (let second = 1; second <= 3; second++) {
+          player = api.prepareTrustedMarketUpdateForUi(api.advanceStreamingBuyerAuction(player, large.session.id, 1, 1000 + second * 1000).player);
+          render();
+        }
+      } finally {
+        JSON.stringify = stringify;
+      }
+      console.log(`  post-compaction parent licence field reads across three ticks: ${observed.reads()}`);
+      console.log(`  post-compaction parent catalogue array serializations: ${catalogueSerializations}`);
+      assert.equal(observed.reads(), 0, 'The old projection must not remain the repeated comparison baseline');
+      assert.equal(catalogueSerializations, 0);
+      assert.equal(writes, 1);
+      assert.equal(draftTimers.size, 0);
+    } finally { parent.close(); }
+  });
+  check('caller-owned cursors keep stable output after normalized clones and invalidate current authority changes', () => {
+    const platform = api.normalizeOwnedStreamingPlatformState(large.player.ownedStreamingPlatform, large.player.id);
+    const observed = observeLicenses({ ...large.player, ownedStreamingPlatform: { ...platform,
+      catalogLicenses: platform.catalogLicenses.map(({ renewalOption, renewedFromLicenseId, ...legacy }) => legacy),
+    } });
+    const original = observed.player;
+    const compacted = api.prepareTrustedMarketUpdateForUi({ ...original,
+      ownedStreamingPlatform: api.compactOwnedStreamingPlatformForPersistence(original.ownedStreamingPlatform, original.id),
+    });
+    for (const mode of ['HQ', 'AUCTION_ROOM', 'BUILD_FORECAST']) {
+      let cursor = api.advanceStreamingPresentationCursor(undefined, original, mode);
+      cursor = api.advanceStreamingPresentationCursor(cursor, compacted, mode);
+      assert.ok(cursor.source === original, `${mode}: normalizing clone preserves projection identity`);
+      assert.ok(cursor.baseline === compacted, `${mode}: comparison moves to latest canonical inputs`);
+      observed.reset();
+      for (let i = 0; i < 20; i++) {
+        const latest = api.prepareTrustedMarketUpdateForUi({ ...compacted });
+        cursor = api.advanceStreamingPresentationCursor(cursor, latest, mode);
+        assert.ok(cursor.source === original);
+        assert.ok(cursor.baseline === latest);
+      }
+      assert.equal(observed.reads(), 0, `${mode}: no traversal of old catalogue after one comparison`);
+      const patch = value => ({ ...compacted, ownedStreamingPlatform: { ...compacted.ownedStreamingPlatform, ...value } });
+      const mutations = {
+        cash: patch({ treasuryCash: 0 }),
+        commitments: patch({ costCommitments: [...compacted.ownedStreamingPlatform.costCommitments, { id: 'new-reserve', committedAmount: 1 }] }),
+        grant: patch({ catalogLicenses: compacted.ownedStreamingPlatform.catalogLicenses.map((row, index) =>
+          index ? row : { ...row, accessGrant: { ...row.accessGrant, modes: ['SUBSCRIPTION'] } }) }),
+        pricing: patch({ serviceConfiguration: { ...compacted.ownedStreamingPlatform.serviceConfiguration, revision: 99 } }),
+        countries: patch({ marketOperations: [...compacted.ownedStreamingPlatform.marketOperations, { countryId: 'JP' }] }),
+        continuation: patch({ rightsObligations: [...compacted.ownedStreamingPlatform.rightsObligations, { id: 'new-sequel' }] }),
+        source: { ...compacted, world: { ...compacted.world, projects: [...compacted.world.projects, { id: 'source-change' }] } },
+        canonicalRights: { ...compacted, world: { ...compacted.world, streamingRightsContracts: { ...compacted.world.streamingRightsContracts, newRight: { id: 'new' } } } },
+        week: { ...compacted, currentWeek: compacted.currentWeek + 1 },
+        unknown: patch({ futureCanonicalAuthority: true }),
+      };
+      for (const [name, changed] of Object.entries(mutations)) {
+        const next = api.advanceStreamingPresentationCursor(cursor, changed, mode);
+        assert.ok(next.source === changed, `${mode}/${name}: current change replaces projection`);
+        assert.ok(next.baseline === changed, `${mode}/${name}: current change replaces baseline`);
+      }
+      const switched = api.advanceStreamingPresentationCursor(cursor, compacted, mode === 'HQ' ? 'AUCTION_ROOM' : 'HQ');
+      assert.ok(switched.source === compacted, 'Changing cursor mode cannot reuse another mode projection');
+    }
+  });
   check('draft persistence compares canonical fields independent of key order, bounds and defaults', () => {
     let player = large.player;
     let writes = 0;

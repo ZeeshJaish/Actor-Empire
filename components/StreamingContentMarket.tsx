@@ -1,7 +1,7 @@
 import { getStreamingRightsContract } from '../services/streamingRightsCore';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { validCollectionSnapshot } from '../services/streamingCollectionPrivateOffers';
-import { reuseStreamingPresentationSource } from '../services/streamingPresentationInputs';
+import { advanceStreamingPresentationCursor } from '../services/streamingPresentationInputs';
 import { sameStreamingContentMarketDraft } from '../services/streamingContentMarketDraft';
 import { ArrowLeft, Bell, BellOff, CalendarDays, Check, ChevronDown, ChevronRight, Clock3, FileSignature, Film, Gavel, Handshake, LibraryBig, Search, Sparkles, Wallet, X } from 'lucide-react';
 import type { OwnedStreamingRightsNegotiation, Player } from '../types';
@@ -171,9 +171,9 @@ function ContentMarketGate({ player, funds, listingPrices, owned, liveRooms, bra
 }
 
 export default function StreamingContentMarket({ player, brand, onUpdatePlayer, onClose, onOpenFinance, onCommission, onReview, returnToLaunch, initialTab, onResumeLegacy, onExistingNegotiations, initialOfferId, initialAuctionId }: Props) {
-    const projectionSourceRef = useRef(player);
-    const readPlayer = reuseStreamingPresentationSource(projectionSourceRef.current, player);
-    projectionSourceRef.current = readPlayer;
+    const projectionSourceRef = useRef<ReturnType<typeof advanceStreamingPresentationCursor> | undefined>(undefined);
+    projectionSourceRef.current = advanceStreamingPresentationCursor(projectionSourceRef.current, player);
+    const readPlayer = projectionSourceRef.current.source;
     const readPlatform = readPlayer.ownedStreamingPlatform;
     const platform = player.ownedStreamingPlatform;
     const [draft, setDraft] = useState<Draft>(() => initialAuctionId

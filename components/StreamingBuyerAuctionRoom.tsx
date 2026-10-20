@@ -12,7 +12,7 @@ import {
 import { resolveAuctionContinuation } from '../services/streamingAuctionTerms';
 import { activateAuctionFutureFunding } from '../services/streamingAuctionFunding';
 import { getContentMarketFunds } from '../services/streamingContentMarket';
-import { reuseStreamingPresentationSource } from '../services/streamingPresentationInputs';
+import { advanceStreamingPresentationCursor } from '../services/streamingPresentationInputs';
 import css from '../content-market-exact/ContentMarket.module.css';
 import { cx } from '../content-market-exact/cx';
 import { OfferUsdInput } from '../content-market-exact/OfferControls';
@@ -38,11 +38,11 @@ export default function StreamingBuyerAuctionRoom({ player, session, onUpdatePla
     const updateRef = useRef(onUpdatePlayer);
     playerRef.current = player;
     updateRef.current = onUpdatePlayer;
-    // One caller-owned immutable presentation snapshot. Actions below always
-    // use playerRef.current; no cached capability can authorize a transaction.
-    const presentationRef = useRef(player);
-    const readPlayer = reuseStreamingPresentationSource(presentationRef.current, player, 'AUCTION_ROOM');
-    presentationRef.current = readPlayer;
+    // One caller-owned immutable presentation cursor. Transaction services below
+    // receive the current player; no cached capability authorizes a transaction.
+    const presentationRef = useRef<ReturnType<typeof advanceStreamingPresentationCursor> | undefined>(undefined);
+    presentationRef.current = advanceStreamingPresentationCursor(presentationRef.current, player, 'AUCTION_ROOM');
+    const readPlayer = presentationRef.current.source;
     const lotKey = JSON.stringify(session.lot);
     const leader = getStreamingBuyerAuctionLeader(session);
     const startingUpfront = Math.min(

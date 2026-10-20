@@ -107,3 +107,25 @@ export const reuseStreamingPresentationSource = (
         && !sameValue(getStreamingBuildMarketAccess(previous).countryIds, getStreamingBuildMarketAccess(current).countryIds)) return current;
     return previous;
 };
+
+interface StreamingPresentationCursor {
+    readonly source: Player;
+    readonly baseline: Player;
+    readonly mode: StreamingPresentationMode;
+}
+
+/** One caller-owned immutable read cursor, never transaction authority.
+ * Keep the stable projection source but compare against the latest equivalent
+ * inputs. After a normalizing save clones licences, that clone is compared once
+ * instead of walking the old source's catalogue again on every clock tick.
+ * Retains at most the projection source and latest comparison player, no history. */
+export const advanceStreamingPresentationCursor = (
+    previous: StreamingPresentationCursor | undefined,
+    current: Player,
+    mode: StreamingPresentationMode = 'HQ',
+): StreamingPresentationCursor => {
+    if (previous?.mode === mode && previous.baseline === current) return previous;
+    const equivalent = previous?.mode === mode
+        && reuseStreamingPresentationSource(previous.baseline, current, mode) === previous.baseline;
+    return { source: equivalent ? previous.source : current, baseline: current, mode };
+};
