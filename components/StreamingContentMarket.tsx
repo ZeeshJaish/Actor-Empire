@@ -1,3 +1,4 @@
+import { getStreamingRightsContract } from '../services/streamingRightsCore';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { validCollectionSnapshot } from '../services/streamingCollectionPrivateOffers';
 import { reuseStreamingPresentationSource } from '../services/streamingPresentationInputs';
@@ -29,7 +30,7 @@ import ContentMarketOneSheet from './ContentMarketOneSheet';
 import StreamingAccessGrantEditor from './StreamingAccessGrantEditor';
 import { ContentMarket as ExactContentMarket, type MarketScene, type SharedLibraryFilters,
     type SharedLibraryResult } from '../content-market-exact/ExactContentMarket';
-import { buildExactContentMarketLots, getExactOfferScope, prepareExactContentMarketOffer, submitExactContentMarketOffer } from '../content-market-exact/adapter';
+import { buildExactContentMarketLots, getInheritedOfferDisplayTerms, getExactOfferScope, prepareExactContentMarketOffer, submitExactContentMarketOffer } from '../content-market-exact/adapter';
 import { OfferClauseHelp, OfferUsdInput } from '../content-market-exact/OfferControls';
 import { parseOfferUsd, type OfferScope } from '../content-market-exact/model';
 import type { Lot as ExactContentMarketLot, Offer as ExactContentMarketOffer } from '../content-market-exact/model';
@@ -316,7 +317,8 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
     const beginOffer = (source: typeof selected | OwnedStreamingRightsNegotiation) => {
         if (!source) return;
         const base = 'terms' in source ? source.terms : source;
-        setOfferTerms({ territory: base.territory, durationWeeks: base.durationWeeks, exclusivity: base.exclusivity,
+        const displaySource = source.sourceLicenseId ? getStreamingRightsContract(player.world.streamingRightsContracts, source.sourceLicenseId) : null;
+        setOfferTerms(getInheritedOfferDisplayTerms({ territory: base.territory, durationWeeks: base.durationWeeks, exclusivity: base.exclusivity,
             windowType: base.windowType, minimumGuarantee: base.minimumGuarantee, platformRevenueShare: base.platformRevenueShare,
             marketingGuarantee: base.marketingGuarantee, viewershipBonusThreshold: base.viewershipBonusThreshold,
             viewershipBonusAmount: base.viewershipBonusAmount, renewalOption: base.renewalOption,
@@ -324,16 +326,19 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
             changeOfControl: base.changeOfControl, cancellationPenalty: base.cancellationPenalty,
             accessGrant: base.accessGrant || createStreamingRightsAccessGrantForOffer(
                 platform.serviceConfiguration.pricing.streams, base.windowType === 'PERMANENT'),
-            countryIds: 'terms' in source ? source.countryIds : source.countryIds });
+            countryIds: source.countryIds }, displaySource));
         setOfferEditor(true); setFeedback('');
     };
     const submitPrivateOffer = (submittedTerms: StreamingRightsTermsInput) => {
         if (!submittedTerms || (!selected && !selectedOffer) || busy) return;
         setBusy(true);
         try {
+            const inheritedProposal = selectedOffer?.sourceLicenseId && selectedOffer.sellerType === 'PLATFORM'
+                ? { ...selectedOffer, minimumGuarantee: submittedTerms.minimumGuarantee, marketingGuarantee: 0, viewershipBonusAmount: 0, viewershipBonusThreshold: 0 }
+                : selected?.sourceLicenseId ? { ...selected.terms, countryIds: selected.countryIds, minimumGuarantee: submittedTerms.minimumGuarantee } : submittedTerms;
             const result = selected
-                ? submitContentMarketPrivateOffer(player, selected.id, submittedTerms)
-                : reviseStreamingRightsNegotiation(player, selectedOffer!.id, submittedTerms);
+                ? submitContentMarketPrivateOffer(player, selected.id, inheritedProposal)
+                : reviseStreamingRightsNegotiation(player, selectedOffer!.id, inheritedProposal);
             if (!result.changed || !result.negotiation) { setFeedback(result.detail || 'This offer could not be submitted.'); return; }
             onUpdatePlayer(result.player); setOfferEditor(false);
             setDraft(current => ({ ...current, tab: 'OFFERS', selectedId: result.negotiation!.id }));

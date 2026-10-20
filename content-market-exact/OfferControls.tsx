@@ -13,9 +13,9 @@ export function OfferClauseHelp({ label }: { label: keyof typeof OFFER_CLAUSE_HE
   const [open, setOpen] = useState(false);
   const id = useId();
   return <span className={css.mkclausehelp}>
-    <button type="button" aria-label={`About ${label}`} aria-expanded={open} aria-controls={id}
+    <button type="button" aria-label={`About ${label}`} aria-expanded={open} aria-controls={id} data-dialog-escape-owner={open ? 'true' : undefined}
       onClick={() => setOpen(value => !value)} onKeyDown={event => {
-        if (event.key === 'Escape') { event.stopPropagation(); setOpen(false); }
+        if (event.key === 'Escape' && open) { event.preventDefault(); event.stopPropagation(); setOpen(false); }
       }}><Eye size={15} aria-hidden="true" /></button>
     {open && <span id={id} className={css.mkhelptext} role="note">{OFFER_CLAUSE_HELP[label]}</span>}
   </span>;

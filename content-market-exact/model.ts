@@ -119,6 +119,7 @@ export interface OfferScope {
 export interface Lot {
   id: string;
   sourceId: string;
+  sourceLicenseId?: string | null;
   artId?: string;
   sourceKind: 'LISTING' | 'COLLECTION' | 'AUCTION' | 'UPCOMING' | 'STUDIO' | 'OPPORTUNITY';
   title: string;
@@ -151,6 +152,8 @@ export interface Lot {
   unavailableReason?: string | null;
   linked?: boolean;
   offerDefaults?: StreamingRightsTermsInput;
+  /** Private proposal fields may differ from fixed inherited obligations. */
+  offerProposalDefaults?: StreamingRightsTermsInput;
   offerScope?: OfferScope;
 }
 

@@ -1,7 +1,8 @@
+import { getStreamingRightsContract } from '../services/streamingRightsCore';
 import {getStreamingBuyerBackendCapability,streamingBackendPercentForBuyer} from '../services/streamingBackendPolicy';
 import { getContentMarketPrivateOfferDefaults, submitContentMarketPrivateOffer } from '../services/streamingContentMarket';
 import type { StreamingRightsTermsInput } from '../services/streamingRightsMarketplace';
-import type { Player } from '../types';
+import type { Player, StreamingRightsContract } from '../types';
 import { getAbsoluteWeek } from '../services/legacyLogic';
 import { getHistoricalCatalogueTitles } from '../services/historicalCatalogue';
 import { getStreamingDayOneMarket } from '../services/streamingDayOneMarkets';
@@ -150,6 +151,7 @@ export const buildExactContentMarketLots = (player: Player, sources: ContentMark
       id: listing.id,
       sourceId: listing.id,
       sourceKind: 'LISTING',
+      sourceLicenseId: listing.sourceLicenseId,
       title: listing.title.title,
       marquee: listing.title.catalogueTier === 'MARQUEE',
       year: yearFor(listing.title.releaseYear, currentYear),
@@ -352,19 +354,32 @@ export const getExactOfferScope = (player: Player, terms: StreamingRightsTermsIn
   };
 };
 
+/** These attached terms are retained by the canonical transfer signer, even
+ * when a new private proposal intentionally contains zero support payments. */
+export const getInheritedOfferDisplayTerms = (terms: StreamingRightsTermsInput, source?: StreamingRightsContract | null): StreamingRightsTermsInput => source ? {
+  ...terms,
+  renewalOption: source.renewalOption, sublicensingAllowed: source.sublicensingAllowed,
+  sequelRightsIncluded: source.sequelRightsIncluded, cancellationPenalty: source.cancellationPenalty,
+  changeOfControl: source.changeOfControl, marketingGuarantee: source.marketingGuarantee,
+  viewershipBonusAmount: source.viewershipBonusAmount, viewershipBonusThreshold: source.viewershipBonusThreshold,
+} : terms;
+
 /** Called once on opening the editor, never while typing. Canonical defaults are authoritative. */
 export const prepareExactContentMarketOffer = (player: Player, lot: Lot): Lot | null => {
   const defaults = getContentMarketPrivateOfferDefaults(player, lot.sourceId);
   if (!defaults) return null;
   const inherited = lot.sellerKind === 'PLATFORM RESALE';
+  const sourceContract = inherited && lot.sourceLicenseId ? getStreamingRightsContract(player.world.streamingRightsContracts, lot.sourceLicenseId) : null;
+  if (inherited && !sourceContract) return null;
+  const displayTerms = getInheritedOfferDisplayTerms(defaults, sourceContract);
   const scope = getExactOfferScope(player, defaults, { collection: lot.sourceKind === 'COLLECTION',
     maximumWeeks: lot.sourceKind === 'COLLECTION' || inherited ? defaults.durationWeeks : 520 });
   if (inherited) {
     scope.fixedScope = true; scope.inheritedGrant = true; scope.backendAllowed = false;
-    scope.sequelAllowed = defaults.sequelRightsIncluded; scope.sublicenseAllowed = defaults.sublicensingAllowed;
+    scope.sequelAllowed = displayTerms.sequelRightsIncluded; scope.sublicenseAllowed = displayTerms.sublicensingAllowed;
   }
-  return { ...lot, offerDefaults: defaults, offerScope: scope,
-    listed: { ...lot.listed, ...termsFor({ ...defaults, backendAllowed: scope.backendAllowed }, defaults.countryIds?.length || 0),
+  return { ...lot, offerDefaults: displayTerms, offerProposalDefaults: defaults, offerScope: scope,
+    listed: { ...lot.listed, ...termsFor({ ...displayTerms, backendAllowed: scope.backendAllowed }, defaults.countryIds?.length || 0),
       ...(inherited && lot.listed ? { basis: lot.listed.basis, recoupable: lot.listed.recoupable,
         backendCap: lot.listed.backendCap, marketing: lot.listed.marketing, bonusAt: lot.listed.bonusAt } : {}) } };
 };
@@ -373,7 +388,12 @@ export const submitExactContentMarketOffer = (player: Player, lot: Lot, offer: O
   // Fetch again at the action boundary. A cached card cannot authorize a contract.
   const defaults = getContentMarketPrivateOfferDefaults(player, lot.sourceId);
   if (!defaults) return { player, changed: false, detail: 'This source is no longer open for private offers.' };
-  const presented = lot.offerDefaults || defaults;
+  const presented = lot.offerProposalDefaults || lot.offerDefaults || defaults;
+  if (lot.sellerKind === 'PLATFORM RESALE') {
+    // The only editable transfer term is its price. Clauses displayed from the
+    // source are inherited at signature, not newly offered support payments.
+    return submitContentMarketPrivateOffer(player, lot.sourceId, { ...presented, minimumGuarantee: offer.mg });
+  }
   return submitContentMarketPrivateOffer(player, lot.sourceId, { ...presented,
     countryIds: offer.markets, durationWeeks: offer.termWeeks,
     exclusivity: offer.excl === 'EXCLUSIVE' ? 'EXCLUSIVE' : 'NON_EXCLUSIVE',

@@ -58,7 +58,7 @@ function Fixture(){
    <p>{session?`${session.rivals.length} funded rivals · ${session.status}`:'No open room'}</p>
   </details>
   {session?<AccessibleDialog className="cm-market-exact-shell" data-epx-root aria-label="Content Market" onEscape={()=>setRoomId('')}><StreamingBuyerAuctionRoom player={player} session={session} onUpdatePlayer={setPlayer} onExit={()=>setRoomId('')}/></AccessibleDialog>
-    :marketOpen?<StreamingContentMarket key={marketKey} player={player} brand={brand} onUpdatePlayer={setPlayer} onClose={()=>setMarketOpen(false)} onOpenFinance={()=>{}} onCommission={()=>{}} onReview={()=>{}}/>
+    :marketOpen?<React.Fragment key={marketKey}><StreamingContentMarket player={player} brand={brand} onUpdatePlayer={setPlayer} onClose={()=>setMarketOpen(false)} onOpenFinance={()=>{}} onCommission={()=>{}} onReview={()=>{}}/></React.Fragment>
     :<StreamingPlatformHQ player={player} onUpdatePlayer={setPlayer} onTrustedMarketUpdate={setPlayer} onBack={()=>{}}/>}
  </>;
 }

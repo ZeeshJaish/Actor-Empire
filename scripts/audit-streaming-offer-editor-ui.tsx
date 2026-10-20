@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { createStreamingLicenseContract, createStreamingRightsContractFromLicense, registerStreamingRightsContract } from '../services/streamingRightsCore';
+import { getAbsoluteWeek } from '../services/legacyLogic';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import * as model from '../content-market-exact/model';
@@ -85,6 +87,46 @@ check('canonical adapter sends an individual custom amount unchanged', () => {
   const result = (adapter as any).submitExactContentMarketOffer(player, prepared, offer);
   assert.equal(result.changed, true, result.detail);
   assert.equal(result.negotiation.minimumGuarantee, offer.mg);
+});
+check('inherited fixed clauses and penalty display the canonical source and survive actual transfer', () => {
+  const resale = contentMarketFixture();
+  resale.businesses = []; resale.pastProjects = [];
+  resale.world.projects = resale.world.projects.slice(0, 1);
+  const week = getAbsoluteWeek(resale.age, resale.currentWeek);
+  const license = createStreamingLicenseContract({ id: 'ui-inherited-trade', sourceProject: resale.world.projects[0], buyerPlatformId: 'NETFLIX', platformContentPlanId: null, cataloguePackageId: null,
+    licensorName: 'Harbour', territory: 'MULTI_REGION', durationWeeks: 104, exclusivity: 'NON_EXCLUSIVE', minimumGuarantee: 1000000, platformRevenueShare: 100,
+    signedAtAbsoluteWeek: week - 3, startsAtAbsoluteWeek: week - 3, countryIds: ['US', 'IN'], origin: 'STUDIO_MARKET', sellerType: 'STUDIO', sellerPlatformId: null, windowType: 'FIRST_WINDOW',
+    renewalOption: true, sublicensingAllowed: true, sequelRightsIncluded: true, cancellationPenalty: 1234567, changeOfControl: 'CONSENT_REQUIRED', marketingGuarantee: 500000,
+    accessGrant: { schemaVersion: 1, modes: ['SUBSCRIPTION'], earlyWindowWeeks: 0, purchaseFulfillment: 'NONE', source: 'EXPLICIT' } });
+  const contract = createStreamingRightsContractFromLicense({ license, seller: { type: 'NPC_STUDIO', id: 'seller-cm1', name: 'Harbour', platformId: null }, buyer: { type: 'AI_PLATFORM', id: 'NETFLIX', name: 'Netflix', platformId: 'NETFLIX' }, guaranteeDisposition: 'PAID', settledAtAbsoluteWeek: week - 3 });
+  resale.world.streamingRightsContracts = registerStreamingRightsContract({}, contract).registry;
+  const listing = getContentMarketListings(resale).find(row => row.sourceLicenseId === license.id)!;
+  assert.ok(listing);
+  const card = adapter.buildExactContentMarketLots(resale, { listings: [listing], collections: [], auctionLots: [], upcomingSales: [], ownedTitles: [] })[0];
+  const prepared = adapter.prepareExactContentMarketOffer(resale, card)!;
+  assert.equal(prepared.listed!.renewal, 'First option');
+  assert.equal(prepared.listed!.sublicense, true);
+  assert.equal(prepared.listed!.sequel, true);
+  const html = renderToStaticMarkup(<ContentMarket brand={brand} state={{ treasury: 5e12, committed: 0, week: 12, subs: 0 }} catalogue={[prepared]} initialScene="OFFER" initialLotId={prepared.id} onBack={() => {}} />);
+  assert.match(html, /\$1,234,567/);
+  assert.match(html, /consent required/);
+  assert.match(html, /Inherited marketing obligation/);
+  assert.match(html, /\$500,000/);
+  for (const label of ['Sequel rights', 'Sublicensing', 'Renewal option']) assert.match(html, new RegExp(`aria-pressed="true" disabled=""[^>]*>[^<]*${label}`));
+  const sent = adapter.submitExactContentMarketOffer(resale, prepared, { ...model.offerFrom(prepared.listed!), markets: listing.countryIds });
+  assert.equal(sent.changed, true, sent.detail);
+  const negotiation = sent.player.ownedStreamingPlatform.rightsNegotiations[0];
+  assert.equal(negotiation.marketingGuarantee, 0, 'Proposal money support remains separate from inherited obligations');
+  const due = negotiation.responseDueAbsoluteWeek!;
+  const replied = processStreamingPrivateOffersWeek(sent.player, due).player;
+  const atReply = { ...replied, age: Math.floor(due / 52) + 1, currentWeek: due % 52 + 1 };
+  const signed = signStreamingRightsDeal(atReply, negotiation.id);
+  assert.equal(signed.changed, true, signed.detail);
+  const acquired = signed.player.ownedStreamingPlatform.catalogLicenses.find(row => row.sourceProjectId === license.sourceProjectId)!;
+  assert.ok(acquired);
+  assert.equal(acquired.renewalOption, true); assert.equal(acquired.sublicensingAllowed, true); assert.equal(acquired.sequelRightsIncluded, true);
+  assert.equal(acquired.cancellationPenalty, 1234567); assert.equal(acquired.changeOfControl, 'CONSENT_REQUIRED');
+  assert.equal(acquired.marketingGuarantee, 500000, 'Existing obligation survives while new proposal support stays zero');
 });
 check('malformed saved collection stays visible without offering signature or crashing', () => {
   const prepared = (adapter as any).prepareExactContentMarketOffer(player, lot);

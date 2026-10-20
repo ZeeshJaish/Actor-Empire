@@ -80,6 +80,11 @@ export default function AccessibleDialog({
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (!isTopMostDialog()) return;
+      // A focused expanded disclosure owns its first Escape. The document
+      // capture listener must let that event reach its React target handler.
+      if (event.key === 'Escape' && event.target instanceof Element
+        && dialog.contains(event.target)
+        && event.target.closest('[data-dialog-escape-owner="true"]')) return;
       if (event.key === 'Escape' && onEscapeRef.current) {
         event.preventDefault();
         event.stopPropagation();
