@@ -1,10 +1,12 @@
 import {getStreamingBuyerBackendCapability,streamingBackendPercentForBuyer} from '../services/streamingBackendPolicy';
+import { getContentMarketPrivateOfferDefaults, submitContentMarketPrivateOffer } from '../services/streamingContentMarket';
+import type { StreamingRightsTermsInput } from '../services/streamingRightsMarketplace';
 import type { Player } from '../types';
 import { getAbsoluteWeek } from '../services/legacyLogic';
 import { getHistoricalCatalogueTitles } from '../services/historicalCatalogue';
 import { getStreamingDayOneMarket } from '../services/streamingDayOneMarkets';
 import { getOwnedPlatformPackageCountryIds } from '../services/streamingRightsMarketplace';
-import type { Lot, SellerAppetite, Terms, Territory } from './model';
+import type { Lot, Offer, OfferScope, SellerAppetite, Terms, Territory } from './model';
 
 type ContentMarketSources = {
   listings: any[];
@@ -229,6 +231,7 @@ export const buildExactContentMarketLots = (player: Player, sources: ContentMark
       mode: 'LISTED',
       avail: 'OPEN',
       rows,
+      offerScope: { maximumMoney: 5_000_000_000_000, maximumWeeks: collection.package.maximumDurationWeeks || 104, fixedScope: true, sequelAllowed: false, sublicenseAllowed: true, backendAllowed: false },
     };
   });
 
@@ -328,4 +331,55 @@ export const buildExactContentMarketLots = (player: Player, sources: ContentMark
   });
 
   return [...auctions, ...opportunities, ...listings, ...collections, ...upcoming, ...studio];
+};
+
+/** Presentation policy is bounded by the saved grant. Actions still revalidate current state. */
+export const getExactOfferScope = (player: Player, terms: StreamingRightsTermsInput, source: {
+  collection?: boolean; maximumWeeks?: number; sourceLicenseId?: string | null;
+}): OfferScope => {
+  const inherited = source.sourceLicenseId ? player.world.streamingRightsContracts?.[source.sourceLicenseId]
+    || player.ownedStreamingPlatform.catalogLicenses.find(row => row.id === source.sourceLicenseId) : null;
+  return {
+    maximumMoney: source.collection ? 5_000_000_000_000 : 5_000_000_000,
+    maximumWeeks: source.maximumWeeks || (inherited ? terms.durationWeeks : 520),
+    fixedScope: Boolean(source.collection || inherited),
+    inheritedGrant: Boolean(inherited),
+    sequelAllowed: !source.collection && (!inherited || Boolean(inherited.sequelRightsIncluded)),
+    sublicenseAllowed: !inherited || Boolean(inherited.sublicensingAllowed),
+    backendAllowed: !inherited && terms.windowType !== 'PERMANENT' && getStreamingBuyerBackendCapability(
+      player, null, getAbsoluteWeek(player.age, player.currentWeek), terms.countryIds || [], terms.accessGrant,
+    ).eligibleRevenueFraction > 0,
+  };
+};
+
+/** Called once on opening the editor, never while typing. Canonical defaults are authoritative. */
+export const prepareExactContentMarketOffer = (player: Player, lot: Lot): Lot | null => {
+  const defaults = getContentMarketPrivateOfferDefaults(player, lot.sourceId);
+  if (!defaults) return null;
+  const inherited = lot.sellerKind === 'PLATFORM RESALE';
+  const scope = getExactOfferScope(player, defaults, { collection: lot.sourceKind === 'COLLECTION',
+    maximumWeeks: lot.sourceKind === 'COLLECTION' || inherited ? defaults.durationWeeks : 520 });
+  if (inherited) {
+    scope.fixedScope = true; scope.inheritedGrant = true; scope.backendAllowed = false;
+    scope.sequelAllowed = defaults.sequelRightsIncluded; scope.sublicenseAllowed = defaults.sublicensingAllowed;
+  }
+  return { ...lot, offerDefaults: defaults, offerScope: scope,
+    listed: { ...lot.listed, ...termsFor({ ...defaults, backendAllowed: scope.backendAllowed }, defaults.countryIds?.length || 0),
+      ...(inherited && lot.listed ? { basis: lot.listed.basis, recoupable: lot.listed.recoupable,
+        backendCap: lot.listed.backendCap, marketing: lot.listed.marketing, bonusAt: lot.listed.bonusAt } : {}) } };
+};
+
+export const submitExactContentMarketOffer = (player: Player, lot: Lot, offer: Offer) => {
+  // Fetch again at the action boundary. A cached card cannot authorize a contract.
+  const defaults = getContentMarketPrivateOfferDefaults(player, lot.sourceId);
+  if (!defaults) return { player, changed: false, detail: 'This source is no longer open for private offers.' };
+  const presented = lot.offerDefaults || defaults;
+  return submitContentMarketPrivateOffer(player, lot.sourceId, { ...presented,
+    countryIds: offer.markets, durationWeeks: offer.termWeeks,
+    exclusivity: offer.excl === 'EXCLUSIVE' ? 'EXCLUSIVE' : 'NON_EXCLUSIVE',
+    windowType: offer.window === 'FIRST' ? 'FIRST_WINDOW' : offer.window === 'PERPETUAL' ? 'PERMANENT' : 'SECOND_WINDOW',
+    minimumGuarantee: offer.mg, platformRevenueShare: 100 - offer.backendPct,
+    marketingGuarantee: 0, viewershipBonusThreshold: 0, viewershipBonusAmount: 0,
+    renewalOption: offer.renewal !== 'None', sublicensingAllowed: offer.sublicense, sequelRightsIncluded: offer.sequel,
+  });
 };

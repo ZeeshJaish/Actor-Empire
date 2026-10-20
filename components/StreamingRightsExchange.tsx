@@ -1,3 +1,6 @@
+import { validCollectionSnapshot } from '../services/streamingCollectionPrivateOffers';
+import { OfferUsdInput, OfferClauseHelp } from '../content-market-exact/OfferControls';
+import { parseOfferUsd } from '../content-market-exact/model';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowLeft,
@@ -90,9 +93,10 @@ const termsFromNegotiation = (negotiation: OwnedStreamingRightsNegotiation): Str
   windowType: negotiation.windowType,
   minimumGuarantee: negotiation.minimumGuarantee,
   platformRevenueShare: negotiation.platformRevenueShare,
-  marketingGuarantee: negotiation.marketingGuarantee,
-  viewershipBonusThreshold: negotiation.viewershipBonusThreshold,
-  viewershipBonusAmount: negotiation.viewershipBonusAmount,
+  marketingGuarantee: negotiation.proposalVersion ? 0 : negotiation.marketingGuarantee,
+  viewershipBonusThreshold: negotiation.proposalVersion ? 0 : negotiation.viewershipBonusThreshold,
+  viewershipBonusAmount: negotiation.proposalVersion ? 0 : negotiation.viewershipBonusAmount,
+  countryIds: negotiation.countryIds,
   renewalOption: negotiation.renewalOption,
   sublicensingAllowed: negotiation.sublicensingAllowed,
   sequelRightsIncluded: negotiation.sequelRightsIncluded,
@@ -133,8 +137,13 @@ export default function StreamingRightsExchange({
     selectedNegotiation ? termsFromNegotiation(selectedNegotiation) : null,
   );
 
+  const [amountDraft, setAmountDraft] = useState(String(selectedNegotiation?.minimumGuarantee || 0));
+  const parsedAmount = parseOfferUsd(amountDraft, selectedNegotiation?.collectionSnapshot ? 5_000_000_000_000 : 5_000_000_000);
+  const validSavedCollection = useMemo(() => selectedNegotiation?.collectionSnapshot && validCollectionSnapshot(selectedNegotiation.collectionSnapshot) ? selectedNegotiation.collectionSnapshot : null, [selectedNegotiation]);
+  const invalidCollection = Boolean(selectedNegotiation?.collectionSnapshot && !validSavedCollection);
+  const collectionScope = validSavedCollection?.package;
   useEffect(() => {
-    if (selectedNegotiation) setTerms(termsFromNegotiation(selectedNegotiation));
+    if (selectedNegotiation) { setTerms(termsFromNegotiation(selectedNegotiation)); setAmountDraft(String(selectedNegotiation.minimumGuarantee)); }
   }, [selectedNegotiation?.id, selectedNegotiation?.updatedAtAbsoluteWeek, selectedNegotiation?.status]);
 
   const activeNegotiations = platform.rightsNegotiations.filter(item => ['OPEN', 'COUNTERED', 'READY_TO_SIGN'].includes(item.status));
@@ -178,8 +187,9 @@ export default function StreamingRightsExchange({
   };
 
   const submitOffer = () => {
-    if (!selectedNegotiation || !terms) return;
-    const revised = reviseStreamingRightsNegotiation(player, selectedNegotiation.id, terms);
+    if (!selectedNegotiation || !terms || parsedAmount.value === null || invalidCollection) return;
+    const revised = reviseStreamingRightsNegotiation(player, selectedNegotiation.id, { ...terms, minimumGuarantee: parsedAmount.value });
+    if (!revised.changed) { setFeedback(revised.detail || 'This offer could not be revised.'); return; }
     const submitted = submitStreamingRightsOffer(revised.player, selectedNegotiation.id);
     if (!submitted.changed) {
       setFeedback('This negotiating window has closed.');
@@ -395,19 +405,20 @@ export default function StreamingRightsExchange({
                 {selectedIsExactTransfer ? <div className="rights-fixed-transfer-terms">
                   <span>INHERITED LICENCE — FIXED</span>
                   <strong>{formatCountries(selectedNegotiation.countryIds)} · {formatWindow(selectedNegotiation.windowType)} · {selectedNegotiation.exclusivity === 'EXCLUSIVE' ? 'Exclusive' : 'Shared'}</strong>
+                  {!!selectedNegotiation.marketingGuarantee && <small>Inherited Marketing obligation: {formatMoney(selectedNegotiation.marketingGuarantee)}</small>}
                   <small>The price is negotiable. Scope, expiry, backend and attached obligations transfer unchanged.</small>
                 </div> : null}
+                {invalidCollection && <p role="status">Collection details unavailable. This proposal cannot be changed or signed.</p>}
                 <div className={`rights-term-grid ${selectedIsExactTransfer ? 'is-exact-transfer' : ''}`}>
                   {!selectedIsExactTransfer ? <>
-                  <label><span>Territory</span><select value={terms.territory} onChange={event => setTerms({ ...terms, territory: event.target.value as StreamingLicenseTerritory })}><option value="DOMESTIC">Domestic</option><option value="MULTI_REGION">Multi-region</option><option value="GLOBAL">Global</option></select></label>
-                  <label><span>Window</span><select value={terms.windowType} onChange={event => setTerms({ ...terms, windowType: event.target.value as StreamingRightsWindowType })}><option value="FIRST_WINDOW">First window</option><option value="SECOND_WINDOW">Second window</option><option value="PERMANENT">Permanent catalog</option></select></label>
-                  <label><span>Term</span><select value={terms.durationWeeks} onChange={event => setTerms({ ...terms, durationWeeks: Number(event.target.value) })}><option value={52}>52 weeks</option><option value={104}>104 weeks</option><option value={156}>156 weeks</option><option value={260}>260 weeks</option></select></label>
-                  <label><span>Exclusivity</span><select value={terms.exclusivity} onChange={event => setTerms({ ...terms, exclusivity: event.target.value as StreamingLicenseExclusivity })}><option value="NON_EXCLUSIVE">Non-exclusive</option><option value="EXCLUSIVE">Exclusive</option></select></label>
+                  <label><span>Territory</span><select disabled={Boolean(collectionScope)} value={terms.territory} onChange={event => setTerms({ ...terms, territory: event.target.value as StreamingLicenseTerritory })}><option value="DOMESTIC">Domestic</option><option value="MULTI_REGION">Multi-region</option><option value="GLOBAL">Global</option></select></label>
+                  <label><span>Window</span><select disabled={Boolean(collectionScope)} value={terms.windowType} onChange={event => setTerms({ ...terms, windowType: event.target.value as StreamingRightsWindowType })}><option value="FIRST_WINDOW">First window</option><option value="SECOND_WINDOW">Second window</option><option value="PERMANENT">Permanent catalog</option></select></label>
+                  <label><span>Term</span><select value={terms.durationWeeks} onChange={event => setTerms({ ...terms, durationWeeks: Number(event.target.value) })}>{![52,104,156,260].includes(terms.durationWeeks) && <option value={terms.durationWeeks}>{terms.durationWeeks} weeks</option>}<option value={52}>52 weeks</option><option value={104}>104 weeks</option>{!collectionScope && <><option value={156}>156 weeks</option><option value={260}>260 weeks</option></>}</select></label>
+                  <label><span>Exclusivity</span><select disabled={Boolean(collectionScope)} value={terms.exclusivity} onChange={event => setTerms({ ...terms, exclusivity: event.target.value as StreamingLicenseExclusivity })}><option value="NON_EXCLUSIVE">Non-exclusive</option><option value="EXCLUSIVE">Exclusive</option></select></label>
                   </> : null}
-                  <label className="is-money"><span>{selectedIsExactTransfer ? 'Transfer price' : selectedNegotiation.kind === 'SUBLICENSE_OUT' ? 'Upfront asking price' : 'Minimum guarantee'}</span><input type="number" min={0} step={250000} value={terms.minimumGuarantee} onChange={event => setTerms({ ...terms, minimumGuarantee: Number(event.target.value) })} /><small>{formatMoney(terms.minimumGuarantee)}</small></label>
+                  <OfferUsdInput label={selectedIsExactTransfer ? 'Transfer price' : selectedNegotiation.kind === 'SUBLICENSE_OUT' ? 'Upfront asking price' : 'Upfront offer'} draft={amountDraft} onChange={setAmountDraft} maximum={collectionScope ? 5_000_000_000_000 : 5_000_000_000} />
                   {!selectedIsExactTransfer ? <>
-                  <label><span>{selectedNegotiation.kind === 'SUBLICENSE_OUT' ? 'Seller backend · actual ads + rentals' : 'Platform retained share'}</span><input type="range" min={0} max={20} value={100 - terms.platformRevenueShare} onChange={event => setTerms({ ...terms, platformRevenueShare: 100 - Number(event.target.value) })} /><small>{terms.platformRevenueShare}% / {100 - terms.platformRevenueShare}%</small></label>
-                  <label className="is-money"><span>Marketing guarantee</span><input type="number" min={0} step={250000} value={terms.marketingGuarantee} onChange={event => setTerms({ ...terms, marketingGuarantee: Number(event.target.value) })} /><small>{formatMoney(terms.marketingGuarantee)}</small></label>
+                  <label><span>Seller backend · actual ads + rentals</span><input type="range" min={0} max={20} value={100 - terms.platformRevenueShare} onChange={event => setTerms({ ...terms, platformRevenueShare: 100 - Number(event.target.value) })} /><small>{terms.platformRevenueShare}% / {100 - terms.platformRevenueShare}%</small></label>
                   </> : null}
                 </div>
                 <StreamingAccessGrantEditor
@@ -415,20 +426,20 @@ export default function StreamingRightsExchange({
                     platform.serviceConfiguration.pricing.streams,
                     terms.windowType === 'PERMANENT',
                   )}
-                  ceiling={sourceGrant}
+                  ceiling={validSavedCollection?.accessGrant || sourceGrant}
                   permanentWindow={terms.windowType === 'PERMANENT'}
-                  readOnly={selectedIsExactTransfer}
+                  readOnly={selectedIsExactTransfer || Boolean(collectionScope)}
                   onChange={grant => setTerms({ ...terms, accessGrant: grant })}
                 />
                 {!selectedIsExactTransfer ? <div className="rights-clause-board">
                   {([
                     ['renewalOption', 'Renewal option'],
-                    ['sublicensingAllowed', 'Sublicensing allowed'],
-                    ['sequelRightsIncluded', 'Sequel / franchise rights'],
+                    ['sublicensingAllowed', 'Sublicensing'],
+                    ['sequelRightsIncluded', 'Sequel rights'],
                   ] as const).map(([key, label]) => (
-                    <button type="button" key={key} className={terms[key] ? 'is-on' : ''} onClick={() => setTerms({ ...terms, [key]: !terms[key] })}>
+                    <div key={key} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center' }}><button type="button" disabled={Boolean(collectionScope) && key === 'sequelRightsIncluded'} aria-pressed={terms[key]} className={terms[key] ? 'is-on' : ''} onClick={() => setTerms({ ...terms, [key]: !terms[key] })}>
                       {terms[key] ? <CheckCircle2 size={16} /> : <Scale size={16} />}{label}
-                    </button>
+                    </button><OfferClauseHelp label={label} /></div>
                   ))}
                   <span><ShieldCheck size={16} /> Cancellation penalty {formatMoney(terms.cancellationPenalty)}</span>
                   <span><UsersRound size={16} /> Seller backend applies to this title’s actual ads + rental receipts</span>
@@ -436,15 +447,15 @@ export default function StreamingRightsExchange({
                 {selectedNegotiation.status === 'COUNTERED' ? (
                   <div className="rights-counteroffer">
                     <div><span>COUNTEROFFER RECEIVED</span><strong>{formatMoney(selectedNegotiation.counterMinimumGuarantee || 0)} • {selectedNegotiation.counterPlatformRevenueShare}% platform share</strong></div>
-                    <button type="button" onClick={acceptCounter}><BadgeCheck size={17} /> Accept counter</button>
+                    <button type="button" disabled={invalidCollection} onClick={acceptCounter}><BadgeCheck size={17} /> Accept counter</button>
                   </div>
                 ) : null}
                 <footer>
                   <span><Clock3 size={15} /> Changes stay on this term sheet until you submit.</span>
                   {selectedNegotiation.status === 'READY_TO_SIGN' ? (
-                    <button type="button" className="is-sign" onClick={signDeal}><FileKey2 size={18} /> Sign & fund contract</button>
+                    <button type="button" className="is-sign" disabled={invalidCollection} onClick={signDeal}><FileKey2 size={18} /> Sign & fund contract</button>
                   ) : selectedNegotiation.status !== 'LOST' && selectedNegotiation.status !== 'SIGNED' ? (
-                    <button type="button" onClick={submitOffer}><Gavel size={18} /> Submit round {selectedNegotiation.round + 1}</button>
+                    <button type="button" disabled={parsedAmount.value === null || invalidCollection} onClick={submitOffer}><Gavel size={18} /> Submit round {selectedNegotiation.round + 1}</button>
                   ) : null}
                 </footer>
               </div>

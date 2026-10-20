@@ -14,6 +14,8 @@ import { activateAuctionFutureFunding } from '../services/streamingAuctionFundin
 import { getContentMarketFunds } from '../services/streamingContentMarket';
 import css from '../content-market-exact/ContentMarket.module.css';
 import { cx } from '../content-market-exact/cx';
+import { OfferUsdInput } from '../content-market-exact/OfferControls';
+import { parseOfferUsd } from '../content-market-exact/model';
 import { PlatformMark, Poster } from '../content-market-exact/Poster';
 
 const money = (value: number) => value >= 1e9
@@ -40,7 +42,10 @@ export default function StreamingBuyerAuctionRoom({ player, session, onUpdatePla
         session.lot.referenceValue * 2.2,
         Math.max(session.lot.minimumGuarantee, (leader?.minimumGuarantee || session.lot.minimumGuarantee) + session.lot.minimumBidIncrement * 2),
     );
-    const [upfront, setUpfront] = useState(startingUpfront);
+    const [upfrontDraft, setUpfrontDraft] = useState(String(Math.round(startingUpfront / 100_000) * 100_000));
+    const parsedUpfront = parseOfferUsd(upfrontDraft, Number.MAX_SAFE_INTEGER);
+    const upfront = parsedUpfront.value ?? 0;
+    const setUpfront = (amount: number) => setUpfrontDraft(String(amount));
     const [backend, setBackend] = useState(0);
     const [productionFunding, setProductionFunding] = useState(0);
     const [futureGreenlight, setFutureGreenlight] = useState(false);
@@ -72,12 +77,12 @@ export default function StreamingBuyerAuctionRoom({ player, session, onUpdatePla
         return () => window.clearInterval(timer);
     }, [session.id]);
 
-    const backendCapability = getStreamingBuyerAuctionBackendCapability(player, session.lot);
+    const backendCapability = useMemo(() => getStreamingBuyerAuctionBackendCapability(player, session.lot), [player, session.lot]);
     const backendAvailable = backendCapability.advertising || backendCapability.rental;
     const backendReason = 'Backend unavailable: enable advertising or rental in an eligible market with matching title rights.';
     const offeredBackend = backendAvailable ? backend : 0;
     useEffect(() => { if (!backendAvailable) setBackend(0); }, [backendAvailable]);
-    const continuation = resolveAuctionContinuation(player,session.lot.sourceProjectId,session.lot.title,session.lot.projectType);
+    const continuation = useMemo(() => resolveAuctionContinuation(player, session.lot.sourceProjectId, session.lot.title, session.lot.projectType), [player, session.lot]);
     const playerBid = session.playerBidId ? session.bids.find(bid => bid.id === session.playerBidId) || null : null;
     const previewTerms = {
         minimumGuarantee: upfront, licensorRevenueShare: offeredBackend, marketingGuarantee: 0,
@@ -88,9 +93,10 @@ export default function StreamingBuyerAuctionRoom({ player, session, onUpdatePla
     const firmFutureReserve = futureGreenlight && futureFunding.commitment === 'FIRM'
         ? futureFunding.count * futureFunding.budgetPerProject : 0;
     const guaranteedExposure = upfront + previewTerms.productionFunding + firmFutureReserve;
-    const funds = getContentMarketFunds(player) + (playerBid?.guaranteedExposure || 0);
+    const availableFunds = useMemo(() => getContentMarketFunds(player), [player]);
+    const funds = availableFunds + (playerBid?.guaranteedExposure || 0);
     const validFutureFunding = !futureGreenlight || futureFunding.budgetPerProject >= 100_000;
-    const canBid = validFutureFunding && session.status === 'LIVE' && guaranteedExposure <= funds && upfront >= session.lot.minimumGuarantee;
+    const canBid = parsedUpfront.value !== null && upfront % 100_000 === 0 && validFutureFunding && session.status === 'LIVE' && guaranteedExposure <= funds && upfront >= session.lot.minimumGuarantee;
     const activeBids = useMemo(() => session.bids.filter(bid => bid.status === 'ACTIVE')
         .sort((left, right) => right.sellerValue - left.sellerValue), [session.bids]);
 
@@ -150,8 +156,8 @@ export default function StreamingBuyerAuctionRoom({ player, session, onUpdatePla
             setFundingFeedback(result.changed ? 'Funding activated. The seller will deliver the project within 52 weeks.' : result.reason === 'INSUFFICIENT_CASH' ? 'Your platform needs more available funds to activate this deal.' : result.reason === 'ALREADY_ACTIVE' ? 'This funding deal is already active.' : 'This funding deal is no longer available.');
         };
         return <div className={css.mkwrap} data-content-market-design="zip-exact">
-            <section className={cx(css.mk, css.mkroom, css.mkauction)} style={{ ['--epx-auction-own' as string]: playerTint }} data-content-market-scene="room" role="dialog" aria-label="Live rights auction">
-                <div className={cx(css.mkverdict, css.mkauctionresult, css['mk-' + (won ? 'won' : 'lost')])}>
+            <section className={cx(css.mk, css.mkroom, css.mkauction)} style={{ ['--epx-auction-own' as string]: playerTint, ['--epx-result-tint' as string]: winner ? winner.isPlayer ? playerTint : session.rivals.find(rival => rival.bidderId === winner.bidderId)?.color || `hsl(${titleHue} 55% 58%)` : `hsl(${titleHue} 55% 58%)` }} data-content-market-scene="room" role="dialog" aria-label="Live rights auction">
+                <div data-auction-result={session.status} className={cx(css.mkverdict, css.mkauctionresult, css['mk-' + (won ? 'won' : 'lost')])}>
                     <div className={css.mkresultbody}>
                         <div className={css.mkresultidentity}>
                             <div className={css.mkresultposter}><Poster id={session.lot.sourceProjectId} title={session.lot.title} genre={collection ? 'Mixed' : session.lot.genre} hue={titleHue} size="md" stack={collection ? session.lot.catalogueComponentIds.length : undefined} /></div>
@@ -166,16 +172,13 @@ export default function StreamingBuyerAuctionRoom({ player, session, onUpdatePla
                             <span>{won ? 'Added to your platform' : `Acquired by ${winner.bidderName}`}</span>
                         </div>}
                         {winner ? <dl className={css.mkresultfacts}>
-                            <div><dt>Upfront guarantee</dt><dd>{money(winner.minimumGuarantee)}</dd></div>
+                            <div className={css.mkresultfee}><dt>Upfront guarantee</dt><dd title={`$${winner.minimumGuarantee.toLocaleString('en-US')}`}>{money(winner.minimumGuarantee)}</dd></div>
                             <div><dt>Backend share</dt><dd>{winner.licensorRevenueShare}%</dd></div>
                             <div><dt>Rights term</dt><dd>{session.lot.durationWeeks} weeks</dd></div>
                             <div><dt>Coverage</dt><dd>{session.lot.countryIds.length ? `${session.lot.countryIds.length} ${session.lot.countryIds.length === 1 ? 'country' : 'countries'}` : session.lot.territory === 'GLOBAL' ? 'Global' : session.lot.territory.replaceAll('_', ' ')}</dd></div>
                             {winner.productionFunding > 0 && <div><dt>Production funding</dt><dd>{money(winner.productionFunding)}</dd></div>}
                             {winner.futureFunding && <div><dt>Future funding</dt><dd>{fundingLabel(winner.futureFunding)} · {winner.futureFunding.commitment === 'OPTION' ? 'Optional' : 'Firm'}</dd></div>}
-                        </dl> : session.status === 'NO_SALE' && <dl className={css.mkresultfacts}>
-                            <div><dt>Rights</dt><dd>Not transferred</dd></div>
-                            <div><dt>Payment</dt><dd>None charged</dd></div>
-                        </dl>}
+                        </dl> : session.status === 'NO_SALE' && <p className={css.mkresultsettlement}>No rights transferred · No payment charged</p>}
                         <p className={css.mkresultnote}>{session.resultReason || (won ? 'The contract is registered in your catalogue.' : winner ? 'The seller accepted the winning contract.' : 'This room has closed. Return to the market to explore other available rights.')}</p>
                         {optionalFunding && <div className={css.mkfundingresult}>
                             <b>YOUR OPTIONAL DEAL</b>
@@ -274,11 +277,11 @@ export default function StreamingBuyerAuctionRoom({ player, session, onUpdatePla
                 </button>
                 <div className={css.mkmakerrow}>
                     <button className={css.mkstep} type="button" aria-label="Decrease upfront bid" onClick={() => setUpfront(Math.max(session.lot.minimumGuarantee, upfront - session.lot.minimumBidIncrement))}>−</button>
-                    <b className={guaranteedExposure > funds ? css.mkover : ''}>{money(upfront)}</b>
+                    <OfferUsdInput label="Upfront bid" draft={upfrontDraft} onChange={setUpfrontDraft} maximum={Number.MAX_SAFE_INTEGER} minimum={session.lot.minimumGuarantee} increment={100_000} />
                     <button className={css.mkstep} type="button" aria-label="Increase upfront bid" onClick={() => setUpfront(upfront + session.lot.minimumBidIncrement)}>+</button>
                 </div>
                 <button className={cx(css.mkbid, !canBid ? css.dead : '')} type="button" disabled={!canBid || submittingBid} aria-busy={submittingBid} onClick={placeBid}>
-                    {submittingBid ? 'SUBMITTING BID…' : guaranteedExposure > funds ? `SHORT BY ${money(guaranteedExposure - funds)}` : `${playerBid ? 'REVISE' : 'TABLE'} ${money(upfront)}`}
+                    {submittingBid ? 'SUBMITTING BID…' : parsedUpfront.value === null || upfront % 100_000 !== 0 ? 'ENTER A VALID AMOUNT' : guaranteedExposure > funds ? `SHORT BY ${money(guaranteedExposure - funds)}` : `${playerBid ? 'REVISE' : 'TABLE'} ${money(upfront)}`}
                 </button>
                 <small className={css.mkbidbudget}>{money(guaranteedExposure)} reserved · {money(upfront)} upfront{previewTerms.productionFunding > 0 ? ` + ${money(previewTerms.productionFunding)} production funding` : ''}{firmFutureReserve > 0 ? ` + ${money(firmFutureReserve)} future funding` : ''}{futureGreenlight && futureFunding.commitment === 'OPTION' ? ' · optional funding is reserved only when activated' : ''}</small>
             </section>

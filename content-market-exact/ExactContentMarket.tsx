@@ -24,10 +24,11 @@
  *
  * The realism that matters most: a bid is a CONTRACT, not a number, and each
  * seller reads a contract differently. A cash-poor producer wants the
- * guarantee. A prestige label wants the marketing spend. So the biggest
+ * guarantee. Another seller values eligible backend participation. So the biggest
  * cheque does not automatically lead — which is exactly how these rooms work.
  */
 import css from './ContentMarket.module.css';
+import { OfferClauseHelp, OfferUsdInput } from './OfferControls';
 import { cx } from './cx';
 import { Poster } from './Poster';
 import AccessibleDialog from '../components/AccessibleDialog';
@@ -36,7 +37,7 @@ import React, { createContext, useContext, useEffect, useMemo, useRef, useState 
 import {
   Lot, Offer, Terms, Basis, Availability, Territory,
   verdictOf, offerFrom, reachOf, getContentMarketPostActionScene, createMarketResultPresentation,
-  repFor, sayOf, yearsOf, termLabel,
+  repFor, sayOf, yearsOf, termLabel, parseOfferUsd,
 } from './model';
 
 export type { Lot, Offer } from './model';
@@ -1127,11 +1128,15 @@ const Redline: React.FC<{
     ...offerFrom(base),
     markets: lot.terr.filter(t => t.status === 'FREE').map(t => t.id),
   });
+  const [moneyDraft, setMoneyDraft] = useState(String(base.mg));
+  const scope = lot.offerScope;
+  const parsed = parseOfferUsd(moneyDraft, scope?.maximumMoney || 5_000_000_000);
   const set = <K extends keyof Offer>(k: K, v: Offer[K]) => setO(p => ({ ...p, [k]: v }));
-  const v = verdictOf(lot, o);
+  const currentOffer = { ...o, mg: parsed.value ?? o.mg };
+  const v = parsed.value === null ? { tone: 'warn' as const, line: 'Enter a valid whole USD amount to preview the offer.' } : verdictOf(lot, currentOffer);
   const power = st.treasury - st.committed;
-  const afford = o.mg <= power;
-  const delta = o.mg - base.mg;
+  const afford = parsed.value !== null && parsed.value <= power;
+  const delta = currentOffer.mg - base.mg;
 
   return (
     <div className={cx(css.mk, css.mkoffer)} data-content-market-design="zip-exact" data-content-market-scene="offer" style={{ ['--epx-mkwrap-dh' as string]: String(lot.hue) }}>
@@ -1145,7 +1150,7 @@ const Redline: React.FC<{
       {/* they are sitting opposite you, and you can read them */}
       <Rep seller={lot.seller} posture={v.tone === 'good' ? 'in' : v.tone === 'warn' ? 'level' : 'back'} />
       <div className={cx(css.mksays, css['mk-' + (v.tone)])}>
-        <p>{o.backendAllowed === false ? 'This is a fixed-fee licence. Backend requires enabled advertising or rental access.' : sayOf(lot, v.tone)}</p>
+        <p>{parsed.value === null ? 'Your amount is still being edited.' : o.backendAllowed === false ? 'This is a fixed-fee licence. Backend requires enabled advertising or rental access.' : sayOf(lot, v.tone)}</p>
         <em>{v.line}</em>
       </div>
 
@@ -1153,10 +1158,11 @@ const Redline: React.FC<{
       <div className={css.mksheet}>
         <div className={css.mksheethead}><b>HEADS OF TERMS</b><span>DRAFT · NOT SIGNED</span></div>
         <div className={css.mkrow}><span>Guarantee</span>
-          <b className={afford ? '' : css.mkover}>{exact(o.mg)}</b></div>
+          <b className={afford ? '' : css.mkover}>{parsed.value === null ? 'Enter amount below' : exact(parsed.value)}</b></div>
         <div className={css.mkrow}><span>Seller backend</span><b>{o.backendPct}% · {o.basis === 'Ads + rental receipts' ? 'actual ads + rental receipts' : 'adjusted gross receipts (legacy)'}</b></div>
         <div className={css.mkrow}><span>Term</span><b>{termLabel(o.termWeeks)}</b></div>
-        <div className={css.mkrow}><span>Marketing</span><b>{o.marketing ? exact(o.marketing) : '—'}</b></div>
+        {!!base.marketing && <div className={css.mkrow}><span>Inherited marketing obligation</span><b>{exact(base.marketing)} · fixed</b></div>}
+        {lot.offerDefaults && <div className={css.mkrow}><span>Cancellation penalty</span><b>{exact(lot.offerDefaults.cancellationPenalty)}</b></div>}
         <div className={css.mkrow}><span>Exclusivity</span>
           <b>{o.excl === 'EXCLUSIVE' ? 'Exclusive' : 'Shared'}</b></div>
         <div className={cx(css.mkrow, css.mkdelta)}><span>Against the ask</span>
@@ -1164,36 +1170,35 @@ const Redline: React.FC<{
             {delta === 0 ? 'as listed' : `${delta > 0 ? '+' : '−'}${money(Math.abs(delta))}`}</b></div>
       </div>
 
-      <div className={css.mkbigrow}>
-        <button onClick={() => set('mg', Math.max(Math.ceil(base.mg*.62), o.mg - 250_000))}>− 250K</button>
-        <button onClick={() => set('mg', o.mg + 250_000)}>+ 250K</button>
-      </div>
-
+      <OfferUsdInput draft={moneyDraft} onChange={setMoneyDraft} maximum={scope?.maximumMoney || 5_000_000_000} />
       <div className={css.mkdials}>
-        <Dial label="THEY KEEP" value={`${o.backendPct}%`} disabled={o.backendAllowed === false}
-          dec={() => set('backendPct', Math.max(0, o.backendPct - 2))}
-          inc={() => set('backendPct', o.backendAllowed === false ? 0 : Math.min(20, o.backendPct + 2))} />
-        <Dial label="TERM" value={`${yearsOf(o.termWeeks)}y`}
-          dec={() => set('termWeeks', Math.max(52, o.termWeeks - 52))}
-          inc={() => set('termWeeks', Math.min(260, o.termWeeks + 52))} />
-        <Dial label="MARKETING" value={o.marketing ? money(o.marketing) : '—'}
-          dec={() => set('marketing', Math.max(0, o.marketing - 200_000))}
-          inc={() => set('marketing', o.marketing + 200_000)} />
+        <Dial label="SELLER BACKEND" value={`${o.backendPct}%`} disabled={o.backendAllowed === false}
+          dec={() => set('backendPct', Math.max(0, o.backendPct - 1))}
+          inc={() => set('backendPct', o.backendAllowed === false ? 0 : Math.min(20, o.backendPct + 1))} />
+        <label className={css.mktermedit}>Term in weeks
+          <input aria-label="Offer term in weeks" type="number" disabled={scope?.inheritedGrant} min={1} max={scope?.maximumWeeks || 520} step={1}
+            value={o.termWeeks} onChange={event => set('termWeeks', Number(event.target.value))} />
+          <small>1–{scope?.maximumWeeks || 520} weeks</small>
+        </label>
       </div>
-
+      <p className={css.mkfoot}>{o.window === 'FIRST' ? 'First window' : o.window === 'SECOND' ? 'Second window' : 'Permanent window'} · {o.markets.length} markets · {lot.offerDefaults?.accessGrant?.modes.map(mode => mode.replaceAll('_', ' ').toLowerCase()).join(', ') || 'Listed viewing routes'}.
+        {scope?.fixedScope && ' Seller window and exclusivity stay fixed.'}{scope?.inheritedGrant && ' Inherited term and clauses remain fixed.'}
+        {lot.sourceKind === 'COLLECTION' && ` All ${lot.rows?.length || 0} titles sign together with individual allocations. No sequel rights.`}
+        {lot.offerDefaults && ` Change of control: ${lot.offerDefaults.changeOfControl.replaceAll('_', ' ').toLowerCase()}.`}
+      </p>
       <div className={css.mkclauses}>
-        <Clause on={o.excl === 'EXCLUSIVE'} label="Exclusive"
+        <Clause on={o.excl === 'EXCLUSIVE'} label="Exclusive" disabled={scope?.fixedScope}
           go={() => set('excl', o.excl === 'EXCLUSIVE' ? 'SHARED' : 'EXCLUSIVE')} />
-        <Clause on={o.sequel} label="Sequel rights" go={() => set('sequel', !o.sequel)} />
-        <Clause on={o.sublicense} label="Sublicensing" go={() => set('sublicense', !o.sublicense)} />
-        <Clause on={o.renewal !== 'None'} label="Renewal option"
-          go={() => set('renewal', o.renewal === 'None' ? 'First option' : 'None')} />
+        <span className={css.mkclausepair}><Clause on={o.sequel} label="Sequel rights" disabled={scope?.inheritedGrant || scope?.sequelAllowed === false} go={() => set('sequel', !o.sequel)} /><OfferClauseHelp label="Sequel rights" /></span>
+        <span className={css.mkclausepair}><Clause on={o.sublicense} label="Sublicensing" disabled={scope?.inheritedGrant || scope?.sublicenseAllowed === false} go={() => set('sublicense', !o.sublicense)} /><OfferClauseHelp label="Sublicensing" /></span>
+        <span className={css.mkclausepair}><Clause on={o.renewal !== 'None'} label="Renewal option" disabled={scope?.inheritedGrant}
+          go={() => set('renewal', o.renewal === 'None' ? 'First option' : 'None')} /><OfferClauseHelp label="Renewal option" /></span>
       </div>
 
       <div className={css.mkbar2}>
-        <button className={cx(css.mksign, (afford ? '' : css.dead))} disabled={!afford}
-          onClick={() => afford && onSend(lot, o)}>
-          {afford ? 'SEND IT' : `SHORT BY ${money(o.mg - power)}`}
+        <button className={cx(css.mksign, (afford ? '' : css.dead))} disabled={!afford || !Number.isInteger(o.termWeeks) || o.termWeeks < 1 || o.termWeeks > (scope?.maximumWeeks || 520)}
+          onClick={() => afford && onSend(lot, currentOffer)}>
+          {parsed.value === null ? 'ENTER A VALID AMOUNT' : afford ? 'SEND IT' : `SHORT BY ${money(parsed.value - power)}`}
         </button>
       </div>
       <p className={css.mkfoot}>Seller reaction is indicative, not an acceptance. Nothing is charged while an offer sits with them. They answer in two to three processed weeks.</p>
@@ -1210,8 +1215,8 @@ const Dial: React.FC<{ label: string; value: string; inc: () => void; dec: () =>
     </div>
   );
 
-const Clause: React.FC<{ on: boolean; label: string; go: () => void }> = ({ on, label, go }) => (
-  <button className={on ? css.on : ''} onClick={go}>{on ? '✓ ' : ''}{label}</button>
+const Clause: React.FC<{ on: boolean; label: string; go: () => void; disabled?: boolean }> = ({ on, label, go, disabled }) => (
+  <button type="button" aria-pressed={on} disabled={disabled} className={on ? css.on : ''} onClick={go}>{on ? '✓ ' : ''}{label}</button>
 );
 /* ============================================================
    THE MARKET
@@ -1226,6 +1231,7 @@ export const ContentMarket: React.FC<{
   onBack: () => void;
   onCommission?: () => void;
   onAcquired?: (l: Lot) => { changed: boolean; detail: string };
+  onPrepareOffer?: (l: Lot) => Lot | null;
   onOfferSent?: (l: Lot, o: Offer) => { changed: boolean; detail: string };
   onEnterRoom?: (l: Lot) => void;
   onFollow?: (l: Lot) => { changed: boolean; detail: string };
@@ -1243,7 +1249,7 @@ export const ContentMarket: React.FC<{
   initialLotId?: string | null;
   /** Distinguishes "no production house" from "a studio with nothing released". */
   ownsStudio?: boolean;
-}> = ({ brand, state, supplySummary, catalogue, onBack, onCommission, ownsStudio, onAcquired, onOfferSent, onEnterRoom, onFollow, offerCount = 0, onOpenOffers, feedback, onNavigation, initialQuery = '', onQueryChange, searchLibrary, libraryOptions, firstLook, paidScout, initialScene = 'GATE', initialLotId = null }) => {
+}> = ({ brand, state, supplySummary, catalogue, onBack, onCommission, ownsStudio, onAcquired, onPrepareOffer, onOfferSent, onEnterRoom, onFollow, offerCount = 0, onOpenOffers, feedback, onNavigation, initialQuery = '', onQueryChange, searchLibrary, libraryOptions, firstLook, paidScout, initialScene = 'GATE', initialLotId = null }) => {
   const c = brandColor(brand);
   const [scene, setScene] = useState<MarketScene>(initialScene);
   const [back, setBack] = useState<MarketScene>(initialScene === 'STUDIO' ? 'STUDIO' : 'MARKET');
@@ -1395,7 +1401,11 @@ export const ContentMarket: React.FC<{
       {scene === 'STUDIO' && <Studio onBack={() => navigate('GATE', null)} onTake={take} ownsStudio={ownsStudio} onCommission={onCommission} />}
       {scene === 'DETAIL' && lot && (
         <Detail lot={lot} st={state} onBack={() => navigate(back, null)} onTake={take}
-          onOffer={() => navigate('OFFER', lot)} offerCount={offerCount} onOffers={onOpenOffers}
+          onOffer={() => {
+            const prepared = onPrepareOffer ? onPrepareOffer(lot) : lot;
+            if (!prepared) { setActionError('This source is no longer open for private offers.'); return; }
+            setLot(prepared); navigate('OFFER', prepared);
+          }} offerCount={offerCount} onOffers={onOpenOffers}
           onRoom={roomLot => onEnterRoom?.(roomLot)} />
       )}
       {scene === 'OFFER' && lot && (

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { validCollectionSnapshot } from '../services/streamingCollectionPrivateOffers';
 import { reuseStreamingPresentationSource } from '../services/streamingPresentationInputs';
 import { ArrowLeft, Bell, BellOff, CalendarDays, Check, ChevronDown, ChevronRight, Clock3, FileSignature, Film, Gavel, Handshake, LibraryBig, Search, Sparkles, Wallet, X } from 'lucide-react';
 import type { OwnedStreamingRightsNegotiation, Player } from '../types';
@@ -28,7 +29,9 @@ import ContentMarketOneSheet from './ContentMarketOneSheet';
 import StreamingAccessGrantEditor from './StreamingAccessGrantEditor';
 import { ContentMarket as ExactContentMarket, type MarketScene, type SharedLibraryFilters,
     type SharedLibraryResult } from '../content-market-exact/ExactContentMarket';
-import { buildExactContentMarketLots } from '../content-market-exact/adapter';
+import { buildExactContentMarketLots, getExactOfferScope, prepareExactContentMarketOffer, submitExactContentMarketOffer } from '../content-market-exact/adapter';
+import { OfferClauseHelp, OfferUsdInput } from '../content-market-exact/OfferControls';
+import { parseOfferUsd, type OfferScope } from '../content-market-exact/model';
 import type { Lot as ExactContentMarketLot, Offer as ExactContentMarketOffer } from '../content-market-exact/model';
 import '../styles/streaming-content-market.css';
 
@@ -56,40 +59,51 @@ interface Props {
     initialAuctionId?: string;
 }
 
-function PrivateOfferEditor({ title, sellerName, terms, setTerms, availableCountryIds, advanced, setAdvanced, onCancel, onSubmit, busy }: {
-    title: string;
-    sellerName: string;
-    terms: StreamingRightsTermsInput;
-    setTerms: React.Dispatch<React.SetStateAction<StreamingRightsTermsInput | null>>;
-    availableCountryIds: string[];
-    advanced: boolean;
-    setAdvanced: (value: boolean) => void;
-    onCancel: () => void;
-    onSubmit: () => void;
-    busy: boolean;
+export function PrivateOfferEditor({ title, sellerName, terms: initialTerms, availableCountryIds, scope, fixedGrant, onCancel, onSubmit, busy }: {
+    title: string; sellerName: string; terms: StreamingRightsTermsInput;
+    availableCountryIds: string[]; scope: OfferScope; fixedGrant?: boolean;
+    onCancel: () => void; onSubmit: (terms: StreamingRightsTermsInput) => void; busy: boolean;
 }) {
-    const patchTerms = (patch: Partial<StreamingRightsTermsInput>) => setTerms(current => current ? { ...current, ...patch } : current);
+    // Draft edits belong to this editor, never the catalogue or persisted player.
+    const [terms, setTerms] = useState(initialTerms);
+    const [amount, setAmount] = useState(String(initialTerms.minimumGuarantee));
+    const [penalty, setPenalty] = useState(String(initialTerms.cancellationPenalty));
+    const [advanced, setAdvanced] = useState(false);
+    const parsed = parseOfferUsd(amount, scope.maximumMoney);
+    const parsedPenalty = parseOfferUsd(penalty, scope.maximumMoney);
+    const patchTerms = (patch: Partial<StreamingRightsTermsInput>) => setTerms(current => ({ ...current, ...patch }));
     const chosenCountries = terms.countryIds || availableCountryIds;
     const toggleCountry = (id: string) => patchTerms({
         countryIds: chosenCountries.includes(id) ? chosenCountries.filter(countryId => countryId !== id) : [...chosenCountries, id],
         territory: 'MULTI_REGION',
     });
     const sellerInitials = sellerName.split(/\s+/).slice(0, 2).map(word => word[0]).join('').toUpperCase();
+    const valid = parsed.value !== null && parsedPenalty.value !== null && Number.isInteger(terms.durationWeeks)
+        && terms.durationWeeks >= 1 && terms.durationWeeks <= scope.maximumWeeks && chosenCountries.length > 0;
     return <section className="cm-offer-stage" aria-label="Private offer terms">
-        <div className="cm-negotiator"><span>{sellerInitials}</span><div><em>WHO IS ACROSS THE TABLE</em><b>Rights representative</b><small>{sellerName}</small></div></div>
+        <div className="cm-negotiator"><span>{sellerInitials}</span><div><b>Rights representative</b><small>{sellerName}</small></div></div>
         <p className="cm-negotiator-line">You are redlining the published terms for <b>{title}</b>. The seller replies after the week progresses.</p>
         <div className="cm-offer-editor">
-        <div className="cm-editor-head"><div><span>HEADS OF TERMS · DRAFT</span><h2>Shape your offer</h2></div><button aria-label="Close offer editor" onClick={onCancel}><X size={18} /></button></div>
-        <label><span>Upfront offer</span><input type="number" min={0} step={250000} value={terms.minimumGuarantee} onChange={event => patchTerms({ minimumGuarantee: Number(event.target.value) })} /><small>{money(terms.minimumGuarantee)}</small></label>
-        <label><span>Seller backend · actual ads + rentals</span><input type="range" min={0} max={20} value={100 - terms.platformRevenueShare} onChange={event => patchTerms({ platformRevenueShare: 100 - Number(event.target.value) })} /><small>{terms.platformRevenueShare}% platform · {100 - terms.platformRevenueShare}% rights holder</small></label>
-        <div className="cm-editor-pair"><label><span>Term</span><select value={terms.durationWeeks} onChange={event => patchTerms({ durationWeeks: Number(event.target.value) })}><option value={52}>1 year</option><option value={104}>2 years</option><option value={156}>3 years</option><option value={260}>5 years</option></select></label><label><span>Rights</span><select value={terms.exclusivity} onChange={event => patchTerms({ exclusivity: event.target.value as any })}><option value="NON_EXCLUSIVE">Shared</option><option value="EXCLUSIVE">Exclusive</option></select></label></div>
-        {terms.accessGrant && <StreamingAccessGrantEditor grant={terms.accessGrant}
-            permanentWindow={terms.windowType === 'PERMANENT'}
-            onChange={accessGrant => patchTerms({ accessGrant })} />}
-        <fieldset className="cm-country-pick"><legend>Markets in this proposal</legend>{availableCountryIds.map(id => <button type="button" key={id} aria-pressed={chosenCountries.includes(id)} onClick={() => toggleCountry(id)}>{getStreamingDayOneMarket(id)?.country || id}</button>)}</fieldset>
+        <div className="cm-editor-head"><div><h2>Shape your offer</h2></div><button aria-label="Close offer editor" onClick={onCancel}><X size={18} /></button></div>
+        <OfferUsdInput draft={amount} onChange={setAmount} maximum={scope.maximumMoney} />
+        <label><span>Seller backend · actual ads + rentals</span><input aria-label="Seller backend percent" type="range" min={0} max={20} disabled={!scope.backendAllowed} value={100 - terms.platformRevenueShare} onChange={event => patchTerms({ platformRevenueShare: 100 - Number(event.target.value) })} /><small>{terms.platformRevenueShare}% platform · {100 - terms.platformRevenueShare}% rights holder</small></label>
+        {!scope.backendAllowed && <p className="cm-note">Backend stays at the listed share. New backend requires enabled advertising or rental with matching title rights.</p>}
+        <div className="cm-editor-pair"><label><span>Term in weeks</span><input aria-label="Offer term in weeks" type="number" disabled={scope.inheritedGrant} min={1} max={scope.maximumWeeks} step={1} value={terms.durationWeeks} onChange={event => patchTerms({ durationWeeks: Number(event.target.value) })} /><small>1–{scope.maximumWeeks} weeks</small></label><label><span>Rights</span><select disabled={scope.fixedScope} value={terms.exclusivity} onChange={event => patchTerms({ exclusivity: event.target.value as StreamingRightsTermsInput['exclusivity'] })}><option value="NON_EXCLUSIVE">Shared</option><option value="EXCLUSIVE">Exclusive</option></select></label></div>
+        <p className="cm-note">{terms.windowType.replaceAll('_', ' ').toLowerCase()} · {scope.fixedScope ? 'Seller window and exclusivity stay fixed.' : 'Listed window applies.'}{!scope.sequelAllowed && ' No sequel rights are available.'}</p>
+        {terms.accessGrant && (fixedGrant ? <p className="cm-note">Fixed viewing routes: {terms.accessGrant.modes.join(', ')}. Inherited viewing limits remain in force.</p> : <StreamingAccessGrantEditor grant={terms.accessGrant} permanentWindow={terms.windowType === 'PERMANENT'} onChange={accessGrant => patchTerms({ accessGrant })} />)}
+        <fieldset className="cm-country-pick"><legend>Markets in this proposal</legend>{availableCountryIds.map(id => <button type="button" disabled={scope.inheritedGrant} key={id} aria-pressed={chosenCountries.includes(id)} onClick={() => toggleCountry(id)}>{getStreamingDayOneMarket(id)?.country || id}</button>)}</fieldset>
         <button type="button" className="cm-advanced-toggle" aria-expanded={advanced} onClick={() => setAdvanced(!advanced)}>Deal protections <ChevronDown size={15} /></button>
-        {advanced && <div className="cm-advanced-grid"><label><span>Marketing commitment</span><input type="number" min={0} step={250000} value={terms.marketingGuarantee} onChange={event => patchTerms({ marketingGuarantee: Number(event.target.value) })} /></label><label><span>Viewership bonus</span><input type="number" min={0} step={250000} value={terms.viewershipBonusAmount} onChange={event => patchTerms({ viewershipBonusAmount: Number(event.target.value) })} /></label><label><span>Bonus at viewers</span><input type="number" min={0} step={100000} value={terms.viewershipBonusThreshold} onChange={event => patchTerms({ viewershipBonusThreshold: Number(event.target.value) })} /></label><label><span>Cancellation penalty</span><input type="number" min={0} step={250000} value={terms.cancellationPenalty} onChange={event => patchTerms({ cancellationPenalty: Number(event.target.value) })} /></label><label><span>Change of control</span><select value={terms.changeOfControl} onChange={event => patchTerms({ changeOfControl: event.target.value as StreamingRightsTermsInput['changeOfControl'] })}><option value="NONE">No restriction</option><option value="NOTICE">Notify rights holder</option><option value="CONSENT_REQUIRED">Consent required</option></select></label><label className="cm-check"><input type="checkbox" checked={terms.renewalOption} onChange={event => patchTerms({ renewalOption: event.target.checked })} /><span>Renewal option</span></label><label className="cm-check"><input type="checkbox" checked={terms.sublicensingAllowed} onChange={event => patchTerms({ sublicensingAllowed: event.target.checked })} /><span>Sublicensing</span></label><label className="cm-check"><input type="checkbox" checked={terms.sequelRightsIncluded} onChange={event => patchTerms({ sequelRightsIncluded: event.target.checked })} /><span>Sequel rights</span></label></div>}
-        <div className="cm-editor-actions"><button className="cm-walk" onClick={onCancel}>Cancel</button><button className="cm-primary" disabled={busy || chosenCountries.length === 0 || terms.minimumGuarantee <= 0} onClick={onSubmit}>Send private offer</button></div>
+        {advanced && <div className="cm-advanced-grid">
+          <OfferUsdInput label="Cancellation penalty" readOnly={scope.inheritedGrant} draft={penalty} onChange={setPenalty} maximum={scope.maximumMoney} />
+          <label><span>Change of control</span><select disabled={scope.inheritedGrant} value={terms.changeOfControl} onChange={event => patchTerms({ changeOfControl: event.target.value as StreamingRightsTermsInput['changeOfControl'] })}><option value="NONE">No restriction</option><option value="NOTICE">Notify rights holder</option><option value="CONSENT_REQUIRED">Consent required</option></select></label>
+          <div className="cm-clause-pair"><label className="cm-check"><input type="checkbox" disabled={scope.inheritedGrant} checked={terms.renewalOption} onChange={event => patchTerms({ renewalOption: event.target.checked })} /><span>Renewal option</span></label><OfferClauseHelp label="Renewal option" /></div>
+          <div className="cm-clause-pair"><label className="cm-check"><input type="checkbox" disabled={scope.inheritedGrant || !scope.sublicenseAllowed} checked={terms.sublicensingAllowed} onChange={event => patchTerms({ sublicensingAllowed: event.target.checked })} /><span>Sublicensing</span></label><OfferClauseHelp label="Sublicensing" /></div>
+          <div className="cm-clause-pair"><label className="cm-check"><input type="checkbox" disabled={scope.inheritedGrant || !scope.sequelAllowed} checked={terms.sequelRightsIncluded} onChange={event => patchTerms({ sequelRightsIncluded: event.target.checked })} /><span>Sequel rights</span></label><OfferClauseHelp label="Sequel rights" /></div>
+        </div>}
+        <div className="cm-editor-actions"><button className="cm-walk" onClick={onCancel}>Cancel</button><button className="cm-primary" disabled={busy || !valid} onClick={() => {
+          if (!valid) return;
+          onSubmit({ ...terms, minimumGuarantee: parsed.value!, cancellationPenalty: parsedPenalty.value!, marketingGuarantee: 0, viewershipBonusAmount: 0, viewershipBonusThreshold: 0 });
+        }}>Send private offer</button></div>
         </div>
         <p className="cm-offer-footnote">Nothing is charged while an offer is with the seller. Rights remain available until both sides sign.</p>
     </section>;
@@ -173,7 +187,6 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
     const scoutLock = useRef(false);
     const [busy, setBusy] = useState(false);
     const [offerEditor, setOfferEditor] = useState(false);
-    const [advancedOffer, setAdvancedOffer] = useState(false);
     const [offerTerms, setOfferTerms] = useState<StreamingRightsTermsInput | null>(null);
     const [libraryGenre, setLibraryGenre] = useState('');
     const [libraryLanguage, setLibraryLanguage] = useState('');
@@ -224,12 +237,21 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
     const activeAuctionSession = platform.buyerAuctionSessions.find(session => session.lot.id === auctionLot?.id) || null;
     const privateOffers = platform.rightsNegotiations.filter(offer => Boolean(offer.proposalVersion));
     const selectedOffer = privateOffers.find(offer => offer.id === draft.selectedId) || null;
+    const savedCollection = useMemo(() => selectedOffer?.collectionSnapshot && validCollectionSnapshot(selectedOffer.collectionSnapshot)
+        ? selectedOffer.collectionSnapshot : null, [selectedOffer]);
+    const invalidCollection = Boolean(selectedOffer?.collectionSnapshot && !savedCollection);
     const selectedUpcoming = upcomingSales.find(sale => sale.id === draft.selectedId) || null;
     const selectedUpcomingLot = auctionLots.find(lot => lot.upcomingRightsSaleId === selectedUpcoming?.id) || null;
-    const funds = inAuctionRoom ? 0 : getContentMarketFunds(player);
+    const funds = useMemo(() => inAuctionRoom ? 0 : getContentMarketFunds(player), [player, inAuctionRoom]);
+    const offerScope = useMemo(() => {
+        const terms = selectedOffer || selected?.terms;
+        return terms && !invalidCollection ? getExactOfferScope(player, terms, { collection: Boolean(selectedOffer?.collectionSnapshot),
+            maximumWeeks: savedCollection?.package.maximumDurationWeeks,
+            sourceLicenseId: selectedOffer?.sourceLicenseId || selected?.sourceLicenseId }) : null;
+    }, [player, selectedOffer, selected, savedCollection, invalidCollection]);
     const scoutQuote = useMemo(() => inAuctionRoom ? null : getStreamingPaidScoutQuote(readPlayer), [readPlayer, inAuctionRoom]);
     useEffect(() => { scoutLock.current = false; }, [scoutQuote?.cycle, scoutQuote?.completedInCycle]);
-    const patch = (value: Partial<Draft>) => { setDraft(d => ({ ...d, ...value })); setFeedback(''); };
+    const patch = (value: Partial<Draft>) => { setDraft(d => ({ ...d, ...value })); setFeedback(''); setOfferEditor(false); setOfferTerms(null); };
     const persistDraft = () => persistContentMarketDraft(player, draft, onUpdatePlayer);
     useEffect(() => {
         if (JSON.stringify(player.ownedStreamingPlatform.contentMarketDraft) === JSON.stringify(draft)) return;
@@ -303,15 +325,15 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
             accessGrant: base.accessGrant || createStreamingRightsAccessGrantForOffer(
                 platform.serviceConfiguration.pricing.streams, base.windowType === 'PERMANENT'),
             countryIds: 'terms' in source ? source.countryIds : source.countryIds });
-        setAdvancedOffer(false); setOfferEditor(true); setFeedback('');
+        setOfferEditor(true); setFeedback('');
     };
-    const submitPrivateOffer = () => {
-        if (!offerTerms || (!selected && !selectedOffer) || busy) return;
+    const submitPrivateOffer = (submittedTerms: StreamingRightsTermsInput) => {
+        if (!submittedTerms || (!selected && !selectedOffer) || busy) return;
         setBusy(true);
         try {
             const result = selected
-                ? submitContentMarketPrivateOffer(player, selected.id, offerTerms)
-                : reviseStreamingRightsNegotiation(player, selectedOffer!.id, offerTerms);
+                ? submitContentMarketPrivateOffer(player, selected.id, submittedTerms)
+                : reviseStreamingRightsNegotiation(player, selectedOffer!.id, submittedTerms);
             if (!result.changed || !result.negotiation) { setFeedback(result.detail || 'This offer could not be submitted.'); return; }
             onUpdatePlayer(result.player); setOfferEditor(false);
             setDraft(current => ({ ...current, tab: 'OFFERS', selectedId: result.negotiation!.id }));
@@ -425,27 +447,7 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
         return { changed: false, detail: 'Open the live room or follow the announced sale.' };
     };
     const sendExactOffer = (lot: ExactContentMarketLot, offer: ExactContentMarketOffer) => {
-        const source = listings.find(item => item.id === lot.sourceId);
-        if (!source) return { changed: false, detail: 'This listing is no longer open for private offers.' };
-        const result = submitContentMarketPrivateOffer(player, source.id, {
-            territory: source.terms.territory,
-            countryIds: offer.markets,
-            durationWeeks: offer.termWeeks,
-            exclusivity: offer.excl === 'EXCLUSIVE' ? 'EXCLUSIVE' : 'NON_EXCLUSIVE',
-            windowType: offer.window === 'FIRST' ? 'FIRST_WINDOW' : offer.window === 'PERPETUAL' ? 'PERMANENT' : 'SECOND_WINDOW',
-            minimumGuarantee: offer.mg,
-            platformRevenueShare: 100 - offer.backendPct,
-            marketingGuarantee: offer.marketing,
-            viewershipBonusThreshold: 0,
-            viewershipBonusAmount: 0,
-            renewalOption: offer.renewal !== 'None',
-            sublicensingAllowed: offer.sublicense,
-            sequelRightsIncluded: offer.sequel,
-            changeOfControl: source.terms.changeOfControl,
-            cancellationPenalty: source.terms.cancellationPenalty,
-            accessGrant: createStreamingRightsAccessGrantForOffer(
-                platform.serviceConfiguration.pricing.streams, offer.window === 'PERPETUAL'),
-        });
+        const result = submitExactContentMarketOffer(player, lot, offer);
         if (result.changed) onUpdatePlayer(result.player);
         setFeedback(result.changed ? '' : result.detail || 'This offer could not be sent.');
         return { changed: result.changed, detail: result.detail || 'Private offer sent. The seller will answer after week progression.' };
@@ -473,7 +475,7 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
         setFeedback(result.changed ? '' : result.detail);
         return { changed: result.changed, detail: result.detail };
     };
-    if (!selectedOffer && !activeAuctionSession) return <AccessibleDialog className="cm-market-exact-shell" data-epx-root style={brandVars(brand)} aria-label="Content Market" onEscape={() => leave(onClose)}>
+    if (!selectedOffer && !activeAuctionSession && draft.tab !== 'OFFERS') return <AccessibleDialog className="cm-market-exact-shell" data-epx-root style={brandVars(brand)} aria-label="Content Market" onEscape={() => leave(onClose)}>
         <ExactContentMarket
             brand={brand}
             ownsStudio={ownsStudio}
@@ -517,14 +519,14 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
             onBack={() => leave(onClose)}
             onCommission={() => leave(onCommission)}
             onAcquired={acquireExactLot}
+            onPrepareOffer={lot => prepareExactContentMarketOffer(player, lot)}
             onOfferSent={sendExactOffer}
             onEnterRoom={openExactRoom}
             onFollow={followExactLot}
             feedback={feedback}
             offerCount={privateOffers.length}
             onOpenOffers={() => {
-                const latest = [...privateOffers].reverse()[0];
-                if (latest) patch({ tab: 'OFFERS', selectedId: latest.id });
+                patch({ tab: 'OFFERS', selectedId: null });
             }}
         />
     </AccessibleDialog>;
@@ -543,9 +545,14 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
                 <div className={`cm-offer-status is-${(selectedOffer.responseStatus || 'AWAITING_RESPONSE').toLowerCase()}`}><Clock3 size={16} /><div><b>{statusLabel(selectedOffer)}</b><small>{selectedOffer.status === 'SIGNED'
                     ? 'Agreement signed. The upfront fee is settled and the signed rights are in your catalogue.'
                     : selectedOffer.responseStatus === 'AWAITING_RESPONSE' ? 'Rights remain on the market until you sign.' : selectedOffer.responseReason}</small></div></div>
-                <dl className="cm-terms cm-terms-compact"><div><dt>Your upfront offer</dt><dd>{money(selectedOffer.minimumGuarantee)}</dd></div><div><dt>Markets</dt><dd>{countries(selectedOffer.countryIds)}</dd></div><div><dt>Duration</dt><dd>{selectedOffer.durationWeeks} weeks</dd></div><div><dt>Seller backend · actual ads + rentals</dt><dd>{100-selectedOffer.platformRevenueShare}%</dd></div><div><dt>Rights</dt><dd>{selectedOffer.exclusivity === 'EXCLUSIVE' ? 'Exclusive' : 'Shared'}</dd></div><div><dt>Viewer routes</dt><dd>{selectedOffer.accessGrant?.modes.join(', ') || 'No routes granted'}</dd></div></dl>
+                {savedCollection && <section className="cm-frozen-collection" aria-label="Frozen collection">
+                    <h2>Frozen collection · {savedCollection.package.components.length} titles</h2>
+                    <p className="cm-note">These titles stay with this negotiation even when the market rotates. The whole collection signs together.</p>
+                    <details><summary>View included titles</summary><ul>{savedCollection.package.components.map(component => <li key={component.sourceProjectId}>{component.title}</li>)}</ul></details>
+                </section>}
+                <dl className="cm-terms cm-terms-compact"><div><dt>Your upfront offer</dt><dd>{money(selectedOffer.minimumGuarantee)}</dd></div><div><dt>Markets</dt><dd>{countries(selectedOffer.countryIds)}</dd></div><div><dt>Duration</dt><dd>{selectedOffer.durationWeeks} weeks</dd></div><div><dt>Seller backend · actual ads + rentals</dt><dd>{100-selectedOffer.platformRevenueShare}%</dd></div><div><dt>Rights</dt><dd>{selectedOffer.exclusivity === 'EXCLUSIVE' ? 'Exclusive' : 'Shared'}</dd></div><div><dt>Viewer routes</dt><dd>{Array.isArray(selectedOffer.accessGrant?.modes) ? selectedOffer.accessGrant.modes.join(', ') : 'No routes granted'}</dd></div></dl>
                 {selectedOffer.responseStatus === 'SELLER_COUNTERED' && <div className="cm-counter-strip"><span>Owner revision</span><b>{money(selectedOffer.counterMinimumGuarantee || 0)} · {selectedOffer.counterPlatformRevenueShare}% to your platform</b></div>}
-                {offerEditor && offerTerms ? <PrivateOfferEditor title={selectedOffer.title} sellerName={selectedOffer.sellerName} terms={offerTerms} setTerms={setOfferTerms} availableCountryIds={selectedOffer.countryIds} advanced={advancedOffer} setAdvanced={setAdvancedOffer} onCancel={() => setOfferEditor(false)} onSubmit={submitPrivateOffer} busy={busy} /> : <div className="cm-offer-actions">
+                {invalidCollection ? <p className="cm-feedback" role="status">Collection details unavailable. This saved proposal cannot be revised, accepted or signed.</p> : offerEditor && offerTerms ? <PrivateOfferEditor title={selectedOffer.title} sellerName={selectedOffer.sellerName} terms={offerTerms} scope={offerScope!} fixedGrant={Boolean(selectedOffer.collectionSnapshot || selectedOffer.sourceLicenseId)} availableCountryIds={savedCollection?.package.requestedCountryIds || selectedOffer.countryIds} onCancel={() => setOfferEditor(false)} onSubmit={submitPrivateOffer} busy={busy} /> : <div className="cm-offer-actions">
                     {selectedOffer.responseStatus === 'AWAITING_RESPONSE' && <button className="cm-secondary" onClick={() => beginOffer(selectedOffer)}>Revise offer</button>}
                     {selectedOffer.responseStatus === 'SELLER_COUNTERED' && <button className="cm-primary" onClick={() => updateOffer(acceptStreamingRightsCounter(player, selectedOffer.id), 'Counter accepted. Review once more, then sign.')}>Accept revised terms</button>}
                     {selectedOffer.responseStatus === 'SELLER_COUNTERED' && <button className="cm-secondary" onClick={() => beginOffer(selectedOffer)}>Send another offer</button>}
@@ -565,7 +572,7 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
                 {selectedUpcoming.status === 'WITHDRAWN' && <p className="cm-feedback">The sale was withdrawn because the underlying production is no longer eligible.</p>}
             </> : auctionLot ? <>
                 <div className="cm-title"><StreamingTitleArt id={auctionLot.sourceProjectId} title={auctionLot.title} poster={posterById.get(auctionLot.sourceProjectId)} size={68} /><div><span className="cm-kicker">LIVE AUCTION · {auctionLot.listingKind === 'CATALOGUE_PACKAGE' ? `${auctionLot.catalogueComponentIds?.length || 0} TITLES` : auctionLot.projectType}</span><h1>{auctionLot.title}</h1><p>{auctionLot.sellerName}</p></div></div>
-                <p className="cm-note">The rights scope below is frozen for this room. You can compete with upfront money, seller backend, marketing support, and—when allowed—a future original.</p>
+                <p className="cm-note">The rights scope below is frozen for this room. You can compete with upfront money, seller backend and—when allowed—a future original.</p>
                 <dl className="cm-terms"><div><dt>Opening level</dt><dd>{money(auctionLot.minimumGuarantee)}</dd></div><div><dt>Markets</dt><dd>{countries(auctionLot.countryIds)}</dd></div><div><dt>Duration</dt><dd>{auctionLot.durationWeeks} weeks</dd></div><div><dt>Rights</dt><dd>{auctionLot.exclusivity === 'EXCLUSIVE' ? 'Exclusive' : 'Shared'} · {auctionLot.windowType === 'FIRST_WINDOW' ? 'First window' : 'Second window'}</dd></div><div><dt>Seller backend range</dt><dd>{auctionLot.allowedTerms.backendMinimum}–{auctionLot.allowedTerms.backendMaximum}%</dd></div><div><dt>Room clock</dt><dd>15 seconds · 45 second hard cap</dd></div></dl>
                 {auctionLot.notice && <p className="cm-feedback">{auctionLot.notice}</p>}
                 <button className="cm-primary" disabled={busy || funds < auctionLot.minimumGuarantee} onClick={enterAuction}>Enter live auction</button>
@@ -595,7 +602,7 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
                     </dl></section>
                     <p className="cm-note">{selected.inheritedContract ? 'You acquire the remaining window, not a new term. The transfer payment does not reset original royalty or recoupment obligations.' : 'The rights window starts when you sign, including before your platform launches. No extra marketing or viewership-bonus payment is required.'} Scheduling and language preparation follow in Content Desk.</p>
                     {selected.unavailableReason && <p className="cm-feedback">{selected.unavailableReason}</p>}
-                    {offerEditor && offerTerms ? <PrivateOfferEditor title={selected.title.title} sellerName={selected.sellerName} terms={offerTerms} setTerms={setOfferTerms} availableCountryIds={selected.countryIds} advanced={advancedOffer} setAdvanced={setAdvancedOffer} onCancel={() => setOfferEditor(false)} onSubmit={submitPrivateOffer} busy={busy} /> : <div className="cm-decision-rail"><button className="cm-primary" disabled={busy || !!selected.unavailableReason || funds < selected.terms.minimumGuarantee} onClick={() => accept(() => purchaseContentMarketListing(player, selected.id, selected.signature))}>Accept listed terms · {money(selected.terms.minimumGuarantee)}</button><button className="cm-secondary" disabled={busy || !!selected.unavailableReason} onClick={() => beginOffer(selected)}><Handshake size={16} /> Make private offer</button><small>Seller replies after 2–3 processed weeks. No money or rights move until signature.</small></div>}
+                    {offerEditor && offerTerms ? <PrivateOfferEditor title={selected.title.title} sellerName={selected.sellerName} terms={offerTerms} scope={offerScope!} fixedGrant={Boolean(selected.sourceLicenseId)} availableCountryIds={selected.countryIds} onCancel={() => setOfferEditor(false)} onSubmit={submitPrivateOffer} busy={busy} /> : <div className="cm-decision-rail"><button className="cm-primary" disabled={busy || !!selected.unavailableReason || funds < selected.terms.minimumGuarantee} onClick={() => accept(() => purchaseContentMarketListing(player, selected.id, selected.signature))}>Accept listed terms · {money(selected.terms.minimumGuarantee)}</button><button className="cm-secondary" disabled={busy || !!selected.unavailableReason} onClick={() => beginOffer(selected)}><Handshake size={16} /> Make private offer</button><small>Seller replies after 2–3 processed weeks. No money or rights move until signature.</small></div>}
                 </>}
                 {collection && <><dl className="cm-terms"><div><dt>Collection price</dt><dd>{money(collection.totalGuarantee)}</dd></div><div><dt>Markets</dt><dd>{countries(collection.package.requestedCountryIds)}</dd></div><div><dt>Duration</dt><dd>104 weeks from signing</dd></div></dl>
                     <h2 className="cm-section-label">Title breakdown</h2>{collection.rows.map(row => <div className="cm-allocation" key={row.componentProjectId}><span>{collection.package.components.find(c => c.sourceProjectId === row.componentProjectId)?.title}<small>{row.durationWeeks} weeks · {row.exclusivity === 'EXCLUSIVE' ? 'Exclusive' : 'Shared'} · {row.licensorRevenueShare}% rights holder share</small><small>{row.guaranteeRecoupment === 'RECOUPABLE' ? 'Recoupable guarantee' : 'Non-recoupable guarantee'} · {row.backendCap == null ? 'Uncapped backend' : `${money(row.backendCap)} backend cap`}</small></span><b>{money(row.minimumGuarantee)}</b></div>)}

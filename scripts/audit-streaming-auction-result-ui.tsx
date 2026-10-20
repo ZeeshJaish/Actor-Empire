@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import React from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 import {contentMarketFixture} from './helpers/contentMarketFixture';
-import {getStreamingBuyerAuctionLots,openStreamingBuyerAuction} from '../services/streamingBuyerAuctions';
+import {getStreamingBuyerAuctionLots,openStreamingBuyerAuction,placeStreamingBuyerAuctionBid} from '../services/streamingBuyerAuctions';
 import StreamingBuyerAuctionRoom from '../components/StreamingBuyerAuctionRoom';
 import type {StreamingBuyerAuctionSession} from '../types';
 const player=contentMarketFixture();
@@ -23,6 +23,9 @@ for(const status of ['NO_SALE','WON','LOST','INVALIDATED','WITHDRAWN'] as const)
   try{
     const html=renderToStaticMarkup(<StreamingBuyerAuctionRoom player={opened.player} session={session} onUpdatePlayer={()=>{}} onExit={()=>{}}/>);
     assert.ok(html.includes(lot.title),'Every terminal outcome must identify the project, including no sale');
+    assert.match(html,/--epx-result-tint:/,'A title or winner tint powers the static outcome bloom');
+    assert.ok(html.includes(`data-auction-result="${status}"`));
+    assert.doesNotMatch(html,/Your complete contract leads|Offer submitted|Backend unavailable/,'Terminal outcomes do not retain live offer feedback');
     assert.match(html,/<svg[^>]*viewBox="0 0 100 150"/,'Every result shows the actual title poster');
     if(sold){assert.match(html,/Upfront guarantee/);assert.match(html,/Rights term/);assert.match(html,new RegExp(status==='WON'?'Acquired':'Prime Video'));}
     else {assert.doesNotMatch(html,/>SOLD</);assert.doesNotMatch(html,/>—</,'No-sale screen must not show an empty price badge');}
@@ -39,4 +42,17 @@ try {
   assert.doesNotMatch(html,/Film/,'A catalogue package is not a single film');
   passed++;console.log('PASS collection result identity');
 }catch(error){failures.push('COLLECTION');console.error(`FAIL COLLECTION: ${String(error)}`);}
+try {
+  const html=renderToStaticMarkup(<StreamingBuyerAuctionRoom player={opened.player} session={base} onUpdatePlayer={()=>{}} onExit={()=>{}}/>);
+  assert.match(html,/aria-label="Upfront bid in USD"/);
+  assert.match(html,/aria-label="Increase upfront bid"/);
+  assert.match(html,/aria-label="Decrease upfront bid"/);
+  assert.match(html,/100,000 increments/);
+  const amount=Number(html.match(/aria-label="Upfront bid in USD"[^>]*value="(\d+)"/)?.[1]);
+  assert.ok(Number.isSafeInteger(amount) && amount % 100_000 === 0);
+  const sent=placeStreamingBuyerAuctionBid(opened.player,base.id,{minimumGuarantee:amount,licensorRevenueShare:0,marketingGuarantee:0,futureGreenlight:false},1001);
+  assert.equal(sent.changed,true,sent.detail);
+  assert.equal(sent.session?.bids.find(row=>row.id===sent.session?.playerBidId)?.minimumGuarantee,amount,'The service receives and saves the exact displayed bid');
+  passed++;console.log('PASS custom bid and benchmark controls');
+}catch(error){failures.push('LIVE INPUT');console.error(`FAIL LIVE INPUT: ${String(error)}`);}
 console.log(JSON.stringify({passed,failures}));if(failures.length)process.exitCode=1;

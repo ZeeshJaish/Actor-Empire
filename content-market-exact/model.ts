@@ -1,3 +1,4 @@
+import type { StreamingRightsTermsInput } from '../services/streamingRightsMarketplace';
 import type { CustomPoster } from '../types';
 
 export type RightsWindowKind = 'FIRST' | 'SECOND' | 'PERPETUAL';
@@ -98,6 +99,23 @@ export interface CollectionRow {
   poster?: CustomPoster;
 }
 
+/** Text stays local until an explicit submission; reject partial and inexact dollars. */
+export const parseOfferUsd = (draft: string, maximum: number): { value: number | null; error: string | null } => {
+  if (!/^(?:\d+|\d{1,3}(?:,\d{3})+)$/.test(draft)) return { value: null, error: 'Enter a whole USD amount, without decimals.' };
+  const value = Number(draft.replaceAll(',', ''));
+  if (!Number.isSafeInteger(value) || value < 0 || value > maximum) return { value: null, error: `Enter an amount from $0 to $${maximum.toLocaleString('en-US')}.` };
+  return { value, error: null };
+};
+export interface OfferScope {
+  maximumMoney: number;
+  maximumWeeks: number;
+  fixedScope: boolean;
+  inheritedGrant?: boolean;
+  sequelAllowed: boolean;
+  sublicenseAllowed: boolean;
+  backendAllowed: boolean;
+}
+
 export interface Lot {
   id: string;
   sourceId: string;
@@ -132,6 +150,8 @@ export interface Lot {
   note?: string;
   unavailableReason?: string | null;
   linked?: boolean;
+  offerDefaults?: StreamingRightsTermsInput;
+  offerScope?: OfferScope;
 }
 
 export interface Offer {
@@ -185,7 +205,7 @@ export const offerFrom = (terms: Terms): Offer => ({
   excl: terms.excl,
   localization: terms.localization,
   renewal: terms.renewal,
-  marketing: terms.marketing || 0,
+  marketing: 0,
   sublicense: Boolean(terms.sublicense),
   sequel: Boolean(terms.sequel),
   markets: [],
@@ -197,14 +217,14 @@ export const readOffer = (lot: Lot, offer: Offer): number => {
   const cash = ((offer.mg * (offer.recoupable ? 0.72 : 1)) / base) * weights.cash;
   const listedBackend = lot.listed?.backendPct || 30;
   const backend = ((offer.backendPct * BASIS_WORTH[offer.basis] * (offer.backendCap ? 0.78 : 1)) / Math.max(1, listedBackend)) * weights.back;
-  const marketing = (offer.marketing / Math.max(400_000, base * 0.25)) * weights.mkt;
+
   const concessions = (offer.excl === 'EXCLUSIVE' ? 0.22 : 0)
     + (offer.termWeeks / 260) * 0.18
     + (offer.sequel ? 0.14 : 0)
     + (offer.sublicense ? 0.09 : 0)
     + (offer.renewal === 'Automatic' ? 0.1 : offer.renewal === 'First option' ? 0.05 : 0)
     - (offer.localization === 'Dubs + subtitles' ? 0.07 : offer.localization === 'Subtitles only' ? 0.02 : 0);
-  return cash + backend + marketing - concessions;
+  return cash + backend - concessions;
 };
 
 export const askOf = (lot: Lot): number => lot.listed ? readOffer(lot, offerFrom(lot.listed)) + 0.1 : 1.05;
@@ -224,7 +244,7 @@ export const repFor = (seller: string) => {
 export const sayOf = (lot: Lot, tone: 'good' | 'warn' | 'bad'): string => {
   const subject = lot.appetite === 'CASH' ? 'the guarantee'
     : lot.appetite === 'BACKEND' ? 'the backend'
-      : lot.appetite === 'MARKETING' ? 'the release commitment'
+      : lot.appetite === 'MARKETING' ? 'the guarantee'
         : 'the long-term relationship';
   if (tone === 'good') return `The shape works. ${subject} is where it needs to be.`;
   if (tone === 'warn') return `We are close, but I need more on ${subject}.`;
