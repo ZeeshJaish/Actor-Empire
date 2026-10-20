@@ -347,25 +347,97 @@ export const getStreamingMarketCandidateCompatibility = (
     });
 };
 
+/** Caller-owned immutable read batch; never retained by canonical actions. */
+export const createStreamingCatalogTitleReadIndex = (player: Player, platform: OwnedStreamingPlatformState) => {
+    const ownedStudioNames = getOwnedStudioNames(player);
+    const studioNames = new Map(Object.values(player.world?.studios || {}).map(studio => [String(studio.id), studio.name]));
+    const titles = new Map(getEligibleOwnedStreamingTitles(player).map(title => [title.id, title]));
+    let historical: Map<string, ReturnType<typeof getHistoricalCatalogueTitles>[number]> | undefined;
+    const historicalTitle = (id: string) => {
+        if (!historical) {
+            historical = new Map();
+            for (const title of getHistoricalCatalogueTitles(player)) if (!historical.has(title.id)) historical.set(title.id, title);
+        }
+        return historical.get(id) || null;
+    };
+    // Match .find precedence, including duplicate IDs within world/career pools.
+    for (const project of player.world?.projects || []) {
+        if (!ownedStudioNames.has(String(project.studioId)) && !titles.has(String(project.id))) {
+            const title = toWorldLicenseTitle(project, studioNames); titles.set(title.id, title);
+        }
+    }
+    for (const project of player.pastProjects || []) {
+        if (titles.has(String(project.id))) continue;
+        const title = toCareerLicenseTitle(project, ownedStudioNames);
+        if (title) titles.set(title.id, title);
+    }
+    const commissions = new Map<string, OwnedStreamingPlatformState['originalCommissions'][number]>();
+    for (const commission of platform.originalCommissions) {
+        if (commission.canonicalProjectId && !commissions.has(commission.canonicalProjectId)) commissions.set(commission.canonicalProjectId, commission);
+    }
+    for (const commission of player.ownedStreamingPlatform.originalCommissions) {
+        if (!commission.canonicalProjectId) continue;
+        if (!titles.has(commission.canonicalProjectId)) titles.set(commission.canonicalProjectId, {
+            id: commission.canonicalProjectId, title: commission.title, projectType: commission.projectType,
+            genre: commission.genre, rating: null, releaseYear: null, gross: null,
+            studioId: commission.producerStudioId, studioName: commission.producerStudioName, source: 'OWNED_LIBRARY',
+        });
+    }
+    const licenses = new Map<string, OwnedStreamingCatalogLicense[]>();
+    for (const license of platform.catalogLicenses) {
+        const id = license.sourceProjectId;
+        const group = licenses.get(id); if (group) group.push(license); else licenses.set(id, [license]);
+        if (!titles.has(id)) titles.set(id, {
+            id, title: license.titleAtSigning, projectType: license.projectType || 'MOVIE', genre: license.genre || 'Licensed',
+            rating: null, releaseYear: null, gross: null, studioId: license.licensorName, studioName: license.licensorName, source: 'EXTERNAL_MARKET',
+        });
+    }
+    const firstById = <T>(rows: T[], id: (row: T) => string) => {
+        const map = new Map<string, T>(); for (const row of rows) if (!map.has(id(row))) map.set(id(row), row); return map;
+    };
+    return { titles, licenses, commissions, ownedStudioNames, historicalTitle,
+        pastProjects: firstById(player.pastProjects || [], row => row.id),
+        worldProjects: firstById(player.world.projects || [], row => row.id),
+        slate: firstById(platform.launchSlate?.entries || [], row => row.projectId),
+    };
+};
+export type StreamingCatalogTitleReadIndex = ReturnType<typeof createStreamingCatalogTitleReadIndex>;
+
 export const resolveStreamingCatalogTitle = (
     player: Player,
     projectId: string,
     preparedPlatform?: OwnedStreamingPlatformState,
+    preparedIndex?: StreamingCatalogTitleReadIndex,
 ): StreamingCatalogTitle | null => {
+    if (preparedIndex) {
+        const found = preparedIndex.titles.get(projectId);
+        if (found) return found;
+        const historical = preparedIndex.historicalTitle(projectId);
+        return historical ? {
+            id: historical.id, title: historical.title, projectType: historical.projectType, genre: historical.genre,
+            rating: historical.rating, releaseYear: historical.year, gross: historical.boxOffice,
+            studioId: historical.studioId, studioName: historical.studioName, originalLanguageId: historical.originalLanguageId,
+            regionId: historical.regionId, quality: historical.quality, reach: historical.reach, prestige: historical.prestige,
+            catalogueTier: historical.catalogueTier, budgetTier: historical.budgetTier,
+            source: preparedIndex.ownedStudioNames.has(historical.studioId) ? 'OWNED_LIBRARY' : 'EXTERNAL_MARKET',
+        } : null;
+    }
     const ownedStudioNames = getOwnedStudioNames(player);
     const worldStudioNames = new Map(
         Object.values(player.world?.studios || {}).map(studio => [String(studio.id), studio.name]),
     );
     return (
         getEligibleOwnedStreamingTitles(player).find(project => project.id === projectId)
-        || (player.world?.projects || [])
-            .filter(project => !ownedStudioNames.has(String(project.studioId)))
-            .map(project => toWorldLicenseTitle(project, worldStudioNames))
-            .find(project => project.id === projectId)
-        || (player.pastProjects || [])
-            .map(project => toCareerLicenseTitle(project, ownedStudioNames))
-            .filter((project): project is StreamingCatalogTitle => Boolean(project))
-            .find(project => project.id === projectId)
+        || (() => {
+            const project = (player.world?.projects || []).find(project => String(project.id) === projectId
+                && !ownedStudioNames.has(String(project.studioId)));
+            return project ? toWorldLicenseTitle(project, worldStudioNames) : null;
+        })()
+        || (() => {
+            const project = (player.pastProjects || []).find(project => Boolean(project.id) && String(project.id) === projectId
+                && !ownedStudioNames.has(String(project.studioId || '')));
+            return project ? toCareerLicenseTitle(project, ownedStudioNames) : null;
+        })()
         || (() => {
         const commission = player.ownedStreamingPlatform?.originalCommissions?.find(item => item.canonicalProjectId === projectId);
         if (commission) return {

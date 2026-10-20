@@ -43,7 +43,7 @@ import {
   setStreamingDefineLaunchStep,
 } from '../services/streamingLaunchProgram';
 import { getStreamingOpeningCatalogueView } from '../services/streamingOpeningCatalogue';
-import { createStreamingCatalogueReadContext, type StreamingCatalogueReadContext } from '../services/streamingContentAvailability';
+import { createStreamingCatalogueReadContext, getStreamingCatalogueReadContext, type StreamingCatalogueReadContext } from '../services/streamingContentAvailability';
 import { reuseStreamingPresentationSource } from '../services/streamingPresentationInputs';
 import { rankStreamingLaunchAnchors } from '../services/streamingCatalogueAnchors';
 import { getEligibleOwnedStreamingTitles, getStreamingLicenseOpportunities } from '../services/streamingCatalog';
@@ -75,6 +75,7 @@ import { createBuildBudgetSummary } from './studio-finance/finance/budgetLinks';
 
 interface Props {
   player: Player;
+  preparedCatalogueContext?: StreamingCatalogueReadContext;
   onUpdatePlayer: (player: Player) => void;
   onClose: () => void;
   onOpenFinance: () => void;
@@ -304,10 +305,10 @@ const buildCapabilityLocks = (player: Player): Record<string, string> => {
   return locks;
 };
 
-const buildLaunchData = (player: Player): LaunchData => {
-  const context = createStreamingCatalogueReadContext(player);
+const buildLaunchData = (player: Player, preparedContext?: StreamingCatalogueReadContext): LaunchData => {
+  const context = getStreamingCatalogueReadContext(player, preparedContext);
   const platform = player.ownedStreamingPlatform;
-  const budget = getStreamingLaunchBudgetView(player);
+  const budget = getStreamingLaunchBudgetView(player, context);
   const launchView = getStreamingLaunchProgramView(player, context);
   const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
   const worldPopulation = normalizeWorldPopulationState(player.world.worldPopulation, absoluteWeek);
@@ -547,7 +548,15 @@ function OpeningLaunchExperience(props: Props) {
   const projectionSourceRef = useRef(props.player);
   const projectionSource = reuseStreamingLaunchProjectionSource(projectionSourceRef.current, props.player);
   projectionSourceRef.current = projectionSource;
-  const data = useMemo(() => buildLaunchData(projectionSource), [projectionSource]);
+  const catalogueContextRef = useRef<StreamingCatalogueReadContext | undefined>(undefined);
+  const catalogueContext = useMemo(() => {
+    const supplied = props.preparedCatalogueContext;
+    const context = supplied?.player === projectionSource ? supplied
+      : createStreamingCatalogueReadContext(projectionSource, supplied || catalogueContextRef.current);
+    catalogueContextRef.current = context;
+    return context;
+  }, [projectionSource, props.preparedCatalogueContext]);
+  const data = useMemo(() => buildLaunchData(projectionSource, catalogueContext), [projectionSource, catalogueContext]);
   const platform = props.player.ownedStreamingPlatform;
   const currentPlayerRef = useRef(props.player);
   useEffect(() => { currentPlayerRef.current = props.player; }, [props.player]);
@@ -747,9 +756,10 @@ function OpeningLaunchExperience(props: Props) {
         if (result.changed) update(result.player);
       }}
       onForecastPricing={(pricing, countryIds) => forecastWorldStreamingLaunchPricing(
-        props.player,
+        projectionSource,
         pricing as OwnedStreamingPricingConfiguration,
         countryIds,
+        catalogueContext,
       )}
       onAssembleCatalogue={props.onOpenCatalogue}
       onOpenContentDesk={props.onOpenContentDesk || props.onOpenCatalogue}

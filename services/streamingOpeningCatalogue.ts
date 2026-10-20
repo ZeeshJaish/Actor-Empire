@@ -198,7 +198,8 @@ const buildStreamingOpeningCatalogueView = (player: Player, context: StreamingCa
     ]));
     const baseTitles = titleIds.map(projectId => {
         const title = resolveStreamingCatalogueReadTitle(context, projectId);
-        const license = activeLicenseFor(player, projectId, platform);
+        const license = (context.titleIndex.licenses.get(projectId) || []).find(license =>
+            license.startsAtAbsoluteWeek <= context.absoluteWeek && getStreamingCatalogLicenseStatus(license, context.absoluteWeek) === 'ACTIVE') || null;
         const source: StreamingOpeningTitleCoverage['source'] = originalIds.has(projectId)
             ? 'ORIGINAL'
             : ownedIds.has(projectId) || title?.source === 'OWNED_LIBRARY'
@@ -217,7 +218,7 @@ const buildStreamingOpeningCatalogueView = (player: Player, context: StreamingCa
         };
     });
     const readTitleRoute = createStreamingTitleRouteReadBatch(player, context.absoluteWeek, platform,
-        new Set(baseTitles.filter(title => title.access.source !== 'LICENSED').map(title => title.projectId)));
+        new Set(baseTitles.filter(title => title.access.source !== 'LICENSED').map(title => title.projectId)), context);
     const firstSubscriptionRoute: StreamingTitleAccessRoute = { kind: 'SUBSCRIPTION', planId: context.offer.subscriptions[0]?.id || '' };
     const remainingRoutes: StreamingTitleAccessRoute[] = [
         ...context.offer.subscriptions.slice(1).map(plan => ({ kind: 'SUBSCRIPTION' as const, planId: plan.id })),

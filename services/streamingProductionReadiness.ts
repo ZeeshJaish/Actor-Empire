@@ -1,6 +1,16 @@
 import type { OwnedStreamingOriginalCommission, Player, StreamingOriginalCommissionStatus } from '../types';
 import { getAbsoluteWeek } from './legacyLogic';
 
+/** Indexes are scoped to a current read batch; omitted inputs always read fresh. */
+export const createStreamingProductionReadIndex = (player: Player) => {
+    const productions = new Map<string, NonNullable<Player['world']['industryProductions']>[string]>();
+    for (const row of Object.values(player.world.industryProductions || {})) if (!productions.has(row.canonicalProjectId)) productions.set(row.canonicalProjectId, row);
+    const commitments = new Map<string, Player['commitments'][number]>();
+    for (const row of player.commitments) if (!commitments.has(row.id)) commitments.set(row.id, row);
+    return { productions, commitments, released: new Set([...player.activeReleases, ...player.pastProjects, ...player.world.projects].map(row => row.id)) };
+};
+export type StreamingProductionReadIndex = ReturnType<typeof createStreamingProductionReadIndex>;
+
 /**
  * Production truth shared by the Originals desk and playback/catalogue gates.
  * Old commissions can retain GREENLIT after their canonical project completes;
@@ -10,8 +20,9 @@ export const resolveStreamingProductionReadiness = (
     player: Player,
     projectId: string,
     commission?: OwnedStreamingOriginalCommission,
+    prepared?: StreamingProductionReadIndex,
 ): { ready: boolean; status: StreamingOriginalCommissionStatus } => {
-    const production = Object.values(player.world.industryProductions || {})
+    const production = prepared ? prepared.productions.get(projectId) : Object.values(player.world.industryProductions || {})
         .find(item => item.canonicalProjectId === projectId);
     const productionComplete = production && ['DELIVERED', 'AWAITING_RELEASE', 'RELEASED'].includes(production.status);
     if (production && !productionComplete) {
@@ -19,7 +30,7 @@ export const resolveStreamingProductionReadiness = (
         // must not be made playable by a stale commission or released mirror.
         return { ready: false, status: production.status === 'PLANNED' ? 'GREENLIT' : 'IN_PRODUCTION' };
     }
-    const commitment = player.commitments.find(item => item.id === projectId);
+    const commitment = prepared ? prepared.commitments.get(projectId) : player.commitments.find(item => item.id === projectId);
     if (!productionComplete && commitment && commitment.projectPhase !== 'AWAITING_RELEASE') {
         return {
             ready: false,
@@ -27,7 +38,7 @@ export const resolveStreamingProductionReadiness = (
                 ? 'IN_PRODUCTION' : 'GREENLIT',
         };
     }
-    if (player.activeReleases.some(project => project.id === projectId)
+    if (prepared ? prepared.released.has(projectId) : player.activeReleases.some(project => project.id === projectId)
         || player.pastProjects.some(project => project.id === projectId)
         || player.world.projects.some(project => project.id === projectId)) {
         return { ready: true, status: 'RELEASED' };

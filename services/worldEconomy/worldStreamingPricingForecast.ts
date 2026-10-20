@@ -22,7 +22,7 @@ import { projectStreamingCommercialOffers } from '../streamingCommercialOffers';
 import { stageWorldStreamingOpeningOffer } from './worldStreamingOpening';
 import { deriveStreamingNetworkCoverage } from '../streamingNetworkCoverage';
 import { getOwnedStreamingProgramEntries } from '../streamingOriginals';
-import { createStreamingCatalogueReadContext, createStreamingTitleRouteReadBatch } from '../streamingContentAvailability';
+import { createStreamingCatalogueReadContext, createStreamingTitleRouteReadBatch, getStreamingCatalogueReadContext, readStreamingCatalogueDerivedView, type StreamingCatalogueReadContext } from '../streamingContentAvailability';
 import { getEligibleOwnedStreamingTitles } from '../streamingCatalog';
 import { streamingTitleQuality, streamingTitleWeeksAvailable } from './worldStreamingContentValue';
 
@@ -124,7 +124,7 @@ const median = (values: number[]): number => {
     return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
 };
 
-export const forecastWorldStreamingLaunchPricing = (
+const buildWorldStreamingLaunchPricing = (
     player: Player,
     proposedPricing: OwnedStreamingPricingConfiguration,
     proposedCountryIds: string[],
@@ -171,7 +171,7 @@ export const forecastWorldStreamingLaunchPricing = (
     const programEntries = getOwnedStreamingProgramEntries(previewPlayer, context);
     const registry = getWorldStreamingOffers(previewPlayer, absoluteWeek, context);
     const readTitleRoute = createStreamingTitleRouteReadBatch(previewPlayer, absoluteWeek, context.platform,
-        new Set(getEligibleOwnedStreamingTitles(previewPlayer).map(title => title.id)));
+        new Set(getEligibleOwnedStreamingTitles(previewPlayer).map(title => title.id)), context);
     // The saved platform normalizer bounds day-one markets and network coverage
     // may narrow them further. Forecast only the countries where the same player
     // offer used by live customer choice is actually available.
@@ -294,7 +294,7 @@ export const forecastWorldStreamingLaunchPricing = (
             const price = kind === 'RENTAL' ? pricing.rentals.rent : pricing.rentals.buy;
             const titles = programEntries.filter(entry=>readTitleRoute(entry.projectId,countryId,{kind}).allowed);
             if(!titles.length) return 0;
-            const quality=titles.reduce((sum,title)=>sum+streamingTitleQuality(previewPlayer,title.projectId),0)/titles.length;
+            const quality=titles.reduce((sum,title)=>sum+streamingTitleQuality(previewPlayer,title.projectId,context),0)/titles.length;
             const weeksAvailable=titles.reduce((sum,title)=>sum+streamingTitleWeeksAvailable(previewPlayer,title,absoluteWeek),0)/titles.length;
             const canBuyTitle = (source:typeof storeSources[number],titleId:string):boolean => {
                 const permitted=storeEligibility?.kind!=='MEMBERSHIP_PLANS'
@@ -309,7 +309,7 @@ export const forecastWorldStreamingLaunchPricing = (
             const pools=eligibleByTitle.map(rows=>rows.reduce((sum,source)=>sum+source.households,0));
             const wanted=calculateStreamingStoreConversion({buyerPool:pool,price,kind,quality,weeksAvailable});
             const byTitle=allocateStreamingStoreUnits(wanted,titles.map((title,index)=>
-                pools[index]*Math.max(1,streamingTitleQuality(previewPlayer,title.projectId))));
+                pools[index]*Math.max(1,streamingTitleQuality(previewPlayer,title.projectId,context))));
             return titles.reduce((sum,title,index)=>{
                 const owners=(previewPlayer.world.worldStreamingAudienceChoice?.entitlements || [])
                     .filter(row=>row.countryId===countryId && row.titleId===title.projectId
@@ -411,6 +411,31 @@ export const forecastWorldStreamingLaunchPricing = (
     };
 };
 
+// Explicit read-batch reuse only. Public calls without preparation always read
+// current mutable fixtures. The context invalidates for all canonical inputs
+// except navigation/draft intent (including commissioned/pending delivery).
+const pricingForecastKey = {};
+export const forecastWorldStreamingLaunchPricing = (
+    player: Player,
+    proposedPricing: OwnedStreamingPricingConfiguration,
+    proposedCountryIds: string[],
+    preparedContext?: StreamingCatalogueReadContext,
+): WorldStreamingLaunchPricingForecast => {
+    if (!preparedContext || preparedContext.player !== player) return buildWorldStreamingLaunchPricing(player, proposedPricing, proposedCountryIds);
+    const context = getStreamingCatalogueReadContext(player, preparedContext);
+    const forecasts = readStreamingCatalogueDerivedView(context, pricingForecastKey, () => new Map<string, WorldStreamingLaunchPricingForecast>(), true);
+    const key = JSON.stringify([normalizeStreamingPricingConfiguration(proposedPricing),
+        [...new Set(proposedCountryIds.map(id => String(id || '').trim().toUpperCase()).filter(Boolean))].sort()]);
+    let forecast = forecasts.get(key);
+    if (!forecast) {
+        forecast = buildWorldStreamingLaunchPricing(player, proposedPricing, proposedCountryIds);
+        // Retain a small recent set while pricing controls change repeatedly.
+        if (forecasts.size >= 4) forecasts.delete(forecasts.keys().next().value!);
+        forecasts.set(key, forecast);
+    }
+    return forecast;
+};
+
 /**
  * Converts canonical country/cohort/rival account demand into an opening-night
  * concurrency range. These rates deliberately match the operating loop's
@@ -421,11 +446,13 @@ export const forecastWorldStreamingBuildDemand = (
     player: Player,
     proposedPricing: OwnedStreamingPricingConfiguration,
     proposedCountryIds: string[],
+    preparedContext?: StreamingCatalogueReadContext,
 ): WorldStreamingBuildDemandForecast => {
     const pricingForecast = forecastWorldStreamingLaunchPricing(
         player,
         proposedPricing,
         proposedCountryIds,
+        preparedContext,
     );
     const forecastAccounts = pricingForecast.subscribers + pricingForecast.freeAdHouseholds + pricingForecast.storeHouseholds
         + (pricingForecast.secondaryStoreOpportunities || 0);

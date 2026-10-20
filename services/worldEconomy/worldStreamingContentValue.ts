@@ -1,11 +1,13 @@
 import type { OwnedStreamingSlateEntry, Player } from '../../types';
 import { resolveHistoricalCatalogueTitle } from '../historicalCatalogue';
+import type { StreamingCatalogueReadContext } from '../streamingContentAvailability';
 
 const bounded = (n:number, lo:number, hi:number) => Math.max(lo,Math.min(hi,Number.isFinite(n)?n:lo));
 
 /** Authored title quality is a simulation input, not a measured audience rating. */
-export const streamingTitleQuality = (player: Player, projectId: string): number => {
-    const raw = (player.world.projects || []).find(project => String(project.id) === projectId) as any
+export const streamingTitleQuality = (player: Player, projectId: string, preparedContext?: StreamingCatalogueReadContext): number => {
+    const index = preparedContext?.player === player ? preparedContext.titleIndex : undefined;
+    const raw = index ? index.worldProjects.get(projectId) || index.pastProjects.get(projectId) || index.historicalTitle(projectId) || {} : (player.world.projects || []).find(project => String(project.id) === projectId) as any
         || (player.pastProjects || []).find(project => String(project.id) === projectId) as any
         || resolveHistoricalCatalogueTitle(player, projectId) || {};
     const quality = Number(raw.quality ?? raw.finalQuality);

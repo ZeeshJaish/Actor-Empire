@@ -14,22 +14,24 @@ const sameProjectInputs = (left: Player['pastProjects'], right: Player['pastProj
     ));
 
 type StreamingPresentationMode = 'HQ' | 'WIZARD' | 'BUILD_FORECAST';
+const sameValueFields = (left: object, right: object) => {
+    const keys = Object.keys(left);
+    return keys.length === Object.keys(right).length && keys.every(key => Object.prototype.hasOwnProperty.call(right, key)
+        && sameValue((left as Record<string, unknown>)[key], (right as Record<string, unknown>)[key]));
+};
+
 const platformInputs = (player: Player, mode: StreamingPresentationMode) => {
     const { launchProgram, ...platform } = player.ownedStreamingPlatform;
     const { defineCurrentStep: _step, defineDraft: _draft, ...program } = launchProgram;
-    if (mode === 'WIZARD') return JSON.stringify({ ...platform, launchProgram: program });
+    if (mode === 'WIZARD') return { platform, program };
     if (mode === 'BUILD_FORECAST') {
         // Customer choice reads commissioned delivery, pricing, catalogue and
         // rights. An uncommissioned network drawing is not an economy input.
         const { infrastructureSetupDraft: _networkDraft, ...forecast } = platform;
-        return JSON.stringify({ ...forecast, launchProgram: program,
-            // A draft exposes inherited countries only for legacy pre-filing
-            // careers. Filed markets keep the same footprint on their first edit.
-            buildCountryIds: getStreamingBuildMarketAccess(player).countryIds,
-        });
+        return { platform: forecast, program };
     }
     const { contentMarketDraft: _marketDraft, buyerAuctionSessions, ...hq } = platform;
-    return JSON.stringify({ ...hq, launchProgram: program,
+    return { platform: { ...hq,
         // Clock/AI offers do not change catalogue reads. Player reservations,
         // settlement and lot terms can affect finances/eligibility and remain inputs.
         buyerAuctionSessions: buyerAuctionSessions.map(session => {
@@ -40,7 +42,7 @@ const platformInputs = (player: Player, mode: StreamingPresentationMode) => {
                 leaderBidId: _leader, bids, ...canonical } = session;
             return { ...canonical, bids: bids.filter(bid => bid.bidderId === session.playerBidderId) };
         }),
-    });
+    }, program };
 };
 
 /** Read-only projection reuse for immutable canonical players. Actual actions
@@ -56,5 +58,14 @@ export const reuseStreamingPresentationSource = (
         || !sameValue(previous.world.universes, current.world.universes)
         || !sameValue(previous.awards, current.awards)
         || !sameProjectInputs(previous.pastProjects, current.pastProjects)) return current;
-    return platformInputs(previous, mode) === platformInputs(current, mode) ? previous : current;
+    const left = platformInputs(previous, mode);
+    const right = platformInputs(current, mode);
+    if (!sameValueFields(left.platform, right.platform) || !sameValueFields(left.program, right.program)) return current;
+    // Draft contents do not affect the audience baseline. Only introducing or
+    // removing its presence can expose a legacy pre-filing footprint. Avoid
+    // normalizing every licence just to compare ordinary step/rack edits.
+    if (mode === 'BUILD_FORECAST'
+        && Boolean(previous.ownedStreamingPlatform.infrastructureSetupDraft) !== Boolean(current.ownedStreamingPlatform.infrastructureSetupDraft)
+        && !sameValue(getStreamingBuildMarketAccess(previous).countryIds, getStreamingBuildMarketAccess(current).countryIds)) return current;
+    return previous;
 };

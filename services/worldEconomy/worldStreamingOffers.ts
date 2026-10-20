@@ -112,7 +112,7 @@ const createPlayerOffer = (player: Player, absoluteWeek: number, preparedContext
             ? [{ kind: 'RENTAL' as const }, { kind: 'PURCHASE' as const }] : []),
     ];
     const routePlayer = { ...player, ownedStreamingPlatform: platform };
-    const readTitleRoute = createStreamingTitleRouteReadBatch(routePlayer, absoluteWeek, platform, eligibleOwnedIds);
+    const readTitleRoute = createStreamingTitleRouteReadBatch(player, absoluteWeek, platform, eligibleOwnedIds, context);
     const playableIds = new Set<string>();
     const subscriptionCatalogueStrengthByCountry: Record<string, number> = {};
     const storeCatalogueStrengthByCountry: Record<string, number> = {};
@@ -121,7 +121,7 @@ const createPlayerOffer = (player: Player, absoluteWeek: number, preparedContext
     const entryByProject = new Map(programEntries.map(entry => [entry.projectId, entry]));
     const facts = new Map(titleIds.map(projectId => {
         const entry = entryByProject.get(projectId);
-        return [projectId, { quality: streamingTitleQuality(routePlayer, projectId),
+        return [projectId, { quality: streamingTitleQuality(player, projectId, context),
             weeksAvailable: entry ? streamingTitleWeeksAvailable(routePlayer, entry, absoluteWeek) : 52,
             genre: entry?.genre || 'UNKNOWN' }];
     }));

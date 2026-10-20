@@ -111,12 +111,11 @@ import {
   getStreamingCatalogProjectIds,
   getEligibleOwnedStreamingTitles,
   getStreamingCatalogLicenseStatus,
-  resolveStreamingCatalogTitle,
 } from '../services/streamingCatalog';
 import { getAbsoluteWeek } from '../services/legacyLogic';
 import { updateWorldStreamingCustomerAccessPolicy } from '../services/worldEconomy/worldStreamingCustomers';
 import { forecastWorldStreamingBuildDemand } from '../services/worldEconomy/worldStreamingPricingForecast';
-import { getStreamingContentAvailability, getStreamingPlayableCatalogProjectIds, createStreamingCatalogueReadContext } from '../services/streamingContentAvailability';
+import { getStreamingContentAvailability, getStreamingPlayableCatalogProjectIds, resolveStreamingCatalogueReadTitle, createStreamingCatalogueReadContext } from '../services/streamingContentAvailability';
 import { getStreamingOriginalLiveStatus } from '../services/streamingOriginals';
 import { getStreamingTechnologyCampus } from '../services/streamingTechnologyCampus';
 import { getStreamingProductSuite } from '../services/streamingProductSuite';
@@ -592,7 +591,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
       };
     });
     const service = getStreamingPlayableCatalogProjectIds(readPlayer, catalogueContext(), 8).map(projectId => {
-      const title = resolveStreamingCatalogTitle(readPlayer, projectId);
+      const title = resolveStreamingCatalogueReadTitle(catalogueContext(), projectId);
       if (!title) return null;
       const performance = performanceByProject.get(projectId);
       const license = readPlatform.catalogLicenses.find(item => item.sourceProjectId === projectId);
@@ -806,6 +805,8 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
     buildForecastPlayer,
     buildForecastPlayer.ownedStreamingPlatform.serviceConfiguration.pricing,
     getStreamingBuildMarketAccess(buildForecastPlayer).countryIds.filter(id => Boolean(getStreamingDayOneMarket(id))),
+    catalogueContext().player === buildForecastPlayer ? catalogueContext()
+      : createStreamingCatalogueReadContext(buildForecastPlayer, catalogueContext()),
   ), [buildForecastPlayer]);
   const buildAbsoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
   const buildInputs = useStreamingView(() => ({
@@ -2005,6 +2006,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
     return (
       <StreamingDefineLaunchWizard
         player={player}
+        preparedCatalogueContext={catalogueContext()}
         onUpdatePlayer={persistCanonical}
         onClose={() => setShowDefineLaunch(false)}
         onOpenFinance={() => {
