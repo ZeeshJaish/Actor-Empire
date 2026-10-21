@@ -510,23 +510,7 @@
 .bw-paper-figure .kit-figure { font-size: var(--sf-t-8); }
 .bw-paper-figure em { min-width: 0; flex: 1; font-style: normal; font-size: var(--sf-t-2); line-height: 1.4; color: var(--sf-fg-4); }
 
-/* THE AISLE — every cabinet in the network, standing on a floor.
-   Owned faces are solid and rented ones outlined, which is the language the
-   room's own rack wall already speaks, so this reads as the same world seen
-   from further back. A lit cabinet carries a strip of drive lights. */
-.bw-aisle { display: block; width: 100%; height: auto; }
-.bw-aisle-cab rect { fill: var(--sf-canvas); stroke: none; transition: fill var(--sf-slow) var(--sf-ease); }
-.bw-aisle-cab.is-rented rect { fill: none; stroke: var(--sf-line-strong); stroke-width: .35; }
-.bw-aisle-cab.is-lit rect { fill: var(--sf-good); }
-.bw-aisle-cab.is-lit.is-rented rect { fill: var(--sf-good-wash); stroke: var(--sf-good); }
-.bw-aisle-cab .bw-aisle-lamp { fill: var(--sf-good-deep); stroke: none; }
-.bw-aisle-cab.is-lit.is-rented .bw-aisle-lamp { fill: var(--sf-good); }
-.bw-aisle.is-over .bw-aisle-cab.is-lit rect { fill: var(--sf-bad); }
-.bw-aisle.is-over .bw-aisle-cab.is-lit .bw-aisle-lamp { fill: var(--sf-bad-deep); }
-.bw-aisle.is-over .bw-aisle-cab.is-lit.is-rented rect { fill: var(--sf-bad-wash); stroke: var(--sf-bad); }
-/* Where the aisle ends, and the machines there is no floor for. */
-.bw-aisle-edge { stroke: var(--sf-fg-max); stroke-width: .4; }
-.bw-aisle-stranded { fill: none; stroke: var(--sf-bad); stroke-width: .35; stroke-dasharray: 1.2 1; }
+
 
 .bw-paper-scale { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sf-3); font-family: var(--sf-font-num); font-size: var(--sf-t-1); color: var(--sf-fg-5); }
 .bw-paper-scale .is-over { color: var(--sf-bad); font-weight: 700; }
@@ -1268,3 +1252,24 @@
 .bw-market-no-quote { margin: 1rem 0; padding: 1.2rem; border-radius: 1rem; border: 1px solid var(--sf-line); background: var(--sf-surface-2); }
 .bw-market-no-quote h2 { margin: 0 0 .5rem; font-size: 1.1rem; }
 .bw-market-no-quote p { margin: 0; line-height: 1.5; color: var(--sf-fg-3); }
+
+/* Dense opening markets stay inside six regional strips on small screens. */
+.bw-board-regions { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 14px 18px; }
+.bw-board-regions > div { min-width: 0; }
+.bw-board-regions p { display: flex; justify-content: space-between; gap: 6px; font-size: var(--sf-t-1); margin-bottom: 7px; }
+.bw-board-regions p b { font-weight: 600; }
+.bw-board-strip:not(.is-few) { display: grid; grid-template-columns: repeat(var(--market-count, 1),minmax(0,1fr)); gap: 1px; min-width: 0; }
+.bw-board-strip:not(.is-few) .bw-board-bar { min-width: 0; animation: none; }
+.bw-board-gap { color: var(--sf-warn-tint); font-size: var(--sf-t-1); line-height: 1.5; margin: 12px 0; }
+.bw-marketing-budget .bw-budget-label > b { font-family: var(--sf-font-num); font-size: clamp(28px,7vw,44px); line-height: 1.1; }
+.bw-marketing-band { padding: 5px 10px; border-radius: var(--sf-r-chip); background: var(--sf-brand-wash); color: var(--sf-brand); font-size: var(--sf-t-2); }
+.bw-marketing-budget > p { color: var(--sf-fg-4); font-size: var(--sf-t-1); line-height: 1.5; margin: 10px 0 0; }
+.bw-marketing-budget > .bw-budget-error { color: var(--sf-bad-tint); }
+.bw-agreement-region > .bw-agreement-provider { margin: 0 0 0 12px; }
+.bw-agreement-region .bw-agreement-provider ul { max-height: 220px; overflow-y: auto; }
+
+/* A fixed visual scale keeps every region comparable. */
+.bw-board-strip.bw-board-summary { grid-template-columns: repeat(14, minmax(0, 1fr)); gap: 3px; }
+.bw-board-summary .bw-board-bar { height: 34px; border-radius: 3px; }
+.bw-board-counts { display: block; margin-top: 6px; color: var(--sf-fg-4); font-size: var(--sf-t-0); line-height: 1.4; }
+.bw-board-regions + .bw-board-axis { flex-wrap: wrap; row-gap: 5px; }

@@ -65,6 +65,7 @@ interface HomePageProps {
   onQueueBabyNamingCheat?: () => void;
   onOpenDeathSummaryPreview?: () => void;
   onShowWhatsNewCheat?: () => void;
+  onStreamingLaunchQa?: (action: 'READY' | 'COMPLETE_BUILD', report: (message: string) => void) => Promise<{ok:boolean;message:string}>;
 }
 
 type HomeProductionPhase = NonNullable<Commitment['projectPhase']>;
@@ -130,12 +131,23 @@ const cheatWeekFromAbsolute = (absoluteWeek: number): { year: number; week: numb
   week: Math.max(1, Math.max(1, absoluteWeek) % 52 || 52)
 });
 
-export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProcessing, onUpdatePlayer, setPage, onOpenProductionHouseCheat, onOpenPlatformCommissionCheat, onOpenStudioAcquisitionCheat, onOpenBoxOfficeCheat, onQueueBabyNamingCheat, onOpenDeathSummaryPreview, onShowWhatsNewCheat }) => {
+export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProcessing, onUpdatePlayer, setPage, onOpenProductionHouseCheat, onOpenPlatformCommissionCheat, onOpenStudioAcquisitionCheat, onOpenBoxOfficeCheat, onQueueBabyNamingCheat, onOpenDeathSummaryPreview, onShowWhatsNewCheat, onStreamingLaunchQa }) => {
   const logContainerRef = useRef<HTMLDivElement>(null);
   const language = getPlayerLanguage(player);
   const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
 
   // Cheat Menu State
+  const [streamingQaFeedback,setStreamingQaFeedback]=useState('');
+  const [streamingQaBusy,setStreamingQaBusy]=useState(false);
+  const streamingQaLock=useRef(false);
+  const runStreamingQa=async(action:'READY'|'COMPLETE_BUILD')=>{
+    if(!onStreamingLaunchQa||streamingQaLock.current||isProcessing) return;
+    streamingQaLock.current=true;setStreamingQaBusy(true);
+    setStreamingQaFeedback(action==='READY'?'Preparing 197 markets and testing the network…':'Processing the commissioned build…');
+    try {const result=await onStreamingLaunchQa(action,setStreamingQaFeedback);setStreamingQaFeedback(result.message);}
+    catch(error){setStreamingQaFeedback(error instanceof Error?error.message:'Streaming QA action failed.');}
+    finally{streamingQaLock.current=false;setStreamingQaBusy(false);}
+  };
   const [activeCheatMenu, setActiveCheatMenu] = useState<CheatMenuMode>('NONE');
   const [showPasswordPrompt, setShowPasswordPrompt] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
@@ -3913,6 +3925,18 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                               >
                                   Streaming Founder Ready
                               </button>
+                              {onStreamingLaunchQa && <section className="rounded-xl border border-cyan-400/30 bg-cyan-950/20 p-3 space-y-2" aria-label="Streaming launch test shortcuts">
+                                <p className="text-xs font-bold text-cyan-200">Streaming launch testing</p>
+                                <button type="button" disabled={isProcessing||streamingQaBusy||Boolean(player.ownedStreamingPlatform.infrastructureSetup||player.ownedStreamingPlatform.launchCommit)} onClick={()=>void runStreamingQa('READY')} className="w-full rounded-lg border border-cyan-400/40 px-3 py-3 text-left text-sm font-bold text-cyan-100 disabled:opacity-40">
+                                  Ready to Commission · 197 markets
+                                  <span className="block pt-1 text-xs font-normal text-zinc-400">Sets a funded subscription test launch with QA titles and an organic campaign. Replaces the unbuilt plan; you press Commission.</span>
+                                </button>
+                                <button type="button" disabled={isProcessing||streamingQaBusy||!player.ownedStreamingPlatform.infrastructureSetup||Boolean(player.ownedStreamingPlatform.launchCommit)} onClick={()=>void runStreamingQa('COMPLETE_BUILD')} className="w-full rounded-lg border border-cyan-400/40 px-3 py-3 text-left text-sm font-bold text-cyan-100 disabled:opacity-40">
+                                  Fast-forward commissioned build
+                                  <span className="block pt-1 text-xs font-normal text-zinc-400">Advances and saves every week to completion. Opening Night stays manual.</span>
+                                </button>
+                                <p role="status" aria-live="polite" className="text-xs leading-relaxed text-zinc-300">{streamingQaFeedback||'Developer shortcuts change this save. Existing rights contracts are preserved.'}</p>
+                              </section>}
                               <div>
                                   <label className="text-xs font-bold text-zinc-500 uppercase block mb-1">Bank Balance ($)</label>
                                   <input

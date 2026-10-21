@@ -1940,6 +1940,48 @@ export const App: React.FC = () => {
       setToastMessage({ title: pregnancyFeedback.title, subtext: pregnancyFeedback.toast });
   };
 
+  const handleStreamingLaunchQa = async (
+    action: 'READY' | 'COMPLETE_BUILD', report: (message: string) => void,
+  ): Promise<{ok:boolean;message:string}> => {
+    if(weekProcessingLockRef.current||isProcessing) return {ok:false,message:'Wait for current processing to finish.'};
+    weekProcessingLockRef.current=true;
+    setIsProcessing(true);
+    if(autosaveTimerRef.current){window.clearTimeout(autosaveTimerRef.current);autosaveTimerRef.current=null;}
+    let latest=player;
+    try {
+      await yieldForWeekProcessingPaint();
+      // Preserve pending career edits as the recoverable pre-cheat generation.
+      const checkpoint=await persistCurrentSlotSnapshot(player);
+      latest=checkpoint;
+      const qa=await import('./services/streamingLaunchQa');
+      const publish=async(candidate:Player)=>{
+        const saved=await persistCurrentSlotSnapshot(candidate);
+        suppressNextAutosaveRef.current=true;
+        commitProcessedWeekPlayer(saved);
+        latest=saved;
+        return saved;
+      };
+      if(action==='READY') await publish(qa.prepareStreamingCommissionQa(checkpoint));
+      else await qa.advanceStreamingCommissionQa(checkpoint,{
+        processWeek: candidate=>processGameWeek(candidate),persistWeek:publish,
+        onProgress:(done,total)=>report(`Saved ${done} of ${total} weeks. Opening Night remains manual.`),
+        yieldToUi:yieldForWeekProcessingPaint,
+      });
+      if(latest.flags?.isDead){setGameStatus('DEATH_SCREEN');return {ok:false,message:'Career ended during fast-forward. Completed weeks are saved.'};}
+      const message=action==='READY'?'Both wizards prepared for 197 markets. Open Streaming and press Commission.':`Build time processed and saved through week ${latest.currentWeek}. Open Streaming to review the Opening Programme.`;
+      setLifestyleInitialView('STREAMING_PLATFORM');
+      setActivePage(Page.LIFESTYLE);
+      return {ok:true,message};
+    } catch(error) {
+      if(latest.flags?.isDead) setGameStatus('DEATH_SCREEN');
+      return {ok:false,message:error instanceof Error?error.message:'Streaming QA failed. Only verified saves were published.'};
+    } finally {
+      weekProcessingLockRef.current=false;
+      lastWeekProcessSettledAtRef.current=Date.now();
+      setIsProcessing(false);
+    }
+  };
+
   const handleNextWeek = async () => {
     const now = Date.now();
     if (weekProcessingLockRef.current || isProcessing) {
@@ -3607,7 +3649,7 @@ export const App: React.FC = () => {
         {gameStatus === 'PLAYING' && (
             <>
                 <div className={`ae-game-content ${isFullBleedMobileSurface ? 'ae-game-content--immersive flex-1 overflow-hidden p-0' : isUiOverhaulSurface ? 'min-h-0 flex-1 overflow-hidden' : `flex-1 px-5 pt-5 overflow-y-auto custom-scrollbar ${player.money < 0 ? 'pt-8' : ''}`}`}>
-                    {activePage === Page.HOME && (<HomePage player={player} onNextWeek={handleNextWeek} isProcessing={isProcessing} onUpdatePlayer={handleUpdatePlayer} setPage={setActivePage} onOpenProductionHouseCheat={() => { setLifestyleInitialView('PRODUCTION_GAME'); setActivePage(Page.LIFESTYLE); }} onOpenPlatformCommissionCheat={() => { setInitialMobileAppMode('MESSAGES'); setActivePage(Page.MOBILE); }} onOpenStudioAcquisitionCheat={(studioId) => { setInitialForbesStudioId(studioId); setActivePage(Page.MOBILE); }} onOpenBoxOfficeCheat={() => { setInitialMobileAppMode('BOXOFFICE'); setActivePage(Page.MOBILE); }} onQueueBabyNamingCheat={handleQueueBabyNamingCheat} onOpenDeathSummaryPreview={handleOpenDeathSummaryPreview} onShowWhatsNewCheat={handleShowWhatsNewCheat} />)}
+                    {activePage === Page.HOME && (<HomePage player={player} onNextWeek={handleNextWeek} isProcessing={isProcessing} onUpdatePlayer={handleUpdatePlayer} setPage={setActivePage} onOpenProductionHouseCheat={() => { setLifestyleInitialView('PRODUCTION_GAME'); setActivePage(Page.LIFESTYLE); }} onOpenPlatformCommissionCheat={() => { setInitialMobileAppMode('MESSAGES'); setActivePage(Page.MOBILE); }} onOpenStudioAcquisitionCheat={(studioId) => { setInitialForbesStudioId(studioId); setActivePage(Page.MOBILE); }} onOpenBoxOfficeCheat={() => { setInitialMobileAppMode('BOXOFFICE'); setActivePage(Page.MOBILE); }} onQueueBabyNamingCheat={handleQueueBabyNamingCheat} onOpenDeathSummaryPreview={handleOpenDeathSummaryPreview} onShowWhatsNewCheat={handleShowWhatsNewCheat} onStreamingLaunchQa={handleStreamingLaunchQa} />)}
                     {activePage === Page.CAREER && (<CareerPage player={player} onQuitJob={handleQuitJob} onRehearse={handleRehearse} onOwnedProductionFocus={handleOwnedProductionFocus} />)}
                     {activePage === Page.IMPROVE && (<ImprovePage player={player} onTrain={()=>{}} onEnroll={(c)=>handleGenericUpdate(p=>{ const previousCommitments = p.commitments; const next: Player = { ...p, energy: { ...p.energy }, flags: { ...p.flags }, money: p.money- (c.upfrontCost||0), commitments: [...p.commitments, {...c, id: `c_${Date.now()}`, weeksCompleted:0}] }; syncWeeklyEnergyForCommitments(next, previousCommitments); return next; })} onCancel={(id)=>handleGenericUpdate(p=>{ const previousCommitments = p.commitments; const next: Player = { ...p, energy: { ...p.energy }, flags: { ...p.flags }, commitments: p.commitments.filter(c=>c.id!==id)}; syncWeeklyEnergyForCommitments(next, previousCommitments); return next; })} onPerformAction={handleImproveAction} />)}
                     {activePage === Page.SOCIAL && (<SocialPage player={player} onInteract={handleSocialInteract} onContinueAsChild={handleContinueAsChild} />)}

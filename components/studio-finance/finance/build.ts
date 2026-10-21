@@ -395,6 +395,9 @@ export interface Facility {
   /** False while it is still a drawing. */
   built: boolean;
   groups: RackGroup[];
+  /** Read-only canonical projection, including provider-expanded rooms. Local
+      draft estimates omit this; never use it as a persisted configuration. */
+  physicalConstraint?: Limiting;
   power: { used: number; contracted: number };
   cooling: { used: number; available: number };
   bandwidth: { used: number; available: number };
@@ -517,6 +520,8 @@ export interface CountryService {
   role: string;
   state: ServiceState;
   startupMs: number;
+  /** Raw route latency, separate from the resulting playback startup time. */
+  networkLatencyMs?: number | null;
   buffering: number;      // %
   peak: number;           // concurrent streams
   /** The share of this market's audience inside any ring at all, 0–1 —
@@ -700,6 +705,7 @@ export interface BuildHandlers {
   onOpenDefine?: (step: import('../../../types').StreamingDefineLaunchStepId) => void;
   onOpenLaunchBudget?: () => void;
   onOpenRehearsal?: (draft: BuildDraft) => void;
+  onRepairRoom?: (draft: BuildDraft, repair: Repair) => void;
   onValidateCommission?: (draft: BuildDraft) => { ok: boolean; message: string } | void;
   onCommission?: (draft: BuildDraft) => { ok: boolean; message: string } | void;
   onOpeningNight?: () => void;
@@ -829,12 +835,13 @@ export function facilityRoomLabel(data: BuildData, facilities: Facility[], facil
 /** What prevents this room from running the rack drawing. A room using every
     valid floor position is full, not broken; only overflow is a constraint. */
 export function limitingFactor(data: BuildData, facility: Facility): Limiting {
+  if (facility.physicalConstraint !== undefined) return facility.physicalConstraint;
   const listing = listingFor(data, facility);
   const racks = facilityRacks(facility);
   if (listing && racks > listing.rackPositions) return 'RACK';
-  if (facility.power.used >= facility.power.contracted) return 'POWER';
-  if (facility.cooling.used >= facility.cooling.available) return 'COOLING';
-  if (facility.bandwidth.used >= facility.bandwidth.available) return 'BANDWIDTH';
+  if (facility.power.used > facility.power.contracted) return 'POWER';
+  if (facility.cooling.used > facility.cooling.available) return 'COOLING';
+  if (facility.bandwidth.used > facility.bandwidth.available) return 'BANDWIDTH';
   if (facility.condition < 0.5) return 'CONDITION';
   return 'NONE';
 }
@@ -1487,6 +1494,7 @@ export function fillRoom(listing: FacilityListing, facility: Facility, plan: Tie
   const engineering = listing.engineering;
   return {
     ...facility,
+    physicalConstraint: undefined,
     groups,
     power: { used: drawn.powerKw, contracted: engineering?.powerContractKw ?? listing.rackPositions * POWER_KW_PER_RACK },
     cooling: { used: drawn.coolingKw, available: engineering?.coolingCapacityKw ?? listing.rackPositions * COOLING_KW_PER_RACK },
@@ -2094,7 +2102,8 @@ export function rehearse(data: BuildData, draft: BuildDraft, scenario: Scenario)
 export function stageStates(data: BuildData, draft: BuildDraft): Record<BuildStageId, StageState> {
   const totals = buildTotals(data, draft);
   const plan = moneyPlan(data, draft);
-  const constrained = draft.facilities.filter((f) => limitingFactor(data, f) !== 'NONE').length;
+  const rooms = data.canonical?.facilities?.(draft) ?? draft.facilities;
+  const constrained = rooms.filter((f) => limitingFactor(data, f) !== 'NONE').length;
   const empty = draft.facilities.filter((f) => computeRacks(f) === 0).length;
   const stale = rehearsalStale(data, draft);
 
@@ -2140,6 +2149,10 @@ export function gates(data: BuildData, draft: BuildDraft): Gate[] {
   const totals = buildTotals(data, draft);
   const money = moneyPlan(data, draft);
   const rehearsal = draft.rehearsal;
+  // Provider provisioning can differ from the local draft estimate. Judge the
+  // exact rooms the career forecast and commission will use.
+  const projectedRooms = data.canonical?.facilities?.(draft) ?? draft.facilities;
+  const constrainedRooms = projectedRooms.filter(room => limitingFactor(data, room) !== 'NONE');
   const services = serviceForecast(data, draft);
   const coverageAvailable = services.length === data.markets.length
     && services.every(countryServiceCoverageValid);
@@ -2186,15 +2199,14 @@ export function gates(data: BuildData, draft: BuildDraft): Gate[] {
       ok: data.pricing.plans > 0,
     },
     {
-      id: 'physical', stage: 'network', label: 'The rooms',
+      id: 'physical', stage: 'network', label: 'Room capacity',
       value: (() => {
-        const constrained = draft.facilities.filter((f) => limitingFactor(data, f) !== 'NONE');
-        if (draft.facilities.length === 0) return 'No rooms leased';
-        return constrained.length === 0
+        if (projectedRooms.length === 0) return 'No rooms leased';
+        return constrainedRooms.length === 0
           ? 'All rooms within limits'
-          : `${constrained.length} room${constrained.length > 1 ? 's' : ''} short of power, cooling or fibre`;
+          : `${constrainedRooms.length} room${constrainedRooms.length > 1 ? 's need' : ' needs'} a provider upgrade`;
       })(),
-      ok: draft.facilities.length > 0 && draft.facilities.every((f) => limitingFactor(data, f) === 'NONE'),
+      ok: projectedRooms.length > 0 && constrainedRooms.length === 0,
     },
     {
       id: 'coverage', stage: 'network', label: 'Opening-market coverage',

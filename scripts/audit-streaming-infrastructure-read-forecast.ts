@@ -1,3 +1,4 @@
+import { STREAMING_SERVER_SITES } from '../services/streamingServerSites';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createHash } from 'node:crypto';
@@ -126,4 +127,16 @@ test('a read never rebinds stale rehearsal evidence or clears the real commissio
     const quote = getStreamingOpeningCommissionQuote(player, draft, marketing);
     assert.equal(quote.ready, false);
     assert.ok(quote.blockers.includes('The exact infrastructure configuration has not passed rehearsal.'));
+});
+
+test('large worldwide topology keeps exact rehearsal signatures through save normalization', () => {
+ const placements=STREAMING_SERVER_SITES.slice(0,80).map(site=>({cityId:site.id,racks:1,role:'EDGE_CACHE' as const}));
+ const draft={...base,networkPlacements:placements,facilities:undefined,regionPlans:undefined};
+ const tested=infrastructure.runStreamingInfrastructureLoadTest(player,draft);
+ assert.ok(tested.forecast.configurationSignature.length<=640,'A worldwide topology must fit the persisted signature field');
+ assert.equal(tested.player.ownedStreamingPlatform.infrastructureSetupDraft?.lastLoadTestSignature,tested.forecast.configurationSignature);
+ const normalized=tested.player.ownedStreamingPlatform.infrastructureSetupDraft!;
+ const changed={...normalized,facilities:undefined,networkPlacements:normalized.networkPlacements.map((site,index)=>index===normalized.networkPlacements.length-1?{...site,racks:site.racks+1}:site)};
+ assert.notEqual(infrastructure.getCanonicalStreamingInfrastructureDraftForecast(tested.player,changed).configurationSignature,tested.forecast.configurationSignature,'Changes at the end of the topology still invalidate evidence');
+ assert.ok(infrastructure.validateStreamingInfrastructureDraft(tested.player,changed).issues.some(issue=>issue.code==='LOAD_TEST_REQUIRED'));
 });

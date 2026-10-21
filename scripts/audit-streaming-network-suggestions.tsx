@@ -35,6 +35,13 @@ async function main() {
  assert.equal(result.status,'READY');
  if (result.status !== 'READY') throw Error('No proposal');
  const p = result.proposal;
+ const setupOnly = await createNetworkSuggestion(data,draft,{mode:'BALANCED',upfrontLimit:500_000_000,replaceUnbuilt:false});
+ assert.equal(setupOnly.status,'READY','A setup-only budget must quote weekly costs rather than require a weekly input');
+ if(setupOnly.status==='READY') {
+  assert.ok(setupOnly.proposal.weekly>0);
+  assert.ok(setupOnly.proposal.upfront<=500_000_000);
+  assert.equal(validateNetworkSuggestion({...data},{...draft},{mode:'BALANCED',upfrontLimit:500_000_000,replaceUnbuilt:false},setupOnly.proposal).ok,true,'Equivalent object refreshes must remain actionable with fresh validation');
+ }
  assert.ok(p.draft.facilities.length > 0);
  assert.ok(p.upfront <= request.upfrontLimit && p.weekly <= request.weeklyLimit);
  assert.deepEqual(p.services,serviceForecast(data,p.draft));
@@ -116,7 +123,7 @@ async function main() {
  assert.equal(outside.status,'READY');
  if(outside.status==='READY') for(const room of builtOutside) assert.deepEqual(outside.proposal.draft.facilities.find(r=>r.id===room.id),room);
  const html=renderToStaticMarkup(<NetworkSuggestionSheet data={data} draft={draft} onApply={()=>{throw Error('render applied');}} onClose={()=>{}}/>);
- assert.match(html,/Suggest network/); assert.match(html,/Fill remaining gaps/);assert.match(html,/Generate/);assert.match(html,/aria-modal="true"/);
+ assert.match(html,/Suggest network/); assert.match(html,/Keep my current setup/);assert.match(html,/Generate/);assert.match(html,/aria-modal="true"/);
  assert.equal(buildTotals(data,draft).racks,0);
  const player=filedMarketFixture(['US','IN']);
  // Real CAREER accounting: paid setup/catalogue/originals must not reserve current cash again.
@@ -182,6 +189,8 @@ async function main() {
  const career=await createNetworkSuggestion(canonical.data,canonical.draft,request);
  assert.equal(career.status,'READY');
  if(career.status==='READY') {
+  const equivalentRefresh=captureNetworkBuildData(JSON.parse(JSON.stringify(player)),['US','IN']);
+  assert.equal(validateNetworkSuggestion(equivalentRefresh.data,equivalentRefresh.draft,request,career.proposal).ok,true,'A real CAREER save refresh with unchanged values must not block Use this plan');
   const accepted=validateNetworkSuggestion(canonical.data,canonical.draft,request,career.proposal);
   assert.equal(accepted.ok,true);
   if(!accepted.ok) throw Error('Apply failed');

@@ -10,13 +10,27 @@ export interface StreamingRehearsalMarketTally {
   total: number;
 }
 
-export const streamingRehearsalPlayback = (country: StreamingRehearsalCountryResult): 'PLAYING' | 'BUFFERING' | 'DOWN' => (
-  country.outageResistance === 'UNSERVED' || country.verdict === 'BROKE' || country.startupTimeMs === null
-    ? 'DOWN'
-    : country.verdict === 'BURST' || country.bufferingRiskPercent >= 15
-      ? 'BUFFERING'
-      : 'PLAYING'
-);
+export const streamingRehearsalPlayback = (
+  country: StreamingRehearsalCountryResult,
+  result?: StreamingLaunchRehearsalResult,
+  loadShare = 1,
+): 'PLAYING' | 'BUFFERING' | 'DOWN' => {
+  if (country.outageResistance === 'UNSERVED' || country.startupTimeMs === null) return 'DOWN';
+  if (result && loadShare < 1) {
+    if ((country.unreachablePercent || 0) >= 100) return 'DOWN';
+    if ((country.unreachablePercent || 0) > 0) return 'BUFFERING';
+    const routes = result.facilities.filter(facility => facility.affectedMarketIds.includes(country.marketId));
+    const share = Math.max(0, loadShare);
+    if (routes.length && routes.every(route => route.demand * share > route.burstCapacity && route.burstCapacity <= 0)) return 'DOWN';
+    if (country.failedPercent > 0 && routes.some(route => route.demand * share > route.burstCapacity)) return 'BUFFERING';
+    if (country.bufferingRiskPercent >= 15 && routes.some(route => route.demand * share > route.steadyCapacity * .72)) return 'BUFFERING';
+    // Peak congestion is not an outage during the quiet arrival phase.
+    if (country.failedPercent > 0 || country.verdict === 'BURST') return 'PLAYING';
+  }
+  if (country.failedPercent >= 100) return 'DOWN';
+  return country.failedPercent > 0 || country.bufferingRiskPercent >= 15
+    ? 'BUFFERING' : 'PLAYING';
+};
 
 /** Count the complete canonical result, never just the visible monitor wall. */
 export const summarizeStreamingRehearsalMarkets = (result: StreamingLaunchRehearsalResult): StreamingRehearsalMarketTally => {
@@ -54,14 +68,22 @@ export const diagnoseStreamingRehearsalMarket = (
     };
   }
 
+  if ((country.unreachablePercent || 0) > 0) return {
+    reason: `${country.unreachablePercent}% of this market is outside signal reach. Spare compute cannot replace geographic coverage.`,
+    route: [...new Set(route.map(facility => facility.cityLabel))].join(', '),
+    load: 'Partial geographic reach', repair: `Improve reach in ${country.regionLabel}, then rehearse again.`,
+  };
+
   const worst = [...route].sort((a, b) => b.loadPercent - a.loadPercent)[0];
-  const factor = route.find(facility => facility.limitingFactor !== 'NONE');
+  const factor = route.find(facility => facility.limitingFactor !== 'NONE' && result.repairActions.some(action => action.type === 'REPAIR_PHYSICAL' && action.facilityId === facility.facilityId));
   const action = result.repairActions.find(item =>
     item.type === 'REPAIR_PHYSICAL' && route.some(facility => facility.facilityId === item.facilityId)
     || item.type === 'ADD_CAPACITY' && route.some(facility => facility.cityId === item.cityId));
   const routeLabels = [...new Set(route.map(facility => facility.cityLabel))];
   const reason = factor
     ? `${factor.cityLabel} is constrained by ${factor.limitingFactor.toLowerCase().replaceAll('_', ' ')}.`
+    : country.verdict === 'BURST' && country.failedPercent === 0 && country.bufferingRiskPercent < 15
+      ? `${worst.cityLabel} uses protected burst capacity at peak; playback remains healthy.`
     : worst.verdict === 'BROKE' || worst.loadPercent > 100
       ? `${worst.cityLabel} is overloaded at peak; global spare capacity does not replace this route.`
       : country.bufferingRiskPercent >= 15
@@ -75,6 +97,7 @@ export const diagnoseStreamingRehearsalMarket = (
     load: `${worst.loadPercent}% peak load at ${worst.cityLabel}`,
     repair: action?.detail || (country.verdict === 'BROKE'
       ? `Add capacity on the ${country.regionLabel} route, then run rehearsal again.`
+      : country.verdict === 'BURST' ? 'Optional: add steady compute to reduce reliance on protected burst.'
       : country.outageResistance === 'SINGLE_POINT'
         ? `Add a second delivery city in ${country.regionLabel} for resilience.`
         : 'No network repair required for this market.'),

@@ -42,7 +42,7 @@ const CLOUD_POSITION: Record<CloudProviderId, string> = {
   ATLAS: 'GLOBAL', NORTHWIND: 'VALUE', MERIDIAN: 'EDGE',
 };
 
-export function RegionBoard({ data, draft, patch, totals, services, onStartOver }: StageProps) {
+export function RegionBoard({ data, draft, patch, totals, services, onStartOver, focusRegionId, selectedRegionId, onSelectRegion, handlers }: StageProps) {
   const boardRef = useRef<HTMLDivElement>(null);
   const [suggesting, setSuggesting] = useState(false);
   const [tucked, setTucked] = useState(false);
@@ -63,7 +63,11 @@ export function RegionBoard({ data, draft, patch, totals, services, onStartOver 
   const regions = useMemo(() => openingRegions(data), [data]);
   // Start with the complete network. A region becomes the map's focus only
   // after the player selects its continent or opens its row.
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [localOpenId, setLocalOpenId] = useState<string | null>(null);
+  const openId = onSelectRegion ? selectedRegionId : localOpenId;
+  const setOpenId = useCallback((id: string | null) => {
+    if (onSelectRegion) onSelectRegion(id); else setLocalOpenId(id);
+  }, [onSelectRegion]);
   const [note, setNote] = useState<{ regionId: string; text: string } | null>(null);
   /* Tapping a continent you are not opening in used to do nothing at all: the
      map reported the tap, the board found no row for it and quietly fell back
@@ -84,8 +88,10 @@ export function RegionBoard({ data, draft, patch, totals, services, onStartOver 
     window.requestAnimationFrame(() => {
       rowRefs.current.get(id)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     });
-  }, [data, openIds]);
-  const showWorld = useCallback(() => { setScouted(null); setOpenId(null); }, []);
+  }, [data, openIds, setOpenId]);
+  const lastFocus = useRef<string>();
+  useEffect(() => { if (focusRegionId && lastFocus.current !== focusRegionId) { lastFocus.current = focusRegionId; selectRegion(focusRegionId); } }, [focusRegionId, selectRegion]);
+  const showWorld = useCallback(() => { setScouted(null); setOpenId(null); }, [setOpenId]);
   const showRegion = useCallback(() => undefined, []);
   const reports = useMemo(
     () => regions.map(region => regionReport(data, draft, services, region)),
@@ -119,13 +125,18 @@ export function RegionBoard({ data, draft, patch, totals, services, onStartOver 
         onShowWorld={showWorld}
         onShowRegion={showRegion}
       />
-      <button type="button" className="bw-suggest-entry" onClick={() => setSuggesting(true)}><span>Suggest network</span><small>Choose limits · preview a plan</small><b aria-hidden="true">↗</b></button>
+      <button type="button" className="bw-suggest-entry" onClick={() => setSuggesting(true)}><span><b>Suggest network</b><small>Find a setup for your budget</small></span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></button>
       {suggesting && <NetworkSuggestionSheet data={data} draft={draft} onApply={patch} onClose={() => setSuggesting(false)} />}
       <p className="bw-rg-footprint-note">
         Green is network reach, even in unopened countries. Only entered markets count toward viewers and revenue.
         A service gap can remain where signal quality or capacity is short.
       </p>
 
+      {handlers.onRepairRoom && data.repairs.filter(repair => !draft.repairIds.includes(repair.id)).length > 0 && <details className="bw-room-repairs">
+        <summary>Room limits to review <span>Power, delivery capacity and equipment</span></summary>
+        <p>These limits still affect usable compute. Upgrades below change the drawing; their cost is included when you commission.</p>
+        {data.repairs.filter(repair => !draft.repairIds.includes(repair.id)).map(repair => <div key={repair.id}><span><b>{repair.label}</b><small>{repair.what}</small></span><button type="button" onClick={() => handlers.onRepairRoom?.(draft, repair)}>Plan upgrade · {money(repair.cost)}</button></div>)}
+      </details>}
       {scouted && (
         <p className="bw-rg-scouted" role="status">
           <b>You are not opening in {scouted}.</b>
@@ -340,7 +351,7 @@ function RegionRow({ data, draft, report, open, note, onToggle, onWrite, onCloud
           <b>{region.name}</b>
           <em>{region.opening.length} {region.opening.length === 1 ? 'country' : 'countries'} · {coverageAvailable ? compactCount(peak) : '—'} on the night</em>
         </span>
-        <span className={stamp ? 'bw-rg-word is-stamp' : 'bw-rg-word'}><i aria-hidden="true" />{word}</span>
+        <span className={stamp ? 'bw-rg-word is-stamp' : 'bw-rg-word'}><i aria-hidden="true" />{word}{countries.some(country => country.state !== 'READY') && rooms.length > 0 && <small>{countries.filter(country => country.state !== 'READY').length} need attention</small>}</span>
         <span className="bw-rg-cost">
           <b>{rooms.length === 0 ? '—' : `${money(Math.round(weeklyShown))}/wk`}</b>
           <em>{rooms.length === 0 ? 'nothing here yet' : once > 0 ? `${money(Math.round(onceShown))} once` : 'nothing once'}</em>

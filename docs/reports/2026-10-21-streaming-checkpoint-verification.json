@@ -1,0 +1,79 @@
+{
+  "date": "2026-10-21",
+  "scope": "pre-push source verification; no new browser or physical-device benchmark",
+  "typecheck": {
+    "exitCode": 0
+  },
+  "build": {
+    "exitCode": 0,
+    "seconds": 20.8,
+    "warning": "Existing large chunks"
+  },
+  "audits": [
+    {
+      "name": "network-budget",
+      "exitCode": 0,
+      "output": "Network budget sliders: exact endpoints, useful small amounts, clamping and safe whole USD PASS"
+    },
+    {
+      "name": "build-status-polish",
+      "exitCode": 0,
+      "output": "PASS room contract boundaries and canonical commissioning checks\nPASS 14-segment regional summaries, proportions and small-outage visibility\nPASS small-market failures remain visible in the aggregate summary"
+    },
+    {
+      "name": "facility-map",
+      "exitCode": 0,
+      "output": "PASS capacity boundaries, exact demand/spare semantics, burst distinction and map removal"
+    },
+    {
+      "name": "network-suggestions",
+      "exitCode": 0,
+      "output": "US+IN generation=580.8ms validation=2.8ms candidates=144\nCAREER settled $150M / cash $100M: zero and funded plans pass; unpaid $100M/$100M+1 and current-money Apply gates PASS\nNetwork suggestions: planner, hard limits, current-input apply, preservation, cancellation, deterministic output and sheet render PASS"
+    },
+    {
+      "name": "build-reconciliation",
+      "exitCode": 0,
+      "output": "{\"titles\":0,\"countries\":197,\"generationMs\":1897.3,\"scenarioReadMs\":1.5,\"likely\":0,\"surge\":0,\"unavailable\":189,\"degraded\":8}"
+    },
+    {
+      "name": "launch-cheats",
+      "exitCode": 0,
+      "output": "PASS fresh and existing company preparation, 197 markets, true wizard gates, rights/localization preservation and retry\n{\"result\":\"PASS real commission and full weekly processing\",\"savedWeeks\":15,\"programme\":\"READY_TO_OPEN\",\"canLaunch\":true}"
+    },
+    {
+      "name": "infrastructure-read-forecast",
+      "exitCode": 0,
+      "output": "\n\n\u2714 public forecast math retains the complete checkpoint output across ten canonical draft variants (24.98175ms)\n\u2714 read-only empty drawing matches the complete saved canonical forecast (35.198ms)\n\u2714 read-only legacy placements matches the complete saved canonical forecast (33.284ms)\n\u2714 read-only facilities and rack groups matches the complete saved canonical forecast (33.859ms)\n\u2714 read-only edited legacy placements with stale facilities matches the complete saved canonical forecast (32.386125ms)\n\u2714 read-only rounded pricing and demand matches the complete saved canonical forecast (34.440541ms)\n\u2714 read-only malformed legacy values matches the complete saved canonical forecast (31.318083ms)\n\u2714 read-only hands-on management matches the complete saved canonical forecast (32.253666ms)\n\u2714 read-only rollout SAFE matches the complete saved canonical forecast (31.377958ms)\n\u2714 read-only rollout STANDARD matches the complete saved canonical forecast (34.224917ms)\n\u2714 read-only rollout RUSHED matches the complete saved canonical forecast (31.23775ms)\n\u2714 save rounding is observable in the read-only result (0.793875ms)\n\u2714 one read normalizes the live platform once instead of saving and compacting it (0.688459ms)\n\u2714 the read helper sees current canonical changes and does not retain an authorization cache (3.699708ms)\n\u2714 commissioned and legacy invalid-state careers keep the existing public forecast behavior (11.022167ms)\n\u2714 a read never rebinds stale rehearsal evidence or clears the real commissioning gate (8.444542ms)\n\u2714 large worldwide topology keeps exact rehearsal signatures through save normalization (8.770542ms)\n\u2139 tests 17\n\u2139 suites 0\n\u2139 pass 17\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 393.889917\n\n  ../../../../tmp/audit-streaming-infrastructure-read-forecast.cjs  6.2mb \u26a0\ufe0f\n"
+    },
+    {
+      "name": "launch-s1-rehearsal",
+      "exitCode": 0,
+      "output": "\n\n\u2714 all-market tally and local route diagnosis explain failure despite global spare capacity (1.155583ms)\n\u2714 routed market diagnosis names its city and local load (0.152208ms)\n\u2714 partial route failure is degraded playback, not a total country outage (0.106459ms)\n\u2714 missing delivery routes get a coverage repair, never an invented server purchase (0.108ms)\n\u2714 partial geographic reach cannot turn into complete playback just because one route exists (0.369ms)\n\u2714 successful burst delivery is playing, not an invented buffering incident (0.12025ms)\n\u2714 physical repair targets the actual constraint rather than the first available upgrade (0.121916ms)\n\u2139 tests 7\n\u2139 suites 0\n\u2139 pass 7\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 4.711042\n\n  ../../../../tmp/audit-streaming-launch-s1-rehearsal.cjs  24.7kb\n"
+    },
+    {
+      "name": "build-test-autosave-gates",
+      "exitCode": 0,
+      "output": "\n\nStreaming Build Test, autosave, and launch-gate audit passed.\n\u25b2 [WARNING] Ignoring this import because \"components/studio-finance/styles/tokens.css\" was marked as having no side effects [ignored-bare-import]\n\n    components/studio-finance/components/build/BuildWizard.tsx:32:7:\n      32 \u2502 import '../../styles/tokens.css';\n         \u2575        ~~~~~~~~~~~~~~~~~~~~~~~~~\n\n\u25b2 [WARNING] Ignoring this import because \"components/studio-finance/styles/studio-finance.css\" was marked as having no side effects [ignored-bare-import]\n\n    components/studio-finance/components/build/BuildWizard.tsx:33:7:\n      33 \u2502 import '../../styles/studio-finance.css';\n         \u2575        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n\n\u25b2 [WARNING] Ignoring this import because \"components/studio-finance/styles/launch.css\" was marked as having no side effects [ignored-bare-import]\n\n    components/studio-finance/components/build/BuildWizard.tsx:34:7:\n      34 \u2502 import '../../styles/launch.css';\n         \u2575        ~~~~~~~~~~~~~~~~~~~~~~~~~\n\n\u25b2 [WARNING] Ignoring this import because \"components/studio-finance/styles/kit.css\" was marked as having no side effects [ignored-bare-import]\n\n    components/studio-finance/components/build/BuildWizard.tsx:35:7:\n      35 \u2502 import '../../styles/kit.css';\n         \u2575        ~~~~~~~~~~~~~~~~~~~~~~\n\n\u25b2 [WARNING] Ignoring this import because \"components/studio-finance/styles/build.css\" was marked as having no side effects [ignored-bare-import]\n\n    components/studio-finance/components/build/BuildWizard.tsx:36:7:\n      36 \u2502 import '../../styles/build.css';\n         \u2575        ~~~~~~~~~~~~~~~~~~~~~~~~\n\n\u25b2 [WARNING] Ignoring this import because \"components/studio-finance/styles/network.css\" was marked as having no side effects [ignored-bare-import]\n\n    components/studio-finance/components/build/BuildWizard.tsx:37:7:\n      37 \u2502 import '../../styles/network.css';\n         \u2575        ~~~~~~~~~~~~~~~~~~~~~~~~~~\n\n6 of 9 warnings shown (disable the message limit with --log-limit=0)\n\n  ../../../../tmp/audit-streaming-build-test-autosave-gates.cjs  3.3mb \u26a0\ufe0f\n"
+    },
+    {
+      "name": "physical-infrastructure-phase5",
+      "exitCode": 0,
+      "output": "\n\nEMPIRE+ Phase 5 physical infrastructure audit passed.\n\n  ../../../../tmp/audit-streaming-physical-infrastructure-phase5.mjs  5.2mb \u26a0\ufe0f\n"
+    },
+    {
+      "name": "network-scale",
+      "exitCode": 0,
+      "output": "US+IN generation=494.5ms validation=2.6ms candidates=144\nCAREER settled $150M / cash $100M: zero and funded plans pass; unpaid $100M/$100M+1 and current-money Apply gates PASS\nCanonical 5000 titles / 2 markets: generation=294.6ms apply=4.2ms longest work slice=4.7ms candidates=144\nCanonical 5000 titles / 197 markets: generation=1924.7ms apply=7.5ms longest work slice=21.8ms candidates=432\nNetwork suggestions: planner, hard limits, current-input apply, preservation, cancellation, deterministic output and sheet render PASS"
+    },
+    {
+      "name": "reconciliation-5000",
+      "exitCode": 0,
+      "output": "{\"titles\":5000,\"countries\":197,\"generationMs\":2731.8,\"scenarioReadMs\":5.9,\"likely\":5188122,\"surge\":9079237,\"unavailable\":1,\"degraded\":2}"
+    },
+    {
+      "name": "capacity-career",
+      "exitCode": 0,
+      "output": "{\"titles\":52,\"markets\":197,\"ssrRenderMs\":7.1}\n{\"titles\":5000,\"markets\":197,\"ssrRenderMs\":10.7}"
+    }
+  ]
+}

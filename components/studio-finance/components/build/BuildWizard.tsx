@@ -9,7 +9,7 @@
    commissioning sequence in the last stage runs.
    ========================================================================== */
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { BuildData, BuildDraft, BuildHandlers, BuildStageId, BuildTotals } from '../../finance/build';
 import {
   BUILD_STAGES, CLOUD_WEEKLY_PER_RACK, OPEN_TIERS, REDUNDANCY_COPY, SERVER_TIERS, STAGE_STATE_COPY,
@@ -40,6 +40,7 @@ import '../../styles/cine.css';
 export interface BuildWizardProps extends BuildHandlers {
   data: BuildData;
   initialStage?: BuildStageId;
+  networkRequest?: { id: number; regionId?: string };
   initialDraft?: BuildDraft;
   initialSheet?: 'money' | 'build' | null;
   launchBudgetSummary?: LinkedBudgetSummary;
@@ -109,8 +110,13 @@ function BuildHeaderLine({ data, totals }: { data: BuildData; totals: BuildTotal
     : 'ready on the night'}</>;
 }
 
-export function BuildWizard({ data, initialStage = 'network', initialDraft, initialSheet, launchBudgetSummary, onDraftChange, ...handlers }: BuildWizardProps) {
+export function BuildWizard({ data, initialStage = 'network', initialDraft, initialSheet, launchBudgetSummary, onDraftChange, networkRequest, ...handlers }: BuildWizardProps) {
   const [stageId, setStageId] = useState<BuildStageId>(initialStage);
+  const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null);
+  useEffect(() => { if (networkRequest) {
+    setStageId('network'); setOpenSheet(null);
+    if (networkRequest.regionId) setSelectedRegionId(networkRequest.regionId);
+  } }, [networkRequest]);
   const [openSheet, setOpenSheet] = useState<'money' | 'build' | null>(initialSheet ?? null);
   /* Hands-on, always (#103): nobody drafts the network for you. */
   const [draft, setDraft] = useState<BuildDraft>(() => initialDraft ?? blankDraft(data, 'HANDS'));
@@ -127,6 +133,7 @@ export function BuildWizard({ data, initialStage = 'network', initialDraft, init
     setOpenSheet(null);
     setTeamProposal(null);
     setStageId('network');
+    setSelectedRegionId(null);
     setDraft(blankDraft(data, 'HANDS'));
   };
   const externalRehearsal = initialDraft?.rehearsal ?? null;
@@ -146,9 +153,15 @@ export function BuildWizard({ data, initialStage = 'network', initialDraft, init
     });
   }, [externalRehearsal]);
 
+  const draftChangeRef = useRef(onDraftChange);
+  draftChangeRef.current = onDraftChange;
+  // Evidence and callback refreshes are not configuration edits. In particular,
+  // recording a successful rehearsal must not immediately erase that evidence.
   useEffect(() => {
-    onDraftChange?.(draft);
-  }, [draft, onDraftChange]);
+    draftChangeRef.current?.(draft);
+  }, [draft.facilities, draft.architecture, draft.ownedShare, draft.doctrine,
+    draft.campaignId, draft.mode, draft.instructions, draft.repairIds,
+    draft.teamPlanApproved, draft.teamPlanClass]);
 
   const brand = useMemo(() => brandVars(data.company.brandHex), [data.company.brandHex]);
   const index = Math.max(0, BUILD_STAGES.findIndex((s) => s.id === stageId));
@@ -189,7 +202,7 @@ export function BuildWizard({ data, initialStage = 'network', initialDraft, init
      as something you had to do before taking control, in that order, or not at
      all. The wizard owns the draft, so the wizard answers it. */
   const hasWork = useMemo(() => buildDraftHasWork(data, draft, Boolean(teamProposal)), [data, draft, teamProposal]);
-  const shared = { data, draft, patch, totals, plan, services, handlers, managed, teamProposal, setTeamProposal, onJump: selectStage, onStartOver: hasWork && !marketLocked ? () => setConfirmReset(true) : undefined };
+  const shared = { selectedRegionId, onSelectRegion: setSelectedRegionId, data, draft, patch, totals, plan, services, handlers, managed, teamProposal, setTeamProposal, onJump: selectStage, onStartOver: hasWork && !marketLocked ? () => setConfirmReset(true) : undefined };
   /* Network is not wrapped: under a team plan you must still be able to open a
      city and read what they did, which a disabled fieldset would prevent. It
      locks its own controls instead, and carries the way to take control. */
@@ -580,6 +593,9 @@ function Tick() {
 }
 
 export interface StageProps {
+  selectedRegionId?: string | null;
+  onSelectRegion?: (id: string | null) => void;
+  focusRegionId?: string;
   data: BuildData;
   draft: BuildDraft;
   patch: (next: Partial<BuildDraft>) => void;

@@ -11,7 +11,8 @@ export type NetworkSuggestionMode = 'BUDGET' | 'BALANCED' | 'PREMIUM';
 export interface NetworkSuggestionRequest {
   mode: NetworkSuggestionMode;
   upfrontLimit: number;
-  weeklyLimit: number;
+  /** Optional legacy hard cap. The normal editor quotes weekly operation as an output. */
+  weeklyLimit?: number;
   replaceUnbuilt: boolean;
 }
 export const NETWORK_SUGGESTION_TARGETS: Record<NetworkSuggestionMode, number> = { BUDGET: 1, BALANCED: 1.2, PREMIUM: 1.5 };
@@ -58,8 +59,9 @@ const fail = (message: string): NetworkSuggestionResult => ({ status: 'INVALID',
 function requestError(data: BuildData, request: NetworkSuggestionRequest): string | null {
   if (!Object.hasOwn(NETWORK_SUGGESTION_TARGETS, request.mode)
     || typeof request.replaceUnbuilt !== 'boolean') return 'Choose a suggestion mode and a plan option.';
-  if (![request.upfrontLimit, request.weeklyLimit].every(n => Number.isSafeInteger(n) && n >= 0))
-    return 'Enter exact, non-negative whole USD amounts for both limits.';
+  if (!Number.isSafeInteger(request.upfrontLimit) || request.upfrontLimit < 0
+    || request.weeklyLimit !== undefined && (!Number.isSafeInteger(request.weeklyLimit) || request.weeklyLimit < 0))
+    return 'Enter an exact, non-negative whole USD budget.';
   if (data.hasExplicitOpeningMarkets !== true || !data.markets.length || !selectedCodes(data).size)
     return 'Choose and confirm opening markets in Define the Launch first.';
   const codes = selectedCodes(data);
@@ -134,7 +136,7 @@ function affordable(data: BuildData, request: NetworkSuggestionRequest, value: E
   // Explicit canonical deferred excludes already-settled launch/catalogue spend.
   // Only legacy money without that accounting needs the committedLaunch fallback.
   const deferred = value.money.deferred ?? Math.max(0, value.money.total - value.upfront, data.treasury.committedLaunch);
-  return value.upfront <= request.upfrontLimit && value.weekly <= request.weeklyLimit
+  return value.upfront <= request.upfrontLimit && (request.weeklyLimit === undefined || value.weekly <= request.weeklyLimit)
     && value.upfront + deferred <= Math.min(data.treasury.available, value.money.available);
 }
 function structuralError(data: BuildData, original: BuildDraft, request: NetworkSuggestionRequest, proposed: BuildDraft): string | null {
@@ -253,8 +255,8 @@ export async function createNetworkSuggestion(data: BuildData, draft: BuildDraft
     const warnings: string[] = [];
     if (!best.complete) warnings.push('Partial suggestion: no complete plan was found in the bounded comparison.');
     const gaps = best.services.filter(service => !countryServiceCoverageValid(service) || service.coveredShare < .999999);
-    if (gaps.length) warnings.push(`Remaining service gaps: ${gaps.map(service => service.name).join(', ')}. Geography, residency and available sites can limit coverage.`);
-    if (!best.capacityTargetMet) warnings.push(`Capacity is short of the ${multiplier}× likely-demand target.`);
+    if (gaps.length) warnings.push(`${gaps.length} markets still have service gaps. Check the regions below for geography, local capacity or site limits.`);
+    if (!best.capacityTargetMet) warnings.push(`Some regions are short of the ${multiplier}× demand target, even if total network capacity is higher.`);
     if (capLimited) warnings.push('Some evaluated plans exceeded the spending limits or available funds.');
     warnings.push('Practical bounded comparison; costs are evaluated quotes, not a proven minimum.');
     control.onProgress?.({ evaluated, maximum });

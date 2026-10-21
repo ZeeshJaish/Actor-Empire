@@ -8,13 +8,12 @@
    · THE BOARD — the real-world thing a viewer meets when a service is in
      trouble is a status page: the banner, the row of little bars, the list of
      affected components. So opening night is drawn as your status page before
-     it happens. One bar per market, ordered west to east — the way a premiere
+     it happens. Regional summaries, with smaller launches ordered west to east — the way a premiere
      actually crosses the world — each coloured by the state the engine gives
      it, sweeping in as the night sweeps. Under the banner, the markets that
      will be affected and what would fix each one. Under those, capacity as the
-     thing it actually is: every cabinet in the network standing in an aisle,
-     the ones opening night lights up lit, owned faces solid and rented ones
-     outlined, and the machines with no floor standing past the end.
+     load and headroom, followed by actual facility forecasts grouped by region.
+     Physical rooms and cloud sites keep their own identity and health.
    · WHAT HAPPENED — the evidence from the last run. The rehearsal returns the
      night country by country and room by room, and this page used to throw
      all of it away on one line of summary. It does not any more: the markets
@@ -30,105 +29,15 @@
 import { SCENARIOS, SERVICE_COPY, SUPPLY_COPY, countryServiceCoverageValid, rehearsalStale } from '../../finance/build';
 import type { CountryService, Limiting, ServiceState } from '../../finance/build';
 import { compactCount, pct } from '../../finance/format';
-import { Bars, Figure, Verdict, type KitTone } from '../kit';
+import { Bars, Verdict, type KitTone } from '../kit';
+import { regionsOf } from '../../finance/placer';
+import { regionalStatusSegments } from '../../finance/regionalStatus';
 import type { StageProps } from './BuildWizard';
+import { FacilityCapacityPanel } from './FacilityCapacityPanel';
 
 const whole = (value: number): string => String(Math.round(value));
-const percent = (value: number): string => pct(value, 0);
-
-/* --- the aisle --------------------------------------------------------------
-   Every cabinet in the network, standing on a floor, and how many of them the
-   night actually lights up. Owned faces are solid and rented ones outlined,
-   which is how the room's own rack wall already draws the difference, so this
-   is the same world seen from further back. */
-
-const AISLE_MAX = 480;
-
-/** How the aisle divides. The caption reads from this too, so it can never
-    claim a rented machine the picture has not drawn — with two machines and a
-    22% burst share there is no whole machine to call rented, and saying "some
-    rented" over an aisle of two solid faces is a small lie. */
-function aisleSplit(racks: number, own: number, carried: number) {
-  const drawn = Math.min(AISLE_MAX, Math.max(1, Math.round(racks)));
-  const owned = carried > 0 ? Math.round(drawn * (own / carried)) : drawn;
-  return { drawn, owned, rented: drawn - owned };
-}
-
-function Aisle({ racks, peak, carried, own }: {
-  racks: number;
-  peak: number;
-  carried: number;
-  /** Steady capacity — the rest of what is carried is rented burst. */
-  own: number;
-}) {
-  const { drawn, owned: ownedCabinets } = aisleSplit(racks, own, carried);
-  const columns = drawn > 200 ? 32 : drawn > 80 ? 20 : drawn > 24 ? 12 : 8;
-  const rows = Math.ceil(drawn / columns);
-  const cell = 100 / columns;
-  const cab = cell * 0.74;
-  const cabHeight = cab * 1.5;
-  const rowHeight = cabHeight * 1.32;
-
-  /* The cabinets you own come first, so the lit block only reaches the rented
-     ones when the night has asked for more than you own. */
-  const load = carried > 0 ? peak / carried : 0;
-  const lit = Math.max(0, Math.min(drawn, Math.round(drawn * Math.min(1, load))));
-  const over = load > 1;
-  /* Whoever is left when the aisle is full is standing outside it. */
-  const stranded = over
-    ? Math.min(columns * 2, Math.max(1, Math.round(drawn * (load - 1))))
-    : 0;
-
-  const at = (index: number) => ({
-    x: (index % columns) * cell + (cell - cab) / 2,
-    y: Math.floor(index / columns) * rowHeight,
-  });
-  const floor = rows * rowHeight;
-  const strandedRows = stranded > 0 ? Math.ceil(stranded / columns) : 0;
-  const height = floor + (stranded > 0 ? 6 + strandedRows * rowHeight : 0);
-
-  return (
-    <svg
-      className={over ? 'bw-aisle is-over' : 'bw-aisle'}
-      viewBox={`0 0 100 ${height.toFixed(2)}`}
-      role="img"
-      aria-label={`${racks} machines, ${Math.round(Math.min(1, load) * 100)}% of the network under load`}
-    >
-      {Array.from({ length: drawn }, (unused, index) => {
-        const spot = at(index);
-        const rented = index >= ownedCabinets;
-        const on = index < lit;
-        return (
-          <g key={index} className={`bw-aisle-cab${on ? ' is-lit' : ''}${rented ? ' is-rented' : ''}`}>
-            <rect x={spot.x} y={spot.y} width={cab} height={cabHeight} rx={cab * 0.18} />
-            {/* The strip of drive lights down a live cabinet's face. */}
-            {on && <rect className="bw-aisle-lamp" x={spot.x + cab * 0.22} y={spot.y + cabHeight * 0.18} width={cab * 0.56} height={cabHeight * 0.16} rx={cabHeight * 0.08} />}
-          </g>
-        );
-      })}
-
-      {stranded > 0 && (
-        <>
-          <line className="bw-aisle-edge" x1="0" y1={floor + 3} x2="100" y2={floor + 3} />
-          {Array.from({ length: stranded }, (unused, index) => {
-            const spot = at(index);
-            return (
-              <rect
-                key={`over-${index}`}
-                className="bw-aisle-stranded"
-                x={spot.x}
-                y={floor + 6 + spot.y}
-                width={cab}
-                height={cabHeight}
-                rx={cab * 0.18}
-              />
-            );
-          })}
-        </>
-      )}
-    </svg>
-  );
-}
+const percent = (value: number): string => value > 0 && value < .1 ? '<0.1%'
+  : value > 0 && value < 100 ? pct(Math.floor(value * 10) / 10, 1) : pct(value, 0);
 
 /* The kit's unit slot is a <s>, and this page's time is asserted not to use
    strike-through markup, so ms and % carry their own. */
@@ -172,6 +81,8 @@ export function StageTest({ data, draft, totals, services, handlers, onJump }: S
     data.markets?.find((market) => market.id === service.marketId)?.coord.lng ?? 0
   );
   const strip = [...services].sort((left, right) => longitudeOf(left) - longitudeOf(right));
+  const regionStrips = regionsOf(data).map(region => ({ region, services: strip.filter(service => region.markets.some(market => market.id === service.marketId)) })).filter(group => group.services.length);
+  const viewerGap = Math.max(0, expectedPeak - services.reduce((sum, service) => sum + service.coveredPeak, 0));
   const ready = services.filter((service) => service.state === 'READY').length;
   const affected = [...services]
     .filter((service) => service.state !== 'READY')
@@ -217,11 +128,11 @@ export function StageTest({ data, draft, totals, services, handlers, onJump }: S
       ? 'The rehearsal service is unavailable. Return to the Streaming Hall and reopen Build.'
       : '';
 
-  const loadPct = carried > 0 ? Math.round((expectedPeak / carried) * 100) : 0;
-  const { rented } = aisleSplit(machines, totals.capacity, carried);
   const failedCountries = result
     ? [...result.countries].filter((country) => country.failedPct > 0).sort((left, right) => right.failedPct - left.failedPct)
     : [];
+  const failedAudiencePct = result ? result.countries.reduce((sum, country) => sum + country.demand * country.failedPct, 0)
+    / Math.max(1, result.countries.reduce((sum, country) => sum + country.demand, 0)) : 0;
   const hotRooms = result
     ? [...result.rooms].sort((left, right) => right.load - left.load).slice(0, 3)
     : [];
@@ -259,13 +170,25 @@ export function StageTest({ data, draft, totals, services, handlers, onJump }: S
 
         {strip.length > 0 && (
           <>
-            {/* One bar per market, west to east, the way the night crosses the
-                world — and the way the proposal's skylines light up. */}
-            {/* A status page has ninety bars and can leave them unlabelled.
-                Two markets cannot: two anonymous slabs say nothing. Up to a
-                dozen, every bar is named; past that the strip goes dense and
-                the names would not fit anyway. */}
-            <div
+            {/* Regional bars show proportions on a fixed scale. Exact counts
+                remain visible, including problems smaller than one segment. */}
+            {strip.length > 12 ? <div className="bw-board-regions" aria-label={`${ready} of ${strip.length} markets operational`}>
+              {regionStrips.map(({ region, services }) => {
+                const counts = {
+                  good: services.filter(service => service.state === 'READY').length,
+                  warn: services.filter(service => service.state === 'WATCH' || service.state === 'POOR').length,
+                  bad: services.filter(service => service.state === 'UNSTABLE' || service.state === 'NONE').length,
+                };
+                const label = `${region.name}: ${counts.good} operational, ${counts.warn} degraded, ${counts.bad} unavailable or unstable, ${services.length} markets total`;
+                return <div key={region.id}>
+                  <p><b>{region.name}</b><span>{counts.good}/{services.length}</span></p>
+                  <div className="bw-board-strip bw-board-summary" role="img" aria-label={label} title={label}>
+                    {regionalStatusSegments(services.map(service => service.state)).map((tone, index) => <span key={index} aria-hidden="true" className={`bw-board-bar is-${tone}`}><i/></span>)}
+                  </div>
+                  <small className="bw-board-counts">{counts.warn + counts.bad === 0 ? 'All operational' : [counts.warn ? `${counts.warn} degraded` : '', counts.bad ? `${counts.bad} down / unstable` : ''].filter(Boolean).join(' · ')}</small>
+                </div>;
+              })}
+            </div> : <div
               className={strip.length <= 12 ? 'bw-board-strip is-few' : 'bw-board-strip'}
               role="img"
               aria-label={`${ready} of ${strip.length} markets operational`}
@@ -281,15 +204,16 @@ export function StageTest({ data, draft, totals, services, handlers, onJump }: S
                   <em>{service.code}</em>
                 </span>
               ))}
-            </div>
+            </div>}
             <p className="bw-board-axis">
-              <span>West</span>
+              <span>{strip.length > 12 ? 'Approximate share · exact counts above' : 'West'}</span>
               <span><b>{ready}</b> of {strip.length} operational</span>
-              <span>East</span>
+              <span>{strip.length > 12 ? '' : 'East'}</span>
             </p>
           </>
         )}
 
+        {viewerGap > 0 && <p className="bw-board-gap">{viewerGap.toLocaleString()} expected viewers are outside smooth service. Regional totals can hide small-country gaps.</p>}
         {affected.length > 0 && (
           <ul className="bw-board-affected" aria-label="Markets that will be affected">
             {affected.slice(0, 4).map((service) => (
@@ -314,37 +238,18 @@ export function StageTest({ data, draft, totals, services, handlers, onJump }: S
           </ul>
         )}
 
-        <p className="kit-title bw-board-rule"><b>Capacity</b><em>{loadPct}% under load</em></p>
-
-        <p className="bw-paper-figure">
-          <Figure value={expectedPeak} format={compactCount} />
-          <em>expected at peak, of {compactCount(carried)} this network can carry</em>
-        </p>
-
-        {machines > 0 && (
-          <Aisle racks={machines} peak={expectedPeak} carried={carried} own={totals.capacity} />
-        )}
-
-        <p className="bw-paper-scale">
-          <span>
-            {machines} {machines === 1 ? 'machine' : 'machines'}
-            {rented > 0 && <><i aria-hidden="true" className="bw-paper-key" />{rented} rented</>}
-          </span>
-          <span className={clears ? '' : 'is-over'}>
-            {clears
-              ? `${loadPct}% under load · ${compactCount(carried - expectedPeak)} spare`
-              : `${loadPct}% · ${compactCount(expectedPeak - carried)} with nowhere to go`}
-          </span>
-        </p>
+        <FacilityCapacityPanel totals={totals} expectedPeak={expectedPeak}/>
 
         <Verdict
-          label={unavailable > 0 ? 'Coverage unavailable' : machines === 0 ? 'Nothing to test' : clears ? 'Clears on paper' : 'Short on paper'}
+          label={unavailable > 0 ? 'Coverage unavailable' : machines === 0 ? 'Nothing to test' : clears ? affected.length ? 'Global capacity clears · local gaps remain' : 'Capacity clears on paper' : 'Short on paper'}
           tone={unavailable > 0 ? 'bad' : machines === 0 ? 'flat' : clears ? 'good' : 'bad'}
           line={unavailable > 0
             ? 'The service projection is incomplete. This drawing cannot be verified or commissioned.'
             : machines === 0
             ? 'There is no network to test yet. Put a room on the map and fill it.'
-            : 'A status page is drawn from what the drawing says. Only the rehearsal puts a real night through it.'}
+            : affected.length > 0
+            ? 'Total capacity can be sufficient while local routes still need attention.'
+            : 'Run a rehearsal to verify delivery when the audience arrives.'}
         />
         <p className="bw-evidence-note">This load rehearsal tests routed traffic. Geographic coverage of every opening market is checked separately before commissioning.</p>
 
@@ -390,7 +295,7 @@ export function StageTest({ data, draft, totals, services, handlers, onJump }: S
                 ? `${compactCount(result.peak)} at peak with ${compactCount(result.spare)} to spare.`
                 : result.verdict === 'RENTED'
                   ? 'Burst capacity carried the night. Rented machines hold it up, and cost every week.'
-                  : `${percent(result.failedPct)} of viewers could not watch.`}
+                  : `${percent(failedAudiencePct)} of viewers could not watch.`}
             />
           )}
 

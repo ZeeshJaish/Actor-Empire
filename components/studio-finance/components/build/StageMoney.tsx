@@ -18,7 +18,7 @@
    dial's last position.
    ========================================================================== */
 
-import { useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type {
   OwnedStreamingLaunchMarketingDraft,
   StreamingLaunchMarketingAllocationMode,
@@ -30,7 +30,7 @@ import type { RoomCounterpart, SpendLine } from '../../finance/build';
 import { roomCounterparts } from '../../finance/build';
 import { regionOfCity, regionsOf } from '../../finance/placer';
 import { compactCount, money, moneyPrecise, pct as formatPct } from '../../finance/format';
-import { Sheet } from '../ui';
+import { budgetAmountAt, budgetPositionFor } from '../../finance/networkBudget';
 import { Dial, Figure, Hud, Split, Step, Tile, Verdict, type KitPartTone } from '../kit';
 
 const OBJECTIVES: Array<{ id: StreamingLaunchMarketingObjective; label: string; line: string }> = [
@@ -46,14 +46,34 @@ const TIMELINES: Array<{ id: StreamingLaunchMarketingTimeline; label: string; li
   { id: 'LAST_WEEK_PUSH', label: 'Last-week push', line: 'A louder opening moment with more volatility.' },
 ];
 
-/* The team's four recommended ceilings, in the order the dial shows them. */
-type Level = 'lean' | 'balanced' | 'heavy' | 'event';
-const LEVELS: Array<{ id: Level; name: string; line: string }> = [
-  { id: 'lean', name: 'Lean', line: 'Credible presence in every market.' },
-  { id: 'balanced', name: 'Balanced', line: 'Best cost-to-acquisition mix.' },
-  { id: 'heavy', name: 'Heavy', line: 'Wider awareness, weaker marginal returns.' },
-  { id: 'event', name: 'Event', line: 'A major simultaneous opening moment.' },
-];
+/** Budget drags are local; forecast/save happens once on release. */
+function MarketingBudget({ value, treasury, available, recommendations, onCommit }: {
+  value: number; treasury: number; available: number;
+  recommendations: Record<'lean' | 'balanced' | 'heavy' | 'event', number>;
+  onCommit: (value: number) => void;
+}) {
+  const maximum = Math.max(0, Math.floor(treasury));
+  const [text, setText] = useState(String(value));
+  const pending = useRef(value);
+  useEffect(() => { setText(String(value)); pending.current = value; }, [value]);
+  const amount = /^\d+$/.test(text.trim()) ? Number(text) : NaN;
+  const valid = Number.isSafeInteger(amount) && amount >= 0 && amount <= maximum;
+  const band = !valid ? 'Enter a valid amount' : amount === 0 ? 'Organic'
+    : amount < (recommendations.lean + recommendations.balanced) / 2 ? 'Lean'
+      : amount < (recommendations.balanced + recommendations.heavy) / 2 ? 'Balanced' : amount < (recommendations.heavy + recommendations.event) / 2 ? 'Heavy' : 'Event';
+  const commit = () => { if (valid && amount !== value) onCommit(amount); };
+  const position = budgetPositionFor(valid ? amount : 0, maximum);
+  return <div className="bw-budget bw-marketing-budget">
+    <div className="bw-budget-label"><b>{valid ? money(amount) : '—'}</b><span className="bw-marketing-band">{band}</span></div>
+    <label className="bw-budget-amount"><span aria-hidden="true">$</span><input aria-label="Marketing budget amount" type="text" inputMode="numeric" value={text} aria-invalid={!valid} onChange={event => setText(event.target.value)} onBlur={commit} onKeyDown={event => { if (event.key === 'Enter') commit(); }}/><span>USD</span></label>
+    <input className="bw-budget-slider" type="range" min="0" max="1000" step="1" value={position} aria-label="Marketing budget slider" aria-valuetext={valid ? money(amount) : 'Enter a valid amount'} onChange={event => { const next = budgetAmountAt(Number(event.target.value), maximum); pending.current = next; setText(String(next)); }} onPointerUp={() => { if (pending.current !== value) onCommit(pending.current); }} onKeyUp={commit} onBlur={commit} style={{ '--budget-fill': `${position / 10}%` } as CSSProperties}/>
+    <div className="bw-budget-range"><span>$0 · Organic</span><span>{money(maximum)} treasury</span></div>
+    <p>{money(Math.max(0, available))} available after the network and operating reserve.</p>
+    {!valid && <p className="bw-budget-error" role="status">Enter whole dollars between $0 and {money(maximum)}.</p>}
+    {valid && amount > available && <p className="bw-budget-error" role="status">This leaves a {money(amount - Math.max(0, available))} funding shortfall. Reduce the plan or add funds before commissioning.</p>}
+    <p>Balanced recommendation: {money(recommendations.balanced)}. Forecast updates when you finish adjusting.</p>
+  </div>;
+}
 
 /* The bill's parts, by when the money moves. A part's tone is its identity
    everywhere on the page: the bar, and the swatch beside its lines. */
@@ -151,7 +171,6 @@ export function StageMoney({ data, draft: build, totals, plan, handlers }: Stage
   const marketing = data.marketing;
   const draft = marketing?.draft;
   const forecast = marketing?.forecast;
-  const [customOpen, setCustomOpen] = useState(false);
   const setMarketing = (patch: Partial<OwnedStreamingLaunchMarketingDraft>) => handlers.onChangeMarketing?.(patch);
   /* A stage handed a partial draft (the marketing audits pass one with no
      facilities) has no rooms to bill. */
@@ -201,12 +220,6 @@ export function StageMoney({ data, draft: build, totals, plan, handlers }: Stage
   const netCrossover = netSaves > 0 && yoursOnce > rentedOnce ? Math.ceil((yoursOnce - rentedOnce) / netSaves) : null;
 
   const ceiling = draft?.budgetCeiling ?? 0;
-  const level = marketing ? LEVELS.find((option) => marketing.recommendations[option.id] === ceiling)?.id ?? 'custom' : 'custom';
-  const pickLevel = (id: string) => {
-    if (id === 'custom') { setCustomOpen(true); return; }
-    const option = LEVELS.find((candidate) => candidate.id === id);
-    if (option && marketing) setMarketing({ budgetCeiling: marketing.recommendations[option.id] });
-  };
 
   const groups = BILL_GROUPS
     .map((group) => {
@@ -442,51 +455,12 @@ export function StageMoney({ data, draft: build, totals, plan, handlers }: Stage
           <Verdict label="Waiting" tone="flat" line="Marketing recommendations become available when Day-One markets are confirmed." />
         ) : (
           <>
-            <div className="bw-ceiling-figure">
-              <Figure value={ceiling} format={ceilingFigure} />
-              {forecast && <em>{forecast.customerAcquisitionCost === null ? 'No paid acquisition' : `${moneyPrecise(forecast.customerAcquisitionCost)} a household`}</em>}
-            </div>
-            <Dial
-              label="The team recommends"
-              value={level}
-              options={[
-                ...LEVELS.map((option) => ({ id: option.id, name: option.name, line: `${money(marketing.recommendations[option.id])} · ${option.line}` })),
-                { id: 'custom', name: 'Custom', line: level === 'custom' ? 'Your own ceiling. Shortfalls stay visible.' : 'Any planning value. Shortfalls stay visible.' },
-              ]}
-              onPick={pickLevel}
-            />
+            <MarketingBudget value={ceiling} treasury={data.treasury.available} available={Math.max(0, data.treasury.available - (plan.commissionNow ?? 0) - (totals?.weeklyCost ?? 0) * 12)} recommendations={marketing.recommendations} onCommit={budgetCeiling => setMarketing({ budgetCeiling })} />
+            {forecast && <p className="bw-money-why">{forecast.customerAcquisitionCost === null ? 'No paid acquisition' : `${moneyPrecise(forecast.customerAcquisitionCost)} per acquired household`}</p>}
             <p className="bw-money-why">The campaign spends week by week and stops at this line; the money is reserved, not spent, until it does.</p>
           </>
         )}
       </section>
-
-      {marketing && draft && (
-        <Sheet
-          open={customOpen}
-          onClose={() => setCustomOpen(false)}
-          eyebrow="Marketing ceiling"
-          title="Set any ceiling"
-          footer={<button type="button" className="sf-btn sf-btn--primary" onClick={() => setCustomOpen(false)}>Done</button>}
-        >
-          <label className="bw-ceiling-input">
-            <span>Ceiling</span>
-            <span className="bw-ceiling-field">
-              <i aria-hidden="true">$</i>
-              <input
-                type="number"
-                min="0"
-                step="100000"
-                inputMode="numeric"
-                aria-label="Custom marketing ceiling"
-                value={ceiling}
-                onChange={(event) => setMarketing({ budgetCeiling: Math.max(0, Number(event.currentTarget.value) || 0) })}
-              />
-            </span>
-          </label>
-          <p className="bw-money-why">Authorization only. The campaign spends week by week and stops at this line.</p>
-          <button type="button" className="bw-money-jump" onClick={() => { setMarketing({ budgetCeiling: 0 }); setCustomOpen(false); }}>No paid campaign — open organically</button>
-        </Sheet>
-      )}
 
       {/* ---- the campaign: what it says, when, and where the money goes ------ */}
       {marketing && draft && forecast && (

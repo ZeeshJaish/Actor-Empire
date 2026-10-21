@@ -1,3 +1,5 @@
+import { getStreamingServerSite } from '../../services/streamingServerSites';
+import { RehearsalMarkets } from './RehearsalMarkets';
 /**
  * EMPIRE+ v2 — THE BUILD
  *
@@ -27,7 +29,7 @@ import {
   type NetworkMapNode,
 } from './StreamingBuildNetworkMap';
 import { StreamingFacilityRoom } from './StreamingFacilityRoom';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   OwnedStreamingFacility,
   OwnedStreamingRegionNetworkPlan,
@@ -1897,14 +1899,16 @@ const Rehearsal: React.FC<{
   onOpenContent?: () => void;
   /** Saved careers inject the canonical Phase 3 bridge. Omitted only by legacy labs. */
   forecastFor?: (scenario: StreamingRehearsalScenario) => RunResult;
-}> = ({ brand, d, inp, sel, onClose, onResult, onRepair, onOpenContent, forecastFor }) => {
+  onOpenNetwork?: (regionId?: string) => void;
+}> = ({ brand, d, inp, sel, onClose, onResult, onRepair, onOpenContent, forecastFor, onOpenNetwork }) => {
   const [scenario, setScenario] = useState<Scenario>('LIKELY');
   const [running, setRunning] = useState(false);
   const [t, setT] = useState(0);
   const [result, setResult] = useState<RunResult | null>(null);
   const [viewerMarketId, setViewerMarketId] = useState<string | null>(null);
-  const [viewerViewOpen, setViewerViewOpen] = useState(false);
+
   const raf = useRef(0);
+  const monitorRef = useRef<HTMLDivElement>(null);
 
   const forecast = useMemo(
     () => forecastFor?.(scenario) || deriveStreamingLaunchRehearsal(d, inp, sel, scenario),
@@ -1963,76 +1967,31 @@ const Rehearsal: React.FC<{
   const yOf = (v: number) => H - (v / top) * H;
   const commandStep = result ? 5 : running ? Math.min(5, Math.floor(t * 5) + 1) : 0;
 
-  /* THE VIEWER'S SIDE, WHILE IT IS HAPPENING.
-     The rehearsal already knew what every market would get; it kept it behind
-     a button until the run was over. A premiere is watched, so the stream is
-     on screen while the traffic climbs: playing, then stuttering when the load
-     crosses your own ceiling, then gone when it crosses the rented one. The
-     thresholds are the same two the chart draws its lines at, so the picture
-     and the numbers cannot disagree.
-
-     Who we are watching is the market the forecast says gives first. The
-     reactions are the forecast's own sentences for the markets it says end up
-     in trouble, ordered worst first — only when they arrive follows the
-     curve. */
-  const watching = useMemo(() => (
-    [...forecast.countries].sort((a, b) => b.failedPercent - a.failedPercent)[0] || null
-  ), [forecast.countries]);
+  // Start on the largest audience; selecting a country pins that monitor.
+  const watching = useMemo(() => forecast.countries.find(country => country.marketId === viewerMarketId)
+    || [...forecast.countries].sort((a, b) => b.demand - a.demand)[0] || null, [forecast, viewerMarketId]);
+  const pickMarket = useCallback((id: string) => { setViewerMarketId(id); monitorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, []);
   const watchingDiagnosis = watching ? diagnoseStreamingRehearsalMarket(forecast, watching) : null;
   const marketTally = result ? summarizeStreamingRehearsalMarkets(result) : null;
-  const troubled = useMemo(() => (
-    [...forecast.countries]
-      .filter(country => country.failedPercent > 0 || country.bufferingRiskPercent >= 15 || country.startupTimeMs === null)
-      .sort((a, b) => b.failedPercent - a.failedPercent)
-  ), [forecast.countries]);
-  const playback: 'PLAYING' | 'BUFFERING' | 'DOWN' = result
-    ? (watching ? streamingRehearsalPlayback(watching) : 'PLAYING')
-    : watching?.outageResistance === 'UNSERVED' ? 'DOWN'
-      : brokeNow ? 'DOWN' : overNow ? 'BUFFERING' : 'PLAYING';
-  const reactions = result ? troubled : troubled.slice(0, Math.max(0, Math.floor(((t - .42) / .46) * troubled.length)));
-  const biggestMarket = forecast.countries.reduce((most, country) => Math.max(most, country.demand), 0);
-  /* One health for the whole screen, in one colour: carrying it is green,
-     leaning on rented capacity is amber, past both is red. The readout, the
-     load bar and the program monitor all read from this, so the screen can
-     never be telling you two things at once. */
-  const health: 'good' | 'warn' | 'bad' = result
-    ? (result.verdict === 'BROKE' ? 'bad' : result.verdict === 'BURST' ? 'warn' : 'good')
-    : brokeNow ? 'bad' : overNow ? 'warn' : 'good';
-  const healthClass = health === 'bad' ? css.bad : health === 'warn' ? css.warn : css.good;
-  /* The rest of the gallery. Each market's state is the forecast's own verdict
-     for it; the moment it arrives follows the curve, most fragile first, so the
-     wall turns over in the order the night would actually reach them. */
-  const wall = useMemo(() => {
-    const rest = forecast.countries.filter(country => country.marketId !== watching?.marketId);
-    const fragile = [...rest].sort((a, b) => b.failedPercent - a.failedPercent);
-    return fragile.map((country, index) => {
-      const settled = result || t >= .40 + (index / Math.max(1, fragile.length)) * .42;
-      const state: 'PLAYING' | 'BUFFERING' | 'DOWN' = !settled ? 'PLAYING'
-        : streamingRehearsalPlayback(country);
-      return { country, state };
-    });
-  }, [forecast.countries, result, t, watching]);
-  /* Thirty markets is ten rows of monitors and a scroll nobody watches. The
-     wall is sorted worst first, so the eleven on it are the eleven worth
-     watching, and the rest are counted in a twelfth cell by what they are
-     doing — which is what a multiviewer's overflow page says anyway. */
-  const WALL_CELLS = 11;
-  const wallShown = wall.slice(0, WALL_CELLS);
-  const wallRest = wall.slice(WALL_CELLS);
-  const wallRestTally = {
-    down: wallRest.filter(cell => cell.state === 'DOWN').length,
-    buffering: wallRest.filter(cell => cell.state === 'BUFFERING').length,
-    playing: wallRest.filter(cell => cell.state === 'PLAYING').length,
-  };
-  const viewerCountry = result
-    ? result.countries.find(country => country.marketId === viewerMarketId) || result.countries[0]
-    : null;
-  const viewerDiagnosis = result && viewerCountry ? diagnoseStreamingRehearsalMarket(result, viewerCountry) : null;
+  const stressedFacilities = useMemo(() => [...forecast.facilities].sort((a, b) => b.loadPercent - a.loadPercent).slice(0, 4), [forecast]);
+  const playback = watching ? streamingRehearsalPlayback(watching, forecast, result ? 1 : curveAt(t)) : 'PLAYING';
+  // This gauge describes total capacity, not a country's delivery failure.
+  const capacityDemand = result ? result.peakConcurrentStreams : live;
+  const capacityClass = capacityDemand > forecast.burstCapacity ? css.bad
+    : capacityDemand > forecast.steadyCapacity ? css.warn : css.good;
 
   const applyRehearsalRepair = (action: StreamingRehearsalRepairAction) => {
     if (action.type === 'EXPAND_RIGHTS') {
       onClose();
       onOpenContent?.();
+      return;
+    }
+    if (action.type === 'REVIEW_COVERAGE') { onOpenNetwork?.(action.regionId); return; }
+    if (onOpenNetwork) {
+      const region = forecast.countries.find(country => country.servingCityLabels.includes(
+        forecast.facilities.find(facility => facility.cityId === action.cityId)?.cityLabel || ''))?.regionId
+        || getStreamingServerSite(action.cityId)?.regionId;
+      onOpenNetwork(region);
       return;
     }
     const facilities = facilitiesOf(sel);
@@ -2104,64 +2063,8 @@ const Rehearsal: React.FC<{
               ))}
             </div>
 
-            {/* What is on the line: every market said once, on one line each.
-                Three markets repeating "1.1s startup · 5% buffer risk · 0%
-                catalogue" word for word told you nothing about any of them, so
-                a market now says only what is true of it and what is not
-                ordinary is what stands out. */}
-            <p className={css.rhsub}>
-              What is on the line
-              <em>{forecast.countries.length} {forecast.countries.length === 1 ? 'market' : 'markets'}</em>
-            </p>
-            {/* A note every market carries is a fact about the network, not
-                about any market in it — printing "0% catalogue · one room only"
-                on fourteen rows says nothing fourteen times. Whatever they all
-                share is lifted out and said once; a row then carries only what
-                makes it different. */}
-            {(() => {
-              const shown = forecast.countries.slice(0, 6);
-              const notesOf = (country: typeof forecast.countries[number]) => [
-                country.startupTimeMs === null ? 'no delivery path' : null,
-                country.bufferingRiskPercent >= 15 ? `${country.bufferingRiskPercent}% buffer risk` : null,
-                country.catalogueAvailabilityPercent < 100 ? `${country.catalogueAvailabilityPercent}% catalogue` : null,
-                country.outageResistance === 'SINGLE_POINT' ? 'one room only' : null,
-              ].filter((note): note is string => Boolean(note));
-              const everyone = forecast.countries.length > 1
-                ? notesOf(forecast.countries[0]).filter(note => forecast.countries.every(country => notesOf(country).includes(note)))
-                : [];
-              return (
-                <>
-                  {everyone.length > 0 && (
-                    <Facts className={cx(css.rhlall, css.warn)} of={[`every market: ${everyone.join(' · ')}`]} />
-                  )}
-                  <div className={css.rhlineup}>
-                    {shown.map(country => {
-                      /* The bar is this market's share of the night. */
-                      const share = biggestMarket > 0 ? country.demand / biggestMarket : 0;
-                      const tone = country.verdict === 'BROKE' ? css.bad
-                        : country.bufferingRiskPercent >= 15 || country.outageResistance === 'SINGLE_POINT' ? css.warn : css.good;
-                      const mine = notesOf(country).filter(note => !everyone.includes(note));
-                      return (
-                        <div className={css.rhlrow} key={country.marketId}>
-                          <b>{country.country}</b>
-                          <em className={tone}>{conc(country.demand)}</em>
-                          <span className={css.rhlbar}>
-                            <i className={tone} style={{ width: `${Math.max(4, Math.round(share * 100))}%` }} />
-                          </span>
-                          <Facts
-                            className={cx(css.rhlnote, mine.length ? css.warn : '')}
-                            of={mine.length ? mine : [country.startupTimeMs === null ? 'no delivery path' : `${((country.startupTimeMs || 0) / 1000).toFixed(1)}s to start`, mine.length ? null : 'clear']}
-                          />
-                        </div>
-                      );
-                    })}
-                    {forecast.countries.length > 6 && (
-                      <p className={css.rhmore}>+{forecast.countries.length - 6} more markets in this rehearsal</p>
-                    )}
-                  </div>
-                </>
-              );
-            })()}
+            <RehearsalMarkets result={forecast} selected={watching?.marketId} onSelect={pickMarket}/>
+
           </>
         )}
 
@@ -2175,14 +2078,14 @@ const Rehearsal: React.FC<{
                   percentage used to float beside a 42px number and read as an
                   afterthought pinned to the wrong baseline. */}
               <div className={css.rhreadout} role="status" aria-live="polite">
-                <span>CONCURRENT STREAMS</span>
-                <b className={healthClass}>{conc(result ? result.peakConcurrentStreams : live)}</b>
+                <span>{result ? 'PEAK VIEWERS TOGETHER' : 'VIEWERS WATCHING NOW'}</span>
+                <b className={capacityClass}>{conc(result ? result.peakConcurrentStreams : live)}</b>
                 <em>
-                  <u className={healthClass}>{Math.round(result ? result.peakLoadPercent : loadPct)}%</u>
-                  {' '}of your own capacity · {conc(forecast.steadyCapacity)} carried
+                  <u className={capacityClass}>{Math.round(result ? result.peakLoadPercent : loadPct)}%</u>
+                  {' '}of owned capacity in use
                 </em>
               </div>
-              <svg className={css.rhchart} viewBox={`0 0 ${W} ${H + 16}`} preserveAspectRatio="none">
+              <svg className={css.rhchart} role="img" aria-label="Viewers arriving through the rehearsal" viewBox={`0 0 ${W} ${H + 16}`} preserveAspectRatio="none">
                 {ceilingFits && forecast.burstCapacity > forecast.steadyCapacity && (
                   <line className={css.burstline} x1="0" x2={W} y1={yOf(forecast.burstCapacity)} y2={yOf(forecast.burstCapacity)} />
                 )}
@@ -2194,19 +2097,24 @@ const Rehearsal: React.FC<{
               </svg>
               <div className={css.rhkeys}>
                 {ceilingFits
-                  ? <span><i className={css.kc} />your capacity {conc(forecast.steadyCapacity)}</span>
-                  : <span className={css.rhoffscale}><i className={css.kc} />your capacity {conc(forecast.steadyCapacity)} — above this chart</span>}
+                  ? <span><i className={css.kc} />owned capacity</span>
+                  : <span>Audience over time · scaled to this rehearsal</span>}
                 {ceilingFits && forecast.burstCapacity > forecast.steadyCapacity && <span><i className={css.kb} />protected burst {conc(forecast.burstCapacity)}</span>}
               </div>
               {/* A solid colour that changes, not a gradient that always shows
                   every colour at once and so says nothing. */}
-              <div className={css.rhbar}>
-                <i className={cx(css.fill, healthClass)} style={{ width: `${Math.min(100, loadPct)}%` }} />
+              <div className={css.rhcapacity}>
+                <span>Owned capacity<b>{conc(forecast.steadyCapacity)}</b></span>
+                <span>{(result ? result.peakConcurrentStreams : live) > forecast.steadyCapacity ? 'Backup capacity available' : 'Owned capacity still free'}<b>{conc((result ? result.peakConcurrentStreams : live) > forecast.steadyCapacity ? Math.max(0, forecast.burstCapacity - forecast.steadyCapacity) : Math.max(0, forecast.steadyCapacity - (result ? result.peakConcurrentStreams : live)))}</b></span>
+              </div>
+              <p className={css.rhcapacitynote}>Total network capacity. Local delivery is checked below.</p>
+              <div className={css.rhbar} role="progressbar" aria-label="Owned capacity in use" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(100, Math.round(result ? result.peakLoadPercent : loadPct))} aria-valuetext={`${Math.round(result ? result.peakLoadPercent : loadPct)}% of owned capacity in use`}>
+                <i className={cx(css.fill, capacityClass)} style={{ width: `${Math.min(100, result ? result.peakLoadPercent : loadPct)}%` }} />
               </div>
             </div>
 
             {watching && (
-              <div className={css.rhwatch} aria-label="What a viewer is getting">
+              <div ref={monitorRef} className={css.rhwatch} aria-label="What a viewer is getting">
                 <div className={cx(css.rhwscreen, playback === 'DOWN' ? css.broke : playback === 'BUFFERING' ? css.burst : css.held)}>
                   <i className={css.viewerSignal} aria-hidden="true" />
                   <div className={css.rhwtop}>
@@ -2220,74 +2128,39 @@ const Rehearsal: React.FC<{
                   <div className={css.rhwstate}>
                     {playback === 'PLAYING'
                       ? <><i className={css.viewerPlay}><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="currentColor" /></svg></i><b>PLAYING</b></>
-                      : <><i className={css.viewerSpinner} /><b>{playback === 'DOWN' ? 'STREAM UNAVAILABLE' : 'BUFFERING'}</b></>}
+                      : <><i className={css.viewerSpinner} /><b>{playback === 'DOWN' ? 'STREAM UNAVAILABLE' : 'PLAYBACK DEGRADED'}</b></>}
                   </div>
                   <div className={css.rhwbar}>
                     <i style={{ width: `${Math.round((playback === 'DOWN' ? Math.min(t, .34) : t) * 100)}%` }} />
                   </div>
                 </div>
-                <span className={css.rhwwhere}>
-                  <em>PROGRAM</em>Watching from <b>{watching.country}</b>
-                </span>
-                {watchingDiagnosis && (running || result) && <p className={css.rhwatchreason}>{watchingDiagnosis.reason}</p>}
+                <div className={css.rhwwhere}>
+                  <span>VIEWER CHECK</span><b>{watching.country}</b>
+                  <em className={playback === 'DOWN' ? css.bad : playback === 'BUFFERING' ? css.warn : css.good}>{playback === 'DOWN' ? 'Unavailable' : playback === 'BUFFERING' ? 'Degraded' : 'Playing smoothly'}</em>
+                </div>
+                {watchingDiagnosis && <div className={css.rhwatchreason}>
+                  <p>{playback === 'DOWN' ? 'This market has no working stream.' : playback === 'BUFFERING' ? 'Some viewers may wait or lose playback.' : result && watching.verdict === 'BURST' ? 'Backup capacity is keeping playback smooth.' : 'The selected market is playing normally.'}</p>
+                  {result && <div className={css.rhviewerfacts}>
+                    <span>Stream starts<b>{watching.startupTimeMs === null ? 'No connection' : `${(watching.startupTimeMs / 1000).toFixed(1)}s`}</b></span>
+                    <span>Streams delivered<b>{(Math.floor((100 - watching.failedPercent) * 10) / 10).toLocaleString()}%</b></span>
+                  </div>}
+                  {result && <details className={css.rhdeliverydetails}>
+                    <summary>Delivery details</summary>
+                    <p>{watchingDiagnosis.reason}</p>
+                    <dl><dt>Serving cities</dt><dd>{watchingDiagnosis.route}</dd><dt>Busiest route</dt><dd>{watchingDiagnosis.load}</dd></dl>
+                    <p>{watchingDiagnosis.repair}</p>
+                  </details>}
+                </div>}
                 {marketTally && (
                   <p className={css.rhmarketcount} aria-label={`All ${marketTally.total} opening markets`}>
                     <b>ALL {marketTally.total} MARKETS</b>
-                    <span>{marketTally.playing} playing</span>
-                    <span>{marketTally.buffering} buffering</span>
-                    <span>{marketTally.down} down</span>
+                    <span className={css.good}>{marketTally.playing} playing</span>
+                    <span className={marketTally.buffering ? css.warn : undefined}>{marketTally.buffering} degraded</span>
+                    <span className={marketTally.down ? css.bad : undefined}>{marketTally.down} unavailable</span>
                   </p>
                 )}
 
-                {/* THE WALL — a gallery does not watch one feed. Every other
-                    market is a monitor of its own, all playing at once, each
-                    going to its own state as the night reaches it. Which city
-                    gives first is a thing you see rather than read.
 
-                    A market's state is the one the forecast already gave it;
-                    only the moment it arrives follows the curve, most fragile
-                    first. Nothing here is invented. */}
-                {wall.length > 0 && (
-                  <div className={css.rhwall} aria-label="Every market, live">
-                    {wallShown.map(({ country, state }) => (
-                      <button type="button" key={country.marketId} disabled={!result} onClick={() => { setViewerMarketId(country.marketId); setViewerViewOpen(true); }} className={cx(css.rhcell, state === 'DOWN' ? css.broke : state === 'BUFFERING' ? css.burst : css.held)} aria-label={`View ${country.country}: ${state.toLowerCase()}`}>
-                        <i className={css.viewerSignal} aria-hidden="true" />
-                        <b>{country.country}</b>
-                        <span className={css.rhcellstate}>
-                          {state === 'PLAYING' ? '▶' : state === 'BUFFERING' ? '⟳' : '✕'}
-                        </span>
-                        <em>{state === 'PLAYING' ? 'playing' : state === 'BUFFERING' ? 'buffering' : 'no stream'}</em>
-                      </button>
-                    ))}
-                    {wallRest.length > 0 && (
-                      <div className={cx(css.rhcell, css.rhcellmore)}>
-                        <b>+{wallRest.length} more markets</b>
-                        <span className={css.rhcellstate}>
-                          {wallRestTally.down > 0 ? '✕' : wallRestTally.buffering > 0 ? '⟳' : '▶'}
-                        </span>
-                        <em>
-                          {[
-                            wallRestTally.down ? `${wallRestTally.down} down` : null,
-                            wallRestTally.buffering ? `${wallRestTally.buffering} buffering` : null,
-                            wallRestTally.playing ? `${wallRestTally.playing} playing` : null,
-                          ].filter(Boolean).join(' · ')} among these {wallRest.length}
-                        </em>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {reactions.length > 0 && (
-                  <ul className={css.rhreactions} aria-live="polite">
-                    {reactions.map(country => (
-                      <li key={country.marketId} className={country.verdict === 'BROKE' ? css.bad : css.warn}>
-                        <i aria-hidden="true" />
-                        <b>{country.country}</b>
-                        <em>{country.viewerConsequence}</em>
-                      </li>
-                    ))}
-                  </ul>
-                )}
               </div>
             )}
 
@@ -2298,7 +2171,7 @@ const Rehearsal: React.FC<{
               {commandStep === 2 && forecast.countries.slice(0, 4).map(country => (
                 <span key={country.marketId}><i />{country.country}<b>{country.servingCityLabels.join(' + ') || 'NO ROUTE'}</b></span>
               ))}
-              {commandStep === 3 && forecast.facilities.map(facility => (
+              {commandStep === 3 && stressedFacilities.map(facility => (
                 <span key={facility.facilityId} className={css[facility.state.toLowerCase()] || ''}><i />{facility.cityLabel}<b>{facility.loadPercent}% · {facility.state}</b></span>
               ))}
             </div>}
@@ -2310,7 +2183,7 @@ const Rehearsal: React.FC<{
             <b className={css.vhead}>
               {result.verdict === 'HELD' ? 'IT HELD'
                 : result.verdict === 'BURST' ? 'IT HELD — BY RENTING'
-                  : 'IT BROKE'}
+                  : 'DELIVERY NEEDS ATTENTION'}
             </b>
             {/* One sentence. The paragraph that used to sit here repeated the
                 numbers in the grid below it and, on a broken night, listed every
@@ -2327,7 +2200,7 @@ const Rehearsal: React.FC<{
               {result.verdict === 'BROKE' && (() => {
                 const worst = [...result.countries].sort((a, b) => b.failedPercent - a.failedPercent)[0];
                 return (
-                  <><b>{worst.country} failed.</b> {worst.failedPercent}% of the streams it asked for could not be served
+                  <><b>{worst.country} at peak:</b> {worst.failedPercent}% of requested streams could not be served
                     {worst.servingCityLabels.length ? ` through ${worst.servingCityLabels.join(' + ')}` : ', because nothing reaches it'}.</>
                 );
               })()}
@@ -2354,176 +2227,40 @@ const Rehearsal: React.FC<{
               })()}
             </div>
 
-            {/* said in the language of the page they will be staring at when it happens for real */}
-            <div className={css.ministatus}>
-              <div className={css.mstop}>
-                <b>Streaming delivery</b>
-                <em className={result.verdict === 'BROKE' ? css.outage : result.verdict === 'BURST' && result.failedPercent > 0 ? css.degraded : css.operational}>
-                  {result.verdict === 'BROKE' ? 'Major outage'
-                    : result.verdict === 'BURST' && result.failedPercent > 0 ? 'Degraded performance'
-                      : 'Operational'}
-                </em>
-              </div>
-              <div className={css.mstrip}>
-                {Array.from({ length: 46 }).map((_, n) => {
-                  const bad = n >= 42 && result.verdict === 'BROKE';
-                  const deg = n >= 43 && result.verdict === 'BURST' && result.failedPercent > 0;
-                  return <i key={n} className={bad ? css.down : deg ? css.deg : css.ok} />;
-                })}
-              </div>
-            </div>
-
-            <button
-              type="button"
-              className={css.rhvieweropen}
-              onClick={() => {
-                const worstCountry = [...result.countries]
-                  .sort((a, b) => b.failedPercent - a.failedPercent)[0];
-                setViewerMarketId(worstCountry?.marketId || result.countries[0]?.marketId || null);
-                setViewerViewOpen(true);
-              }}
-            >
-              <span><b>SEE WHAT VIEWERS SEE</b><em>Open the stream in every launch market</em></span>
-              <i aria-hidden="true">→</i>
-            </button>
-
-            {/* Per city, because "which of my own territories did I let down" is
-                a far better question than one global percentage — but thirty
-                cards of which twenty-seven say HELD buries the three that did
-                not. The ones that let you down are open; the ones that held are
-                one line you can open. */}
-            {(() => {
-              const rank: Record<string, number> = { DOWN: 0, BUFFERING: 1, PLAYING: 2 };
-              /* The same rule the line-up learned: a fact every one of them
-                 carries is a fact about the night, not about any market in it.
-                 Lifted out, a card is its name, its size, and the thing that
-                 makes it different — two lines instead of six. */
-              const notesOf = (x: RunResult['countries'][number]) => [
-                x.failedPercent > 0 ? `${x.failedPercent}% lost` : null,
-                x.startupTimeMs === null ? 'no route' : `${(x.startupTimeMs / 1000).toFixed(1)}s start`,
-                x.bufferingRiskPercent >= 15 ? `${x.bufferingRiskPercent}% buffer` : null,
-                x.catalogueAvailabilityPercent < 100 ? `${x.catalogueAvailabilityPercent}% catalogue` : null,
-                x.outageResistance === 'SINGLE_POINT' ? 'one room only' : null,
-              ].filter((note): note is string => Boolean(note));
-              const sharedAcross = (group: RunResult['countries']) => (group.length > 1
-                ? notesOf(group[0]).filter(note => group.every(x => notesOf(x).includes(note)))
-                : []);
-              const card = (shared: string[]) => (x: RunResult['countries'][number]) => {
-                const mine = notesOf(x).filter(note => !shared.includes(note));
-                const playbackState = streamingRehearsalPlayback(x);
-                return (
-                  <div className={cx(css.cres, playbackState === 'DOWN' ? css.broke : playbackState === 'BUFFERING' ? css.burst : css.held)} key={x.marketId}>
-                    <div className={css.crtop}>
-                      <b>{x.country}</b>
-                      <em>{playbackState === 'PLAYING' ? 'PLAYING' : playbackState === 'BUFFERING' ? 'BUFFERING' : 'FAILED'}</em>
-                    </div>
-                    {/* Each fact its own unbreakable unit, so a line can only
-                        break where a separator is not. */}
-                    <Facts of={[`${conc(x.demand)} at peak`, ...mine]} />
-                  </div>
-                );
-              };
-              const hurt = result.countries
-                .filter(x => streamingRehearsalPlayback(x) !== 'PLAYING')
-                .sort((a, b) => (rank[streamingRehearsalPlayback(a)] - rank[streamingRehearsalPlayback(b)]) || (b.failedPercent - a.failedPercent));
-              const held = result.countries.filter(x => streamingRehearsalPlayback(x) === 'PLAYING');
-              return (
-                <>
-                  {hurt.length > 0 && (() => {
-                    const shared = sharedAcross(hurt);
-                    return (
-                      <>
-                        <p className={css.rhsub}>
-                          Where it went wrong
-                          <em>{hurt.length} of {result.countries.length} {result.countries.length === 1 ? 'market' : 'markets'}</em>
-                        </p>
-                        {shared.length > 0 && (
-                          <Facts className={cx(css.rhlall, css.bad)} of={[`all ${hurt.length}: ${shared.join(' · ')}`]} />
-                        )}
-                        <div className={css.citygrid}>{hurt.map(card(shared))}</div>
-                      </>
-                    );
-                  })()}
-                  {held.length > 0 && (
-                    <details className={css.rhheld}>
-                      <summary>
-                        <b>{held.length} {held.length === 1 ? 'market' : 'markets'} held</b>
-                        <em>{held.slice(0, 3).map(x => x.country).join(', ')}{held.length > 3 ? ` and ${held.length - 3} more` : ''}</em>
-                      </summary>
-                      <div className={css.citygrid}>{held.map(card(sharedAcross(held)))}</div>
-                    </details>
-                  )}
-                </>
-              );
-            })()}
+            <RehearsalMarkets result={result} selected={watching?.marketId} onSelect={pickMarket}/>
 
             <div className={css.fixes}>
               <span className={css.fixhead}>REPAIR THE PLAN</span>
-              {/* Every rights repair runs the same handler — close this, open the
-                  content desk — so fourteen of them were fourteen buttons for one
-                  action, and they buried the capacity fixes that each do
-                  something different. The rights are one card that names what it
-                  covers; the capacity fixes stay one each, four deep, with the
-                  rest behind a line. */}
-              {(() => {
-                const fixAction = (action: StreamingRehearsalRepairAction) => (
-                  <button className={css.fixaction} key={action.id} onClick={() => applyRehearsalRepair(action)}>
-                    <span><b>{action.label.toUpperCase()}</b>{action.detail}</span>
-                    <i>{action.type === 'EXPAND_RIGHTS' ? 'OPEN →' : 'FIX →'}</i>
-                  </button>
-                );
-                const rights = result.repairActions.filter(action => action.type === 'EXPAND_RIGHTS');
-                const capacity = result.repairActions.filter(action => action.type !== 'EXPAND_RIGHTS');
-                const shown = capacity.slice(0, 4);
-                const rest = capacity.slice(4);
-                /* Count the markets, not the buttons. The engine caps its repair
-                   list at twelve, so with two capacity fixes only ten rights
-                   actions survive — and saying "10 markets" when fourteen have
-                   no catalogue would be a quiet lie told by a truncation. The
-                   content desk this opens handles all of them. */
+              {onOpenNetwork ? (() => {
+                const groups = new Map<string, { name: string; affected: number; noReach: boolean; overload: boolean; limits: boolean; single: boolean }>();
+                for (const country of result.countries) {
+                  const group = groups.get(country.regionId) || { name: country.regionLabel, affected: 0, noReach: false, overload: false, limits: false, single: false };
+                  if (streamingRehearsalPlayback(country) !== 'PLAYING') group.affected++;
+                  group.noReach ||= country.outageResistance === 'UNSERVED' || (country.unreachablePercent || 0) > 0;
+                  group.single ||= country.outageResistance === 'SINGLE_POINT';
+                  groups.set(country.regionId, group);
+                }
+                for (const facility of result.facilities) {
+                  const regionId = getStreamingServerSite(facility.cityId)?.regionId;
+                  const group = regionId ? groups.get(regionId) : null;
+                  if (group) { group.overload ||= facility.loadPercent > 82; group.limits ||= result.repairActions.some(action => action.type === 'REPAIR_PHYSICAL' && action.facilityId === facility.facilityId); }
+                }
                 const missing = result.countries.filter(country => country.catalogueAvailabilityPercent < 100);
-                const named = missing.slice(0, 3).map(country => country.country).join(', ');
-                return (
-                  <>
-                    {shown.map(fixAction)}
-                    {rest.length > 0 && (
-                      <details className={css.fixmore}>
-                        <summary>{rest.length} more {rest.length === 1 ? 'fix' : 'fixes'} to the network</summary>
-                        {rest.map(fixAction)}
-                      </details>
-                    )}
-                    {rights.length === 1 && fixAction(rights[0])}
-                    {rights.length > 1 && (
-                      <button className={css.fixaction} onClick={() => applyRehearsalRepair(rights[0])}>
-                        <span>
-                          <b>CLEAR THE OPENING CATALOGUE</b>
-                          {missing.length} markets have no opening title cleared
-                          {named ? ` — ${named}${missing.length > 3 ? ` and ${missing.length - 3} more` : ''}.` : '.'}
-                        </span>
-                        <i>OPEN →</i>
-                      </button>
-                    )}
-                  </>
-                );
-              })()}
-              {result.verdict !== 'HELD' && archOf(sel.arch).burst === 0 && (
-                <button className={css.fixaction} onClick={() => onRepair({ ...sel, arch: 'HYBRID' }, 'Hybrid burst enabled. Rehearse again before commissioning.')}>
-                  <span><b>ENABLE HYBRID BURST</b>Rent temporary capacity when a premiere crosses your own ceiling.</span><i>FIX →</i>
-                </button>
-              )}
-              {sel.doctrine === 'RUSHED' && (
-                <button className={css.fixaction} onClick={() => onRepair({ ...sel, doctrine: 'STANDARD' }, 'Construction returned to a standard schedule. Rehearse again to verify it.')}>
-                  <span><b>STOP RUSHING THE BUILD</b>Restore testing time and rated stability.</span><i>FIX →</i>
-                </button>
-              )}
-              {result.verdict !== 'HELD' && sel.campaign !== 'NONE' && (
-                <button className={css.fixaction} onClick={() => onRepair({ ...sel, campaign: 'NONE' }, 'The launch campaign was removed. Demand forecast has been recalculated.')}>
-                  <span><b>REDUCE OPENING HYPE</b>Lower demand instead of buying more capacity.</span><i>CHANGE →</i>
-                </button>
-              )}
-              {result.repairActions.length === 0 && result.verdict === 'HELD' && (
-                <div className={css.fix}>Nothing needs to change. Every opening market clears traffic, rights and resilience checks.</div>
-              )}
+                const repairs = [...groups].filter(([, group]) => group.affected || group.limits);
+                const optional = [...groups].filter(([, group]) => !group.affected && !group.limits && (group.overload || group.single));
+                return <>
+                  {repairs.map(([id, group]) => <button type="button" className={css.fixaction} key={id} onClick={() => onOpenNetwork(id)}><span><b>{group.noReach ? 'IMPROVE COVERAGE' : group.limits ? 'REVIEW ROOM LIMITS' : group.overload ? 'ADD COMPUTE' : group.single ? 'ADD BACKUP COVERAGE' : 'REVIEW DELIVERY'} · {group.name.toUpperCase()}</b>{[
+                    group.noReach ? 'Some viewers are outside signal reach.' : null,
+                    group.limits ? 'Physical room limits reduce usable compute.' : null,
+                    group.overload ? 'A local route needs more capacity.' : null,
+                    group.single ? 'A second serving city improves resilience.' : null,
+                    group.affected ? `${group.affected} markets need attention at peak.` : 'Playback is healthy; review these room limits before commissioning.',
+                  ].filter(Boolean).join(' ')} Review the setup, then rehearse again.</span><i>OPEN →</i></button>)}
+                  {optional.length > 0 && <details className={css.fixmore}><summary>Optional headroom and backup · {optional.length} regions</summary>{optional.map(([id, group]) => <button type="button" className={css.fixaction} key={id} onClick={() => onOpenNetwork(id)}><span><b>{group.name}</b>Playback clears this scenario. Add steady compute or a second delivery city if you want less reliance on burst and more resilience.</span><i>OPEN →</i></button>)}</details>}
+                  {missing.length > 0 && <button type="button" className={css.fixaction} onClick={() => { onClose(); onOpenContent?.(); }}><span><b>REVIEW CATALOGUE RIGHTS</b>{missing.length} markets have incomplete opening-catalogue clearance.</span><i>OPEN →</i></button>}
+                  {!repairs.length && !missing.length && <div className={css.fix}>No repairs required for this scenario.</div>}
+                </>;
+              })() : result.repairActions.map(action => <button type="button" className={css.fixaction} key={action.id} onClick={() => applyRehearsalRepair(action)}><span><b>{action.label}</b>{action.detail}</span><i>OPEN →</i></button>)}
             </div>
             {result.verdict !== 'HELD' && (
               <div className={css.overridecopy}>
@@ -2535,79 +2272,6 @@ const Rehearsal: React.FC<{
         )}
       </div>
 
-      {viewerViewOpen && viewerCountry && (
-        <div className={css.viewerOverlay} role="dialog" aria-modal="true" aria-label="Viewer experience">
-          <header className={css.viewerTop}>
-            <button type="button" onClick={() => setViewerViewOpen(false)} aria-label="Close viewer experience">✕</button>
-            <span><b>VIEWER EXPERIENCE</b><em>{viewerCountry.country}</em></span>
-          </header>
-
-          <div className={css.viewerBody}>
-            <div className={cx(css.viewerScreen, streamingRehearsalPlayback(viewerCountry) === 'DOWN' ? css.broke : streamingRehearsalPlayback(viewerCountry) === 'BUFFERING' ? css.burst : css.held)}>
-              <div className={css.viewerSignal} aria-hidden="true" />
-              <span className={css.viewerService}>{brand.name}</span>
-              <div className={css.viewerTitle}>
-                <span>PREMIERE NIGHT</span>
-                <b>{inp.premiereTitle}</b>
-              </div>
-              <div className={css.viewerPlayback}>
-                {streamingRehearsalPlayback(viewerCountry) === 'DOWN' ? (
-                  <><i className={css.viewerSpinner} /><b>STREAM UNAVAILABLE</b></>
-                ) : streamingRehearsalPlayback(viewerCountry) === 'BUFFERING' ? (
-                  <><i className={css.viewerSpinner} /><b>BUFFERING</b></>
-                ) : (
-                  <><i className={css.viewerPlay}><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="currentColor" /></svg></i><b>PLAYING</b></>
-                )}
-              </div>
-              <div className={css.viewerTimeline}><i style={{ width: streamingRehearsalPlayback(viewerCountry) === 'DOWN' ? '12%' : '42%' }} /></div>
-            </div>
-
-            {/* What this market is getting, in its own words, directly under
-                the screen it is getting it on — rather than below a strip you
-                had to scroll past first. */}
-            <section className={css.viewerReport}>
-              <p>{viewerCountry.viewerConsequence}</p>
-              {viewerDiagnosis && (
-                <div className={css.viewerDiagnosis}>
-                  <p><b>WHY</b>{viewerDiagnosis.reason}</p>
-                  <p><b>LOCAL ROUTE</b>{viewerDiagnosis.route}</p>
-                  <p><b>ROUTE LOAD</b>{viewerDiagnosis.load}</p>
-                  <p><b>NEXT STEP</b>{viewerDiagnosis.repair}</p>
-                </div>
-              )}
-              <div>
-                <span><em>STARTUP</em><b>{viewerCountry.startupTimeMs === null ? 'NO ROUTE' : `${(viewerCountry.startupTimeMs / 1000).toFixed(1)}s`}</b></span>
-                <span><em>BUFFER RISK</em><b>{viewerCountry.bufferingRiskPercent}%</b></span>
-                <span><em>STREAMS LOST</em><b>{viewerCountry.failedPercent}%</b></span>
-                <span><em>CATALOGUE</em><b>{viewerCountry.catalogueAvailabilityPercent}%</b></span>
-              </div>
-            </section>
-
-            {/* Every market, wrapping rather than scrolling off the edge, each
-                wearing what it got. Half the screen underneath was empty; this
-                is what fills it, and it is the thing you came here to compare. */}
-            <p className={css.viewerPick}>Watch it from somewhere else</p>
-            <div className={css.viewerMarkets} aria-label="Choose viewer market">
-              {result.countries.map(country => {
-                const state = streamingRehearsalPlayback(country);
-                const tone = state === 'DOWN' ? css.broke
-                  : state === 'BUFFERING' ? css.burst : css.held;
-                return (
-                  <button
-                    type="button"
-                    key={country.marketId}
-                    className={cx(tone, country.marketId === viewerCountry.marketId ? css.on : '')}
-                    onClick={() => setViewerMarketId(country.marketId)}
-                  >
-                    <b>{country.country}</b>
-                    <em>{state === 'PLAYING' ? 'Playing' : state === 'BUFFERING' ? 'Buffering' : 'Down'}</em>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
 
       <div className={css.rhfoot}>
         {!running && !result && (

@@ -13,6 +13,7 @@ import type {
   Facility,
   FacilityListing,
   MoneyPlan,
+  Limiting,
   RehearsalResult,
   Scenario,
 } from '../studio-finance/finance/build';
@@ -455,7 +456,9 @@ export const buildSelectionFromDraft = (
       };
     }
     draft.repairIds.forEach(repairId => {
-      const [facilityId, action] = repairId.split(':');
+      const separator = repairId.lastIndexOf(':');
+      const facilityId = repairId.slice(0, separator);
+      const action = repairId.slice(separator + 1);
       if (facilityId !== draftFacility.id) return;
       if (!['UPGRADE_POWER', 'IMPROVE_COOLING', 'ADD_BANDWIDTH', 'REPLACE_EQUIPMENT'].includes(action)) return;
       next = applyStreamingFacilityRepair(next, action as StreamingFacilityRepairAction, absoluteWeek).facility;
@@ -579,7 +582,8 @@ export const StreamingBuildWizardExperience: React.FC<StreamingBuildWizardExperi
   } = props;
   const canonicalSource = props.canonicalSource || 'CAREER';
   const absoluteWeek = inputs.absoluteWeek || 0;
-  const [rehearsalRun, setRehearsalRun] = useState<{ draft: BuildDraft; selection: BuildSel } | null>(null);
+  const [networkRequest, setNetworkRequest] = useState<{ id: number; regionId?: string }>();
+  const [rehearsalRun, setRehearsalRun] = useState<{ draft: BuildDraft; selection: BuildSel; forecasts: Record<Scenario, RunResult> } | null>(null);
   const baseFacilities = useMemo(() => facilitiesOf(sel), [sel]);
   const builtIds = useMemo(() => new Set((builtFacilities || []).map(facility => facility.id)), [builtFacilities]);
 
@@ -717,7 +721,13 @@ export const StreamingBuildWizardExperience: React.FC<StreamingBuildWizardExperi
       return result;
     };
 
+    const facilityCache = new WeakMap<BuildDraft, Facility[]>();
+    const serviceCache = new WeakMap<BuildDraft, CountryService[]>();
+    const baseServiceCache = new WeakMap<BuildDraft, CountryService[]>();
+    const rehearsalCache = new WeakMap<BuildDraft, Map<Scenario, RunResult>>();
     const servicesFor = (draft: BuildDraft): CountryService[] => {
+      const cached = serviceCache.get(draft);
+      if (cached) return cached;
       const { build } = projectionFor(draft);
       const coverageById = new Map(build.coverage.countries.map(country => [country.countryId, country]));
       const signalById = new Map(build.signals.marketSignals.map(signal => [signal.countryId, signal]));
@@ -780,7 +790,8 @@ export const StreamingBuildWizardExperience: React.FC<StreamingBuildWizardExperi
             : primaryRole === 'REGIONAL_HUB' ? 'Region relay'
               : primaryRole === 'EDGE_CACHE' ? 'Fast cache' : '—',
           state,
-          startupMs: reachedShare > 0 ? Math.round(180 + (1 - reachedShare) * 1_200) : 0,
+          startupMs: 0,
+          networkLatencyMs: reachedShare > 0 ? Math.round(20 + (1 - reachedShare) * 160) : null,
           buffering: Math.min(100, Math.round((1 - coveredShare) * 20 + (overloaded ? 35 : 0))),
           peak: marketDemand,
           reachedShare,
@@ -796,8 +807,27 @@ export const StreamingBuildWizardExperience: React.FC<StreamingBuildWizardExperi
                 : 'Increase regional reach or fibre',
         };
       });
-      props.onProjectionDiagnostic?.({ coverage: build.coverage.countries, services });
-      return services;
+      baseServiceCache.set(draft, services);
+      const evidence = rehearsalForServices(draft, services, 'LIKELY');
+      const byId = new Map(evidence.countries.map(country => [country.marketId, country]));
+      const reconciled: CountryService[] = services.map(service => {
+        const country = byId.get(service.marketId)!;
+        const routeShare = country.outageResistance === 'UNSERVED' ? 0 : 1 - country.failedPercent / 100;
+        const coveredShare = Math.min(service.coveredShare, routeShare);
+        const state: CountryService['state'] = routeShare === 0 ? 'NONE'
+          : coveredShare < .25 ? 'UNSTABLE' : coveredShare < .6 ? 'POOR'
+            : country.failedPercent > 0 || country.bufferingRiskPercent >= 15 || coveredShare < .9 ? 'WATCH' : 'READY';
+        return { ...service, state, coveredShare, coveredPeak: Math.round(service.peak * coveredShare),
+          cloudServedShare: Math.min(service.cloudServedShare || 0, coveredShare),
+          startupMs: country.startupTimeMs ?? 0, buffering: country.bufferingRiskPercent,
+          fix: routeShare === 0 ? 'Review regional reach and local delivery restrictions'
+            : (country.unreachablePercent || 0) > 0 ? 'Improve geographic reach in this region'
+              : country.failedPercent > 0 ? 'Add capacity on the affected delivery route'
+                : country.bufferingRiskPercent >= 15 ? 'Review delivery quality and local route load' : service.fix };
+      });
+      serviceCache.set(draft, reconciled);
+      props.onProjectionDiagnostic?.({ coverage: build.coverage.countries, services: reconciled });
+      return reconciled;
     };
 
     const totalsFor = (draft: BuildDraft): BuildTotals => {
@@ -849,11 +879,15 @@ export const StreamingBuildWizardExperience: React.FC<StreamingBuildWizardExperi
       };
     };
 
-    const runRehearsalFor = (draft: BuildDraft, scenario: Scenario) => {
+    const rehearsalForServices = (draft: BuildDraft, services: CountryService[], scenario: Scenario) => {
+      const cached = rehearsalCache.get(draft)?.get(scenario);
+      if (cached) return cached;
       const { build } = projectionFor(draft);
-      const services = servicesFor(draft);
-      const scenarioMultiplier = scenario === 'QUIET' ? .55 : scenario === 'SURGE' ? 1.9 : 1;
-      return createStreamingLaunchRehearsal({
+      const demand = inputs.openingDemandForecast;
+      const scenarioMultiplier = scenario === 'LIKELY' ? 1 : demand && demand.likely > 0
+        ? (scenario === 'QUIET' ? demand.low : demand.high) / demand.likely
+        : scenario === 'QUIET' ? .55 : 1.9;
+      const result = createStreamingLaunchRehearsal({
         scenario,
         rolloutRiskPercent: 0,
         countries: services.map(service => {
@@ -868,10 +902,11 @@ export const StreamingBuildWizardExperience: React.FC<StreamingBuildWizardExperi
             regionId: market?.region || '',
             regionLabel: STREAMING_DAY_ONE_REGION_LABELS[market?.region || 'NORTH_AMERICA'],
             demand: Math.round(service.peak * scenarioMultiplier),
-            latencyMs: service.startupMs || null,
+            latencyMs: service.networkLatencyMs ?? null,
             cacheHitPercent: Math.round((coverage?.reachedShare || 0) * 100),
             baseBufferingRiskPercent: service.buffering,
             routeFacilityIds: routeFacilities.map(facility => facility.id),
+            reachableShare: coverage?.reachedShare || 0,
             servingCityLabels: service.servedBy,
             recommendedCityId: market?.recommendedCityId || '',
             localizationNote: service.localization,
@@ -900,14 +935,27 @@ export const StreamingBuildWizardExperience: React.FC<StreamingBuildWizardExperi
           };
         }),
       });
+      const scenarios = rehearsalCache.get(draft) || new Map<Scenario, RunResult>();
+      scenarios.set(scenario, result);
+      rehearsalCache.set(draft, scenarios);
+      return result;
+    };
+    const runRehearsalFor = (draft: BuildDraft, scenario: Scenario) => {
+      servicesFor(draft);
+      return rehearsalForServices(draft, baseServiceCache.get(draft)!, scenario);
     };
 
     const canonical = {
       facilities: (draft: BuildDraft): Facility[] => {
+        const cached = facilityCache.get(draft);
+        if (cached) return cached;
         const { build } = projectionFor(draft);
         const capacityByFacilityId = new Map(build.capacity.facilities.map(facility => [facility.facilityId, facility]));
-        return build.facilities.map(facility => {
-          const projected = facilityToBuild(facility, builtIds.has(facility.id));
+        const facilities = build.facilities.map(facility => {
+          const factor = getStreamingFacilityPhysicalView(facility).limitingFactor;
+          const physicalConstraint: Limiting = factor === 'RACK_SPACE' ? 'RACK'
+            : factor === 'MAINTENANCE' ? 'CONDITION' : factor;
+          const projected = { ...facilityToBuild(facility, builtIds.has(facility.id)), physicalConstraint };
           const canonicalCapacity = capacityByFacilityId.get(facility.id);
           if (!canonicalCapacity) return projected;
           const rawCapacity = projected.groups.reduce((sum, group) => sum + group.capacity, 0);
@@ -920,6 +968,8 @@ export const StreamingBuildWizardExperience: React.FC<StreamingBuildWizardExperi
             })),
           };
         });
+        facilityCache.set(draft, facilities);
+        return facilities;
       },
       quote: (draft: BuildDraft) => projectionFor(draft).build.quote,
       totals: totalsFor,
@@ -985,10 +1035,11 @@ export const StreamingBuildWizardExperience: React.FC<StreamingBuildWizardExperi
       repairs: baseFacilities.flatMap(facility => {
         const view = getStreamingFacilityPhysicalView(facility, facility.lease?.electricityRatePerKwh);
         const listingId = facility.lease?.listingId || `LEGACY:${facility.id}`;
+        if (view.limitingFactor === 'NONE') return [];
         return view.repairActions.map(action => ({
           id: `${facility.id}:${action.id}`,
           facilityId: listingId,
-          label: action.label,
+          label: `${getStreamingServerSite(facility.cityId)?.name || facility.cityId} · ${action.label}`,
           what: action.detail,
           cost: action.cost,
           fixes: action.id === 'UPGRADE_POWER' ? 'POWER' as const
@@ -1060,16 +1111,17 @@ export const StreamingBuildWizardExperience: React.FC<StreamingBuildWizardExperi
   }, [canonicalFor, inputs.marketPlanning?.editable, onChange, onResult]);
   const rehearsalForecastFor = useCallback((scenario: Scenario) => {
     if (!rehearsalRun) throw new Error('Career Build rehearsal opened without a draft.');
-    const run = data.canonical?.runRehearsal?.(rehearsalRun.draft, scenario);
+    const run = rehearsalRun.forecasts[scenario];
     if (!run) throw new Error('Career Build is missing its canonical rehearsal handlers.');
     return run;
-  }, [data.canonical, rehearsalRun]);
+  }, [rehearsalRun]);
 
   return (
     <>
       <BuildWizard
         data={data}
         initialDraft={draftWithResult}
+        networkRequest={networkRequest}
         initialSheet={props.initialSheet}
         launchBudgetSummary={launchBudgetSummary}
         onDraftChange={handleDraftChange}
@@ -1080,7 +1132,11 @@ export const StreamingBuildWizardExperience: React.FC<StreamingBuildWizardExperi
         onOpenLaunchBudget={onOpenLaunchBudget}
         onOpenRehearsal={draft => {
           if (inputs.marketPlanning?.editable === false) return;
-          setRehearsalRun({ draft, selection: canonicalFor(draft) });
+          const rehearse = data.canonical?.runRehearsal;
+          if (!rehearse) return;
+          setRehearsalRun({ draft, selection: canonicalFor(draft), forecasts: {
+            QUIET: rehearse(draft, 'QUIET'), LIKELY: rehearse(draft, 'LIKELY'), SURGE: rehearse(draft, 'SURGE'),
+          } });
         }}
         onValidateCommission={draft => inputs.marketPlanning?.editable === false
           ? { ok: false, message: inputs.marketPlanning.reason || 'File an opening market first.' }
@@ -1092,6 +1148,18 @@ export const StreamingBuildWizardExperience: React.FC<StreamingBuildWizardExperi
           return outcome || { ok: true, message: 'Infrastructure commissioned.' };
         }}
         onOpeningNight={onOpenNight}
+        onRepairRoom={(draft, repair) => {
+          const selection = canonicalFor(draft);
+          const separator = repair.id.lastIndexOf(':');
+          const facilityId = repair.id.slice(0, separator);
+          const action = repair.id.slice(separator + 1);
+          const facilities = facilitiesOf(selection);
+          const facility = facilities.find(item => item.id === facilityId);
+          if (!facility || !['UPGRADE_POWER', 'IMPROVE_COOLING', 'ADD_BANDWIDTH', 'REPLACE_EQUIPMENT'].includes(action)) return;
+          const repaired = applyStreamingFacilityRepair(facility, action as StreamingFacilityRepairAction, absoluteWeek);
+          onResult?.(null);
+          onChange(selectionWithFacilities(selection, facilities.map(item => item.id === facilityId ? repaired.facility : item)));
+        }}
         onChangeMarketing={onChangeMarketing}
       />
 
@@ -1108,6 +1176,7 @@ export const StreamingBuildWizardExperience: React.FC<StreamingBuildWizardExperi
           onClose={() => setRehearsalRun(null)}
           onResult={next => onResult?.(next, rehearsalRun.selection)}
           onOpenContent={onOpenContent}
+          onOpenNetwork={regionId => { setRehearsalRun(null); setNetworkRequest(previous => ({ id: (previous?.id || 0) + 1, regionId })); }}
           onRepair={next => {
             onResult?.(null);
             onChange(next);

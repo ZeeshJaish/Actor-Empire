@@ -12,6 +12,7 @@ import type { BuildStageId } from '../../finance/build';
 import { kitWords, cityFor, computeRacks, constructionProgress, facilityRacks, facilityRoomLabel, gates, listingFor, providerOf } from '../../finance/build';
 import type { StageProps } from './BuildWizard';
 import { compactCount, money } from '../../finance/format';
+import { regionOfCity, regionsOf } from '../../finance/placer';
 import { Cutscene } from '../cine/Cutscene';
 import { commissionBeats } from '../cine/CommissionCut';
 
@@ -37,6 +38,7 @@ export function StageLaunch({ data, draft, totals, plan, handlers, onJump }: Sta
       key: string;
       provider: string;
       kind: 'PHYSICAL' | 'CLOUD';
+      regionId: string;
       items: Array<{ id: string; label: string; quantity: number }>;
       quantity: number;
     };
@@ -46,9 +48,10 @@ export function StageLaunch({ data, draft, totals, plan, handlers, onJump }: Sta
       const provider = cloud
         ? providerOf(facility).name
         : listingFor(data, facility)?.provider ?? 'Unnamed provider';
-      const key = `${cloud ? 'cloud' : 'physical'}:${provider}`;
+      const regionId = regionOfCity(data, facility.cityId) || 'ELSEWHERE';
+      const key = `${regionId}:${cloud ? 'cloud' : 'physical'}:${provider}`;
       const group = groups.get(key) ?? {
-        key, provider, kind: cloud ? 'CLOUD' : 'PHYSICAL', items: [], quantity: 0,
+        key, provider, regionId, kind: cloud ? 'CLOUD' : 'PHYSICAL', items: [], quantity: 0,
       };
       const quantity = cloud ? computeRacks(facility) : facilityRacks(facility);
       const cloudPeers = cloud
@@ -69,6 +72,16 @@ export function StageLaunch({ data, draft, totals, plan, handlers, onJump }: Sta
     return [...groups.values()].sort((left, right) =>
       Number(left.kind === 'CLOUD') - Number(right.kind === 'CLOUD') || right.quantity - left.quantity);
   }, [data, draft.facilities]);
+  const scheduleRegions = useMemo(() => {
+    const names = new Map(regionsOf(data).map(region => [region.id, region.name]));
+    const groups = new Map<string, typeof providers>();
+    providers.forEach(provider => groups.set(provider.regionId, [...(groups.get(provider.regionId) || []), provider]));
+    return [...groups].map(([id, providers]) => ({ id, name: names.get(id) || 'Other locations', providers,
+      rooms: providers.filter(group => group.kind === 'PHYSICAL').reduce((sum, group) => sum + group.items.length, 0),
+      cloud: providers.filter(group => group.kind === 'CLOUD').reduce((sum, group) => sum + group.quantity, 0),
+      racks: providers.filter(group => group.kind === 'PHYSICAL').reduce((sum, group) => sum + group.quantity, 0),
+    }));
+  }, [data, providers]);
   const physicalRoomCount = draft.facilities.filter(facility => facility.tenure !== 'CLOUD').length;
   const cloudSiteCount = draft.facilities.length - physicalRoomCount;
 
@@ -303,26 +316,15 @@ export function StageLaunch({ data, draft, totals, plan, handlers, onJump }: Sta
           <p className="bw-agreement-empty">No infrastructure selected. There is no build to commission.</p>
         ) : (
           <ul className="bw-agreement-schedule">
-            {providers.map(group => (
-              <li key={group.key}>
-                <details className="bw-agreement-provider">
-                  <summary className="bw-agreement-party">
-                    <b>{group.kind === 'CLOUD' ? 'Cloud · ' : 'Rooms · '}{group.provider}</b>
-                    <em>{group.items.length} {group.kind === 'CLOUD'
-                      ? group.items.length === 1 ? 'cloud site' : 'cloud sites'
-                      : group.items.length === 1 ? 'room' : 'rooms'} · {Number(group.quantity.toFixed(1))} {group.kind === 'CLOUD' ? 'compute' : group.quantity === 1 ? 'rack' : 'racks'}</em>
-                  </summary>
-                  <ul>
-                    {group.items.map(item => (
-                      <li key={item.id}>
-                        <span>{item.label}</span>
-                        <s>{Number(item.quantity.toFixed(1))} {group.kind === 'CLOUD' ? 'compute' : item.quantity === 1 ? 'rack' : 'racks'}</s>
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-              </li>
-            ))}
+            {scheduleRegions.map(region => <li key={region.id}>
+              <details className="bw-agreement-provider bw-agreement-region">
+                <summary className="bw-agreement-party"><b>{region.name}</b><em>{region.rooms} rooms · {region.racks} racks{region.cloud > 0 ? ` · ${region.cloud} cloud compute` : ''}</em></summary>
+                {region.providers.map(group => <details key={group.key} className="bw-agreement-provider">
+                  <summary className="bw-agreement-party"><b>{group.kind === 'CLOUD' ? 'Cloud · ' : 'Rooms · '}{group.provider}</b><em>{group.items.length} sites · {group.quantity} {group.kind === 'CLOUD' ? 'compute' : 'racks'}</em></summary>
+                  <ul>{group.items.map(item => <li key={item.id}><span>{item.label}</span><s>{Number(item.quantity.toFixed(1))} {group.kind === 'CLOUD' ? 'compute' : 'racks'}</s></li>)}</ul>
+                </details>)}
+              </details>
+            </li>)}
           </ul>
         )}
 

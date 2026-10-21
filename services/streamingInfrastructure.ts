@@ -478,7 +478,8 @@ export const getStreamingInfrastructureSignature = (
         likely: 200_000,
         high: 320_000,
     },
-): string => [
+): string => {
+    const signature = [
     STREAMING_INFRASTRUCTURE_SIGNATURE_MODEL,
     reachConfigurationKey,
     roundCapacity(demandRange.low),
@@ -489,6 +490,13 @@ export const getStreamingInfrastructureSignature = (
     networkSignature(draft.networkPlacements),
     facilitySignature(draft.facilities, draft.networkPlacements),
 ].join(':');
+    // Keep valid short signatures byte-for-byte compatible. Large topologies
+    // previously exceeded the save field and lost their tail on normalization.
+    // Fingerprint the complete preimage, including every node, before persisting.
+    if (signature.length <= 640) return signature;
+    return `${STREAMING_INFRASTRUCTURE_SIGNATURE_MODEL}:compact-v1:${[0, 1, 2, 3]
+        .map(part => createDeterministicId(`streaming_configuration_${part}`, signature)).join('.')}`;
+};
 
 /**
  * The founding journey chooses markets, never machines. This is the single

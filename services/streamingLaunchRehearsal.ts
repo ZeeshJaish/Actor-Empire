@@ -30,6 +30,8 @@ export interface StreamingRehearsalCountryInput {
     cacheHitPercent: number;
     baseBufferingRiskPercent: number;
     routeFacilityIds: string[];
+    /** Fraction inside signal reach; omitted by legacy callers means fully reached. */
+    reachableShare?: number;
     servingCityLabels: string[];
     recommendedCityId: string;
     localizationNote: string;
@@ -69,11 +71,20 @@ export interface StreamingRehearsalCountryResult {
     servingCityLabels: string[];
     verdict: StreamingRehearsalVerdict;
     failedPercent: number;
+    unreachablePercent?: number;
     viewerConsequence: string;
     localizationNote: string;
 }
 
 export type StreamingRehearsalRepairAction =
+    | {
+        id: string;
+        type: 'REVIEW_COVERAGE';
+        label: string;
+        detail: string;
+        marketId: string;
+        regionId: string;
+    }
     | {
         id: string;
         type: 'REPAIR_PHYSICAL';
@@ -145,14 +156,15 @@ export const createStreamingLaunchRehearsal = (
         const route = Array.from(new Set(country.routeFacilityIds))
             .map(id => facilityById.get(id))
             .filter((item): item is StreamingRehearsalFacilityInput => Boolean(item));
+        const reachableDemand = round(country.demand * clamp(country.reachableShare ?? 1, 0, 1));
         const routeCapacity = route.reduce((sum, item) => sum + Math.max(1, item.steadyCapacity), 0);
         const allocations = route.map(item => ({
             facilityId: item.facilityId,
-            demand: round(country.demand * Math.max(1, item.steadyCapacity) / Math.max(1, routeCapacity)),
+            demand: round(reachableDemand * Math.max(1, item.steadyCapacity) / Math.max(1, routeCapacity)),
         }));
         const allocationTotal = allocations.reduce((sum, item) => sum + item.demand, 0);
-        if (allocations.length && allocationTotal !== country.demand) {
-            allocations[0].demand += country.demand - allocationTotal;
+        if (allocations.length && allocationTotal !== reachableDemand) {
+            allocations[0].demand += reachableDemand - allocationTotal;
         }
         countryAllocations.set(country.marketId, allocations);
         allocations.forEach(allocation => {
@@ -213,14 +225,15 @@ export const createStreamingLaunchRehearsal = (
         const routeResults = allocations
             .map(item => ({ allocation: item, result: facilityResultById.get(item.facilityId) }))
             .filter((item): item is { allocation: { facilityId: string; demand: number }; result: StreamingRehearsalFacilityResult } => Boolean(item.result));
+        const delivered = routeResults.reduce((sum, item) => sum + item.allocation.demand * (1 - item.result.failedPercent / 100), 0);
+        const unreachablePercent = routeResults.length ? round((1 - clamp(country.reachableShare ?? 1, 0, 1)) * 100) : 100;
         const failedPercent = routeResults.length
-            ? round(routeResults.reduce((sum, item) => sum + item.result.failedPercent * item.allocation.demand, 0)
-                / Math.max(1, routeResults.reduce((sum, item) => sum + item.allocation.demand, 0)))
+            ? country.demand > 0 ? clamp(round((country.demand - delivered) / country.demand * 100), 0, 100) : unreachablePercent
             : 100;
         const worstLoad = routeResults.reduce((max, item) => Math.max(max, item.result.loadPercent), 0);
         const hasBrokenRoute = routeResults.some(item => item.result.verdict === 'BROKE');
         const hasBurstRoute = routeResults.some(item => item.result.verdict === 'BURST');
-        const verdict: StreamingRehearsalVerdict = routeResults.length === 0 || hasBrokenRoute
+        const verdict: StreamingRehearsalVerdict = routeResults.length === 0 || hasBrokenRoute || unreachablePercent > 0
             ? 'BROKE'
             : hasBurstRoute ? 'BURST' : 'HELD';
         const uniqueCities = new Set(country.servingCityLabels).size;
@@ -276,6 +289,7 @@ export const createStreamingLaunchRehearsal = (
             servingCityLabels: [...country.servingCityLabels],
             verdict,
             failedPercent,
+            unreachablePercent,
             viewerConsequence,
             localizationNote: country.localizationNote,
         };
@@ -303,9 +317,18 @@ export const createStreamingLaunchRehearsal = (
         : countries.some(country => country.verdict === 'BURST') ? 'BURST' : 'HELD';
 
     const repairs: StreamingRehearsalRepairAction[] = [];
+    for (const country of countries.filter(item => item.outageResistance === 'UNSERVED' || (item.unreachablePercent || 0) > 0)) {
+        repairs.push({
+            id: `coverage:${country.marketId}`, type: 'REVIEW_COVERAGE',
+            label: `Review ${country.country} coverage`,
+            detail: country.outageResistance === 'UNSERVED' ? `No eligible delivery route in ${country.regionLabel}. Review reach and local serving restrictions before adding compute.` : `${country.unreachablePercent}% of this market is outside signal reach. Review coverage in ${country.regionLabel}.`,
+            marketId: country.marketId, regionId: country.regionId,
+        });
+    }
     for (const facilityResult of facilityResults.filter(item => item.state !== 'CLEAR')) {
         const facility = facilityById.get(facilityResult.facilityId);
-        const physical = facility?.physicalRepairActions[0];
+        const repairForLimit: Record<string, StreamingFacilityRepairAction> = { POWER: 'UPGRADE_POWER', COOLING: 'IMPROVE_COOLING', BANDWIDTH: 'ADD_BANDWIDTH', FIBRE: 'ADD_BANDWIDTH', CONDITION: 'REPLACE_EQUIPMENT', MAINTENANCE: 'REPLACE_EQUIPMENT' };
+        const physical = facility?.physicalRepairActions.find(action => action.id === repairForLimit[facilityResult.limitingFactor]);
         if (physical && facilityResult.limitingFactor !== 'NONE') {
             repairs.push({
                 id: `physical:${facilityResult.facilityId}:${physical.id}`,
