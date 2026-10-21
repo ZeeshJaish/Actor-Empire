@@ -1,0 +1,30 @@
+[
+  {
+    "name": "audit:streaming-infrastructure-read-forecast",
+    "exit": 0
+  },
+  {
+    "name": "audit:streaming-build-test-autosave-gates",
+    "exit": 0
+  },
+  {
+    "name": "audit:streaming-launch-s1-coverage",
+    "exit": 0
+  },
+  {
+    "name": "audit:streaming-regional-plan-migration",
+    "exit": 0
+  },
+  {
+    "name": "audit:streaming-regional-network-lifecycle",
+    "exit": 0
+  },
+  {
+    "name": "audit:save-generations",
+    "exit": 0
+  },
+  {
+    "name": "audit:streaming-rights-transactions-phase6",
+    "exit": 0
+  }
+]

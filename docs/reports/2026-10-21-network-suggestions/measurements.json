@@ -1,0 +1,64 @@
+{
+  "fixture": {
+    "titles": 5000,
+    "filedMarkets": 197,
+    "bytes": 34904173,
+    "sha256": "055c5fdb458d826038cee70b29292017e9003b3d0c128bcda885867cc045269e",
+    "construction": "52 normal acquisitions plus 4948 synthetic released titles with explicit grants; not manual purchases"
+  },
+  "isolatedPlannerAt": "a42ea26",
+  "plannerCases": [
+    {
+      "markets": 2,
+      "generationMs": 296.1,
+      "applyValidationMs": 4.6,
+      "longestSliceMs": 4.9,
+      "candidates": 144
+    },
+    {
+      "markets": 197,
+      "generationMs": 1584.0,
+      "applyValidationMs": 5.8,
+      "longestSliceMs": 9,
+      "candidates": 432
+    }
+  ],
+  "browserMeasurement": "document click handler to double requestAnimationFrame, production disposable HQ; excludes App career persistence and is not a physical-device INP measurement",
+  "browser5k": {
+    "measurements": [
+      {
+        "action": "Reset QA metrics",
+        "nextPaintMs": 7.7
+      },
+      {
+        "action": "Build the Platform. 0 of 6 checks cleared. Next: Network blueprint.",
+        "nextPaintMs": 4635.3
+      },
+      {
+        "action": "Suggest networkChoose limits \u00b7 preview a plan\u2197",
+        "nextPaintMs": 7.8
+      },
+      {
+        "action": "Generate suggestion",
+        "nextPaintMs": 9
+      },
+      {
+        "action": "Generate suggestion",
+        "nextPaintMs": 9.5
+      },
+      {
+        "action": "Cancel generation",
+        "nextPaintMs": 6.4
+      }
+    ],
+    "longTasks": [
+      4630
+    ]
+  },
+  "browserAt": "e88e984 (same sheet; final correction changed affordability authority only)",
+  "finalChecks": {
+    "typescript": "exit0, zero diagnostics",
+    "productionBuild": "exit0, 17.58s",
+    "focusedScaleAudit": "exit0, includes actual CAREER settled/unpaid accounting regressions"
+  }
+}

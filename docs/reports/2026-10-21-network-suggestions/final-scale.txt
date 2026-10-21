@@ -1,0 +1,10 @@
+
+  ../../../../tmp/network-suggestions-root-audit.cjs    9.1mb ⚠️
+  ../../../../tmp/network-suggestions-root-audit.css  288.5kb
+
+⚡ Done in 78ms
+US+IN generation=271.3ms validation=2.8ms candidates=144
+CAREER settled $150M / cash $100M: zero and funded plans pass; unpaid $100M/$100M+1 and current-money Apply gates PASS
+Canonical 5000 titles / 2 markets: generation=296.1ms apply=4.6ms longest work slice=4.9ms candidates=144
+Canonical 5000 titles / 197 markets: generation=1584.0ms apply=5.8ms longest work slice=9.0ms candidates=432
+Network suggestions: planner, hard limits, current-input apply, preservation, cancellation, deterministic output and sheet render PASS
