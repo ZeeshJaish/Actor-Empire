@@ -65,7 +65,7 @@ export function NetworkSuggestionSheet({ data, draft, onApply, onClose }: Props)
   const apply = () => {
     if (!proposal || !request || stale) return;
     const result = validateNetworkSuggestion(current.current.data, current.current.draft, request, proposal);
-    if (!result.ok) { setMessage(result.message); setProposal(null); return; }
+    if (result.ok === false) { setMessage(result.message); setProposal(null); return; }
     onApply(result.patch); onClose();
   };
   return <div className="bw-suggest-backdrop">
