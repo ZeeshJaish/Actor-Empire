@@ -11,6 +11,8 @@ Confirmed decisions:
 - Earnings come from the actual modeled audience, spending and cinema market.
 - Full series/rating bugs will be triaged separately when the user supplies those reports. IMDb audience insights are included here; a numerical-rating redesign is a separate decision.
 
+**Implementation status:** Phase 1 foundations are implemented; [verification and remaining integration boundaries](../../reports/2026-10-22-box-office-phase1/README.md). The shared audience market is not yet active.
+
 ## Global constraints
 
 - Automatic country/chain ticket prices; no manual ticket-price slider.
@@ -327,7 +329,7 @@ Use the current checkout only with a fresh baseline/checkpoint manifest and sele
 
 Execute inline with one owner of the shared world/week/accounting changes. A separate simultaneous implementation of Greenlight, NPC, streaming and theatrical money would multiply integration risk before the common contracts exist. The user delegated the execution approach; no additional choice prompt is needed. Read-only review can be used when useful, but it is not a dependency of this plan.
 
-The implementation plan is [Fair Box Office Implementation Plan](</Users/zeesh/Vibe code/Actor empire/docs/superpowers/plans/2026-10-22-fair-box-office.md>). Gameplay implementation has not started. The preliminary five-step outline is superseded by these six gated phases.
+The implementation plan is [Fair Box Office Implementation Plan](</Users/zeesh/Vibe code/Actor empire/docs/superpowers/plans/2026-10-22-fair-box-office.md>). Phase 1 foundations are implemented; the shared audience market and later phases remain inactive. The preliminary five-step outline is superseded by these six gated phases.
 
 ## Evidence pointers
 

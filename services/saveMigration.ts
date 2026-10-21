@@ -1,4 +1,5 @@
 import { repairTalentNegotiations } from './talentNegotiation';
+import { normalizeCinemaReceiptHistory } from './boxOffice/boxOfficeReceiptHistory';
 import { INITIAL_PLAYER, type Business, type Message, type NewsItem, type Player, type PortfolioItem, type Relationship, type ScheduledEvent, type Stock, type StockTakeoverCase } from '../types';
 import { ensureLifestyleActivityState } from './lifestyleActivities';
 import { getAbsoluteWeek, getRelationshipContactAbsoluteWeek, inferStreamingStartWeekAbsolute } from './legacyLogic';
@@ -515,8 +516,8 @@ const migrateActiveRelease = (release: any, playerAge: number, currentWeek: numb
     next.weekNum = Math.max(1, Math.round(Number(next.weekNum || 1)));
     next.weeklyGross = toMoneySeries(next.weeklyGross);
     next.totalGross = clampMoney(Number(next.totalGross || next.weeklyGross.reduce((sum: number, value: number) => sum + value, 0)));
+    Object.assign(next, normalizeCinemaReceiptHistory(next));
     next.weeklyStudioReceipts = toMoneySeries(next.weeklyStudioReceipts);
-    next.totalStudioReceipts = clampMoney(Number(next.totalStudioReceipts || next.weeklyStudioReceipts.reduce((sum: number, value: number) => sum + value, 0)));
     next.weeklyExhibitorReceipts = toMoneySeries(next.weeklyExhibitorReceipts);
     next.totalExhibitorReceipts = clampMoney(Number(next.totalExhibitorReceipts || next.weeklyExhibitorReceipts.reduce((sum: number, value: number) => sum + value, 0)));
     next.weeklyDistributionBreakdowns = toObjectSeries(next.weeklyDistributionBreakdowns);
@@ -636,8 +637,8 @@ const migratePastProject = (project: any, index: number): any => {
     next.budget = clampMoney(Number(next.budget || 0));
     next.gross = clampMoney(Number(next.gross || 0));
     next.weeklyGross = toMoneySeries(next.weeklyGross);
+    Object.assign(next, normalizeCinemaReceiptHistory(next));
     next.weeklyStudioReceipts = toMoneySeries(next.weeklyStudioReceipts);
-    next.totalStudioReceipts = clampMoney(Number(next.totalStudioReceipts || next.weeklyStudioReceipts.reduce((sum: number, value: number) => sum + value, 0)));
     next.weeklyExhibitorReceipts = toMoneySeries(next.weeklyExhibitorReceipts);
     next.totalExhibitorReceipts = clampMoney(Number(next.totalExhibitorReceipts || next.weeklyExhibitorReceipts.reduce((sum: number, value: number) => sum + value, 0)));
     next.weeklyDistributionBreakdowns = toObjectSeries(next.weeklyDistributionBreakdowns);

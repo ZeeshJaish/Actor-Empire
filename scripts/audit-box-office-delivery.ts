@@ -52,11 +52,29 @@ test('legacy dynamic ceiling uses continuous cash inputs instead of labels',()=>
  assert.equal(calculateDynamicBoxOfficeTotalCap({...common,budgetTier:'HIGH'}).totalCap,
   calculateDynamicBoxOfficeTotalCap({...common,budgetTier:'BLOCKBUSTER'}).totalCap);
 });
+test('event and sleeper opening bonuses remain continuous across $35M and $90M',()=>{
+ const f=makeCinemaFixture();const saved=Math.random;Math.random=()=>0.5;
+ try {for(const boundary of [35_000_000,90_000_000])for(const fame of [1,6]){
+  const values=[boundary,boundary+1].map(budget=>calculateWeeklyBoxOffice(1,budget,
+   {...f.project.hiddenStats,scriptQuality:95,directorQuality:95,castingStrength:95,qualityScore:95,
+    fameMultiplier:fame,rawHype:100,distributionPower:100},0,100,getProductionBudgetTier(budget),'ACTION'));
+  assert.ok(Math.abs(values[1]-values[0])<20,`${boundary}/${fame}: one dollar changed opening by ${values[1]-values[0]}`);
+ }}finally{Math.random=saved;}
+});
 test('blockbuster fallback has the actual offered ensemble and stable credits',()=>{
  const f=makeCinemaFixture(14);f.project.budgetTier='BLOCKBUSTER';
  const first=generateCastList(f.player,f.project,'LEAD');
  assert.ok(first.filter(c=>c.type==='ACTOR').length>=7);
  assert.deepEqual(generateCastList(f.player,f.project,'LEAD'),first);
+});
+test('sleeper week-two and later retention do not cliff at $90M',()=>{
+ const f=makeCinemaFixture();const saved=Math.random;Math.random=()=>0.5;
+ try {for(const week of [2,3,5]){
+  const values=[89_999_999,90_000_000].map(budget=>calculateWeeklyBoxOffice(week,budget,
+   {...f.project.hiddenStats,scriptQuality:95,directorQuality:95,castingStrength:95,qualityScore:95,
+    campaignReachMultiplier:.5,boxOfficeCapRoll:.99},100e6,80,getProductionBudgetTier(budget),'ACTION'));
+  assert.ok(Math.abs(values[1]-values[0])<20,`week ${week}: one dollar changed gross by ${values[1]-values[0]}`);
+ }}finally{Math.random=saved;}
 });
 let failures=0;for(const[name,run]of cases){try{run();console.log('PASS',name)}catch(error){failures++;console.error('FAIL',name,error instanceof Error?error.message:error)}}
 assert.equal(failures,0,`${failures} cinema delivery regressions`);

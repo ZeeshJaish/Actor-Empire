@@ -1315,7 +1315,7 @@ export const calculateInteraction = (player: Player, npc: NPCActor, type: Intera
  * Legacy compatibility input: unique credited people only. The shared audience
  * market will replace this revenue multiplier with bounded recognition signals.
  */
-export const calculateProjectFameMultiplier = (castIds: string[], directorName: string, playerFame: number, playerTalent?: number, extraFame: number = 0): number => {
+export const calculateProjectFameMultiplier = (castIds: string[], directorName: string, playerFame: number, playerTalent?: number, extraFame: number = 0, fameByPersonId?: ReadonlyMap<string, number>): number => {
     const uniqueCastIds = new Set(castIds);
     const playerCredited = uniqueCastIds.has('player') || uniqueCastIds.has('PLAYER_SELF');
     const finiteScore = (value: number) => Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 0;
@@ -1329,7 +1329,7 @@ export const calculateProjectFameMultiplier = (castIds: string[], directorName: 
     uniqueCastIds.forEach(id => {
         if (id === 'player' || id === 'PLAYER_SELF' || id === director?.id) return;
         const npc = NPC_DATABASE.find(n => n.id === id);
-        if (npc?.stats?.fame) totalFame += npc.stats.fame;
+        totalFame += finiteScore(fameByPersonId?.get(id) ?? npc?.stats?.fame ?? 0);
     });
     
     // Base 1.0, +1.0 for every 50 points of total fame

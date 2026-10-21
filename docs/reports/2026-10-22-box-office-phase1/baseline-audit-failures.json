@@ -1,0 +1,14 @@
+[
+  {
+    "audit": "scripts/audit-project-investors.mjs",
+    "baselineCommit": "f693fd2",
+    "exitCode": 1,
+    "assertion": "services/projectInvestors.ts is missing Lead Investor"
+  },
+  {
+    "audit": "scripts/audit-box-office-archive-migration.mjs",
+    "baselineCommit": "f693fd2",
+    "exitCode": 1,
+    "assertion": "save migration missing: SAVE_MIGRATION_VERSION = 27"
+  }
+]

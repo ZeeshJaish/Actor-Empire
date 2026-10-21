@@ -7196,6 +7196,8 @@ export interface ActiveRelease {
     totalGross: number;
     weeklyStudioReceipts?: number[];
     totalStudioReceipts?: number;
+    /** Historical ticket gross whose producer receipts were never recorded. */
+    unrecordedTheatricalGross?: number;
     weeklyExhibitorReceipts?: number[];
     totalExhibitorReceipts?: number;
     weeklyDistributionBreakdowns?: TheatricalDistributionBreakdown[];
@@ -7312,6 +7314,8 @@ export interface PastProject {
     weeklyGross?: number[];
     weeklyStudioReceipts?: number[];
     totalStudioReceipts?: number;
+    /** Historical ticket gross whose producer receipts were never recorded. */
+    unrecordedTheatricalGross?: number;
     weeklyExhibitorReceipts?: number[];
     totalExhibitorReceipts?: number;
     weeklyDistributionBreakdowns?: TheatricalDistributionBreakdown[];

@@ -1,3 +1,4 @@
+import { buildCinemaReleaseDashboardProject, buildCinemaArchiveDashboardProject } from '../../../services/boxOffice/boxOfficePresentation';
 import { calculateStudioPrestigeScore } from '../../../services/studioPrestige';
 import React, { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -442,53 +443,8 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
     };
 
     const pastProjectsSlate = [
-        ...activeReleases.map(r => ({
-            id: r.id,
-            name: r.name,
-            phase: getReleaseDisplayPhase(r),
-            rating: r.imdbRating,
-            gross: r.totalGross,
-            budget: r.budget,
-            type: r.type,
-            awards: [],
-            views: r.streaming?.totalViews,
-            streamingRevenue: r.streamingRevenue,
-            projectDetails: r.projectDetails,
-            bids: r.bids,
-            weekNum: r.weekNum,
-            streaming: r.streaming,
-            streamingRuns: r.streamingRuns,
-            releaseWeek: r.releaseWeek,
-            releaseYear: r.releaseYear,
-            releasedAtAbsoluteWeek: r.releasedAtAbsoluteWeek,
-            franchiseId: r.projectDetails.franchiseId,
-            installmentNumber: r.projectDetails.installmentNumber,
-            genre: r.projectDetails.genre
-        })),
-        ...library.map(p => ({
-            id: p.id,
-            name: p.name,
-            phase: 'RELEASED',
-            rating: p.rating,
-            gross: p.gross,
-            budget: p.budget,
-            type: p.type,
-            awards: p.awards,
-            views: p.totalViews,
-            streamingRevenue: p.streamingRevenue,
-            customPoster: p.customPoster,
-            releaseWeek: p.releaseWeek,
-            releaseYear: p.releaseYear,
-            releasedAtAbsoluteWeek: p.releasedAtAbsoluteWeek,
-            franchiseId: p.franchiseId,
-            installmentNumber: p.installmentNumber,
-            genre: p.genre,
-            projectDetails: p,
-            sourceLabel: p.sourceLabel,
-            isPlatformCommissionCredit: p.isPlatformCommissionCredit,
-            countsTowardOwnedStudioEvaluation: p.countsTowardOwnedStudioEvaluation,
-            producerFee: p.producerFee,
-        }))
+        ...activeReleases.map(buildCinemaReleaseDashboardProject),
+        ...library.map(buildCinemaArchiveDashboardProject),
     ];
     const sortedPastProjectsSlate = [...pastProjectsSlate].sort(sortStudioArchiveByRecent);
     const recentPastProjectsPreview = sortedPastProjectsSlate.slice(0, 8);

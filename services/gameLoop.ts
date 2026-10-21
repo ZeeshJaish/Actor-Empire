@@ -121,6 +121,7 @@ import { getReturnStatusForContinuation } from './continuationReturnLogic';
 import { createContinuationScript } from './sequelFlow';
 import { processStreamingFundingContracts } from './streamingFundingLogic';
 import { getProjectFundingEconomics, getProjectMarketOutcomeRevenue } from './projectFundingEconomics';
+import { normalizeCinemaReceiptHistory } from './boxOffice/boxOfficeReceiptHistory';
 import { resolveInstagramReferralOutcome } from './instagramOfferLogic';
 import { resolveYoutubeEventChoice, YoutubeEventResolution } from './youtubeEventLogic';
 import { resolveStudioAcquisitionResponses } from './studioAcquisition';
@@ -1374,7 +1375,7 @@ const createPastProjectArchiveSnapshot = (
     const totalGross = ensureFiniteNumber(release.totalGross, weeklyGross.reduce((sum, value) => sum + value, 0));
     const streamingRevenue = ensureFiniteNumber(options.streamingRevenue ?? release.streamingRevenue);
     const soundtrackRevenue = ensureFiniteNumber(release.soundtrackRevenue);
-    const totalStudioReceipts = ensureFiniteNumber(release.totalStudioReceipts, weeklyStudioReceipts.reduce((sum, value) => sum + value, 0));
+    const { totalStudioReceipts, unrecordedTheatricalGross } = normalizeCinemaReceiptHistory(release);
     const totalExhibitorReceipts = ensureFiniteNumber(release.totalExhibitorReceipts, weeklyExhibitorReceipts.reduce((sum, value) => sum + value, 0));
     const qualityScore = ensureFiniteNumber(projectDetails.hiddenStats?.qualityScore, ensureFiniteNumber(release.productionPerformance, 50));
     const playerRoleType = getPlayerProjectRoleType(release.roleType, projectDetails.castList);
@@ -1467,6 +1468,7 @@ const createPastProjectArchiveSnapshot = (
         weeklyGross,
         weeklyStudioReceipts,
         totalStudioReceipts,
+        unrecordedTheatricalGross,
         weeklyExhibitorReceipts,
         totalExhibitorReceipts,
         weeklyDistributionBreakdowns,
@@ -1700,7 +1702,7 @@ export const processGameWeek = async (
         weeklyGross: ensureMoneyArray(release.weeklyGross),
         totalGross: ensureFiniteNumber(release.totalGross),
         weeklyStudioReceipts: ensureMoneyArray(release.weeklyStudioReceipts),
-        totalStudioReceipts: ensureFiniteNumber(release.totalStudioReceipts),
+        ...normalizeCinemaReceiptHistory(release),
         weeklyExhibitorReceipts: ensureMoneyArray(release.weeklyExhibitorReceipts),
         totalExhibitorReceipts: ensureFiniteNumber(release.totalExhibitorReceipts),
         weeklyDistributionBreakdowns: ensureObjectArray(release.weeklyDistributionBreakdowns),
@@ -4245,7 +4247,7 @@ export const processGameWeek = async (
                     if (cinemaTitle.playerCredited && !castIds.includes('PLAYER_SELF')) castIds.push('PLAYER_SELF');
 
                     let talentValue = 0;
-                    if (updatedC.type === 'ACTING_GIG') talentValue = getActorTalent(nextPlayer.stats.skills);
+                    if (updatedC.type === 'ACTING_GIG' && cinemaTitle.cast.some(person => person.isPlayer)) talentValue = getActorTalent(nextPlayer.stats.skills);
                     else if (updatedC.type === 'DIRECTOR_GIG') talentValue = getDirectorTalent(nextPlayer.directorStats || { vision: 0, technical: 0, leadership: 0, style: 0 });
                     else if (updatedC.type === 'WRITER_GIG') talentValue = getWriterTalent(nextPlayer.writerStats || { creativity: 0, dialogue: 0, structure: 0, pacing: 0 });
 
@@ -4253,7 +4255,9 @@ export const processGameWeek = async (
                         castIds,
                         updatedC.projectDetails.directorName,
                         nextPlayer.stats.fame,
-                        talentValue
+                        talentValue,
+                        0,
+                        new Map(cinemaTitle.cast.map(person => [person.personId, person.fame]))
                     );
 
                     const castDepth = calculateCastDepthScore(
@@ -5254,16 +5258,10 @@ export const processGameWeek = async (
             rel.projectDetails.hiddenStats.boxOfficeTotalCap = effectiveTotalCap;
             rel.projectDetails.hiddenStats.boxOfficeCapLabel = thinSpectaclePenalty ? 'LIMITED' : dynamicBoxOfficeCap.label;
             const remainingHeadroom = Math.max(0, effectiveTotalCap - rel.totalGross);
-            const rawRevenue = Math.min(goodwillAdjustedRevenue, remainingHeadroom);
-            const distributionBreakdown = calculateTheatricalDistributionBreakdown(
-                rel.projectDetails,
-                rawRevenue,
-                rel.weekNum
+            const finalDistributionBreakdown = calculateTheatricalDistributionBreakdown(
+                rel.projectDetails, goodwillAdjustedRevenue, rel.weekNum, { maxGross: remainingHeadroom }
             );
-            const revenue = Math.min(distributionBreakdown.gross, remainingHeadroom);
-            const finalDistributionBreakdown = revenue === distributionBreakdown.gross
-                ? distributionBreakdown
-                : calculateTheatricalDistributionBreakdown(rel.projectDetails, revenue, rel.weekNum);
+            const revenue = finalDistributionBreakdown.gross;
             const newTotal = rel.totalGross + revenue;
             const newWeeklyGross = [...rel.weeklyGross, revenue];
             const newWeeklyStudioReceipts = [...(rel.weeklyStudioReceipts || []), finalDistributionBreakdown.studioReceipts];
@@ -5370,10 +5368,10 @@ export const processGameWeek = async (
                         id: `studio_ledger_theatrical_${rel.id}_${nextPlayer.age}_${nextPlayer.currentWeek}`,
                         week: nextPlayer.currentWeek,
                         year: nextPlayer.age,
-                        amount: netStudioShare,
+                        amount: studioShare,
                         type: 'THEATRICAL',
                         label: investorTheatricalPayout > 0
-                            ? `${rel.name} theatrical receipts after investor split`
+                            ? `${rel.name} theatrical receipts before investor split`
                             : `${rel.name} theatrical receipts (${Math.round(finalDistributionBreakdown.studioShare * 100)}% studio share)`,
                         projectId: rel.id
                     });
@@ -5400,10 +5398,10 @@ export const processGameWeek = async (
                         id: `studio_ledger_soundtrack_${rel.id}_${nextPlayer.age}_${nextPlayer.currentWeek}`,
                         week: nextPlayer.currentWeek,
                         year: nextPlayer.age,
-                        amount: netSoundtrackRevenue,
+                        amount: weeklySoundtrackRevenue,
                         type: 'SOUNDTRACK',
                         label: investorSoundtrackPayout > 0
-                            ? `${rel.name} soundtrack revenue after investor split`
+                            ? `${rel.name} soundtrack revenue before investor split`
                             : `${rel.name} soundtrack revenue`,
                         projectId: rel.id
                     });
@@ -5905,7 +5903,7 @@ export const processGameWeek = async (
                             amount: uncreditedStreamingRevenue,
                             type: 'STREAMING_ROYALTY',
                             label: investorStreamingPayout > 0
-                                ? `${rel.name} streaming royalties after investor split`
+                                ? `${rel.name} streaming royalties before investor split`
                                 : `${rel.name} streaming royalties`,
                             projectId: rel.id
                         });
@@ -6000,10 +5998,10 @@ export const processGameWeek = async (
                     id: `studio_ledger_soundtrack_${rel.id}_${nextPlayer.age}_${nextPlayer.currentWeek}`,
                     week: nextPlayer.currentWeek,
                     year: nextPlayer.age,
-                    amount: netSoundtrackRevenue,
+                    amount: weeklySoundtrackRevenue,
                     type: 'SOUNDTRACK',
                     label: investorSoundtrackPayout > 0
-                        ? `${rel.name} soundtrack streaming revenue after investor split`
+                        ? `${rel.name} soundtrack streaming revenue before investor split`
                         : `${rel.name} soundtrack streaming revenue`,
                     projectId: rel.id
                 });

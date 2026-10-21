@@ -1,3 +1,4 @@
+import { getCinemaProjectFinance } from '../../../../services/boxOffice/boxOfficeSettlement';
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Film, Tv, Users, DollarSign, Star, TrendingUp, Calendar, Check, Activity, Layers, Zap, Info, ChevronRight, Play, Settings, Camera, Award, BarChart3, Globe, BookOpen, Edit3, Sparkles, ShieldCheck } from 'lucide-react';
@@ -13,7 +14,7 @@ import { getReleasePlanningCtaLabel } from '../../../../services/releasePlanning
 import { getPlayerLanguage, t } from '../../../../services/i18n';
 import { createCustomPosterBlobFromFile, saveCustomPosterMedia } from '../../../../services/customPosterMedia';
 import { CustomPosterImage } from '../../../../components/CustomPosterImage';
-import { getProjectFundingEconomics, getProjectMarketOutcomeRevenue, getStudioReturnPercent } from '../../../../services/projectFundingEconomics';
+import { getProjectFundingEconomics, getProjectMarketOutcomeRevenue } from '../../../../services/projectFundingEconomics';
 import { resolveProjectType } from '../../../../services/businessLogic';
 import { getProjectAlumniStories } from '../../../../services/livingEnsemble';
 import { resolveStreamingPlatformBrandById } from '../../../../services/streamingPlatformBrandRegistry';
@@ -359,15 +360,16 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
     const streamingRevenue = project.streamingRevenue || project.projectDetails?.streamingRevenue || 0;
     const soundtrackRevenue = project.soundtrackRevenue || 0;
     const projectRevenue = actualGross + streamingRevenue + soundtrackRevenue;
-    const studioReceipts = Math.floor(actualGross * 0.5) + streamingRevenue + soundtrackRevenue;
+    const cinemaFinance = getCinemaProjectFinance(project);
+    const studioReceipts = cinemaFinance.producerReceiptsCents / 100;
     const investorPlan = project.investorPlan || project.projectDetails?.investorPlan;
     const investorPayouts = project.investorPayouts || project.projectDetails?.investorPayouts;
     const investorPayoutTotal = Math.max(0, Number(investorPayouts?.lifetimeInvestorPayout || 0));
-    const studioNetAfterInvestors = Math.max(0, studioReceipts - investorPayoutTotal);
+    const studioNetAfterInvestors = cinemaFinance.netStudioReceiptsCents / 100;
     const fundingEconomics = getProjectFundingEconomics(project, budget);
     const platformFunding = fundingEconomics.platformFunding;
     const isPlatformFundedPremiere = fundingEconomics.isPlatformFundedPremiere && platformFunding > 0;
-    const studioReturnPercent = getStudioReturnPercent(project, studioNetAfterInvestors, budget);
+    const studioReturnPercent = cinemaFinance.studioReturnPercent;
     const fundingPlatformId = project.streaming?.platformId
         || project.streamingPlatform
         || project.projectDetails?.hiddenStats?.nextSeasonFundingPlatformId
@@ -960,7 +962,7 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                                 </div>
                                             </div>
                                             <div className="p-5 sm:p-6 bg-blue-500/5 rounded-3xl border border-blue-500/10 backdrop-blur-sm flex flex-col justify-center h-[120px]">
-                                                <div className="text-[10px] font-black uppercase tracking-widest text-blue-400/70 mb-2">{tr('projectDashboard.revenue.studioReceipts')}</div>
+                                                <div className="text-[10px] font-black uppercase tracking-widest text-blue-400/70 mb-2">{tr('projectDashboard.revenue.studioReceipts')}{cinemaFinance.receiptsEstimated ? ' · Estimated' : ''}</div>
                                                 <div className="text-2xl sm:text-3xl font-bold tracking-tight text-blue-300">
                                                     {formatMoney(studioReceipts)}
                                                 </div>
@@ -988,7 +990,7 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                                     : 'flex h-[120px] flex-col justify-center'
                                             }`}>
                                                 <div className="flex items-center justify-between gap-3 text-[10px] font-black uppercase tracking-widest text-amber-500/60 mb-2">
-                                                    <span>{isPlatformFundedPremiere ? 'Studio return' : 'ROI'}</span>
+                                                    <span>{isPlatformFundedPremiere ? 'Studio return' : 'ROI'}{cinemaFinance.receiptsEstimated || cinemaFinance.costsEstimated ? ' · Estimated' : ''}</span>
                                                     {isPlatformFundedPremiere && (
                                                         <button
                                                             type="button"
@@ -1003,7 +1005,7 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                                 <div className={`font-bold tracking-tight ${
                                                     isPlatformFundedPremiere && studioReturnPercent === null
                                                         ? 'text-[26px] leading-[1.05] text-sky-200 sm:text-3xl'
-                                                        : (studioReturnPercent ?? ((projectRevenue - budget) / Math.max(1, budget) * 100)) >= 0
+                                                        : (studioReturnPercent ?? 0) >= 0
                                                             ? 'text-2xl text-emerald-400 sm:text-3xl'
                                                             : 'text-2xl text-rose-400 sm:text-3xl'
                                                 }`}>
@@ -1011,7 +1013,7 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                                         ? studioReturnPercent === null
                                                             ? 'No cash at risk'
                                                             : `${studioReturnPercent >= 0 ? '+' : ''}${studioReturnPercent.toFixed(0)}%`
-                                                        : `${budget ? (((projectRevenue - budget) / budget) * 100).toFixed(0) : 0}%`}
+                                                        : `${(studioReturnPercent ?? 0).toFixed(0)}%`}
                                                 </div>
                                                 {isPlatformFundedPremiere && (
                                                     <div className={`mt-2 font-bold ${

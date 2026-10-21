@@ -95,8 +95,8 @@ Deduplicate exposure source IDs and credited people before calculating increment
 
 **Interfaces:** produce `normalizeCinemaTitle(input: { titleId: string; owner: CinemaOwnerRef; project: ProjectDetails; player: Player }): CinemaTitleInput`. Produce the shared types and fixture/runner contracts above. Actor input IDs are normalized once; no implicit player fame if the player is not credited.
 
-- [ ] Capture the baseline manifest and add fixtures for a $210M accepted lead role, complete ensemble, singleton legacy cast, `actorId`/`npcId` duplicates, no-player credit and a universe offer with a known template owner.
-- [ ] Write the failing assertions before the repair:
+- [x] Capture the baseline manifest and add fixtures for a $210M accepted lead role, complete ensemble, singleton legacy cast, `actorId`/`npcId` duplicates, no-player credit and a universe offer with a known template owner.
+- [x] Write the failing assertions before the repair:
 
 ~~~ts
 const f = makeCinemaFixture('accepted-universe-offer', 21);
@@ -108,19 +108,19 @@ assert.equal(title.owner.id, f.project.studioId);
 assert.equal(new Set(title.cast.map(c => c.personId)).size, title.cast.length);
 ~~~
 
-- [ ] Run `node scripts/run-box-office-audit.mjs inputs`; confirm a substantive assertion fails against the old normalization, not just a missing fixture or import. Record the old handoff's missing ensemble and owner mismatch.
-- [ ] Repair offer construction/acceptance so the player's credit merges with the actual package; a legacy singleton receives a deterministic missing-package reconstruction, not a second player or invented high-quality superstar cast. Carry template studio ownership explicitly. Normalize both cast ID fields and reject duplicate fame contribution.
-- [ ] Run the inputs suite and `npm run audit:studio-ai-commercial-result-b6`; inspect the actual accepted-offer handoff once. Expected: unique correct identities/owner, preserved player role/pay and no dummy co-stars counted as new population.
-- [ ] Review owned hunks and checkpoint as `fix: normalize theatrical package identities`.
+- [x] Run `node scripts/run-box-office-audit.mjs inputs`; confirm a substantive assertion fails against the old normalization, not just a missing fixture or import. Record the old handoff's missing ensemble and owner mismatch.
+- [x] Repair offer construction/acceptance so the player's credit merges with the actual package; a legacy singleton receives a deterministic missing-package reconstruction, not a second player or invented high-quality superstar cast. Carry template studio ownership explicitly. Normalize both cast ID fields and reject duplicate fame contribution.
+- [x] Run the inputs suite and `npm run audit:studio-ai-commercial-result-b6`; inspect the actual accepted-offer handoff once. Expected: unique correct identities/owner, preserved player role/pay and no dummy co-stars counted as new population.
+- [x] Review owned hunks and checkpoint as `fix: normalize theatrical package identities`.
 
 ### Task 2: Continuous production inputs and meaningful quality
 
 **Files:** create `boxOfficeDelivery.ts`; modify `greenlightCalculations.ts`, `greenlightProjectBuilder.ts`, `studioProductionEconomy.ts`, `roleLogic.ts` and `productionRisk.ts` only at the canonical input boundaries; create `scripts/audit-box-office-delivery.ts`.
 
-**Interfaces:** produce `buildCinemaDeliveryInput(project: ProjectDetails): CinemaTitleInput['delivery']`. The delivery payload contains `estimatedQuality`, optional `deliveredQuality`, craft/fit contributions and expectation inputs, each with explicit ranges. Produce `evaluateCinemaExperience(title: CinemaTitleInput, cohort: CinemaWeekInput['cohorts'][number]): number` on [0,1], independent of revenue/budget ROI.
+**Interfaces:** produce `buildCinemaDeliveryInput(project: ProjectDetails): CinemaTitleInput['delivery']`. The delivery payload contains `estimatedQuality`, optional `deliveredQuality`, craft/fit contributions and expectation inputs, each with explicit ranges. The cohort-aware `evaluateCinemaExperience` consumer is implemented with Task 5, independent of revenue/budget ROI; Phase 1 provides delivered/estimated craft facts without unused audience scaffolding.
 
-- [ ] Add fixed craft 70/equipment 0-versus-10, script/cast fit, weak execution, and $120M/$120M+1 cases. Document candidate contribution ranges in `boxOfficeProfiles.ts`; retain named budget tiers only for production categorization.
-- [ ] Write and run the regression assertions:
+- [x] Add fixed craft 70/equipment 0-versus-10, script/cast fit, weak execution, and $120M/$120M+1 cases. Document candidate contribution ranges in `boxOfficeProfiles.ts`; retain named budget tiers only for production categorization.
+- [x] Write and run the regression assertions:
 
 ~~~ts
 const f = makeCinemaFixture('ordinary-craft-max-equipment', 11);
@@ -134,10 +134,10 @@ assert.ok(Math.abs(next.estimatedQuality - delivery.estimatedQuality) < 0.01);
 
 Run `node scripts/run-box-office-audit.mjs delivery`; expected old behavior exposes the quality saturation or budget discontinuity, then the repaired suite passes.
 
-- [ ] Replace additive equipment inflation with bounded diminishing contributions; preserve script, acting, direction, crew, location/fit and realized execution. Normalize offer and player-production budgets consistently without a ticket multiplier at a tier boundary.
-- [ ] Compute experience from delivered craft, cohort fit and expectation mismatch; do not use `buildAudienceReception`'s gross/budget proof as a causal satisfaction input. Retain current numerical IMDb scoring as presentation unless a separate approved change is needed.
-- [ ] Run `npm run audit:greenlight-calculations` and `npm run audit:studio-production-economy`. Update assertions that intentionally encode superseded tier cliffs only with explicit before/after evidence; do not weaken unrelated guards.
-- [ ] Checkpoint as `fix: make film delivery inputs continuous`.
+- [x] Replace additive equipment inflation with bounded diminishing contributions; preserve script, acting, direction, crew, location/fit and realized execution. Normalize offer and player-production budgets consistently without a ticket multiplier at a tier boundary.
+- [x] Provide separate delivered/estimated craft facts for Task 5's cohort-fit/expectation experience consumer. Do not add `buildAudienceReception`'s gross/budget proof as a new causal satisfaction input. Existing audience shortcuts and numerical IMDb scoring remain on the compatibility route until the corresponding consumer switches.
+- [x] Run `npm run audit:greenlight-calculations` and `npm run audit:studio-production-economy`. Update assertions that intentionally encode superseded tier cliffs only with explicit before/after evidence; do not weaken unrelated guards.
+- [x] Checkpoint as `fix: make film delivery inputs continuous`.
 
 ### Task 3: Realized gross, costs and one financial ledger
 
@@ -145,8 +145,8 @@ Run `node scripts/run-box-office-audit.mjs delivery`; expected old behavior expo
 
 **Interfaces:** produce `splitRealizedCinemaGross(input: { grossCents: number; exhibitorBasisPoints: number; distributionBasisPoints: number }): CinemaGrossSplit` and `summarizeCinemaFinance(ledger: CinemaLedger): CinemaFinanceSummary`. Later Task 8 adds live commit to this same module.
 
-- [ ] Reproduce cap-headroom overpayment and hybrid theater/streaming omission from the audit. Trace actual marketing and booking fee charging, including failed/retried release confirmation. Record already-paid facts as opening ledger entries rather than charging again.
-- [ ] Write the exact reconciliation test:
+- [x] Reproduce cap-headroom overpayment and hybrid theater/streaming omission. Trace actual marketing/reserve debits and refunds and distinguish the unpaid booking quote. Finance adapters read paid facts without new debits. Live release-confirmation retries and one-time booking charges are verified with the new transaction in Tasks 6/8.
+- [x] Write the exact reconciliation test:
 
 ~~~ts
 const split = splitRealizedCinemaGross({ grossCents: 10001,
@@ -156,12 +156,14 @@ assert.equal(split.grossCents, split.producerReceiptsCents
 assert.ok(Object.values(split).every(Number.isSafeInteger));
 ~~~
 
-- [ ] Run `node scripts/run-box-office-audit.mjs finance`; first fail the old final-gross reapplication scenario, then implement splitting **realized** gross without another demand/distribution modifier. Existing legacy caps may remain until v1 activation; their clipped receipts must still reconcile.
-- [ ] Add ledger cases: production + marketing + booking costs; signed actor fee/backend; investor recoupment; theatrical plus streaming plus soundtrack income; owned producer plus owned exhibitor; already-paid deposit/advance; player dollars and NPC studio millions conversions. Assert 100 cents/dollar and 100,000,000 cents/million at the adapters.
-- [ ] Keep public gross rank separate from financial success. Feed consistent cost-recovery/profit facts to financial verdicts. Preserve signed participation bases rather than replacing every contract with a new net-profit assumption.
-- [ ] Run finance, `npm run audit:distribution-revenue` and the actual loop cap fixture. Expected: no receipt sum above ticket gross, no duplicated cost or hybrid income loss. Checkpoint as `fix: reconcile theatrical gross and settled costs`.
+- [x] Run `node scripts/run-box-office-audit.mjs finance`; first fail the old final-gross reapplication scenario, then implement splitting **realized** gross without another demand/distribution modifier. Existing legacy caps may remain until v1 activation; their clipped receipts must still reconcile.
+- [x] Add pure-ledger cases for production/marketing/explicitly paid booking/localization, actor fee/backend, investor payout, combined media income, duplicate cost events and distinct currency adapters. Assert 100 cents/dollar and 100,000,000 cents/million. Preserve receipt gaps through migration and actual weekly/archive paths. Owned-exhibitor consolidation and live advance/deposit posting stay with supply/settlement Tasks 6/8.
+- [x] Keep public gross rank separate from financial success and use canonical cost/receipt facts for current financial reports. Preserve signed participation bases. Activate outcome/reward policies and remaining commercial badges together in Tasks 8/9, after all owner routes consume committed shared-market facts; do not rebalance one legacy career route in isolation.
+- [x] Run finance, `npm run audit:distribution-revenue` and the actual loop cap fixture. Expected: no receipt sum above ticket gross, no duplicated cost or hybrid income loss. Checkpoint as `fix: reconcile theatrical gross and settled costs`.
 
 **Phase 1 gate:** all source-traced defect cases covered; historical receipts/pay/rights remain intact. Do not tune hit probability to compensate for broken inputs.
+
+**Phase 1 execution:** implemented against recovery checkpoint `f693fd2`; see [evidence and dependency decisions](../../reports/2026-10-22-box-office-phase1/README.md). The new audience/market/save-schema contracts are introduced with their owning consumers in later phases.
 
 ## Phase 2 — Recognition, real awareness and honest Greenlight inputs
 
@@ -397,4 +399,4 @@ for (let seed = 0; seed < 32; seed += 1) {
 | Cinema-chain foundation and vertical ownership | 3, 6, 8 |
 | Loophole matrix, normal career/UI, durability, localization/performance | 11 and each phase gate |
 
-Completion means the gates are evidenced, not merely that these files exist. Before execution this is a source-traced plan; no proposed cinema outcome, fairness distribution or performance target has passed yet.
+Completion means the gates are evidenced, not merely that these files exist. Phase 1 has source-traced regression and integration evidence. Later proposed audience-market outcomes, fairness distributions and performance targets remain unverified until their phase gates run.

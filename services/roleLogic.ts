@@ -1276,6 +1276,7 @@ export const calculateWeeklyBoxOffice = (
     const caps = getBoxOfficeCaps(budgetTier, budget);
     const productionScale = getProductionScale(budget);
     const spectacleWeight = clamp(productionScale - 1, 0, 1);
+    const sleeperWeight = clamp(2 - productionScale, 0, 1);
     const genreMod = GENRE_MULTIPLIERS[genre];
     const scriptQuality = stats.scriptQuality || 50;
     const directorQuality = stats.directorQuality || 50;
@@ -1322,11 +1323,10 @@ export const calculateWeeklyBoxOffice = (
 
         // Sleeper hits are possible when craft is excellent even without massive star power.
         const isSleeperCandidate =
-            productionScale < 2 &&
             audienceStrength > 82 &&
             (scriptQuality > 85 || directorQuality > 85);
         if (isSleeperCandidate) {
-            rawOpening *= 1.08 + (Math.random() * 0.12);
+            rawOpening *= 1 + (0.08 + Math.random() * 0.12) * sleeperWeight;
         }
 
         if (SPECTACLE_GENRES.has(genre) && spectacleWeight > 0 && castDepthScore < 55) {
@@ -1345,7 +1345,7 @@ export const calculateWeeklyBoxOffice = (
         
         if (isMegaEvent) {
             const breakoutMult = 1.0 + (Math.random() * 0.2);
-            rawOpening = Math.min(rawOpening, caps.opening * 1.2 * breakoutMult);
+            rawOpening = Math.min(rawOpening, caps.opening * (1 + (1.2 * breakoutMult - 1) * spectacleWeight));
         } else {
             rawOpening = Math.min(rawOpening, caps.opening);
         }
@@ -1384,14 +1384,13 @@ export const calculateWeeklyBoxOffice = (
     // preserves indie upside without making zero marketing a guaranteed exploit.
     const sleeperRoll = stats.boxOfficeCapRoll ?? 0.5;
     const sleeperEligible =
-        productionScale < 2
-        && campaignReachMod < 0.78
+        campaignReachMod < 0.78
         && qualityScore >= 84
         && scriptQuality >= 82
         && directorQuality >= 78;
     const sleeperBreakout = sleeperEligible && sleeperRoll >= 0.86;
     if (sleeperBreakout && week <= 5) {
-        dropRate -= 0.18 + Math.min(0.1, (qualityScore - 84) / 80);
+        dropRate -= (0.18 + Math.min(0.1, (qualityScore - 84) / 80)) * sleeperWeight;
     }
 
     const variance = (Math.random() * 0.1) - 0.05; 
@@ -1402,7 +1401,7 @@ export const calculateWeeklyBoxOffice = (
 
     let retention = Math.max(0.05, 1 - dropRate);
     if (sleeperBreakout && week === 2 && sleeperRoll >= 0.96 && qualityScore >= 90) {
-        retention = Math.max(retention, 1.28);
+        retention = Math.max(retention, retention + (1.28 - retention) * sleeperWeight);
     }
     const musicLegsMod = Math.max(0.92, Math.min(1.14, 1 + (musicAudienceReachLiftPct / 260) - (musicMismatchBacklashRisk / 1100) - (musicControversyRisk / 1500)));
     return Math.floor(prevGross * retention * formatAudienceMod * marketDemandMod * studioReputationMod * musicLegsMod);

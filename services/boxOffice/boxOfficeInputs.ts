@@ -61,7 +61,9 @@ export const completeOfferedCinemaCast = (project: ProjectDetails): ProjectDetai
     const pool = NPC_DATABASE.filter(isCastableActor).map(npc => ({ npc,
         priority: Math.abs(score(npc.stats?.talent, 50) - craft) + rng() * 25,
     })).sort((a, b) => a.priority - b.priority || a.npc.id.localeCompare(b.npc.id));
-    const additions: CastMember[] = pool.slice(0, Math.max(0, target - cast.filter(c => c.type !== 'DIRECTOR').length)).map(({ npc }) => ({
+    const actorCount = new Set(cast.filter(member => member.type !== 'DIRECTOR').map(member =>
+        isCinemaPlayerCredit(member) ? 'PLAYER_SELF' : member.actorId || member.npcId || member.id)).size;
+    const additions: CastMember[] = pool.slice(0, Math.max(0, target - actorCount)).map(({ npc }) => ({
         id: npc.id, npcId: npc.id, actorId: npc.id, actorName: npc.name, name: npc.name,
         role: 'Co-Star', roleType: 'SUPPORTING', isPlayer: false, image: npc.avatar, type: 'ACTOR',
     }));

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { applyOpportunityIdentityToProject } from '../services/characterIdentityLogic';
 import { NPC_DATABASE, calculateProjectFameMultiplier, isCastableActor } from '../services/npcLogic';
 import { generateRandomUniverseOpportunity } from '../services/universeLogic';
-import { normalizeCinemaTitle } from '../services/boxOffice/boxOfficeInputs';
+import { normalizeCinemaTitle, completeOfferedCinemaCast } from '../services/boxOffice/boxOfficeInputs';
 import { makeCinemaFixture } from './fixtures/boxOfficeScenarios';
 
 const cases: Array<[string, () => void]> = [];
@@ -70,6 +70,17 @@ test('custom actor IDs resolve through relationships without inventing fame', ()
   const result=normalizeCinemaTitle({titleId:'film',owner:{id:'UNIVERSAL',route:'ACCEPTED_ROLE'},project:f.project,player:f.player});
   assert.equal(result.cast[0].personId,actor.id);
   assert.equal(result.cast[0].fame,Math.min(100,actor.stats?.fame || 0));
+});
+test('duplicate player rows cannot stand in for missing co-stars',()=>{
+ const f=makeCinemaFixture(9);
+ const credit={id:'self',actorId:'PLAYER_SELF',name:f.player.name,role:'Lead',roleType:'LEAD' as const,isPlayer:true,type:'ACTOR' as const,image:''};
+ f.project.castList=[credit,{...credit,id:'self-copy'}];
+ const repaired=completeOfferedCinemaCast(f.project);
+ const title=normalizeCinemaTitle({titleId:'film',owner:{id:'UNIVERSAL',route:'ACCEPTED_ROLE'},project:repaired,player:f.player});
+ assert.ok(title.cast.length>=7,'Duplicate player rows are one person, not two ensemble positions');
+});
+test('canonical custom actor fame is retained without a global database entry',()=>{
+ assert.equal(calculateProjectFameMultiplier(['custom-actor'],'Unknown',0,undefined,0,new Map([['custom-actor',80]])),2.6);
 });
 let failures = 0;
 for (const [name, run] of cases) { try { run(); console.log('PASS', name); } catch (error) { failures++; console.error('FAIL', name, error instanceof Error ? error.message : error); } }

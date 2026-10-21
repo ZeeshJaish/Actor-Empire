@@ -1,3 +1,5 @@
+import { createArchivedCinemaReleaseRecord } from '../../services/boxOffice/boxOfficePresentation';
+import { getCinemaProjectFinance } from '../../services/boxOffice/boxOfficeSettlement';
 import React, { useState } from 'react';
 import { Player, ActiveRelease, OutsideProductionInvestment, BoxOfficeRegionId, CinemaChainId, PastProject } from '../../types';
 import { PLATFORMS } from '../../services/streamingLogic';
@@ -84,10 +86,12 @@ type BoxOfficeArchiveEntry = {
     streamingRevenue: number;
     soundtrackRevenue: number;
     studioReceipts: number;
+    receiptsEstimated: boolean;
+    financialsEstimated: boolean;
     budget: number;
     rating: number;
     openingWeekend: number;
-    roi: number;
+    roi: number | null;
     weekTwoHold?: number;
     releaseRecord: ActiveRelease;
 };
@@ -477,82 +481,6 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
       }));
   };
 
-  const createArchivedReleaseRecord = (project: any): ActiveRelease => {
-      const weeklyGross = Array.isArray(project.weeklyGross) ? project.weeklyGross.map(Number) : [];
-      const weeklyViews = Array.isArray(project.weeklyViews) ? project.weeklyViews.map(Number) : [];
-      const gross = Math.max(0, Number(project.gross ?? project.totalGross ?? 0));
-      const streamingRevenue = Math.max(0, Number(project.streamingRevenue || 0));
-      const projectType = project.projectType === 'SERIES' || project.type === 'SERIES' ? 'SERIES' : 'MOVIE';
-      const projectDetails = project.projectDetails && typeof project.projectDetails === 'object'
-          ? project.projectDetails
-          : {
-              title: project.name || project.title || tr('box.untitled'),
-              type: projectType,
-              description: project.description || '',
-              studioId: project.studioId || 'ARCHIVE',
-              subtype: project.subtype || 'STANDALONE',
-              genre: project.genre || 'DRAMA',
-              format: project.format || 'LIVE_ACTION',
-              budgetTier: project.budgetTier || 'MID',
-              estimatedBudget: Math.max(1, Number(project.budget || 1)),
-              visibleHype: 'MID',
-              hiddenStats: {
-                  qualityScore: Number(project.projectQuality || project.imdbRating * 10 || 50),
-              },
-              directorName: project.directorName || '',
-              visibleDirectorTier: '',
-              visibleScriptBuzz: '',
-              visibleCastStrength: '',
-              releaseRegionIds: project.releaseRegionIds || [],
-              releaseChainSelections: project.releaseChainSelections || {},
-          };
-      const streamingOnly = gross <= 0 && streamingRevenue > 0 && project.streamingPlatform;
-
-      return {
-          id: String(project.id),
-          name: project.name || project.title || tr('box.untitled'),
-          type: projectType,
-          roleType: project.roleType || 'LEAD',
-          projectDetails,
-          distributionPhase: streamingOnly ? 'STREAMING' : 'THEATRICAL',
-          weekNum: Math.max(1, streamingOnly ? weeklyViews.length : weeklyGross.length),
-          weeklyGross,
-          totalGross: gross,
-          weeklyStudioReceipts: Array.isArray(project.weeklyStudioReceipts) ? project.weeklyStudioReceipts.map(Number) : [],
-          totalStudioReceipts: Math.max(0, Number(project.totalStudioReceipts || project.earnings || 0)),
-          weeklyExhibitorReceipts: Array.isArray(project.weeklyExhibitorReceipts) ? project.weeklyExhibitorReceipts.map(Number) : [],
-          totalExhibitorReceipts: Math.max(0, Number(project.totalExhibitorReceipts || 0)),
-          weeklyDistributionBreakdowns: Array.isArray(project.weeklyDistributionBreakdowns) ? project.weeklyDistributionBreakdowns : [],
-          budget: Math.max(1, Number(project.budget || projectDetails.estimatedBudget || 1)),
-          status: 'FINISHED',
-          imdbRating: Number(project.imdbRating || project.rating || 0),
-          productionPerformance: Number(project.projectQuality || project.imdbRating * 10 || 50),
-          maxTheatricalWeeks: Math.max(1, Number(project.baseTheatricalWeeks || weeklyGross.length || 1)),
-          baseTheatricalWeeks: project.baseTheatricalWeeks,
-          theatricalExtensionWeeks: Math.max(0, Number(project.theatricalExtensionWeeks || 0)),
-          theatricalExtensionHistory: Array.isArray(project.theatricalExtensionHistory) ? project.theatricalExtensionHistory : [],
-          weeksInTheaters: weeklyGross.length,
-          streaming: streamingOnly ? {
-              platformId: project.streamingPlatform,
-              weekOnPlatform: Math.max(1, weeklyViews.length),
-              totalViews: Math.max(0, Number(project.totalViews || 0)),
-              weeklyViews,
-              isLeaving: true,
-          } : undefined,
-          streamingRevenue,
-          weeklyStreamingBreakdowns: Array.isArray(project.weeklyStreamingBreakdowns) ? project.weeklyStreamingBreakdowns : [],
-          soundtrackRevenue: Math.max(0, Number(project.soundtrackRevenue || 0)),
-          weeklySoundtrackRevenue: Array.isArray(project.weeklySoundtrackRevenue) ? project.weeklySoundtrackRevenue.map(Number) : [],
-          soundtrackRevenueBreakdown: project.soundtrackRevenueBreakdown,
-          weeklySoundtrackBreakdowns: Array.isArray(project.weeklySoundtrackBreakdowns) ? project.weeklySoundtrackBreakdowns : [],
-          investorPlan: project.investorPlan,
-          investorPayouts: project.investorPayouts,
-          audienceReception: project.audienceReception,
-          releaseWeek: project.releaseWeek,
-          releaseYear: project.releaseYear || project.year,
-          releasedAtAbsoluteWeek: project.releasedAtAbsoluteWeek,
-      };
-  };
 
   const getBoxOfficeArchiveEntries = (): BoxOfficeArchiveEntry[] => {
       const activeEntries: BoxOfficeArchiveEntry[] = activeReleases.map(rel => {
@@ -560,7 +488,8 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
           const streamingRevenue = Math.max(0, rel.streamingRevenue || 0);
           const soundtrackRevenue = Math.max(0, rel.soundtrackRevenue || 0);
           const totalRevenue = worldwideGross + streamingRevenue + soundtrackRevenue;
-          const studioReceipts = Math.max(0, rel.totalStudioReceipts || streamingRevenue || Math.round(worldwideGross * 0.55)) + soundtrackRevenue;
+          const cinemaFinance = getCinemaProjectFinance(rel);
+          const studioReceipts = cinemaFinance.producerReceiptsCents / 100;
           const budget = Math.max(1, rel.budget || rel.projectDetails?.estimatedBudget || 1);
           const openingWeekend = rel.distributionPhase === 'STREAMING'
               ? streamingRevenue
@@ -584,10 +513,12 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
               streamingRevenue,
               soundtrackRevenue,
               studioReceipts,
+              receiptsEstimated: cinemaFinance.receiptsEstimated,
+              financialsEstimated: cinemaFinance.receiptsEstimated || cinemaFinance.costsEstimated,
               budget,
               rating: rel.imdbRating || 0,
 	              openingWeekend,
-	              roi: studioReceipts / budget,
+	              roi: cinemaFinance.studioReturnPercent === null ? null : cinemaFinance.studioReturnPercent / 100 + 1,
 	              weekTwoHold,
 	              releaseRecord: rel,
 	          };
@@ -598,12 +529,8 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
           const streamingRevenue = Math.max(0, Number(project.streamingRevenue || 0));
           const soundtrackRevenue = Math.max(0, Number(project.soundtrackRevenue || 0));
           const totalRevenue = worldwideGross + streamingRevenue + soundtrackRevenue;
-	          const studioReceipts = Math.max(0, Number(
-	              project.totalStudioReceipts
-	              ?? project.earnings
-	              ?? streamingRevenue
-	              ?? Math.round(worldwideGross * 0.5)
-	          )) + soundtrackRevenue;
+          const cinemaFinance = getCinemaProjectFinance(project);
+          const studioReceipts = cinemaFinance.producerReceiptsCents / 100;
           const budget = Math.max(1, Number(project.budget || 1));
           const openingWeekend = Math.max(0, Number(
               project.openingWeekend ||
@@ -626,11 +553,13 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
               streamingRevenue,
               soundtrackRevenue,
               studioReceipts,
+              receiptsEstimated: cinemaFinance.receiptsEstimated,
+              financialsEstimated: cinemaFinance.receiptsEstimated || cinemaFinance.costsEstimated,
               budget,
               rating: Number(project.imdbRating || project.rating || 0),
 	              openingWeekend,
-	              roi: studioReceipts / budget,
-	              releaseRecord: createArchivedReleaseRecord(project),
+	              roi: cinemaFinance.studioReturnPercent === null ? null : cinemaFinance.studioReturnPercent / 100 + 1,
+	              releaseRecord: createArchivedCinemaReleaseRecord(project, tr('box.untitled')),
 	          };
       });
 
@@ -648,7 +577,8 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
           const streamingRevenue = Math.max(0, Number(project.streamingRevenue ?? details.streamingRevenue ?? 0));
           const soundtrackRevenue = Math.max(0, Number(project.soundtrackRevenue ?? details.soundtrackRevenue ?? 0));
           const totalRevenue = worldwideGross + streamingRevenue + soundtrackRevenue;
-          const studioReceipts = Math.max(0, Number(project.earnings || project.totalStudioReceipts || streamingRevenue || Math.round(worldwideGross * 0.5))) + soundtrackRevenue;
+          const cinemaFinance = getCinemaProjectFinance({ ...project, projectDetails: details });
+          const studioReceipts = cinemaFinance.producerReceiptsCents / 100;
           const budget = Math.max(1, Number(project.budget || details.estimatedBudget || 1));
           return {
               id: String(project.id),
@@ -660,11 +590,13 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
               streamingRevenue,
               soundtrackRevenue,
               studioReceipts,
+              receiptsEstimated: cinemaFinance.receiptsEstimated,
+              financialsEstimated: cinemaFinance.receiptsEstimated || cinemaFinance.costsEstimated,
               budget,
               rating: Number(project.imdbRating || project.rating || details.imdbRating || 0),
 	              openingWeekend: Math.max(0, Number(project.openingWeekend || details.campaignRealitySnapshot?.openingActual || (worldwideGross > 0 ? worldwideGross * 0.32 : streamingRevenue * 0.45))),
-	              roi: studioReceipts / budget,
-	              releaseRecord: createArchivedReleaseRecord(project),
+	              roi: cinemaFinance.studioReturnPercent === null ? null : cinemaFinance.studioReturnPercent / 100 + 1,
+	              releaseRecord: createArchivedCinemaReleaseRecord(project, tr('box.untitled')),
 	          };
       });
 
@@ -673,7 +605,7 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
 
   const getAllTimeMetricValue = (entry: BoxOfficeArchiveEntry, mode: BoxOfficeAllTimeMode) => {
       if (mode === 'STUDIO') return entry.studioReceipts;
-      if (mode === 'ROI') return entry.roi;
+      if (mode === 'ROI') return entry.roi ?? -1;
       if (mode === 'OPENING') return entry.openingWeekend;
       if (mode === 'STREAMING') return entry.streamingRevenue;
       return entry.totalRevenue;
@@ -730,13 +662,13 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
               return { rel, studioShare: latest?.studioShare || 0 };
           })
           .sort((a, b) => b.studioShare - a.studioShare)[0];
-      const bestRoi = [...archive].sort((a, b) => b.roi - a.roi)[0];
+      const bestRoi = [...archive].filter(entry => entry.roi !== null).sort((a, b) => b.roi - a.roi)[0];
       const topStreaming = [...archive].filter(entry => entry.streamingRevenue > 0).sort((a, b) => b.streamingRevenue - a.streamingRevenue)[0];
       const sleeperHit = [...archive]
-          .filter(entry => entry.budget <= 50_000_000 && entry.roi >= 1.6)
+          .filter(entry => entry.roi !== null && entry.budget <= 50_000_000 && entry.roi >= 1.6)
           .sort((a, b) => b.roi - a.roi)[0];
       const biggestFlop = [...archive]
-          .filter(entry => entry.budget >= 5_000_000 && entry.totalRevenue > 0)
+          .filter(entry => entry.roi !== null && entry.budget >= 5_000_000 && entry.totalRevenue > 0)
           .sort((a, b) => a.roi - b.roi)[0];
       const weekTwoHold = [...archive]
           .filter(entry => entry.weekTwoHold !== undefined)
@@ -850,7 +782,8 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
       const theatricalRegions = getTheatricalRegionTotals(rel);
       const theatricalChains = getTheatricalChainTotals(rel);
       const streamingRegions = getStreamingRegionTotals(rel);
-      const totalStudioReceipts = rel.totalStudioReceipts || (rel.weeklyStudioReceipts || []).reduce((sum, amount) => sum + amount, 0);
+      const cinemaFinance = getCinemaProjectFinance(rel);
+      const totalStudioReceipts = cinemaFinance.theatricalProducerReceiptsCents / 100;
       const totalExhibitorReceipts = rel.totalExhibitorReceipts || (rel.weeklyExhibitorReceipts || []).reduce((sum, amount) => sum + amount, 0);
       const soundtrackRevenue = Math.max(0, rel.soundtrackRevenue || 0);
       const soundtrackBreakdown = rel.soundtrackRevenueBreakdown;
@@ -863,7 +796,7 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
       const investorOwnerExtraCount = Math.max(0, (investorPlan?.commitments?.filter(item => item.ownerName).length || 0) - 2);
       const investorScopeLabel = rel.type === 'SERIES' ? tr('box.seasonOnlyCapTable') : tr('box.projectOnlyCapTable');
       const investorPayoutTotal = Math.max(0, Number(rel.investorPayouts?.lifetimeInvestorPayout || rel.projectDetails?.investorPayouts?.lifetimeInvestorPayout || 0));
-      const studioNetAfterInvestors = Math.max(0, totalStudioReceipts + (rel.streamingRevenue || 0) + soundtrackRevenue - investorPayoutTotal);
+      const studioNetAfterInvestors = cinemaFinance.netStudioReceiptsCents / 100;
       const platform = isStreamingRelease ? PLATFORMS[rel.streaming!.platformId] : null;
       const tone = isStreamingRelease ? 'streaming' : 'theatrical';
       const streamingRolloutStatus = isStreamingRelease ? getStreamingRolloutStatus(rel) : null;
@@ -996,7 +929,7 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
                       ) : (
                           <>
 	                              {renderMetric(tr('box.worldwideGross'), formatMoney(rel.totalGross))}
-	                              {renderMetric(tr('box.metric.studioReceipts'), formatMoney(totalStudioReceipts), 'text-emerald-300')}
+	                              {renderMetric(`${tr('box.metric.studioReceipts')}${cinemaFinance.receiptsEstimated ? ' · Estimated' : ''}`, formatMoney(totalStudioReceipts), 'text-emerald-300')}
 	                              {soundtrackRevenue > 0 && renderMetric(tr('box.soundtrackRevenue'), formatMoney(soundtrackRevenue), 'text-cyan-300')}
 	                              {renderMetric(tr('box.openingWeekend'), formatMoney(getOpeningWeekend(rel)))}
 	                              {renderMetric(tr('box.weeklyDrop'), latestDrop === null ? '-' : `${latestDrop}%`, latestDrop !== null && latestDrop < 0 ? 'text-emerald-300' : 'text-amber-300')}
@@ -1436,7 +1369,7 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
       const activeMode = ALL_TIME_MODES.find(mode => mode.id === allTimeMode) || ALL_TIME_MODES[0];
       const formatAllTimeValue = (entry: BoxOfficeArchiveEntry) => (
           allTimeMode === 'ROI'
-              ? `${entry.roi.toFixed(1)}x`
+              ? entry.roi === null ? '—' : `${entry.roi.toFixed(1)}x`
               : formatMoney(getAllTimeMetricValue(entry, allTimeMode))
       );
 
@@ -1512,7 +1445,12 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
                                   {tr(`box.releaseType.${entry.type.toLowerCase()}`)} · {entry.source === 'HISTORY' ? tr('box.archive') : tr('box.live')}{entry.rating ? ` · IMDb ${entry.rating.toFixed(1)}` : ''}
                               </div>
 	                          </div>
-	                          <div className="text-right font-mono text-sm font-black text-emerald-300">{formatAllTimeValue(entry)}</div>
+	                          <div className="text-right">
+                              <div className="font-mono text-sm font-black text-emerald-300">{formatAllTimeValue(entry)}</div>
+                              {((allTimeMode === 'STUDIO' && entry.receiptsEstimated) || (allTimeMode === 'ROI' && entry.financialsEstimated)) && (
+                                  <div className="text-[9px] text-zinc-500">Estimated</div>
+                              )}
+                          </div>
 	                          <ChevronRight size={16} className="text-emerald-300" />
 	                      </button>
 	                  ))}

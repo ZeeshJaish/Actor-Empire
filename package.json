@@ -4,6 +4,9 @@
   "version": "1.0.25",
   "type": "module",
   "scripts": {
+    "audit:box-office-finance": "node scripts/run-box-office-audit.mjs finance",
+    "audit:box-office-finance-contracts": "node scripts/run-box-office-audit.mjs finance-contracts",
+    "audit:box-office-finance-ui": "node scripts/run-box-office-audit.mjs finance-ui",
     "audit:box-office-delivery": "node scripts/run-box-office-audit.mjs delivery",
     "audit:box-office-inputs": "node scripts/run-box-office-audit.mjs inputs",
     "audit:box-office-phase1-integration": "node scripts/run-box-office-audit.mjs phase1-integration",

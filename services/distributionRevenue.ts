@@ -162,8 +162,11 @@ const getDistributionModifier = (project: ProjectDetails, totalScreens: number, 
 export const calculateTheatricalDistributionBreakdown = (
     project: ProjectDetails,
     worldwideGrossDemand: number,
-    week: number
+    week: number,
+    options: { grossBasis?: 'DEMAND' | 'REALIZED'; maxGross?: number } = {}
 ): TheatricalDistributionBreakdown => {
+    if (!Number.isFinite(worldwideGrossDemand) || worldwideGrossDemand < 0) throw new RangeError('Invalid theatrical gross input');
+    if (options.maxGross !== undefined && (!Number.isFinite(options.maxGross) || options.maxGross < 0)) throw new RangeError('Invalid theatrical gross limit');
     const regionIds = getReleaseRegionIdsForProject(project);
     const chainSelections = normalizeDistributionChainSelections(project.releaseChainSelections);
 
@@ -207,7 +210,8 @@ export const calculateTheatricalDistributionBreakdown = (
     const totalScreens = rows.reduce((sum, row) => sum + row.totalScreens, 0);
     const expectedFootfall = rows.reduce((sum, row) => sum + row.expectedFootfall, 0);
     const { distributionModifier, overscreeningPenalty, underReleasePenalty } = getDistributionModifier(project, totalScreens, expectedFootfall);
-    const gross = Math.max(0, Math.floor(worldwideGrossDemand * distributionModifier));
+    const realizedGross = options.grossBasis === 'REALIZED' ? worldwideGrossDemand : worldwideGrossDemand * distributionModifier;
+    const gross = rows.length ? Math.max(0, Math.floor(Math.min(realizedGross, options.maxGross ?? realizedGross))) : 0;
     const totalWeight = rows.reduce((sum, row) => sum + row.regionWeight, 0) || 1;
 
     let allocatedGross = 0;
