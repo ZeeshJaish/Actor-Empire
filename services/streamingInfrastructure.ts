@@ -466,7 +466,7 @@ export interface StreamingInfrastructureForecast {
 
 export interface StreamingInfrastructureValidationIssue {
     step: number;
-    code: 'PRICE_RANGE' | 'PRICE_ORDER' | 'LOAD_TEST_REQUIRED' | 'INSUFFICIENT_TREASURY' | 'INVALID_STATE' | 'CHANGE_IN_PROGRESS';
+    code: 'PRICE_RANGE' | 'PRICE_ORDER' | 'LOAD_TEST_REQUIRED' | 'INSUFFICIENT_TREASURY' | 'INVALID_STATE' | 'CHANGE_IN_PROGRESS' | 'PRICING_IN_AUDIENCE';
     message: string;
 }
 
@@ -1020,25 +1020,33 @@ export const validateStreamingInfrastructureDraft = (
             message: `Infrastructure revision ${platform.pendingInfrastructureSetup.revision} is already under construction. Finish it before commissioning another change.`,
         });
     }
-    STREAMING_SUBSCRIPTION_TIERS.forEach(tier => {
-        const price = draft.subscriptionPrices[tier.id];
-        if (!Number.isFinite(price) || price < tier.minPrice || price > tier.maxPrice) {
+    // Live commercial plans belong to Audience. Their valid custom prices do
+    // not have to fit the old three-tier network onboarding ladder.
+    if (platform.launchCommit) {
+        if (STREAMING_SUBSCRIPTION_TIERS.some(tier => draft.subscriptionPrices[tier.id] !== platform.subscriptionPrices[tier.id])) {
+            issues.push({ step: 3, code: 'PRICING_IN_AUDIENCE', message: 'Change live prices in Audience → Pricing. Network revisions preserve your current offers.' });
+        }
+    } else {
+        STREAMING_SUBSCRIPTION_TIERS.forEach(tier => {
+            const price = draft.subscriptionPrices[tier.id];
+            if (!Number.isFinite(price) || price < tier.minPrice || price > tier.maxPrice) {
+                issues.push({
+                    step: 3,
+                    code: 'PRICE_RANGE',
+                    message: `${tier.title} must be priced between $${tier.minPrice.toFixed(2)} and $${tier.maxPrice.toFixed(2)}.`,
+                });
+            }
+        });
+        if (
+            draft.subscriptionPrices.PREMIUM < draft.subscriptionPrices.BASIC + 2
+            || draft.subscriptionPrices.FAMILY < draft.subscriptionPrices.PREMIUM + 3
+        ) {
             issues.push({
                 step: 3,
-                code: 'PRICE_RANGE',
-                message: `${tier.title} must be priced between $${tier.minPrice.toFixed(2)} and $${tier.maxPrice.toFixed(2)}.`,
+                code: 'PRICE_ORDER',
+                message: 'Keep at least $2 between Basic and Premium, and $3 between Premium and Family.',
             });
         }
-    });
-    if (
-        draft.subscriptionPrices.PREMIUM < draft.subscriptionPrices.BASIC + 2
-        || draft.subscriptionPrices.FAMILY < draft.subscriptionPrices.PREMIUM + 3
-    ) {
-        issues.push({
-            step: 3,
-            code: 'PRICE_ORDER',
-            message: 'Keep at least $2 between Basic and Premium, and $3 between Premium and Family.',
-        });
     }
     if (!sameInfrastructure && draft.lastLoadTestSignature !== forecast.configurationSignature) {
         issues.push({

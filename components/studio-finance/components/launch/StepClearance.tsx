@@ -34,12 +34,14 @@ const OUTCOME: Record<ClearanceOutcome, { label: string; tone: 'good' | 'warn' |
 
 const NEEDS_PLAYER: ClearanceOutcome[] = ['DOCUMENT_REQUIRED', 'PAYMENT_REQUIRED', 'REJECTED', 'REVISABLE'];
 
-export function StepClearance({ data, draft, chosen, free, handlers }: StepProps) {
+export function StepClearance({ data, draft, chosen, free, handlers, initialCountryId, operations }: StepProps) {
   const byCountry = new Map(data.clearance.map((c) => [c.countryId, c]));
-  const [openId, setOpenId] = useState<string | undefined>(chosen[0]?.id);
+  const firstCountry = chosen.find(country=>country.id===initialCountryId) || chosen.find(country=>NEEDS_PLAYER.includes(byCountry.get(country.id)?.outcome || 'NOT_FILED')) || chosen[0];
+  const [openId, setOpenId] = useState<string | undefined>(firstCountry?.id);
+  const [region, setRegion] = useState(firstCountry?.region || data.regions[0]);
 
   if (chosen.length === 0) {
-    return <p className="lw-empty">Choose opening markets first — there is nothing to clear yet.</p>;
+    return <p className="lw-empty">{operations ? 'Plan a market entry first. Its filing and clearance will appear here.' : 'Choose opening markets first — there is nothing to clear yet.'}</p>;
   }
 
   const stateOf = (id: string): ClearanceState =>
@@ -54,7 +56,8 @@ export function StepClearance({ data, draft, chosen, free, handlers }: StepProps
   const filingEnergy = quoteStreamingMarketFilingEnergy(unfiled.map(country => country.id));
   const short = Math.max(0, due - free);
 
-  const active = chosen.find((c) => c.id === openId) ?? chosen[0];
+  const visibleCountries = operations ? chosen.filter(country=>country.region===region) : chosen;
+  const active = visibleCountries.find((c) => c.id === openId) ?? visibleCountries[0] ?? chosen[0];
   const state = stateOf(active.id);
   const singleFilingEnergy = quoteStreamingMarketFilingEnergy([active.id]);
   const outcome = OUTCOME[state.outcome];
@@ -91,13 +94,18 @@ export function StepClearance({ data, draft, chosen, free, handlers }: StepProps
             ? `${needsYou} market${needsYou > 1 ? 's are' : ' is'} waiting on you.`
             : waiting > 0
               ? `${waiting} under review. Everything else stays open while you wait.`
-              : 'Nothing filed yet. Reviews run 4–6 weeks once they start.'}
+              : cleared === chosen.length ? 'All filed markets are cleared. Review a country below for its ongoing obligations.' : 'Nothing filed yet. Reviews run 4–6 weeks once they start.'}
         </p>
       </section>
 
       {/* --- the markets as a strip, not a stack --------------------------- */}
+      {operations && <label className="cl-region-filter">Region
+        <select value={region} onChange={event=>{setRegion(event.target.value);setOpenId(undefined);}}>
+          {data.regions.filter(name=>chosen.some(country=>country.region===name)).map(name=><option key={name} value={name}>{name} · {chosen.filter(country=>country.region===name).length} markets</option>)}
+        </select>
+      </label>}
       <div className="cl-strip" role="tablist" aria-label="Market">
-        {chosen.map((country) => {
+        {visibleCountries.map((country) => {
           const s = stateOf(country.id);
           const tone = OUTCOME[s.outcome].tone;
           const on = country.id === active.id;

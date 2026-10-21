@@ -5276,3 +5276,14 @@
 .lw-group-map-key i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #a7b8c8; }
 .lw-group-map-key i.is-picked { background: var(--sf-brand); }
 .lw-group-map-key small { flex-basis: 100%; font: inherit; }
+
+/* Focused Operations editor: retain the familiar control, omit the launch journey. */
+.sf.lw .op-editor-intro { padding: 12px 24px 4px; border-bottom: 1px solid var(--sf-line, #ffffff18); }
+.sf.lw .op-editor-intro p { margin: 0 0 12px; color: var(--sf-muted, #9ca3af); font-size: 14px; line-height: 1.55; }
+.sf.lw .op-editor-tabs { display: flex; gap: 8px; padding-bottom: 12px; }
+.sf.lw .op-editor-tabs button { flex: 1; padding: 12px 8px; border: 1px solid #ffffff24; background: transparent; color: inherit; border-radius: 12px; font: inherit; font-size: 13px; }
+.sf.lw .op-editor-tabs button[aria-selected=true] { border-color: var(--sf-brand, #ff292e); background: #ffffff0a; }
+.sf.lw .op-editor-footer { flex-wrap: wrap; }
+.sf.lw .op-editor-footer p { flex: 0 0 100%; margin: 0; padding: 0 4px 8px; font-size: 13px; line-height: 1.5; color: inherit; }
+.sf.lw .cl-region-filter { display:flex; align-items:center; gap:12px; margin:16px 0; color:var(--sf-fg-3); font-size:13px; }
+.sf.lw .cl-region-filter select { flex:1; min-width:0; min-height:44px; padding:10px; border:1px solid var(--sf-line-strong); border-radius:10px; background:var(--sf-surface); color:var(--sf-fg); font:inherit; }

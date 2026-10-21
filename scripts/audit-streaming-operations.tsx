@@ -1,0 +1,115 @@
+import assert from 'node:assert/strict';
+import {readFileSync,writeFileSync} from 'node:fs';
+import {commitOwnedStreamingLaunch} from '../services/streamingLaunch';
+import {saveStreamingPricingPlan,saveStreamingServiceIdent,saveStreamingStorefrontPlan} from '../services/streamingLaunchProgram';
+import {normalizeOwnedStreamingPlatformState} from '../services/ownedStreamingPlatform';
+import type {Player} from '../types';
+const ready:Player=JSON.parse(readFileSync('/tmp/streaming-cheats-finished.json','utf8'));
+const launched=commitOwnedStreamingLaunch(ready,'OWNED' as never);
+// Choose a real canonical capacity option rather than bypassing launch checks.
+let live=launched.player;
+if(!launched.changed){
+ const {getStreamingLaunchReadiness}=require('../services/streamingLaunch');
+ const choice=getStreamingLaunchReadiness(ready).capacityOptions.find((row:any)=>row.canAfford);
+ assert.ok(choice,'Fixture has an affordable launch choice');
+ const result=commitOwnedStreamingLaunch(ready,choice.id);assert.equal(result.changed,true,result.reason);live=result.player;
+}
+assert.ok(live.ownedStreamingPlatform.launchCommit);
+const source=JSON.stringify(live);
+const pricing=structuredClone(live.ownedStreamingPlatform.serviceConfiguration.pricing);
+pricing.plans[0].monthly=11.49;
+assert.equal(saveStreamingPricingPlan(live,pricing).changed,false,'Opening-only callers remain guarded');
+const saved=saveStreamingPricingPlan(live,pricing,'OPERATIONS');
+assert.equal(saved.changed,true,'Operations must save live pricing');
+assert.equal(saved.player.ownedStreamingPlatform.serviceConfiguration.pricing.plans[0].monthly,11.49);
+for(const next of [saved.player,
+ saveStreamingStorefrontPlan(live,{storefrontLayoutId:'CINEMA'},'OPERATIONS').player,
+ saveStreamingServiceIdent(live,{soundIdentKey:'SILENT',identPackageId:'STANDARD'},'OPERATIONS').player]){
+ assert.deepEqual(next.ownedStreamingPlatform.launchCommit,live.ownedStreamingPlatform.launchCommit,'Signed launch receipt is immutable');
+ assert.deepEqual(next.ownedStreamingPlatform.launchProgram,live.ownedStreamingPlatform.launchProgram,'Live edits cannot restart launch');
+ assert.deepEqual(next.ownedStreamingPlatform.catalogLicenses,live.ownedStreamingPlatform.catalogLicenses,'Rights untouched');
+ assert.deepEqual(next.world,live.world,'No immediate customer billing/settlement side effect');
+ const reload=normalizeOwnedStreamingPlatformState(JSON.parse(JSON.stringify(next.ownedStreamingPlatform)),live.id);
+ assert.deepEqual(reload.serviceConfiguration,next.ownedStreamingPlatform.serviceConfiguration,'Edits survive reload');
+}
+const ident=saveStreamingServiceIdent(live,{soundIdentKey:'SILENT',identPackageId:'STANDARD'},'OPERATIONS');
+assert.equal(ident.changed,true);
+assert.equal(saveStreamingServiceIdent(ident.player,{soundIdentKey:'SILENT',identPackageId:'STANDARD'},'OPERATIONS').changed,false);
+const locked=saveStreamingServiceIdent(live,{soundIdentKey:'PULSE',identPackageId:'LIVING'},'OPERATIONS');
+assert.equal(locked.changed,false,'Research restrictions still apply');
+assert.equal(JSON.stringify(live),source,'All operations leave source immutable');
+assert.equal(saveStreamingPricingPlan(saved.player,pricing,'OPERATIONS').changed,false,'Duplicate price save is a no-op');
+writeFileSync('/tmp/streaming-operations-live.json',JSON.stringify(live));
+console.log('PASS live configuration saves, guarded opening callers, immutable launch/rights/customer state, no-op and reload');
+const {getStreamingAudienceMarket}=require('../services/streamingAudienceMarket');
+assert.equal(getStreamingAudienceMarket(live).countries.length,197,'Operations map must represent every country, not only the 24 authored cards');
+const {getStreamingBuildMarketAccess}=require('../services/streamingBuildMarketAccess');
+const expanded=structuredClone(live);
+expanded.ownedStreamingPlatform.marketOperations=expanded.ownedStreamingPlatform.marketOperations.filter(row=>row.countryId==='US'||row.countryId==='IN').map(row=>row.countryId==='IN'?{...row,entryKind:'EXPANSION'}:row);
+assert.deepEqual(getStreamingBuildMarketAccess(expanded).countryIds,['IN','US'],'A live network drawing includes filed expansion countries');
+console.log('PASS all-country Operations scope and filed expansion coverage');
+const infra=require('../services/streamingInfrastructure');
+const altered=structuredClone(infra.createDefaultStreamingInfrastructureDraft(saved.player));
+// Add real compute while retaining facility ownership and the current service pricing.
+const room=altered.facilities.find((row:any)=>row.type==='CLOUD_ALLOCATION') || altered.facilities[0];
+assert.ok(room?.rackGroups?.length);
+room.rackGroups[0].rackCount+=1;room.installedRacks+=1;
+altered.lastLoadTestSignature=null;
+assert.ok(infra.validateStreamingInfrastructureDraft(saved.player,altered).issues.some((row:any)=>row.code==='LOAD_TEST_REQUIRED'));
+const rehearsed=infra.runStreamingInfrastructureLoadTest(saved.player,altered);
+const revision=infra.commitStreamingInfrastructureSetup(rehearsed.player);
+assert.equal(revision.changed,true,JSON.stringify(revision.issues));
+assert.deepEqual(revision.player.ownedStreamingPlatform.infrastructureSetup,saved.player.ownedStreamingPlatform.infrastructureSetup,'Live service stays on the current network');
+assert.ok(revision.player.ownedStreamingPlatform.pendingInfrastructureSetup,'Revision becomes pending construction');
+assert.equal(revision.player.ownedStreamingPlatform.treasuryCash,saved.player.ownedStreamingPlatform.treasuryCash-revision.forecast.transactionCost);
+assert.deepEqual(revision.player.ownedStreamingPlatform.serviceConfiguration.pricing,saved.player.ownedStreamingPlatform.serviceConfiguration.pricing);
+assert.equal(infra.commitStreamingInfrastructureSetup(revision.player).changed,false,'Duplicate revision cannot charge twice');
+console.log('PASS custom live prices, exact rehearsal, pending construction, canonical quoted debit and duplicate refusal');
+const markets=require('../services/streamingMarkets');
+const base=structuredClone(live);base.ownedStreamingPlatform.marketOperations=base.ownedStreamingPlatform.marketOperations.map(row=>row.countryId==='IN'?{...row,status:'EXITED'}:row);base.energy.current=100;
+const entry=markets.saveStreamingMarketPlan(base,['IN'],'EXPANSION');
+assert.equal(entry.changed,true,entry.reason);
+assert.deepEqual(entry.player.ownedStreamingPlatform.launchProgram,base.ownedStreamingPlatform.launchProgram,'Expansion planning must not restart the signed launch');
+const filed=markets.beginStreamingMarketClearance(entry.player,['IN'],'EXPANSION');
+assert.equal(filed.reason,'STARTED');
+assert.deepEqual(filed.player.ownedStreamingPlatform.launchProgram,base.ownedStreamingPlatform.launchProgram,'Expansion filing must retain launch history');
+assert.equal(markets.beginStreamingMarketClearance(filed.player,['IN'],'EXPANSION').changed,false,'Filing cannot debit twice');
+assert.deepEqual(filed.player.ownedStreamingPlatform.catalogLicenses,base.ownedStreamingPlatform.catalogLicenses);
+console.log('PASS real expansion selection/filing, unchanged signed launch and duplicate payment refusal');
+const assets=structuredClone(live.ownedStreamingPlatform);
+const originalAssets=assets.localizationOperations.titleLanguageAssets;
+assets.localizationOperations.titleLanguageAssets=[...originalAssets,...Array.from({length:5000},(_,index)=>({id:`ops-language-${index}`,titleId:`ops-title-${index}`,languageId:'hindi',subtitleReady:true,dubReady:index%2===0,readyAtAbsoluteWeek:1274}))];
+const kept=normalizeOwnedStreamingPlatformState(JSON.parse(JSON.stringify(assets)),live.id).localizationOperations.titleLanguageAssets;
+assert.equal(kept.length,originalAssets.length+5000,'Normalization must not delete paid language assets after 320 records');
+assert.deepEqual(kept.slice(0,originalAssets.length),originalAssets);
+assert.equal(kept.at(-1)?.subtitleReady,true);
+console.log('PASS existing plus 5,000 title-language assets survive canonical save normalization');
+const full=saveStreamingServiceIdent(live,{soundIdentKey:'ASCENT',identPackageId:'FULL'},'OPERATIONS');
+assert.equal(full.changed,true);
+assert.equal(full.player.ownedStreamingPlatform.treasuryCash,live.ownedStreamingPlatform.treasuryCash-4500000);
+assert.equal(saveStreamingServiceIdent(full.player,{soundIdentKey:'ASCENT',identPackageId:'FULL'},'OPERATIONS').changed,false);
+const broke=structuredClone(live);broke.ownedStreamingPlatform.treasuryCash=1;
+assert.equal(saveStreamingServiceIdent(broke,{soundIdentKey:'ASCENT',identPackageId:'FULL'},'OPERATIONS').reason,'INSUFFICIENT_TREASURY');
+const storefront=saveStreamingStorefrontPlan(live,{storefrontLayoutId:'shelves'},'OPERATIONS');
+assert.equal(storefront.changed,true);
+assert.equal(storefront.player.ownedStreamingPlatform.serviceConfiguration.storefrontLayoutId,'shelves');
+assert.equal(storefront.player.ownedStreamingPlatform.treasuryCash,live.ownedStreamingPlatform.treasuryCash);
+assert.equal(saveStreamingStorefrontPlan(live,{storefrontLayoutId:'freeform-canvas'},'OPERATIONS').changed,false);
+const priceMutation=structuredClone(altered);priceMutation.subscriptionPrices.BASIC+=1;
+assert.ok(infra.validateStreamingInfrastructureDraft(saved.player,priceMutation).issues.some((row:any)=>row.code==='PRICING_IN_AUDIENCE'));
+console.log('PASS exactly-once ident package cost, insufficient cash/research refusal, storefront save and separate pricing authority');
+async function weeklyPricing(){
+ const {advanceWorldStreamingCustomersToWeek}=await import('../services/worldEconomy/worldStreamingCustomers');
+ const {getWorldStreamingOffers}=await import('../services/worldEconomy/worldStreamingOffers');
+ const week=require('../services/legacyLogic').getAbsoluteWeek(saved.player.age,saved.player.currentWeek)+1;
+ const advanced={...saved.player,currentWeek:saved.player.currentWeek+1};
+ const registry=getWorldStreamingOffers(advanced,week);
+ const offer=registry.offers.find((row:any)=>row.platformId==='PLAYER');
+ assert.equal(offer?.plans[0]?.monthlyPrice,11.49,'The customer offer registry must consume live price edits');
+ const customers=advanceWorldStreamingCustomersToWeek(saved.player.world.worldStreamingCustomers,advanced,week);
+ assert.equal(customers.lastProcessedAbsoluteWeek,week);
+ assert.ok(customers.countries.US,'The canonical weekly customer settlement still runs');
+ assert.deepEqual(advanced.ownedStreamingPlatform.launchCommit,saved.player.ownedStreamingPlatform.launchCommit);
+ console.log('PASS saved live price reaches the next-week canonical customer offer and settlement');
+}
+weeklyPricing().catch(error=>{console.error(error);process.exitCode=1;});

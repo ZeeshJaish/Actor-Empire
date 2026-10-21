@@ -587,6 +587,8 @@ export interface RehearsalResult {
 /* --- the whole thing ------------------------------------------------------------- */
 
 export interface BuildData {
+  /** Operational region cards show full asset value; approval uses the delta quote. */
+  operationalRevision?: boolean;
   company: { name: string; week: number; brandHex?: string; logoSrc?: string; signatoryName?: string };
   treasury: { available: number; committedLaunch: number };
   /** True only when the player explicitly confirmed at least one Day-One market. */

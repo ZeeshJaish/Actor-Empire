@@ -40,8 +40,8 @@ export const DIFFICULTY_LABEL = {
 } as const;
 export const DIFFICULTY_TONE = { LOW: 'good', MODERATE: 'flat', HIGH: 'warn', SEVERE: 'bad' } as const;
 
-export function StepMarkets({ data, draft, patch, chosen, handlers }: StepProps) {
-  const [region, setRegion] = useState(data.regions[0]);
+export function StepMarkets({ data, draft, patch, chosen, handlers, initialCountryId }: StepProps) {
+  const [region, setRegion] = useState(data.countries.find(country=>country.id===initialCountryId)?.region || data.regions[0]);
   /* The bloc you have opened to pick through country by country. */
   const [openGroupId, setOpenGroupId] = useState<string | null>(null);
   const [report, setReport] = useState<Country | null>(null);

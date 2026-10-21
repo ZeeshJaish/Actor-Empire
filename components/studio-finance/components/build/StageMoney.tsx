@@ -167,7 +167,7 @@ function CostCurve({ yoursOnce, yoursWeekly, rentedOnce, rentedWeekly, crossover
   );
 }
 
-export function StageMoney({ data, draft: build, totals, plan, handlers }: StageProps) {
+export function StageMoney({ data, draft: build, totals, plan, handlers, campaignOnly }: StageProps) {
   const marketing = data.marketing;
   const draft = marketing?.draft;
   const forecast = marketing?.forecast;
@@ -263,6 +263,7 @@ export function StageMoney({ data, draft: build, totals, plan, handlers }: Stage
           a picture that answered the page's own question the same way every
           time. It is the treasury now: the bill's lines fill part of it and
           what survives is the rest of the track (#121). */}
+      {!campaignOnly && <>
       <section className={short ? 'bw-money bw-money--fit is-short' : 'bw-money bw-money--fit'} aria-label="Launch allocation">
         <p className="kit-title"><b>Launch allocation</b></p>
 
@@ -446,7 +447,8 @@ export function StageMoney({ data, draft: build, totals, plan, handlers }: Stage
         </>
       )}
 
-      <p className="bw-money-divider"><b>The launch</b><em>what it costs to be heard</em></p>
+      </>}
+      <p className="bw-money-divider"><b>{campaignOnly ? 'Opening campaign' : 'The launch'}</b><em>what it costs to be heard</em></p>
 
       {/* ---- the lever: how much to authorize for marketing ------------------ */}
       <section className="bw-money bw-money--ceiling" aria-label="Marketing ceiling">

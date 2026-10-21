@@ -224,3 +224,9 @@
 .nw .prodfoot em{font-style:normal;font-size:8.5px;color:#ffb020}
 
 @media (prefers-reduced-motion:reduce){ .nw *{animation:none!important;transition:none!important} }
+.nw .serviceControls { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+.nw .serviceControls button { padding:14px 12px; border:1px solid #ffffff20; border-radius:12px; background:#ffffff04; display:flex; flex-direction:column; gap:7px; }
+.nw .serviceControls button:first-child { grid-column:1/-1; }
+.nw .serviceControls b { font-size:13px; }
+.nw .serviceControls span { font-size:11px; color:#8e9aae; line-height:1.5; overflow-wrap:anywhere; }
+.nw .serviceControls i { font-size:11px; font-style:normal; color:var(--epx-nw-c); }

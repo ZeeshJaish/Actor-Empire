@@ -134,7 +134,7 @@ export const saveStreamingMarketPlan = (player: Player, countryIds: string[], en
     });
     const plannedIds = new Set(planned.map(operation => operation.id));
     const operations = [...retained.filter(operation => !plannedIds.has(operation.id)), ...planned];
-    const nextPlatform = compactOwnedStreamingPlatformForPersistence({ ...platform, launchProgram: {
+    const nextPlatform = compactOwnedStreamingPlatformForPersistence({ ...platform, launchProgram: platform.launchCommit ? platform.launchProgram : {
         ...platform.launchProgram, status: 'PLANNING', startedAtAbsoluteWeek: platform.launchProgram.startedAtAbsoluteWeek ?? absoluteWeek,
         defineCurrentStep: 'MARKETS', configurationRevision: platform.launchProgram.configurationRevision + 1,
     }, marketOperations: operations }, player.id);
@@ -178,7 +178,7 @@ export const beginStreamingMarketClearance = (player: Player, countryIds: string
     };
     const existingCommitmentKeys = new Set(platform.costCommitments.map(item => item.idempotencyKey));
     const nextPlatform = compactOwnedStreamingPlatformForPersistence({ ...platform, treasuryCash: platform.treasuryCash - amount,
-        launchProgram: { ...platform.launchProgram, status: 'PLANNING', defineCurrentStep: 'CLEARANCE', configurationRevision: platform.launchProgram.configurationRevision + 1 },
+        launchProgram: platform.launchCommit ? platform.launchProgram : { ...platform.launchProgram, status: 'PLANNING', defineCurrentStep: 'CLEARANCE', configurationRevision: platform.launchProgram.configurationRevision + 1 },
         marketOperations: platform.marketOperations.map(operation => targetIds.has(operation.id) ? byId.get(operation.id)! : operation),
         costCommitments: [...platform.costCommitments, ...commitments.filter(item => !existingCommitmentKeys.has(item.idempotencyKey))],
         eventLedger: platform.eventLedger.some(item => item.idempotencyKey === ledger.idempotencyKey) ? platform.eventLedger : [...platform.eventLedger, ledger],

@@ -1,0 +1,37 @@
+{
+  "date": "2026-10-22",
+  "head": "612efbb1cb6c80a22d1ba30fde4a1d88f90cdc4e",
+  "sourceSha256": {
+    "services/roleLogic.ts": "0cb8bdedf318a42e8db693cf07fc6b69db1a417b3bba005eaa1db548b56acf36",
+    "services/gameLoop.ts": "629de28d3fbfc19fa629c75c32cb454f7eeda91685474e75ae04fd3bf87a592a",
+    "services/productionRisk.ts": "a4a66373d97dce83551198915b2aa82e5ab5f291f37cbfc924219c244cfb287a",
+    "services/distributionRevenue.ts": "6e5d1109232ae82531cd7c6bdfc679b0c76cb24b7f8b1f8909385f59244c032c",
+    "services/theatricalRunLogic.ts": "a36bc6f36c4a53b5b590dc015136d02771ec0f0ee543346a057048cc75d77c74",
+    "services/studioProductionEconomy.ts": "3c3c4108d22abe6f69c09be848e1ae48b1cdbafa90845768fa7dfd4cfd607898",
+    "services/npcLogic.ts": "21d886ea234028f3f4b25b151363989c34c003ac149aa731160e526c2b001089",
+    "services/characterIdentityLogic.ts": "75dc57a2565141acc024371feefca952f36e7f3825a20b2c8dc09de9c5d61ae8",
+    "services/universeLogic.ts": "06eaef421f760026ff2210dff70d9bd44f12e0c6cc99b9c712574706e234f66f",
+    "services/businessLogic.ts": "4570ca1650d98f444c213e514ae0a3450cb871f528a439984a654878aaff0e2d",
+    "services/studioAi/studioAiCommercialResult.ts": "89ba7d47b9faccf4a727d103e300364f4c563eb848462524dc0134ea9d51fbb7",
+    "views/mobile/MobilePage.tsx": "0c11658ce799224644ab2b840eef96413fc94a1bfbd86029ca91719bb2915dda",
+    "views/mobile/BoxOfficeApp.tsx": "a1662e711563b5f150202a06e119b1667833d367744605a981c91bbacdf6b317",
+    "views/lifestyle/business/greenlightProjectBuilder.ts": "e6297fce69b763b1fb3eb679ec233f0018f4aa49771b40c159f593b73e25f342",
+    "views/lifestyle/business/greenlightCalculations.ts": "d9a162bb4ba6ffb82efefc3a493f049691124d2ed93aa6bcdb7f0623dbf2bae9",
+    "views/lifestyle/business/components/ProjectDashboardModal.tsx": "fae316399ae41d8bc3520fa32d70c7ce6ee77b6b01e0bfc2fa2a690b07cc216f"
+  },
+  "resultsSha256": "fe3c8dade5457c781e1bb9f4f67dbbeaf60db97a7c49630ce319c8dfc1bd346a",
+  "reproducedByteForByte": true,
+  "existingTrackedDirtyFilesPreserved": true,
+  "existingTrackedDirtyFileCount": 28,
+  "observedDefects": 2,
+  "formulaRuns": 4000,
+  "actualLoopPreparedReleases": 6,
+  "acceptedOfferHandoffs": 2,
+  "existingAuditsPassed": [
+    "box-office-economy",
+    "distribution-revenue",
+    "studio-production-economy",
+    "greenlight-calculations",
+    "studio-ai-commercial-result-b6"
+  ]
+}

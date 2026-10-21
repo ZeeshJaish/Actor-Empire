@@ -1,0 +1,159 @@
+{
+  "date": "2026-10-21",
+  "checkpoint": "612efbb",
+  "typecheck": {
+    "exitCode": 0,
+    "diagnostics": ""
+  },
+  "build": {
+    "exitCode": 0,
+    "timing": "15.86s",
+    "existingWarnings": [
+      "large chunks",
+      "Browserslist database age"
+    ]
+  },
+  "scopeAudits": [
+    {
+      "name": "service-tests",
+      "status": "PASS",
+      "output": "PASS live configuration saves, guarded opening callers, immutable launch/rights/customer state, no-op and reload\nPASS all-country Operations scope and filed expansion coverage\nPASS custom live prices, exact rehearsal, pending construction, canonical quoted debit and duplicate refusal\nPASS real expansion selection/filing, unchanged signed launch and duplicate payment refusal\nPASS existing plus 5,000 title-language assets survive canonical save normalization\nPASS exactly-once ident package cost, insufficient cash/research refusal, storefront save and separate pricing authority\nPASS saved live price reaches the next-week canonical customer offer and settlement\n"
+    },
+    {
+      "name": "ui-tests",
+      "status": "PASS",
+      "output": "PASS focused Network/Test/Review shell without launch journey\nPASS focused Pricing/Ident/Storefront/Markets/Clearance and bounded country controls\nPASS canonical revision quote reaches totals and bill without re-reserving launch marketing\n"
+    },
+    {
+      "name": "career-tests",
+      "status": "PASS",
+      "output": "{\"titles\":52,\"markets\":197,\"ssrRenderMs\":7.8}\n{\"titles\":5000,\"markets\":197,\"ssrRenderMs\":11}\n"
+    },
+    {
+      "name": "streaming-global-localization",
+      "status": "PASS",
+      "output": "\n> pr-6.6.3@1.0.25 audit:streaming-global-localization\n> esbuild scripts/audit-streaming-global-localization.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-streaming-global-localization.mjs && node /tmp/audit-streaming-global-localization.mjs\n\nGlobal research-driven localization covers the catalogue without per-title jobs.\n\n  ../../../../tmp/audit-streaming-global-localization.mjs  5.0mb \u26a0\ufe0f\n\n\u26a1 Done in 63ms\n"
+    },
+    {
+      "name": "streaming-infrastructure-phase5",
+      "status": "PASS",
+      "output": "\n> pr-6.6.3@1.0.25 audit:streaming-infrastructure-phase5\n> esbuild scripts/audit-streaming-infrastructure-phase5.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-streaming-infrastructure-phase5.mjs && node /tmp/audit-streaming-infrastructure-phase5.mjs\n\nEMPIRE+ Phase 5 infrastructure and subscription setup audit passed.\n\n  ../../../../tmp/audit-streaming-infrastructure-phase5.mjs  5.2mb \u26a0\ufe0f\n\n\u26a1 Done in 60ms\n"
+    },
+    {
+      "name": "streaming-launch-draft-continuity",
+      "status": "PASS",
+      "output": "\n> pr-6.6.3@1.0.25 audit:streaming-launch-draft-continuity\n> esbuild scripts/audit-streaming-launch-draft-continuity.ts --bundle --platform=node --format=esm --outfile=/tmp/audit-streaming-launch-draft-continuity.mjs && node /tmp/audit-streaming-launch-draft-continuity.mjs\n\nStreaming launch draft continuity audit passed.\n\n  ../../../../tmp/audit-streaming-launch-draft-continuity.mjs  3.9kb\n\n\u26a1 Done in 5ms\n"
+    },
+    {
+      "name": "streaming-opening-programme",
+      "status": "PASS",
+      "output": "\n> pr-6.6.3@1.0.25 audit:streaming-opening-programme\n> esbuild scripts/audit-streaming-opening-programme.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-streaming-opening-programme.mjs && node /tmp/audit-streaming-opening-programme.mjs\n\nStreaming Opening Programme domain audit passed.\n\n  ../../../../tmp/audit-streaming-opening-programme.mjs  4.5mb \u26a0\ufe0f\n\n\u26a1 Done in 53ms\n"
+    },
+    {
+      "name": "streaming-build-test-autosave-gates",
+      "status": "PASS",
+      "output": "\n> pr-6.6.3@1.0.25 audit:streaming-build-test-autosave-gates\n> esbuild scripts/audit-streaming-build-test-autosave-gates.tsx --bundle --platform=node --format=cjs --loader:.css=text --loader:.csv=text --outfile=/tmp/audit-streaming-build-test-autosave-gates.cjs && node /tmp/audit-streaming-build-test-autosave-gates.cjs\n\nStreaming Build Test, autosave, and launch-gate audit passed.\n\u25b2 [WARNING] Ignoring this import because \"components/studio-finance/styles/tokens.css\" was marked as having no side effects [ignored-bare-import]\n\n    components/studio-finance/components/build/BuildWizard.tsx:32:7:\n      32 \u2502 import '../../styles/tokens.css';\n         \u2575        ~~~~~~~~~~~~~~~~~~~~~~~~~\n\n\u25b2 [WARNING] Ignoring this import because \"components/studio-finance/styles/studio-finance.css\" was marked as having no side effects [ignored-bare-import]\n\n    components/studio-finance/components/build/BuildWizard.tsx:33:7:\n      33 \u2502 import '../../styles/studio-finance.css';\n         \u2575        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n\n\u25b2 [WARNING] Ignoring this import because \"components/studio-finance/styles/launch.css\" was marked as having no side effects [ignored-bare-import]\n\n    components/studio-finance/components/build/BuildWizard.tsx:34:7:\n      34 \u2502 import '../../styles/launch.css';\n         \u2575        ~~~~~~~~~~~~~~~~~~~~~~~~~\n\n\u25b2 [WARNING] Ignoring this import because \"components/studio-finance/styles/kit.css\" was marked as having no side effects [ignored-bare-import]\n\n    components/studio-finance/components/build/BuildWizard.tsx:35:7:\n      35 \u2502 import '../../styles/kit.css';\n         \u2575        ~~~~~~~~~~~~~~~~~~~~~~\n\n\u25b2 [WARNING] Ignoring this import because \"components/studio-finance/styles/build.css\" was marked as having no side effects [ignored-bare-import]\n\n    components/studio-finance/components/build/BuildWizard.tsx:36:7:\n      36 \u2502 import '../../styles/build.css';\n         \u2575        ~~~~~~~~~~~~~~~~~~~~~~~~\n\n\u25b2 [WARNING] Ignoring this import because \"components/studio-finance/styles/network.css\" was marked as having no side effects [ignored-bare-import]\n\n    components/studio-finance/components/build/BuildWizard.tsx:37:7:\n      37 \u2502 import '../../styles/network.css';\n         \u2575        ~~~~~~~~~~~~~~~~~~~~~~~~~~\n\n6 of 9 warnings shown (disable the message limit with --log-limit=0)\n\n  ../../../../tmp/audit-streaming-build-test-autosave-gates.cjs  3.3mb \u26a0\ufe0f\n\n\u26a1 Done in 91ms\n"
+    },
+    {
+      "name": "save-generations",
+      "status": "PASS",
+      "output": "\n> pr-6.6.3@1.0.25 audit:save-generations\n> esbuild scripts/audit-save-generations.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-save-generations.mjs && node /tmp/audit-save-generations.mjs\n\nSave generation audit passed.\n\n  ../../../../tmp/audit-save-generations.mjs  383.4kb\n\n\u26a1 Done in 41ms\n"
+    },
+    {
+      "name": "streaming-rights-transactions-phase6",
+      "status": "PASS",
+      "output": "\n> pr-6.6.3@1.0.25 audit:streaming-rights-transactions-phase6\n> esbuild scripts/audit-streaming-rights-transactions-phase6.ts --bundle --platform=node --format=cjs --loader:.csv=text --outfile=/tmp/audit-streaming-rights-transactions-phase6.cjs && node /tmp/audit-streaming-rights-transactions-phase6.cjs\n\nStreaming rights transactions Phase A6 schema audit passed.\n\n  ../../../../tmp/audit-streaming-rights-transactions-phase6.cjs    9.1mb \u26a0\ufe0f\n  ../../../../tmp/audit-streaming-rights-transactions-phase6.css  383.2kb\n\n\u26a1 Done in 166ms\n"
+    }
+  ],
+  "standingBaselineFailures": [
+    {
+      "name": "audience-market-phase2",
+      "checkpointExitCode": 1,
+      "currentExitCode": 1,
+      "checkpointAssertion": "Error: Audience personas must cover the full active-viewer market.",
+      "currentAssertion": "Error: Audience personas must cover the full active-viewer market."
+    },
+    {
+      "name": "promotion-phase14",
+      "checkpointExitCode": 1,
+      "currentExitCode": 1,
+      "checkpointAssertion": "Error: The promoted title discovery mix should still reconcile to one hundred percent.",
+      "currentAssertion": "Error: The promoted title discovery mix should still reconcile to one hundred percent."
+    }
+  ],
+  "wholeGameWeekProbe": [
+    {
+      "source": "baseline",
+      "timeoutMs": 45000,
+      "completed": false,
+      "lastStages": [
+        "world_streaming_customers_countries_advanced 457",
+        "world_streaming_customers_global_ready 459",
+        "world_streaming_customers_done 462",
+        "world_streaming_viewing_start 462",
+        "world_streaming_viewing_audience_ready 463",
+        "world_streaming_viewing_customers_ready 464",
+        "world_streaming_viewing_choices_ready 542",
+        "world_streaming_viewing_ai_catalogue_ready 543",
+        "world_streaming_viewing_rival_viewing_ready 654"
+      ]
+    },
+    {
+      "source": "current",
+      "timeoutMs": 45000,
+      "completed": false,
+      "lastStages": [
+        "world_streaming_customers_countries_advanced 477",
+        "world_streaming_customers_global_ready 479",
+        "world_streaming_customers_done 482",
+        "world_streaming_viewing_start 482",
+        "world_streaming_viewing_audience_ready 483",
+        "world_streaming_viewing_customers_ready 484",
+        "world_streaming_viewing_choices_ready 567",
+        "world_streaming_viewing_ai_catalogue_ready 569",
+        "world_streaming_viewing_rival_viewing_ready 684"
+      ]
+    }
+  ],
+  "browser": {
+    "storage": "React memory only; actual career untouched by test actions",
+    "livePrice": {
+      "initial": 7.99,
+      "previewKeepsInitial": true,
+      "saved": 11.49,
+      "closedUnsaved": 15.99,
+      "retained": 11.49,
+      "treasuryUnchanged": true,
+      "rightsRetained": 55
+    },
+    "storefront": {
+      "initial": "cinema",
+      "saved": "shelves",
+      "previewOnlyBeforeSave": true
+    },
+    "ident": {
+      "package": "FULL",
+      "debit": 4500000,
+      "duplicateSaveDebit": 0
+    },
+    "recommendation": "CATALOG_DISCOVERY selected then canonical next-growth-week lock",
+    "context": "Markets/India/Asia -> clearance/IN -> Close returns to same map/tab",
+    "requested393Frame": {
+      "documentWidth": 393,
+      "horizontalOverflow": false
+    },
+    "requested320Frame": {
+      "actualDocumentWidth": 321,
+      "campaignPanelWidth": 321,
+      "pricingPanelWidth": 321,
+      "horizontalOverflow": false
+    },
+    "physicalDevice": false
+  },
+  "fixtureHashes": {
+    "streaming-operations-live.json": "bde28a6b54324d4f846a164ac0c92b04dd58cdd198887bdb3b065eaab2f9767f",
+    "network-suggestion-seed.json": "110b0920af5af003c9823ae7b460e23f4fff901c166a522b9c6639031b8dec89",
+    "build-polish-ready-5000.json": "c81be5e9f03e4229473c172dc6f770a2064b775cec9d73def0d13184499387f3"
+  },
+  "rawSavesCommitted": false
+}

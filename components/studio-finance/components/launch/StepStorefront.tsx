@@ -15,14 +15,14 @@ import { Poster } from '../Poster';
 import type { StepProps } from './LaunchWizard';
 import { ResearchLockMark } from './ResearchLockMark';
 
-export function StepStorefront({ data, draft, patch, handlers }: StepProps) {
+export function StepStorefront({ data, draft, patch, handlers, operations }: StepProps) {
   const firstLayout = data.storefronts.some(option => option.id === draft.storefrontId)
     ? draft.storefrontId || ''
     : data.storefronts[0]?.id || '';
   const [previewId, setPreviewId] = useState(firstLayout);
   const preview = data.storefronts.find(option => option.id === previewId) || data.storefronts[0];
   const previewLock = preview ? data.capabilityLocks[`storefront:${preview.id}`] : undefined;
-  const applied = Boolean(preview && draft.storefrontId === preview.id);
+  const applied = Boolean(preview && (operations ? data.offer.storefrontId : draft.storefrontId) === preview.id);
 
   const saveLayout = (option: Approach) => {
     patch({ storefrontId: option.id });
@@ -73,7 +73,7 @@ export function StepStorefront({ data, draft, patch, handlers }: StepProps) {
             <h2 id="st-preview-title">{preview.name}</h2>
           </div>
           <span className={`st-preview-state${previewLock ? ' is-research' : applied ? ' is-applied' : ''}`}>
-            {previewLock ? 'Research preview' : applied ? 'Applied' : 'Ready'}
+            {previewLock ? 'Research preview' : applied ? 'Applied' : operations ? 'Unsaved preview' : 'Ready'}
           </span>
         </header>
 
@@ -112,7 +112,7 @@ export function StepStorefront({ data, draft, patch, handlers }: StepProps) {
             {data.storefronts.map(option => {
               const lock = data.capabilityLocks[`storefront:${option.id}`];
               const isPreview = preview.id === option.id;
-              const isApplied = draft.storefrontId === option.id;
+              const isApplied = (operations ? data.offer.storefrontId : draft.storefrontId) === option.id;
               return (
                 <button
                   key={option.id}

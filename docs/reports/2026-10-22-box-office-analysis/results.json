@@ -1,0 +1,2381 @@
+{
+  "scope": "Current local source; prepared fixtures, not production telemetry or career frequencies. Rating held fixed as an input; no IMDb audit.",
+  "seed": 20261022,
+  "samplesPerScenario": 500,
+  "capExamples": [
+    {
+      "tier": "LOW",
+      "ordinary": {
+        "totalCap": 170000000,
+        "label": "STANDARD"
+      },
+      "exceptional": {
+        "totalCap": 222481463,
+        "label": "STANDARD"
+      }
+    },
+    {
+      "tier": "MID",
+      "ordinary": {
+        "totalCap": 600000000,
+        "label": "STANDARD"
+      },
+      "exceptional": {
+        "totalCap": 785228693,
+        "label": "STANDARD"
+      }
+    },
+    {
+      "tier": "HIGH",
+      "ordinary": {
+        "totalCap": 1936973684,
+        "label": "EVENT"
+      },
+      "exceptional": {
+        "totalCap": 2770740000,
+        "label": "BREAKOUT"
+      }
+    },
+    {
+      "tier": "BLOCKBUSTER",
+      "ordinary": {
+        "totalCap": 2933131578,
+        "label": "EVENT"
+      },
+      "exceptional": {
+        "totalCap": 4506484000,
+        "label": "BREAKOUT"
+      }
+    }
+  ],
+  "budgetMismatch": [
+    {
+      "budget": 210000000,
+      "tier": "HIGH",
+      "gross": 496355474,
+      "receipts": 256049459,
+      "exhibitors": 240306015,
+      "netBeforeMarketing": 46049459,
+      "grossMultiple": 2.3635974952380954,
+      "receiptsMultiple": 1.219283138095238,
+      "outcome": "SUCCESS",
+      "weeks": 5,
+      "weekly": [
+        294000000,
+        123480000,
+        51861600,
+        19603683,
+        7410191
+      ],
+      "risks": [
+        0.75,
+        0.75,
+        0.75,
+        0.75,
+        0.75
+      ],
+      "cap": 1936973684,
+      "capFraction": 0.2562530808239933
+    },
+    {
+      "budget": 210000000,
+      "tier": "BLOCKBUSTER",
+      "gross": 1495505892,
+      "receipts": 771497627,
+      "exhibitors": 724008265,
+      "netBeforeMarketing": 561497627,
+      "grossMultiple": 7.121456628571429,
+      "receiptsMultiple": 3.673798223809524,
+      "outcome": "MASSIVE_SUCCESS",
+      "weeks": 8,
+      "weekly": [
+        678720000,
+        383884032,
+        217124808,
+        110525210,
+        56261751,
+        28639479,
+        14578639,
+        5771973
+      ],
+      "risks": [
+        1.01,
+        1.01,
+        1.01,
+        1.01,
+        1.01,
+        1.01,
+        1.01,
+        1.01
+      ],
+      "cap": 2933131578,
+      "capFraction": 0.5098666228331064
+    }
+  ],
+  "budgetBoundaries": [
+    {
+      "budget": 12000000,
+      "tier": "LOW",
+      "gross": 49400527,
+      "receipts": 25483963,
+      "exhibitors": 23916564,
+      "netBeforeMarketing": 13483963,
+      "grossMultiple": 4.116710583333333,
+      "receiptsMultiple": 2.1236635833333333,
+      "outcome": "MASSIVE_SUCCESS",
+      "weeks": 6,
+      "weekly": [
+        27420120,
+        12531048,
+        5726713,
+        2355405,
+        968781,
+        398460
+      ],
+      "risks": [
+        0.93,
+        0.93,
+        0.93,
+        0.93,
+        0.93,
+        0.93
+      ],
+      "cap": 170000000,
+      "capFraction": 0.2905913352941176
+    },
+    {
+      "budget": 12000001,
+      "tier": "MID",
+      "gross": 140920584,
+      "receipts": 72697679,
+      "exhibitors": 68222905,
+      "netBeforeMarketing": 60697678,
+      "grossMultiple": 11.743381021384915,
+      "receiptsMultiple": 6.058139411821716,
+      "outcome": "MASSIVE_SUCCESS",
+      "weeks": 8,
+      "weekly": [
+        64629005,
+        36204909,
+        20281844,
+        10225626,
+        5155518,
+        2599289,
+        1310499,
+        513894
+      ],
+      "risks": [
+        1.14,
+        1.14,
+        1.14,
+        1.14,
+        1.14,
+        1.14,
+        1.14,
+        1.14
+      ],
+      "cap": 600000000,
+      "capFraction": 0.23486764
+    },
+    {
+      "budget": 45000000,
+      "tier": "MID",
+      "gross": 216874179,
+      "receipts": 111878057,
+      "exhibitors": 104996122,
+      "netBeforeMarketing": 66878057,
+      "grossMultiple": 4.8194262,
+      "receiptsMultiple": 2.4861790444444445,
+      "outcome": "MASSIVE_SUCCESS",
+      "weeks": 6,
+      "weekly": [
+        115577280,
+        55658781,
+        26803709,
+        11617123,
+        5035031,
+        2182255
+      ],
+      "risks": [
+        0.98,
+        0.98,
+        0.98,
+        0.98,
+        0.98,
+        0.98
+      ],
+      "cap": 600000000,
+      "capFraction": 0.361456965
+    },
+    {
+      "budget": 45000001,
+      "tier": "HIGH",
+      "gross": 709554371,
+      "receipts": 366050772,
+      "exhibitors": 343503599,
+      "netBeforeMarketing": 321050771,
+      "grossMultiple": 15.7678745607139,
+      "receiptsMultiple": 8.13446141923419,
+      "outcome": "MASSIVE_SUCCESS",
+      "weeks": 10,
+      "weekly": [
+        276192316,
+        176321174,
+        112563437,
+        64674447,
+        37159349,
+        21350274,
+        12267012,
+        5481881,
+        2449742,
+        1094739
+      ],
+      "risks": [
+        1.14,
+        1.14,
+        1.14,
+        1.14,
+        1.14,
+        1.14,
+        1.14,
+        1.14,
+        1.14,
+        1.14
+      ],
+      "cap": 1936973684,
+      "capFraction": 0.36632112086041124
+    },
+    {
+      "budget": 120000000,
+      "tier": "HIGH",
+      "gross": 802603286,
+      "receipts": 414042556,
+      "exhibitors": 388560730,
+      "netBeforeMarketing": 294042556,
+      "grossMultiple": 6.688360716666667,
+      "receiptsMultiple": 3.4503546333333333,
+      "outcome": "MASSIVE_SUCCESS",
+      "weeks": 8,
+      "weekly": [
+        380240000,
+        206546368,
+        112195986,
+        54850372,
+        26815248,
+        13109437,
+        6408940,
+        2436935
+      ],
+      "risks": [
+        0.97,
+        0.97,
+        0.97,
+        0.97,
+        0.97,
+        0.97,
+        0.97,
+        0.97
+      ],
+      "cap": 1936973684,
+      "capFraction": 0.4143594167694433
+    },
+    {
+      "budget": 120000001,
+      "tier": "BLOCKBUSTER",
+      "gross": 1892144996,
+      "receipts": 976135311,
+      "exhibitors": 916009685,
+      "netBeforeMarketing": 856135310,
+      "grossMultiple": 15.76787483526771,
+      "receiptsMultiple": 8.134460857212826,
+      "outcome": "MASSIVE_SUCCESS",
+      "weeks": 10,
+      "weekly": [
+        736512836,
+        470189793,
+        300169162,
+        172465192,
+        99091600,
+        56934067,
+        32712037,
+        14618353,
+        6532648,
+        2919308
+      ],
+      "risks": [
+        1.14,
+        1.14,
+        1.14,
+        1.14,
+        1.14,
+        1.14,
+        1.14,
+        1.14,
+        1.14,
+        1.14
+      ],
+      "cap": 2933131578,
+      "capFraction": 0.6450938001527322
+    }
+  ],
+  "budgetRiskIsolation": [
+    {
+      "budget": 120000000,
+      "HIGH": {
+        "label": "Balanced",
+        "riskScore": 67,
+        "theatricalDemandMultiplier": 0.97,
+        "streamingViewMultiplier": 0.98,
+        "platformBidMultiplier": 0.96,
+        "episodeScoreModifier": 0,
+        "notes": [
+          "budget pressure"
+        ]
+      },
+      "BLOCKBUSTER": {
+        "label": "Upside",
+        "riskScore": 84,
+        "theatricalDemandMultiplier": 1.14,
+        "streamingViewMultiplier": 1.09,
+        "platformBidMultiplier": 1.03,
+        "episodeScoreModifier": 0,
+        "notes": [
+          "efficient budget"
+        ]
+      }
+    },
+    {
+      "budget": 210000000,
+      "HIGH": {
+        "label": "Risky",
+        "riskScore": 43,
+        "theatricalDemandMultiplier": 0.75,
+        "streamingViewMultiplier": 0.82,
+        "platformBidMultiplier": 0.72,
+        "episodeScoreModifier": 0,
+        "notes": [
+          "budget pressure"
+        ]
+      },
+      "BLOCKBUSTER": {
+        "label": "Balanced",
+        "riskScore": 71,
+        "theatricalDemandMultiplier": 1.01,
+        "streamingViewMultiplier": 1.01,
+        "platformBidMultiplier": 0.99,
+        "episodeScoreModifier": 0,
+        "notes": []
+      }
+    },
+    {
+      "budget": 300000000,
+      "HIGH": {
+        "label": "Dangerous",
+        "riskScore": 19,
+        "theatricalDemandMultiplier": 0.53,
+        "streamingViewMultiplier": 0.65,
+        "platformBidMultiplier": 0.49,
+        "episodeScoreModifier": 0,
+        "notes": [
+          "budget pressure"
+        ]
+      },
+      "BLOCKBUSTER": {
+        "label": "Balanced",
+        "riskScore": 59,
+        "theatricalDemandMultiplier": 0.9,
+        "streamingViewMultiplier": 0.93,
+        "platformBidMultiplier": 0.88,
+        "episodeScoreModifier": 0,
+        "notes": [
+          "budget pressure"
+        ]
+      }
+    }
+  ],
+  "footprint": [
+    {
+      "name": "North America / one chain",
+      "week": 1,
+      "gross": 86673575,
+      "studioReceipts": 46803731,
+      "exhibitorReceipts": 39869844,
+      "totalScreens": 1768,
+      "expectedFootfall": 1447016,
+      "averageExhibitorCut": 0.45999999423122906,
+      "studioShare": 0.5400000057687709,
+      "distributionModifier": 0.8667357530940496,
+      "overscreeningPenalty": 0,
+      "underReleasePenalty": 0.2132869565217391,
+      "regionReceipts": [
+        {
+          "regionId": "NORTH_AMERICA",
+          "regionLabel": "",
+          "regionShortLabel": "NA",
+          "gross": 86673575,
+          "studioReceipts": 46803731,
+          "exhibitorReceipts": 39869844,
+          "screens": 1768,
+          "expectedFootfall": 1447016,
+          "averageExhibitorCut": 0.45999999423122906,
+          "holdModifier": 1,
+          "chainReceipts": [
+            {
+              "chainId": "NOVA_CIRCUIT",
+              "chainName": "Nova Circuit",
+              "gross": 86673575,
+              "studioReceipts": 46803731,
+              "exhibitorReceipts": 39869844,
+              "screens": 1768,
+              "expectedFootfall": 1447016,
+              "exhibitorCut": 0.46
+            }
+          ]
+        }
+      ],
+      "run": {
+        "budget": 90000000,
+        "tier": "HIGH",
+        "gross": 562589121,
+        "receipts": 303798128,
+        "exhibitors": 258790993,
+        "netBeforeMarketing": 213798128,
+        "grossMultiple": 6.250990233333333,
+        "receiptsMultiple": 3.3755347555555555,
+        "outcome": "MASSIVE_SUCCESS",
+        "weeks": 6,
+        "weekly": [
+          315491814,
+          142192977,
+          64086742,
+          25995653,
+          10544675,
+          4277260
+        ],
+        "risks": [
+          1.04,
+          1.04,
+          1.04,
+          1.04,
+          1.04,
+          1.04
+        ],
+        "cap": 1936973684,
+        "capFraction": 0.2904474777572662
+      }
+    },
+    {
+      "name": "Six regions / default chain partners",
+      "week": 1,
+      "gross": 112000000,
+      "studioReceipts": 57773282,
+      "exhibitorReceipts": 54226718,
+      "totalScreens": 17755,
+      "expectedFootfall": 14227052,
+      "averageExhibitorCut": 0.484167125,
+      "studioShare": 0.515832875,
+      "distributionModifier": 1.12,
+      "overscreeningPenalty": 0.011692934782608695,
+      "underReleasePenalty": 0,
+      "regionReceipts": [
+        {
+          "regionId": "NORTH_AMERICA",
+          "regionLabel": "",
+          "regionShortLabel": "NA",
+          "gross": 25450708,
+          "studioReceipts": 13104135,
+          "exhibitorReceipts": 12346573,
+          "screens": 3765,
+          "expectedFootfall": 3232934,
+          "averageExhibitorCut": 0.4851170741497643,
+          "holdModifier": 1,
+          "chainReceipts": [
+            {
+              "chainId": "EMPIRE_CINEMAS",
+              "chainName": "Empire Cinemas",
+              "gross": 13023378,
+              "studioReceipts": 6641923,
+              "exhibitorReceipts": 6381455,
+              "screens": 1909,
+              "expectedFootfall": 1654324,
+              "exhibitorCut": 0.49
+            },
+            {
+              "chainId": "CROWNSCREEN",
+              "chainName": "CrownScreen",
+              "gross": 12427330,
+              "studioReceipts": 6462212,
+              "exhibitorReceipts": 5965118,
+              "screens": 1856,
+              "expectedFootfall": 1578610,
+              "exhibitorCut": 0.48
+            }
+          ]
+        },
+        {
+          "regionId": "SOUTH_AMERICA",
+          "regionLabel": "",
+          "regionShortLabel": "SA",
+          "gross": 6468866,
+          "studioReceipts": 3620930,
+          "exhibitorReceipts": 2847936,
+          "screens": 1747,
+          "expectedFootfall": 821722,
+          "averageExhibitorCut": 0.4402527429073349,
+          "holdModifier": 1,
+          "chainReceipts": [
+            {
+              "chainId": "EMPIRE_CINEMAS",
+              "chainName": "Empire Cinemas",
+              "gross": 3316248,
+              "studioReceipts": 1823937,
+              "exhibitorReceipts": 1492311,
+              "screens": 886,
+              "expectedFootfall": 421254,
+              "exhibitorCut": 0.45
+            },
+            {
+              "chainId": "CROWNSCREEN",
+              "chainName": "CrownScreen",
+              "gross": 3152618,
+              "studioReceipts": 1796993,
+              "exhibitorReceipts": 1355625,
+              "screens": 861,
+              "expectedFootfall": 400468,
+              "exhibitorCut": 0.43
+            }
+          ]
+        },
+        {
+          "regionId": "EUROPE",
+          "regionLabel": "",
+          "regionShortLabel": "EU",
+          "gross": 14640433,
+          "studioReceipts": 7755868,
+          "exhibitorReceipts": 6884565,
+          "screens": 3278,
+          "expectedFootfall": 1859734,
+          "averageExhibitorCut": 0.47024326397996563,
+          "holdModifier": 1,
+          "chainReceipts": [
+            {
+              "chainId": "EMPIRE_CINEMAS",
+              "chainName": "Empire Cinemas",
+              "gross": 7498381,
+              "studioReceipts": 3899159,
+              "exhibitorReceipts": 3599222,
+              "screens": 1662,
+              "expectedFootfall": 952499,
+              "exhibitorCut": 0.48
+            },
+            {
+              "chainId": "CROWNSCREEN",
+              "chainName": "CrownScreen",
+              "gross": 7142052,
+              "studioReceipts": 3856709,
+              "exhibitorReceipts": 3285343,
+              "screens": 1616,
+              "expectedFootfall": 907235,
+              "exhibitorCut": 0.46
+            }
+          ]
+        },
+        {
+          "regionId": "ASIA",
+          "regionLabel": "",
+          "regionShortLabel": "AS",
+          "gross": 61954955,
+          "studioReceipts": 31356648,
+          "exhibitorReceipts": 30598307,
+          "screens": 7067,
+          "expectedFootfall": 7869968,
+          "averageExhibitorCut": 0.49387990032435664,
+          "holdModifier": 1,
+          "chainReceipts": [
+            {
+              "chainId": "Z_CINEMAS",
+              "chainName": "Z Cinemas",
+              "gross": 33290633,
+              "studioReceipts": 17311130,
+              "exhibitorReceipts": 15979503,
+              "screens": 3769,
+              "expectedFootfall": 4228818,
+              "exhibitorCut": 0.48
+            },
+            {
+              "chainId": "CROWNSCREEN",
+              "chainName": "CrownScreen",
+              "gross": 28664322,
+              "studioReceipts": 14045518,
+              "exhibitorReceipts": 14618804,
+              "screens": 3298,
+              "expectedFootfall": 3641150,
+              "exhibitorCut": 0.51
+            }
+          ]
+        },
+        {
+          "regionId": "AFRICA",
+          "regionLabel": "",
+          "regionShortLabel": "AF",
+          "gross": 3072996,
+          "studioReceipts": 1705095,
+          "exhibitorReceipts": 1367901,
+          "screens": 1385,
+          "expectedFootfall": 390354,
+          "averageExhibitorCut": 0.44513595201555745,
+          "holdModifier": 1,
+          "chainReceipts": [
+            {
+              "chainId": "EMPIRE_CINEMAS",
+              "chainName": "Empire Cinemas",
+              "gross": 1578332,
+              "studioReceipts": 868083,
+              "exhibitorReceipts": 710249,
+              "screens": 702,
+              "expectedFootfall": 200491,
+              "exhibitorCut": 0.45
+            },
+            {
+              "chainId": "CROWNSCREEN",
+              "chainName": "CrownScreen",
+              "gross": 1494664,
+              "studioReceipts": 837012,
+              "exhibitorReceipts": 657652,
+              "screens": 683,
+              "expectedFootfall": 189863,
+              "exhibitorCut": 0.44
+            }
+          ]
+        },
+        {
+          "regionId": "OCEANIA",
+          "regionLabel": "",
+          "regionShortLabel": "OC",
+          "gross": 412042,
+          "studioReceipts": 230606,
+          "exhibitorReceipts": 181436,
+          "screens": 513,
+          "expectedFootfall": 52340,
+          "averageExhibitorCut": 0.44033375238446565,
+          "holdModifier": 1,
+          "chainReceipts": [
+            {
+              "chainId": "EMPIRE_CINEMAS",
+              "chainName": "Empire Cinemas",
+              "gross": 212950,
+              "studioReceipts": 117123,
+              "exhibitorReceipts": 95827,
+              "screens": 260,
+              "expectedFootfall": 27050,
+              "exhibitorCut": 0.45
+            },
+            {
+              "chainId": "CROWNSCREEN",
+              "chainName": "CrownScreen",
+              "gross": 199092,
+              "studioReceipts": 113483,
+              "exhibitorReceipts": 85609,
+              "screens": 253,
+              "expectedFootfall": 25290,
+              "exhibitorCut": 0.43
+            }
+          ]
+        }
+      ],
+      "run": {
+        "budget": 90000000,
+        "tier": "HIGH",
+        "gross": 928473966,
+        "receipts": 478980806,
+        "exhibitors": 449493160,
+        "netBeforeMarketing": 388980806,
+        "grossMultiple": 10.3163774,
+        "receiptsMultiple": 5.322008955555556,
+        "outcome": "MASSIVE_SUCCESS",
+        "weeks": 8,
+        "weekly": [
+          407680000,
+          237432832,
+          138280880,
+          72481304,
+          37991798,
+          19913780,
+          10438006,
+          4255366
+        ],
+        "risks": [
+          1.04,
+          1.04,
+          1.04,
+          1.04,
+          1.04,
+          1.04,
+          1.04,
+          1.04
+        ],
+        "cap": 1936973684,
+        "capFraction": 0.47934258150716313
+      }
+    }
+  ],
+  "regionalHold": [
+    {
+      "week": 1,
+      "gross": 112000000,
+      "studioReceipts": 57773282,
+      "exhibitorReceipts": 54226718,
+      "totalScreens": 17755,
+      "expectedFootfall": 14227052,
+      "averageExhibitorCut": 0.484167125,
+      "studioShare": 0.515832875,
+      "distributionModifier": 1.12,
+      "overscreeningPenalty": 0.011692934782608695,
+      "underReleasePenalty": 0,
+      "regionReceipts": [
+        {
+          "regionId": "NORTH_AMERICA",
+          "regionLabel": "",
+          "regionShortLabel": "NA",
+          "gross": 25450708,
+          "studioReceipts": 13104135,
+          "exhibitorReceipts": 12346573,
+          "screens": 3765,
+          "expectedFootfall": 3232934,
+          "averageExhibitorCut": 0.4851170741497643,
+          "holdModifier": 1,
+          "chainReceipts": [
+            {
+              "chainId": "EMPIRE_CINEMAS",
+              "chainName": "Empire Cinemas",
+              "gross": 13023378,
+              "studioReceipts": 6641923,
+              "exhibitorReceipts": 6381455,
+              "screens": 1909,
+              "expectedFootfall": 1654324,
+              "exhibitorCut": 0.49
+            },
+            {
+              "chainId": "CROWNSCREEN",
+              "chainName": "CrownScreen",
+              "gross": 12427330,
+              "studioReceipts": 6462212,
+              "exhibitorReceipts": 5965118,
+              "screens": 1856,
+              "expectedFootfall": 1578610,
+              "exhibitorCut": 0.48
+            }
+          ]
+        },
+        {
+          "regionId": "SOUTH_AMERICA",
+          "regionLabel": "",
+          "regionShortLabel": "SA",
+          "gross": 6468866,
+          "studioReceipts": 3620930,
+          "exhibitorReceipts": 2847936,
+          "screens": 1747,
+          "expectedFootfall": 821722,
+          "averageExhibitorCut": 0.4402527429073349,
+          "holdModifier": 1,
+          "chainReceipts": [
+            {
+              "chainId": "EMPIRE_CINEMAS",
+              "chainName": "Empire Cinemas",
+              "gross": 3316248,
+              "studioReceipts": 1823937,
+              "exhibitorReceipts": 1492311,
+              "screens": 886,
+              "expectedFootfall": 421254,
+              "exhibitorCut": 0.45
+            },
+            {
+              "chainId": "CROWNSCREEN",
+              "chainName": "CrownScreen",
+              "gross": 3152618,
+              "studioReceipts": 1796993,
+              "exhibitorReceipts": 1355625,
+              "screens": 861,
+              "expectedFootfall": 400468,
+              "exhibitorCut": 0.43
+            }
+          ]
+        },
+        {
+          "regionId": "EUROPE",
+          "regionLabel": "",
+          "regionShortLabel": "EU",
+          "gross": 14640433,
+          "studioReceipts": 7755868,
+          "exhibitorReceipts": 6884565,
+          "screens": 3278,
+          "expectedFootfall": 1859734,
+          "averageExhibitorCut": 0.47024326397996563,
+          "holdModifier": 1,
+          "chainReceipts": [
+            {
+              "chainId": "EMPIRE_CINEMAS",
+              "chainName": "Empire Cinemas",
+              "gross": 7498381,
+              "studioReceipts": 3899159,
+              "exhibitorReceipts": 3599222,
+              "screens": 1662,
+              "expectedFootfall": 952499,
+              "exhibitorCut": 0.48
+            },
+            {
+              "chainId": "CROWNSCREEN",
+              "chainName": "CrownScreen",
+              "gross": 7142052,
+              "studioReceipts": 3856709,
+              "exhibitorReceipts": 3285343,
+              "screens": 1616,
+              "expectedFootfall": 907235,
+              "exhibitorCut": 0.46
+            }
+          ]
+        },
+        {
+          "regionId": "ASIA",
+          "regionLabel": "",
+          "regionShortLabel": "AS",
+          "gross": 61954955,
+          "studioReceipts": 31356648,
+          "exhibitorReceipts": 30598307,
+          "screens": 7067,
+          "expectedFootfall": 7869968,
+          "averageExhibitorCut": 0.49387990032435664,
+          "holdModifier": 1,
+          "chainReceipts": [
+            {
+              "chainId": "Z_CINEMAS",
+              "chainName": "Z Cinemas",
+              "gross": 33290633,
+              "studioReceipts": 17311130,
+              "exhibitorReceipts": 15979503,
+              "screens": 3769,
+              "expectedFootfall": 4228818,
+              "exhibitorCut": 0.48
+            },
+            {
+              "chainId": "CROWNSCREEN",
+              "chainName": "CrownScreen",
+              "gross": 28664322,
+              "studioReceipts": 14045518,
+              "exhibitorReceipts": 14618804,
+              "screens": 3298,
+              "expectedFootfall": 3641150,
+              "exhibitorCut": 0.51
+            }
+          ]
+        },
+        {
+          "regionId": "AFRICA",
+          "regionLabel": "",
+          "regionShortLabel": "AF",
+          "gross": 3072996,
+          "studioReceipts": 1705095,
+          "exhibitorReceipts": 1367901,
+          "screens": 1385,
+          "expectedFootfall": 390354,
+          "averageExhibitorCut": 0.44513595201555745,
+          "holdModifier": 1,
+          "chainReceipts": [
+            {
+              "chainId": "EMPIRE_CINEMAS",
+              "chainName": "Empire Cinemas",
+              "gross": 1578332,
+              "studioReceipts": 868083,
+              "exhibitorReceipts": 710249,
+              "screens": 702,
+              "expectedFootfall": 200491,
+              "exhibitorCut": 0.45
+            },
+            {
+              "chainId": "CROWNSCREEN",
+              "chainName": "CrownScreen",
+              "gross": 1494664,
+              "studioReceipts": 837012,
+              "exhibitorReceipts": 657652,
+              "screens": 683,
+              "expectedFootfall": 189863,
+              "exhibitorCut": 0.44
+            }
+          ]
+        },
+        {
+          "regionId": "OCEANIA",
+          "regionLabel": "",
+          "regionShortLabel": "OC",
+          "gross": 412042,
+          "studioReceipts": 230606,
+          "exhibitorReceipts": 181436,
+          "screens": 513,
+          "expectedFootfall": 52340,
+          "averageExhibitorCut": 0.44033375238446565,
+          "holdModifier": 1,
+          "chainReceipts": [
+            {
+              "chainId": "EMPIRE_CINEMAS",
+              "chainName": "Empire Cinemas",
+              "gross": 212950,
+              "studioReceipts": 117123,
+              "exhibitorReceipts": 95827,
+              "screens": 260,
+              "expectedFootfall": 27050,
+              "exhibitorCut": 0.45
+            },
+            {
+              "chainId": "CROWNSCREEN",
+              "chainName": "CrownScreen",
+              "gross": 199092,
+              "studioReceipts": 113483,
+              "exhibitorReceipts": 85609,
+              "screens": 253,
+              "expectedFootfall": 25290,
+              "exhibitorCut": 0.43
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "week": 8,
+      "gross": 112000000,
+      "studioReceipts": 57795396,
+      "exhibitorReceipts": 54204604,
+      "totalScreens": 17755,
+      "expectedFootfall": 14227052,
+      "averageExhibitorCut": 0.4839696785714286,
+      "studioShare": 0.5160303214285714,
+      "distributionModifier": 1.12,
+      "overscreeningPenalty": 0.011692934782608695,
+      "underReleasePenalty": 0,
+      "regionReceipts": [
+        {
+          "regionId": "NORTH_AMERICA",
+          "regionLabel": "",
+          "regionShortLabel": "NA",
+          "gross": 26018735,
+          "studioReceipts": 13396602,
+          "exhibitorReceipts": 12622133,
+          "screens": 3765,
+          "expectedFootfall": 3232934,
+          "averageExhibitorCut": 0.48511708966635003,
+          "holdModifier": 0.9729111111111112,
+          "chainReceipts": [
+            {
+              "chainId": "EMPIRE_CINEMAS",
+              "chainName": "Empire Cinemas",
+              "gross": 13314043,
+              "studioReceipts": 6790162,
+              "exhibitorReceipts": 6523881,
+              "screens": 1909,
+              "expectedFootfall": 1654324,
+              "exhibitorCut": 0.49
+            },
+            {
+              "chainId": "CROWNSCREEN",
+              "chainName": "CrownScreen",
+              "gross": 12704692,
+              "studioReceipts": 6606440,
+              "exhibitorReceipts": 6098252,
+              "screens": 1856,
+              "expectedFootfall": 1578610,
+              "exhibitorCut": 0.48
+            }
+          ]
+        },
+        {
+          "regionId": "SOUTH_AMERICA",
+          "regionLabel": "",
+          "regionShortLabel": "SA",
+          "gross": 6526236,
+          "studioReceipts": 3653042,
+          "exhibitorReceipts": 2873194,
+          "screens": 1747,
+          "expectedFootfall": 821722,
+          "averageExhibitorCut": 0.44025285018807164,
+          "holdModifier": 0.9601111111111112,
+          "chainReceipts": [
+            {
+              "chainId": "EMPIRE_CINEMAS",
+              "chainName": "Empire Cinemas",
+              "gross": 3345659,
+              "studioReceipts": 1840113,
+              "exhibitorReceipts": 1505546,
+              "screens": 886,
+              "expectedFootfall": 421254,
+              "exhibitorCut": 0.45
+            },
+            {
+              "chainId": "CROWNSCREEN",
+              "chainName": "CrownScreen",
+              "gross": 3180577,
+              "studioReceipts": 1812929,
+              "exhibitorReceipts": 1367648,
+              "screens": 861,
+              "expectedFootfall": 400468,
+              "exhibitorCut": 0.43
+            }
+          ]
+        },
+        {
+          "regionId": "EUROPE",
+          "regionLabel": "",
+          "regionShortLabel": "EU",
+          "gross": 15139488,
+          "studioReceipts": 8020245,
+          "exhibitorReceipts": 7119243,
+          "screens": 3278,
+          "expectedFootfall": 1859734,
+          "averageExhibitorCut": 0.4702433133802147,
+          "holdModifier": 0.9841111111111112,
+          "chainReceipts": [
+            {
+              "chainId": "EMPIRE_CINEMAS",
+              "chainName": "Empire Cinemas",
+              "gross": 7753981,
+              "studioReceipts": 4032071,
+              "exhibitorReceipts": 3721910,
+              "screens": 1662,
+              "expectedFootfall": 952499,
+              "exhibitorCut": 0.48
+            },
+            {
+              "chainId": "CROWNSCREEN",
+              "chainName": "CrownScreen",
+              "gross": 7385507,
+              "studioReceipts": 3988174,
+              "exhibitorReceipts": 3397333,
+              "screens": 1616,
+              "expectedFootfall": 907235,
+              "exhibitorCut": 0.46
+            }
+          ]
+        },
+        {
+          "regionId": "ASIA",
+          "regionLabel": "",
+          "regionShortLabel": "AS",
+          "gross": 60785741,
+          "studioReceipts": 30764885,
+          "exhibitorReceipts": 30020856,
+          "screens": 7067,
+          "expectedFootfall": 7869968,
+          "averageExhibitorCut": 0.49387990515736246,
+          "holdModifier": 0.9337111111111112,
+          "chainReceipts": [
+            {
+              "chainId": "Z_CINEMAS",
+              "chainName": "Z Cinemas",
+              "gross": 32662372,
+              "studioReceipts": 16984434,
+              "exhibitorReceipts": 15677938,
+              "screens": 3769,
+              "expectedFootfall": 4228818,
+              "exhibitorCut": 0.48
+            },
+            {
+              "chainId": "CROWNSCREEN",
+              "chainName": "CrownScreen",
+              "gross": 28123369,
+              "studioReceipts": 13780451,
+              "exhibitorReceipts": 14342918,
+              "screens": 3298,
+              "expectedFootfall": 3641150,
+              "exhibitorCut": 0.51
+            }
+          ]
+        },
+        {
+          "regionId": "AFRICA",
+          "regionLabel": "",
+          "regionShortLabel": "AF",
+          "gross": 3100249,
+          "studioReceipts": 1720217,
+          "exhibitorReceipts": 1380032,
+          "screens": 1385,
+          "expectedFootfall": 390354,
+          "averageExhibitorCut": 0.445135858442338,
+          "holdModifier": 0.9601111111111112,
+          "chainReceipts": [
+            {
+              "chainId": "EMPIRE_CINEMAS",
+              "chainName": "Empire Cinemas",
+              "gross": 1592329,
+              "studioReceipts": 875781,
+              "exhibitorReceipts": 716548,
+              "screens": 702,
+              "expectedFootfall": 200491,
+              "exhibitorCut": 0.45
+            },
+            {
+              "chainId": "CROWNSCREEN",
+              "chainName": "CrownScreen",
+              "gross": 1507920,
+              "studioReceipts": 844436,
+              "exhibitorReceipts": 663484,
+              "screens": 683,
+              "expectedFootfall": 189863,
+              "exhibitorCut": 0.44
+            }
+          ]
+        },
+        {
+          "regionId": "OCEANIA",
+          "regionLabel": "",
+          "regionShortLabel": "OC",
+          "gross": 429551,
+          "studioReceipts": 240405,
+          "exhibitorReceipts": 189146,
+          "screens": 513,
+          "expectedFootfall": 52340,
+          "averageExhibitorCut": 0.4403342094419522,
+          "holdModifier": 0.9921111111111112,
+          "chainReceipts": [
+            {
+              "chainId": "EMPIRE_CINEMAS",
+              "chainName": "Empire Cinemas",
+              "gross": 221999,
+              "studioReceipts": 122100,
+              "exhibitorReceipts": 99899,
+              "screens": 260,
+              "expectedFootfall": 27050,
+              "exhibitorCut": 0.45
+            },
+            {
+              "chainId": "CROWNSCREEN",
+              "chainName": "CrownScreen",
+              "gross": 207552,
+              "studioReceipts": 118305,
+              "exhibitorReceipts": 89247,
+              "screens": 253,
+              "expectedFootfall": 25290,
+              "exhibitorCut": 0.43
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "fame": [
+    {
+      "fame": 0,
+      "multiplier": 1.4
+    },
+    {
+      "fame": 50,
+      "multiplier": 2.4
+    },
+    {
+      "fame": 100,
+      "multiplier": 3.4
+    }
+  ],
+  "fameDuplicateIds": [
+    {
+      "count": 1,
+      "multiplier": 2.438584247883409
+    },
+    {
+      "count": 2,
+      "multiplier": 2.4771684957668185
+    },
+    {
+      "count": 4,
+      "multiplier": 2.554336991533637
+    }
+  ],
+  "qualitySaturation": [
+    {
+      "inputQuality": 70,
+      "estimated": 100
+    },
+    {
+      "inputQuality": 80,
+      "estimated": 100
+    },
+    {
+      "inputQuality": 90,
+      "estimated": 100
+    }
+  ],
+  "fixedControls": {
+    "ordinary": {
+      "budget": 90000000,
+      "tier": "HIGH",
+      "gross": 928473966,
+      "receipts": 478980806,
+      "exhibitors": 449493160,
+      "netBeforeMarketing": 388980806,
+      "grossMultiple": 10.3163774,
+      "receiptsMultiple": 5.322008955555556,
+      "outcome": "MASSIVE_SUCCESS",
+      "weeks": 8,
+      "weekly": [
+        407680000,
+        237432832,
+        138280880,
+        72481304,
+        37991798,
+        19913780,
+        10438006,
+        4255366
+      ],
+      "risks": [
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04
+      ],
+      "cap": 1936973684,
+      "capFraction": 0.47934258150716313
+    },
+    "hotMarket": {
+      "budget": 90000000,
+      "tier": "HIGH",
+      "gross": 1352854911,
+      "receipts": 697946223,
+      "exhibitors": 654908688,
+      "netBeforeMarketing": 607946223,
+      "grossMultiple": 15.031721233333334,
+      "receiptsMultiple": 7.754958033333334,
+      "outcome": "MASSIVE_SUCCESS",
+      "weeks": 11,
+      "weekly": [
+        407680000,
+        303914024,
+        226559394,
+        152004314,
+        101983462,
+        68423232,
+        45906842,
+        23955584,
+        12500751,
+        6523270,
+        3404038
+      ],
+      "risks": [
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04
+      ],
+      "cap": 2025173684,
+      "capFraction": 0.6680192033346608
+    },
+    "coldMarket": {
+      "budget": 90000000,
+      "tier": "HIGH",
+      "gross": 707269318,
+      "receipts": 364854687,
+      "exhibitors": 342414631,
+      "netBeforeMarketing": 274854687,
+      "grossMultiple": 7.858547977777778,
+      "receiptsMultiple": 4.053940966666667,
+      "outcome": "MASSIVE_SUCCESS",
+      "weeks": 7,
+      "weekly": [
+        393065267,
+        178558544,
+        81114146,
+        33163095,
+        13558557,
+        5543344,
+        2266365
+      ],
+      "risks": [
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04
+      ],
+      "cap": 1867673684,
+      "capFraction": 0.3786899842617261
+    },
+    "studioSpecialist": {
+      "budget": 90000000,
+      "tier": "HIGH",
+      "gross": 1108764324,
+      "receipts": 572002897,
+      "exhibitors": 536761427,
+      "netBeforeMarketing": 482002897,
+      "grossMultiple": 12.3196036,
+      "receiptsMultiple": 6.355587744444445,
+      "outcome": "MASSIVE_SUCCESS",
+      "weeks": 10,
+      "weekly": [
+        407680000,
+        270673428,
+        179709831,
+        107384242,
+        64166636,
+        38342284,
+        22911138,
+        10648069,
+        4948744,
+        2299952
+      ],
+      "risks": [
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04
+      ],
+      "cap": 2111973684,
+      "capFraction": 0.5249896494448933
+    },
+    "elite": {
+      "budget": 90000000,
+      "tier": "HIGH",
+      "gross": 2243318965,
+      "receipts": 1157498923,
+      "exhibitors": 1086099814,
+      "netBeforeMarketing": 1067498923,
+      "grossMultiple": 24.92576627777778,
+      "receiptsMultiple": 12.861099144444445,
+      "outcome": "MASSIVE_SUCCESS",
+      "weeks": 6,
+      "weekly": [
+        442959998,
+        454094239,
+        465508350,
+        447751998,
+        430672944,
+        2331436
+      ],
+      "risks": [
+        1.13,
+        1.13,
+        1.13,
+        1.13,
+        1.13,
+        1.13
+      ],
+      "cap": 2243318965,
+      "capFraction": 1
+    },
+    "eliteHotSpecialist": {
+      "budget": 90000000,
+      "tier": "HIGH",
+      "gross": 2362500000,
+      "receipts": 1235242108,
+      "exhibitors": 1159146117,
+      "netBeforeMarketing": 1145242108,
+      "grossMultiple": 26.25,
+      "receiptsMultiple": 13.724912311111112,
+      "outcome": "MASSIVE_SUCCESS",
+      "weeks": 5,
+      "weekly": [
+        442959998,
+        662614314,
+        991190472,
+        265735216,
+        0
+      ],
+      "risks": [
+        1.13,
+        1.13,
+        1.13,
+        1.13,
+        1.13
+      ],
+      "cap": 2362500000,
+      "capFraction": 1
+    },
+    "weak": {
+      "budget": 90000000,
+      "tier": "HIGH",
+      "gross": 284225400,
+      "receipts": 146617456,
+      "exhibitors": 137607944,
+      "netBeforeMarketing": 56617456,
+      "grossMultiple": 3.15806,
+      "receiptsMultiple": 1.6290828444444445,
+      "outcome": "MASSIVE_SUCCESS",
+      "weeks": 4,
+      "weekly": [
+        205785875,
+        58081004,
+        16392781,
+        3965740
+      ],
+      "risks": [
+        0.72,
+        0.72,
+        0.72,
+        0.72
+      ],
+      "cap": 1682800000,
+      "capFraction": 0.16890028523888756
+    },
+    "zeroCampaign": {
+      "budget": 90000000,
+      "tier": "HIGH",
+      "gross": 482025118,
+      "receipts": 248666961,
+      "exhibitors": 233358157,
+      "netBeforeMarketing": 158666961,
+      "grossMultiple": 5.355834644444444,
+      "receiptsMultiple": 2.762966233333333,
+      "outcome": "MASSIVE_SUCCESS",
+      "weeks": 8,
+      "weekly": [
+        211650528,
+        123265266,
+        71789690,
+        37629282,
+        19723763,
+        10338406,
+        5418977,
+        2209206
+      ],
+      "risks": [
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04
+      ],
+      "cap": 1936973684,
+      "capFraction": 0.24885475831792458
+    },
+    "noRiskAdjustment": {
+      "budget": 210000000,
+      "tier": "HIGH",
+      "gross": 851305190,
+      "receipts": 439167982,
+      "exhibitors": 412137208,
+      "netBeforeMarketing": 229167982,
+      "grossMultiple": 4.053834238095238,
+      "receiptsMultiple": 2.0912761047619046,
+      "outcome": "MASSIVE_SUCCESS",
+      "weeks": 7,
+      "weekly": [
+        392000000,
+        219520000,
+        122931200,
+        61957323,
+        31226490,
+        15738150,
+        7932027
+      ],
+      "risks": [
+        0.75,
+        0.75,
+        0.75,
+        0.75,
+        0.75,
+        0.75,
+        0.75
+      ],
+      "cap": 1936973684,
+      "capFraction": 0.4395027134503909
+    }
+  },
+  "genreControls": [
+    {
+      "genre": "ACTION",
+      "budget": 90000000,
+      "tier": "HIGH",
+      "gross": 928473966,
+      "receipts": 478980806,
+      "exhibitors": 449493160,
+      "netBeforeMarketing": 388980806,
+      "grossMultiple": 10.3163774,
+      "receiptsMultiple": 5.322008955555556,
+      "outcome": "MASSIVE_SUCCESS",
+      "weeks": 8,
+      "weekly": [
+        407680000,
+        237432832,
+        138280880,
+        72481304,
+        37991798,
+        19913780,
+        10438006,
+        4255366
+      ],
+      "risks": [
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04
+      ],
+      "cap": 1936973684,
+      "capFraction": 0.47934258150716313
+    },
+    {
+      "genre": "SUPERHERO",
+      "budget": 90000000,
+      "tier": "HIGH",
+      "gross": 928473966,
+      "receipts": 478980806,
+      "exhibitors": 449493160,
+      "netBeforeMarketing": 388980806,
+      "grossMultiple": 10.3163774,
+      "receiptsMultiple": 5.322008955555556,
+      "outcome": "MASSIVE_SUCCESS",
+      "weeks": 8,
+      "weekly": [
+        407680000,
+        237432832,
+        138280880,
+        72481304,
+        37991798,
+        19913780,
+        10438006,
+        4255366
+      ],
+      "risks": [
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04
+      ],
+      "cap": 1936973684,
+      "capFraction": 0.47934258150716313
+    },
+    {
+      "genre": "DRAMA",
+      "budget": 90000000,
+      "tier": "HIGH",
+      "gross": 874846708,
+      "receipts": 463038854,
+      "exhibitors": 411807854,
+      "netBeforeMarketing": 373038854,
+      "grossMultiple": 9.720518977777777,
+      "receiptsMultiple": 5.144876155555556,
+      "outcome": "MASSIVE_SUCCESS",
+      "weeks": 9,
+      "weekly": [
+        337799117,
+        216407625,
+        138639379,
+        80743573,
+        47025055,
+        27387391,
+        15950415,
+        7431616,
+        3462537
+      ],
+      "risks": [
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04
+      ],
+      "cap": 1750000000,
+      "capFraction": 0.49991240457142855
+    },
+    {
+      "genre": "HORROR",
+      "budget": 90000000,
+      "tier": "HIGH",
+      "gross": 617593462,
+      "receipts": 332289150,
+      "exhibitors": 285304312,
+      "netBeforeMarketing": 242289150,
+      "grossMultiple": 6.862149577777778,
+      "receiptsMultiple": 3.692101666666667,
+      "outcome": "MASSIVE_SUCCESS",
+      "weeks": 7,
+      "weekly": [
+        337799117,
+        157387362,
+        73329917,
+        29895138,
+        12187648,
+        4968659,
+        2025621
+      ],
+      "risks": [
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04
+      ],
+      "cap": 1750000000,
+      "capFraction": 0.3529105497142857
+    },
+    {
+      "genre": "DOCUMENTARY",
+      "budget": 90000000,
+      "tier": "HIGH",
+      "gross": 659720463,
+      "receipts": 349176847,
+      "exhibitors": 310543616,
+      "netBeforeMarketing": 259176847,
+      "grossMultiple": 7.330227366666667,
+      "receiptsMultiple": 3.8797427444444446,
+      "outcome": "MASSIVE_SUCCESS",
+      "weeks": 9,
+      "weekly": [
+        254733760,
+        163192635,
+        104547728,
+        60888596,
+        35461517,
+        20652786,
+        12028181,
+        5604168,
+        2611092
+      ],
+      "risks": [
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04
+      ],
+      "cap": 1750000000,
+      "capFraction": 0.3769831217142857
+    }
+  ],
+  "ignoredInputs": [
+    {
+      "targetAudience": "G",
+      "budget": 90000000,
+      "tier": "HIGH",
+      "gross": 928473966,
+      "receipts": 478980806,
+      "exhibitors": 449493160,
+      "netBeforeMarketing": 388980806,
+      "grossMultiple": 10.3163774,
+      "receiptsMultiple": 5.322008955555556,
+      "outcome": "MASSIVE_SUCCESS",
+      "weeks": 8,
+      "weekly": [
+        407680000,
+        237432832,
+        138280880,
+        72481304,
+        37991798,
+        19913780,
+        10438006,
+        4255366
+      ],
+      "risks": [
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04
+      ],
+      "cap": 1936973684,
+      "capFraction": 0.47934258150716313
+    },
+    {
+      "targetAudience": "NC-17",
+      "budget": 90000000,
+      "tier": "HIGH",
+      "gross": 928473966,
+      "receipts": 478980806,
+      "exhibitors": 449493160,
+      "netBeforeMarketing": 388980806,
+      "grossMultiple": 10.3163774,
+      "receiptsMultiple": 5.322008955555556,
+      "outcome": "MASSIVE_SUCCESS",
+      "weeks": 8,
+      "weekly": [
+        407680000,
+        237432832,
+        138280880,
+        72481304,
+        37991798,
+        19913780,
+        10438006,
+        4255366
+      ],
+      "risks": [
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04,
+        1.04
+      ],
+      "cap": 1936973684,
+      "capFraction": 0.47934258150716313
+    }
+  ],
+  "distributions": {
+    "acceptedHighOfferSingleCast": {
+      "n": 500,
+      "medianGross": 276531164,
+      "p10Gross": 208608611,
+      "p90Gross": 414804582,
+      "medianGrossMultiple": 1.3097718664396327,
+      "medianReceiptsMultiple": 0.6730551400965454,
+      "medianWeeks": 4,
+      "grossFailurePct": 45,
+      "receiptsBelowBudgetPct": 72.2,
+      "over3BPct": 0,
+      "atLeast99PctCap": 0
+    },
+    "highOfferWithGeneratedEnsemble": {
+      "n": 500,
+      "medianGross": 462118790,
+      "p10Gross": 294266256,
+      "p90Gross": 758776949,
+      "medianGrossMultiple": 2.189327007002572,
+      "medianReceiptsMultiple": 1.1293771564554047,
+      "medianWeeks": 5,
+      "grossFailurePct": 14.6,
+      "receiptsBelowBudgetPct": 43.6,
+      "over3BPct": 0,
+      "atLeast99PctCap": 0
+    },
+    "ensembleOfferReclassified": {
+      "n": 500,
+      "medianGross": 1341106053,
+      "p10Gross": 985030311,
+      "p90Gross": 2171609394,
+      "medianGrossMultiple": 6.491592166357998,
+      "medianReceiptsMultiple": 3.3425633915946777,
+      "medianWeeks": 7,
+      "grossFailurePct": 0,
+      "receiptsBelowBudgetPct": 0.2,
+      "over3BPct": 2.6,
+      "atLeast99PctCap": 2.4
+    },
+    "ownWeak90M": {
+      "n": 500,
+      "medianGross": 247091088,
+      "p10Gross": 208111744,
+      "p90Gross": 283581595,
+      "medianGrossMultiple": 2.7454565333333334,
+      "medianReceiptsMultiple": 1.4162336444444446,
+      "medianWeeks": 4,
+      "grossFailurePct": 0,
+      "receiptsBelowBudgetPct": 0,
+      "over3BPct": 0,
+      "atLeast99PctCap": 0
+    },
+    "ownOrdinary90M": {
+      "n": 500,
+      "medianGross": 820104006,
+      "p10Gross": 775202556,
+      "p90Gross": 865956761,
+      "medianGrossMultiple": 9.112266733333334,
+      "medianReceiptsMultiple": 4.700771188888889,
+      "medianWeeks": 8,
+      "grossFailurePct": 0,
+      "receiptsBelowBudgetPct": 0,
+      "over3BPct": 0,
+      "atLeast99PctCap": 0
+    },
+    "ownElite90M": {
+      "n": 500,
+      "medianGross": 2234869761,
+      "p10Gross": 1893815671,
+      "p90Gross": 2521734435,
+      "medianGrossMultiple": 24.831886233333332,
+      "medianReceiptsMultiple": 12.904467144444444,
+      "medianWeeks": 8,
+      "grossFailurePct": 0,
+      "receiptsBelowBudgetPct": 0,
+      "over3BPct": 0,
+      "atLeast99PctCap": 100
+    },
+    "ownElite90M_Specialist": {
+      "n": 500,
+      "medianGross": 2387121140,
+      "p10Gross": 2022832607,
+      "p90Gross": 2693528583,
+      "medianGrossMultiple": 26.523568222222224,
+      "medianReceiptsMultiple": 13.839692455555555,
+      "medianWeeks": 7,
+      "grossFailurePct": 0,
+      "receiptsBelowBudgetPct": 0,
+      "over3BPct": 0,
+      "atLeast99PctCap": 100
+    },
+    "ownElite180M_Specialist": {
+      "n": 500,
+      "medianGross": 3651993089,
+      "p10Gross": 3094677759,
+      "p90Gross": 4120757680,
+      "medianGrossMultiple": 20.288850494444443,
+      "medianReceiptsMultiple": 10.618772294444444,
+      "medianWeeks": 6,
+      "grossFailurePct": 0,
+      "receiptsBelowBudgetPct": 0,
+      "over3BPct": 98,
+      "atLeast99PctCap": 100
+    }
+  },
+  "universeOffer": {
+    "tier": "HIGH",
+    "budget": 210000000,
+    "isFamous": true,
+    "visibleHype": "HIGH",
+    "hidden": {
+      "scriptQuality": 70,
+      "directorQuality": 70,
+      "castingStrength": 70,
+      "distributionPower": 90,
+      "rawHype": 100,
+      "qualityScore": 70,
+      "prestigeBonus": 0
+    },
+    "studioId": "MARVEL_STUDIOS",
+    "genre": "ACTION",
+    "universe": "MONSTERVERSE"
+  },
+  "lossYetHit": {
+    "gross": 230000000,
+    "production": 100000000,
+    "marketing": 30000000,
+    "studioReceipts": 115000000,
+    "net": -15000000,
+    "calculatedOutcome": {
+      "tier": "SUCCESS",
+      "score": 83.5
+    },
+    "dashboardBadge": "Hit (>2x gross)",
+    "boxOfficeReceiptsMultiple": 1.15
+  },
+  "realGameLoop": {
+    "ticks": 8,
+    "results": [
+      {
+        "id": "owned_weak",
+        "phase": "STREAMING_BIDDING",
+        "gross": 211999629,
+        "receipts": 109358209,
+        "exhibitors": 102641420,
+        "accountingDifference": 0,
+        "weeklyAccountingDifferences": [
+          0,
+          0,
+          0
+        ],
+        "weekly": [
+          176400000,
+          30481981,
+          5117648
+        ],
+        "cap": 1651300000,
+        "bids": [
+          {
+            "platform": "NETFLIX",
+            "upfront": 145451564
+          },
+          {
+            "platform": "APPLE_TV",
+            "upfront": 127384144
+          },
+          {
+            "platform": "DISNEY_PLUS",
+            "upfront": 134230536
+          },
+          {
+            "platform": "HULU",
+            "upfront": 117758994
+          },
+          {
+            "platform": "YOUTUBE",
+            "upfront": 110095095
+          }
+        ],
+        "risk": {
+          "label": "Dangerous",
+          "riskScore": 4,
+          "theatricalDemandMultiplier": 0.45,
+          "streamingViewMultiplier": 0.54,
+          "platformBidMultiplier": 0.44,
+          "episodeScoreModifier": 0,
+          "notes": [
+            "budget pressure",
+            "hype/quality mismatch"
+          ]
+        },
+        "outcome": "FAILURE"
+      },
+      {
+        "id": "owned_high",
+        "phase": "STREAMING_BIDDING",
+        "gross": 473194766,
+        "receipts": 244100465,
+        "exhibitors": 229094301,
+        "accountingDifference": 0,
+        "weeklyAccountingDifferences": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "weekly": [
+          294000000,
+          115442886,
+          43351356,
+          14927572,
+          5472952
+        ],
+        "cap": 1905473684,
+        "bids": [
+          {
+            "platform": "NETFLIX",
+            "upfront": 480218775
+          },
+          {
+            "platform": "APPLE_TV",
+            "upfront": 466468915
+          },
+          {
+            "platform": "DISNEY_PLUS",
+            "upfront": 419405384
+          },
+          {
+            "platform": "HULU",
+            "upfront": 495024995
+          },
+          {
+            "platform": "YOUTUBE",
+            "upfront": 429380270
+          }
+        ],
+        "risk": {
+          "label": "Risky",
+          "riskScore": 43,
+          "theatricalDemandMultiplier": 0.75,
+          "streamingViewMultiplier": 0.82,
+          "platformBidMultiplier": 0.72,
+          "episodeScoreModifier": 0,
+          "notes": [
+            "budget pressure"
+          ]
+        },
+        "outcome": "SUCCESS"
+      },
+      {
+        "id": "offered_high",
+        "phase": "STREAMING",
+        "gross": 477342333,
+        "receipts": 246239906,
+        "exhibitors": 231102427,
+        "accountingDifference": 0,
+        "weeklyAccountingDifferences": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "weekly": [
+          294000000,
+          121414406,
+          43084762,
+          14049114,
+          4794051
+        ],
+        "cap": 1905473684,
+        "bids": [],
+        "risk": {
+          "label": "Risky",
+          "riskScore": 43,
+          "theatricalDemandMultiplier": 0.75,
+          "streamingViewMultiplier": 0.82,
+          "platformBidMultiplier": 0.73,
+          "episodeScoreModifier": 0,
+          "notes": [
+            "budget pressure"
+          ]
+        },
+        "outcome": "SUCCESS"
+      },
+      {
+        "id": "owned_blockbuster",
+        "phase": "STREAMING_BIDDING",
+        "gross": 1290677737,
+        "receipts": 665818943,
+        "exhibitors": 624858794,
+        "accountingDifference": 0,
+        "weeklyAccountingDifferences": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "weekly": [
+          678720000,
+          326809700,
+          159796659,
+          74074088,
+          30922410,
+          13952551,
+          6402329
+        ],
+        "cap": 2885431578,
+        "bids": [
+          {
+            "platform": "NETFLIX",
+            "upfront": 1134587302
+          },
+          {
+            "platform": "APPLE_TV",
+            "upfront": 1118556784
+          },
+          {
+            "platform": "DISNEY_PLUS",
+            "upfront": 961885784
+          },
+          {
+            "platform": "HULU",
+            "upfront": 906025971
+          },
+          {
+            "platform": "YOUTUBE",
+            "upfront": 883722138
+          }
+        ],
+        "risk": {
+          "label": "Balanced",
+          "riskScore": 71,
+          "theatricalDemandMultiplier": 1.01,
+          "streamingViewMultiplier": 1.01,
+          "platformBidMultiplier": 0.99,
+          "episodeScoreModifier": 0,
+          "notes": []
+        },
+        "outcome": "MASSIVE_SUCCESS"
+      },
+      {
+        "id": "owned_elite_blockbuster",
+        "phase": "STREAMING_BIDDING",
+        "gross": 3289015517,
+        "receipts": 1714220649,
+        "exhibitors": 1608475184,
+        "accountingDifference": 33680316,
+        "weeklyAccountingDifferences": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          33680316,
+          0
+        ],
+        "weekly": [
+          759359998,
+          678465023,
+          612050410,
+          520174811,
+          438295968,
+          280669307,
+          0
+        ],
+        "cap": 3289015517,
+        "bids": [
+          {
+            "platform": "NETFLIX",
+            "upfront": 3750393975
+          },
+          {
+            "platform": "APPLE_TV",
+            "upfront": 2951022833
+          },
+          {
+            "platform": "DISNEY_PLUS",
+            "upfront": 3554021094
+          },
+          {
+            "platform": "HULU",
+            "upfront": 3459611452
+          },
+          {
+            "platform": "YOUTUBE",
+            "upfront": 1746880599
+          }
+        ],
+        "risk": {
+          "label": "Upside",
+          "riskScore": 88,
+          "theatricalDemandMultiplier": 1.13,
+          "streamingViewMultiplier": 1.11,
+          "platformBidMultiplier": 1.09,
+          "episodeScoreModifier": 0,
+          "notes": []
+        },
+        "outcome": "MASSIVE_SUCCESS"
+      },
+      {
+        "id": "owned_elite_high",
+        "phase": "STREAMING_BIDDING",
+        "gross": 2211818965,
+        "receipts": 1146533012,
+        "exhibitors": 1075766173,
+        "accountingDifference": 10480220,
+        "weeklyAccountingDifferences": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          10480220,
+          0
+        ],
+        "weekly": [
+          442959998,
+          417692459,
+          388690636,
+          331283555,
+          292507229,
+          251349916,
+          87335172,
+          0
+        ],
+        "cap": 2211818965,
+        "bids": [
+          {
+            "platform": "NETFLIX",
+            "upfront": 1666816277
+          },
+          {
+            "platform": "APPLE_TV",
+            "upfront": 1510936040
+          },
+          {
+            "platform": "DISNEY_PLUS",
+            "upfront": 1542878651
+          },
+          {
+            "platform": "HULU",
+            "upfront": 1858040487
+          },
+          {
+            "platform": "YOUTUBE",
+            "upfront": 1018605270
+          }
+        ],
+        "risk": {
+          "label": "Upside",
+          "riskScore": 88,
+          "theatricalDemandMultiplier": 1.13,
+          "streamingViewMultiplier": 1.11,
+          "platformBidMultiplier": 1.09,
+          "episodeScoreModifier": 0,
+          "notes": []
+        },
+        "outcome": "MASSIVE_SUCCESS"
+      }
+    ],
+    "accountingMismatches": [
+      {
+        "id": "owned_elite_blockbuster",
+        "phase": "STREAMING_BIDDING",
+        "gross": 3289015517,
+        "receipts": 1714220649,
+        "exhibitors": 1608475184,
+        "accountingDifference": 33680316,
+        "weeklyAccountingDifferences": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          33680316,
+          0
+        ],
+        "weekly": [
+          759359998,
+          678465023,
+          612050410,
+          520174811,
+          438295968,
+          280669307,
+          0
+        ],
+        "cap": 3289015517,
+        "bids": [
+          {
+            "platform": "NETFLIX",
+            "upfront": 3750393975
+          },
+          {
+            "platform": "APPLE_TV",
+            "upfront": 2951022833
+          },
+          {
+            "platform": "DISNEY_PLUS",
+            "upfront": 3554021094
+          },
+          {
+            "platform": "HULU",
+            "upfront": 3459611452
+          },
+          {
+            "platform": "YOUTUBE",
+            "upfront": 1746880599
+          }
+        ],
+        "risk": {
+          "label": "Upside",
+          "riskScore": 88,
+          "theatricalDemandMultiplier": 1.13,
+          "streamingViewMultiplier": 1.11,
+          "platformBidMultiplier": 1.09,
+          "episodeScoreModifier": 0,
+          "notes": []
+        },
+        "outcome": "MASSIVE_SUCCESS"
+      },
+      {
+        "id": "owned_elite_high",
+        "phase": "STREAMING_BIDDING",
+        "gross": 2211818965,
+        "receipts": 1146533012,
+        "exhibitors": 1075766173,
+        "accountingDifference": 10480220,
+        "weeklyAccountingDifferences": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          10480220,
+          0
+        ],
+        "weekly": [
+          442959998,
+          417692459,
+          388690636,
+          331283555,
+          292507229,
+          251349916,
+          87335172,
+          0
+        ],
+        "cap": 2211818965,
+        "bids": [
+          {
+            "platform": "NETFLIX",
+            "upfront": 1666816277
+          },
+          {
+            "platform": "APPLE_TV",
+            "upfront": 1510936040
+          },
+          {
+            "platform": "DISNEY_PLUS",
+            "upfront": 1542878651
+          },
+          {
+            "platform": "HULU",
+            "upfront": 1858040487
+          },
+          {
+            "platform": "YOUTUBE",
+            "upfront": 1018605270
+          }
+        ],
+        "risk": {
+          "label": "Upside",
+          "riskScore": 88,
+          "theatricalDemandMultiplier": 1.13,
+          "streamingViewMultiplier": 1.11,
+          "platformBidMultiplier": 1.09,
+          "episodeScoreModifier": 0,
+          "notes": []
+        },
+        "outcome": "MASSIVE_SUCCESS"
+      }
+    ]
+  },
+  "acceptedOfferRealHandoff": {
+    "ticks": 5,
+    "results": [
+      {
+        "id": "accepted_single_cast",
+        "castCount": 1,
+        "depth": 10,
+        "fame": 2.3714,
+        "budget": 210000000,
+        "tier": "HIGH",
+        "gross": 296625440,
+        "receipts": 156643892,
+        "weekly": [
+          223439998,
+          56067444,
+          13787475,
+          3330523
+        ],
+        "outcome": "NEUTRAL"
+      },
+      {
+        "id": "counterfactual_full_cast",
+        "castCount": 8,
+        "depth": 96,
+        "fame": 13.454490008585713,
+        "budget": 210000000,
+        "tier": "HIGH",
+        "gross": 485392117,
+        "receipts": 256336658,
+        "weekly": [
+          286160000,
+          120754852,
+          52285694,
+          18930106,
+          7261465
+        ],
+        "outcome": "SUCCESS"
+      }
+    ]
+  }
+}

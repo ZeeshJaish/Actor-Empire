@@ -1,0 +1,35 @@
+{
+  "date": "2026-10-22",
+  "head": "612efbb1cb6c80a22d1ba30fde4a1d88f90cdc4e",
+  "deliverable": "Final design and phased implementation plan; gameplay unchanged",
+  "checks": {
+    "linkedTargets": 21,
+    "missing": [],
+    "badLines": [],
+    "sourceDrift": [],
+    "preexistingTrackedDirtyFilesChanged": [],
+    "preexistingTrackedDirtyFileCount": 28,
+    "globalConstraintsIdentical": true,
+    "phaseCount": 6,
+    "taskCount": 11,
+    "placeholders": [],
+    "selfReview": {
+      "specCoverage": "All sections mapped in coverage table; no known omitted requirement",
+      "typeConsistency": "Normalized id/titleId, owner/cast, delivery, choice kind, rights fixture and readonly slate contracts reviewed",
+      "implementationTestsRun": false,
+      "reason": "Documentation-only deliverable; existing current-source audit results retained separately"
+    }
+  },
+  "docSha256": {
+    "docs/superpowers/specs/2026-10-22-fair-box-office-design.md": "d913e3645f41dd0ffb9bef9c2205e1c24c11f47d3133a4583586a5f186c6a44f",
+    "docs/superpowers/plans/2026-10-22-fair-box-office.md": "c869ffcc79da3b79407b2123f6c746b82980c80cdd994546f217c6c0377557e0"
+  },
+  "confirmedDecisions": {
+    "automaticCountryChainPrices": true,
+    "amountsIllustrativeNoFixedGrossCap": true,
+    "availabilityDoesNotCreateAwareness": true,
+    "oneInlineOwnerSixPhases": true
+  },
+  "executionStarted": false,
+  "newCinemaEngineVerified": false
+}

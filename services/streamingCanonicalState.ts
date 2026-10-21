@@ -736,7 +736,9 @@ const normalizeLocalization = (root: UnknownRecord): OwnedStreamingLocalizationO
         providers: dedupe(asArray(source.providers).map(normalizeProvider).filter((item): item is OwnedStreamingLocalizationProvider => Boolean(item)), item => item.id).slice(-80),
         facilities: dedupe(asArray(source.facilities).map(normalizeFacility).filter((item): item is OwnedStreamingLocalizationFacility => Boolean(item)), item => item.id).slice(-40),
         jobs: dedupe(asArray(source.jobs).map(normalizeJob).filter((item): item is OwnedStreamingLocalizationJob => Boolean(item)), item => item.id).slice(-240),
-        titleLanguageAssets: dedupe(asArray(source.titleLanguageAssets).map(normalizeAsset).filter((item): item is OwnedStreamingTitleLanguageAsset => Boolean(item)), item => item.id).slice(-320),
+        // Completed language assets are owned capabilities, not a rolling activity log.
+        // Keep every validated asset; truncation silently revoked older localization.
+        titleLanguageAssets: dedupe(asArray(source.titleLanguageAssets).map(normalizeAsset).filter((item): item is OwnedStreamingTitleLanguageAsset => Boolean(item)), item => item.id),
         legacyPackageGrants: dedupe([
             ...migrateLegacyGrants(root),
             ...asArray(source.legacyPackageGrants).map(normalizeLegacyGrant).filter((item): item is OwnedStreamingLegacyLocalizationGrant => Boolean(item)),

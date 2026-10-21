@@ -354,7 +354,7 @@ function RegionRow({ data, draft, report, open, note, onToggle, onWrite, onCloud
         <span className={stamp ? 'bw-rg-word is-stamp' : 'bw-rg-word'}><i aria-hidden="true" />{word}{countries.some(country => country.state !== 'READY') && rooms.length > 0 && <small>{countries.filter(country => country.state !== 'READY').length} need attention</small>}</span>
         <span className="bw-rg-cost">
           <b>{rooms.length === 0 ? '—' : `${money(Math.round(weeklyShown))}/wk`}</b>
-          <em>{rooms.length === 0 ? 'nothing here yet' : once > 0 ? `${money(Math.round(onceShown))} once` : 'nothing once'}</em>
+          <em>{rooms.length === 0 ? 'nothing here yet' : once > 0 ? `${money(Math.round(onceShown))} ${data.operationalRevision ? 'asset value' : 'once'}` : 'nothing once'}</em>
         </span>
         {/* A closed row used to say only a word and a price (#119). It carries
             its own coverage along the bottom now, and the kit standing in it,

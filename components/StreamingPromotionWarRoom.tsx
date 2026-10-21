@@ -60,6 +60,7 @@ interface Props {
   onUpdatePlayer: (player: Player) => void;
   onClose: () => void;
   initialProjectId?: string | null;
+  initialObjective?: StreamingRecommendationObjective;
 }
 
 type WarRoomTab = 'CAMPAIGN' | 'RECOMMENDATION' | 'CREATIVE' | 'ATTRIBUTION';
@@ -108,16 +109,17 @@ export default function StreamingPromotionWarRoom({
   onUpdatePlayer,
   onClose,
   initialProjectId,
+  initialObjective,
 }: Props) {
   const center = useMemo(() => getStreamingPromotionCenter(player), [player]);
   const initialTitle = center.eligibleTitles.find(title => title.projectId === initialProjectId)
     || center.eligibleTitles[0]
     || null;
-  const [activeTab, setActiveTab] = useState<WarRoomTab>(center.appliedActions.length ? 'CAMPAIGN' : 'CAMPAIGN');
+  const [activeTab, setActiveTab] = useState<WarRoomTab>(initialObjective ? 'RECOMMENDATION' : 'CAMPAIGN');
   const [projectId, setProjectId] = useState(initialTitle?.projectId || '');
   const [channels, setChannels] = useState<StreamingCampaignChannelId[]>(['SOCIAL']);
   const [homepagePlacement, setHomepagePlacement] = useState<StreamingHomepagePlacement>('TOP_TEN');
-  const [recommendationObjective, setRecommendationObjective] = useState<StreamingRecommendationObjective>('BALANCED');
+  const [recommendationObjective, setRecommendationObjective] = useState<StreamingRecommendationObjective>(initialObjective || 'BALANCED');
   const [explorationPercent, setExplorationPercent] = useState(25);
   const [artworkVariants, setArtworkVariants] = useState<StreamingArtworkVariant[]>([]);
   const [feedback, setFeedback] = useState('');

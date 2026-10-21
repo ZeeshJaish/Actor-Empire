@@ -103,6 +103,9 @@ export interface StreamingBuildWizardExperienceProps {
   builtFacilities?: OwnedStreamingFacility[] | null;
   construction?: { committedAtAbsoluteWeek: number; readyAtAbsoluteWeek: number } | null;
   isLive?: boolean;
+  operations?: boolean;
+  revisionQuote?: (selection: BuildSel) => { dueNow: number; weeklyCost: number; buildWeeks: number };
+  campaignOnly?: boolean;
   onResult?: (result: RunResult | null, selection?: BuildSel) => void;
   onCommit?: (selection: BuildSel) => BuildCommitResult | void;
   onValidateCommit?: (selection: BuildSel) => BuildCommitResult;
@@ -689,6 +692,13 @@ export const StreamingBuildWizardExperience: React.FC<StreamingBuildWizardExperi
 
   const data = useMemo<BuildData>(() => {
     const projectionCache = new WeakMap<BuildDraft, { selection: BuildSel; build: StreamingCanonicalBuildData }>();
+    const revisionQuotes = new WeakMap<BuildDraft, ReturnType<NonNullable<typeof props.revisionQuote>>>();
+    const revisionQuoteFor = (draft: BuildDraft) => {
+      if (!props.revisionQuote) return undefined;
+      const cached = revisionQuotes.get(draft);
+      if (cached) return cached;
+      const quote = props.revisionQuote(canonicalFor(draft)); revisionQuotes.set(draft, quote); return quote;
+    };
     const projectionFor = (draft: BuildDraft) => {
       const cached = projectionCache.get(draft);
       if (cached) return cached;
@@ -843,9 +853,9 @@ export const StreamingBuildWizardExperience: React.FC<StreamingBuildWizardExperi
         buildingCities: new Set(build.facilities.filter(facility => facility.type !== 'CLOUD_ALLOCATION').map(facility => facility.cityId)).size,
         capacity: build.capacity.steadyStreams,
         burst: Math.max(0, build.capacity.burstStreams - build.capacity.steadyStreams),
-        buildCost: build.quote.totals.dueNow,
-        weeklyCost: build.quote.totals.weeklyTotal,
-        weeks: build.schedule.weeks,
+        buildCost: revisionQuoteFor(draft)?.dueNow ?? build.quote.totals.dueNow,
+        weeklyCost: revisionQuoteFor(draft)?.weeklyCost ?? build.quote.totals.weeklyTotal,
+        weeks: revisionQuoteFor(draft)?.buildWeeks ?? build.schedule.weeks,
         energy: Math.round(physicalViews.reduce((sum, view) => sum + view.energyKwhWeekly, 0) / 1_000),
         water: Math.round(physicalViews.reduce((sum, view) => sum + view.waterLitresWeekly, 0) / 1_000),
         sustainability: average(physicalViews.map(view => view.sustainabilityScore)),
@@ -856,13 +866,16 @@ export const StreamingBuildWizardExperience: React.FC<StreamingBuildWizardExperi
 
     const moneyFor = (draft: BuildDraft): MoneyPlan => {
       const { build } = projectionFor(draft);
-      const infrastructure = build.quote.totals.dueNow;
-      const campaign = marketing?.draft.budgetCeiling || 0;
+      const operationalQuote = revisionQuoteFor(draft);
+      const infrastructure = operationalQuote?.dueNow ?? build.quote.totals.dueNow;
+      const campaign = props.isLive ? 0 : marketing?.draft.budgetCeiling || 0;
       const lines = [
         ...(inputs.defineLaunchPaid || []).map(item => ({ ...item, locked: true, timing: 'SETTLED' as const })),
+        ...(operationalQuote ? [{ id: 'network-revision', label: 'Network revision', amount: infrastructure, note: 'Incremental construction and migration charge', timing: 'COMMISSION' as const }] : [
         { id: 'network-capex', label: 'Servers and owned property', amount: build.quote.totals.capex, note: `${totalsFor(draft).racks} racks · ${totalsFor(draft).compute} compute`, timing: 'COMMISSION' as const },
         { id: 'network-deposits', label: 'Facility deposits', amount: build.quote.totals.deposits, note: `${build.quote.totals.rooms} rooms · ${build.quote.totals.cities} cities`, timing: 'COMMISSION' as const },
         { id: 'network-setup', label: 'Commissioning and setup', amount: build.quote.totals.setup, note: `${build.schedule.weeks} weeks to build`, timing: 'COMMISSION' as const },
+        ]),
         { id: 'campaign', label: 'Launch marketing ceiling', amount: campaign, note: campaign ? 'Reserved and spent across construction' : 'Organic launch', timing: 'OPENING_NIGHT' as const },
         { id: 'catalogue', label: 'Catalogue licences already signed', amount: inputs.catalogueSpend, note: `${inputs.catalogueTitles} titles · already settled`, locked: true, timing: 'SETTLED' as const },
         { id: 'originals', label: 'Originals already funded', amount: inputs.originalsSpend, note: `${inputs.originalsCount} commissions · already settled`, locked: true, timing: 'SETTLED' as const },
@@ -1051,6 +1064,7 @@ export const StreamingBuildWizardExperience: React.FC<StreamingBuildWizardExperi
       team: managementToBuild(sel.managementPolicy),
       existing: (builtFacilities || []).map(facility => facilityToBuild(facility, true)),
       commissioned: Boolean(built),
+      operationalRevision: Boolean(props.isLive),
       canonicalMode: canonicalSource === 'CAREER' ? 'CAREER' : 'FIXTURE',
       construction: props.construction ? {
         committedAtWeek: props.construction.committedAtAbsoluteWeek,
@@ -1058,7 +1072,7 @@ export const StreamingBuildWizardExperience: React.FC<StreamingBuildWizardExperi
       } : undefined,
       canonical,
     };
-  }, [absoluteWeek, baseFacilities, brand, built, builtFacilities, canonicalFor, canonicalSource, cities, countries, initialDraft, inputs, listings, marketing, pricing, props.construction, props.signatoryName, regions, sel.managementPolicy]);
+  }, [absoluteWeek, baseFacilities, brand, built, builtFacilities, canonicalFor, canonicalSource, cities, countries, initialDraft, inputs, listings, marketing, pricing, props.construction, props.revisionQuote, props.isLive, props.signatoryName, regions, sel.managementPolicy]);
 
   const draftWithResult = useMemo<BuildDraft>(() => {
     if (!result && !savedRehearsal) return initialDraft;
@@ -1120,6 +1134,9 @@ export const StreamingBuildWizardExperience: React.FC<StreamingBuildWizardExperi
     <>
       <BuildWizard
         data={data}
+        operations={props.operations}
+        campaignOnly={props.campaignOnly}
+        initialStage={props.campaignOnly ? 'money' : undefined}
         initialDraft={draftWithResult}
         networkRequest={networkRequest}
         initialSheet={props.initialSheet}

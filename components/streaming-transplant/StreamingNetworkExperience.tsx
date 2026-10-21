@@ -184,7 +184,10 @@ export const PlatformDesk: React.FC<{
   treasury?: number;
   onToggleProduct?: (p: PlatformProduct) => void;
   onOpenChronicle?: () => void;
-}> = ({ brand, state, onBack, initialTab, onAddCity, onBuild, onCancelBuild, onToggleProduct, onOpenChronicle, treasury = 0 }) => {
+  onOpenIdent?: () => void;
+  onOpenStorefront?: () => void;
+  serviceControls?: { ident: string; storefront: string; network: string };
+}> = ({ brand, state, onBack, initialTab, onAddCity, onBuild, onCancelBuild, onToggleProduct, onOpenChronicle, onOpenIdent, onOpenStorefront, serviceControls, treasury = 0 }) => {
   const c = brandColor(brand), c2 = brandDeep(brand);
   /* a console chip can open this page straight on the tab it names */
   const [tab, setTab] = useState<Tab>(initialTab ?? 'STATUS');
@@ -235,6 +238,14 @@ export const PlatformDesk: React.FC<{
       </div>
 
       <div className={s.nwscroll}>
+        {serviceControls && <section className={s.nwsec}>
+          <div className={s.nwhead}><h2>Service controls</h2><span>current configuration</span></div>
+          <div className={s.serviceControls}>
+            <button type="button" onClick={onAddCity}><b>Network</b><span>{serviceControls.network}</span><i>Manage →</i></button>
+            <button type="button" onClick={onOpenIdent}><b>Playback ident</b><span>{serviceControls.ident}</span><i>Edit →</i></button>
+            <button type="button" onClick={onOpenStorefront}><b>Storefront</b><span>{serviceControls.storefront}</span><i>Edit →</i></button>
+          </div>
+        </section>}
 
         {/* ── STATUS — the page everyone has watched go red ── */}
         {tab === 'STATUS' && (

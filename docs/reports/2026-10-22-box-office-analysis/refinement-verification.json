@@ -1,0 +1,39 @@
+{
+  "date": "2026-10-22",
+  "deliverable": "Design proposal; gameplay unchanged",
+  "confirmedPreferences": {
+    "automaticCountryChainTicketPrices": true,
+    "budgetAmountsIllustrative": true
+  },
+  "checks": {
+    "linksChecked": 16,
+    "missing": [],
+    "outOfRange": [],
+    "sourceDrift": [],
+    "preexistingTrackedDirtyFilesChanged": []
+  },
+  "sourceSha256": {
+    "services/worldEconomy/worldStreamingViewing.ts": "ccc7edb9845a484ee7cb710f8e28db44b2671e7407caa9d02fb364f41eb59cd8",
+    "services/worldEconomy/worldStreamingContentValue.ts": "0f9a53f5316dc0246cd4886a4cb98ef7072ea9e0d6374819b46e7a232f325581",
+    "services/worldEconomy/worldStreamingAudienceChoice.ts": "f92d2402e49bc409f5b4ce36035d245530106694c1249a3221569a5a72d1e211",
+    "services/worldEconomy/worldStreamingOffers.ts": "87dac9b207c55b4c9ef55228e2a831f89d24ed5a5eaebbc6f670be5b40a78585",
+    "services/streamingLaunchMarketing.ts": "abc3ab77ddf9b3c21f6b241f36ca8aa237811fa4cb7b3d31374e25b4597b17d9",
+    "services/streamingLaunchMarketingLifecycle.ts": "515b37bbc7a13a9613611a928a12ed496ec7db39d1f2f18984a270b0ff41ccfb",
+    "services/industryWorld/industryMediaFandoms.ts": "d85ce8dddf3dda21dd992856d0a03621329fa8480bea8bfe2de22fd0431c5994",
+    "services/industryIntelligence/industryUniverseBlueprint.ts": "9034d607fdbe74be586ec28cd85e1193d4c99a1869c5736bc4ee9771f9bdc48a",
+    "services/industryIntelligence/industryContentNovelty.ts": "64694ca83d177effb107effe3ffed9706f8865b542f2f0b840bab774e0014c77",
+    "services/streamingContentAvailability.ts": "132f93ef1d45bcdb627b97153265575a245bd42c2568641041ebb36d3de242e8",
+    "services/audienceReception.ts": "2ff9c4c3022f2cdeb699689827cd40b65e909254bec0aefbc900ca8374a56d3f",
+    "views/mobile/ImdbApp.tsx": "4f4ec10d9777ebfcf111e8b7afedc53dde204f4995a3e8322f60161ae86d9974"
+  },
+  "existingAuditsPassed": [
+    "world-streaming-we6",
+    "industry-universe-blueprint-b3",
+    "industry-media-fandom-state-c5",
+    "industry-media-fandom-formation-c5",
+    "industry-content-novelty-b3",
+    "streaming-launch-marketing-forecast",
+    "streaming-launch-marketing-lifecycle"
+  ],
+  "proposedCinemaEngineVerified": false
+}

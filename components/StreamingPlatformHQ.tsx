@@ -7,6 +7,7 @@ import type {
   OwnedStreamingLaunchRehearsalSnapshot,
   OwnedStreamingLaunchMarketingDraft,
   Player,
+  StreamingRecommendationObjective,
   StreamingHqSection,
   StreamingDefineLaunchStepId,
   StreamingLogoKey,
@@ -139,6 +140,8 @@ import {
   getCanonicalStreamingInfrastructureDraftForecast,
   saveStreamingInfrastructureRehearsal,
   saveStreamingInfrastructureDraft,
+  validateStreamingInfrastructureDraft,
+  commitStreamingInfrastructureSetup,
 } from '../services/streamingInfrastructure';
 import {
   aggregateStreamingFacilities,
@@ -348,6 +351,15 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
     : 'HOME';
   const [activeSection, setActiveSection] = useState<StreamingHqSection>(initialSection);
   const [contentInitialTab, setContentInitialTab] = useState<'LIBRARY' | 'RIGHTS' | 'SLATE' | 'LOCALIZATION'>('LIBRARY');
+  const [operationReturnToBuild, setOperationReturnToBuild] = useState(false);
+  const [audienceMapSelection, setAudienceMapSelection] = useState<{regionId:string|null;countryId:string|null}>({regionId:null,countryId:null});
+  const [operationCountryId, setOperationCountryId] = useState<string | undefined>();
+  const [operationEditor, setOperationEditor] = useState<'MARKETS' | 'CLEARANCE' | 'IDENTITY' | 'STOREFRONT' | 'PRICING' | null>(null);
+  const [audienceInitialMarketView, setAudienceInitialMarketView] = useState<'OVERVIEW' | 'PEOPLE' | 'SWITCHING' | 'RIVALS'>('OVERVIEW');
+  const [audienceInitialRegion, setAudienceInitialRegion] = useState<string | null>(null);
+  const [campaignOperations, setCampaignOperations] = useState(false);
+  const [networkOperations, setNetworkOperations] = useState(false);
+  const [promotionInitialObjective, setPromotionInitialObjective] = useState<StreamingRecommendationObjective | undefined>();
   const [audienceInitialTab, setAudienceInitialTab] = useState<'ANALYTICS' | 'TOP 10' | 'CAMPAIGNS' | 'REGIONS' | 'MARKETS'>('ANALYTICS');
   const [showWelcome, setShowWelcome] = useState(onboarding.status === 'NOT_STARTED');
   const [showTourComplete, setShowTourComplete] = useState(false);
@@ -695,7 +707,13 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
           pressure: openingMarkets.length === 0 ? 'urgent' : clearedMarkets.length < openingMarkets.length ? 'watch' : 'calm',
           note: openingMarkets.length === 0 ? 'Opening markets are not defined.' : undefined,
           chips: [
-            { id: 'MARKETS', label: 'OPENING MARKETS', alert: openingMarkets.length === 0 || clearedMarkets.length < openingMarkets.length },
+            { id: 'MARKETS', label: 'MARKETS' },
+            { id: 'PRICING', label: 'PRICING' },
+            { id: 'ANALYTICS', label: 'ANALYTICS' },
+            { id: 'TOP10', label: 'TOP 10' },
+            { id: 'CAMPAIGNS', label: 'CAMPAIGNS' },
+            { id: 'REGIONS', label: 'REGIONS' },
+            { id: 'WARS', label: 'COMPETITION' },
           ],
         },
         {
@@ -720,7 +738,9 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
           pressure: readPlatform.infrastructureSetup ? 'calm' : 'watch',
           note: !readPlatform.infrastructureSetup ? 'The delivery network is not commissioned.' : undefined,
           chips: [
-            { id: 'INFRA', label: 'DELIVERY BUILD', alert: !readPlatform.infrastructureSetup },
+            { id: 'INFRA', label: 'NETWORK', alert: !readPlatform.infrastructureSetup },
+            { id: 'IDENTITY', label: 'PLAYBACK IDENT' },
+            { id: 'STOREFRONT', label: 'STOREFRONT' },
             { id: 'TECH', label: 'TECHNOLOGY' },
             { id: 'PRODUCTS', label: 'PRODUCT' },
           ],
@@ -758,7 +778,9 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
           pressure: incidentCommand().activeCrisis ? 'urgent' : !readPlatform.infrastructureSetup || capacityPressure >= 0.82 ? 'watch' : 'calm',
           note: incidentCommand().activeCrisis ? 'A live incident needs command.' : undefined,
           chips: [
-            { id: 'INFRA', label: 'DELIVERY', alert: !readPlatform.infrastructureSetup },
+            { id: 'INFRA', label: 'NETWORK', alert: !readPlatform.infrastructureSetup },
+            { id: 'IDENTITY', label: 'PLAYBACK IDENT' },
+            { id: 'STOREFRONT', label: 'STOREFRONT' },
             { id: 'TECH', label: 'TECHNOLOGY' },
             { id: 'PRODUCTS', label: 'PRODUCT' },
             { id: 'INCIDENTS', label: 'INCIDENTS', alert: Boolean(incidentCommand().activeCrisis) },
@@ -771,10 +793,12 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
           note: readPlatform.metrics.churnRate > 0.055 ? 'Churn is above the comfort line.' : undefined,
           chips: [
             { id: 'MARKETS', label: 'MARKETS' },
+            { id: 'PRICING', label: 'PRICING' },
             { id: 'ANALYTICS', label: 'ANALYTICS' },
-            { id: 'GROWTH', label: 'GROWTH' },
-            { id: 'WARS', label: 'PLATFORM WARS', alert: Boolean(openRivalMove) },
-            { id: 'ACQUISITIONS', label: 'M&A' },
+            { id: 'TOP10', label: 'TOP 10' },
+            { id: 'CAMPAIGNS', label: 'CAMPAIGNS' },
+            { id: 'REGIONS', label: 'REGIONS' },
+            { id: 'WARS', label: 'COMPETITION' },
           ],
         },
         {
@@ -785,6 +809,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
             { id: 'LEADERSHIP', label: 'LEADERSHIP' },
             { id: 'MARKETS', label: readPlatform.publicCompany.listing ? 'PUBLIC MARKETS' : 'IPO DESK' },
             { id: 'FINANCE', label: 'FINANCE' },
+            { id: 'ACQUISITIONS', label: 'M&A' },
             { id: 'OPERATIONS', label: 'CEO BRIEF', alert: Boolean(latestWeeklySnapshot && readPlatform.lastAcknowledgedWeeklyReportAbsoluteWeek !== latestWeeklySnapshot.absoluteWeek) },
             { id: 'LEGACY', label: 'LEGACY' },
           ],
@@ -1256,6 +1281,10 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
     if (!buildMarketAccess().editable) return { ok: false, message: buildMarketAccess().reason || 'File an opening market first.' };
     if (!onUpdatePlayer) return { ok: false, message: 'The company save is not available, so no money was moved.' };
     const prepared = prepareCinematicBuild(selection);
+    if (platform.launchCommit) {
+      const checked = validateStreamingInfrastructureDraft(prepared.player, prepared.draft);
+      return { ok: checked.valid, message: checked.issues[0]?.message || 'The tested network revision is ready to apply.' };
+    }
     const quote = getStreamingOpeningCommissionQuote(prepared.player, prepared.draft, launchMarketing().forecast);
     if (!quote.ready) return { ok: false, message: quote.blockers[0] || 'The opening programme is not ready.' };
     if (prepared.player.ownedStreamingPlatform.treasuryCash < quote.totalCashRequired) {
@@ -1272,6 +1301,14 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
     if (!onUpdatePlayer) return { ok: false, message: 'The company save is not available, so no money was moved.' } as const;
     const { player: withDraft, draft: testedDraft } = prepareCinematicBuild(selection);
     const draft = testedDraft;
+    if (platform.launchCommit) {
+      const changed = commitStreamingInfrastructureSetup(withDraft, testedDraft);
+      if (!changed.changed) return { ok: false, message: changed.issues[0]?.message || (changed.reason === 'ALREADY_CONFIGURED' ? 'This configuration is already commissioned.' : 'The revision could not be applied.') } as const;
+      persist(changed.player);
+      const pending = changed.player.ownedStreamingPlatform.pendingInfrastructureSetup;
+      setShowCinematicBuild(false);
+      return { ok: true, message: pending ? `Revision ${pending.revision} approved. The current network stays live until construction finishes.` : 'Network revision applied.', next: 'BACK' as const };
+    }
     const committed = commissionStreamingOpeningProgramme(withDraft, {
       infrastructureDraft: testedDraft,
       marketingForecast: launchMarketing().forecast,
@@ -1525,7 +1562,8 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
     </section>
   );
 
-  const openPromotionWarRoom = (projectId?: string | null) => {
+  const openPromotionWarRoom = (projectId?: string | null, objective?: StreamingRecommendationObjective) => {
+    setPromotionInitialObjective(objective);
     setPromotionInitialProjectId(projectId || null);
     setShowPromotionWarRoom(true);
   };
@@ -1735,7 +1773,8 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
       return selectSection('CONTENT');
     }
     if (division === 'PLATFORM') {
-      if (chip === 'INFRA') return setShowCinematicBuild(true);
+      if (chip === 'INFRA') { setCampaignOperations(false); setNetworkOperations(Boolean(platform.launchCommit)); return setShowCinematicBuild(true); }
+      if (chip === 'IDENTITY' || chip === 'STOREFRONT') return setOperationEditor(chip);
       if (chip === 'TECH') return setShowTechnologyCampus(true);
       if (chip === 'PRODUCTS') return setShowProductLab(true);
       if (chip === 'INCIDENTS' && incidentCommand().available) return setShowIncidentCommand(true);
@@ -1743,12 +1782,17 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
     }
     if (division === 'AUDIENCE') {
       if (chip === 'MARKETS') { setAudienceInitialTab('MARKETS'); return selectSection('MARKET'); }
-      if (chip === 'ANALYTICS') { setAudienceInitialTab('ANALYTICS'); return selectSection('MARKET'); }
+      if (chip === 'ANALYTICS') { setAudienceInitialTab('ANALYTICS'); setAudienceInitialMarketView('OVERVIEW'); return selectSection('MARKET'); }
+      if (chip === 'PRICING') return setOperationEditor('PRICING');
+      if (chip === 'TOP10') { setAudienceInitialTab('TOP 10'); return selectSection('MARKET'); }
+      if (chip === 'CAMPAIGNS') { setAudienceInitialTab('CAMPAIGNS'); return selectSection('MARKET'); }
+      if (chip === 'REGIONS') { setAudienceInitialTab('REGIONS'); return selectSection('MARKET'); }
       if (chip === 'GROWTH') return openPromotionWarRoom();
-      if (chip === 'WARS') return setShowPlatformWars(true);
+      if (chip === 'WARS') { if (!platform.launchCommit) { setAudienceInitialTab('ANALYTICS'); setAudienceInitialMarketView('RIVALS'); return selectSection('MARKET'); } return setShowPlatformWars(true); }
       if (chip === 'ACQUISITIONS') return setShowAcquisitionCommand(true);
       return selectSection('MARKET');
     }
+    if (chip === 'ACQUISITIONS') return setShowAcquisitionCommand(true);
     if (chip === 'LEADERSHIP') return setShowLeadershipSuite(true);
     if (chip === 'MARKETS') return setShowPublicMarkets(true);
     if (chip === 'FINANCE') return openFinanceRoom();
@@ -1907,7 +1951,14 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
           state={cinematicNetworkState()}
           treasury={platform.treasuryCash}
           onBack={() => selectSection('HOME')}
-          onAddCity={() => setShowCinematicBuild(true)}
+          onAddCity={() => { setCampaignOperations(false); setNetworkOperations(Boolean(platform.launchCommit)); setShowCinematicBuild(true); }}
+          onOpenIdent={() => setOperationEditor('IDENTITY')}
+          onOpenStorefront={() => setOperationEditor('STOREFRONT')}
+          serviceControls={{
+            ident: platform.serviceConfiguration.soundIdentKey ? `${platform.serviceConfiguration.soundIdentKey} · ${platform.serviceConfiguration.identPackageId || 'Standard'}` : 'Not configured',
+            storefront: platform.serviceConfiguration.storefrontLayoutId || 'Not configured',
+            network: platform.pendingInfrastructureSetup ? `Revision ${platform.pendingInfrastructureSetup.revision} · ${Math.max(0,platform.pendingInfrastructureSetup.readyAtAbsoluteWeek-buildAbsoluteWeek)} weeks remaining` : platform.infrastructureSetup ? `Revision ${platform.infrastructureSetup.revision} · ${platform.launchCommit ? 'operating' : 'commissioned'}` : 'Not commissioned',
+          }}
           onBuild={() => setShowTechnologyCampus(true)}
           onCancelBuild={() => setShowTechnologyCampus(true)}
           onToggleProduct={() => setShowProductLab(true)}
@@ -1927,14 +1978,22 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
         brand={commandDeckBrand()}
         state={cinematicAudienceState()}
         initialTab={audienceInitialTab}
+        initialMarketView={audienceInitialMarketView}
         onBack={() => selectSection('HOME')}
-        onNewCampaign={() => openPromotionWarRoom()}
-        onObjective={() => openPromotionWarRoom()}
+        onNewCampaign={() => { if (platform.launchCommit) openPromotionWarRoom(); else { setCampaignOperations(true); setShowCinematicBuild(true); } }}
+        onObjective={objective => openPromotionWarRoom(null, objective === 'DISCOVERY' ? 'CATALOG_DISCOVERY' : objective)}
+        initialRegionId={audienceInitialRegion}
+        initialMapSelection={audienceMapSelection}
+        onNavigationChange={navigation => {
+          setAudienceInitialTab(navigation.tab);
+          setAudienceMapSelection(current => current.regionId === navigation.regionId && current.countryId === navigation.countryId ? current : {regionId:navigation.regionId,countryId:navigation.countryId});
+        }}
+        onOpenRegion={region => { setAudienceInitialRegion(region.id); setAudienceInitialTab('REGIONS'); }}
+        onOpenPricing={() => setOperationEditor('PRICING')}
+        onReviewClearance={countryId => { setOperationCountryId(countryId); setOperationEditor('CLEARANCE'); }}
         marketOperations={platform.marketOperations}
-        onManageMarkets={() => {
-          setDefineLaunchMode(platform.launchCommit ? 'EXPANSION' : 'OPENING');
-          setDefineLaunchInitialStep('MARKETS');
-          setShowDefineLaunch(true);
+        onManageMarkets={countryId => {
+          setOperationCountryId(countryId); setOperationEditor('MARKETS');
         }}
         accessPolicy={platform.audienceAccessPolicy}
         onAccessPolicyChange={policy => persist(updateWorldStreamingCustomerAccessPolicy(
@@ -1957,11 +2016,25 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
         onOpenFinance={() => openFinanceRoom()}
         onOpenTable={() => setShowLeadershipSuite(true)}
         onOpenOwnership={() => openFinanceRoom('CAPITAL', 'EQUITY')}
+        onOpenAcquisitions={() => setShowAcquisitionCommand(true)}
+        acquisitionSummary={`${platform.corporateDevelopment.acquisitionCases.length} reviews · ${platform.corporateDevelopment.acquiredPlatformIds.length} acquired platforms`}
         onOpenBrief={() => setShowOperationsOffice(true)}
       />
     );
     return renderHome();
   };
+
+  if (operationEditor && onUpdatePlayer) {
+    return <React.Fragment key={operationEditor}><StreamingDefineLaunchWizard player={player}
+      preparedCatalogueContext={catalogueContext()} onUpdatePlayer={persistCanonical}
+      operation={operationEditor} operationCountryId={operationCountryId} initialStep={operationEditor}
+      onClose={() => { setOperationEditor(null); setOperationCountryId(undefined); if(operationReturnToBuild) {setOperationReturnToBuild(false);setShowCinematicBuild(true);} }}
+      onOpenFinance={() => { setOperationEditor(null); openFinanceRoom(); }}
+      onOpenCatalogue={() => { setOperationEditor(null); setContentInitialTab('LIBRARY'); selectSection('CONTENT'); }}
+      onOpenBuild={() => { setOperationEditor(null); setNetworkOperations(Boolean(platform.launchCommit)); setShowCinematicBuild(true); }}
+      onOpenPricing={() => setOperationEditor('PRICING')}
+      onOpenTechnology={() => { setOperationEditor(null); setShowTechnologyCampus(true); }} /></React.Fragment>;
+  }
 
   if (showLaunchBlueprintReview && !platform.launchCommit) {
     return <StreamingLaunchBlueprintReview player={player} brand={commandDeckBrand()}
@@ -2066,6 +2139,12 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
           committedAtAbsoluteWeek: constructionSetup.committedAtAbsoluteWeek,
           readyAtAbsoluteWeek: constructionSetup.readyAtAbsoluteWeek,
         } : null}
+        operations={networkOperations || campaignOperations}
+        revisionQuote={platform.launchCommit ? selection => {
+          const quote = getCanonicalStreamingInfrastructureDraftForecast(player, canonicalInfrastructureDraft(selection));
+          return { dueNow: quote.transactionCost, weeklyCost: quote.weeklyOperatingCost, buildWeeks: quote.transactionCost === 0 ? 0 : quote.buildWeeks };
+        } : undefined}
+        campaignOnly={campaignOperations}
         isLive={Boolean(platform.launchCommit)}
         initialSheet={buildInitialSheet}
         launchBudget={launchBudget()}
@@ -2086,11 +2165,17 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
             openFinanceRoom('CAPITAL', 'INJECT');
             return;
           }
+          if (platform.launchCommit) {
+            if (step === 'CATALOGUE') { setContentInitialTab('LIBRARY'); selectSection('CONTENT'); }
+            else if (step === 'MARKETS' || step === 'CLEARANCE' || step === 'IDENTITY' || step === 'STOREFRONT' || step === 'PRICING') setOperationEditor(step);
+            return;
+          }
           setDefineLaunchMode('OPENING');
           setDefineLaunchInitialStep(step);
           setShowDefineLaunch(true);
         }}
         onOpenLaunchBudget={() => {
+          if (platform.launchCommit) { setShowCinematicBuild(false); openFinanceRoom(); return; }
           const destination = resolveLinkedBudgetDestination('BUILD');
           setShowCinematicBuild(false);
           setDefineLaunchMode('OPENING');
@@ -2098,7 +2183,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
           setShowDefineLaunch(true);
         }}
         onChange={updateBuildSelection}
-        onBack={() => setShowCinematicBuild(false)}
+        onBack={() => { setShowCinematicBuild(false); setCampaignOperations(false); setNetworkOperations(false); }}
         pricing={{
           label: buildPricing().label,
           arpu: buildPricing().priceLabel,
@@ -2107,6 +2192,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
           sellable: buildPricing().sellable,
         }}
         onOpenPricing={() => {
+          if (platform.launchCommit) { setOperationReturnToBuild(true); setShowCinematicBuild(false); setOperationEditor('PRICING'); return; }
           setShowCinematicBuild(false);
           setDefineLaunchMode('OPENING');
           setDefineLaunchInitialStep('PRICING');
@@ -2134,7 +2220,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
         onInjectCapital={injectFinanceCapital}
         onAcceptInvestment={acceptFinanceInvestment}
         onOpenBuild={() => {
-          setShowFinanceRoom(false);
+          setShowFinanceRoom(false); setCampaignOperations(false); setNetworkOperations(Boolean(platform.launchCommit));
           setShowCinematicBuild(true);
         }}
         onOpenBank={() => {
@@ -2624,6 +2710,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
           player={player}
           onUpdatePlayer={persist}
           initialProjectId={promotionInitialProjectId}
+          initialObjective={promotionInitialObjective}
           onClose={() => {
             setShowPromotionWarRoom(false);
             setPromotionInitialProjectId(null);

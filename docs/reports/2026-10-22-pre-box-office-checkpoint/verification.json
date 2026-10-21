@@ -1,0 +1,33 @@
+{
+  "date": "2026-10-22",
+  "parent": "612efbb1cb6c80a22d1ba30fde4a1d88f90cdc4e",
+  "branch": "codex/streaming-tap-lag",
+  "checks": {
+    "typescript": {
+      "command": "npm run lint",
+      "exitCode": 0
+    },
+    "build": {
+      "command": "npm run build",
+      "exitCode": 0,
+      "durationSeconds": 22.84
+    },
+    "streamingOperationsService": {
+      "exitCode": 0,
+      "preparedLocalFixture": true
+    },
+    "streamingOperationsUi": {
+      "exitCode": 0,
+      "preparedLocalFixture": true
+    },
+    "diffCheck": {
+      "exitCode": 0
+    }
+  },
+  "boxOfficeGameplayChanged": false,
+  "limits": [
+    "Operations audits depend on prepared local fixtures, which are not committed",
+    "Prior broader streaming percentage failures and full-week stall remain documented",
+    "No proposed box-office market or physical-device certification"
+  ]
+}

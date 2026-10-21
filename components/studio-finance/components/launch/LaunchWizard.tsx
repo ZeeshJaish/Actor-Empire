@@ -37,6 +37,9 @@ import '../../styles/kit.css';
 
 export interface LaunchWizardProps extends LaunchHandlers {
   data: LaunchData;
+  operation?: { title: string; section: 'Audience' | 'Platform'; note: string;
+    onSave?: (draft: LaunchDraft) => { ok: boolean; message: string } };
+  initialCountryId?: string;
   initialStep?: LaunchStepId;
   initialDraft?: LaunchDraft | null;
   initialSheet?: 'money' | 'plan' | null;
@@ -47,8 +50,9 @@ export interface LaunchWizardProps extends LaunchHandlers {
   forecastContextKey?: string;
 }
 
-export function LaunchWizard({ data, initialStep = 'markets', initialDraft, initialSheet, buildBudgetSummary, onDraftChange,
+export function LaunchWizard({ data, operation, initialCountryId, initialStep = 'markets', initialDraft, initialSheet, buildBudgetSummary, onDraftChange,
   forecastWorldState, forecastContextKey, ...handlers }: LaunchWizardProps) {
+  const [saveFeedback, setSaveFeedback] = useState('');
   const [stepId, setStepId] = useState<LaunchStepId>(initialStep);
   const [openSheet, setOpenSheet] = useState<'money' | 'plan' | null>(initialSheet ?? null);
   const [pricingGesture, setPricingGesture] = useState<{ settings: PricingSettings; active: boolean } | null>(null);
@@ -76,7 +80,7 @@ export function LaunchWizard({ data, initialStep = 'markets', initialDraft, init
     /* Opening or returning to the wizard is itself enough to persist the
        visible working copy. The player never needs to make a meaningless
        edit just to turn an older/session-only draft into a device save. */
-    onDraftChange?.(resolveLaunchDraftAfterDetour(draft, null));
+    if (!operation) onDraftChange?.(resolveLaunchDraftAfterDetour(draft, null));
   }, []);
 
   const brand = useMemo(() => brandVars(data.company.brandHex), [data.company.brandHex]);
@@ -171,7 +175,8 @@ export function LaunchWizard({ data, initialStep = 'markets', initialDraft, init
     /* Notify after deriving from the current render, rather than from inside a
        React state-updater callback. Autosave can update the parent safely
        without causing a render-during-render warning. */
-    onDraftChange?.(resolveLaunchDraftAfterDetour(updated, null));
+    setSaveFeedback('');
+    if (!operation) onDraftChange?.(resolveLaunchDraftAfterDetour(updated, null));
   };
   const selectStep = (next: LaunchStepId) => {
     setOpenSheet(null);
@@ -181,7 +186,10 @@ export function LaunchWizard({ data, initialStep = 'markets', initialDraft, init
   };
   const go = (to: number) => selectStep(STEPS[Math.max(0, Math.min(STEPS.length - 1, to))].id);
 
-  const shared = { data, draft, patch, chosen, treasury, free, gap, handlers, pricingPreview,
+  const previewHandlers = operation ? { ...handlers, onSelectIdent: undefined,
+    onClearIdent: undefined, onRemoveCustomIdentAudio: undefined, onClearViewerOffer: undefined,
+    onSaveViewerOffer: undefined, onSavePricing: undefined } : handlers;
+  const shared = { operations: Boolean(operation), initialCountryId, data, draft, patch, chosen, treasury, free, gap, handlers: previewHandlers, pricingPreview,
     onPricingGesture: (settings: PricingSettings | null) => setPricingGesture(current => settings
       ? { settings, active: true } : current ? { ...current, active: false } : null) };
 
@@ -192,10 +200,10 @@ export function LaunchWizard({ data, initialStep = 'markets', initialDraft, init
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 2L4 8l6 6" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </button>
         <div className="sf-head-titles">
-          <h1>Define the Launch</h1>
-          <p>{data.company.name} · Week {data.company.week}</p>
+          <h1>{operation?.title || 'Define the Launch'}</h1>
+          <p>{operation ? `${operation.section} · ${data.company.name}` : `${data.company.name} · Week ${data.company.week}`}</p>
         </div>
-        <span className="lw-count">{index + 1}<i>/{STEPS.length}</i></span>
+        {!operation && <span className="lw-count">{index + 1}<i>/{STEPS.length}</i></span>}
       </header>
 
       {/* --- the stage rail --------------------------------------------------
@@ -203,7 +211,7 @@ export function LaunchWizard({ data, initialStep = 'markets', initialDraft, init
           its own glyph, and the stop you are on opens into a pill that names
           itself — which is how seven steps fit on a phone without a second
           line of text underneath doing the naming. */}
-      <nav ref={trackRef} className="lw-track" aria-label="Launch steps">
+      {!operation && <nav ref={trackRef} className="lw-track" aria-label="Launch steps">
         <span className="lw-track-line" aria-hidden="true">
           <i style={{ width: `${(index / (STEPS.length - 1)) * 100}%` }} />
         </span>
@@ -233,8 +241,13 @@ export function LaunchWizard({ data, initialStep = 'markets', initialDraft, init
             </button>
           );
         })}
-      </nav>
+      </nav>}
 
+      {operation && <div className="op-editor-intro"><p>{operation.note}</p>
+        {(initialStep === 'markets' || initialStep === 'clearance') && <div className="op-editor-tabs" role="tablist" aria-label="Market management">
+          {(['markets','clearance'] as const).map(id => <button type="button" role="tab" aria-selected={stepId === id} key={id} onClick={() => selectStep(id)}>{id === 'markets' ? 'Choose markets' : 'Clearance & requests'}</button>)}
+        </div>}
+      </div>}
       {/* Each step arrives rather than appearing. */}
       <div className="sf-scroll" key={stepId}>
         <div className="lw-body lw-enter">
@@ -249,7 +262,7 @@ export function LaunchWizard({ data, initialStep = 'markets', initialDraft, init
         </div>
       </div>
 
-      {blockers.length > 0 && (
+      {!operation && blockers.length > 0 && (
         <ul className="lw-blockers">
           {blockers.map((b) => (
             <li key={b.id} className={b.severity === 'block' ? 'is-block' : 'is-warn'}>{b.text}</li>
@@ -263,7 +276,7 @@ export function LaunchWizard({ data, initialStep = 'markets', initialDraft, init
           screens and nothing about the step you were on, and it sat furthest
           from the thumb doing the work. Same money, same gauge, same two ways
           in — and now it also says what this step amounts to. */}
-      {!(stepId === 'pricing' && (draft.pricing ?? data.pricing).commercialOffers?.coreModelSelected === false) && <PlanStrip
+      {!operation && !(stepId === 'pricing' && (draft.pricing ?? data.pricing).commercialOffers?.coreModelSelected === false) && <PlanStrip
         view={bar}
         page={stepId}
         tone={bar.verdict ? bar.verdict.tone : 'flat'}
@@ -279,7 +292,13 @@ export function LaunchWizard({ data, initialStep = 'markets', initialDraft, init
         ]}
       />}
 
-      <footer className="lw-foot">
+      {operation ? <footer className="lw-foot op-editor-footer">
+        {saveFeedback && <p role="status">{saveFeedback}</p>}
+        <button type="button" className="sf-btn sf-btn--ghost" onClick={handlers.onExit}>Close</button>
+        {operation.onSave && <button type="button" className="sf-btn sf-btn--primary" onClick={() => {
+          const result = operation.onSave!(draft); setSaveFeedback(result.message);
+        }}>Save changes</button>}
+      </footer> : <footer className="lw-foot">
         <button type="button" className="sf-btn sf-btn--ghost" disabled={index === 0} onClick={() => go(index - 1)}>
           Back
         </button>
@@ -292,7 +311,7 @@ export function LaunchWizard({ data, initialStep = 'markets', initialDraft, init
           {stepId === 'pricing' && (draft.pricing ?? data.pricing).commercialOffers?.coreModelSelected === false
             ? 'Choose an offer' : index === STEPS.length - 1 ? 'Open Build the Platform' : `Next · ${STEPS[index + 1].label}`}
         </button>
-      </footer>
+      </footer>}
 
       {/* --- where money comes from, attached to the shortfall --------------- */}
       <Sheet
@@ -398,6 +417,8 @@ function TickIcon() {
 
 /** What every step receives. Kept in one place so a new step is one file. */
 export interface StepProps {
+  operations?: boolean;
+  initialCountryId?: string;
   data: LaunchData;
   draft: LaunchDraft;
   patch: (next: Partial<LaunchDraft>) => void;

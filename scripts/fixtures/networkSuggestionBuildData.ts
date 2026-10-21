@@ -13,7 +13,7 @@ import type { BuildInputs, BuildSel } from '../../components/streaming-transplan
 import type { Player } from '../../types';
 
 export function captureNetworkBuildData(player: Player, countryCodes?: string[], selectionOverride?: BuildSel,
-  options: { settled?: Pick<BuildInputs, 'defineLaunchPaid' | 'catalogueSpend' | 'originalsSpend'>; marketing?: BuildData['marketing'] } = {},
+  options: { settled?: Pick<BuildInputs, 'defineLaunchPaid' | 'catalogueSpend' | 'originalsSpend'>; marketing?: BuildData['marketing']; bridge?: Pick<React.ComponentProps<typeof StreamingBuildWizardExperience>, 'isLive' | 'revisionQuote' | 'operations'> } = {},
 ): { data: BuildData; draft: BuildDraft } {
   const platform = player.ownedStreamingPlatform;
   const ids = countryCodes ?? platform.marketOperations.map(operation => operation.countryId).filter(Boolean);
@@ -59,7 +59,7 @@ export function captureNetworkBuildData(player: Player, countryCodes?: string[],
   React.createElement = intercept(original);
   try {
     renderToStaticMarkup(original(StreamingBuildWizardExperience, {
-      brand, inputs, sel: selection, marketing: options.marketing, canonicalSource: 'CAREER', onChange: () => {}, onBack: () => {},
+      brand, inputs, sel: selection, marketing: options.marketing, ...options.bridge, canonicalSource: 'CAREER', onChange: () => {}, onBack: () => {},
     }));
   } finally {
     React.createElement = original; runtime.jsx = originalJsx; runtime.jsxs = originalJsxs;

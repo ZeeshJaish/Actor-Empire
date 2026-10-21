@@ -1,0 +1,217 @@
+{
+  "description": "Read-only model feasibility measurements; no proposed box-office engine implemented.",
+  "snapshots": [
+    {
+      "absoluteWeek": 728,
+      "scope": "Fresh deterministic game-model projection, not a player save or real-world economic data",
+      "global": {
+        "population": 8120000000,
+        "households": 2504193662,
+        "countries": 197,
+        "cohorts": 2362,
+        "cinemaReachableHouseholds": 803345728,
+        "monthlyCinemaBudget": 18062257442,
+        "weeklyCinemaBudgetProxy": 4171422042.0323324,
+        "monthlyStreamingBudget": 23394157263
+      },
+      "countries": [
+        {
+          "id": "US",
+          "name": "United States",
+          "population": 340618106,
+          "households": 144943875,
+          "cinemaAccessPercent": 78,
+          "cinemaReachableHouseholds": 72275742,
+          "monthlyCinemaBudget": 2268046387,
+          "weeklyCinemaBudgetProxy": 523798241.8013857,
+          "averageCinemaBudgetPerReachableHousehold": 31.38046492832962,
+          "consumerConfidence": 66,
+          "purchasingPowerIndex": 88.8,
+          "cohortCount": 12
+        },
+        {
+          "id": "IN",
+          "name": "India",
+          "population": 1444141091,
+          "households": 380037129,
+          "cinemaAccessPercent": 42.3,
+          "cinemaReachableHouseholds": 79953391,
+          "monthlyCinemaBudget": 1145138034,
+          "weeklyCinemaBudgetProxy": 264466058.66050807,
+          "averageCinemaBudgetPerReachableHousehold": 14.32256993327525,
+          "consumerConfidence": 57,
+          "purchasingPowerIndex": 47.9,
+          "cohortCount": 12
+        },
+        {
+          "id": "CN",
+          "name": "China",
+          "population": 1404302716,
+          "households": 510655533,
+          "cinemaAccessPercent": 68.7,
+          "cinemaReachableHouseholds": 205174029,
+          "monthlyCinemaBudget": 4631126110,
+          "weeklyCinemaBudgetProxy": 1069544136.2586604,
+          "averageCinemaBudgetPerReachableHousehold": 22.571697463717495,
+          "consumerConfidence": 63.3,
+          "purchasingPowerIndex": 72.1,
+          "cohortCount": 12
+        },
+        {
+          "id": "GB",
+          "name": "United Kingdom",
+          "population": 68721197,
+          "households": 29243063,
+          "cinemaAccessPercent": 78.8,
+          "cinemaReachableHouseholds": 14782919,
+          "monthlyCinemaBudget": 463621949,
+          "weeklyCinemaBudgetProxy": 107072043.64896074,
+          "averageCinemaBudgetPerReachableHousehold": 31.362002930544367,
+          "consumerConfidence": 66.2,
+          "purchasingPowerIndex": 89.2,
+          "cohortCount": 12
+        },
+        {
+          "id": "NG",
+          "name": "Nigeria",
+          "population": 231062575,
+          "households": 60805941,
+          "cinemaAccessPercent": 43.3,
+          "cinemaReachableHouseholds": 12991356,
+          "monthlyCinemaBudget": 178267201,
+          "weeklyCinemaBudgetProxy": 41170254.27251732,
+          "averageCinemaBudgetPerReachableHousehold": 13.721985680324671,
+          "consumerConfidence": 56.6,
+          "purchasingPowerIndex": 48,
+          "cohortCount": 12
+        },
+        {
+          "id": "NZ",
+          "name": "New Zealand",
+          "population": 5278585,
+          "households": 2246206,
+          "cinemaAccessPercent": 80.1,
+          "cinemaReachableHouseholds": 1157924,
+          "monthlyCinemaBudget": 37005400,
+          "weeklyCinemaBudgetProxy": 8546281.755196305,
+          "averageCinemaBudgetPerReachableHousehold": 31.95840141494606,
+          "consumerConfidence": 65.7,
+          "purchasingPowerIndex": 89.3,
+          "cohortCount": 12
+        }
+      ]
+    },
+    {
+      "absoluteWeek": 1875,
+      "scope": "Fresh deterministic game-model projection, not a player save or real-world economic data",
+      "global": {
+        "population": 9594582967,
+        "households": 3115549188,
+        "countries": 197,
+        "cohorts": 2363,
+        "cinemaReachableHouseholds": 1035285156,
+        "monthlyCinemaBudget": 23674243406,
+        "weeklyCinemaBudgetProxy": 5467492703.464203,
+        "monthlyStreamingBudget": 30802674605
+      },
+      "countries": [
+        {
+          "id": "US",
+          "name": "United States",
+          "population": 335707220,
+          "households": 145688105,
+          "cinemaAccessPercent": 79.2,
+          "cinemaReachableHouseholds": 75259714,
+          "monthlyCinemaBudget": 2519304979,
+          "weeklyCinemaBudgetProxy": 581825630.2540416,
+          "averageCinemaBudgetPerReachableHousehold": 33.47481467973689,
+          "consumerConfidence": 67.9,
+          "purchasingPowerIndex": 89.4,
+          "cohortCount": 12
+        },
+        {
+          "id": "IN",
+          "name": "India",
+          "population": 1762379182,
+          "households": 514883693,
+          "cinemaAccessPercent": 47.9,
+          "cinemaReachableHouseholds": 128296631,
+          "monthlyCinemaBudget": 2028433680,
+          "weeklyCinemaBudgetProxy": 468460434.1801386,
+          "averageCinemaBudgetPerReachableHousehold": 15.810498406618331,
+          "consumerConfidence": 58.9,
+          "purchasingPowerIndex": 54.3,
+          "cohortCount": 12
+        },
+        {
+          "id": "CN",
+          "name": "China",
+          "population": 1510582208,
+          "households": 578133336,
+          "cinemaAccessPercent": 71.2,
+          "cinemaReachableHouseholds": 247818519,
+          "monthlyCinemaBudget": 6059519528,
+          "weeklyCinemaBudgetProxy": 1399427142.7251732,
+          "averageCinemaBudgetPerReachableHousehold": 24.451439514897594,
+          "consumerConfidence": 65.2,
+          "purchasingPowerIndex": 75.2,
+          "cohortCount": 12
+        },
+        {
+          "id": "GB",
+          "name": "United Kingdom",
+          "population": 65373168,
+          "households": 28370236,
+          "cinemaAccessPercent": 80,
+          "cinemaReachableHouseholds": 14856549,
+          "monthlyCinemaBudget": 495617157,
+          "weeklyCinemaBudgetProxy": 114461237.18244803,
+          "averageCinemaBudgetPerReachableHousehold": 33.36018055067836,
+          "consumerConfidence": 68.1,
+          "purchasingPowerIndex": 89.7,
+          "cohortCount": 12
+        },
+        {
+          "id": "NG",
+          "name": "Nigeria",
+          "population": 363081550,
+          "households": 106075226,
+          "cinemaAccessPercent": 48.9,
+          "cinemaReachableHouseholds": 26813742,
+          "monthlyCinemaBudget": 406468560,
+          "weeklyCinemaBudgetProxy": 93872646.65127021,
+          "averageCinemaBudgetPerReachableHousehold": 15.158964384754652,
+          "consumerConfidence": 58.5,
+          "purchasingPowerIndex": 54.4,
+          "cohortCount": 12
+        },
+        {
+          "id": "NZ",
+          "name": "New Zealand",
+          "population": 5206688,
+          "households": 2259566,
+          "cinemaAccessPercent": 81.2,
+          "cinemaReachableHouseholds": 1205173,
+          "monthlyCinemaBudget": 41062422,
+          "weeklyCinemaBudgetProxy": 9483238.337182447,
+          "averageCinemaBudgetPerReachableHousehold": 34.071807118148186,
+          "consumerConfidence": 67.6,
+          "purchasingPowerIndex": 89.9,
+          "cohortCount": 12
+        }
+      ]
+    }
+  ],
+  "screenshotArithmetic": {
+    "animatedGrossMillions": 3023.4,
+    "budgetMillions": 189.7,
+    "week1Millions": 721.6,
+    "week2Millions": 982.7,
+    "week3Millions": 1319,
+    "week2GrowthPct": 36.183481152993345,
+    "week3GrowthPct": 34.22204131474509,
+    "grossToBudget": 15.937796520822353,
+    "superheroGrossToBudget": 20.82193396226415,
+    "illustrativeWeeklyTicketsAt10Dollars": 131900000
+  }
+}

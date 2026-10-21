@@ -73,6 +73,8 @@ interface Props {
   onOpenFinance?: () => void;
   onOpenTable?: () => void;
   onOpenOwnership?: () => void;
+  onOpenAcquisitions?: () => void;
+  acquisitionSummary?: string;
   onOpenBrief?: () => void;
 }
 
@@ -102,6 +104,8 @@ export const Boardroom = ({
   onOpenFinance,
   onOpenTable,
   onOpenOwnership,
+  onOpenAcquisitions,
+  acquisitionSummary,
   onOpenBrief,
 }: Props) => {
   const data = useMemo<BoardroomData>(() => {
@@ -184,6 +188,9 @@ export const Boardroom = ({
           line: `You ${founderStake.toFixed(1)}% · ${Math.max(0, state.holders.length - 1)} outside holder${state.holders.length === 2 ? '' : 's'}`,
           attention: founderStake < 51 ? 'urgent' : 'none',
         },
+        ...(onOpenAcquisitions ? [{ id: 'acquisitions', name: 'Mergers & acquisitions', group: 'Running the company', glyph: 'ownership' as const,
+          line: acquisitionSummary || 'No acquisition reviews started', state: state.live ? 'open' as const : 'locked' as const,
+          lockedReason: 'Available after opening' }] : []),
         {
           id: 'ipo', name: state.listed ? 'Public Markets' : 'IPO Desk', group: 'The long game', glyph: 'markets',
           line: state.listed && state.share
@@ -205,12 +212,13 @@ export const Boardroom = ({
         },
       ],
     };
-  }, [brand, founderName, state]);
+  }, [brand, founderName, state, onOpenAcquisitions, acquisitionSummary]);
 
   const openSection = (id: string) => {
     if (id === 'finance') return onOpenFinance?.();
     if (id === 'table') return (onOpenTable ?? onHire)?.();
     if (id === 'ownership') return (onOpenOwnership ?? onIssueEquity)?.();
+    if (id === 'acquisitions') return onOpenAcquisitions?.();
     if (id === 'ipo') return onFileIpo?.();
     if (id === 'brief') return onOpenBrief?.();
     if (id === 'legacy') return onOpenLegacy?.();

@@ -86,6 +86,8 @@ interface Props {
   onOpenPricing: () => void;
   onOpenTechnology: () => void;
   mode?: 'OPENING' | 'EXPANSION';
+  operationCountryId?: string;
+  operation?: 'MARKETS' | 'CLEARANCE' | 'IDENTITY' | 'STOREFRONT' | 'PRICING';
   initialStep?: StreamingDefineLaunchStepId;
   initialDraft?: LaunchDraft | null;
   initialSheet?: 'money' | 'plan' | null;
@@ -305,7 +307,7 @@ const buildCapabilityLocks = (player: Player): Record<string, string> => {
   return locks;
 };
 
-const buildLaunchData = (player: Player, preparedContext?: StreamingCatalogueReadContext): LaunchData => {
+export const buildLaunchData = (player: Player, preparedContext?: StreamingCatalogueReadContext, operations = false): LaunchData => {
   const context = getStreamingCatalogueReadContext(player, preparedContext);
   const platform = player.ownedStreamingPlatform;
   const budget = getStreamingLaunchBudgetView(player, context);
@@ -349,7 +351,7 @@ const buildLaunchData = (player: Player, preparedContext?: StreamingCatalogueRea
       }) : [],
     };
   });
-  const opening = platform.marketOperations.filter(operation => operation.entryKind === 'OPENING' && operation.countryId && operation.status !== 'EXITED');
+  const opening = platform.marketOperations.filter(operation => (operations || operation.entryKind === 'OPENING') && operation.countryId && operation.status !== 'EXITED');
   const clearance = opening.map(operation => {
     const view = getStreamingMarketClearanceView(operation, absoluteWeek);
     return {
@@ -556,12 +558,13 @@ function OpeningLaunchExperience(props: Props) {
     catalogueContextRef.current = context;
     return context;
   }, [projectionSource, props.preparedCatalogueContext]);
-  const data = useMemo(() => buildLaunchData(projectionSource, catalogueContext), [projectionSource, catalogueContext]);
+  const data = useMemo(() => buildLaunchData(projectionSource, catalogueContext, Boolean(props.operation)), [projectionSource, catalogueContext, props.operation]);
   const platform = props.player.ownedStreamingPlatform;
   const currentPlayerRef = useRef(props.player);
   useEffect(() => { currentPlayerRef.current = props.player; }, [props.player]);
-  const currentStep = props.initialStep || platform.launchProgram.defineCurrentStep;
+  const currentStep = props.operation || props.initialStep || platform.launchProgram.defineCurrentStep;
   const restoredDraft = useMemo<LaunchDraft | null>(() => {
+    if (props.operation) return null;
     const saved = platform.launchProgram.defineDraft;
     if (!saved) return props.initialDraft ?? null;
     return {
@@ -572,7 +575,7 @@ function OpeningLaunchExperience(props: Props) {
       storefrontId: saved.storefrontId ?? undefined,
       pricing: saved.pricing,
     };
-  }, [platform.launchProgram.defineDraft, props.initialDraft]);
+  }, [platform.launchProgram.defineDraft, props.initialDraft, props.operation]);
   const buildBudgetSummary = useMemo(() => {
     const absoluteWeek = getAbsoluteWeek(props.player.age, props.player.currentWeek);
     const draft = platform.infrastructureSetupDraft;
@@ -605,12 +608,12 @@ function OpeningLaunchExperience(props: Props) {
   }, [projectionSource]);
 
   const update = (next: Player) => {
-    const checkpoint = checkpointStreamingLaunchBlueprint(next, createStreamingCatalogueReadContext(next, catalogueContext));
+    const checkpoint = props.operation ? { changed: false, player: next } : checkpointStreamingLaunchBlueprint(next, createStreamingCatalogueReadContext(next, catalogueContext));
     const current = checkpoint.changed ? checkpoint.player : next;
     currentPlayerRef.current = current;
     props.onUpdatePlayer(current);
   };
-  const findOperation = (countryId: string) => currentPlayerRef.current.ownedStreamingPlatform.marketOperations.find(operation => operation.countryId === countryId && operation.entryKind === 'OPENING' && operation.status !== 'EXITED');
+  const findOperation = (countryId: string) => currentPlayerRef.current.ownedStreamingPlatform.marketOperations.find(operation => operation.countryId === countryId && (props.operation || operation.entryKind === 'OPENING') && operation.status !== 'EXITED');
   const persistDraft = (draft: LaunchDraft) => {
     const absoluteWeek = getAbsoluteWeek(currentPlayerRef.current.age, currentPlayerRef.current.currentWeek);
     const persisted: OwnedStreamingDefineLaunchDraftState = {
@@ -663,7 +666,7 @@ function OpeningLaunchExperience(props: Props) {
   const restoredDraftKey = restoredDraft ? JSON.stringify(restoredDraft) : '';
   const restoredDraftKeyRef = useRef('');
   useEffect(() => {
-    if (!restoredDraft || restoredDraftKeyRef.current === restoredDraftKey) return;
+    if (props.operation || !restoredDraft || restoredDraftKeyRef.current === restoredDraftKey) return;
     restoredDraftKeyRef.current = restoredDraftKey;
     persistDraft(restoredDraft);
   }, [restoredDraftKey]);
@@ -686,16 +689,45 @@ function OpeningLaunchExperience(props: Props) {
   return (
     <LaunchWizard
       data={data}
+      initialCountryId={props.operationCountryId}
+      operation={props.operation ? {
+        title: ({ MARKETS: 'Markets', CLEARANCE: 'Market clearance', IDENTITY: 'Playback ident', STOREFRONT: 'Storefront', PRICING: 'Pricing & offers' })[props.operation],
+        section: props.operation === 'IDENTITY' || props.operation === 'STOREFRONT' ? 'Platform' : 'Audience',
+        note: props.operation === 'PRICING' ? 'Preview your offer, then save. The next normal weekly customer settlement uses the updated prices; saving makes no immediate customer charge.'
+          : props.operation === 'IDENTITY' ? 'Preview your playback identity. Save applies the choice and charges only an unowned package at the price shown.'
+          : props.operation === 'STOREFRONT' ? 'Preview your current catalogue in a new layout. Save applies it to the service; research restrictions still apply.'
+          : 'Choose new countries or review government requests. Filed and active markets are retained. Filing shows its treasury and energy cost before confirmation.',
+        onSave: ['IDENTITY','STOREFRONT','PRICING'].includes(props.operation) ? draft => {
+          const current = currentPlayerRef.current;
+          let result;
+          if (props.operation === 'IDENTITY') {
+            if (!draft.soundId || !draft.packageId) return { ok: false, message: 'Choose an available sound and ident package first.' };
+            if (draft.soundId === 'custom' && !draft.customAudio) return {ok:false,message:'Upload custom audio or choose a sound first.'};
+            result = saveStreamingServiceIdent(current, {
+              soundIdentKey: draft.soundId === 'custom' ? 'PULSE' : draft.soundId.toUpperCase() as StreamingSoundIdentKey,
+              identPackageId: PACKAGE_TO_CANONICAL[draft.packageId] || 'STANDARD',
+              customIdentAudio: draft.soundId === 'custom' ? draft.customAudio : null,
+            }, 'OPERATIONS');
+          } else if (props.operation === 'STOREFRONT') {
+            result = saveStreamingStorefrontPlan(current, { storefrontLayoutId: draft.storefrontId || '' }, 'OPERATIONS');
+          } else result = saveStreamingPricingPlan(current, (draft.pricing || data.pricing) as OwnedStreamingPricingConfiguration, 'OPERATIONS');
+          if (result.changed) update(result.player);
+          return { ok: result.reason === 'SAVED', message: result.reason === 'SAVED' ? 'Changes saved.'
+            : result.reason === 'INSUFFICIENT_TREASURY' ? `Treasury needs $${result.shortfall.toLocaleString()} more. Open Boardroom → Finance.`
+            : 'This choice is incomplete or research-locked. The current service has been kept.' };
+        } : undefined,
+      } : undefined}
       forecastWorldState={projectionSource.world}
       forecastContextKey={forecastContextKey}
       initialStep={STEP_FROM_CANONICAL[currentStep] || 'markets'}
       initialDraft={restoredDraft}
       initialSheet={props.initialSheet}
       buildBudgetSummary={buildBudgetSummary}
-      onDraftChange={persistDraft}
+      onDraftChange={props.operation ? undefined : persistDraft}
       onExit={props.onClose}
       onOpenStudioFinance={props.onOpenFinance}
       onStepChange={(step) => {
+        if (props.operation) return;
         const current = currentPlayerRef.current;
         const next = setStreamingDefineLaunchStep(current, STEP_TO_CANONICAL[step]);
         if (next === current) return;
@@ -705,15 +737,16 @@ function OpeningLaunchExperience(props: Props) {
         props.onUpdatePlayer(next);
       }}
       onSaveFootprint={(countryIds) => {
-        const result = saveStreamingMarketPlan(currentPlayerRef.current, countryIds, 'OPENING');
+        const result = saveStreamingMarketPlan(currentPlayerRef.current, countryIds, platform.launchCommit ? 'EXPANSION' : 'OPENING');
         if (result.changed) update(result.player);
       }}
       onBeginMarketEntry={(countryIds, plannedCountryIds) => {
         /* The visible wizard draft is the player's intent. Persist it first,
            then file against that exact canonical state in the same action. */
-        const planResult = saveStreamingMarketPlan(currentPlayerRef.current, plannedCountryIds || countryIds, 'OPENING');
+        const entryKind = platform.launchCommit ? 'EXPANSION' : 'OPENING';
+        const planResult = saveStreamingMarketPlan(currentPlayerRef.current, plannedCountryIds || countryIds, entryKind);
         const filingBase = planResult.changed ? planResult.player : currentPlayerRef.current;
-        const result = beginStreamingMarketClearance(filingBase, countryIds, 'OPENING');
+        const result = beginStreamingMarketClearance(filingBase, countryIds, entryKind);
         if (result.changed || planResult.changed) update(result.player);
         if (result.reason === 'INSUFFICIENT_TREASURY') props.onOpenFinance();
       }}
@@ -780,7 +813,7 @@ function OpeningLaunchExperience(props: Props) {
 }
 
 export default function StreamingDefineLaunchExperience(props: Props) {
-  return props.mode === 'EXPANSION'
+  return props.mode === 'EXPANSION' && !props.operation
     ? <StreamingMarketExpansionWizard {...props} />
     : <OpeningLaunchExperience {...props} />;
 }

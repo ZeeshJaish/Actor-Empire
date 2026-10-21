@@ -39,6 +39,8 @@ import '../../styles/cine.css';
 
 export interface BuildWizardProps extends BuildHandlers {
   data: BuildData;
+  operations?: boolean;
+  campaignOnly?: boolean;
   initialStage?: BuildStageId;
   networkRequest?: { id: number; regionId?: string };
   initialDraft?: BuildDraft;
@@ -110,7 +112,8 @@ function BuildHeaderLine({ data, totals }: { data: BuildData; totals: BuildTotal
     : 'ready on the night'}</>;
 }
 
-export function BuildWizard({ data, initialStage = 'network', initialDraft, initialSheet, launchBudgetSummary, onDraftChange, networkRequest, ...handlers }: BuildWizardProps) {
+export function BuildWizard({ data, operations = false, campaignOnly = false, initialStage = 'network', initialDraft, initialSheet, launchBudgetSummary, onDraftChange, networkRequest, ...handlers }: BuildWizardProps) {
+  const [revisionFeedback, setRevisionFeedback] = useState('');
   const [stageId, setStageId] = useState<BuildStageId>(initialStage);
   const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null);
   useEffect(() => { if (networkRequest) {
@@ -202,7 +205,7 @@ export function BuildWizard({ data, initialStage = 'network', initialDraft, init
      as something you had to do before taking control, in that order, or not at
      all. The wizard owns the draft, so the wizard answers it. */
   const hasWork = useMemo(() => buildDraftHasWork(data, draft, Boolean(teamProposal)), [data, draft, teamProposal]);
-  const shared = { selectedRegionId, onSelectRegion: setSelectedRegionId, data, draft, patch, totals, plan, services, handlers, managed, teamProposal, setTeamProposal, onJump: selectStage, onStartOver: hasWork && !marketLocked ? () => setConfirmReset(true) : undefined };
+  const shared = { campaignOnly, selectedRegionId, onSelectRegion: setSelectedRegionId, data, draft, patch, totals, plan, services, handlers, managed, teamProposal, setTeamProposal, onJump: selectStage, onStartOver: hasWork && !marketLocked ? () => setConfirmReset(true) : undefined };
   /* Network is not wrapped: under a team plan you must still be able to open a
      city and read what they did, which a disabled fieldset would prevent. It
      locks its own controls instead, and carries the way to take control. */
@@ -346,13 +349,15 @@ export function BuildWizard({ data, initialStage = 'network', initialDraft, init
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 2L4 8l6 6" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </button>
         <div className="sf-head-titles">
-          <h1>The Build</h1>
-          <p><BuildHeaderLine data={data} totals={totals} /></p>
+          <h1>{campaignOnly ? 'Opening campaign' : operations ? 'Network operations' : 'The Build'}</h1>
+          <p>{campaignOnly ? `${data.company.name} · campaign planning` : <BuildHeaderLine data={data} totals={totals} />}</p>
         </div>
-        <span className="lw-count">{index + 1}<i>/{BUILD_STAGES.length}</i></span>
+        {!operations && <span className="lw-count">{index + 1}<i>/{BUILD_STAGES.length}</i></span>}
       </header>
 
-      <nav className="lw-track" aria-label="Build stages">
+      {operations ? !campaignOnly && <nav className="op-editor-tabs bw-operations-tabs" aria-label="Network management">
+        {([{id:"network", label:"Network"},{id:"test",label:"Load rehearsal"},{id:"launch",label:"Review revision"}] as const).map(tab => <button key={tab.id} type="button" aria-current={stageId === tab.id ? "page" : undefined} aria-pressed={stageId === tab.id} onClick={() => selectStage(tab.id)}>{tab.label}</button>)}
+      </nav> : <nav className="lw-track" aria-label="Build stages">
         <span className="lw-track-line" aria-hidden="true">
           <i style={{ width: `${(index / (BUILD_STAGES.length - 1)) * 100}%` }} />
         </span>
@@ -377,7 +382,7 @@ export function BuildWizard({ data, initialStage = 'network', initialDraft, init
             </button>
           );
         })}
-      </nav>
+      </nav>}
 
       {constructionLocked && construction && (
         <section className="bw-construction-status" role="status" aria-live="polite" aria-label="Construction underway">
@@ -416,7 +421,7 @@ export function BuildWizard({ data, initialStage = 'network', initialDraft, init
               question sat above the picture, so the one fixed thing on the page
               started 180px down it and the first thing you read was a sentence
               about a map you could not yet see. */}
-          {stageId !== 'network' && (
+          {!operations && stageId !== 'network' && (
             <Headline
               ask={BUILD_STAGES[index].ask}
               state={STAGE_STATE_COPY[states[stageId]].label}
@@ -430,7 +435,28 @@ export function BuildWizard({ data, initialStage = 'network', initialDraft, init
               {editableStage}
             </fieldset>
           ) : editableStage}
-          {stageId === 'launch' && (marketLocked
+          {operations && stageId === 'launch' && <section className="bw-revision-review">
+            <p className="sf-eyebrow">Current service stays online</p>
+            <h2>Review this network revision</h2>
+            <p>Only the tested drawing is approved. New rooms and compute enter service after construction; the current network continues serving viewers.</p>
+            <div className="bw-revision-facts">
+              <div><span>Due on approval</span><b>{money(buildPlan.total)}</b></div>
+              <div><span>Proposed running cost</span><b>{money(totals.weeklyCost)} / week</b></div>
+              <div><span>Build time</span><b>{totals.weeks} weeks</b></div>
+              <div><span>Current → proposed</span><b>{totalRacks(data.existing.filter(facility=>facility.tenure !== 'CLOUD'))} → {totals.racks} racks</b></div>
+            </div>
+            <p>{constructionLocked ? 'A revision is already under construction. Finish it before applying another.'
+              : !draft.rehearsal || rehearsalStale(data, draft) ? 'Run a load rehearsal for this exact drawing before applying it.'
+              : `Latest rehearsal: ${draft.rehearsal.verdict === 'BROKE' ? 'delivery gaps remain; review the rehearsal before accepting the risk.' : 'saved for this drawing.'}`}</p>
+            {revisionFeedback && <p role="status">{revisionFeedback}</p>}
+            <button type="button" className="sf-btn sf-btn--primary" disabled={constructionLocked || marketLocked || !draft.rehearsal || rehearsalStale(data,draft)} onClick={() => {
+              const validation = handlers.onValidateCommission?.(draft);
+              if (!validation || !validation.ok) { setRevisionFeedback((validation && validation.message) || 'Canonical validation is unavailable. No money moved.'); return; }
+              const result = handlers.onCommission?.(draft);
+              setRevisionFeedback((result && result.message) || 'No revision was applied.');
+            }}>Apply network revision · {money(buildPlan.total)}</button>
+          </section>}
+          {!operations && stageId === 'launch' && (marketLocked
             ? <fieldset className="bw-construction-locked" disabled><legend>Commissioning locked until opening-market filing</legend><StageLaunch {...shared} onJump={setStageId} /></fieldset>
             : <StageLaunch {...shared} onJump={setStageId} />)}
           <div className="sf-tail" />
@@ -443,7 +469,7 @@ export function BuildWizard({ data, initialStage = 'network', initialDraft, init
           were furthest from the thumb moving them — and it never said the one
           thing a network is for, which is whether it carries the night. It is
           a strip above the footer now, and it answers that. */}
-      <PlanStrip
+      {!campaignOnly && !(operations && stageId === 'launch') && <PlanStrip
         view={bar}
         page={stageId}
         tone={bar.verdict ? bar.verdict.tone : 'flat'}
@@ -464,7 +490,7 @@ export function BuildWizard({ data, initialStage = 'network', initialDraft, init
             ? { label: 'Add money', primary: true, onClick: () => handlers.onOpenStudioFinance?.() }
             : { label: 'Money', onClick: () => setOpenSheet('money') },
         ]}
-      />
+      />}
 
       {/* Undoing an hour of decisions asks first, in the dialog the handoff
           between team and player already uses. */}
@@ -486,7 +512,10 @@ export function BuildWizard({ data, initialStage = 'network', initialDraft, init
         </div>
       )}
 
-      <footer className="lw-foot">
+      {operations ? <footer className="lw-foot">
+        <button type="button" className="sf-btn sf-btn--ghost" onClick={handlers.onExit}>Close</button>
+        {!campaignOnly && <button type="button" className="sf-btn sf-btn--primary" onClick={() => selectStage(stageId === 'launch' ? 'network' : 'launch')}>{stageId === 'launch' ? 'Edit network' : 'Review revision'}</button>}
+      </footer> : <footer className="lw-foot">
         <button type="button" className="sf-btn sf-btn--ghost" disabled={index === 0} onClick={() => go(index - 1)}>
           Back
         </button>
@@ -499,7 +528,7 @@ export function BuildWizard({ data, initialStage = 'network', initialDraft, init
         >
           {index === BUILD_STAGES.length - 1 ? 'Commission below' : `Next · ${BUILD_STAGES[index + 1].label}`}
         </button>
-      </footer>
+      </footer>}
 
       <Sheet
         open={openSheet === 'money'}
@@ -593,6 +622,7 @@ function Tick() {
 }
 
 export interface StageProps {
+  campaignOnly?: boolean;
   selectedRegionId?: string | null;
   onSelectRegion?: (id: string | null) => void;
   focusRegionId?: string;

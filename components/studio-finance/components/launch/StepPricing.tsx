@@ -118,7 +118,7 @@ export function PlanPriceEditorControl({
   );
 }
 
-export function StepPricing({ data, draft, patch, chosen, handlers, pricingPreview, onPricingGesture }: StepProps) {
+export function StepPricing({ data, draft, patch, chosen, handlers, pricingPreview, onPricingGesture, operations }: StepProps) {
   const settings: PricingSettings = draft.pricing ?? data.pricing;
   const selected = settings.commercialOffers?.coreModelSelected !== false;
   const offer = useMemo(() => projectStreamingCommercialOffers(settings as OwnedStreamingPricingConfiguration), [settings]);
@@ -343,9 +343,9 @@ export function StepPricing({ data, draft, patch, chosen, handlers, pricingPrevi
   ) : null;
 
   const forecastPanel = (
-      <section className="pr-forecast" aria-label="Conditional opening forecast" aria-busy={forecastUpdating}>
+      <section className="pr-forecast" aria-label={operations ? "Conditional offer forecast" : "Conditional opening forecast"} aria-busy={forecastUpdating}>
         <div className="pr-forecast-head">
-          <div><span className="sf-eyebrow">Opening audience</span><strong>{forecastUpdating ? '—' : compactCount(forecast.households)}</strong><small>households</small></div>
+          <div><span className="sf-eyebrow">{operations ? 'Potential audience' : 'Opening audience'}</span><strong>{forecastUpdating ? '—' : compactCount(forecast.households)}</strong><small>households</small></div>
           <div><span className="sf-eyebrow">Potential gross</span><strong>{!forecastUpdating && worldForecast ? money(forecast.monthlyRevenue) : '—'}</strong><small>per month · before costs</small></div>
         </div>
         {forecastUpdating && <p className="pr-forecast-updating" role="status">Updating forecast…</p>}
@@ -360,7 +360,7 @@ export function StepPricing({ data, draft, patch, chosen, handlers, pricingPrevi
         </div>
         {worldForecast && <p className="pr-forecast-buyers">Billing mix: {compactCount(worldForecast.monthlySubscribers)} monthly · {compactCount(worldForecast.annualSubscribers)} annual subscribers. {compactCount(worldForecast.freeAdHouseholds)} free ad viewers.</p>}
         {worldForecast && worldForecast.countries.length > 0 && <div className="pr-forecast-countries">
-          <p className="sf-eyebrow">Opening markets</p>
+          <p className="sf-eyebrow">{operations ? 'Service markets' : 'Opening markets'}</p>
           {worldForecast.countries.map(country => <div key={country.countryId}>
             <b>{chosen.find(item => item.id === country.countryId)?.name || country.countryId}</b>
             <span>Subscription {compactCount(country.monthlySubscribers)} monthly · {compactCount(country.annualSubscribers)} annual · {compactCount(country.freeAdHouseholds)} free ad viewers</span>
@@ -586,7 +586,7 @@ export function StepPricing({ data, draft, patch, chosen, handlers, pricingPrevi
 
       <p className="lw-autosave-state is-current" role="status">
         <i aria-hidden="true" />
-        Autosaved as you edit
+        {operations ? 'Preview only · Save changes to apply' : 'Autosaved as you edit'}
       </p>
     </div>;
 }

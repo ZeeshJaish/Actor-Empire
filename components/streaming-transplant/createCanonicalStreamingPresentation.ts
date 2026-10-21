@@ -319,7 +319,7 @@ export const createCanonicalAudienceState = (player: Player): AudienceState => {
     return {
       id: regionId,
       label: countries[0]?.regionName || regionId,
-      subs: Math.round(platform.metrics.subscribers * subscriberShare),
+      subs: countries.reduce((sum, country) => sum + (country.playerPaidAccounts || 0), 0),
       sharePct: weightedShare,
       growthPct: weightedGrowth,
       latencyMs: Math.round(countries.reduce((sum, country) => sum + (country.selectedForLaunch ? 54 : 118), 0) / Math.max(1, countries.length)),

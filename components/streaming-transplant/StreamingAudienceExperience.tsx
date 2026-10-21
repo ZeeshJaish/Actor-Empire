@@ -17,7 +17,8 @@
 import css from './presentation/screens/AudienceDesk/AudienceDesk.module.css';
 import { cx } from './presentation/cx';
 import { brandVars } from './presentation/brand';
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { StreamingAudienceMap } from './StreamingAudienceMap';
 import { Brand, Mark, brandColor } from './StreamingBrandVisuals';
 import type {
   OwnedStreamingMarketOperation,
@@ -209,13 +210,18 @@ export const AudienceDesk: React.FC<{
   onObjective?: (o: RecObjective) => void;
   onOpenRegion?: (r: RegionRow) => void;
   marketOperations?: OwnedStreamingMarketOperation[];
-  onManageMarkets?: () => void;
+  onManageMarkets?: (countryId?: string) => void;
+  onReviewClearance?: (countryId?: string) => void;
+  onOpenPricing?: () => void;
+  initialRegionId?: string | null;
+  initialMapSelection?: {regionId:string|null;countryId:string|null};
+  onNavigationChange?: (state:{tab:Tab;regionId:string|null;countryId:string|null})=>void;
   accessPolicy?: WorldStreamingCustomerAccessPolicy;
   onAccessPolicyChange?: (policy: {
     sharingPosture: StreamingSharingPosture;
     enforcementInvestment: StreamingEnforcementInvestment;
   }) => void;
-}> = ({ brand, state, onBack, initialTab, initialAnalyticsScope, initialMarketView, onNewCampaign, onObjective, onOpenRegion, marketOperations = [], onManageMarkets, accessPolicy, onAccessPolicyChange }) => {
+}> = ({ brand, state, onBack, initialTab, initialAnalyticsScope, initialMarketView, onNewCampaign, onObjective, onOpenRegion, marketOperations = [], onManageMarkets, onReviewClearance, onOpenPricing, initialRegionId, initialMapSelection, onNavigationChange, accessPolicy, onAccessPolicyChange }) => {
   const c = brandColor(brand);
   /* a console chip can open this page straight on the tab it names */
   const [tab, setTab] = useState<Tab>(initialTab ?? 'ANALYTICS');
@@ -223,7 +229,11 @@ export const AudienceDesk: React.FC<{
   const [hover, setHover] = useState<number | null>(null);
   const [analyticsScope, setAnalyticsScope] = useState<AnalyticsScope>(initialAnalyticsScope ?? (state.live ? 'PLATFORM' : 'MARKET'));
   const [marketView, setMarketView] = useState<MarketView>(initialMarketView ?? 'OVERVIEW');
-  const [countryRegion, setCountryRegion] = useState<string>('ALL');
+  const [countryRegion, setCountryRegion] = useState<string>(initialMapSelection?.regionId || initialRegionId || 'ALL');
+  const [mapCountry, setMapCountry] = useState<string | null>(initialMapSelection?.countryId || null);
+  const [portfolioLimit, setPortfolioLimit] = useState(8);
+  const navigationRef = useRef(onNavigationChange); navigationRef.current = onNavigationChange;
+  useEffect(() => { navigationRef.current?.({tab,regionId:countryRegion === 'ALL' ? null : countryRegion,countryId:mapCountry}); }, [tab,countryRegion,mapCountry]);
   const svgRef = useRef<SVGSVGElement>(null);
   const countryMarketOperations = useMemo(() => marketOperations.filter(operation => operation.scope === 'COUNTRY' && operation.status !== 'EXITED'), [marketOperations]);
   const plannedAudience = countryMarketOperations.reduce((sum, operation) => sum + (operation.countryProfile?.audienceSize || 0), 0);
@@ -268,6 +278,12 @@ export const AudienceDesk: React.FC<{
   const countryRegions = useMemo(() => market
     ? Array.from(new Map(market.countries.map(country => [country.regionId, country.regionName])).entries())
     : [], [market]);
+  const mapRegion = countryRegion === 'ALL' ? null : countryRegion;
+  const selectMapRegion = (id: string | null) => { setCountryRegion(id || 'ALL'); setPortfolioLimit(8); };
+  const focusedCountry = market?.countries.find(row => row.id === mapCountry);
+  const portfolio = countryMarketOperations.filter(operation => !mapCountry || operation.countryId === mapCountry).filter(operation => !mapRegion || market?.countries.find(row => row.id === operation.countryId)?.regionId === mapRegion);
+  const audienceMap = (scope: 'INDUSTRY' | 'PLATFORM' | 'MARKETS') => market ? <StreamingAudienceMap countries={market.countries} operations={marketOperations} scope={scope} live={state.live}
+    regionId={mapRegion} onRegionChange={selectMapRegion} countryId={mapCountry} onCountryChange={setMapCountry} onManage={onManageMarkets} onClearance={onReviewClearance}/> : null;
   const marketTrend = market?.globalTrend.map(point => point.activeViewers) ?? [];
 
   return (
@@ -295,6 +311,10 @@ export const AudienceDesk: React.FC<{
       </div>
 
       <div className={css.adscroll}>
+        <div className={css.operationsActions}>
+          <button type="button" onClick={onOpenPricing}>Pricing & offers <span>→</span></button>
+          <button type="button" onClick={()=>onReviewClearance?.()}>Market clearance <span>→</span></button>
+        </div>
 
         {/* ── ANALYTICS ── */}
         {tab === 'ANALYTICS' && (
@@ -316,6 +336,7 @@ export const AudienceDesk: React.FC<{
               </div>
             ) : analyticsScope === 'PLATFORM' ? (
               <>
+                {audienceMap('PLATFORM')}
                 {/* filters in one row, above the charts */}
                 <div className={css.ranges}>
                   {(['7D', '28D', '90D'] as Range[]).map(r => (
@@ -423,12 +444,7 @@ export const AudienceDesk: React.FC<{
 
                 {marketView === 'OVERVIEW' && (
                   <>
-                    <section className={css.marketHero}>
-                      <span>THE LIVING MARKET · WK {market.generatedAtAbsoluteWeek}</span>
-                      <strong>{count(market.activeViewers)}</strong>
-                      <h2>active streaming viewers</h2>
-                      <p>{count(market.globalPopulation)} people · {plainPct(market.streamingAdoptionPercent)} adoption</p>
-                    </section>
+                    {audienceMap('INDUSTRY')}
                     <div className={css.marketKpis}>
                       <div><span>PAYING HOMES</span><b>{count(market.payingHouseholds)}</b></div>
                       <div><span>PAID SUBSCRIPTIONS</span><b>{count(market.paidSubscriptions)}</b></div>
@@ -455,6 +471,7 @@ export const AudienceDesk: React.FC<{
                       )}
                       <p className={css.marketExplain}>Every active service competes for the same finite country households. Price, plan fit, catalogue, localization and trust decide who wins; homes may still choose nobody.</p>
                     </section>
+<details className={css.audienceMore}><summary>Audience economics & access</summary>
                     <section className={css.adsec}>
                       <div className={css.adhead}><h2>Paid audience and access</h2><span>{market.customerAccess.available ? 'canonical customers' : 'forecast'}</span></div>
                       <div className={css.marketKpis}>
@@ -525,6 +542,7 @@ export const AudienceDesk: React.FC<{
                       </div>
                       <p className={css.marketCallout}>You do not always need to replace Netflix. Winning the second subscription slot can be the first victory.</p>
                     </section>
+                    </details>
                   </>
                 )}
 
@@ -659,8 +677,8 @@ export const AudienceDesk: React.FC<{
 
             <section className={css.adsec}>
               <div className={css.adhead}>
-                <h2>Recommendation engine</h2>
-                <span>what the algorithm optimises for</span>
+                <h2>Recommendation plan</h2>
+                <span>{state.live ? 'Review and lock for the next week' : 'Available after opening'}</span>
               </div>
               <div className={css.objgrid}>
                 {([
@@ -670,7 +688,7 @@ export const AudienceDesk: React.FC<{
                   ['BREAKOUT', 'Breakout creation', 'Bet everything on making one title huge'],
                 ] as [RecObjective, string, string][]).map(([id, label, note]) => (
                   <button key={id} className={cx(css.obj, (state.objective === id ? css.on : ''))}
-                    onClick={() => onObjective?.(id)}>
+                    disabled={!state.live || !onObjective} onClick={() => onObjective?.(id)}>
                     <b>{label}</b>
                     <span>{note}</span>
                   </button>
@@ -681,55 +699,34 @@ export const AudienceDesk: React.FC<{
         )}
 
         {/* ── REGIONS ── */}
-        {tab === 'REGIONS' && (
-          <>
-            <section className={css.adsec}>
-              <div className={css.adhead}><h2>Territories</h2><span>{state.live ? 'your platform' : 'opening footprint'}</span></div>
-              {state.regions.map(r => (
-                <button className={css.reg} key={r.id} onClick={() => onOpenRegion?.(r)}>
-                  <div className={css.regtop}><b>{r.label}</b><em className={r.growthPct >= 0 ? css.up : css.down}>{pct(r.growthPct)}</em></div>
-                  <div className={css.regbar}><i style={{ width: `${Math.max(2, r.sharePct * 6)}%` }} /></div>
-                  <div className={css.regfoot}>
-                    <div><span>SUBSCRIBERS</span><em>{count(r.subs)}</em></div>
-                    <div><span>SHARE</span><em>{r.sharePct.toFixed(1)}%</em></div>
-                    <div className={css.right}><span>LATENCY</span><em className={r.latencyMs > 120 ? css.bad : r.latencyMs > 60 ? css.warn : css.good}>{r.latencyMs}ms</em></div>
-                  </div>
-                  {r.rivals.length > 0 && <div className={css.regrivals}>Contested by {r.rivals.join(', ')}</div>}
-                </button>
-              ))}
-            </section>
-            {market && (
-              <section className={css.adsec}>
-                <div className={css.adhead}><h2>Country markets</h2><span>living industry data</span></div>
-                <div className={css.countryFilters}>
-                  <button className={countryRegion === 'ALL' ? css.on : ''} onClick={() => setCountryRegion('ALL')}>World</button>
-                  {countryRegions.map(([id, label]) => <button key={id} className={countryRegion === id ? css.on : ''} onClick={() => setCountryRegion(id)}>{label}</button>)}
-                </div>
-                <div className={css.countryMarketList}>{countries.map(country => <CountryMarketCard key={country.id} country={country} color={c} />)}</div>
-              </section>
-            )}
-          </>
-        )}
+        {tab === 'REGIONS' && <>
+          {audienceMap('INDUSTRY')}
+          {focusedCountry && <CountryMarketCard country={focusedCountry} color={c}/>}
+          <section className={css.adsec}><div className={css.adhead}><h2>Your regions</h2><span>{state.live ? 'platform performance' : 'opening footprint'}</span></div>
+            {state.regions.map(region => <button className={css.reg} key={region.id} onClick={() => { selectMapRegion(region.id); setMapCountry(null); onOpenRegion?.(region); }}>
+              <div className={css.regtop}><b>{region.label}</b><em>{count(region.subs)} subscribers</em></div>
+              <div className={css.regfoot}><span>Industry watch share {region.sharePct.toFixed(1)}%</span><span>Explore countries →</span></div>
+            </button>)}
+          </section>
+        </>}
 
         {/* Markets owns territory entry and expansion. Regions remains analytics. */}
         {tab === 'MARKETS' && (
           <>
-            <section className={css.marketOpsHero}>
-              <span>MARKET OPERATIONS</span>
-              <strong>{countryMarketOperations.filter(operation => operation.status === 'ACTIVE').length}</strong>
-              <h2>countries live</h2>
-              <p>{countryMarketOperations.filter(operation => ['PLANNED', 'AWAITING_FUNDING', 'CLEARANCE', 'INFRASTRUCTURE_PREPARATION', 'READY'].includes(operation.status)).length} entries moving toward launch</p>
-              <div className={css.marketOpsPulse}>
-                <div><small>REACH IN PLAY</small><b>{count(plannedAudience)}</b></div>
-                <div><small>AVG TAX + LEVY</small><b>{averagePolicyRate.toFixed(1)}%</b></div>
-                <div><small>OPEN FILES</small><b>{countryMarketOperations.filter(operation => operation.status === 'CLEARANCE' || operation.status === 'AWAITING_FUNDING').length}</b></div>
-              </div>
-              <button type="button" onClick={onManageMarkets}>ENTER A NEW MARKET →</button>
-            </section>
+            {audienceMap('MARKETS')}
+            <div className={css.marketPortfolioSummary}>
+              <div><span>Live</span><b>{countryMarketOperations.filter(row=>row.status==='ACTIVE').length}</b></div>
+              <div><span>Selected / filed</span><b>{countryMarketOperations.filter(row=>row.status!=='ACTIVE').length}</b></div>
+              <div><span>Open requests</span><b>{countryMarketOperations.filter(row=>row.clearance?.outcome==='ADDITIONAL_REQUIREMENT'||row.clearance?.outcome==='TEMPORARILY_REJECTED').length}</b></div>
+            </div>
+            <div className={css.operationsActions}>
+              <button type="button" onClick={()=>onManageMarkets?.()}>Plan market entry →</button>
+              <button type="button" onClick={()=>onReviewClearance?.()}>Clearance & requests →</button>
+            </div>
             <section className={css.adsec}>
               <div className={css.adhead}><h2>Country portfolio</h2><span>one living record per market</span></div>
               <div className={css.marketOpsList}>
-                {countryMarketOperations.length ? countryMarketOperations.map(operation => (
+                {portfolio.length ? portfolio.slice(0,portfolioLimit).map(operation => (
                   <details key={operation.id} className={css.marketOpsFile}>
                     <summary>
                       <span><b>{operation.countryProfile?.country || operation.countryId || operation.scopeId}</b><small>{operation.entryKind === 'OPENING' ? 'Opening territory' : 'Expansion'} · {count(operation.countryProfile?.audienceSize || 0)} viewers</small></span>
@@ -746,8 +743,9 @@ export const AudienceDesk: React.FC<{
                       {operation.policySnapshot && <small className={css.marketOpsElection}>NEXT POLICY CYCLE · WEEK {operation.policySnapshot.nextElectionAtAbsoluteWeek}</small>}
                     </div>
                   </details>
-                )) : <div className={css.adpending}><b>No market entries yet</b><span>Evaluate countries and create your first expansion plan.</span></div>}
+                )) : <div className={css.adpending}><b>No entries in this view</b><span>Choose World to see your full portfolio, or plan an entry here.</span></div>}
               </div>
+              {portfolio.length > portfolioLimit && <button type="button" className={css.adadd} onClick={()=>setPortfolioLimit(limit=>limit+8)}>Show 8 more · {portfolio.length-portfolioLimit} remaining</button>}
             </section>
           </>
         )}

@@ -15,7 +15,7 @@ import type {
 import { getAbsoluteWeek } from './legacyLogic';
 import { normalizeOwnedStreamingPlatformState } from './ownedStreamingPlatform';
 import {
-    STREAMING_DAY_ONE_MARKETS,
+    STREAMING_WORLD_MARKETS,
     STREAMING_DAY_ONE_REGION_LABELS,
     type StreamingDayOneMarket,
     type StreamingDayOneRegionId,
@@ -55,6 +55,9 @@ export interface StreamingAudienceCountryView {
     estimatedPopulation: number;
     streamingAdoptionPercent: number;
     activeViewers: number;
+    /** Last settled country accounts, never inferred from watch-share. */
+    playerPaidAccounts?: number | null;
+    audienceMeasured?: boolean;
     payingHouseholds: number;
     commercialHouseholds: number;
     nonParticipantHouseholds: number;
@@ -359,7 +362,7 @@ const buildCountry = (
     const estimatedPopulation = canonicalPopulation && canonicalPopulation > 0
         ? round(canonicalPopulation)
         : round(market.streamingAudience / (adoption / 100));
-    const activeViewers = round(estimatedPopulation * adoption / 100);
+    const activeViewers = canonicalCustomers ? canonicalCustomers.activeViewers + canonicalCustomers.sharedActiveViewers + canonicalCustomers.piracyReach : round(estimatedPopulation * adoption / 100);
     const estimatedSubscriptionsPerHousehold = round1(clamp(1.38 + adoption / 100 * 0.9 + (market.competition === 'FIERCE' ? 0.18 : 0), 1.3, 2.55));
     const estimatedPayingHouseholds = Math.min(
         canonicalAudience?.commercialHouseholds ?? Number.MAX_SAFE_INTEGER,
@@ -393,6 +396,8 @@ const buildCountry = (
         estimatedPopulation,
         streamingAdoptionPercent: round1(adoption),
         activeViewers,
+        playerPaidAccounts: canonicalCustomers ? canonicalCustomers.platformSummaries.find(row => row.platformId === 'PLAYER')?.endingPaidAccounts || 0 : null,
+        audienceMeasured: Boolean(canonicalCustomers),
         payingHouseholds,
         commercialHouseholds: canonicalAudience?.commercialHouseholds ?? payingHouseholds,
         nonParticipantHouseholds: canonicalAudience?.nonParticipantHouseholds ?? 0,
@@ -550,7 +555,8 @@ export const getStreamingAudienceMarket = (player: Player): StreamingAudienceMar
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
     const foundedAt = platform.identity?.foundedAtAbsoluteWeek ?? absoluteWeek;
     const weeksSinceFounding = Math.max(0, absoluteWeek - foundedAt);
-    const selectedMarketIds = new Set(platform.identity?.dayOneMarketIds || platform.foundingDraft?.dayOneMarketIds || []);
+    const countryOperations = platform.marketOperations.filter(operation => operation.scope === 'COUNTRY' && operation.countryId && operation.status !== 'EXITED');
+    const selectedMarketIds = new Set(countryOperations.length ? countryOperations.map(operation => operation.countryId!) : platform.identity?.dayOneMarketIds || platform.foundingDraft?.dayOneMarketIds || []);
     const playerPresentation = getAudiencePlatformPresentation('PLAYER', {
         name: platform.identity?.name || PLATFORM_META.PLAYER.fallbackName || 'Your platform',
         color: platform.identity?.primaryColor || PLATFORM_META.PLAYER.fallbackColor || '#8B5CF6',
@@ -583,7 +589,7 @@ export const getStreamingAudienceMarket = (player: Player): StreamingAudienceMar
     const worldStreamingCustomers = player.world?.worldStreamingCustomers?.lastProcessedAbsoluteWeek === absoluteWeek
         ? player.world.worldStreamingCustomers
         : null;
-    const countries = STREAMING_DAY_ONE_MARKETS.map(market => buildCountry(
+    const countries = STREAMING_WORLD_MARKETS.map(market => buildCountry(
         market,
         selectedMarketIds,
         platform.metrics.subscribers,

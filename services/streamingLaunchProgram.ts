@@ -328,6 +328,11 @@ export const setStreamingDefineLaunchStep = (
     };
 };
 
+export type StreamingConfigurationScope = 'OPENING' | 'OPERATIONS';
+
+const canEditStreamingConfiguration = (platform: ReturnType<typeof normalizeOwnedStreamingPlatformState>, scope: StreamingConfigurationScope): boolean =>
+    Boolean(platform.identity && (!platform.launchCommit || scope === 'OPERATIONS' && platform.lifecycle === 'ACTIVE'));
+
 export const saveStreamingServiceIdent = (
     player: Player,
     input: {
@@ -335,9 +340,10 @@ export const saveStreamingServiceIdent = (
         identPackageId: StreamingIdentPackageId;
         customIdentAudio?: OwnedStreamingCustomIdentAudio | null;
     },
+    scope: StreamingConfigurationScope = 'OPENING',
 ): StreamingLaunchConfigurationResult => {
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
-    if (!platform.identity || platform.launchCommit) return { player, changed: false, reason: 'INVALID_STATE', shortfall: 0 };
+    if (!canEditStreamingConfiguration(platform, scope)) return { player, changed: false, reason: 'INVALID_STATE', shortfall: 0 };
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
     const productLevel = platform.technologyLevels.PRODUCT_EXPERIENCE;
     const dataLevel = platform.technologyLevels.DATA_RECOMMENDATIONS;
@@ -405,7 +411,7 @@ export const saveStreamingServiceIdent = (
             committedAtAbsoluteWeek: absoluteWeek,
             revision: platform.serviceConfiguration.revision + 1,
         },
-        launchProgram: {
+        launchProgram: platform.launchCommit ? platform.launchProgram : {
             ...platform.launchProgram,
             status: 'PLANNING',
             defineCurrentStep: 'IDENTITY',
@@ -479,15 +485,20 @@ export const clearStreamingServiceIdent = (player: Player): StreamingLaunchConfi
 export const saveStreamingStorefrontPlan = (
     player: Player,
     input: { storefrontLayoutId: string; pricingApproach?: string },
+    scope: StreamingConfigurationScope = 'OPENING',
 ): StreamingLaunchConfigurationResult => {
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
-    if (!platform.identity || platform.launchCommit) return { player, changed: false, reason: 'INVALID_STATE', shortfall: 0 };
+    if (!canEditStreamingConfiguration(platform, scope)) return { player, changed: false, reason: 'INVALID_STATE', shortfall: 0 };
     if (!input.storefrontLayoutId) return { player, changed: false, reason: 'INCOMPLETE', shortfall: 0 };
     const storefront = getStreamingStorefrontDefinition(input.storefrontLayoutId);
     if (!storefront) return { player, changed: false, reason: 'INVALID_STATE', shortfall: 0 };
     const storefrontId = storefront.id;
     if (getStreamingStorefrontLockReason(platform, storefrontId)) {
         return { player, changed: false, reason: 'INVALID_STATE', shortfall: 0 };
+    }
+    if (platform.serviceConfiguration.storefrontLayoutId === storefrontId
+        && (!input.pricingApproach || input.pricingApproach === platform.serviceConfiguration.pricingApproach)) {
+        return { player, changed: false, reason: 'SAVED', shortfall: 0 };
     }
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
     const nextPlatform = compactOwnedStreamingPlatformForPersistence({
@@ -499,7 +510,7 @@ export const saveStreamingStorefrontPlan = (
             pricingApproach: input.pricingApproach || platform.serviceConfiguration.pricingApproach,
             revision: platform.serviceConfiguration.revision + 1,
         },
-        launchProgram: {
+        launchProgram: platform.launchCommit ? platform.launchProgram : {
             ...platform.launchProgram,
             status: 'PLANNING',
             startedAtAbsoluteWeek: platform.launchProgram.startedAtAbsoluteWeek ?? absoluteWeek,
@@ -537,9 +548,10 @@ export const clearStreamingStorefrontPlan = (player: Player): StreamingLaunchCon
 export const saveStreamingPricingPlan = (
     player: Player,
     pricing: OwnedStreamingPricingConfiguration,
+    scope: StreamingConfigurationScope = 'OPENING',
 ): StreamingLaunchConfigurationResult => {
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
-    if (!platform.identity || platform.launchCommit) return { player, changed: false, reason: 'INVALID_STATE', shortfall: 0 };
+    if (!canEditStreamingConfiguration(platform, scope)) return { player, changed: false, reason: 'INVALID_STATE', shortfall: 0 };
     if (pricing.commercialOffers?.coreModelSelected === false
         || !pricing.streams.length || pricing.streams.includes('subs') && !pricing.plans.length) {
         return { player, changed: false, reason: 'INCOMPLETE', shortfall: 0 };
@@ -577,6 +589,9 @@ export const saveStreamingPricingPlan = (
             ads: allowedStreams.includes('ads') && plan.ads,
         })),
     });
+    if (JSON.stringify(safePricing) === JSON.stringify(platform.serviceConfiguration.pricing)) {
+        return { player, changed: false, reason: 'SAVED', shortfall: 0 };
+    }
     const priceFor = (id: string, index: number, fallback: number) => {
         const plan = safePricing.plans.find(item => item.id === id) || safePricing.plans[index];
         return plan ? Math.max(0, Math.min(100, Number(plan.monthly) || 0)) : fallback;
@@ -596,7 +611,7 @@ export const saveStreamingPricingPlan = (
             pricing: safePricing,
             revision: platform.serviceConfiguration.revision + 1,
         },
-        launchProgram: {
+        launchProgram: platform.launchCommit ? platform.launchProgram : {
             ...platform.launchProgram,
             status: 'PLANNING',
             startedAtAbsoluteWeek: platform.launchProgram.startedAtAbsoluteWeek ?? absoluteWeek,

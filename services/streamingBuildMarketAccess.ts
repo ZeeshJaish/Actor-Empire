@@ -14,7 +14,7 @@ export interface StreamingBuildMarketAccess {
  */
 export const getStreamingBuildMarketAccess = (player: Player): StreamingBuildMarketAccess => {
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
-    const opening = platform.marketOperations.filter(operation => operation.scope === 'COUNTRY' && operation.entryKind === 'OPENING');
+    const opening = platform.marketOperations.filter(operation => operation.scope === 'COUNTRY' && (operation.entryKind === 'OPENING' || Boolean(platform.launchCommit)));
     const filed = opening.filter(operation => (
         operation.countryId
         && operation.status !== 'EXITED'
