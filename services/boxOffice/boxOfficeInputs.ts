@@ -1,6 +1,7 @@
 import type { CastMember, Player, ProjectDetails, RoleType } from '../../types';
 import { NPC_DATABASE, isCastableActor } from '../npcLogic';
 import { createDeterministicRng } from '../deterministicRandom';
+import { buildCinemaDeliveryInput } from './boxOfficeDelivery';
 import { CINEMA_ROLE_WEIGHTS } from './boxOfficeProfiles';
 import type { CinemaOwnerRef, CinemaTitleInput } from './boxOfficeTypes';
 
@@ -41,7 +42,7 @@ export const normalizeCinemaTitle = ({ titleId, owner, project, player }: {
     const playerDirected = directorId === 'PLAYER_SELF' || project.crewList?.some(c => c.role === 'DIRECTOR' && c.isPlayer);
     return { id: titleId, owner: { ...owner }, projectType: project.type, genre: project.genre, budgetCents,
         cast: [...people.values()].sort((a, b) => a.personId.localeCompare(b.personId)), directorId,
-        playerCredited: Boolean(playerDirected || people.has('PLAYER_SELF')) };
+        playerCredited: Boolean(playerDirected || people.has('PLAYER_SELF')), delivery: buildCinemaDeliveryInput(project) };
 };
 
 /** Only offered packages with an absent/legacy player-only ensemble are reconstructed.

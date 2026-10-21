@@ -15,3 +15,13 @@ Validation: seven input cases, actual week handoff/source-save immutability, exi
 Contracts are introduced with working consumers. Phase 1 defines canonical production/finance types; the later week-market/forecast/migration payloads will be added in their owning phases instead of committing unused placeholder state or activating a new save schema prematurely.
 
 The original audit results remain unchanged. New phase evidence is written here, not over the pre-revamp measurements. No historical player cash is reclaimed and no old contract is rewritten.
+
+## Task 2 — continuous production and meaningful craft
+
+Before the repair, seven delivery assertions failed, including ordinary craft/max equipment reaching 100, zero craft becoming average, fame replacing acting craft, inconsistent generated budget labels, tier-only risk differences, and a $250M opening jump for one dollar across $120M. An additional regression exposed the incomplete/nondeterministic blockbuster fallback cast.
+
+Craft now uses normalized script/direction/cast/crew weights, bounded diminishing equipment benefits, location/story fit and background delivery. Fame does not increase acting craft. Explicit zero values remain zero. Greenlight stores its visible estimate separately from hidden realized production quality. Existing money/cost formulas for equipment and staff were retained.
+
+Generated budgets cover all four declared tiers consistently. The old opening/ceiling, risk, depth and distribution inputs use continuous cash-scale interpolation where the actual budget is known, rather than granting a reward when a label changes. Legacy label-only callers retain a compatibility fallback. This is an interim repair: legacy monetary caps, weekly retention shortcuts and timed theater exits are still replaced by the audience/supply engine in later phases, not certified as final balance here.
+
+Validation: nine delivery cases and the real release handoff pass; existing Greenlight, studio-production-economy and production-risk audits pass. The intentional Greenlight reference changes are 69→74 for talent-only casting and 97→80 for the craft/gear fixture; the new assertions separately protect the removed exploits.

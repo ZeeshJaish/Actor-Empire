@@ -25,4 +25,13 @@ export interface CinemaTitleInput {
     cast: CinemaCreditedPerson[];
     directorId?: string;
     playerCredited: boolean;
+    delivery: CinemaDeliveryInput;
+}
+
+export interface CinemaDeliveryInput {
+    estimatedQuality?: number;
+    deliveredQuality: number;
+    scriptQuality: number;
+    directorQuality: number;
+    castingStrength: number;
 }

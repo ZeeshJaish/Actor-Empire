@@ -1,3 +1,4 @@
+import { getProductionScale } from './studioProductionEconomy';
 import { completeOfferedCinemaCast, normalizeCinemaTitle } from './boxOffice/boxOfficeInputs';
 import { recordStudioSaleEarnings } from './studioSaleHistory';
 import { retainBankTransactionHistory } from './bankTransactionHistory';
@@ -4259,7 +4260,8 @@ export const processGameWeek = async (
                         cinemaTitle.cast.length,
                         updatedC.projectDetails.genre,
                         updatedC.projectDetails.budgetTier,
-                        updatedC.projectDetails.hiddenStats.castingStrength
+                        updatedC.projectDetails.hiddenStats.castingStrength,
+                        budget
                     );
                     updatedC.projectDetails.hiddenStats.castDepthScore = updatedC.projectDetails.hiddenStats.castDepthScore ?? castDepth.score;
                     updatedC.projectDetails.hiddenStats.castDepthNote = updatedC.projectDetails.hiddenStats.castDepthNote ?? castDepth.note;
@@ -5239,14 +5241,15 @@ export const processGameWeek = async (
                 hiddenStats: rel.projectDetails.hiddenStats,
                 marketDemand,
                 studioGenreReputation,
-                capRoll
+                capRoll,
+                estimatedBudget: rel.budget
             });
             const thinSpectaclePenalty =
                 ['ACTION', 'SCI_FI', 'SUPERHERO', 'ADVENTURE'].includes(rel.projectDetails.genre) &&
-                ['HIGH', 'BLOCKBUSTER'].includes(rel.projectDetails.budgetTier) &&
+                getProductionScale(rel.budget) > 1 &&
                 (rel.projectDetails.hiddenStats.castDepthScore ?? 70) < 55;
             const effectiveTotalCap = thinSpectaclePenalty
-                ? Math.floor(dynamicBoxOfficeCap.totalCap * (0.54 + ((rel.projectDetails.hiddenStats.castDepthScore ?? 45) / 180)))
+                ? Math.floor(dynamicBoxOfficeCap.totalCap * (1 - (1 - (0.54 + ((rel.projectDetails.hiddenStats.castDepthScore ?? 45) / 180))) * Math.min(1, Math.max(0, getProductionScale(rel.budget) - 1))))
                 : dynamicBoxOfficeCap.totalCap;
             rel.projectDetails.hiddenStats.boxOfficeTotalCap = effectiveTotalCap;
             rel.projectDetails.hiddenStats.boxOfficeCapLabel = thinSpectaclePenalty ? 'LIMITED' : dynamicBoxOfficeCap.label;

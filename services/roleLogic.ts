@@ -1,3 +1,5 @@
+import { completeOfferedCinemaCast } from './boxOffice/boxOfficeInputs';
+import { interpolateProductionBudget, getProductionScale, getProductionBudgetReference } from './studioProductionEconomy';
 
 // ... existing imports
 import { 
@@ -66,7 +68,10 @@ const splitLocalizedList = (language: GameLanguage, key: string, vars: Record<st
 const SPECTACLE_GENRES = new Set<Genre>(['ACTION', 'SCI_FI', 'SUPERHERO', 'ADVENTURE', 'FANTASY', 'ANIMATION']);
 const INTIMATE_GENRES = new Set<Genre>(['DRAMA', 'ROMANCE', 'THRILLER', 'MYSTERY', 'COMEDY', 'HORROR', 'BIOPIC', 'CRIME', 'DOCUMENTARY', 'MUSICAL', 'SPORTS']);
 
-export const getRecommendedCastDepth = (genre: Genre, budgetTier: BudgetTier): number => {
+export const getRecommendedCastDepth = (genre: Genre, budgetTier: BudgetTier, budget?: number): number => {
+    if (typeof budget === 'number' && Number.isFinite(budget)) return interpolateProductionBudget(budget, SPECTACLE_GENRES.has(genre)
+        ? { LOW: 4, MID: 4, HIGH: 6, BLOCKBUSTER: 7 }
+        : { LOW: 2, MID: 2, HIGH: 3, BLOCKBUSTER: 4 });
     if (SPECTACLE_GENRES.has(genre)) {
         if (budgetTier === 'BLOCKBUSTER') return 7;
         if (budgetTier === 'HIGH') return 6;
@@ -84,9 +89,10 @@ export const calculateCastDepthScore = (
     castSize: number,
     genre: Genre,
     budgetTier: BudgetTier,
-    leadStarPower: number = 50
+    leadStarPower: number = 50,
+    budget?: number
 ): { score: number; note: string } => {
-    const recommended = getRecommendedCastDepth(genre, budgetTier);
+    const recommended = getRecommendedCastDepth(genre, budgetTier, budget);
     const depthRatio = Math.min(1.35, Math.max(0.2, castSize / Math.max(1, recommended)));
     const starCover = Math.max(0, Math.min(18, (leadStarPower - 70) * 0.45));
     const spectaclePenalty = SPECTACLE_GENRES.has(genre) && castSize < recommended ? 10 : 0;
@@ -679,20 +685,16 @@ export const calculateProjectPay = (roleType: RoleType, budgetTier: BudgetTier, 
 };
 
 export const getEstimatedBudget = (tier: BudgetTier, rng: () => number = Math.random): number => {
-    switch(tier) {
-        case 'LOW': return Math.floor(500000 + rng() * 4500000);
-        case 'MID': return Math.floor(20000000 + rng() * 60000000);
-        case 'HIGH': return Math.floor(120000000 + rng() * 180000000);
-    }
+    const ranges: Record<BudgetTier, [number, number]> = {
+        LOW: [500_000, 12_000_000], MID: [12_000_001, 45_000_000],
+        HIGH: [45_000_001, 120_000_000], BLOCKBUSTER: [120_000_001, 300_000_000],
+    };
+    const [min, max] = ranges[tier] || ranges.MID;
+    const roll = rng();
+    return Math.round(min + (max - min) * (Number.isFinite(roll) ? clamp(roll, 0, 1) : 0.5));
 };
 
-export const getBudgetDisplay = (tier: BudgetTier): string => {
-    switch(tier) {
-        case 'LOW': return '$';
-        case 'MID': return '$$';
-        case 'HIGH': return '$$$';
-    }
-};
+export const getBudgetDisplay = (tier: BudgetTier): string => ({ LOW: '$', MID: '$$', HIGH: '$$$', BLOCKBUSTER: '$$$$' }[tier]);
 
 // --- TITLE GENERATION ---
 const TITLES_FIRST = [
@@ -758,8 +760,8 @@ export const generateHiddenStats = (tier: BudgetTier): ProjectHiddenStats => {
     const script = roll();
     const director = roll();
     const casting = roll();
-    const distribution = tier === 'HIGH' ? Math.min(100, roll() + 20) : roll();
-    const hype = tier === 'HIGH' ? Math.min(100, roll() + 30) : roll();
+    const distribution = ['HIGH', 'BLOCKBUSTER'].includes(tier) ? Math.min(100, roll() + 20) : roll();
+    const hype = ['HIGH', 'BLOCKBUSTER'].includes(tier) ? Math.min(100, roll() + 30) : roll();
     
     const baseQuality = (script * 0.4) + (director * 0.3) + (casting * 0.3);
     // Add final variance to the quality score itself (+/- 5 points)
@@ -802,7 +804,7 @@ export const generateProjectDetails = (tier: BudgetTier, type: ProjectType, used
         targetAudience,
         budgetTier: tier,
         estimatedBudget: getEstimatedBudget(tier),
-        releaseScale: tier === 'HIGH' ? 'GLOBAL' : tier === 'MID' ? 'MASS' : 'LIMITED',
+        releaseScale: ['HIGH', 'BLOCKBUSTER'].includes(tier) ? 'GLOBAL' : tier === 'MID' ? 'MASS' : 'LIMITED',
         releaseStrategy, 
         visibleHype: hidden.rawHype > 80 ? 'HIGH' : hidden.rawHype > 50 ? 'MID' : 'LOW',
         hiddenStats: hidden,
@@ -966,38 +968,13 @@ export const generateCastList = (player: Player, project: ProjectDetails, player
         ...suggestCharacterIdentity(storyCompass, playerRole, 0, project)
     });
 
-    let count = 2;
-    if (project.budgetTier === 'MID') count = 4;
-    if (project.budgetTier === 'HIGH') count = 6;
-
-    const pool = [...NPC_DATABASE].filter(npc => isCastableActor(npc)).sort(() => 0.5 - Math.random()).slice(0, count);
-    
-    pool.forEach((npc, index) => {
-        cast.push({
-            id: npc.id,
-            name: npc.name,
-            role: 'Co-Star',
-            isPlayer: false,
-            image: npc.avatar,
-            type: 'ACTOR',
-            npcId: npc.id,
-            actorId: npc.id,
-            actorName: npc.name,
-            roleType: 'SUPPORTING',
-            ...suggestCharacterIdentity(storyCompass, 'SUPPORTING', index + 1, project)
-        });
-    });
-
-    cast.push({
-        id: `dir_${Math.random()}`,
-        name: project.directorName,
-        role: 'Director',
-        isPlayer: false,
-        image: `https://ui-avatars.com/api/?name=${project.directorName.replace(' ', '+')}`,
-        type: 'DIRECTOR'
-    });
-
-    return cast;
+    const completed = completeOfferedCinemaCast({ ...project, castList: cast, castPackageSource: undefined });
+    return [...(completed.castList || cast), {
+        id: project.directorId || `director:${project.studioId}:${project.title}`,
+        name: project.directorName, role: 'Director', isPlayer: project.directorId === 'PLAYER_SELF',
+        image: `https://ui-avatars.com/api/?name=${encodeURIComponent(project.directorName)}`,
+        type: 'DIRECTOR' as const,
+    }];
 };
 
 export const generateReviews = (
@@ -1169,13 +1146,7 @@ export const calculateIMDbRating = (commitment: Commitment): number => {
     const directorQuality = stats.directorQuality || quality;
     const castingStrength = stats.castingStrength || 50;
     const castDepthScore = stats.castDepthScore ?? 70;
-    const budgetAnchor = details.budgetTier === 'LOW'
-        ? 8_000_000
-        : details.budgetTier === 'MID'
-            ? 35_000_000
-            : details.budgetTier === 'HIGH'
-                ? 90_000_000
-                : 180_000_000;
+    const budgetAnchor = getProductionBudgetReference(details.estimatedBudget);
     const budgetPressure = Math.max(0, ((details.estimatedBudget || budgetAnchor) / budgetAnchor) - 1);
     const elitePackageScore = (quality * 0.34)
         + (scriptQuality * 0.22)
@@ -1207,7 +1178,11 @@ const BOX_OFFICE_CAPS: Record<BudgetTier, { opening: number, total: number }> = 
     'BLOCKBUSTER': { opening: 600000000, total: 2650000000 }
 };
 
-export const getBoxOfficeCaps = (budgetTier: BudgetTier): { opening: number, total: number } => {
+export const getBoxOfficeCaps = (budgetTier: BudgetTier, budget?: number): { opening: number, total: number } => {
+    if (typeof budget === 'number' && Number.isFinite(budget)) return {
+        opening: interpolateProductionBudget(budget, { LOW: 30_000_000, MID: 120_000_000, HIGH: 350_000_000, BLOCKBUSTER: 600_000_000 }),
+        total: interpolateProductionBudget(budget, { LOW: 170_000_000, MID: 600_000_000, HIGH: 1_750_000_000, BLOCKBUSTER: 2_650_000_000 }),
+    };
     return BOX_OFFICE_CAPS[budgetTier] || BOX_OFFICE_CAPS.HIGH;
 };
 
@@ -1218,7 +1193,8 @@ export const calculateDynamicBoxOfficeTotalCap = ({
     hiddenStats,
     marketDemand = 1,
     studioGenreReputation = 0,
-    capRoll = 0.5
+    capRoll = 0.5,
+    estimatedBudget
 }: {
     budgetTier: BudgetTier;
     genre: Genre;
@@ -1227,8 +1203,11 @@ export const calculateDynamicBoxOfficeTotalCap = ({
     marketDemand?: number;
     studioGenreReputation?: number;
     capRoll?: number;
+    estimatedBudget?: number;
 }): { totalCap: number; label: NonNullable<ProjectHiddenStats['boxOfficeCapLabel']> } => {
-    const baseCap = getBoxOfficeCaps(budgetTier).total;
+    const baseCap = getBoxOfficeCaps(budgetTier, estimatedBudget).total;
+    const scale = typeof estimatedBudget === 'number' ? getProductionScale(estimatedBudget) : { LOW: 0, MID: 1, HIGH: 2, BLOCKBUSTER: 3 }[budgetTier];
+    const eventWeight = clamp(scale - 1, 0, 1);
     const safeRoll = clamp(Number.isFinite(capRoll) ? capRoll : 0.5, 0, 1);
     const packageStrength = (
         (hiddenStats.scriptQuality || 50) * 0.18 +
@@ -1249,23 +1228,23 @@ export const calculateDynamicBoxOfficeTotalCap = ({
     let stretch = 1 + marketLift + studioLift - weakPackageDrag;
     let label: NonNullable<ProjectHiddenStats['boxOfficeCapLabel']> = weakPackageDrag > 0.08 ? 'LIMITED' : 'STANDARD';
 
-    if (['HIGH', 'BLOCKBUSTER'].includes(budgetTier) && eventGenre) {
+    if (eventWeight > 0 && eventGenre) {
         const eventScore = packageStrength
             + clamp((hiddenStats.rawHype || 50) - 78, -10, 16) * 0.35
             + clamp((hiddenStats.distributionPower || 50) - 76, -10, 18) * 0.25
             + clamp(((hiddenStats.fameMultiplier || 1) - 1) * 28, -5, 12);
 
         if (eventScore >= 92) {
-            const breakoutRoom = budgetTier === 'BLOCKBUSTER' ? 0.45 : 0.36;
-            stretch += clamp((eventScore - 88) / 58, 0.08, breakoutRoom);
+            const breakoutRoom = 0.36 + clamp(scale - 2, 0, 1) * 0.09;
+            stretch += clamp((eventScore - 88) / 58, 0.08, breakoutRoom) * eventWeight;
             label = eventScore >= 102 ? 'BREAKOUT' : 'EVENT';
         } else if (eventScore >= 82) {
-            stretch += clamp((eventScore - 80) / 95, 0.02, 0.14);
+            stretch += clamp((eventScore - 80) / 95, 0.02, 0.14) * eventWeight;
             label = 'EVENT';
         }
     }
 
-    const maxStretch = budgetTier === 'BLOCKBUSTER' ? 1.45 : budgetTier === 'HIGH' ? 1.35 : 1.28;
+    const maxStretch = 1.28 + clamp(scale - 1, 0, 1) * 0.07 + clamp(scale - 2, 0, 1) * 0.1;
     const totalCap = Math.floor(baseCap * variance * clamp(stretch, 0.64, maxStretch));
     return { totalCap: Math.max(1, totalCap), label };
 };
@@ -1294,7 +1273,9 @@ const GENRE_MULTIPLIERS: Record<Genre, number> = {
 export const calculateWeeklyBoxOffice = (
     week: number, budget: number, stats: ProjectHiddenStats, prevGross: number, buzzScore: number | undefined, budgetTier: BudgetTier = 'LOW', genre: Genre = 'DRAMA', format: ProjectFormat = 'LIVE_ACTION', marketDemand: number = 1, studioGenreReputation: number = 0
 ): number => {
-    const caps = BOX_OFFICE_CAPS[budgetTier];
+    const caps = getBoxOfficeCaps(budgetTier, budget);
+    const productionScale = getProductionScale(budget);
+    const spectacleWeight = clamp(productionScale - 1, 0, 1);
     const genreMod = GENRE_MULTIPLIERS[genre];
     const scriptQuality = stats.scriptQuality || 50;
     const directorQuality = stats.directorQuality || 50;
@@ -1341,21 +1322,21 @@ export const calculateWeeklyBoxOffice = (
 
         // Sleeper hits are possible when craft is excellent even without massive star power.
         const isSleeperCandidate =
-            ['LOW', 'MID'].includes(budgetTier) &&
+            productionScale < 2 &&
             audienceStrength > 82 &&
             (scriptQuality > 85 || directorQuality > 85);
         if (isSleeperCandidate) {
             rawOpening *= 1.08 + (Math.random() * 0.12);
         }
 
-        if (SPECTACLE_GENRES.has(genre) && ['HIGH', 'BLOCKBUSTER'].includes(budgetTier) && castDepthScore < 55) {
-            rawOpening *= 0.72 + (castDepthScore / 220);
+        if (SPECTACLE_GENRES.has(genre) && spectacleWeight > 0 && castDepthScore < 55) {
+            rawOpening *= 1 - (1 - (0.72 + castDepthScore / 220)) * spectacleWeight;
         }
 
         // "The Avenger Factor": Can we break the cap?
         // Only top-end event films with stars, hype, and distribution get to stretch the opening cap.
         const isMegaEvent =
-            ['HIGH', 'BLOCKBUSTER'].includes(budgetTier) &&
+            spectacleWeight > 0 &&
             ['SUPERHERO', 'SCI_FI', 'ADVENTURE', 'ACTION'].includes(genre) &&
             stats.rawHype > 92 &&
             castingStrength > 82 &&
@@ -1392,7 +1373,7 @@ export const calculateWeeklyBoxOffice = (
     if (scriptQuality > 85) dropRate -= 0.05;
     if (directorQuality > 82) dropRate -= 0.03;
     if (week === 2 && castingStrength - audienceStrength > 18) dropRate += 0.08;
-    if (SPECTACLE_GENRES.has(genre) && ['HIGH', 'BLOCKBUSTER'].includes(budgetTier) && castDepthScore < 55) dropRate += 0.1;
+    if (SPECTACLE_GENRES.has(genre) && spectacleWeight > 0 && castDepthScore < 55) dropRate += 0.1 * spectacleWeight;
     if (castDepthScore > 84 && qualityScore > 75) dropRate -= 0.03;
     dropRate += musicMismatchBacklashRisk / 520;
     dropRate += musicControversyRisk / 760;
@@ -1403,7 +1384,7 @@ export const calculateWeeklyBoxOffice = (
     // preserves indie upside without making zero marketing a guaranteed exploit.
     const sleeperRoll = stats.boxOfficeCapRoll ?? 0.5;
     const sleeperEligible =
-        ['LOW', 'MID'].includes(budgetTier)
+        productionScale < 2
         && campaignReachMod < 0.78
         && qualityScore >= 84
         && scriptQuality >= 82

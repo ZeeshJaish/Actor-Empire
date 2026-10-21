@@ -1,3 +1,4 @@
+import { interpolateProductionBudget } from './studioProductionEconomy';
 import type {
     BoxOfficeRegionId,
     BudgetTier,
@@ -138,7 +139,7 @@ const getRegionHoldModifier = (project: ProjectDetails, terms: CinemaChainRegion
 };
 
 const getDistributionModifier = (project: ProjectDetails, totalScreens: number, expectedFootfall: number) => {
-    const targetScreens = BUDGET_TARGET_SCREENS[project.budgetTier] || BUDGET_TARGET_SCREENS.MID;
+    const targetScreens = interpolateProductionBudget(project.estimatedBudget, BUDGET_TARGET_SCREENS);
     const screenRatio = totalScreens / Math.max(1, targetScreens);
     const underReleasePenalty = screenRatio < 0.7
         ? clamp((0.7 - screenRatio) * 0.42, 0, 0.28)

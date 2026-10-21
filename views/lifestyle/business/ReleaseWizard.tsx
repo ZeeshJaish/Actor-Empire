@@ -1321,7 +1321,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
         const distributionLift = Math.pow(distributionPower / 50, 0.72);
         const musicOpeningMod = Math.max(0.9, Math.min(1.32, 1 + (musicImpact.openingWeekendLiftPct / 100) + (musicImpact.trailerStrengthLift / 260) - (musicImpact.mismatchBacklashRisk / 1000)));
         const grossDemand = budget * (0.28 + screenReach * 0.34 + regionReach * 0.26 + footfallSignal * 0.14 + campaignLift) * qualityLift * hypeLift * fameLift * genreEventMultiplier * distributionLift * musicOpeningMod;
-        const caps = getBoxOfficeCaps(project.projectDetails?.budgetTier || 'MID');
+        const caps = getBoxOfficeCaps(project.projectDetails?.budgetTier || 'MID', budget);
         const openingCap = caps.opening * (quality >= 88 && rawHype >= 82 ? 1.08 : 0.92);
         const midpoint = Math.min(openingCap, grossDemand);
         const uncertainty = quality < 55

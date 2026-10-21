@@ -1,3 +1,5 @@
+import { calculateCinemaCraftQuality } from '../../../services/boxOffice/boxOfficeDelivery';
+import { interpolateProductionBudget } from '../../../services/studioProductionEconomy';
 import { getOwnedEquipmentProjectCost } from '../../../services/studioProductionEconomy';
 
 export interface GreenlightBudgetCastRole {
@@ -216,7 +218,7 @@ export const calculateGreenlightCastingStrength = ({
                     ? 0.35
                     : 0.15;
         return {
-            score: (member.talent * 0.72) + (member.fame * 0.28),
+            score: Number.isFinite(member.talent) ? Math.max(0, Math.min(100, member.talent)) : 50,
             weight: roleWeight,
         };
     });
@@ -225,13 +227,8 @@ export const calculateGreenlightCastingStrength = ({
         (sum, item) => sum + (item.score * item.weight),
         0,
     ) / totalWeight;
-    const requiredCastCount = projectType === 'SERIES'
-        ? 4
-        : estimatedBudget > 100_000_000
-            ? 6
-            : estimatedBudget > 25_000_000
-                ? 4
-                : 3;
+    const requiredCastCount = projectType === 'SERIES' ? 4
+        : interpolateProductionBudget(estimatedBudget, { LOW: 3, MID: 4, HIGH: 6, BLOCKBUSTER: 7 });
     const completenessRatio = Math.min(1, cast.length / requiredCastCount);
     const completenessPenalty = (1 - completenessRatio) * 18;
     const ensembleBonus = cast.length >= requiredCastCount
@@ -268,41 +265,10 @@ export const calculateGreenlightEstimatedQuality = ({
     backgroundReliability: number;
     backgroundSetCare: number;
 }): number => {
-    let score = 50;
-    if (scriptQuality !== undefined) {
-        score += ((scriptQuality || 50) - 50) * 0.5;
-    }
-    score += ((directorQuality || 50) - 50) * 0.4;
-    score += (castingStrength - 50) * 0.3;
-
-    const averageCrewQuality = crewQualities.length > 0
-        ? crewQualities.reduce((total, quality) => total + (quality || 50), 0) / crewQualities.length
-        : 50;
-    score += (averageCrewQuality - 50) * 0.2;
-
-    let equipmentScore = 0;
-    for (const [equipmentId, choice] of Object.entries(equipmentChoices)) {
-        if (choice === 'OWNED') {
-            equipmentScore += (ownedEquipmentLevels[equipmentId] || 0) * 3;
-            continue;
-        }
-        equipmentScore += gearTiers[choice]?.quality || 0;
-    }
-    score += equipmentScore / 4;
-
-    if (locationQualities.length > 0) {
-        const locationScore = locationQualities.reduce(
-            (total, quality) => total + (((quality || 5) - 5) * 2),
-            0,
-        );
-        score += locationScore / locationQualities.length;
-    }
-
-    score += storyFitQualityAdjustment || 0;
-    const backgroundAdjustment = ((backgroundAuthenticity - 50) * 0.04)
-        + ((backgroundReliability - 50) * 0.03)
-        + ((backgroundSetCare - 50) * 0.025);
-    score += Math.max(-3, Math.min(5, backgroundAdjustment));
-
-    return Math.max(1, Math.min(100, Math.round(score || 50)));
+    return calculateCinemaCraftQuality({
+        scriptQuality, directorQuality, castingStrength, crewQualities,
+        equipmentQualityLevels: Object.entries(equipmentChoices).map(([id, choice]) => choice === 'OWNED'
+            ? ownedEquipmentLevels[id] ?? 0 : gearTiers[choice]?.quality ?? 0),
+        locationQualities, storyFitQualityAdjustment, backgroundAuthenticity, backgroundReliability, backgroundSetCare,
+    });
 };

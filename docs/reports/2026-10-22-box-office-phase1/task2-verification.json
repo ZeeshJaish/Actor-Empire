@@ -1,0 +1,16 @@
+{
+  "date": "2026-10-22",
+  "red": {
+    "deliveryRegressions": 7,
+    "blockbusterFallbackRegression": 1,
+    "oneDollarOpeningJumpBefore": 250000000
+  },
+  "green": {
+    "delivery": 9,
+    "actualHandoff": 1,
+    "greenlight": true,
+    "studioProductionEconomy": true,
+    "productionRisk": true
+  },
+  "compatibility": "Legacy label-only calls retain fallback; no shared audience market activated"
+}

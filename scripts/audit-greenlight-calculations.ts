@@ -103,7 +103,7 @@ assert.equal(calculateGreenlightCastingStrength({
     ],
     projectType: 'MOVIE',
     estimatedBudget: 30_000_000,
-}), 69);
+}), 74); // Talent-only craft, with continuous cast completeness.
 assert.equal(calculateGreenlightCastingStrength({
     cast: [],
     projectType: 'SERIES',
@@ -130,6 +130,6 @@ assert.equal(calculateGreenlightEstimatedQuality({
     backgroundAuthenticity: 70,
     backgroundReliability: 60,
     backgroundSetCare: 80,
-}), 97);
+}), 80); // Weighted craft + bounded gear/location/story/background contributions.
 
 console.log('Greenlight calculation audit passed.');

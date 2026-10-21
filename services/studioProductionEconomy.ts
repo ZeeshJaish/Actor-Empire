@@ -123,3 +123,28 @@ export const calculateCampaignReachProfile = ({
 
     return { multiplier, label, spendRatio };
 };
+
+const PRODUCTION_SCALE_ANCHORS: ReadonlyArray<{ budget: number; tier: BudgetTier }> = [
+    { budget: 8_000_000, tier: 'LOW' }, { budget: 35_000_000, tier: 'MID' },
+    { budget: 90_000_000, tier: 'HIGH' }, { budget: 180_000_000, tier: 'BLOCKBUSTER' },
+];
+
+/** Compatibility bridge for the old economy: interpolate numeric inputs, never
+ * switch earnings because one dollar changed a production-label bucket.
+ * The later shared audience engine has no budget-derived monetary ceiling.
+ */
+export const interpolateProductionBudget = (budget: number, values: Record<BudgetTier, number>): number => {
+    const amount = Number.isFinite(budget) ? Math.max(0, budget) : 0;
+    if (amount <= PRODUCTION_SCALE_ANCHORS[0].budget) return values.LOW;
+    for (let index = 1; index < PRODUCTION_SCALE_ANCHORS.length; index++) {
+        const low = PRODUCTION_SCALE_ANCHORS[index - 1], high = PRODUCTION_SCALE_ANCHORS[index];
+        if (amount <= high.budget) {
+            const weight = Math.log(amount / low.budget) / Math.log(high.budget / low.budget);
+            return values[low.tier] + (values[high.tier] - values[low.tier]) * weight;
+        }
+    }
+    return values.BLOCKBUSTER;
+};
+export const getProductionScale = (budget: number): number => interpolateProductionBudget(budget, { LOW: 0, MID: 1, HIGH: 2, BLOCKBUSTER: 3 });
+export const getProductionBudgetReference = (budget: number): number => interpolateProductionBudget(budget,
+    { LOW: 8_000_000, MID: 35_000_000, HIGH: 90_000_000, BLOCKBUSTER: 180_000_000 });

@@ -4,6 +4,7 @@
   "version": "1.0.25",
   "type": "module",
   "scripts": {
+    "audit:box-office-delivery": "node scripts/run-box-office-audit.mjs delivery",
     "audit:box-office-inputs": "node scripts/run-box-office-audit.mjs inputs",
     "audit:box-office-phase1-integration": "node scripts/run-box-office-audit.mjs phase1-integration",
     "audit:streaming-market-presentations": "esbuild scripts/audit-streaming-market-presentations.tsx --bundle --platform=node --format=cjs --loader:.csv=text --loader:.css=empty --outfile=/tmp/audit-streaming-market-presentations.cjs && node /tmp/audit-streaming-market-presentations.cjs",

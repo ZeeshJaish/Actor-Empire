@@ -2160,6 +2160,8 @@ export interface StudioFinanceEntry {
 }
 
 export interface ProjectHiddenStats {
+    /** Player-visible production estimate, distinct from hidden delivered quality. */
+    estimatedQualityScore?: number;
     scriptQuality: number;
     directorQuality: number;
     castingStrength: number;

@@ -228,7 +228,7 @@ export const buildGreenlightProject = ({
         const fameMultiplier = calculateProjectFameMultiplier(castIds, directorData.name as string, player.stats.fame,
             safeMovieCastList.some(member => member.actorId === 'PLAYER_SELF') ? playerActingTalent : undefined, extraFame);
         const finalBudgetTier = getProductionBudgetTier(productionBudgetWithMusic);
-        const castDepth = calculateCastDepthScore(safeMovieCastList.length, selectedScript.genres[0], finalBudgetTier, currentCastingStrength);
+        const castDepth = calculateCastDepthScore(safeMovieCastList.length, selectedScript.genres[0], finalBudgetTier, currentCastingStrength, productionBudgetWithMusic);
 
         // Calculate Actual Quality (Hidden)
         // User request: "movie perfomed more good if movie quality is good as oer iuts est quaity but also its not neccesaary that what est quality its there movie actucal quality remain that"
@@ -538,6 +538,7 @@ export const buildGreenlightProject = ({
                     distributionPower: Math.min(100, 50 + Math.floor(studioPrestigeScore / 8)),
                     rawHype: currentEstimatedBuzz,
                     qualityScore: Math.max(1, actualQuality - selfRunQualityStrain),
+                    estimatedQualityScore: currentEstimatedQuality,
                     prestigeBonus: (tone < 30 ? 20 : 0) + Math.floor(studioPrestigeScore / 25),
                     fameMultiplier: fameMultiplier,
                     castDepthScore: castDepth.score,

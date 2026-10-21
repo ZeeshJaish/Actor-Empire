@@ -1,4 +1,5 @@
-import type { BudgetTier, Genre, ProjectDetails, ProjectHiddenStats } from '../types';
+import { getProductionBudgetReference, getProductionScale } from './studioProductionEconomy';
+import type { Genre, ProjectDetails, ProjectHiddenStats } from '../types';
 import { getEpisodeRatingsGameplayImpact } from './episodeRatings';
 
 export type ProductionRiskLabel = 'Dangerous' | 'Risky' | 'Balanced' | 'Upside' | 'Prestige Shield';
@@ -22,13 +23,6 @@ export interface ProductionRiskProfile {
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 const roundTwo = (value: number) => Math.round(value * 100) / 100;
 
-const BUDGET_ANCHOR: Record<BudgetTier, number> = {
-    LOW: 8_000_000,
-    MID: 35_000_000,
-    HIGH: 90_000_000,
-    BLOCKBUSTER: 180_000_000,
-};
-
 const SPECTACLE_GENRES = new Set<Genre>(['ACTION', 'ADVENTURE', 'SCI_FI', 'SUPERHERO', 'FANTASY', 'ANIMATION']);
 const PRESTIGE_GENRES = new Set<Genre>(['DRAMA', 'BIOPIC', 'DOCUMENTARY', 'MYSTERY', 'CRIME']);
 
@@ -42,7 +36,7 @@ export const calculateProductionRiskProfile = (
 ): ProductionRiskProfile => {
     const hidden: Partial<ProjectHiddenStats> = project.hiddenStats || {};
     const budget = Math.max(1, Number(context.budget || project.estimatedBudget || 1));
-    const anchor = BUDGET_ANCHOR[project.budgetTier] || BUDGET_ANCHOR.MID;
+    const anchor = getProductionBudgetReference(budget);
     const budgetPressure = budget / anchor;
     const castPayrollRatio = getCastPayroll(project) / budget;
 
@@ -72,8 +66,8 @@ export const calculateProductionRiskProfile = (
     const efficiencyLift = budgetPressure < 0.95 && audienceConfidence >= 74 ? clamp((0.95 - budgetPressure) * 0.35, 0, 0.1) : 0;
     const starVehicleDrag = castPayrollRatio > 0.34 && audienceConfidence < 72 ? clamp((castPayrollRatio - 0.34) * 0.42, 0, 0.18) : 0;
     const hypeTrapDrag = rawHype > 78 && qualityScore < 58 ? clamp((rawHype - qualityScore) / 210, 0, 0.18) : 0;
-    const thinSpectacleDrag = SPECTACLE_GENRES.has(project.genre) && ['HIGH', 'BLOCKBUSTER'].includes(project.budgetTier) && castDepthScore < 58
-        ? clamp((58 - castDepthScore) / 160, 0, 0.16)
+    const thinSpectacleDrag = SPECTACLE_GENRES.has(project.genre) && castDepthScore < 58
+        ? clamp((58 - castDepthScore) / 160, 0, 0.16) * clamp(getProductionScale(budget) - 1, 0, 1)
         : 0;
     const slateFatigueDrag = clamp(studioSlateFatigueScore / 360, 0, 0.19);
 
