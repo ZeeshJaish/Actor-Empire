@@ -12,7 +12,9 @@ import type { BuildData, BuildDraft } from '../../components/studio-finance/fina
 import type { BuildInputs, BuildSel } from '../../components/streaming-transplant/StreamingBuildoutExperience';
 import type { Player } from '../../types';
 
-export function captureNetworkBuildData(player: Player, countryCodes?: string[], selectionOverride?: BuildSel): { data: BuildData; draft: BuildDraft } {
+export function captureNetworkBuildData(player: Player, countryCodes?: string[], selectionOverride?: BuildSel,
+  options: { settled?: Pick<BuildInputs, 'defineLaunchPaid' | 'catalogueSpend' | 'originalsSpend'>; marketing?: BuildData['marketing'] } = {},
+): { data: BuildData; draft: BuildDraft } {
   const platform = player.ownedStreamingPlatform;
   const ids = countryCodes ?? platform.marketOperations.map(operation => operation.countryId).filter(Boolean);
   const markets = ids.map(getStreamingDayOneMarket).filter(Boolean);
@@ -37,6 +39,7 @@ export function captureNetworkBuildData(player: Player, countryCodes?: string[],
       recommendedCityId: market!.recommendedCityId, localizationNote: market!.localizationNote })),
     hasExplicitOpeningMarkets: true, marketPlanning: { editable: true, reason: null }, homeCityId: null,
     audienceMul: 1, openingDemandForecast: { low: forecast.low, likely: forecast.likely, high: forecast.high, byMarket: forecast.byMarket },
+    ...options.settled,
   };
   let captured: { data: BuildData; draft: BuildDraft } | undefined;
   // Intercept the adapter boundary under either JSX transform; no production audit hooks.
@@ -56,7 +59,7 @@ export function captureNetworkBuildData(player: Player, countryCodes?: string[],
   React.createElement = intercept(original);
   try {
     renderToStaticMarkup(original(StreamingBuildWizardExperience, {
-      brand, inputs, sel: selection, canonicalSource: 'CAREER', onChange: () => {}, onBack: () => {},
+      brand, inputs, sel: selection, marketing: options.marketing, canonicalSource: 'CAREER', onChange: () => {}, onBack: () => {},
     }));
   } finally {
     React.createElement = original; runtime.jsx = originalJsx; runtime.jsxs = originalJsxs;

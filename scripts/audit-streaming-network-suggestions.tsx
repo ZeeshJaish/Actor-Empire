@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createLabBuildData, createLabDraft } from '../lab/buildLabData';
-import { buildTotals, serviceForecast, fitsPlan, tiersOf } from '../components/studio-finance/finance/build';
+import { buildTotals, moneyPlan, serviceForecast, fitsPlan, tiersOf, type BuildData } from '../components/studio-finance/finance/build';
+import { forecastStreamingLaunchMarketing, getStreamingLaunchMarketingRecommendations, STREAMING_LAUNCH_MARKETING_CHANNELS, type StreamingLaunchMarketingInput } from '../services/streamingLaunchMarketing';
 import { createNetworkSuggestion, validateNetworkSuggestion, parseNetworkLimit, type NetworkSuggestionRequest } from '../components/studio-finance/finance/networkSuggestions';
 import { NetworkSuggestionSheet } from '../components/studio-finance/components/build/NetworkSuggestionSheet';
 import { captureNetworkBuildData } from './fixtures/networkSuggestionBuildData';
@@ -118,6 +119,58 @@ async function main() {
  assert.match(html,/Suggest network/); assert.match(html,/Fill remaining gaps/);assert.match(html,/Generate/);assert.match(html,/aria-modal="true"/);
  assert.equal(buildTotals(data,draft).racks,0);
  const player=filedMarketFixture(['US','IN']);
+ // Real CAREER accounting: paid setup/catalogue/originals must not reserve current cash again.
+ const modest=structuredClone(player);
+ modest.ownedStreamingPlatform.treasuryCash=100_000_000;
+ const modestBefore=JSON.stringify(modest);
+ const settled={defineLaunchPaid:[{id:'setup',label:'Paid setup',amount:20_000_000}],catalogueSpend:120_000_000,originalsSpend:10_000_000};
+ const paid=captureNetworkBuildData(modest,['US','IN'],undefined,{settled});
+ const paidMoney=moneyPlan(paid.data,paid.draft);
+ assert.equal(paid.data.treasury.committedLaunch,150_000_000);
+ assert.equal(paidMoney.lines.filter(line=>line.timing==='SETTLED').reduce((sum,line)=>sum+line.amount,0),150_000_000);
+ assert.equal(paidMoney.deferred,0);
+ const zeroRequest={...request,upfrontLimit:0,weeklyLimit:0};
+ const zeroPaid=await createNetworkSuggestion(paid.data,paid.draft,zeroRequest);
+ assert.equal(zeroPaid.status,'READY','Settled CAREER spend above current cash must allow a zero-upfront plan');
+ if(zeroPaid.status==='READY') assert.equal(validateNetworkSuggestion(paid.data,paid.draft,zeroRequest,zeroPaid.proposal).ok,true);
+ const fundedDraft=placeRegion(paid.data,paid.draft,'NORTH_AMERICA',{...emptySetup(),servers:{SCOUT:1,WORKHORSE:0,TITAN:0}}).draft;
+ assert.ok(moneyPlan(paid.data,fundedDraft).commissionNow!>0 && moneyPlan(paid.data,fundedDraft).commissionNow!<=100_000_000,'Real owned server quote fits current cash');
+ const affordablePaid=await createNetworkSuggestion(paid.data,fundedDraft,request);
+ assert.equal(affordablePaid.status,'READY');
+ if(affordablePaid.status!=='READY') throw Error('No affordable paid-spend proposal');
+ assert.ok(affordablePaid.proposal.upfront>0 && affordablePaid.proposal.upfront<=100_000_000,'Current cash remains available for actual infrastructure');
+ assert.equal(validateNetworkSuggestion(paid.data,fundedDraft,request,affordablePaid.proposal).ok,true);
+ const marketingInput:StreamingLaunchMarketingInput={platformKey:'network-money-qa',absoluteWeek:100,buildWeeks:8,
+  availableTreasury:100_000_000,protectedOperatingCash:0,hasSellablePlan:true,hasFlagshipOriginal:false,
+  pricingRevision:1,catalogueRevision:1,localizationRevision:1,competitionRevision:1,countries:[]};
+ function marketing(budgetCeiling:number):NonNullable<BuildData['marketing']> {
+  const draft:NonNullable<BuildData['marketing']>['draft']={schemaVersion:1,objective:'PLATFORM_INTRODUCTION',timeline:'BALANCED',
+   budgetCeiling,allocationMode:'AUTO',countryWeights:{},channelAllocations:{SOCIAL_DIGITAL:1},updatedAtAbsoluteWeek:100,revision:1};
+  return {draft,forecast:forecastStreamingLaunchMarketing(marketingInput,draft),recommendations:getStreamingLaunchMarketingRecommendations(marketingInput),
+   channels:STREAMING_LAUNCH_MARKETING_CHANNELS.map(channel=>({...channel,available:true}))};
+ }
+ const reserved=captureNetworkBuildData(modest,['US','IN'],undefined,{settled,marketing:marketing(100_000_000)});
+ assert.equal(moneyPlan(reserved.data,reserved.draft).deferred,100_000_000);
+ const unpaid=await createNetworkSuggestion(reserved.data,reserved.draft,request);
+ assert.equal(unpaid.status,'READY','An unpaid campaign equal to cash permits only zero upfront');
+ if(unpaid.status==='READY') {
+  assert.equal(unpaid.proposal.upfront,0,'Unpaid campaign must leave no cash for infrastructure');
+  assert.equal(validateNetworkSuggestion(reserved.data,reserved.draft,request,unpaid.proposal).ok,true);
+ }
+ assert.equal((await createNetworkSuggestion(reserved.data,fundedDraft,request)).status,'INVALID','Unpaid campaign plus retained unbuilt infrastructure exceeds current cash');
+ const overReserved=captureNetworkBuildData(modest,['US','IN'],undefined,{settled,marketing:marketing(100_000_001)});
+ assert.equal((await createNetworkSuggestion(overReserved.data,overReserved.draft,request)).status,'INVALID','Unpaid campaign above cash rejects even zero upfront');
+ assert.equal(validateNetworkSuggestion(reserved.data,fundedDraft,request,affordablePaid.proposal).ok,false,'Changed campaign invalidates prior Apply');
+ // Fresh canonical money can change behind an otherwise unchanged input identity.
+ // Use another actual CAREER bridge, not a fabricated MoneyPlan, to exercise the final funds gate.
+ const originalMoney=paid.data.canonical!.money;
+ paid.data.canonical!.money=reserved.data.canonical!.money;
+ const currentFunds=validateNetworkSuggestion(paid.data,fundedDraft,request,affordablePaid.proposal);
+ assert.equal(currentFunds.ok,false);
+ if(currentFunds.ok===false) assert.match(currentFunds.message,/available funds/,'Apply rechecks unpaid obligations against current funds');
+ paid.data.canonical!.money=originalMoney;
+ assert.equal(JSON.stringify(modest),modestBefore,'Money regressions must not change cash or rights');
+ console.log('CAREER settled $150M / cash $100M: zero and funded plans pass; unpaid $100M/$100M+1 and current-money Apply gates PASS');
  const canonical=captureNetworkBuildData(player,['US','IN']);
  const careerBefore=JSON.stringify(player);
  const single=captureNetworkBuildData(player,['IN']);

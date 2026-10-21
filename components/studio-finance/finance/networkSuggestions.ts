@@ -131,7 +131,9 @@ function evidence(data: BuildData, draft: BuildDraft, multiplier: number): Evide
     complete: fullCoverage && capacityTargetMet, capacityTargetMet, regional };
 }
 function affordable(data: BuildData, request: NetworkSuggestionRequest, value: Evidence): boolean {
-  const deferred = Math.max(value.money.deferred ?? Math.max(0, value.money.total - value.upfront), data.treasury.committedLaunch);
+  // Explicit canonical deferred excludes already-settled launch/catalogue spend.
+  // Only legacy money without that accounting needs the committedLaunch fallback.
+  const deferred = value.money.deferred ?? Math.max(0, value.money.total - value.upfront, data.treasury.committedLaunch);
   return value.upfront <= request.upfrontLimit && value.weekly <= request.weeklyLimit
     && value.upfront + deferred <= Math.min(data.treasury.available, value.money.available);
 }
