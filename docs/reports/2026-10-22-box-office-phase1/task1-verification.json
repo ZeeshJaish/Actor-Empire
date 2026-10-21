@@ -1,0 +1,15 @@
+{
+  "date": "2026-10-22",
+  "baselineCommit": "f693fd248c861cedecf2fb78f74f57bdab0ddd28",
+  "red": {
+    "inputRegressionFailures": 5,
+    "actualHandoffFailure": "actorId-only cast ignored"
+  },
+  "green": {
+    "inputs": 7,
+    "actualHandoff": 1,
+    "studioAiB6": true,
+    "typescript": true
+  },
+  "newAudienceEngineActivated": false
+}

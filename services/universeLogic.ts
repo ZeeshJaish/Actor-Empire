@@ -1611,6 +1611,7 @@ export const generateRandomUniverseOpportunity = (player: Player, source: 'AGENT
     const project = generateProjectDetails('HIGH', 'MOVIE', [], player);
     project.title = filmDef.title;
     project.universeId = uniId;
+    project.studioId = tmpl.studioId;
     project.genre = tmpl.genre;
     project.visibleHype = 'HIGH';
     project.isFamous = true; // Treats as famous for prestige

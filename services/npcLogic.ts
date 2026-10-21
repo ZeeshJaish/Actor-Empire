@@ -1312,26 +1312,30 @@ export const calculateInteraction = (player: Player, npc: NPCActor, type: Intera
 
 /**
  * Calculates a box office multiplier based on the collective fame of the cast and director.
- * Base 1.0, +0.1 for every 20 points of total fame.
+ * Legacy compatibility input: unique credited people only. The shared audience
+ * market will replace this revenue multiplier with bounded recognition signals.
  */
 export const calculateProjectFameMultiplier = (castIds: string[], directorName: string, playerFame: number, playerTalent?: number, extraFame: number = 0): number => {
-    let totalFame = playerFame + extraFame;
+    const uniqueCastIds = new Set(castIds);
+    const playerCredited = uniqueCastIds.has('player') || uniqueCastIds.has('PLAYER_SELF');
+    const finiteScore = (value: number) => Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 0;
+    let totalFame = (playerCredited ? finiteScore(playerFame) : 0) + (Number.isFinite(extraFame) ? Math.max(0, extraFame) : 0);
     
     // Find director fame
     const director = NPC_DATABASE.find(n => n.name === directorName && n.occupation === 'DIRECTOR');
     if (director?.stats?.fame) totalFame += director.stats.fame;
     
     // Find cast fame
-    castIds.forEach(id => {
-        if (id === 'player') return;
+    uniqueCastIds.forEach(id => {
+        if (id === 'player' || id === 'PLAYER_SELF' || id === director?.id) return;
         const npc = NPC_DATABASE.find(n => n.id === id);
         if (npc?.stats?.fame) totalFame += npc.stats.fame;
     });
     
     // Base 1.0, +1.0 for every 50 points of total fame
     let multiplier = 1.0 + (totalFame / 50);
-    if (playerTalent) {
-        multiplier += (playerTalent / 100) * 0.5;
+    if (playerCredited && playerTalent) {
+        multiplier += (finiteScore(playerTalent) / 100) * 0.5;
     }
     return multiplier;
 };

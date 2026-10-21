@@ -17,6 +17,7 @@ import {
     StoryTone,
     StoryWorldRule,
 } from '../types';
+import { completeOfferedCinemaCast, isCinemaPlayerCredit } from './boxOffice/boxOfficeInputs';
 import { getRoleOfferMarketDecision } from './roleMarketDemand';
 import {
     evaluateCharacterProfileFit,
@@ -305,7 +306,7 @@ export const applyOpportunityIdentityToProject = (
     const profile = getOpportunityCharacterProfile(opportunity);
     const storyCompass = inferStoryCompass(opportunity.project);
     const existingCast = Array.isArray(opportunity.project.castList) ? opportunity.project.castList : [];
-    const playerEntry = existingCast.find(member => member.isPlayer || member.actorId === 'PLAYER_SELF');
+    const playerEntry = existingCast.find(isCinemaPlayerCredit);
     const castList = playerEntry
         ? existingCast.map(member => member === playerEntry ? {
             ...member,
@@ -326,11 +327,11 @@ export const applyOpportunityIdentityToProject = (
             ...profile,
         }, ...existingCast];
 
-    return {
+    return completeOfferedCinemaCast({
         ...opportunity.project,
         storyCompass,
         castList,
-    };
+    });
 };
 
 export const getStoryCompassLabels = (compass: StoryCompass): string[] => [

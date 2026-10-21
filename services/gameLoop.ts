@@ -1,3 +1,4 @@
+import { completeOfferedCinemaCast, normalizeCinemaTitle } from './boxOffice/boxOfficeInputs';
 import { recordStudioSaleEarnings } from './studioSaleHistory';
 import { retainBankTransactionHistory } from './bankTransactionHistory';
 import { getCorporateStockDividendReceipts } from './stockLogic';
@@ -4232,10 +4233,15 @@ export const processGameWeek = async (
                     : undefined;
 
                 if (updatedC.projectDetails) {
-                    if (!updatedC.projectDetails.castList) updatedC.projectDetails.castList = generateCastList(nextPlayer, updatedC.projectDetails, updatedC.roleType || 'MINOR');
-
-                    // Calculate Fame Multiplier for Acting Gig
-                    const castIds = updatedC.projectDetails.castList.map(c => c.npcId).filter(Boolean) as string[];
+                    const isOwnedProduction = nextPlayer.businesses?.some(business => business.id === updatedC.projectDetails!.studioId && business.type === 'PRODUCTION_HOUSE');
+                    if (!isOwnedProduction && updatedC.type === 'ACTING_GIG') {
+                        if (!updatedC.projectDetails.castList?.length) updatedC.projectDetails.castList = generateCastList(nextPlayer, updatedC.projectDetails, updatedC.roleType || 'MINOR');
+                        updatedC.projectDetails = completeOfferedCinemaCast(updatedC.projectDetails);
+                    }
+                    const cinemaTitle = normalizeCinemaTitle({ titleId: updatedC.id, project: updatedC.projectDetails, player: nextPlayer,
+                        owner: { id: updatedC.projectDetails.studioId, route: isOwnedProduction ? 'PLAYER_STUDIO' : 'ACCEPTED_ROLE' } });
+                    const castIds = cinemaTitle.cast.map(person => person.personId);
+                    if (cinemaTitle.playerCredited && !castIds.includes('PLAYER_SELF')) castIds.push('PLAYER_SELF');
 
                     let talentValue = 0;
                     if (updatedC.type === 'ACTING_GIG') talentValue = getActorTalent(nextPlayer.stats.skills);
@@ -4250,7 +4256,7 @@ export const processGameWeek = async (
                     );
 
                     const castDepth = calculateCastDepthScore(
-                        updatedC.projectDetails.castList.length,
+                        cinemaTitle.cast.length,
                         updatedC.projectDetails.genre,
                         updatedC.projectDetails.budgetTier,
                         updatedC.projectDetails.hiddenStats.castingStrength

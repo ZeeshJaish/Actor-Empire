@@ -223,7 +223,10 @@ export const buildGreenlightProject = ({
             extraFame += (directorData as any).fame || 0;
         }
 
-        const fameMultiplier = calculateProjectFameMultiplier(castIds, directorData.name as string, player.stats.fame, playerActingTalent, extraFame);
+        // Self direction is a real credit; owning a studio is not a player acting credit.
+        if (crewModes.director === 'SELF' && !castIds.includes('player')) castIds.push('player');
+        const fameMultiplier = calculateProjectFameMultiplier(castIds, directorData.name as string, player.stats.fame,
+            safeMovieCastList.some(member => member.actorId === 'PLAYER_SELF') ? playerActingTalent : undefined, extraFame);
         const finalBudgetTier = getProductionBudgetTier(productionBudgetWithMusic);
         const castDepth = calculateCastDepthScore(safeMovieCastList.length, selectedScript.genres[0], finalBudgetTier, currentCastingStrength);
 
@@ -597,6 +600,7 @@ export const buildGreenlightProject = ({
                 visibleScriptBuzz: 'High',
                 visibleCastStrength: currentCastingStrength > 80 ? 'Star-Studded' : currentCastingStrength > 62 ? 'Solid' : 'Thin',
                 castList: finalizedCastList as any,
+                castPackageSource: 'AUTHORED',
                 backgroundCastingPlan,
                 crewList: fullCrewList,
                 location: selectedLocations.length > 0 ? { id: selectedLocations[0], name: locationName, region: 'Global', costModifier: 1, qualityBonus: locationQualityBonus, status: 'PENDING', description: `${selectedLocations.length} locations`, coordinates: {x:0,y:0} } : undefined,

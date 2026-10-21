@@ -2801,6 +2801,8 @@ export interface ProjectDetails {
     newUniverseName?: string;
     isFamous?: boolean;
     castList?: CastMember[];
+    /** Protect authored casting from the legacy offered-package repair. */
+    castPackageSource?: 'AUTHORED' | 'OFFER_GENERATED';
     backgroundCastingPlan?: BackgroundCastingPlan;
     crewList?: CrewMember[]; // NEW: Crew roster
     location?: LocationDetails; // NEW: Filming location
