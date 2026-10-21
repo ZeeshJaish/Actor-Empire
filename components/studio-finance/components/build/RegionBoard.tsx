@@ -28,6 +28,7 @@ import {
 import { compactCount, money, pct } from '../../finance/format';
 import type { StageProps } from './BuildWizard';
 import { NetworkMapBox } from './NetworkMapBox';
+import { NetworkSuggestionSheet } from './NetworkSuggestionSheet';
 import { CloudMark, ServerMark } from './BuildMachineMarks';
 import { createCloudDragScheduler } from './cloudDrag';
 import { useCountUp } from './motion';
@@ -43,6 +44,7 @@ const CLOUD_POSITION: Record<CloudProviderId, string> = {
 
 export function RegionBoard({ data, draft, patch, totals, services, onStartOver }: StageProps) {
   const boardRef = useRef<HTMLDivElement>(null);
+  const [suggesting, setSuggesting] = useState(false);
   const [tucked, setTucked] = useState(false);
   const [cloudDragging, setCloudDragging] = useState(false);
   useEffect(() => {
@@ -117,6 +119,8 @@ export function RegionBoard({ data, draft, patch, totals, services, onStartOver 
         onShowWorld={showWorld}
         onShowRegion={showRegion}
       />
+      <button type="button" className="bw-suggest-entry" onClick={() => setSuggesting(true)}><span>Suggest network</span><small>Choose limits · preview a plan</small><b aria-hidden="true">↗</b></button>
+      {suggesting && <NetworkSuggestionSheet data={data} draft={draft} onApply={patch} onClose={() => setSuggesting(false)} />}
       <p className="bw-rg-footprint-note">
         Green is network reach, even in unopened countries. Only entered markets count toward viewers and revenue.
         A service gap can remain where signal quality or capacity is short.
