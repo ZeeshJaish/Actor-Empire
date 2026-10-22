@@ -19,7 +19,7 @@ import { getStudioAiProfileSeed } from './studioAiProfiles';
 import { isStudioAiSlateActive, normalizeStudioAiSlateState } from './studioAiSlateState';
 
 export const STUDIO_AI_SCHEMA_VERSION = STUDIO_AI_RUNTIME_SCHEMA_VERSION;
-export const STUDIO_AI_LEDGER_LIMIT = 104;
+export const STUDIO_AI_LEDGER_LIMIT = 160;
 export const STUDIO_AI_EVENT_LIMIT = 48;
 export const STUDIO_AI_DECISION_LIMIT = 48;
 

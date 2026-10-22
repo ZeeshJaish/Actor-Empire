@@ -1,3 +1,4 @@
+import { createCinemaViewingRouteLookup } from '../boxOffice/boxOfficeViewingRoutes';
 import { resolveStreamingProductionReadiness } from '../streamingProductionReadiness';
 import { allocateCinemaStreamingEvidence, cinemaStreamingInterestWeight, cinemaStreamingLanguageReady, type CinemaStreamingAudienceEvidence } from '../boxOffice/boxOfficeStreamingAudience';
 import type {
@@ -355,10 +356,11 @@ const projectRivalViewing = (
                 .find(row => row.platformId === offer.platformId);
             const choice = choices[country.countryId]?.platforms[offer.platformId] || choiceZero();
             if (!customer && !choice.freeAd && !choice.store && !choice.secondaryStore) return;
-            const resolver=titleResolvers.get(offer.platformId)!;
-            const playable=(countryId:string,week:number,route:StreamingTitleAccessRoute)=>resolver(countryId,week,route).filter(title=>
+            const rawLookup=createCinemaViewingRouteLookup(titleResolvers.get(offer.platformId)!);
+            const playableLookup=createCinemaViewingRouteLookup((countryId:string,week:number,route:StreamingTitleAccessRoute)=>rawLookup.titles(countryId,week,route).filter(title=>
                 !player.world.cinemaMarket?.titles[title.titleId] || (resolveStreamingProductionReadiness(player,title.titleId).ready
-                    && cinemaStreamingLanguageReady(player,title.titleId,countryId,offer.platformId,week)));
+                    && cinemaStreamingLanguageReady(player,title.titleId,countryId,offer.platformId,week))));
+            const playable=playableLookup.titles;
 
             const paidPlanId = offer.plans.find(plan => plan.monthlyPrice > 0)?.id;
             const subscriptionTitles = paidPlanId
@@ -432,9 +434,8 @@ const projectRivalViewing = (
                 if (commercialOffers.storeOffer?.eligibility.kind === 'MEMBERSHIP_PLANS'
                     && (source.kind !== 'SUBSCRIPTION' || !commercialOffers.storeOffer.eligibility.planIds.includes(source.planId || ''))) return false;
                 if (source.kind === 'STORE') return true;
-                return !playable(country.countryId,absoluteWeek,source.kind==='FREE_AD'
-                    ? {kind:'AD_SUPPORTED'} : {kind:'SUBSCRIPTION',planId:source.planId || ''})
-                    .some(title=>title.titleId===titleId);
+                return !playableLookup.hasTitle(country.countryId,absoluteWeek,source.kind==='FREE_AD'
+                    ? {kind:'AD_SUPPORTED'} : {kind:'SUBSCRIPTION',planId:source.planId || ''},titleId);
             };
             const settleStore = (kind: 'RENTAL' | 'PURCHASE', titles: typeof rentalTitles): number => {
                 if (!titles.length) return 0;
@@ -489,7 +490,7 @@ const projectRivalViewing = (
             const funded = fundStreamingAncillaryRevenue(commercial,commercialPricing,storeSources.filter(source=>{
                 const routes = source.kind==='SUBSCRIPTION' ? [{kind:'SUBSCRIPTION' as const,planId:source.planId || ''}]
                     : source.kind==='FREE_AD' ? [{kind:'AD_SUPPORTED' as const}] : [{kind:'RENTAL' as const},{kind:'PURCHASE' as const}];
-                return routes.some(route=>titleResolvers.get(offer.platformId)!(country.countryId,absoluteWeek,route).length>0);
+                return routes.some(route=>rawLookup.titles(country.countryId,absoluteWeek,route).length>0);
             }));
             royaltySourceReceipts.push(...funded.map(row=>({...row,platformId:offer.platformId,countryId:country.countryId})));
             commercial.commercialOperatingCost = Math.round(commercial.advertisingRevenue * .12

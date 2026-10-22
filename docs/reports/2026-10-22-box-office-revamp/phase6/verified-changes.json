@@ -1,0 +1,32 @@
+[
+  {
+    "suite": "viewing-routes",
+    "exit": 0,
+    "seconds": 0.08,
+    "log": "/private/tmp/actor-phase6-verified-viewing-routes.log"
+  },
+  {
+    "suite": "placement",
+    "exit": 0,
+    "seconds": 0.1,
+    "log": "/private/tmp/actor-phase6-verified-placement.log"
+  },
+  {
+    "suite": "migration",
+    "exit": 0,
+    "seconds": 1.77,
+    "log": "/private/tmp/actor-phase6-verified-migration.log"
+  },
+  {
+    "suite": "integration",
+    "exit": 0,
+    "seconds": 11.63,
+    "log": "/private/tmp/actor-phase6-verified-integration.log"
+  },
+  {
+    "suite": "rights",
+    "exit": 0,
+    "seconds": 3.96,
+    "log": "/private/tmp/actor-phase6-verified-rights.log"
+  }
+]

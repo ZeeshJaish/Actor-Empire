@@ -25,7 +25,7 @@ export const inspectCinemaSavedState = (state:unknown):string[] => {
     if(typeof state.schemaVersion==='number' && state.schemaVersion>1)return ['CINEMA_FUTURE_SCHEMA'];
     if(state.schemaVersion===0)return (Array.isArray(state.weeks)&&state.weeks.length || object(state.titles)&&Object.keys(state.titles).length)?['CINEMA_UNKNOWN_SETTLEMENT_BASIS']:[];
     if(state.schemaVersion!==1 || !integer(state.clockEpoch)||!integer(state.activationWeek)||!integer(state.lastProcessedAbsoluteWeek)
-        ||state.tuningVersion!==CINEMA_MARKET_TUNING_VERSION||!object(state.market)||!object(state.titles)||!Array.isArray(state.weeks)
+        ||![1,CINEMA_MARKET_TUNING_VERSION].includes(state.tuningVersion as number)||!object(state.market)||!object(state.titles)||!Array.isArray(state.weeks)
         ||!Array.isArray(state.market.titles)||!Array.isArray(state.market.affinities)||!Array.isArray(state.market.runs))return ['CINEMA_STATE_INCOMPLETE'];
     if(state.market.schemaVersion!==1 || state.market.tuningVersion!==state.tuningVersion)return ['CINEMA_STATE_INCOMPLETE'];
     if(!finiteTree(state)||state.weeks.length>52||state.market.lastProcessedAbsoluteWeek!==state.lastProcessedAbsoluteWeek)return ['CINEMA_STATE_CORRUPT'];
@@ -80,7 +80,12 @@ export const migrateCinemaState = (player:Player,absoluteWeek:number):CinemaMigr
     const rejected=(code:string):CinemaMigrationResult=>({player,status:'REJECTED',diagnostics:[{code}]});
     if(!integer(absoluteWeek))return rejected('CINEMA_CLOCK_CORRUPT');
     const errors=inspectCinemaSavedState(player.world?.cinemaMarket);if(errors.length)return {player,status:'REJECTED',diagnostics:errors.map(code=>({code}))};
-    if(player.world?.cinemaMarket?.schemaVersion===1)return {player,status:'UNCHANGED',diagnostics:[]};
+    if(player.world?.cinemaMarket?.schemaVersion===1){
+        const state=player.world.cinemaMarket;
+        if(state.tuningVersion===CINEMA_MARKET_TUNING_VERSION)return {player,status:'UNCHANGED',diagnostics:[]};
+        // Tuning changes only future demand; preserve paid receipts, IDs, money and audience history.
+        return {player:{...player,world:{...player.world,cinemaMarket:{...state,tuningVersion:CINEMA_MARKET_TUNING_VERSION,market:{...state.market,tuningVersion:CINEMA_MARKET_TUNING_VERSION}}}},status:'MIGRATED',diagnostics:[{code:'CINEMA_TUNING_UPGRADED'}]};
+    }
     if(!Number.isFinite(player.money))return rejected('CINEMA_PROTECTED_MONEY_CORRUPT');
     for(const r of player.activeReleases || [])if(r.type==='MOVIE' && (!Number.isFinite(r.totalGross)||r.totalGross<0||!Number.isFinite(r.budget)||r.budget<0
         ||(r.totalStudioReceipts!==undefined && (!Number.isFinite(r.totalStudioReceipts)||r.totalStudioReceipts<0))))return rejected('CINEMA_LEGACY_FINANCE_CORRUPT');

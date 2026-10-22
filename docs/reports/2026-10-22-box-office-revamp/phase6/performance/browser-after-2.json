@@ -1,0 +1,81 @@
+[
+  {
+    "fixture": "early",
+    "metrics": [
+      {
+        "index": 0,
+        "computeMs": 543.5999999940395,
+        "prepareMs": 12.5,
+        "persistenceMs": 54.79999999701977,
+        "verifiedReadMs": 16.30000001192093,
+        "saveBytes": 7478602,
+        "eventToPaintMs": 647.2999999970198
+      },
+      {
+        "index": 1,
+        "computeMs": 294.69999998807907,
+        "prepareMs": 9.600000008940697,
+        "persistenceMs": 81.09999999403954,
+        "verifiedReadMs": 16.700000002980232,
+        "saveBytes": 7689700,
+        "eventToPaintMs": 432.3999999910593
+      },
+      {
+        "index": 2,
+        "computeMs": 268.59999999403954,
+        "prepareMs": 15.100000008940697,
+        "persistenceMs": 83,
+        "verifiedReadMs": 15.299999997019768,
+        "saveBytes": 7900373,
+        "eventToPaintMs": 407.5
+      },
+      {
+        "index": 3,
+        "computeMs": 327.59999999403954,
+        "prepareMs": 10.5,
+        "persistenceMs": 82.80000001192093,
+        "verifiedReadMs": 15.399999991059303,
+        "saveBytes": 8146085,
+        "eventToPaintMs": 457.5
+      },
+      {
+        "index": 4,
+        "computeMs": 292.1000000089407,
+        "prepareMs": 9.599999994039536,
+        "persistenceMs": 86.5,
+        "verifiedReadMs": 15.799999997019768,
+        "saveBytes": 8296507,
+        "eventToPaintMs": 432.5
+      },
+      {
+        "index": 5,
+        "computeMs": 306.20000000298023,
+        "prepareMs": 18.400000005960464,
+        "persistenceMs": 97.29999999701977,
+        "verifiedReadMs": 16.200000002980232,
+        "saveBytes": 8597116,
+        "eventToPaintMs": 465.90000000596046
+      },
+      {
+        "index": 6,
+        "computeMs": 317.79999999701977,
+        "prepareMs": 10.800000011920929,
+        "persistenceMs": 90.79999999701977,
+        "verifiedReadMs": 16.899999991059303,
+        "saveBytes": 8839659,
+        "eventToPaintMs": 465.79999999701977
+      },
+      {
+        "index": 7,
+        "computeMs": 278.8999999910593,
+        "prepareMs": 10.600000008940697,
+        "persistenceMs": 91.8999999910593,
+        "verifiedReadMs": 16.799999997019768,
+        "saveBytes": 9042858,
+        "eventToPaintMs": 432.59999999403954
+      }
+    ],
+    "errors": [],
+    "evidence": "Headless Chromium, React summary paint, actual verified IndexedDB; no native or full app screen claim"
+  }
+]

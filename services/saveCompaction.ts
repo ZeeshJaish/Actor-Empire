@@ -1,3 +1,4 @@
+import { STUDIO_AI_LEDGER_LIMIT } from './studioAi/studioAiState';
 import { PLATFORM_AI_RUNTIME_SCHEMA_VERSION, type Player } from '../types';
 import { getAbsoluteWeek } from './legacyLogic';
 import {
@@ -78,7 +79,8 @@ const STREAMING_RIGHTS_TERMINAL_MAX_ITEMS = 240;
 const STREAMING_BIDDING_TERMINAL_MAX_ITEMS = 60;
 const STREAMING_ROYALTY_SETTLEMENT_MAX_ITEMS = 520;
 const STREAMING_CATALOGUE_PACKAGE_TERMINAL_MAX_ITEMS = 80;
-const STUDIO_AI_LEDGER_MAX_ITEMS = 104;
+// Paid receipt IDs are protected facts. Match the canonical runtime bound.
+const STUDIO_AI_LEDGER_MAX_ITEMS = STUDIO_AI_LEDGER_LIMIT;
 const STUDIO_AI_EVENT_MAX_ITEMS = 48;
 const STUDIO_AI_DECISION_MAX_ITEMS = 48;
 

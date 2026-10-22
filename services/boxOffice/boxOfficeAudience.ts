@@ -128,13 +128,19 @@ export const buildCinemaAudienceSnapshot = (input: CinemaWeekInput): {choices: C
             const windows=facts.streamingWindows || (facts.streamingWindow ? [facts.streamingWindow] : []);
             const knownWait = windows.some(window=>window.publiclyKnown && !!window.platformId && window.countryIds.includes(cohort.countryId)
                 && window.absoluteWeek-input.absoluteWeek<=8) ? .6*(1-fraction(facts.urgency)*.65) : 0;
-            const interest = people(reachable*utility*P.firstWeeklyIntent);
+            const releaseAge = Math.max(0,input.absoluteWeek-facts.releaseWeek-P.openingInterestGraceWeeks);
+            const firstTiming = 2 ** (-releaseAge/P.firstInterestHalfLifeWeeks);
+            const repeatTiming = 2 ** (-releaseAge/P.repeatInterestHalfLifeWeeks);
+            // New recommendations carry fresh urgency; older unconverted awareness fades.
+            const freshReach = Math.min(reachable,discovery+localDiscovery);
+            const timedReach = (reachable-freshReach)*firstTiming+freshReach;
+            const interest = people(timedReach*utility*P.firstWeeklyIntent);
             const buyShare = clamp(affordability**(.25+fraction(m.priceSensitivity)*.5)*timeFit*(1-knownWait));
             const first = people(interest*buyShare);
             const repeatEligible = accessible ? people(seenBands.filter(b=>b.satisfaction>55).reduce((n,b)=>n+b.people,0)*eligible/Math.max(1,cohort.people)*localFit) : 0;
             const repeat = people(Math.min(repeatEligible,seenBands.reduce((n,b)=>n + b.people*fraction(Math.max(0,b.satisfaction-55)/.45)
                 / (1+b.repeatAdmissions/Math.max(1,b.people)*Math.exp(-Math.max(0,input.absoluteWeek-b.lastViewedWeek)/P.recentRepeatHalfLifeWeeks)),0))
-                *P.repeatWeeklyIntent*(.5+attachment*.5)*buyShare);
+                *P.repeatWeeklyIntent*(.5+attachment*.5)*buyShare*repeatTiming);
             const common = {cohortId:cohort.id,titleId:title.id,utility,priceCents:price,minutesPerVisit:minutes,awarePeople:aware,
                 reachableUnseenPeople:reachable,repeatEligiblePeople:repeatEligible,satisfaction,attachment,universeFamiliarity:familiarity,discoveryPeople:discovery,localDiscoveryPeople:localDiscovery};
             choices.push({...common,kind:'FIRST',requestedAdmissions:first,interestedPeople:interest,reasons:[]});

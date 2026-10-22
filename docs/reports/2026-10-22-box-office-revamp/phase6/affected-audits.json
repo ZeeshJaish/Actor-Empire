@@ -1,0 +1,62 @@
+[
+  {
+    "suite": "audit:save-integrity",
+    "exit": 0,
+    "seconds": 0.26,
+    "log": "/private/tmp/actor-phase6-final-audit-save-integrity.log"
+  },
+  {
+    "suite": "audit:save-generations",
+    "exit": 0,
+    "seconds": 0.2,
+    "log": "/private/tmp/actor-phase6-final-audit-save-generations.log"
+  },
+  {
+    "suite": "audit:large-save-integrity",
+    "exit": 0,
+    "seconds": 0.87,
+    "log": "/private/tmp/actor-phase6-large-save-final.log",
+    "initialFailure": "Overly broad JSON.stringify guard; reproduced on clean baseline, corrected to self-tested whole/wrapped player/world guard"
+  },
+  {
+    "suite": "audit:studio-ai-commercial-result-b6",
+    "exit": 0,
+    "seconds": 0.19,
+    "log": "/private/tmp/actor-phase6-final-audit-studio-ai-commercial-result-b6.log"
+  },
+  {
+    "suite": "audit:streaming-rights-transactions-phase6",
+    "exit": 0,
+    "seconds": 1.12,
+    "log": "/private/tmp/actor-phase6-final-audit-streaming-rights-transactions-phase6.log"
+  },
+  {
+    "suite": "audit:streaming-rights-calendar-phase4",
+    "exit": 0,
+    "seconds": 2.56,
+    "log": "/private/tmp/actor-phase6-final-audit-streaming-rights-calendar-phase4.log"
+  },
+  {
+    "suite": "audit:streaming-original-readiness-repair",
+    "exit": 0,
+    "seconds": 0.14,
+    "log": "/private/tmp/actor-phase6-final-audit-streaming-original-readiness-repair.log"
+  },
+  {
+    "suite": "audit:streaming-original-playback-repair",
+    "exit": 0,
+    "seconds": 4.33,
+    "log": "/private/tmp/actor-phase6-final-audit-streaming-original-playback-repair.log"
+  },
+  {
+    "suite": "audit:streaming-commercial-c4",
+    "exit": 0,
+    "seconds": 6.57,
+    "log": "/private/tmp/actor-phase6-final-audit-streaming-commercial-c4.log"
+  },
+  {
+    "suite": "audit:studio-ai-slate-state-b5",
+    "exit": 0,
+    "log": "/private/tmp/actor-phase6-studio-state.log"
+  }
+]

@@ -1,3 +1,4 @@
+import { CINEMA_MARKET_TUNING_VERSION } from '../../services/boxOffice/boxOfficeProfiles';
 import assert from 'node:assert/strict';
 import { createWorldPopulationState } from '../../services/worldEconomy/worldPopulation';
 import { createWorldAudienceEconomyState } from '../../services/worldEconomy/worldAudienceCohorts';
@@ -23,7 +24,7 @@ export const runCinemaWorldShadowAudit = (seed=41) => {
         return {...title,exposure:{version:1 as const,attentionBasis:'PACKAGE' as const,attentionPotential:75,events:[{id:`world-press-${i}`,titleId:id,absoluteWeek:999,kind:'PROMOTION' as const,channel:'CONTROLLED_WORLD_PRESS',impressions:2_000_000_000}]},
             market:{...makeCinemaMarketFixture().titles[0].market!,universeId:undefined,languages:[project.originalLanguageId || 'english'],releaseWeek:absoluteWeek,countryIds:countries,chainIds:CINEMA_CHAINS.map(c=>c.id)}};
     });
-    const input:CinemaWeekInput={...world,absoluteWeek,seed,tuningVersion:1,knowledge:'OBSERVED',titles};
+    const input:CinemaWeekInput={...world,absoluteWeek,seed,tuningVersion:CINEMA_MARKET_TUNING_VERSION,knowledge:'OBSERVED',titles};
     const before=structuredClone(input),start=performance.now();
     const result=simulateCinemaWeek(input),elapsedMs=Math.round((performance.now()-start)*100)/100;
     assert.deepEqual(input,before,'shadow may not mutate its inputs');

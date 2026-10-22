@@ -1,0 +1,22 @@
+{
+  "status": "STOPPED_AFTER_FUNDING_FAILURE",
+  "fundingFailures": [
+    {
+      "progress": "PROGRESS ordinary-starter 104/208",
+      "cash": -23595,
+      "energy": 65,
+      "phases": [],
+      "campaignPaid": 0
+    },
+    {
+      "progress": "PROGRESS ordinary-starter 117/208",
+      "cash": -59655,
+      "energy": 65,
+      "phases": [],
+      "campaignPaid": 0
+    }
+  ],
+  "latestRecordedProgress": "PROGRESS ordinary-starter 117/208 {\"cash\":-59655,\"energy\":65,\"phases\":[],\"campaignPaid\":0}",
+  "successfulPaidRelease": false,
+  "limitation": "Censored authored strategy; no conclusion about all player career routes. Health/choice handling and full App path require follow-up. No casting, health or earnings rule was changed."
+}

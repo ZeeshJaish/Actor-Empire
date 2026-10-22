@@ -20,11 +20,13 @@ export const CINEMA_EXPOSURE_PROFILE = {
 } as const;
 
 /** Candidate behavior/supply coefficients. Phase 6 calibrates these against full careers. */
-export const CINEMA_MARKET_TUNING_VERSION = 1;
+export const CINEMA_MARKET_TUNING_VERSION = 2;
 export const CINEMA_AUDIENCE_PROFILE = {
     contactRatePerSatisfiedViewer: 1.8, contactOverlap: 0.35,
     favoriteLift: 0.28, maxFavoriteLift: 0.35,
     firstWeeklyIntent: 0.32, repeatWeeklyIntent: 0.12,
+    /** Opportunity loses urgency gradually; no money or week-count cutoff. */
+    openingInterestGraceWeeks: 2, firstInterestHalfLifeWeeks: 4, repeatInterestHalfLifeWeeks: 3,
     deferredRetentionPerWeek: 0.8, recentRepeatHalfLifeWeeks: 3,
     activeTitleHistoryWeeks: 104, maxAffinityEntriesPerCohort: 48,
 } as const;

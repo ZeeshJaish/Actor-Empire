@@ -1,3 +1,4 @@
+import { CINEMA_MARKET_TUNING_VERSION } from '../services/boxOffice/boxOfficeProfiles';
 import assert from 'node:assert/strict';
 import { buildCinemaExposure, appendCinemaExposureEvent, readCinemaExposureRecord, projectCinemaForecastInput } from '../services/boxOffice/boxOfficeAwareness';
 import { makeCinemaExposureFixture, makeCinemaFixture } from './fixtures/boxOfficeScenarios';
@@ -100,7 +101,7 @@ test('malformed counts and duplicate cohort identities cannot mint people',()=>{
 });
 test('forecast projection uses only known quality and creates no history',()=>{
  const f=makeCinemaFixture();const title=normalizeCinemaTitle({titleId:'forecast',owner:{id:'studio',route:'PLAYER_STUDIO'},project:f.project,player:f.player});
- const input:CinemaWeekInput={absoluteWeek:100,seed:1,tuningVersion:1,knowledge:'OBSERVED',titles:[title],cohorts:makeCinemaExposureFixture().cohorts};
+ const input:CinemaWeekInput={absoluteWeek:100,seed:1,tuningVersion:CINEMA_MARKET_TUNING_VERSION,knowledge:'OBSERVED',titles:[title],cohorts:makeCinemaExposureFixture().cohorts};
  const known:CinemaKnownInputs={titles:[{...title,delivery:{estimatedQuality:70,qualityRange:[60,80],scriptQuality:70,directorQuality:70,castingStrength:70}}],cohorts:input.cohorts};
  const before=JSON.stringify({input,known});const a=projectCinemaForecastInput(input,known);
  assert.equal(a.knowledge,'FORECAST');assert.equal(a.titles[0].delivery.deliveredQuality,undefined);

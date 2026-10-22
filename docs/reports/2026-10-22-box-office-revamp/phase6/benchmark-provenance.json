@@ -1,0 +1,35 @@
+{
+  "seedBeforeModuleInitialization": 20261022,
+  "before": {
+    "sourceDirectory": "/private/tmp/actor-box-office-phase6-20261022-143859/baseline",
+    "sha256": {
+      "services/gameLoop.ts": "5b8948bc481bc156ca6bfbcf9808835843b4652670a875f9d31121ec74fa171c",
+      "services/worldEconomy/worldStreamingViewing.ts": "3fc84c61aa123ad715dd12335d2802d07d419d7f1ab93e487f0f81a8e058876c",
+      "services/boxOffice/boxOfficeMarket.ts": "5edb6ce60e0371649ff56fefc93f3cf30da098bdcda740fc9c8ad5a9d6dde18e",
+      "services/boxOffice/boxOfficeAudience.ts": "c7f4353d9d278748b63c175bf22767829b7f8c0ecd8fb8af2413997944e61e4b",
+      "services/boxOffice/boxOfficeProfiles.ts": "04b50c001def1291baa16510ac9c815fbbc058f655ae23510628fbe55ff837b3",
+      "services/saveCompaction.ts": "51de11b5b7689abccc277e71462e97f4f08a483264f562c020657ce9d52b6618",
+      "services/studioAi/studioAiState.ts": "d6cc22da6ad8e9e4ec638b75a1623513c4ec07fc28780e310137a471d41d81b3",
+      "scripts/benchmark-box-office-week.ts": "fe6561c962d9a2db0879817e1533c35179aa649e5030bb4fb6b5f87df29f64d6",
+      "scripts/run-box-office-benchmark.mjs": "7aa0a3e25b39a498fd6b48d5e9d69bf6eada78b0c1f1ae1fc7656c5ba2dc403f",
+      "cinema-phase6-qa.html": "e126b9c853f411396c29fa1e939d6ada9cb2ab0b05da275349c93b2ebfed693c",
+      "lab/cinemaPhase6Qa.tsx": "cf593a748fbc4548f27fedcb4577d6698524b347cad157c68e5a73d5c47ed7a4"
+    }
+  },
+  "after": {
+    "sourceDirectory": "/private/tmp/actor-box-office-phase6-20261022-143859/candidate",
+    "sha256": {
+      "services/gameLoop.ts": "b27f2b453cf3619fc378af2bf22e346fe6a99d8ab0eb996710bc6cfa11fa42ce",
+      "services/worldEconomy/worldStreamingViewing.ts": "539db5f9e74bb14120204da6f8e924e583f4db69f1aa400da0d93c45b5d2d43d",
+      "services/boxOffice/boxOfficeMarket.ts": "fe28cfba55172d6ac71f70ce76862e4cba77576908c9400963dc0788ece20116",
+      "services/boxOffice/boxOfficeAudience.ts": "1892f2f8a3aede9de99832a96d0026ada9f934b14e0dde4af329b4a2be62eaa6",
+      "services/boxOffice/boxOfficeProfiles.ts": "8846b2d733377838c1400ee69e9ae04c20d3ef731dabe59a9f0c487d5ae4253a",
+      "services/saveCompaction.ts": "1777cbc06e280a55079ad5d6bf3648d629a3ac957f4da7d18c84b67ac181e50e",
+      "services/studioAi/studioAiState.ts": "2f40182dcc4da77a7028be3542ba407f98923ae58d6105215ce098bb6121d4af",
+      "scripts/benchmark-box-office-week.ts": "fe6561c962d9a2db0879817e1533c35179aa649e5030bb4fb6b5f87df29f64d6",
+      "scripts/run-box-office-benchmark.mjs": "7aa0a3e25b39a498fd6b48d5e9d69bf6eada78b0c1f1ae1fc7656c5ba2dc403f",
+      "cinema-phase6-qa.html": "e126b9c853f411396c29fa1e939d6ada9cb2ab0b05da275349c93b2ebfed693c",
+      "lab/cinemaPhase6Qa.tsx": "cf593a748fbc4548f27fedcb4577d6698524b347cad157c68e5a73d5c47ed7a4"
+    }
+  }
+}

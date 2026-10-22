@@ -1,3 +1,4 @@
+import { STUDIO_AI_LEDGER_LIMIT } from '../studioAi/studioAiState';
 import { cinemaAudienceReport, cinemaDistributionReport } from './boxOfficeLiveReports';
 import { quoteCinemaSupply } from './boxOfficeSupply';
 import { assertIssuedCinemaResult } from './boxOfficeIdentity';
@@ -118,7 +119,7 @@ export const commitCinemaWeek = (player: Player, result: CinemaWeekResult): Cine
             const studio = next.world.studios[title.owner.id];
             studio.cashReserve = (Math.round(studio.cashReserve * 1e8) + net) / 1e8;
             if (studio.ai)
-                studio.ai.ledger = [...studio.ai.ledger, { id: sourceId, absoluteWeek: result.absoluteWeek, category: 'RIGHTS_INCOME' as const, amountMillions: net / 1e8, balanceAfterMillions: studio.cashReserve, description: `${title.id}: net collected cinema receipts after signed shares and booking costs` }].slice(-160);
+                studio.ai.ledger = [...studio.ai.ledger, { id: sourceId, absoluteWeek: result.absoluteWeek, category: 'RIGHTS_INCOME' as const, amountMillions: net / 1e8, balanceAfterMillions: studio.cashReserve, description: `${title.id}: net collected cinema receipts after signed shares and booking costs` }].slice(-STUDIO_AI_LEDGER_LIMIT);
         }
         else if (outside) {
             state.externalProducerBalancesCents = { ...state.externalProducerBalancesCents, [title.owner.id]: sum([state.externalProducerBalancesCents?.[title.owner.id] || 0, net]) };

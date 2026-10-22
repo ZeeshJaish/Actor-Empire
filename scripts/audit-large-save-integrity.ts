@@ -57,9 +57,24 @@ const externallyCompactedLargeLegacy = prepareVerifiedPlayerForPersistence(struc
 assert.equal(externallyCompactedLargeLegacy.oversizedLegacy, true, 'Original raw size must survive poster/media externalization decisions.');
 
 const originalStringify = JSON.stringify;
-JSON.stringify = (() => { throw new Error('legacy migration attempted a full JSON stringify clone'); }) as typeof JSON.stringify;
+// Route/receipt tuple keys legitimately serialize a few IDs. Reject the actual large
+// player/world graph instead of mistaking every tiny key for a whole-save clone.
+const migrationSource = structuredClone(INITIAL_PLAYER) as Player;
+JSON.stringify = ((value: unknown, ...args: unknown[]) => {
+    const containsSaveGraph = (item: unknown): boolean => Boolean(item && typeof item === 'object'
+        && ('world' in item || ('projects' in item && 'studios' in item)
+            || Object.values(item).some(containsSaveGraph)));
+    if (containsSaveGraph(value)) {
+        throw new Error('legacy migration attempted a full JSON stringify clone');
+    }
+    return (originalStringify as (...args: unknown[]) => string)(value, ...args);
+}) as typeof JSON.stringify;
 try {
-    const migrated = prepareVerifiedPlayerForPersistence(structuredClone(INITIAL_PLAYER) as Player, 'MIGRATION', {
+    assert.throws(() => JSON.stringify(migrationSource), /full JSON stringify clone/);
+    assert.throws(() => JSON.stringify(migrationSource.world), /full JSON stringify clone/);
+    assert.throws(() => JSON.stringify({ wrapped: [migrationSource] }), /full JSON stringify clone/);
+    assert.equal(JSON.stringify(['US', 'title', 'PURCHASE']), '["US","title","PURCHASE"]');
+    const migrated = prepareVerifiedPlayerForPersistence(migrationSource, 'MIGRATION', {
         legacyOrExternal: true,
         currentIsUnverified: true,
     });

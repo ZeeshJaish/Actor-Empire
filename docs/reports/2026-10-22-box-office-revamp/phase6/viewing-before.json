@@ -1,0 +1,100 @@
+[
+  {
+    "name": "early",
+    "sha256": "d45d0c21bb3e15745f61be9c2885ceeb72462159220a8e78546639981c5b1701",
+    "ms": 441.31404100000003,
+    "global": {
+      "totalViewingAccounts": 393919100,
+      "estimatedViewers": 559365127,
+      "totalStarts": 514099817,
+      "totalHoursViewed": 898575667,
+      "unmetDemandAccounts": 199491355,
+      "accessMix": {
+        "paidViewingAccounts": 227197933,
+        "freeViewingAccounts": 133942218,
+        "storeViewingAccounts": 0,
+        "sharedViewingAccounts": 32778949,
+        "piracyViewingAccounts": 16829182
+      },
+      "revenue": {
+        "attributedSubscriptionRevenue": 826821477,
+        "advertisingImpressions": 4858907469,
+        "advertisingRevenue": 111447980,
+        "premiumTransactions": 2385785,
+        "premiumRevenue": 68344735,
+        "rentalTransactions": 40677624,
+        "rentalRevenue": 240571728,
+        "purchaseTransactions": 2895951,
+        "purchaseRevenue": 57326747,
+        "dayPassTransactions": 1040112,
+        "dayPassRevenue": 6472585,
+        "oneHourPassTransactions": 0,
+        "oneHourPassRevenue": 0,
+        "adFreeCoveredHours": 0,
+        "meteredAccounts": 454646,
+        "meteredHours": 3408155,
+        "meteredRevenue": 4764809,
+        "patronAccounts": 994324,
+        "patronRevenue": 2053948,
+        "sponsorshipImpressions": 559365127,
+        "sponsorshipRevenue": 3457347,
+        "totalIncrementalRevenue": 494439879,
+        "commercialOperatingCost": 26881687
+      },
+      "platformCount": 33,
+      "countryCount": 197,
+      "titleCount": 0
+    },
+    "royaltyRows": 0,
+    "storeTransactions": 1100
+  },
+  {
+    "name": "late",
+    "sha256": "3e8ea44e87bb0c2fd758390a417b88dd7657b357b30c3265c77a69b93821a69f",
+    "ms": 121503.45595799999,
+    "global": {
+      "totalViewingAccounts": 751166493,
+      "estimatedViewers": 1066656423,
+      "totalStarts": 1000533251,
+      "totalHoursViewed": 1807727240,
+      "unmetDemandAccounts": 364668157,
+      "accessMix": {
+        "paidViewingAccounts": 424991243,
+        "freeViewingAccounts": 269655863,
+        "storeViewingAccounts": 0,
+        "sharedViewingAccounts": 56519387,
+        "piracyViewingAccounts": 23404884
+      },
+      "revenue": {
+        "attributedSubscriptionRevenue": 1693359120,
+        "advertisingImpressions": 9844894957,
+        "advertisingRevenue": 195606370,
+        "premiumTransactions": 4410907,
+        "premiumRevenue": 129871693,
+        "rentalTransactions": 76170824,
+        "rentalRevenue": 461554393,
+        "purchaseTransactions": 2663180,
+        "purchaseRevenue": 54009208,
+        "dayPassTransactions": 1679361,
+        "dayPassRevenue": 10789343,
+        "oneHourPassTransactions": 0,
+        "oneHourPassRevenue": 0,
+        "adFreeCoveredHours": 0,
+        "meteredAccounts": 685092,
+        "meteredHours": 5228282,
+        "meteredRevenue": 7593824,
+        "patronAccounts": 1957389,
+        "patronRevenue": 4235089,
+        "sponsorshipImpressions": 1066656423,
+        "sponsorshipRevenue": 3434674,
+        "totalIncrementalRevenue": 867094594,
+        "commercialOperatingCost": 47132253
+      },
+      "platformCount": 34,
+      "countryCount": 197,
+      "titleCount": 0
+    },
+    "royaltyRows": 617443,
+    "storeTransactions": 41413
+  }
+]

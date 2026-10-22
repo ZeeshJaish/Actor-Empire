@@ -1,0 +1,19 @@
+{
+  "strategy": "keep job during auditions; 30 energy recovery reserve",
+  "horizonWeeks": 156,
+  "status": "FAILED_JOURNEY_ASSERTION",
+  "sawProduction": false,
+  "sawOpening": false,
+  "campaignCashProof": "NOT_REACHED",
+  "endingCash": "NOT_RECORDED_IN_FAILED_REPORT",
+  "lastActingCommitments": [
+    {
+      "title": "Spirit Dreaming",
+      "phase": "AUDITION",
+      "prep": 55,
+      "weeksLeft": 1,
+      "role": "CAMEO"
+    }
+  ],
+  "limitation": "One bounded strategy failure does not establish that all normal careers cannot progress"
+}

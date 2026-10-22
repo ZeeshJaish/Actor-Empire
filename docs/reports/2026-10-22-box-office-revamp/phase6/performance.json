@@ -1,0 +1,1036 @@
+{
+  "environment": "Desktop macOS arm64, Node v24.11.1; headless Chromium viewport 390x844, no CPU/network throttling",
+  "baselineHead": "7079d1b8ae8085ac74b266884651bae122afe4d2",
+  "fixtureSha256": {
+    "late.json": "eb7ab469b13a95666824b04ca145a12e80bc09ea34224ed12eec1dd01f2fbf61",
+    "early.json": "df71ad39a8055426871e3cdf9fb9a41d67d54898c0da1c7881ff4f5ea4adf077"
+  },
+  "seedBeforeModuleInitialization": 20261022,
+  "earlyComparisons": {
+    "node": {
+      "beforeTrialP95Ms": [
+        532.8559999999998,
+        511.9594589999997,
+        511.7302920000002
+      ],
+      "afterTrialP95Ms": [
+        509.679083,
+        526.2961249999998,
+        517.177208000001
+      ],
+      "beforeMedianP95Ms": 511.9594589999997,
+      "afterMedianP95Ms": 517.177208000001,
+      "relativeMedianP95Percent": 1.019172301297644,
+      "withinTenPercent": true
+    },
+    "browser": {
+      "beforeTrialP95Ms": [
+        482.6000000089407,
+        482.5,
+        482.5
+      ],
+      "afterTrialP95Ms": [
+        465.8999999910593,
+        465.90000000596046,
+        465.90000000596046
+      ],
+      "beforeMedianP95Ms": 482.5,
+      "afterMedianP95Ms": 465.90000000596046,
+      "relativeMedianP95Percent": -3.440414506536693,
+      "withinTenPercent": true
+    }
+  },
+  "trials": [
+    {
+      "kind": "node",
+      "side": "before",
+      "fixture": "early",
+      "trial": 1,
+      "exit": 0,
+      "seconds": 10.99,
+      "metrics": {
+        "compute": {
+          "n": 16,
+          "minMs": 335.9004159999995,
+          "p50Ms": 347.4968329999997,
+          "p95Ms": 411.1314160000002,
+          "maxMs": 411.1314160000002
+        },
+        "prepare": {
+          "n": 16,
+          "minMs": 11.377582999999959,
+          "p50Ms": 15.229167000000416,
+          "p95Ms": 27.00891600000068,
+          "maxMs": 27.00891600000068
+        },
+        "persistence": {
+          "n": 16,
+          "minMs": 87.51083300000005,
+          "p50Ms": 98.85149999999976,
+          "p95Ms": 123.52870900000016,
+          "maxMs": 123.52870900000016
+        },
+        "uiCommit": {
+          "n": 16,
+          "minMs": 0.4048750000001746,
+          "p50Ms": 0.45066700000097626,
+          "p95Ms": 0.6006670000001577,
+          "maxMs": 0.6006670000001577
+        },
+        "total": {
+          "n": 16,
+          "minMs": 448.14437499999985,
+          "p50Ms": 464.04349999999977,
+          "p95Ms": 532.8559999999998,
+          "maxMs": 532.8559999999998
+        },
+        "market": {
+          "n": 16,
+          "minMs": 57.39862499999981,
+          "p50Ms": 60.50604199999998,
+          "p95Ms": 71.28629100000035,
+          "maxMs": 71.28629100000035
+        }
+      },
+      "saveBytes": 9692316,
+      "heapBefore": 77226128,
+      "heapAfter": 369905656,
+      "allocationRows": 0,
+      "slowStages": [
+        [
+          "world_streaming_viewing_choices_ready \u2192 world_streaming_viewing_ai_catalogue_ready",
+          142.40975000000003
+        ],
+        [
+          "world_streaming_viewing_rival_viewing_ready \u2192 world_streaming_viewing_done",
+          127.47516700000006
+        ],
+        [
+          "streaming_industry_start \u2192 streaming_industry_done",
+          118.25329200000033
+        ],
+        [
+          "world_streaming_viewing_ai_catalogue_ready \u2192 world_streaming_viewing_rival_viewing_ready",
+          49.80374999999992
+        ],
+        [
+          "world_streaming_viewing_customers_ready \u2192 world_streaming_viewing_choices_ready",
+          34.027917
+        ],
+        [
+          "world_streaming_customers_start \u2192 world_streaming_customers_inputs_ready",
+          28.249249999999847
+        ],
+        [
+          "world_streaming_customers_inputs_ready \u2192 world_streaming_customers_desired_ready",
+          23.333249999999907
+        ],
+        [
+          "world_streaming_customers_desired_ready \u2192 world_streaming_customers_countries_advanced",
+          19.250082999999904
+        ]
+      ]
+    },
+    {
+      "kind": "node",
+      "side": "after",
+      "fixture": "early",
+      "trial": 1,
+      "exit": 0,
+      "seconds": 10.88,
+      "metrics": {
+        "compute": {
+          "n": 16,
+          "minMs": 322.16612499999974,
+          "p50Ms": 343.6409589999994,
+          "p95Ms": 406.71341699999994,
+          "maxMs": 406.71341699999994
+        },
+        "prepare": {
+          "n": 16,
+          "minMs": 11.543833999999833,
+          "p50Ms": 15.022999999999229,
+          "p95Ms": 24.406875000000582,
+          "maxMs": 24.406875000000582
+        },
+        "persistence": {
+          "n": 16,
+          "minMs": 86.92970800000012,
+          "p50Ms": 98.80875000000015,
+          "p95Ms": 119.97558299999946,
+          "maxMs": 119.97558299999946
+        },
+        "uiCommit": {
+          "n": 16,
+          "minMs": 0.4605830000000424,
+          "p50Ms": 0.5233330000000933,
+          "p95Ms": 3.9329170000000886,
+          "maxMs": 3.9329170000000886
+        },
+        "total": {
+          "n": 16,
+          "minMs": 436.5642499999999,
+          "p50Ms": 464.05474999999933,
+          "p95Ms": 509.679083,
+          "maxMs": 509.679083
+        },
+        "market": {
+          "n": 16,
+          "minMs": 55.18975000000046,
+          "p50Ms": 60.53195799999958,
+          "p95Ms": 68.96037499999966,
+          "maxMs": 68.96037499999966
+        }
+      },
+      "saveBytes": 9692312,
+      "heapBefore": 77213984,
+      "heapAfter": 305287848,
+      "allocationRows": 0,
+      "slowStages": [
+        [
+          "world_streaming_viewing_choices_ready \u2192 world_streaming_viewing_ai_catalogue_ready",
+          151.72625
+        ],
+        [
+          "world_streaming_viewing_rival_viewing_ready \u2192 world_streaming_viewing_done",
+          134.55554200000006
+        ],
+        [
+          "streaming_industry_start \u2192 streaming_industry_done",
+          106.52604199999996
+        ],
+        [
+          "world_streaming_viewing_ai_catalogue_ready \u2192 world_streaming_viewing_rival_viewing_ready",
+          39.34029099999998
+        ],
+        [
+          "world_streaming_viewing_customers_ready \u2192 world_streaming_viewing_choices_ready",
+          33.39416700000004
+        ],
+        [
+          "world_streaming_customers_start \u2192 world_streaming_customers_inputs_ready",
+          27.901875000000018
+        ],
+        [
+          "world_streaming_customers_inputs_ready \u2192 world_streaming_customers_desired_ready",
+          22.79933299999999
+        ],
+        [
+          "world_streaming_competition_start \u2192 world_streaming_competition_done",
+          17.580375000000004
+        ]
+      ]
+    },
+    {
+      "kind": "node",
+      "side": "after",
+      "fixture": "early",
+      "trial": 2,
+      "exit": 0,
+      "seconds": 10.8,
+      "metrics": {
+        "compute": {
+          "n": 16,
+          "minMs": 321.113875,
+          "p50Ms": 339.064292,
+          "p95Ms": 417.9910829999999,
+          "maxMs": 417.9910829999999
+        },
+        "prepare": {
+          "n": 16,
+          "minMs": 11.70508400000017,
+          "p50Ms": 14.417791999999963,
+          "p95Ms": 19.161875000000236,
+          "maxMs": 19.161875000000236
+        },
+        "persistence": {
+          "n": 16,
+          "minMs": 85.06908299999986,
+          "p50Ms": 101.66570900000079,
+          "p95Ms": 116.67283300000054,
+          "maxMs": 116.67283300000054
+        },
+        "uiCommit": {
+          "n": 16,
+          "minMs": 0.4651659999999538,
+          "p50Ms": 0.4937499999996362,
+          "p95Ms": 0.6239170000003469,
+          "maxMs": 0.6239170000003469
+        },
+        "total": {
+          "n": 16,
+          "minMs": 437.2784999999999,
+          "p50Ms": 450.70866599999954,
+          "p95Ms": 526.2961249999998,
+          "maxMs": 526.2961249999998
+        },
+        "market": {
+          "n": 16,
+          "minMs": 56.11045800000011,
+          "p50Ms": 60.45195800000056,
+          "p95Ms": 72.51983399999972,
+          "maxMs": 72.51983399999972
+        }
+      },
+      "saveBytes": 9692312,
+      "heapBefore": 77244608,
+      "heapAfter": 246192248,
+      "allocationRows": 0,
+      "slowStages": [
+        [
+          "world_streaming_viewing_choices_ready \u2192 world_streaming_viewing_ai_catalogue_ready",
+          150.54483300000004
+        ],
+        [
+          "world_streaming_viewing_rival_viewing_ready \u2192 world_streaming_viewing_done",
+          129.6959169999999
+        ],
+        [
+          "streaming_industry_start \u2192 streaming_industry_done",
+          106.07679199999998
+        ],
+        [
+          "world_streaming_viewing_ai_catalogue_ready \u2192 world_streaming_viewing_rival_viewing_ready",
+          49.072083999999904
+        ],
+        [
+          "world_streaming_customers_start \u2192 world_streaming_customers_inputs_ready",
+          31.19433300000003
+        ],
+        [
+          "world_streaming_viewing_customers_ready \u2192 world_streaming_viewing_choices_ready",
+          29.057999999999993
+        ],
+        [
+          "world_streaming_customers_inputs_ready \u2192 world_streaming_customers_desired_ready",
+          24.043791999999996
+        ],
+        [
+          "world_streaming_competition_start \u2192 world_streaming_competition_done",
+          17.765958000000012
+        ]
+      ]
+    },
+    {
+      "kind": "node",
+      "side": "before",
+      "fixture": "early",
+      "trial": 2,
+      "exit": 0,
+      "seconds": 10.95,
+      "metrics": {
+        "compute": {
+          "n": 16,
+          "minMs": 329.70154100000036,
+          "p50Ms": 348.954833,
+          "p95Ms": 402.16799999999967,
+          "maxMs": 402.16799999999967
+        },
+        "prepare": {
+          "n": 16,
+          "minMs": 11.445459000000028,
+          "p50Ms": 15.394083000000137,
+          "p95Ms": 26.219500000001062,
+          "maxMs": 26.219500000001062
+        },
+        "persistence": {
+          "n": 16,
+          "minMs": 87.60837500000002,
+          "p50Ms": 100.75158300000021,
+          "p95Ms": 124.46799999999894,
+          "maxMs": 124.46799999999894
+        },
+        "uiCommit": {
+          "n": 16,
+          "minMs": 0.46362500000032014,
+          "p50Ms": 0.49291700000048877,
+          "p95Ms": 0.5977499999999054,
+          "maxMs": 0.5977499999999054
+        },
+        "total": {
+          "n": 16,
+          "minMs": 448.21558300000015,
+          "p50Ms": 474.99874999999884,
+          "p95Ms": 511.9594589999997,
+          "maxMs": 511.9594589999997
+        },
+        "market": {
+          "n": 16,
+          "minMs": 55.93566699999974,
+          "p50Ms": 59.96529199999986,
+          "p95Ms": 67.71391600000061,
+          "maxMs": 67.71391600000061
+        }
+      },
+      "saveBytes": 9692316,
+      "heapBefore": 77272208,
+      "heapAfter": 234987512,
+      "allocationRows": 0,
+      "slowStages": [
+        [
+          "world_streaming_viewing_choices_ready \u2192 world_streaming_viewing_ai_catalogue_ready",
+          153.37116699999996
+        ],
+        [
+          "world_streaming_viewing_rival_viewing_ready \u2192 world_streaming_viewing_done",
+          123.37904200000003
+        ],
+        [
+          "streaming_industry_start \u2192 streaming_industry_done",
+          105.675667
+        ],
+        [
+          "world_streaming_viewing_ai_catalogue_ready \u2192 world_streaming_viewing_rival_viewing_ready",
+          49.56400000000008
+        ],
+        [
+          "world_streaming_viewing_customers_ready \u2192 world_streaming_viewing_choices_ready",
+          32.99883299999999
+        ],
+        [
+          "world_streaming_customers_start \u2192 world_streaming_customers_inputs_ready",
+          27.73954199999997
+        ],
+        [
+          "world_streaming_customers_inputs_ready \u2192 world_streaming_customers_desired_ready",
+          23.30687499999999
+        ],
+        [
+          "world_streaming_competition_start \u2192 world_streaming_competition_done",
+          17.476458000000036
+        ]
+      ]
+    },
+    {
+      "kind": "node",
+      "side": "before",
+      "fixture": "early",
+      "trial": 3,
+      "exit": 0,
+      "seconds": 11.03,
+      "metrics": {
+        "compute": {
+          "n": 16,
+          "minMs": 341.36083299999973,
+          "p50Ms": 354.49654100000043,
+          "p95Ms": 402.4806659999999,
+          "maxMs": 402.4806659999999
+        },
+        "prepare": {
+          "n": 16,
+          "minMs": 11.568250000000035,
+          "p50Ms": 15.264957999999751,
+          "p95Ms": 24.124125000000276,
+          "maxMs": 24.124125000000276
+        },
+        "persistence": {
+          "n": 16,
+          "minMs": 87.19341699999995,
+          "p50Ms": 100.4237919999996,
+          "p95Ms": 115.46812499999942,
+          "maxMs": 115.46812499999942
+        },
+        "uiCommit": {
+          "n": 16,
+          "minMs": 0.4650419999998121,
+          "p50Ms": 0.4912500000000364,
+          "p95Ms": 0.6131669999999758,
+          "maxMs": 0.6131669999999758
+        },
+        "total": {
+          "n": 16,
+          "minMs": 450.420625,
+          "p50Ms": 480.00499999999965,
+          "p95Ms": 511.7302920000002,
+          "maxMs": 511.7302920000002
+        },
+        "market": {
+          "n": 16,
+          "minMs": 57.646458999999595,
+          "p50Ms": 60.11412499999983,
+          "p95Ms": 71.00854199999958,
+          "maxMs": 71.00854199999958
+        }
+      },
+      "saveBytes": 9692316,
+      "heapBefore": 77265944,
+      "heapAfter": 363623376,
+      "allocationRows": 0,
+      "slowStages": [
+        [
+          "world_streaming_viewing_choices_ready \u2192 world_streaming_viewing_ai_catalogue_ready",
+          143.68224999999995
+        ],
+        [
+          "world_streaming_viewing_rival_viewing_ready \u2192 world_streaming_viewing_done",
+          127.97345799999994
+        ],
+        [
+          "streaming_industry_start \u2192 streaming_industry_done",
+          105.99987499999997
+        ],
+        [
+          "world_streaming_viewing_ai_catalogue_ready \u2192 world_streaming_viewing_rival_viewing_ready",
+          49.174375000000055
+        ],
+        [
+          "world_streaming_viewing_customers_ready \u2192 world_streaming_viewing_choices_ready",
+          33.34212500000001
+        ],
+        [
+          "world_streaming_customers_start \u2192 world_streaming_customers_inputs_ready",
+          28.090958
+        ],
+        [
+          "world_streaming_customers_inputs_ready \u2192 world_streaming_customers_desired_ready",
+          23.712666000000127
+        ],
+        [
+          "world_streaming_customers_desired_ready \u2192 world_streaming_customers_countries_advanced",
+          18.391915999999583
+        ]
+      ]
+    },
+    {
+      "kind": "node",
+      "side": "after",
+      "fixture": "early",
+      "trial": 3,
+      "exit": 0,
+      "seconds": 10.84,
+      "metrics": {
+        "compute": {
+          "n": 16,
+          "minMs": 317.97658299999966,
+          "p50Ms": 338.5624170000001,
+          "p95Ms": 398.12445800000023,
+          "maxMs": 398.12445800000023
+        },
+        "prepare": {
+          "n": 16,
+          "minMs": 11.598500000000058,
+          "p50Ms": 14.98133400000006,
+          "p95Ms": 25.00445800000034,
+          "maxMs": 25.00445800000034
+        },
+        "persistence": {
+          "n": 16,
+          "minMs": 86.52870799999982,
+          "p50Ms": 100.2080420000002,
+          "p95Ms": 114.15337499999987,
+          "maxMs": 114.15337499999987
+        },
+        "uiCommit": {
+          "n": 16,
+          "minMs": 0.4577079999999114,
+          "p50Ms": 0.4897500000006403,
+          "p95Ms": 0.5721250000001419,
+          "maxMs": 0.5721250000001419
+        },
+        "total": {
+          "n": 16,
+          "minMs": 437.19425,
+          "p50Ms": 454.1580839999997,
+          "p95Ms": 517.177208000001,
+          "maxMs": 517.177208000001
+        },
+        "market": {
+          "n": 16,
+          "minMs": 54.70733300000029,
+          "p50Ms": 60.424167000000125,
+          "p95Ms": 81.12933299999986,
+          "maxMs": 81.12933299999986
+        }
+      },
+      "saveBytes": 9692312,
+      "heapBefore": 77301120,
+      "heapAfter": 228880840,
+      "allocationRows": 0,
+      "slowStages": [
+        [
+          "world_streaming_viewing_choices_ready \u2192 world_streaming_viewing_ai_catalogue_ready",
+          147.07158299999998
+        ],
+        [
+          "world_streaming_viewing_rival_viewing_ready \u2192 world_streaming_viewing_done",
+          129.29899999999998
+        ],
+        [
+          "streaming_industry_start \u2192 streaming_industry_done",
+          105.78829100000002
+        ],
+        [
+          "world_streaming_viewing_ai_catalogue_ready \u2192 world_streaming_viewing_rival_viewing_ready",
+          38.21508400000005
+        ],
+        [
+          "world_streaming_viewing_customers_ready \u2192 world_streaming_viewing_choices_ready",
+          33.496375
+        ],
+        [
+          "world_streaming_customers_start \u2192 world_streaming_customers_inputs_ready",
+          30.07929200000001
+        ],
+        [
+          "world_streaming_customers_inputs_ready \u2192 world_streaming_customers_desired_ready",
+          23.861000000000104
+        ],
+        [
+          "world_streaming_competition_start \u2192 world_streaming_competition_done",
+          17.57495899999998
+        ]
+      ]
+    },
+    {
+      "kind": "browser",
+      "side": "before",
+      "fixture": "early",
+      "trial": 1,
+      "exit": 0,
+      "seconds": 6.67,
+      "cold": {
+        "index": 0,
+        "computeMs": 561.8999999910593,
+        "prepareMs": 13.900000005960464,
+        "persistenceMs": 62,
+        "verifiedReadMs": 14.700000002980232,
+        "saveBytes": 7478602,
+        "eventToPaintMs": 673.8999999910593
+      },
+      "warm": {
+        "computeMs": {
+          "n": 7,
+          "p50Ms": 312.3999999910593,
+          "p95Ms": 339.09999999403954,
+          "maxMs": 339.09999999403954
+        },
+        "prepareMs": {
+          "n": 7,
+          "p50Ms": 10.700000002980232,
+          "p95Ms": 18.100000008940697,
+          "maxMs": 18.100000008940697
+        },
+        "persistenceMs": {
+          "n": 7,
+          "p50Ms": 85.59999999403954,
+          "p95Ms": 97.59999999403954,
+          "maxMs": 97.59999999403954
+        },
+        "verifiedReadMs": {
+          "n": 7,
+          "p50Ms": 15.5,
+          "p95Ms": 16.700000002980232,
+          "maxMs": 16.700000002980232
+        },
+        "eventToPaintMs": {
+          "n": 7,
+          "p50Ms": 449.29999999701977,
+          "p95Ms": 482.6000000089407,
+          "maxMs": 482.6000000089407
+        }
+      },
+      "finalSaveJsonCodeUnits": 9042860
+    },
+    {
+      "kind": "browser",
+      "side": "after",
+      "fixture": "early",
+      "trial": 1,
+      "exit": 0,
+      "seconds": 6.08,
+      "cold": {
+        "index": 0,
+        "computeMs": 549.1000000089407,
+        "prepareMs": 12.599999994039536,
+        "persistenceMs": 56.400000005960464,
+        "verifiedReadMs": 16.200000002980232,
+        "saveBytes": 7478602,
+        "eventToPaintMs": 655.7000000029802
+      },
+      "warm": {
+        "computeMs": {
+          "n": 7,
+          "p50Ms": 294.5,
+          "p95Ms": 327.3999999910593,
+          "maxMs": 327.3999999910593
+        },
+        "prepareMs": {
+          "n": 7,
+          "p50Ms": 10.799999997019768,
+          "p95Ms": 18,
+          "maxMs": 18
+        },
+        "persistenceMs": {
+          "n": 7,
+          "p50Ms": 87.20000000298023,
+          "p95Ms": 97,
+          "maxMs": 97
+        },
+        "verifiedReadMs": {
+          "n": 7,
+          "p50Ms": 16.5,
+          "p95Ms": 16.80000001192093,
+          "maxMs": 16.80000001192093
+        },
+        "eventToPaintMs": {
+          "n": 7,
+          "p50Ms": 432.6000000089407,
+          "p95Ms": 465.8999999910593,
+          "maxMs": 465.8999999910593
+        }
+      },
+      "finalSaveJsonCodeUnits": 9042858
+    },
+    {
+      "kind": "browser",
+      "side": "after",
+      "fixture": "early",
+      "trial": 2,
+      "exit": 0,
+      "seconds": 5.33,
+      "cold": {
+        "index": 0,
+        "computeMs": 543.5999999940395,
+        "prepareMs": 12.5,
+        "persistenceMs": 54.79999999701977,
+        "verifiedReadMs": 16.30000001192093,
+        "saveBytes": 7478602,
+        "eventToPaintMs": 647.2999999970198
+      },
+      "warm": {
+        "computeMs": {
+          "n": 7,
+          "p50Ms": 294.69999998807907,
+          "p95Ms": 327.59999999403954,
+          "maxMs": 327.59999999403954
+        },
+        "prepareMs": {
+          "n": 7,
+          "p50Ms": 10.600000008940697,
+          "p95Ms": 18.400000005960464,
+          "maxMs": 18.400000005960464
+        },
+        "persistenceMs": {
+          "n": 7,
+          "p50Ms": 86.5,
+          "p95Ms": 97.29999999701977,
+          "maxMs": 97.29999999701977
+        },
+        "verifiedReadMs": {
+          "n": 7,
+          "p50Ms": 16.200000002980232,
+          "p95Ms": 16.899999991059303,
+          "maxMs": 16.899999991059303
+        },
+        "eventToPaintMs": {
+          "n": 7,
+          "p50Ms": 432.59999999403954,
+          "p95Ms": 465.90000000596046,
+          "maxMs": 465.90000000596046
+        }
+      },
+      "finalSaveJsonCodeUnits": 9042858
+    },
+    {
+      "kind": "browser",
+      "side": "before",
+      "fixture": "early",
+      "trial": 2,
+      "exit": 0,
+      "seconds": 5.44,
+      "cold": {
+        "index": 0,
+        "computeMs": 558,
+        "prepareMs": 13.399999991059303,
+        "persistenceMs": 55.900000005960464,
+        "verifiedReadMs": 14.599999994039536,
+        "saveBytes": 7478602,
+        "eventToPaintMs": 664.2999999970198
+      },
+      "warm": {
+        "computeMs": {
+          "n": 7,
+          "p50Ms": 303.70000000298023,
+          "p95Ms": 338.5,
+          "maxMs": 338.5
+        },
+        "prepareMs": {
+          "n": 7,
+          "p50Ms": 10.899999991059303,
+          "p95Ms": 17.799999997019768,
+          "maxMs": 17.799999997019768
+        },
+        "persistenceMs": {
+          "n": 7,
+          "p50Ms": 85.29999999701977,
+          "p95Ms": 97,
+          "maxMs": 97
+        },
+        "verifiedReadMs": {
+          "n": 7,
+          "p50Ms": 15.799999997019768,
+          "p95Ms": 17,
+          "maxMs": 17
+        },
+        "eventToPaintMs": {
+          "n": 7,
+          "p50Ms": 440.8999999910593,
+          "p95Ms": 482.5,
+          "maxMs": 482.5
+        }
+      },
+      "finalSaveJsonCodeUnits": 9042860
+    },
+    {
+      "kind": "browser",
+      "side": "before",
+      "fixture": "early",
+      "trial": 3,
+      "exit": 0,
+      "seconds": 5.39,
+      "cold": {
+        "index": 0,
+        "computeMs": 554.5999999940395,
+        "prepareMs": 12.5,
+        "persistenceMs": 56.5,
+        "verifiedReadMs": 14.5,
+        "saveBytes": 7478602,
+        "eventToPaintMs": 664.2000000029802
+      },
+      "warm": {
+        "computeMs": {
+          "n": 7,
+          "p50Ms": 306.5,
+          "p95Ms": 338,
+          "maxMs": 338
+        },
+        "prepareMs": {
+          "n": 7,
+          "p50Ms": 10.900000005960464,
+          "p95Ms": 17.900000005960464,
+          "maxMs": 17.900000005960464
+        },
+        "persistenceMs": {
+          "n": 7,
+          "p50Ms": 86.40000000596046,
+          "p95Ms": 96.29999999701977,
+          "maxMs": 96.29999999701977
+        },
+        "verifiedReadMs": {
+          "n": 7,
+          "p50Ms": 16.299999997019768,
+          "p95Ms": 16.900000005960464,
+          "maxMs": 16.900000005960464
+        },
+        "eventToPaintMs": {
+          "n": 7,
+          "p50Ms": 449.1000000089407,
+          "p95Ms": 482.5,
+          "maxMs": 482.5
+        }
+      },
+      "finalSaveJsonCodeUnits": 9042860
+    },
+    {
+      "kind": "browser",
+      "side": "after",
+      "fixture": "early",
+      "trial": 3,
+      "exit": 0,
+      "seconds": 5.3,
+      "cold": {
+        "index": 0,
+        "computeMs": 544.0999999940395,
+        "prepareMs": 12.5,
+        "persistenceMs": 55.5,
+        "verifiedReadMs": 14.600000008940697,
+        "saveBytes": 7478602,
+        "eventToPaintMs": 648.0999999940395
+      },
+      "warm": {
+        "computeMs": {
+          "n": 7,
+          "p50Ms": 294.70000000298023,
+          "p95Ms": 325.09999999403954,
+          "maxMs": 325.09999999403954
+        },
+        "prepareMs": {
+          "n": 7,
+          "p50Ms": 10.700000002980232,
+          "p95Ms": 18.099999994039536,
+          "maxMs": 18.099999994039536
+        },
+        "persistenceMs": {
+          "n": 7,
+          "p50Ms": 86.20000000298023,
+          "p95Ms": 96.90000000596046,
+          "maxMs": 96.90000000596046
+        },
+        "verifiedReadMs": {
+          "n": 7,
+          "p50Ms": 16.399999991059303,
+          "p95Ms": 16.899999991059303,
+          "maxMs": 16.899999991059303
+        },
+        "eventToPaintMs": {
+          "n": 7,
+          "p50Ms": 432.6000000089407,
+          "p95Ms": 465.90000000596046,
+          "maxMs": 465.90000000596046
+        }
+      },
+      "finalSaveJsonCodeUnits": 9042858
+    },
+    {
+      "kind": "node",
+      "side": "after",
+      "fixture": "late",
+      "trial": 1,
+      "exit": 0,
+      "seconds": 145.06,
+      "metrics": {
+        "compute": {
+          "n": 8,
+          "minMs": 10035.804415999999,
+          "p50Ms": 10344.044875000007,
+          "p95Ms": 10788.414709000004,
+          "maxMs": 10788.414709000004
+        },
+        "prepare": {
+          "n": 8,
+          "minMs": 209.26499999999942,
+          "p50Ms": 260.15849999999773,
+          "p95Ms": 418.05354200000875,
+          "maxMs": 418.05354200000875
+        },
+        "persistence": {
+          "n": 8,
+          "minMs": 2649.3992080000025,
+          "p50Ms": 3256.0978329999925,
+          "p95Ms": 4121.526041999998,
+          "maxMs": 4121.526041999998
+        },
+        "uiCommit": {
+          "n": 8,
+          "minMs": 0.6366249999991851,
+          "p50Ms": 0.7501669999910519,
+          "p95Ms": 2.0887080000102287,
+          "maxMs": 2.0887080000102287
+        },
+        "total": {
+          "n": 8,
+          "minMs": 13302.072291999997,
+          "p50Ms": 13600.066749999998,
+          "p95Ms": 14754.815333999999,
+          "maxMs": 14754.815333999999
+        },
+        "market": {
+          "n": 8,
+          "minMs": 747.6494579999999,
+          "p50Ms": 795.3946670000005,
+          "p95Ms": 1615.6158750000031,
+          "maxMs": 1615.6158750000031
+        }
+      },
+      "saveBytes": 240493790,
+      "heapBefore": 766271912,
+      "heapAfter": 3160553648,
+      "allocationRows": 40573,
+      "slowStages": [
+        [
+          "streaming_industry_start \u2192 streaming_industry_done",
+          11334.579584
+        ],
+        [
+          "world_streaming_viewing_ai_catalogue_ready \u2192 world_streaming_viewing_rival_viewing_ready",
+          6328.8112919999985
+        ],
+        [
+          "world_streaming_viewing_rival_viewing_ready \u2192 world_streaming_viewing_done",
+          2986.3627500000002
+        ],
+        [
+          "world_streaming_platform_economy_done \u2192 owned_streaming_processed",
+          317.2752499999988
+        ],
+        [
+          "start \u2192 state_cloned",
+          294.1803749999963
+        ],
+        [
+          "world_streaming_platform_economy_start \u2192 world_streaming_platform_economy_done",
+          247.77449999999953
+        ],
+        [
+          "world_integrity_start \u2192 world_integrity_done",
+          147.5405829999945
+        ],
+        [
+          "world_streaming_viewing_choices_ready \u2192 world_streaming_viewing_ai_catalogue_ready",
+          105.12641600000097
+        ]
+      ]
+    },
+    {
+      "kind": "browser",
+      "side": "after",
+      "fixture": "late",
+      "trial": 1,
+      "exit": 0,
+      "seconds": 101.71,
+      "cold": {
+        "index": 0,
+        "computeMs": 15343,
+        "prepareMs": 185,
+        "persistenceMs": 1338.7999999970198,
+        "verifiedReadMs": 391,
+        "saveBytes": 226289849,
+        "eventToPaintMs": 17569.70000000298
+      },
+      "warm": {
+        "computeMs": {
+          "n": 7,
+          "p50Ms": 8470.5,
+          "p95Ms": 8645.70000000298,
+          "maxMs": 8645.70000000298
+        },
+        "prepareMs": {
+          "n": 7,
+          "p50Ms": 182.59999999403954,
+          "p95Ms": 248.3999999910593,
+          "maxMs": 248.3999999910593
+        },
+        "persistenceMs": {
+          "n": 7,
+          "p50Ms": 2309.0999999940395,
+          "p95Ms": 2401.7999999970198,
+          "maxMs": 2401.7999999970198
+        },
+        "verifiedReadMs": {
+          "n": 7,
+          "p50Ms": 409.29999999701977,
+          "p95Ms": 455.5,
+          "maxMs": 455.5
+        },
+        "eventToPaintMs": {
+          "n": 7,
+          "p50Ms": 11780.79999999702,
+          "p95Ms": 12014.5,
+          "maxMs": 12014.5
+        }
+      },
+      "finalSaveJsonCodeUnits": 239686918
+    }
+  ],
+  "globalRegressionGate": "INCONCLUSIVE",
+  "reason": "Same aligned late baseline fails protected studio receipt-ledger compaction, so no valid late before p95 exists",
+  "limitations": [
+    "3 alternating paired early trials, 16 warm Node samples each; 8 browser clicks with cold separate and 7 warm samples per trial",
+    "Late candidate has one Node trial of 8 warm samples and one browser trial of cold +7 warm samples; p95 is nearest-rank observed maximum for these small samples",
+    "Node persistence uses the real generation coordinator and atomic memory adapter; browser uses actual verified IndexedDB",
+    "QA summary React paint is not full App UI, native bridge, real device, or field telemetry",
+    "Retained heap and allocation row counts are not cumulative JS allocator bytes",
+    "Late absolute latency remains high; no device-readiness claim",
+    "Raw browser capture field saveBytes is JSON string UTF-16 code units, not UTF-8 bytes. Summary labels it finalSaveJsonCodeUnits; current QA harness uses saveJsonCodeUnits. Node Buffer.byteLength reports actual serialized UTF-8 size. This field-name correction changes no measured timing or calculation."
+  ]
+}

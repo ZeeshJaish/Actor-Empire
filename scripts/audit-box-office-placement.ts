@@ -1,0 +1,7 @@
+import assert from 'node:assert/strict';
+import { makeCinemaMarketFixture } from './fixtures/boxOfficeScenarios';
+import { simulateCinemaWeek } from '../services/boxOffice/boxOfficeMarket';
+const make=()=>{const f=makeCinemaMarketFixture(),unknown=structuredClone(f.titles[0]);unknown.id='unknown';unknown.exposure={...unknown.exposure!,events:[]};f.titles=[...f.titles,unknown];f.supply!.offers.push({titleId:'unknown',poolId:f.supply!.pools[0].id});return f};
+{const f=make(),r=simulateCinemaWeek(f),other=r.titles.find(t=>t.titleId==='film')!.firstAdmissions;const placed=r.exhibition!.find(e=>e.titleId==='unknown')!;assert.ok(other>0&&placed.screens>0);const contacts=r.nextState.titles.find(t=>t.titleId==='unknown')!.cells[0].pendingLocalFootfall?.otherFilmAdmissions||0;assert.ok(contacts<=Math.floor(other*placed.screens/f.supply!.pools[0].screens),'One booked screen must not advertise to the entire 1,000-screen chain');}
+{const f=make();f.absoluteWeek=105;f.marketState!.lastProcessedAbsoluteWeek=104;f.marketState!.runs=f.supply!.offers.map(o=>({...o,quietWeeks:0,closed:false}));const r=simulateCinemaWeek(f);assert.equal(r.exhibition!.find(e=>e.titleId==='unknown')!.shows,0);assert.equal(r.costEvents.filter(e=>e.titleId==='unknown').length,0);assert.equal(r.nextState.titles.find(t=>t.titleId==='unknown')!.cells[0].pendingLocalFootfall,undefined,'Unused unpaid access must not generate chain-wide poster exposure');}
+console.log('PASS local discovery needs paid physical placement and is bounded by its actual screen footprint');

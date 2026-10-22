@@ -185,7 +185,7 @@ export const simulateCinemaWeek = (input:CinemaWeekInput):CinemaWeekResult => {
     const allocationsByTitle=group(allocations,a=>a.titleId),allocationsByCell=group(allocations,a=>JSON.stringify([a.titleId,a.cohortId]));
     const footfall=new Map<string,number>();
     for(const a of allocations){const key=JSON.stringify([a.cohortId,a.poolId]);footfall.set(key,(footfall.get(key)||0)+a.admissions)}
-    const posterPools=group(supply.offers,o=>JSON.stringify([o.titleId,poolIndex.get(o.poolId)!.countryId]));
+    const posterPools=group(exhibition.filter(e=>e.shows>0&&e.screens>0),e=>JSON.stringify([e.titleId,poolIndex.get(e.poolId)!.countryId]));
     const firstRequests=new Map(snapshot.choices.filter(r=>r.kind==='FIRST').map(r=>[JSON.stringify([r.titleId,r.cohortId]),r]));
     const titles=[...input.titles].sort((a,b)=>a.id.localeCompare(b.id)).map(t=>{
         const rows=allocationsByTitle.get(t.id)||[];
@@ -221,9 +221,13 @@ export const simulateCinemaWeek = (input:CinemaWeekInput):CinemaWeekResult => {
             cell.seenBands.sort((a,b)=>a.satisfaction-b.satisfaction);
         }
         // A paid release booking includes local exhibitor placement. Only realized OTHER-title
-        // patrons in that same country/chain can discover it; empty booked screens create no source.
+        // patrons near its actual screen footprint can discover it. An offer alone buys no placement;
+        // one booked screen cannot advertise to every visitor across an entire chain.
         const posters=posterPools.get(JSON.stringify([title.titleId,inputCohortIndex.get(cell.cohortId)!.countryId]))||[];
-        const otherVisits=cinemaSum(posters.map(o=>(footfall.get(JSON.stringify([cell.cohortId,o.poolId]))||0)-rows.filter(a=>a.poolId===o.poolId).reduce((n,a)=>n+a.admissions,0)));
+        const otherVisits=cinemaSum(posters.map(o=>{
+            const visitors=(footfall.get(JSON.stringify([cell.cohortId,o.poolId]))||0)-rows.filter(a=>a.poolId===o.poolId).reduce((n,a)=>n+a.admissions,0);
+            return Math.floor(visitors*o.screens/Math.max(1,poolIndex.get(o.poolId)!.screens));
+        }));
         cell.pendingLocalFootfall=otherVisits?{absoluteWeek:input.absoluteWeek,otherFilmAdmissions:otherVisits}:undefined;
         const seen=cell.seenBands.reduce((n,b)=>n+b.people,0);
         const firstIntent=firstRequests.get(JSON.stringify([title.titleId,cell.cohortId]))?.requestedAdmissions || 0;

@@ -1,0 +1,110 @@
+[
+  {
+    "suite": "inputs",
+    "exit": 0,
+    "seconds": 0.17,
+    "log": "/private/tmp/actor-phase6-final-inputs.log"
+  },
+  {
+    "suite": "delivery",
+    "exit": 0,
+    "seconds": 0.16,
+    "log": "/private/tmp/actor-phase6-final-delivery.log"
+  },
+  {
+    "suite": "finance",
+    "exit": 0,
+    "seconds": 0.11,
+    "log": "/private/tmp/actor-phase6-final-finance.log"
+  },
+  {
+    "suite": "finance-contracts",
+    "exit": 0,
+    "seconds": 0.06,
+    "log": "/private/tmp/actor-phase6-final-finance-contracts.log"
+  },
+  {
+    "suite": "finance-ui",
+    "exit": 0,
+    "seconds": 0.58,
+    "log": "/private/tmp/actor-phase6-final-finance-ui.log"
+  },
+  {
+    "suite": "phase1-integration",
+    "exit": 0,
+    "seconds": 5.28,
+    "log": "/private/tmp/actor-phase6-final-phase1-integration.log"
+  },
+  {
+    "suite": "awareness",
+    "exit": 0,
+    "seconds": 0.15,
+    "log": "/private/tmp/actor-phase6-final-awareness.log"
+  },
+  {
+    "suite": "phase2-integration",
+    "exit": 0,
+    "seconds": 3.5,
+    "log": "/private/tmp/actor-phase6-final-phase2-integration.log"
+  },
+  {
+    "suite": "audience",
+    "exit": 0,
+    "seconds": 0.4,
+    "log": "/private/tmp/actor-phase6-final-audience.log"
+  },
+  {
+    "suite": "market",
+    "exit": 0,
+    "seconds": 1.35,
+    "log": "/private/tmp/actor-phase6-final-market.log"
+  },
+  {
+    "suite": "migration",
+    "exit": 0,
+    "seconds": 1.52,
+    "log": "/private/tmp/actor-phase6-final-migration.log"
+  },
+  {
+    "suite": "integration",
+    "exit": 0,
+    "seconds": 12.29,
+    "log": "/private/tmp/actor-phase6-final-integration.log"
+  },
+  {
+    "suite": "presentation",
+    "exit": 0,
+    "seconds": 1.27,
+    "log": "/private/tmp/actor-phase6-final-presentation.log"
+  },
+  {
+    "suite": "rights",
+    "exit": 0,
+    "seconds": 3.97,
+    "log": "/private/tmp/actor-phase6-final-rights.log"
+  },
+  {
+    "suite": "placement",
+    "exit": 0,
+    "seconds": 0.1,
+    "log": "/private/tmp/actor-phase6-final-placement.log"
+  },
+  {
+    "suite": "release-announcement",
+    "exit": 0,
+    "seconds": 2.71,
+    "log": "/private/tmp/actor-phase6-final-release-announcement.log"
+  },
+  {
+    "suite": "save-boundary",
+    "exit": 0,
+    "seconds": 0.54,
+    "log": "/private/tmp/actor-phase6-final-save-boundary.log"
+  },
+  {
+    "suite": "viewing-routes",
+    "exit": 0,
+    "seconds": 0.07,
+    "log": "/private/tmp/actor-phase6-final-viewing-routes.log"
+  }
+]

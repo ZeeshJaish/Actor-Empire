@@ -1,0 +1,122 @@
+[
+  {
+    "function": "evaluateStreamingTitleRoute",
+    "url": "file:///private/tmp/actor-phase6-bench-after-clean.mjs",
+    "line": 86446,
+    "ms": 2889.4019999999905
+  },
+  {
+    "function": "evaluateStreamingTitleRoute",
+    "url": "file:///private/tmp/actor-phase6-bench-after-clean.mjs",
+    "line": 86446,
+    "ms": 2799.9539999999906
+  },
+  {
+    "function": "canBuy",
+    "url": "file:///private/tmp/actor-phase6-bench-after-clean.mjs",
+    "line": 132870,
+    "ms": 1329.422
+  },
+  {
+    "function": "canBuy",
+    "url": "file:///private/tmp/actor-phase6-bench-after-clean.mjs",
+    "line": 132870,
+    "ms": 1313.3449999999978
+  },
+  {
+    "function": "playable",
+    "url": "file:///private/tmp/actor-phase6-bench-after-clean.mjs",
+    "line": 132815,
+    "ms": 1280.8729999999985
+  },
+  {
+    "function": "playable",
+    "url": "file:///private/tmp/actor-phase6-bench-after-clean.mjs",
+    "line": 132815,
+    "ms": 1142.8740000000007
+  },
+  {
+    "function": "(anonymous)",
+    "url": "file:///private/tmp/actor-phase6-bench-after-clean.mjs",
+    "line": 136256,
+    "ms": 836.792
+  },
+  {
+    "function": "(anonymous)",
+    "url": "file:///private/tmp/actor-phase6-bench-after-clean.mjs",
+    "line": 132405,
+    "ms": 724.9560000000006
+  },
+  {
+    "function": "(anonymous)",
+    "url": "file:///private/tmp/actor-phase6-bench-after-clean.mjs",
+    "line": 132405,
+    "ms": 645.496
+  },
+  {
+    "function": "(anonymous)",
+    "url": "file:///private/tmp/actor-phase6-bench-after-clean.mjs",
+    "line": 86465,
+    "ms": 408.45899999999955
+  },
+  {
+    "function": "(anonymous)",
+    "url": "file:///private/tmp/actor-phase6-bench-after-clean.mjs",
+    "line": 86465,
+    "ms": 369.4209999999997
+  },
+  {
+    "function": "(garbage collector)",
+    "url": "",
+    "line": 0,
+    "ms": 336.7499999999997
+  },
+  {
+    "function": "(anonymous)",
+    "url": "file:///private/tmp/actor-phase6-bench-after-clean.mjs",
+    "line": 132815,
+    "ms": 180.252
+  },
+  {
+    "function": "(anonymous)",
+    "url": "file:///private/tmp/actor-phase6-bench-after-clean.mjs",
+    "line": 132815,
+    "ms": 108.626
+  },
+  {
+    "function": "cloneJsonValue",
+    "url": "file:///private/tmp/actor-phase6-bench-after-clean.mjs",
+    "line": 136907,
+    "ms": 104.458
+  },
+  {
+    "function": "(anonymous)",
+    "url": "file:///private/tmp/actor-phase6-bench-after-clean.mjs",
+    "line": 132405,
+    "ms": 93.33500000000001
+  },
+  {
+    "function": "savedTitle",
+    "url": "file:///private/tmp/actor-phase6-bench-after-clean.mjs",
+    "line": 85691,
+    "ms": 79.791
+  },
+  {
+    "function": "add2",
+    "url": "file:///private/tmp/actor-phase6-bench-after-clean.mjs",
+    "line": 85762,
+    "ms": 76.45800000000001
+  },
+  {
+    "function": "cloneJsonValue",
+    "url": "file:///private/tmp/actor-phase6-bench-after-clean.mjs",
+    "line": 136907,
+    "ms": 63.834
+  },
+  {
+    "function": "(anonymous)",
+    "url": "file:///private/tmp/actor-phase6-bench-after-clean.mjs",
+    "line": 86465,
+    "ms": 60.041999999999994
+  }
+]

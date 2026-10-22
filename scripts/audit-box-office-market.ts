@@ -111,6 +111,9 @@ test('named scarce-access and narrow-wide fixtures preserve the access-intent bo
 });
 test('local poster discovery needs real other-film patrons and arrives next week',()=>{
   const f=fixture(),unknown=structuredClone(f.titles[0]);unknown.id='unknown';unknown.exposure!.events=[];f.titles=[...f.titles,unknown];f.supply!.offers.push({titleId:'unknown',poolId:f.supply!.pools[0].id});
+  // One local screen: its placement reaches the patrons at this actual venue.
+  f.supply!.pools[0].screens=1;f.supply!.pools[0].weeklyScreenMinutes=5040;
+  f.titles[0].exposure!.events[0].impressions=10000;
   const first=simulateCinemaWeek(f);assert.equal(first.titles.find(t=>t.titleId==='unknown')!.firstAdmissions,0);
   const next=simulateCinemaWeek({...f,absoluteWeek:101,marketState:first.nextState});assert.ok(next.titles.find(t=>t.titleId==='unknown')!.firstAdmissions>0);
   const cell=next.nextState.titles.find(t=>t.titleId==='unknown')!.cells[0];assert.ok(cell.awarePeople<=first.titles.find(t=>t.titleId==='film')!.firstAdmissions*.025);

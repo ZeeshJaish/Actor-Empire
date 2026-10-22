@@ -1,4 +1,5 @@
 import { recordCinemaStreamingAudience } from './boxOffice/boxOfficeStreamingAudience';
+import { commitCinemaAnnouncement } from './boxOffice/boxOfficeExposureAdapters';
 import { quoteCinemaRightsForBuyer, registerQuotedCinemaStreamingRights, settleQuotedCinemaStreamingSale } from './boxOffice/boxOfficeRightsAdapter';
 import { CINEMA_ROLE_WEIGHTS } from './boxOffice/boxOfficeProfiles';
 import { creditSignedActorBackend } from './talentCareer';
@@ -4256,6 +4257,12 @@ export const processGameWeek = async (
                     if (!isOwnedProduction && updatedC.type === 'ACTING_GIG') {
                         if (!updatedC.projectDetails.castList?.length) updatedC.projectDetails.castList = generateCastList(nextPlayer, updatedC.projectDetails, updatedC.roleType || 'MINOR');
                         updatedC.projectDetails = completeOfferedCinemaCast(updatedC.projectDetails);
+                    }
+                    // A real premiere is public even when an offered role already carried its release strategy.
+                    // The release wizard may have announced it earlier; the event is idempotent.
+                    if (updatedC.projectDetails.type === 'MOVIE' && !isStreamingOnly) {
+                        updatedC.projectDetails = commitCinemaAnnouncement(nextPlayer, updatedC.projectDetails,
+                            updatedC.id, getAbsoluteWeek(nextPlayer.age, nextPlayer.currentWeek));
                     }
                     const cinemaTitle = normalizeCinemaTitle({ titleId: updatedC.id, project: updatedC.projectDetails, player: nextPlayer,
                         owner: { id: updatedC.projectDetails.studioId, route: isOwnedProduction ? 'PLAYER_STUDIO' : 'ACCEPTED_ROLE' } });

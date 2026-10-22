@@ -1,3 +1,4 @@
+import { CINEMA_MARKET_TUNING_VERSION } from '../../services/boxOffice/boxOfficeProfiles';
 import { INITIAL_PLAYER, type Player, type ProjectDetails, type AuditionOpportunity } from '../../types';
 import type { CinemaExposureInput } from '../../services/boxOffice/boxOfficeTypes';
 
@@ -45,7 +46,7 @@ export const makeCinemaMarketFixture = (variant: typeof CINEMA_MARKET_SCENARIOS[
     market:{releaseWeek:100,runtimeMinutes:120,languages:['en'],countryIds:['US'],chainIds:['NOVA_CIRCUIT'],format:'STANDARD',universeId:'universe',returningCharacterIds:['hero'],payoff:85,accessibility:85,urgency:60},
   };
   if(variant==='streaming-wait') title.market!.streamingWindow={platformId:'streamer',countryIds:['US'],absoluteWeek:101,publiclyKnown:true};
-  const state: import('../../services/boxOffice/boxOfficeTypes').CinemaMarketState={schemaVersion:1,tuningVersion:1,lastProcessedAbsoluteWeek:99,titles:[],affinities:[],runs:[]};
+  const state: import('../../services/boxOffice/boxOfficeTypes').CinemaMarketState={schemaVersion:1,tuningVersion:CINEMA_MARKET_TUNING_VERSION,lastProcessedAbsoluteWeek:99,titles:[],affinities:[],runs:[]};
   if(['satisfied-repeat','weak-repeat','indie-discovery','saturated-market'].includes(variant)) {
     title.exposure!.events=[];
     state.titles=[{titleId:'film',ownerId:'studio',cast,universeId:'universe',releaseWeek:98,appliedExposureIds:[],cells:[{cohortId:'US:audience',awarePeople:100_000,seenBands:[band],deferredPeople:0,lastDiscoveryWeek:98}]}];
@@ -53,7 +54,7 @@ export const makeCinemaMarketFixture = (variant: typeof CINEMA_MARKET_SCENARIOS[
   const history: import('../../services/boxOffice/boxOfficeTypes').CinemaViewingEvidence[] = variant==='earned-event'||variant==='overlapping-favorites'?[{
     id:'earlier-view',titleId:'earlier-film',ownerId:'studio',cohortId:'US:audience',people:300_000,satisfaction:95,absoluteWeek:96,cast,universeId:'universe',source:'THEATER',
   }]:[];
-  const input: import('../../services/boxOffice/boxOfficeTypes').CinemaWeekInput = {absoluteWeek:100,seed,tuningVersion:1,knowledge:'OBSERVED',titles:[title],history,marketState:state,
+  const input: import('../../services/boxOffice/boxOfficeTypes').CinemaWeekInput = {absoluteWeek:100,seed,tuningVersion:CINEMA_MARKET_TUNING_VERSION,knowledge:'OBSERVED',titles:[title],history,marketState:state,
     cohorts:[{id:'US:audience',countryId:'US',people:1_000_000,market:{eligiblePeople:800_000,monthlyCinemaBudgetCents:2_000_000_000,weeklyLeisureMinutes:60_000_000,interest:80,priceSensitivity:60,persona:'FANDOM_LOYALISTS',languages:['en'],travelMinutes:40}}],
     countries:[{id:'US',regionId:'NORTH_AMERICA',population:1_000_000,cinemaAccess:80,purchasingPower:90,inflation:10,languages:['en']}],
     supply:{pools:[{id:'US:NOVA_CIRCUIT:STANDARD',countryId:'US',chainId:'NOVA_CIRCUIT',format:'STANDARD',screens:1000,seatsPerShow:180,weeklyScreenMinutes:5_040_000,ticketPriceCents:1000,exhibitorBasisPoints:4500,distributionBasisPoints:500,bookingCentsPerShow:1000}],offers:[{titleId:'film',poolId:'US:NOVA_CIRCUIT:STANDARD'}]},
