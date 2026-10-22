@@ -6,6 +6,7 @@ import { showAd } from '../services/adLogic';
 import { addBreadcrumb, recordNonFatal, setCrashContext, trackGameEvent } from '../services/firebaseService';
 import { resolveYoutubeEventChoice, YoutubeEventResolution } from '../services/youtubeEventLogic';
 import { getPlayerLanguage, t } from '../services/i18n';
+import { resolveLifeEventFallback } from '../services/lifeEventFallback';
 import { generateLegalHearing } from '../services/lifeEventLogic';
 
 interface LifeEventModalProps {
@@ -177,56 +178,8 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
     };
 
     // Fallback logic for when functions are stripped by JSON serialization
-    const getFallbackImpact = (event: LifeEvent, optionIdx: number, p: Player, option?: LifeEventOption) => {
-        const optionText = `${option?.label || ''} ${option?.description || ''}`.toLowerCase();
-        const isGolden = !!option?.isGolden;
-        const isRisky = event.type === 'SCANDAL' || event.type === 'CRIME' || event.type === 'LEGAL' || optionText.includes('double') || optionText.includes('clap') || optionText.includes('refuse') || optionText.includes('ignore') || optionText.includes('risk');
-        const isPositive = isGolden || optionText.includes('apolog') || optionText.includes('help') || optionText.includes('honest') || optionText.includes('professional') || optionText.includes('settle') || optionText.includes('accept');
-        const eventTitle = getLifeEventTitle(event) || tr('life.modal.fallback.momentTitle');
-
-        // Specific fallbacks for common events to ensure game balance isn't broken
-        if (eventTitle === "The Side Hustle") {
-            if (optionIdx === 0) {
-                p.money += 2000;
-                p.energy.current = Math.max(0, p.energy.current - 10);
-                return { updatedPlayer: p, log: tr('life.modal.fallback.sideHustleWorkLog') };
-            } else if (optionIdx === 1) {
-                p.stats.experience += 5;
-                return { updatedPlayer: p, log: tr('life.modal.fallback.sideHustleAuditionLog') };
-            }
-        }
-
-        if (isGolden) {
-            p.stats.reputation = Math.min(100, (p.stats.reputation || 0) + 3);
-            p.stats.fame = Math.min(100, (p.stats.fame || 0) + 1);
-            return {
-                updatedPlayer: p,
-                log: tr('life.modal.fallback.goldenLog', { title: eventTitle })
-            };
-        }
-
-        if (isRisky && !isPositive) {
-            p.stats.reputation = Math.max(0, (p.stats.reputation || 0) - 2);
-            p.stats.fame = Math.min(100, (p.stats.fame || 0) + 1);
-            return {
-                updatedPlayer: p,
-                log: tr('life.modal.fallback.riskyLog', { title: eventTitle })
-            };
-        }
-
-        if (isPositive) {
-            p.stats.reputation = Math.min(100, (p.stats.reputation || 0) + 1);
-            return {
-                updatedPlayer: p,
-                log: tr('life.modal.fallback.positiveLog', { title: eventTitle })
-            };
-        }
-
-        return {
-            updatedPlayer: p,
-            log: tr('life.modal.fallback.neutralLog', { title: eventTitle })
-        };
-    };
+    const getFallbackImpact = (event: LifeEvent, optionIdx: number, p: Player, option?: LifeEventOption) =>
+        resolveLifeEventFallback(p,event,optionIdx,option,getLifeEventTitle(event));
 
     const getTypeTheme = () => {
         switch (lifeEvent?.type) {

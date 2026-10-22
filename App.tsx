@@ -1,3 +1,6 @@
+import { acknowledgeStockControlNotice } from './services/stockControlNotices';
+import { isStockSaveRecoveryError } from './services/stockSaveCompatibility';
+import {applyCareerAuditionApplication,acceptCareerPartTimeJob} from './services/careerApplicationActions';
 
 import React, { useState, useEffect, useRef } from 'react';
 import { INITIAL_PLAYER, Player, Page, Commitment, PressInteraction, SocialEvent, ActorSkills, AdType, Relationship, ProjectDetails, ActiveRelease, PastProject, StreamingState, PregnancyCarrier, ScheduledEvent, SponsorshipOffer } from './types';
@@ -46,7 +49,7 @@ import {
   type PendingRewardAdReceipt,
 } from './services/rewardedAdRecovery';
 import { ensureTrackingPermission } from './services/trackingService';
-import { createDeferredSaveSlotSummary, createSaveSlotSummary, deleteVerifiedGameData, getGameSaveSummary, listGameDataKeys, loadVerifiedGameData, recoverPreviousGameData, saveVerifiedGameData, writeGameSaveSummary, type SaveSlotSummary } from './services/storage';
+import { createDeferredSaveSlotSummary, createSaveSlotSummary, deleteVerifiedGameData, getGameSaveSummary, listGameDataKeys, loadVerifiedGameData, peekVerifiedPreviousGameData, recoverPreviousGameData, saveVerifiedGameData, writeGameSaveSummary, type SaveSlotSummary } from './services/storage';
 import { buildLegacyStudioInheritance, createBloodlineSnapshot, getAbsoluteWeek, getLegacyInheritancePreview, getRelationshipAge, inferStreamingStartWeekAbsolute, inheritActorSkills, LEGACY_MIN_PLAYABLE_AGE } from './services/legacyLogic';
 import { handoffOwnedStreamingPlatformToHeir } from './services/streamingLegacy';
 import { applyPremiumPurchase, getRequiredPremiumProductForAsset, hasNoAds, isNonConsumablePremiumProduct, PremiumProductId, restoreWeeklyEnergy, spendPlayerEnergy, syncEnergyDisplay, syncWeeklyEnergyForCommitments } from './services/premiumLogic';
@@ -1418,6 +1421,18 @@ export const App: React.FC = () => {
             }
             markTraceAction('selected_save_load_completed', { flow: 'save_select', save_slot: slot });
         } catch (error) {
+            if (isStockSaveRecoveryError(error)) {
+                const storageKey = saveSlotSummaries[slot]?.storageKey || `actorEmpireSave_${slot}`;
+                const previous = await peekVerifiedPreviousGameData(storageKey).catch(() => null);
+                if (previous) {
+                    try {
+                        migratePlayerSave(previous);
+                        setPendingSaveRecovery({ slot, storageKey, previous, violations: error.issues.map(issue => issue.detail) });
+                        setCurrentSlot(null);
+                        return;
+                    } catch { /* An incompatible previous save must not replace the current original. */ }
+                }
+            }
             recordNonFatal(error, 'selected_save_load_failed', { save_slot: slot });
             setCurrentSlot(null);
             setToastMessage({
@@ -3051,7 +3066,7 @@ export const App: React.FC = () => {
       }
       resolveQueuedEventSafely(
           player,
-          player,
+          acknowledgeStockControlNotice(player, event.data?.stockId || '', 'OPEN'),
           event.id,
           tr('app.stockControl.acquisitionMovedLog', { companyName }),
           'positive'
@@ -3076,7 +3091,7 @@ export const App: React.FC = () => {
       }
       resolveQueuedEventSafely(
           player,
-          player,
+          acknowledgeStockControlNotice(player, stockId, 'OPEN'),
           event.id,
           tr('app.stockControl.reviewMovedLog', { companyName }),
           'neutral'
@@ -3103,6 +3118,8 @@ export const App: React.FC = () => {
       const previousCommitments = p.commitments;
       const next: Player = {
           ...p,
+          energy: { ...p.energy },
+          flags: { ...p.flags },
           commitments: p.commitments.filter(c => c.id !== id),
           logs: [...p.logs, { week: p.currentWeek, year: p.age, message: "Quit job.", type: 'neutral' }]
       };
@@ -3382,6 +3399,7 @@ export const App: React.FC = () => {
               event={player.pendingEvents[0]}
               onOpenAcquisitionDesk={() => openStockControlAcquisitionDesk(player.pendingEvents![0])}
               onReviewStock={() => openStockControlReview(player.pendingEvents![0])}
+              onDefer={() => handleUpdatePlayer(acknowledgeStockControlNotice(player, player.pendingEvents![0].data?.stockId || '', 'DEFER'))}
           />
       )}
 
@@ -3688,8 +3706,8 @@ export const App: React.FC = () => {
                                 setLifestyleInitialView('PRODUCTION_GAME');
                                 setActivePage(Page.LIFESTYLE);
                             }}
-                            onAudition={(opp)=>handleGenericUpdate(p=>{ const next: Player = { ...p, applications: [...p.applications, { id: `app_${Date.now()}`, type: 'AUDITION' as const, name: opp.projectName, weeksRemaining: 1, data: opp }] }; spendPlayerEnergy(next, 25, `Audition: ${opp.projectName}`); return next; })}
-                            onTakeJob={(job)=>handleGenericUpdate(p=>{ const previousCommitments = p.commitments; const next: Player = { ...p, commitments: [...p.commitments, job] }; syncWeeklyEnergyForCommitments(next, previousCommitments); return next; })}
+                            onAudition={(opp)=>{ const applicationId=`app_${Date.now()}`; handleGenericUpdate(p=>applyCareerAuditionApplication(p,opp,applicationId)); }}
+                            onTakeJob={(job)=>handleGenericUpdate(p=>acceptCareerPartTimeJob(p,job))}
                             onQuitJob={handleQuitJob}
                             onPost={(t,c,img,campaignParticipation,promotedProjectId)=>handleGenericUpdate(p=>{
                                 if (p.instagram.lastPostWeek !== p.currentWeek) {

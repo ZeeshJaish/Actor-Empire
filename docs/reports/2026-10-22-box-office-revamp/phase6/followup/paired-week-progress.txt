@@ -1,0 +1,4 @@
+week-before-trial1 0
+week-after-trial1 0
+week-after-trial2 0
+week-before-trial2 0

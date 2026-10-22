@@ -220,7 +220,7 @@ if (dealRoomSource.includes('This file updated while we were saving your action.
     throw new Error('Studio acquisition failures still expose technical save-conflict wording to players.');
 }
 
-const sharedCompletionStart = forbesAppSource.indexOf('onCompleteAcquisition={() =>');
+const sharedCompletionStart = forbesAppSource.indexOf('onCompleteAcquisition={(expectedQuoteKey) =>');
 const sharedCompletionEnd = forbesAppSource.indexOf('onUpdatePresentation={(patch)', sharedCompletionStart);
 const sharedCompletionBlock = sharedCompletionStart >= 0 && sharedCompletionEnd > sharedCompletionStart
     ? forbesAppSource.slice(sharedCompletionStart, sharedCompletionEnd)

@@ -1,0 +1,118 @@
+{
+  "body": "NETWORKING EVENT\nLife Story\nShareholder Decision: Paramount Global\n\"\n\nThe company wants permission to raise capital for production and acquisition opportunities. Your 51.00% stake gives you a direct voice instead of making you hunt inside Stocks.\n\nSELECT ACTION\nVote For\nBack the board proposal and accept the market reaction.\nVote For\nMarket Visible reaction\nVote Against\nPush back against the board proposal.\nVote Against\nPressure Board challenge\nLet Advisors Handle It\nWatch a rewarded ad to take the safest guided vote and reduce messy fallout.\nReward Ad Required\nRisk Safer route\nStock Actual App Buyer\nACTOR\nNEWCOMER\nYEAR\n35\nWEEK 9 / 52\nNET WORTH\n$2.0T\nENERGY\n100 / 100\n\nCONDITION\n\n80%\nHEALTH\n70%\nPHYSIQUE\n80%\nMOOD\n70%\nLOOKS\n\nSKILLS\n\n0%\nTALENT\n0%\nEXPERIENCE\n\nSTATUS\n\n0%\nREPUTATION\n0%\nFAME\nACTIVITY\n10 EVENTS\nYEAR 35 · WEEK 9\n\n🌟 New talent has emerged in the industry.\n\nThe hiring pool for Agents & Managers has refreshed.\n\n🏢 Netflix: Netflix commissioned Netflix DRAMA Original.\n\n🏢 DreamWorks Pictures committed 1 project to development.\n\n🏢 Lionsgate committed 1 project to development.\n\nYou saw a dog that looked exactly like you.\n\n🔄 CastLink updated.\n\nYEAR 35 · WEEK 8\n\nBought 331,500,000 shares of PARA.\n\nYEAR 15 · WEEK 1\n\nWelcome to Hollywood. Your journey starts today.\n\n🔔 Check your Message App for a note from the developer.\n\nThis week · Energy\nEXPENSE LOG\n\nWeek 9 energy usage from actions and commitments.\n\nSPENT\n0E\nRESERVED\n0E\nAVAILABLE\n100E\n\nNo energy spent this week.\n\nAge Up Week\nW 10\n2",
+  "state": {
+    "label": "waiting for actual App control event",
+    "status": "CURRENT",
+    "money": 1995431930000,
+    "week": 8,
+    "age": 35,
+    "energy": 100,
+    "holdings": [
+      {
+        "stockId": "stk_para",
+        "shares": 331500000,
+        "totalInvested": 4568070000,
+        "averageCost": 13.78
+      }
+    ],
+    "businesses": [],
+    "flags": {
+      "tutorialCompleted": true,
+      "extraNPCs": [],
+      "dynastyCareer": {
+        "schemaVersion": 1,
+        "members": {},
+        "lastProcessedAbsoluteWeek": 0
+      },
+      "dynastyCareerArchives": {},
+      "recentTimeline": [
+        {
+          "id": "LOG_log_2_Bought 331,500,000 shares of PARA._35_8",
+          "year": 35,
+          "week": 8,
+          "absoluteWeek": 1775,
+          "title": "Bought 331,500,000 shares of PARA.",
+          "kind": "LOG",
+          "tone": "neutral"
+        }
+      ],
+      "legacyHighlights": [],
+      "persistenceOptimizedAtWeek": 1775,
+      "persistenceCompaction": {
+        "week": 1775,
+        "keptPastProjects": 0,
+        "keptActiveReleases": 0,
+        "recentTimelineItems": 1,
+        "legacyHighlightItems": 0
+      },
+      "livingEnsembleState": {
+        "version": 1,
+        "seeds": [],
+        "stories": [],
+        "registeredProjectIds": [],
+        "recentCombinationKeys": [],
+        "lastProcessedQuarter": 0
+      },
+      "worldReactionState": {
+        "lastProcessedWeek": 0,
+        "controlledStudioCount": 0,
+        "controlledMajorStudioCount": 0,
+        "antiMonopolyPressure": 0,
+        "rivalRetaliationRisk": 0,
+        "employeeDepartureRisk": 0,
+        "investorConfidence": 0,
+        "acquisitionDebtPressure": 0,
+        "valuationPressure": 0,
+        "franchiseValuePressure": 0
+      },
+      "regulatorPressureState": {
+        "lastProcessedWeek": 0,
+        "pressureScore": 0,
+        "status": "CLEAR",
+        "controlledStudioCount": 0,
+        "controlledMajorStudioCount": 0,
+        "controlledTakeoverCount": 0,
+        "acquisitionMoratoriumWeeksRemaining": 0,
+        "conductAgreementWeeksRemaining": 0,
+        "acquisitionCostMultiplier": 1,
+        "investorConfidencePenalty": 0,
+        "reviewCount": 0,
+        "finesPaidToDate": 0
+      },
+      "rivalRetaliationState": {
+        "lastProcessedWeek": 0,
+        "retaliationScore": 0,
+        "activeCounterBidCount": 0,
+        "negativePressHeat": 0,
+        "dealChallengeWeeksRemaining": 0,
+        "defensiveAllianceCount": 0,
+        "pressureShieldWeeksRemaining": 0,
+        "actions": []
+      },
+      "acquisitionMarketPulseState": {
+        "lastProcessedWeek": 0,
+        "marketMood": "CONFIDENT",
+        "acquisitionStoryCount": 0,
+        "fanSentiment": 0,
+        "investorConfidenceDelta": 0,
+        "franchiseValueDelta": 0,
+        "processedCaseIds": [],
+        "lastHeadlineIds": []
+      },
+      "acquisitionDebtLedger": [],
+      "studioAcquisitionCases": [],
+      "companyEquityPositions": [],
+      "stockTakeoverEventDismissals": {},
+      "saveMigrationVersion": 53,
+      "saveMigratedAtWeek": 8,
+      "talentNegotiationMigrationVersion": 1,
+      "weeklyBaseEnergyRemaining": 100,
+      "bonusEnergyBank": 0,
+      "premiumPurchases": [],
+      "premiumCollections": [],
+      "processedIOSStoreTransactionIds": [],
+      "bailoutAdsUsedThisWeek": 0
+    },
+    "pendingEvents": []
+  }
+}

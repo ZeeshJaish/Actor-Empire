@@ -9,7 +9,7 @@ export const SAVE_INTEGRITY_FORMAT_VERSION = 1;
 // This versions the digest projection, not the IndexedDB generation envelope.
 // Never change an issued projection in place: add a new schema and retain its
 // exact verifier so careers can skip any number of app releases safely.
-export const SAVE_INTEGRITY_DIGEST_SCHEMA_VERSION = 3;
+export const SAVE_INTEGRITY_DIGEST_SCHEMA_VERSION = 4;
 
 export type SaveIntegrityReason = 'AUTOSAVE' | 'PROCESS_WEEK' | 'LIFE_EVENT_RESOLUTION' | 'MIGRATION' | 'IMPORT' | 'MANUAL';
 
@@ -51,6 +51,7 @@ export interface SaveProtectedState {
     ownedStreamingTreasury: number;
     worldEconomy: string;
     cinemaState?: string;
+    stockQuoteRepairs?: string;
 }
 
 export interface SaveIntegrityManifest {
@@ -174,11 +175,12 @@ const businessFinanceTokens = (player: Player): string[] => (player.businesses |
     });
 });
 
-const portfolioTokens = (player: Player): string[] => (player.portfolio || []).map((position, index) => stableSerialize({
+const portfolioTokens = (player: Player, includeCorporateRights = true): string[] => (player.portfolio || []).map((position, index) => stableSerialize({
     id: cleanText(position.stockId) || `portfolio:${index}`,
     shares: finiteNumber(position.shares),
     averageCost: finiteNumber(position.averageCost),
     totalInvested: finiteNumber(position.totalInvested),
+    ...(includeCorporateRights && position.equityFunding !== undefined ? { equityFunding: position.equityFunding } : {}),
 }));
 
 const activeLoanTokens = (player: Player): string[] => (player.finance?.loans || [])
@@ -329,6 +331,9 @@ const nonFiniteCanonicalMoneyPaths = (player: Player): string[] => {
         inspect(`portfolio.${index}.shares`, position.shares);
         inspect(`portfolio.${index}.averageCost`, position.averageCost);
         inspect(`portfolio.${index}.totalInvested`, position.totalInvested);
+        (Array.isArray(position.equityFunding) ? position.equityFunding : []).forEach((allocation, allocationIndex) => {
+            inspect(`portfolio.${index}.equityFunding.${allocationIndex}.shares`, allocation?.shares);
+        });
     });
     (player.finance?.loans || []).forEach((loan, index) => {
         inspect(`finance.loans.${index}.principal`, loan.principal);
@@ -339,7 +344,7 @@ const nonFiniteCanonicalMoneyPaths = (player: Player): string[] => {
     return paths;
 };
 
-const createProtectedState = (player: Player): SaveProtectedState => {
+const createProtectedState = (player: Player, schema = SAVE_INTEGRITY_DIGEST_SCHEMA_VERSION): SaveProtectedState => {
     const platform = player.ownedStreamingPlatform as unknown as Record<string, unknown>;
     const licences = Array.isArray(platform?.catalogLicenses) ? platform.catalogLicenses : [];
     const treasury = finiteNumber(platform?.treasuryCash || 0);
@@ -349,6 +354,7 @@ const createProtectedState = (player: Player): SaveProtectedState => {
         ...(typeof player.flags?.careerArchiveRootDigest === 'string'
             ? { archiveRootDigest: player.flags.careerArchiveRootDigest }
             : {}),
+        ...(schema >= 4 && player.flags?.stockQuoteRepairs ? { stockQuoteRepairs: stableHash(player.flags.stockQuoteRepairs) } : {}),
         money: finiteNumber(player.money),
         stats: stableHash(stats),
         commitments: fingerprintArray(player.commitments, 'commitment'),
@@ -356,7 +362,7 @@ const createProtectedState = (player: Player): SaveProtectedState => {
         pastProjects: fingerprintArray(player.pastProjects, 'past-project'),
         businesses: fingerprintArray(player.businesses, 'business'),
         businessFinances: fingerprintTokens(businessFinanceTokens(player)),
-        portfolio: fingerprintTokens(portfolioTokens(player)),
+        portfolio: fingerprintTokens(portfolioTokens(player, schema >= 4)),
         activeLoans: fingerprintTokens(activeLoanTokens(player)),
         studioTalent: fingerprintArray(
             (player.studio?.talentRoster || []).filter(contract => contract.status === 'ACTIVE'),
@@ -490,6 +496,7 @@ export const compareProtectedSaveState = (before: Player, after: Player): Protec
     if (left.ownedStreamingIdentity !== right.ownedStreamingIdentity) violations.push('owned streaming identity changed');
     if (!Number.isFinite(right.ownedStreamingTreasury)) violations.push('owned streaming treasury is not finite');
     else if (left.ownedStreamingTreasury !== right.ownedStreamingTreasury) violations.push('owned streaming treasury changed');
+    if (left.stockQuoteRepairs !== right.stockQuoteRepairs) violations.push('stock quote repair provenance changed');
     if (left.cinemaState !== right.cinemaState) violations.push('cinema market canonical state changed');
     if (left.worldEconomy !== right.worldEconomy) violations.push('world economy canonical state changed');
     return violations.length ? { ok: false, violations } : { ok: true };
@@ -512,16 +519,21 @@ export const verifySaveIntegrity = (
     const rebuilt = createSaveIntegrityManifest(player, manifest.reason, manifest.createdAt, manifest.needsRecoveryCheckpoint === true);
     if (manifest.digestSchemaVersion === SAVE_INTEGRITY_DIGEST_SCHEMA_VERSION) {
         if (rebuilt.digest !== manifest.digest) violations.push('integrity digest does not match save payload');
+    } else if (manifest.digestSchemaVersion === 3) {
+        const { digest: _digest, createdAt: _createdAt, ...core } = rebuilt;
+        if (stableHash(manifestDigestSource({ ...core, digestSchemaVersion: 3, protected: createProtectedState(player, 3) })) !== manifest.digest) {
+            violations.push('integrity digest does not match save payload');
+        }
     } else if (manifest.digestSchemaVersion === 2) {
         // Issued v2 protected projection remains exact; cinema did not exist in it.
-        const protectedV2={...rebuilt.protected};delete protectedV2.cinemaState;
+        const protectedV2=createProtectedState(player, 3);delete protectedV2.cinemaState;
         const {digest:_digest,createdAt:_createdAt,...core}=rebuilt;
         if(stableHash(manifestDigestSource({...core,digestSchemaVersion:2,protected:protectedV2}))!==manifest.digest)violations.push('integrity digest does not match save payload');
     } else if (manifest.digestSchemaVersion === undefined) {
         // Unversioned v1 was shipped with several protected-field projections.
         // Only the three known optional additions may be absent; derive every
         // protected value from the player, never from the stored manifest.
-        const legacyProtected = { ...rebuilt.protected } as Partial<SaveProtectedState>;
+        const legacyProtected = { ...createProtectedState(player, 3) } as Partial<SaveProtectedState>;
         delete legacyProtected.cinemaState;
         const storedProtected = manifest.protected && typeof manifest.protected === 'object'
             ? manifest.protected as Partial<SaveProtectedState>

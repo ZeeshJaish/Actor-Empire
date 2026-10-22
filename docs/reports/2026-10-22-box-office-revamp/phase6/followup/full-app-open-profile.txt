@@ -1,0 +1,162 @@
+[
+  {
+    n: 590,
+    functionName: '(idle)',
+    scriptId: '0',
+    url: '',
+    lineNumber: -1,
+    columnNumber: -1
+  },
+  {
+    n: 160,
+    functionName: '(garbage collector)',
+    scriptId: '0',
+    url: '',
+    lineNumber: -1,
+    columnNumber: -1
+  },
+  {
+    n: 120,
+    functionName: 'simulateCinemaWeek',
+    scriptId: '437',
+    url: 'http://127.0.0.1:5197/services/boxOffice/boxOfficeMarket.ts',
+    lineNumber: 124,
+    columnNumber: 34
+  },
+  {
+    n: 115,
+    functionName: '',
+    scriptId: '437',
+    url: 'http://127.0.0.1:5197/services/boxOffice/boxOfficeMarket.ts',
+    lineNumber: 303,
+    columnNumber: 33
+  },
+  {
+    n: 94,
+    functionName: '',
+    scriptId: '437',
+    url: 'http://127.0.0.1:5197/services/boxOffice/boxOfficeMarket.ts',
+    lineNumber: 121,
+    columnNumber: 68
+  },
+  {
+    n: 85,
+    functionName: 'promoteAfterReads',
+    scriptId: '64',
+    url: 'http://127.0.0.1:5197/services/storage.ts?t=1792679347732',
+    lineNumber: 138,
+    columnNumber: 30
+  },
+  {
+    n: 77,
+    functionName: 'estimateSaveSize',
+    scriptId: '14',
+    url: 'http://127.0.0.1:5197/services/firebaseService.ts?t=1792679078858',
+    lineNumber: 316,
+    columnNumber: 25
+  },
+  {
+    n: 70,
+    functionName: '',
+    scriptId: '437',
+    url: 'http://127.0.0.1:5197/services/boxOffice/boxOfficeMarket.ts',
+    lineNumber: 50,
+    columnNumber: 40
+  },
+  {
+    n: 67,
+    functionName: 'validate',
+    scriptId: '437',
+    url: 'http://127.0.0.1:5197/services/boxOffice/boxOfficeMarket.ts',
+    lineNumber: 20,
+    columnNumber: 17
+  },
+  {
+    n: 64,
+    functionName: '(program)',
+    scriptId: '0',
+    url: '',
+    lineNumber: -1,
+    columnNumber: -1
+  },
+  {
+    n: 64,
+    functionName: 'buildCinemaAudienceSnapshot',
+    scriptId: '666',
+    url: 'http://127.0.0.1:5197/services/boxOffice/boxOfficeAudience.ts',
+    lineNumber: 46,
+    columnNumber: 43
+  },
+  {
+    n: 58,
+    functionName: 'readGameRecord',
+    scriptId: '64',
+    url: 'http://127.0.0.1:5197/services/storage.ts?t=1792679347732',
+    lineNumber: 98,
+    columnNumber: 23
+  },
+  {
+    n: 57,
+    functionName: 'candidateRequest.onsuccess',
+    scriptId: '64',
+    url: 'http://127.0.0.1:5197/services/storage.ts?t=1792679347732',
+    lineNumber: 169,
+    columnNumber: 33
+  },
+  {
+    n: 56,
+    functionName: 'toDataURL',
+    scriptId: '0',
+    url: '',
+    lineNumber: -1,
+    columnNumber: -1
+  },
+  {
+    n: 56,
+    functionName: 'estimateSaveSize',
+    scriptId: '14',
+    url: 'http://127.0.0.1:5197/services/firebaseService.ts?t=1792679078858',
+    lineNumber: 316,
+    columnNumber: 25
+  },
+  {
+    n: 56,
+    functionName: 'currentRequest.onsuccess',
+    scriptId: '64',
+    url: 'http://127.0.0.1:5197/services/storage.ts?t=1792679347732',
+    lineNumber: 159,
+    columnNumber: 31
+  },
+  {
+    n: 53,
+    functionName: 'stableHash',
+    scriptId: '275',
+    url: 'http://127.0.0.1:5197/services/saveIntegrity.ts?t=1792679347732',
+    lineNumber: 34,
+    columnNumber: 19
+  },
+  {
+    n: 52,
+    functionName: '',
+    scriptId: '437',
+    url: 'http://127.0.0.1:5197/services/boxOffice/boxOfficeMarket.ts',
+    lineNumber: 301,
+    columnNumber: 85
+  },
+  {
+    n: 51,
+    functionName: 'stableHash',
+    scriptId: '275',
+    url: 'http://127.0.0.1:5197/services/saveIntegrity.ts?t=1792679347732',
+    lineNumber: 34,
+    columnNumber: 19
+  },
+  {
+    n: 43,
+    functionName: 'quoteStableString',
+    scriptId: '275',
+    url: 'http://127.0.0.1:5197/services/saveIntegrity.ts?t=1792679347732',
+    lineNumber: 12,
+    columnNumber: 26
+  }
+]

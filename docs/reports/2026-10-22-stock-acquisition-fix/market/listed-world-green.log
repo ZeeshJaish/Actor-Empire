@@ -1,0 +1,7 @@
+PASS legacy oversized listed AI appraisal is capped and original retained
+PASS appraisal correction cannot rewrite actual finance settlement
+PASS healthy company can grow normally below its guardrail
+PASS new successful listed releases cannot recreate runaway appraisals
+PASS owned listed studios retain their earned value
+PASS repeat adjustment preserves the first original rather than overwriting history
+Listed-world appraisal audit passed (6 checks).

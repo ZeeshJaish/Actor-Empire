@@ -6,7 +6,7 @@ import { resolveStreamingRightsCompatibility } from './streamingRightsCompatibil
 import { normalizeStreamingDayOneMarketIds } from './streamingDayOneMarkets';
 import { projectStreamingCommercialOffers } from './streamingCommercialOffers';
 import { normalizeStreamingRightsAccessGrant } from './streamingRightsAccessGrant';
-import { evaluateStreamingTitleRoute, type StreamingTitleAccessDecision, type StreamingTitleAccessRoute } from './streamingTitleAccess';
+import { evaluateStreamingTitleRoute, evaluateStreamingTitlePlayback, type StreamingTitleAccessDecision, type StreamingTitleAccessRoute, type StreamingViewerProof } from './streamingTitleAccess';
 import { createStreamingProductionReadIndex, resolveStreamingProductionReadiness } from './streamingProductionReadiness';
 import { reuseStreamingPresentationSource } from './streamingPresentationInputs';
 
@@ -130,7 +130,7 @@ const prepareTitleRouteContext = (
     const ready = readyProduction ?? resolveStreamingProductionReadiness(player, projectId, commission, context?.productionIndex).ready;
     const slate = context ? context.titleIndex.slate.get(projectId) : platform.launchSlate?.entries.find(entry => entry.projectId === projectId);
     const slateReleaseAtAbsoluteWeek = slate && platform.launchCommit
-        ? platform.launchCommit.committedAtAbsoluteWeek + slate.launchWeek - 1 : absoluteWeek;
+        ? platform.launchCommit.committedAtAbsoluteWeek + slate.launchWeek - 1 : undefined;
     const licenses = [...(context ? context.titleIndex.licenses.get(projectId) || [] : platform.catalogLicenses.filter(license => license.sourceProjectId === projectId))]
         .sort((left, right) => right.startsAtAbsoluteWeek - left.startsAtAbsoluteWeek || left.id.localeCompare(right.id));
     const licensedPositions = licenses.map(licence => {
@@ -148,10 +148,15 @@ const prepareTitleRouteContext = (
             },
         };
     });
+    // Older saves can retain rights and paid ownership without an optional slate
+    // entry. A current-week fallback would move release forward on every read
+    // and invalidate a purchase that vested during the original licence.
+    const legacyReleaseAtAbsoluteWeek = licensedPositions.length
+        ? Math.min(...licensedPositions.map(position => position.startsAtAbsoluteWeek)) : absoluteWeek;
     return {
         projectId, absoluteWeek, owned: Boolean(commission || ownedTitle), licensedPositions,
         productionReadyAtAbsoluteWeek: ready ? Math.max(0, commission?.localization?.readyAtAbsoluteWeek || 0) : Number.MAX_SAFE_INTEGER,
-        generalReleaseAtAbsoluteWeek: commission?.releasePlan?.premiereAtAbsoluteWeek ?? slateReleaseAtAbsoluteWeek,
+        generalReleaseAtAbsoluteWeek: commission?.releasePlan?.premiereAtAbsoluteWeek ?? slateReleaseAtAbsoluteWeek ?? legacyReleaseAtAbsoluteWeek,
     };
 };
 
@@ -169,6 +174,8 @@ export const evaluatePlayerStreamingTitleRoute = (
         activeCountryIds?: ReadonlySet<string>;
         title?: ReturnType<typeof prepareTitleRouteContext>;
         ownedCountryIds?: ReadonlySet<string>;
+        /** Optional already-paid viewer proof: evaluate playback, not a second store sale. */
+        viewerProof?: StreamingViewerProof;
     },
 ): StreamingTitleAccessDecision => {
     const platform = prepared?.platform || normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
@@ -215,14 +222,16 @@ export const evaluatePlayerStreamingTitleRoute = (
             : getOwnedPlatformPackageCountryIds(platform).includes(countryId),
         offer,
         route,
+        viewerProof:prepared?.viewerProof,
     };
+    const evaluate=prepared?.viewerProof?evaluateStreamingTitlePlayback:evaluateStreamingTitleRoute;
     let denial: StreamingTitleAccessDecision | null = null;
     for (const position of positions) {
-        const decision = evaluateStreamingTitleRoute({ ...base, position });
+        const decision = evaluate({ ...base, position });
         if (decision.allowed) return decision;
         denial ||= decision;
     }
-    return denial || evaluateStreamingTitleRoute({ ...base, position: null });
+    return denial || evaluate({ ...base, position: null });
 };
 
 /** One synchronous offer/forecast read. Never persist or reuse after a mutation;

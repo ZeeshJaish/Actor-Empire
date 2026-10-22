@@ -1,0 +1,42 @@
+// Actual MobilePage routing and production actions; all saves are synthetic isolated namespaces.
+import React,{useEffect,useRef,useState} from 'react';
+import {createRoot} from 'react-dom/client';
+import {INITIAL_PLAYER,type Player} from '../types';
+import {MobilePage} from '../views/mobile/MobilePage';
+import {initializeStocks,executeStockTrade,getStockOutstandingShares} from '../services/stockLogic';
+import {ensureStudioEcosystem} from '../services/studioEcosystem';
+import {getAcquisitionCase,runDueDiligence} from '../services/studioAcquisition';
+import {buildForbesStudioProfile} from '../services/forbesStudioProfile';
+import {getAcquisitionDebtSummary} from '../services/acquisitionDebt';
+import {prepareExternalPlayerUpdateForUi,prepareProcessedWeekForUi} from '../services/playerUiState';
+import {prepareVerifiedPlayerForPersistence} from '../services/savePreparation';
+import {saveVerifiedGameData,loadVerifiedGameData} from '../services/storage';
+import {processGameWeek} from '../services/gameLoop';
+import '../index.css';
+const q=new URLSearchParams(location.search),scenario=q.get('scenario')||'public-zero',id=q.get('studio')||'PARAMOUNT';
+const key=`isolated-forbes-route-${scenario}-${id}`;
+const profile=(p:Player)=>buildForbesStudioProfile({player:p,studio:p.world.studios![id],rank:1,worldProjects:p.world.projects,universes:p.world.universes});
+function seed(){let p=structuredClone(INITIAL_PLAYER);Object.assign(p,{id:'isolated-forbes-route',name:'Route Safety Buyer',age:35,currentWeek:12,money:2e12,stocks:initializeStocks(),portfolio:[],businesses:[],pendingEvents:[]});p.flags={...p.flags,tutorialCompleted:true};p.energy={...p.energy,current:100};p.world=ensureStudioEcosystem(p.world);
+ if(scenario.startsWith('private')){p.world.studios![id]={...p.world.studios!.PARAMOUNT,id,name:'Route Private Studio',archetype:scenario==='private-unavailable'?'FRANCHISE':'INDEPENDENT',valuation:1,cashReserve:100} as any;p.flags.studioAcquisitionCases=[{studioId:id,studioName:'Route Private Studio',acquisitionState:scenario==='private-unavailable'?'NOT_FOR_SALE':'OPEN_TO_OFFERS',publicValuation:1e9,approachedYear:35,approachedWeek:8,status:'CLOSED',reapproachAfterYear:35,reapproachAfterWeek:10}];}
+
+ if(scenario==='private-legacy-minority'){p.flags.companyEquityPositions=[{studioId:id,studioName:'Route Private Studio',percent:20,investedAmount:150000000,acquiredYear:31,acquiredWeek:1,entryCompanyValuation:750000000,currentCompanyValuation:1000000000,lifetimeDistributions:18000000}];p.flags.studioAcquisitionCases=[{studioId:id,studioName:'Route Private Studio',acquisitionState:'OPEN_TO_OFFERS',publicValuation:1000000000,approachedYear:31,approachedWeek:1,status:'ACQUIRED',closing:{finalPrice:150000000,signedWeek:1,signedYear:31,funding:{source:'PERSONAL'},verifiedDebt:0,hiddenLiabilities:0,expectedAnnualIncome:42000000,assetSummary:'20% private equity position',outcome:'MINORITY_STAKE'}}];}
+ if(scenario.startsWith('boundary-')){const stock=p.stocks.find(s=>s.relatedStudioId===id)!;const shares=scenario==='boundary-30'?194999999:324999999;p.portfolio=[{stockId:stock.id,shares,averageCost:stock.price,totalInvested:shares*stock.price}];}
+ if(scenario==='fractional'){const stock=p.stocks.find(s=>s.relatedStudioId===id)!;const shares=Math.round(getStockOutstandingShares(stock)*.308);p.portfolio=[{stockId:stock.id,shares,averageCost:stock.price,totalInvested:shares*stock.price}];}
+ if(scenario.startsWith('undersized-')){p=runDueDiligence({player:p,profile:profile(p),funding:{source:'PERSONAL'}}).player;const percent=Number(scenario.split('-')[1]),acq=getAcquisitionCase(p,id)!,amount=Math.round(profile(p).valuation*percent/100/10000)*10000;acq.status='ACCEPTED';acq.offer={type:'MINORITY',amount,minorityPercent:percent,funding:{source:'PERSONAL'},complianceRisk:0,complianceBand:'ROUTINE',submittedWeek:11,submittedYear:35,round:1};acq.sellerResponse={decision:'ACCEPTED',agreedAmount:amount,round:1,respondedWeek:12,respondedYear:35,summary:'Explicit isolated legacy undersized accepted tender'};}
+ if(['closed','final-rejection','reserved'].includes(scenario)){const stock=p.stocks.find(s=>s.relatedStudioId===id)!;const shares=Math.floor(getStockOutstandingShares(stock)*(scenario==='reserved'?1:.51));p.portfolio=[{stockId:stock.id,shares,averageCost:stock.price,totalInvested:shares*stock.price}];
+  if(scenario==='reserved'){p.flags.studioAcquisitionCases=[{studioId:id,studioName:p.world.studios![id].name,acquisitionState:'PUBLICLY_TRADED',publicValuation:1e10,approachedYear:35,approachedWeek:11,status:'DRAFT'}];}
+  else{p=runDueDiligence({player:p,profile:profile(p),funding:{source:'PERSONAL'}}).player;const acq=getAcquisitionCase(p,id)!;acq.status=scenario==='closed'?'CLOSED':'REJECTED';acq.offer={type:'MINORITY',amount:1e9,minorityPercent:49,funding:{source:'PERSONAL'},complianceRisk:0,complianceBand:'ROUTINE',submittedWeek:11,submittedYear:35,round:3};acq.sellerResponse={decision:'REJECTED',round:3,respondedWeek:12,respondedYear:35,summary:'Explicit isolated historical final rejection'};if(scenario==='closed'){acq.reapproachAfterYear=35;acq.reapproachAfterWeek=15;}}
+ }
+ return prepareExternalPlayerUpdateForUi(p);
+}
+function snapshot(p:Player){return {money:p.money,energy:p.energy.current,week:p.currentWeek,age:p.age,holdings:p.portfolio,businesses:p.businesses.map(b=>({id:b.id,balance:b.balance,state:b.studioState})),case:getAcquisitionCase(p,id),debt:getAcquisitionDebtSummary(p),stock:p.stocks.find(s=>s.relatedStudioId===id),privatePositions:p.flags.companyEquityPositions,profile:profile(p),notices:(p.pendingEvents||[]).filter(e=>e.data?.stockDecisionType==='TAKEOVER_CONTROL')}}
+function Harness(){const [p,setP]=useState<Player|null>(null),[target,setTarget]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');const live=useRef<Player|null>(null),pending=useRef(Promise.resolve()),events=useRef<any[]>([]);
+ const persist=async(next:Player,reason:'AUTOSAVE'|'PROCESS_WEEK'|'MIGRATION')=>{const prepared=prepareVerifiedPlayerForPersistence(next,reason);pending.current=pending.current.then(()=>saveVerifiedGameData(key,prepared.player,prepared.manifest,{retainPrevious:prepared.retainPrevious,needsRecoveryCheckpoint:prepared.needsRecoveryCheckpoint}));await pending.current;return prepared.player};
+ const commit=(next:Player)=>{const canonical=prepareExternalPlayerUpdateForUi(next);live.current=canonical;setP(canonical);events.current.push(snapshot(canonical));void persist(canonical,'AUTOSAVE').catch(e=>setError(String(e)))};
+ useEffect(()=>{void(async()=>{try{const loaded=await loadVerifiedGameData(key);const next=loaded.status==='CURRENT'?prepareExternalPlayerUpdateForUi(loaded.player):seed();live.current=next;setP(next);await persist(next,'MIGRATION');}catch(e){setError(String(e));}})()},[]);
+ (window as any).__routeFlow={snapshot:()=>live.current&&snapshot(live.current),idle:()=>pending.current,events:events.current,probeDiligence:()=>{const before=live.current!,result=runDueDiligence({player:before,profile:profile(before),funding:{source:'PERSONAL'}});return {success:result.success,reason:result.reason,samePlayer:result.player===before,cashDelta:result.player.money-before.money}}};
+ if(!p)return <div>{error||'Loading isolated route fixture'}</div>;
+ return <div style={{position:'fixed',inset:0,background:'#111',color:'white'}}><style>{'.sa-stage{bottom:50px!important}'}</style><div style={{position:'absolute',inset:'0 0 50px'}}><MobilePage player={p} onUpdatePlayer={commit} onTradeStock={(stockId,amount)=>{const result=executeStockTrade(live.current!,stockId,amount);if(result.success)commit(result.player);else setError(String(result.reason));}} initialForbesStudioId={target} onInitialForbesStudioConsumed={()=>setTarget('')}/></div>
+ <div style={{position:'fixed',bottom:0,left:0,right:0,zIndex:250,background:'#16464c',padding:5,display:'flex',gap:8,fontSize:10}}><button disabled={busy} onClick={async()=>{setBusy(true);try{await pending.current;const result=await processGameWeek(live.current!);const next=prepareProcessedWeekForUi(await persist(result.player,'PROCESS_WEEK'));live.current=next;setP(next);}catch(e){setError(String(e));}finally{setBusy(false)}}}>Advance Real Week</button><button onClick={()=>setTarget(id)}>Open Target Desk</button><button onClick={async()=>{await pending.current;location.reload()}}>Verified Save / Reload</button></div>{error&&<div role="alert">{error}</div>}</div>
+}
+createRoot(document.getElementById('root')!).render(<Harness/>);

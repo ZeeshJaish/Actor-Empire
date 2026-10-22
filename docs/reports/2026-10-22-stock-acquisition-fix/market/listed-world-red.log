@@ -1,0 +1,36 @@
+FAIL legacy oversized listed AI appraisal is capped and original retained AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+  assert.ok(got.valuation <= 25.35)
+
+PASS appraisal correction cannot rewrite actual finance settlement
+PASS healthy company can grow normally below its guardrail
+FAIL new successful listed releases cannot recreate runaway appraisals AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+  assert.ok(result.valuation <= 25.35)
+
+PASS owned listed studios retain their earned value
+FAIL repeat adjustment preserves the first original rather than overwriting history AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+  assert.ok(next.valuation <= 25.35)
+
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: 3/6 listed appraisal checks failed
+
+3 !== 0
+
+    at file:///private/tmp/audit-listed-world-valuation.mjs:69872:8
+    at ModuleJob.run (node:internal/modules/esm/module_job:377:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:671:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 3,
+  expected: 0,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.11.1

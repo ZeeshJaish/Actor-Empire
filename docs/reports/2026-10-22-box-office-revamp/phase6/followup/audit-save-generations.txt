@@ -1,0 +1,9 @@
+
+> pr-6.6.3@1.0.25 audit:save-generations
+> esbuild scripts/audit-save-generations.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-save-generations.mjs && node /tmp/audit-save-generations.mjs
+
+Save generation audit passed.
+
+  ../../../../tmp/audit-save-generations.mjs  974.9kb
+
+⚡ Done in 32ms

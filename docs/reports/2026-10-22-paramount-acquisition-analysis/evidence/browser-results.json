@@ -1,0 +1,549 @@
+[
+  {
+    "studio": "PARAMOUNT",
+    "pct": 51,
+    "mode": "draft",
+    "steps": [
+      {
+        "label": "initial",
+        "scene": "sa-scene sa-dossier",
+        "status": "DRAFT",
+        "money": 999999975000000,
+        "businesses": [],
+        "shares": 331500000
+      },
+      {
+        "label": "after first decision reveal",
+        "scene": "sa-scene sa-dossier",
+        "status": "DRAFT",
+        "presentation": {
+          "responseSeenKey": "0:DRAFT",
+          "closingStage": "RESPONSE"
+        },
+        "money": 999999975000000,
+        "businesses": [],
+        "shares": 331500000
+      },
+      {
+        "label": "after second decision reveal",
+        "scene": "sa-scene sa-response sa-center",
+        "status": "DRAFT",
+        "presentation": {
+          "responseSeenKey": "0:DRAFT",
+          "closingStage": "RESPONSE"
+        },
+        "money": 999999975000000,
+        "businesses": [],
+        "shares": 331500000
+      },
+      {
+        "label": "after Proceed to Closing",
+        "scene": "sa-scene sa-dossier",
+        "status": "DRAFT",
+        "presentation": {
+          "responseSeenKey": "0:DRAFT",
+          "closingStage": "CLOSING"
+        },
+        "money": 999999975000000,
+        "businesses": [],
+        "shares": 331500000
+      }
+    ],
+    "errors": []
+  },
+  {
+    "studio": "PARAMOUNT",
+    "pct": 100,
+    "mode": "draft",
+    "steps": [
+      {
+        "label": "initial",
+        "scene": "sa-scene sa-dossier",
+        "status": "DRAFT",
+        "money": 999999975000000,
+        "businesses": [],
+        "shares": 650000000
+      },
+      {
+        "label": "after first decision reveal",
+        "scene": "sa-scene sa-dossier",
+        "status": "DRAFT",
+        "presentation": {
+          "responseSeenKey": "0:DRAFT",
+          "closingStage": "RESPONSE"
+        },
+        "money": 999999975000000,
+        "businesses": [],
+        "shares": 650000000
+      },
+      {
+        "label": "after second decision reveal",
+        "scene": "sa-scene sa-response sa-center",
+        "status": "DRAFT",
+        "presentation": {
+          "responseSeenKey": "0:DRAFT",
+          "closingStage": "RESPONSE"
+        },
+        "money": 999999975000000,
+        "businesses": [],
+        "shares": 650000000
+      },
+      {
+        "label": "after Proceed to Closing",
+        "scene": "sa-scene sa-dossier",
+        "status": "DRAFT",
+        "presentation": {
+          "responseSeenKey": "0:DRAFT",
+          "closingStage": "CLOSING"
+        },
+        "money": 999999975000000,
+        "businesses": [],
+        "shares": 650000000
+      }
+    ],
+    "errors": []
+  },
+  {
+    "studio": "WARNER_BROS",
+    "pct": 51,
+    "mode": "draft",
+    "steps": [
+      {
+        "label": "initial",
+        "scene": "sa-scene sa-dossier",
+        "status": "DRAFT",
+        "money": 999999975000000,
+        "businesses": [],
+        "shares": 1249500000
+      },
+      {
+        "label": "after first decision reveal",
+        "scene": "sa-scene sa-dossier",
+        "status": "DRAFT",
+        "presentation": {
+          "responseSeenKey": "0:DRAFT",
+          "closingStage": "RESPONSE"
+        },
+        "money": 999999975000000,
+        "businesses": [],
+        "shares": 1249500000
+      },
+      {
+        "label": "after second decision reveal",
+        "scene": "sa-scene sa-response sa-center",
+        "status": "DRAFT",
+        "presentation": {
+          "responseSeenKey": "0:DRAFT",
+          "closingStage": "RESPONSE"
+        },
+        "money": 999999975000000,
+        "businesses": [],
+        "shares": 1249500000
+      },
+      {
+        "label": "after Proceed to Closing",
+        "scene": "sa-scene sa-dossier",
+        "status": "DRAFT",
+        "presentation": {
+          "responseSeenKey": "0:DRAFT",
+          "closingStage": "CLOSING"
+        },
+        "money": 999999975000000,
+        "businesses": [],
+        "shares": 1249500000
+      }
+    ],
+    "errors": []
+  },
+  {
+    "studio": "UNIVERSAL",
+    "pct": 51,
+    "mode": "draft",
+    "steps": [
+      {
+        "label": "initial",
+        "scene": "sa-scene sa-dossier",
+        "status": "DRAFT",
+        "money": 999999975000000,
+        "businesses": [],
+        "shares": 1989000000
+      },
+      {
+        "label": "after first decision reveal",
+        "scene": "sa-scene sa-dossier",
+        "status": "DRAFT",
+        "presentation": {
+          "responseSeenKey": "0:DRAFT",
+          "closingStage": "RESPONSE"
+        },
+        "money": 999999975000000,
+        "businesses": [],
+        "shares": 1989000000
+      },
+      {
+        "label": "after second decision reveal",
+        "scene": "sa-scene sa-response sa-center",
+        "status": "DRAFT",
+        "presentation": {
+          "responseSeenKey": "0:DRAFT",
+          "closingStage": "RESPONSE"
+        },
+        "money": 999999975000000,
+        "businesses": [],
+        "shares": 1989000000
+      },
+      {
+        "label": "after Proceed to Closing",
+        "scene": "sa-scene sa-dossier",
+        "status": "DRAFT",
+        "presentation": {
+          "responseSeenKey": "0:DRAFT",
+          "closingStage": "CLOSING"
+        },
+        "money": 999999975000000,
+        "businesses": [],
+        "shares": 1989000000
+      }
+    ],
+    "errors": []
+  },
+  {
+    "studio": "PARAMOUNT",
+    "pct": 50,
+    "mode": "draft",
+    "steps": [
+      {
+        "label": "initial",
+        "scene": "sa-scene sa-dossier",
+        "status": "DRAFT",
+        "money": 999999975000000,
+        "businesses": [],
+        "shares": 325000000
+      },
+      {
+        "label": "after first decision reveal",
+        "scene": "sa-scene sa-dossier",
+        "status": "DRAFT",
+        "presentation": {
+          "responseSeenKey": "0:DRAFT",
+          "closingStage": "RESPONSE"
+        },
+        "money": 999999975000000,
+        "businesses": [],
+        "shares": 325000000
+      },
+      {
+        "label": "after second decision reveal",
+        "scene": "sa-scene sa-response sa-center",
+        "status": "DRAFT",
+        "presentation": {
+          "responseSeenKey": "0:DRAFT",
+          "closingStage": "RESPONSE"
+        },
+        "money": 999999975000000,
+        "businesses": [],
+        "shares": 325000000
+      },
+      {
+        "label": "after Proceed to Closing",
+        "scene": "sa-scene sa-dossier",
+        "status": "DRAFT",
+        "presentation": {
+          "responseSeenKey": "0:DRAFT",
+          "closingStage": "CLOSING"
+        },
+        "money": 999999975000000,
+        "businesses": [],
+        "shares": 325000000
+      }
+    ],
+    "errors": []
+  },
+  {
+    "studio": "PARAMOUNT",
+    "pct": 51,
+    "mode": "none",
+    "steps": [
+      {
+        "label": "initial",
+        "scene": "sa-scene sa-dossier",
+        "status": "NO_CASE",
+        "money": 1000000000000000,
+        "businesses": [],
+        "shares": 331500000
+      },
+      {
+        "label": "after first decision reveal",
+        "scene": "sa-scene sa-response sa-center",
+        "status": "NO_CASE",
+        "money": 1000000000000000,
+        "businesses": [],
+        "shares": 331500000
+      },
+      {
+        "label": "after Proceed to Closing",
+        "scene": "sa-scene sa-closing",
+        "status": "NO_CASE",
+        "money": 1000000000000000,
+        "businesses": [],
+        "shares": 331500000
+      },
+      {
+        "label": "entered signing",
+        "scene": "sa-scene sa-signing",
+        "status": "NO_CASE",
+        "money": 1000000000000000,
+        "businesses": [],
+        "shares": 331500000
+      },
+      {
+        "label": "after final signature",
+        "scene": "sa-scene sa-acquired",
+        "status": "ACQUIRED",
+        "money": 1000000000000000,
+        "businesses": [
+          "PARAMOUNT"
+        ],
+        "shares": 331500000
+      }
+    ],
+    "errors": [],
+    "closingText": "←\nCLOSING PACKET\nStamp Every Document\nThree documents stand between you and Paramount Pictures. Tap each to stamp it.\nTender Agreement\n$0\n0 remaining shares at the accepted block price\nTAP TO STAMP\nMarket + Liability File\n51.00% already held · $6.3B exposure\nExisting shares remain credited to your position\nTAP TO STAMP\nControl Transfer\n50%+ voting control\nBoard authority changes at final signature\nTAP TO STAMP\nEnter the Signing Room\n⚡ 25E"
+  },
+  {
+    "studio": "PARAMOUNT",
+    "pct": 100,
+    "mode": "none",
+    "steps": [
+      {
+        "label": "initial",
+        "scene": "sa-scene sa-dossier",
+        "status": "NO_CASE",
+        "money": 1000000000000000,
+        "businesses": [],
+        "shares": 650000000
+      },
+      {
+        "label": "after first decision reveal",
+        "scene": "sa-scene sa-response sa-center",
+        "status": "NO_CASE",
+        "money": 1000000000000000,
+        "businesses": [],
+        "shares": 650000000
+      },
+      {
+        "label": "after Proceed to Closing",
+        "scene": "sa-scene sa-closing",
+        "status": "NO_CASE",
+        "money": 1000000000000000,
+        "businesses": [],
+        "shares": 650000000
+      },
+      {
+        "label": "entered signing",
+        "scene": "sa-scene sa-signing",
+        "status": "NO_CASE",
+        "money": 1000000000000000,
+        "businesses": [],
+        "shares": 650000000
+      },
+      {
+        "label": "after final signature",
+        "scene": "sa-scene sa-acquired",
+        "status": "ACQUIRED",
+        "money": 1000000000000000,
+        "businesses": [
+          "PARAMOUNT"
+        ],
+        "shares": 650000000
+      }
+    ],
+    "errors": [],
+    "closingText": "←\nCLOSING PACKET\nStamp Every Document\nThree documents stand between you and Paramount Pictures. Tap each to stamp it.\nTender Agreement\n$0\n0 remaining shares at the accepted block price\nTAP TO STAMP\nMarket + Liability File\n100.00% already held · $6.3B exposure\nExisting shares remain credited to your position\nTAP TO STAMP\nControl Transfer\n50%+ voting control\nBoard authority changes at final signature\nTAP TO STAMP\nEnter the Signing Room\n⚡ 25E"
+  },
+  {
+    "studio": "PARAMOUNT",
+    "pct": 51,
+    "mode": "accepted",
+    "steps": [
+      {
+        "label": "initial",
+        "scene": "sa-scene sa-breaking",
+        "status": "ACCEPTED",
+        "money": 999999975000000,
+        "businesses": [],
+        "shares": 331500000
+      },
+      {
+        "label": "after first decision reveal",
+        "scene": "sa-scene sa-response sa-center",
+        "status": "ACCEPTED",
+        "presentation": {
+          "responseSeenKey": "1:ACCEPTED",
+          "closingStage": "RESPONSE"
+        },
+        "money": 999999975000000,
+        "businesses": [],
+        "shares": 331500000
+      },
+      {
+        "label": "after Proceed to Closing",
+        "scene": "sa-scene sa-closing",
+        "status": "ACCEPTED",
+        "presentation": {
+          "responseSeenKey": "1:ACCEPTED",
+          "closingStage": "CLOSING"
+        },
+        "money": 999999975000000,
+        "businesses": [],
+        "shares": 331500000
+      },
+      {
+        "label": "entered signing",
+        "scene": "sa-scene sa-signing",
+        "status": "ACCEPTED",
+        "presentation": {
+          "responseSeenKey": "1:ACCEPTED",
+          "closingStage": "SIGNING"
+        },
+        "money": 999999975000000,
+        "businesses": [],
+        "shares": 331500000
+      },
+      {
+        "label": "after final signature",
+        "scene": "sa-scene sa-acquired",
+        "status": "ACQUIRED",
+        "presentation": {
+          "responseSeenKey": "1:ACCEPTED",
+          "closingStage": "SIGNING"
+        },
+        "money": 999999975000000,
+        "businesses": [
+          "PARAMOUNT"
+        ],
+        "shares": 331500000
+      }
+    ],
+    "errors": [],
+    "closingText": "←\nCLOSING PACKET\nStamp Every Document\nThree documents stand between you and Paramount Pictures. Tap each to stamp it.\nTender Agreement\n$1B\n0 remaining shares at the accepted block price\nTAP TO STAMP\nMarket + Liability File\n51.00% already held · $8.2B exposure\nExisting shares remain credited to your position\nTAP TO STAMP\nControl Transfer\n50%+ voting control\nBoard authority changes at final signature\nTAP TO STAMP\nEnter the Signing Room\n⚡ 25E"
+  },
+  {
+    "studio": "PARAMOUNT",
+    "pct": 51,
+    "mode": "countered",
+    "steps": [
+      {
+        "label": "initial",
+        "scene": "sa-scene sa-breaking",
+        "status": "COUNTERED",
+        "money": 999999975000000,
+        "businesses": [],
+        "shares": 331500000
+      },
+      {
+        "label": "after first decision reveal",
+        "scene": "sa-scene sa-response sa-center",
+        "status": "COUNTERED",
+        "presentation": {
+          "responseSeenKey": "1:COUNTERED",
+          "closingStage": "RESPONSE"
+        },
+        "money": 999999975000000,
+        "businesses": [],
+        "shares": 331500000
+      }
+    ],
+    "errors": []
+  },
+  {
+    "studio": "PARAMOUNT",
+    "pct": 51,
+    "mode": "rejected",
+    "steps": [
+      {
+        "label": "initial",
+        "scene": "sa-scene sa-breaking",
+        "status": "REJECTED",
+        "money": 999999975000000,
+        "businesses": [],
+        "shares": 331500000
+      },
+      {
+        "label": "after first decision reveal",
+        "scene": "sa-scene sa-response sa-center",
+        "status": "REJECTED",
+        "presentation": {
+          "responseSeenKey": "1:REJECTED",
+          "closingStage": "RESPONSE"
+        },
+        "money": 999999975000000,
+        "businesses": [],
+        "shares": 331500000
+      }
+    ],
+    "errors": []
+  },
+  {
+    "studio": "ARTISAN_PICTURES",
+    "pct": 0,
+    "mode": "accepted",
+    "steps": [
+      {
+        "label": "initial",
+        "scene": "sa-scene sa-breaking",
+        "status": "ACCEPTED",
+        "money": 999999995500000,
+        "businesses": []
+      },
+      {
+        "label": "after first decision reveal",
+        "scene": "sa-scene sa-response sa-center",
+        "status": "ACCEPTED",
+        "presentation": {
+          "responseSeenKey": "1:ACCEPTED",
+          "closingStage": "RESPONSE"
+        },
+        "money": 999999995500000,
+        "businesses": []
+      },
+      {
+        "label": "after Proceed to Closing",
+        "scene": "sa-scene sa-closing",
+        "status": "ACCEPTED",
+        "presentation": {
+          "responseSeenKey": "1:ACCEPTED",
+          "closingStage": "CLOSING"
+        },
+        "money": 999999995500000,
+        "businesses": []
+      },
+      {
+        "label": "entered signing",
+        "scene": "sa-scene sa-signing",
+        "status": "ACCEPTED",
+        "presentation": {
+          "responseSeenKey": "1:ACCEPTED",
+          "closingStage": "SIGNING"
+        },
+        "money": 999999995500000,
+        "businesses": []
+      },
+      {
+        "label": "after final signature",
+        "scene": "sa-scene sa-acquired",
+        "status": "ACQUIRED",
+        "presentation": {
+          "responseSeenKey": "1:ACCEPTED",
+          "closingStage": "SIGNING"
+        },
+        "money": 999998995500000,
+        "businesses": [
+          "ARTISAN_PICTURES"
+        ]
+      }
+    ],
+    "errors": [],
+    "closingText": "←\nCLOSING PACKET\nStamp Every Document\nThree documents stand between you and Artisan Pictures. Tap each to stamp it.\nPurchase Agreement\n$1B\nPaid from personal wealth\nTAP TO STAMP\nAssets + Liabilities\n0 titles · $906M debt\nEverything moves into your group\nTAP TO STAMP\nOwnership Transfer\nControl instrument\nThe keys change hands at signature\nTAP TO STAMP\nEnter the Signing Room\n⚡ 25E"
+  }
+]

@@ -1,0 +1,35 @@
+
+> pr-6.6.3@1.0.25 audit:streaming-signed-royalties
+> esbuild scripts/audit-streaming-signed-royalties.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-streaming-signed-royalties.mjs && node /tmp/audit-streaming-signed-royalties.mjs
+
+PASS live subscription expense pays each signed percentage rather than a 45-percent catalogue estimate
+PASS one subscription pool includes owned zero-backend titles and is not paid once per license
+PASS no actual contribution cannot manufacture an equal royalty allocation
+PASS duplicate title projections cannot double a project contribution
+PASS multiple signed percentages apply to their own attributed receipts
+PASS subscription and store share one recoupable advance and one backend cap
+PASS non-recouppable guarantee is not silently used as a royalty waiver
+PASS duplicate receipt IDs cannot charge or accrue twice
+PASS receipt-week high-water survives replay even without statement history
+PASS the next earned week uses cumulative caps and advances after reload
+PASS expired, future and internal contracts do not acquire current royalties
+PASS a stale WE6 receipt cannot be relabeled and charged as another owned week
+PASS ancillary funding retains paid-plan versus free-ad source provenance
+PASS ancillary receipts honor their originating subscription or free-ad contract
+PASS live pure-ad engine closes real title advertising at the signed rate
+PASS a pure ad service owes signed ad backend without subscription customer rows
+PASS retained purchase entitlement funds ancillary backend without a new store sale
+PASS owned-platform royalty expenses credit the genuine platform seller
+PASS AI subscription and store consume the same signed cap and recoupable advance
+PASS a receipt earned before transfer remains payable without restoring new playback rights
+PASS signed buyer identity prevents a stale projection billing a second platform
+PASS subscription contribution respects country rights and conserves each billing pool
+PASS the explicitly signed buyer cannot inherit another platform identifier from a license projection
+PASS two paid AI contracts credit CURRENT archived studio and investor/talent once
+PASS two paid AI contracts credit LEGACY archived studio and investor/talent once
+PASS two paid AI contracts credit LEGACY_FALLBACK archived studio and investor/talent once
+{"checks":26,"failures":[]}
+
+  ../../../../tmp/audit-streaming-signed-royalties.mjs  9.2mb ⚠️
+
+⚡ Done in 110ms

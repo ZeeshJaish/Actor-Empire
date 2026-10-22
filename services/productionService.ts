@@ -3,7 +3,7 @@ import { NPC_DATABASE } from './npcLogic';
 import { spendPlayerEnergy } from './premiumLogic';
 import { getPlayerLanguage, t } from './i18n';
 
-const CRISIS_TEMPLATES: Record<ActorTrait, (npc: NPCActor) => ProductionCrisis> = {
+const CRISIS_TEMPLATES: Record<ActorTrait, (npc: NPCActor) => ProductionCrisis | null> = {
     DIVA: (npc) => ({
         id: `crisis_diva_${Date.now()}`,
         title: "Diva Demands",
@@ -309,6 +309,7 @@ export const checkForProductionCrisis = (player: Player, project: Commitment): P
             const template = CRISIS_TEMPLATES[randomTrait];
             if (template) {
                 const crisis = template(randomActor);
+                if (!crisis) return null;
                 (crisis as any).trait = randomTrait;
                 (crisis as any).npcId = randomActor.id;
                 return crisis;

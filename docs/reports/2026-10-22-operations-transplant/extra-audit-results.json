@@ -1,0 +1,32 @@
+[
+  {
+    "name": "audit:content-market-cm1",
+    "exit": 0,
+    "seconds": 0.35,
+    "log": "/tmp/ae-operations-transplant/audit-content-market-cm1.log"
+  },
+  {
+    "name": "audit:streaming-global-localization",
+    "exit": 0,
+    "seconds": 0.24,
+    "log": "/tmp/ae-operations-transplant/audit-streaming-global-localization.log"
+  },
+  {
+    "name": "audit:streaming-audience-market-phase2",
+    "exit": 1,
+    "seconds": 0.28,
+    "log": "/tmp/ae-operations-transplant/audit-streaming-audience-market-phase2.log"
+  },
+  {
+    "name": "audit:streaming-zip-fidelity",
+    "exit": 1,
+    "seconds": 0.13,
+    "log": "/tmp/ae-operations-transplant/audit-streaming-zip-fidelity.log"
+  },
+  {
+    "name": "audit:streaming-promotion-phase14",
+    "exit": 1,
+    "seconds": 0.29,
+    "log": "/tmp/ae-operations-transplant/audit-streaming-promotion-phase14.log"
+  }
+]

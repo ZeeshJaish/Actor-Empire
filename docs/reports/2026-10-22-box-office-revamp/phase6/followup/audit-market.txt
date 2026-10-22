@@ -1,0 +1,38 @@
+PASS paid first tickets produce conserved gross and proposed history
+PASS zero-exposure worldwide release produces zero sales
+PASS extra nonbinding same-price screens do not create intent
+PASS scarce wallet limits the entire competing slate
+PASS shared screen capacity is not duplicated for each title
+PASS repeat admissions pay for fresh seats and time without resetting unique viewers
+PASS long runtime reduces admissions under binding physical capacity
+PASS shared leisure envelope limits first and repeats together
+PASS no cinema allocation cannot borrow streaming money
+PASS cohort and title iteration cannot prefer an owner route
+PASS price and country supply come from economy and shared chain footprint
+PASS wide release pays wider launch costs without guaranteed sales
+PASS shadow simulation leaves its complete input untouched
+PASS same week state cannot generate a second shadow payment proposal
+PASS replayed publicity cannot mint a second aware audience
+PASS natural quiet runs end after bounded discovery grace
+PASS seeded owner routes obey the same population money time and seat invariants
+PASS weekly cinema cents conserve twelve monthly envelopes over a year
+PASS weak observed word of mouth reduces remaining first-time intent
+PASS sold-out interest remains deferred and agrees with title totals
+PASS all owner routes receive identical economic treatment
+PASS duplicate IDs and invalid physical resources fail before allocation
+PASS saturated seen population has no new first viewers
+PASS idle budgets stay unspent rather than forcing purchases
+PASS unaffordable competing request cannot strand feasible funded demand
+PASS physical denial cannot permanently close a film never given a show
+PASS archiving the same history is independent of state iteration order
+PASS inactive title deferred interest keeps decaying across omitted weeks
+PASS screen-denied intent releases wallet to another willing film
+PASS shrinking populations reconcile active audience without rewriting money
+World shadow diagnostics: {"countries":197,"cohorts":2363,"titleCount":3,"poolCount":1729,"admissions":63561609,"grossCents":72918792713,"elapsedMs":459.63}
+PASS full canonical world runs all owner routes in shadow with diagnostics
+PASS budget neither guarantees receipts nor sets a gross ceiling
+PASS legacy population reconciliation uses one fixed cohort baseline for all titles
+PASS title country receipts provide a complete conserved breakdown
+PASS named scarce-access and narrow-wide fixtures preserve the access-intent boundary
+PASS local poster discovery needs real other-film patrons and arrives next week
+Market audit: 36 groups passed

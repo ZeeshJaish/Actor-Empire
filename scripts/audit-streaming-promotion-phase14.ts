@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { assertDiscoveryPercentageTotal } from './helpers/streamingPercentageAssertions';
 import {
     INITIAL_PLAYER,
     OWNED_STREAMING_PLATFORM_SCHEMA_VERSION,
@@ -227,8 +228,8 @@ assert(
 );
 assert(applied.outcome!.artworkWinner !== null && applied.outcome!.artworkWinnerLiftPercent! > 0, 'An armed artwork test should commit a deterministic winner and measured lift.');
 assert(promotedTitle.discoveryMix.homepagePercent > baselineTitle.discoveryMix.homepagePercent, 'A hero placement should visibly increase homepage discovery share.');
-assert(
-    Object.values(promotedTitle.discoveryMix).reduce((total, value) => total + value, 0) === 100,
+assertDiscoveryPercentageTotal(
+    promotedTitle.discoveryMix,
     'The promoted title discovery mix should still reconcile to one hundred percent.',
 );
 assert(promotedA.player.ownedStreamingPlatform.eventLedger.some(entry => entry.type === 'GROWTH_ACTION_APPLIED'), 'A completed action should create a week-processor attribution fact.');
@@ -252,7 +253,7 @@ assert(!serviceSource.includes('Math.random') && !weeklySource.includes('Math.ra
     'No direct subscriber grants',
 ].forEach(fragment => assert(componentSource.includes(fragment), `Phase 14 experience should include ${fragment}.`));
 ['TRAILER', 'BILLBOARD', 'SOCIAL', 'REGIONAL'].forEach(channel => assert(serviceSource.includes(`'${channel}'`), `Phase 14 should include the ${channel} channel.`));
-assert(hqSource.includes('<StreamingPromotionWarRoom') && hqSource.includes('Enter Growth War Room'), 'The live Market Room should expose the complete growth experience.');
+assert(hqSource.includes('<StreamingPromotionWarRoom') && hqSource.includes('onNewCampaign=') && hqSource.includes('openPromotionWarRoom()'), 'The live Audience campaign action must open the canonical Growth War Room.');
 assert(dossierSource.includes('Open Growth War Room'), 'Title discovery analysis should deep-link into the matching growth action.');
 assert(styleSource.includes('@media (min-width: 720px)') && styleSource.includes('@media (min-width: 1080px)'), 'The war room should scale deliberately across mobile, tablet and desktop.');
 assert(styleSource.includes('@media (prefers-reduced-motion: reduce)'), 'War-room motion should respect reduced-motion preferences.');

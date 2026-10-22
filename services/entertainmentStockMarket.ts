@@ -1,5 +1,5 @@
 import type { IndustryProject, Player, Stock } from '../types';
-import { getStockOutstandingShares, getStockOwnershipPercent } from './stockLogic';
+import { getStockOutstandingShares, getStockOwnershipPercent, normalizeStockPrice } from './stockLogic';
 
 export type StockCompanyType = 'ENTERTAINMENT_STUDIO' | 'CONSUMER_COMPANY';
 
@@ -74,10 +74,11 @@ export const getEntertainmentStockSnapshot = (
     const isEntertainment = stock.sector === 'MEDIA' && Boolean(stock.relatedStudioId);
     const outstandingShares = getStockOutstandingShares(stock);
     const holdingShares = Math.max(0, player.portfolio.find(item => item.stockId === stock.id)?.shares || 0);
-    const positionValue = holdingShares * Math.max(0, stock.price || 0);
+    const price = normalizeStockPrice(stock, stock.price);
+    const positionValue = holdingShares * price;
     const ownershipPercent = getStockOwnershipPercent(holdingShares, stock);
-    const historyStart = stock.priceHistory[0] || stock.price || 1;
-    const changeAmount = stock.price - historyStart;
+    const historyStart = normalizeStockPrice(stock, stock.priceHistory[0] || price);
+    const changeAmount = price - historyStart;
     const changePercent = historyStart > 0 ? (changeAmount / historyStart) * 100 : 0;
     const projects = getStudioProjects(player, stock.relatedStudioId);
     const hits = projects.filter(project => isHit(project.reviews || '')).length;
@@ -95,7 +96,7 @@ export const getEntertainmentStockSnapshot = (
     return {
         isEntertainment,
         companyType: isEntertainment ? 'ENTERTAINMENT_STUDIO' : 'CONSUMER_COMPANY',
-        marketCap: Math.max(0, stock.price || 0) * outstandingShares,
+        marketCap: price * outstandingShares,
         holdingShares,
         positionValue,
         ownershipPercent,

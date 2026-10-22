@@ -25,6 +25,13 @@ import { getWorldStreamingOffers } from './worldStreamingOffers';
 import { allocateStreamingAudienceChoice } from './worldStreamingAudienceChoice';
 import { STREAMING_ANNUAL_BILLING_SHARE } from '../streamingPricingEconomy';
 import { deriveStreamingNetworkCoverage } from '../streamingNetworkCoverage';
+import {
+    STREAMING_SHARING_POLICY_EFFECTS,
+    streamingPiracyEnforcementFactor,
+    streamingPolicyWeeklyCancellationRate,
+    streamingSharingEnforcementFactor,
+    streamingSharingPostureFactor,
+} from '../streamingSharingPolicy';
 
 export const WORLD_STREAMING_CUSTOMER_SCHEMA_VERSION = 2 as const;
 const MAX_SNAPSHOTS = 52;
@@ -253,12 +260,13 @@ const applyAccessPaths = (
     const nonPayingHouseholds = Math.max(0, cohort.reachableHouseholds - cohort.payingHouseholds);
     const sharingWeights = cohort.planCells.map(cell => {
         const plan = offerMap.get(cell.platformId)?.plans.find(item => item.id === cell.planId);
+        /* Rival services always sit at Balanced + Standard (streamingSharingPolicy.ts). */
         const postureFactor = cell.platformId !== 'PLAYER'
-            ? .75
-            : policy.sharingPosture === 'REACH_FIRST' ? 1.3 : policy.sharingPosture === 'HOUSEHOLD_ONLY' ? .24 : .75;
+            ? STREAMING_SHARING_POLICY_EFFECTS.sharingPosture.BALANCED
+            : streamingSharingPostureFactor(policy.sharingPosture);
         const enforcementFactor = cell.platformId !== 'PLAYER'
-            ? .78
-            : policy.enforcementInvestment === 'LIGHT' ? 1.08 : policy.enforcementInvestment === 'AGGRESSIVE' ? .48 : .78;
+            ? STREAMING_SHARING_POLICY_EFFECTS.sharingEnforcement.STANDARD
+            : streamingSharingEnforcementFactor(policy.enforcementInvestment);
         const planFactor = plan?.featureIds.includes('streams4') ? 1.25 : plan?.featureIds.includes('downloads') ? 1.05 : .82;
         return cell.paidAccounts * audience.sharingTendencyIndex / 100 * .3 * postureFactor * enforcementFactor * planFactor;
     });
@@ -271,7 +279,7 @@ const applyAccessPaths = (
         1,
     );
     const paymentBarrier = participation.streamingBarrierId === 'PAYMENT_ACCESS' || participation.streamingBarrierId === 'AFFORDABILITY' ? .22 : 0;
-    const enforcementFactor = policy.enforcementInvestment === 'AGGRESSIVE' ? .48 : policy.enforcementInvestment === 'LIGHT' ? 1.18 : .8;
+    const enforcementFactor = streamingPiracyEnforcementFactor(policy.enforcementInvestment);
     const piracyHouseholds = Math.min(remainingHouseholds, Math.round(remainingHouseholds * clamp(
         audience.piracyTendencyIndex / 100 * .24 * enforcementFactor + affordabilityPressure * .08 + paymentBarrier,
         0,
@@ -287,7 +295,7 @@ const applyAccessPaths = (
             externalSharedHouseholds,
             sharedActiveViewers,
             piracyReach: piracyByCell[index] || 0,
-            accessLoadAccounts: cell.paidAccounts + Math.round(externalSharedHouseholds * .72),
+            accessLoadAccounts: cell.paidAccounts + Math.round(externalSharedHouseholds * STREAMING_SHARING_POLICY_EFFECTS.sharedLoadPerHome),
         };
     });
     return {
@@ -495,8 +503,7 @@ const advanceCohort = (
         const weeklyRate = goal >= starting ? .14 : wanted ? .18 : .55;
         const convergence = 1 - Math.pow(1 - weeklyRate, Math.max(1, elapsedWeeks));
         const policyCancellationRate = platformId === 'PLAYER'
-            ? (policy.sharingPosture === 'HOUSEHOLD_ONLY' ? .004 : 0)
-                + (policy.enforcementInvestment === 'AGGRESSIVE' ? .004 : 0)
+            ? streamingPolicyWeeklyCancellationRate(policy)
             : 0;
         const elapsed = Math.max(1, elapsedWeeks);
         const departures = platformId === 'PLAYER'

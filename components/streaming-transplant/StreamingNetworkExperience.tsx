@@ -3,8 +3,12 @@
  *
  * The second division page. Same principle as the Content Desk: every section
  * borrows something the player has already used.
+ *   OFFER    → everything the viewer is sold: ways to earn, plans and prices
+ *              (editable live, staged, applied from next week), account
+ *              sharing, storefront and ident — see PlatformOffer.tsx
  *   STATUS   → a public status page (status.<service>.com), 90-day uptime bars and all
- *   CAPACITY → the server cities placed in the wizard, with real load and latency
+ *   CAPACITY → (tab "NETWORK") the network map: markets by how well they are
+ *              served, each room's field, sites, load — see PlatformNetwork.tsx
  *   TECH     → upgrade tracks that take game weeks to build
  *   PRODUCTS → the product suite, each active / paused / locked behind research
  *
@@ -16,6 +20,9 @@ import { cx } from './presentation/cx';
 import { brandVars } from './presentation/brand';
 import React, { useMemo, useState } from 'react';
 import { Brand, Mark, brandColor, brandDeep } from './StreamingBrandVisuals';
+import { PlatformOffer, type PlatformOfferActions, type PlatformOfferData, type PlatformSharingProps } from './PlatformOffer';
+import { PlatformNetwork } from './PlatformNetwork';
+import type { StreamingNetworkMapView } from '../../services/streamingNetworkMapView';
 
 /* ============================================================
    MODEL
@@ -92,14 +99,25 @@ export interface NetworkState {
   technicalDebt: number;          // 0-100
 }
 
-type Tab = 'STATUS' | 'CAPACITY' | 'TECH' | 'PRODUCTS';
+export type PlatformDeskTab = 'OFFER' | 'CAPACITY' | 'TECH' | 'PRODUCTS' | 'STATUS';
+type Tab = PlatformDeskTab;
 
+/* The room's own pages in its order: what is sold, how it is delivered, what
+   is being built, what the product does, and whether it is all working. */
+const TABS: Tab[] = ['OFFER', 'CAPACITY', 'TECH', 'PRODUCTS', 'STATUS'];
 const TAB_LABELS: Record<Tab, string> = {
-  STATUS: 'STATUS',
-  CAPACITY: 'DELIVERY',
-  TECH: 'TECHNOLOGY',
+  OFFER: 'OFFER',
+  CAPACITY: 'NETWORK',
+  TECH: 'TECH',
   PRODUCTS: 'PRODUCT',
+  STATUS: 'STATUS',
 };
+
+export interface PlatformDeskOffer {
+  data: PlatformOfferData;
+  actions: PlatformOfferActions;
+  sharing?: PlatformSharingProps;
+}
 
 const money = (n: number) => n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M`
   : n >= 1e3 ? `$${Math.round(n / 1e3)}k` : `$${n}`;
@@ -184,13 +202,18 @@ export const PlatformDesk: React.FC<{
   treasury?: number;
   onToggleProduct?: (p: PlatformProduct) => void;
   onOpenChronicle?: () => void;
-  onOpenIdent?: () => void;
-  onOpenStorefront?: () => void;
-  serviceControls?: { ident: string; storefront: string; network: string };
-}> = ({ brand, state, onBack, initialTab, onAddCity, onBuild, onCancelBuild, onToggleProduct, onOpenChronicle, onOpenIdent, onOpenStorefront, serviceControls, treasury = 0 }) => {
+  /** The Offer page's data and actions; without it the tab is not shown. */
+  offer?: PlatformDeskOffer;
+  /** The Network page's map; without it the tab keeps the plain city list. */
+  network?: StreamingNetworkMapView;
+  /** Opens the Technology Campus for a track, where builds are priced and
+      started; without it the tab keeps its own doctrine sheet. */
+  onOpenTechnology?: (t: TechTrack) => void;
+}> = ({ brand, state, onBack, initialTab, onAddCity, onBuild, onCancelBuild, onToggleProduct, onOpenChronicle, offer, network, onOpenTechnology, treasury = 0 }) => {
   const c = brandColor(brand), c2 = brandDeep(brand);
+  const tabs = offer ? TABS : TABS.filter(t => t !== 'OFFER');
   /* a console chip can open this page straight on the tab it names */
-  const [tab, setTab] = useState<Tab>(initialTab ?? 'STATUS');
+  const [tab, setTab] = useState<Tab>(initialTab && tabs.includes(initialTab) ? initialTab : tabs[0]);
   const [buildTrack, setBuildTrack] = useState<TechTrack | null>(null);
 
   /* the banner is derived from the components, never set by hand */
@@ -210,7 +233,7 @@ export const PlatformDesk: React.FC<{
         <button className={s.nwback} onClick={onBack} aria-label="Back">←</button>
         <div className={s.nwtitle}>
           <b>PLATFORM</b>
-          <span>PRODUCT · TECHNOLOGY · DELIVERY</span>
+          <span>OFFER · NETWORK · TECHNOLOGY · PRODUCT</span>
         </div>
         <span className={s.nwmark}><Mark brand={brand} /></span>
       </div>
@@ -223,7 +246,7 @@ export const PlatformDesk: React.FC<{
       </div>
 
       <div className={cx(s.nwtabs, onOpenChronicle ? s.withrecord : '')}>
-        {(['STATUS', 'CAPACITY', 'TECH', 'PRODUCTS'] as Tab[]).map(t => (
+        {tabs.map(t => (
           <button key={t} className={tab === t ? s.on : ''} onClick={() => setTab(t)}>
             {TAB_LABELS[t]}
             {t === 'STATUS' && overall !== 'operational' && <i className={cx(s.tdot, s[overall])} />}
@@ -238,14 +261,11 @@ export const PlatformDesk: React.FC<{
       </div>
 
       <div className={s.nwscroll}>
-        {serviceControls && <section className={s.nwsec}>
-          <div className={s.nwhead}><h2>Service controls</h2><span>current configuration</span></div>
-          <div className={s.serviceControls}>
-            <button type="button" onClick={onAddCity}><b>Network</b><span>{serviceControls.network}</span><i>Manage →</i></button>
-            <button type="button" onClick={onOpenIdent}><b>Playback ident</b><span>{serviceControls.ident}</span><i>Edit →</i></button>
-            <button type="button" onClick={onOpenStorefront}><b>Storefront</b><span>{serviceControls.storefront}</span><i>Edit →</i></button>
-          </div>
-        </section>}
+
+        {/* ── OFFER — what viewers get and pay, editable while live ── */}
+        {tab === 'OFFER' && offer && (
+          <PlatformOffer accent={c} offer={offer.data} actions={offer.actions} sharing={offer.sharing} />
+        )}
 
         {/* ── STATUS — the page everyone has watched go red ── */}
         {tab === 'STATUS' && (
@@ -263,7 +283,7 @@ export const PlatformDesk: React.FC<{
             </div>
 
             <section className={s.nwsec}>
-              <div className={s.nwhead}><h2>Components</h2><span>last 90 days</span></div>
+              <div className={s.nwhead}><h2>Components</h2><span>last {state.components[0]?.history.length ?? 30} weeks</span></div>
               {state.components.map(comp => (
                 <div className={s.comp} key={comp.id}>
                   <div className={s.comptop}>
@@ -276,10 +296,11 @@ export const PlatformDesk: React.FC<{
                       <i key={n} className={d === 3 ? s.none : d === 2 ? s.down : d === 1 ? s.deg : s.ok} />
                     ))}
                   </div>
+                  {/* one bar per weekly settlement, so the strip is read in weeks */}
                   <div className={s.compfoot}>
-                    <span>90 days ago</span>
+                    <span>{comp.history.length} weeks ago</span>
                     <em>{comp.uptime.toFixed(comp.measure ? 0 : 2)}% {comp.measure ?? 'uptime'}</em>
-                    <span>today</span>
+                    <span>this week</span>
                   </div>
                 </div>
               ))}
@@ -302,8 +323,13 @@ export const PlatformDesk: React.FC<{
           </>
         )}
 
-        {/* ── CAPACITY — the cities placed in the wizard, under real load ── */}
-        {tab === 'CAPACITY' && (
+        {/* ── NETWORK — the map, the gauges and the sites ── */}
+        {tab === 'CAPACITY' && network && (
+          <PlatformNetwork accent={c} map={network} state={state} onChangeNetwork={onAddCity} />
+        )}
+
+        {/* ── CAPACITY — the cities placed in the wizard (callers without a map) ── */}
+        {tab === 'CAPACITY' && !network && (
           <section className={s.nwsec}>
             <div className={s.nwhead}>
               <h2>Data centres</h2>
@@ -363,25 +389,36 @@ export const PlatformDesk: React.FC<{
                     <b>{t.name}</b>
                     <span>{t.note}</span>
                   </div>
-                  <div className={s.tklvl}>
-                    {Array.from({ length: t.maxLevel }).map((_, n) => (
-                      <i key={n} className={n < t.level ? s.on : ''} />
-                    ))}
-                  </div>
+                  {/* Levels run 0–100 in the save; five pips cannot draw that, so a
+                      long scale is a bar with its number, a short one keeps pips. */}
+                  {t.maxLevel > 10 ? (
+                    <div className={s.tkscale}>
+                      <b>{t.level}<small>/{t.maxLevel}</small></b>
+                      <i><em style={{ width: `${Math.min(100, t.level / t.maxLevel * 100)}%` }} /></i>
+                    </div>
+                  ) : (
+                    <div className={s.tklvl}>
+                      {Array.from({ length: t.maxLevel }).map((_, n) => (
+                        <i key={n} className={n < t.level ? s.on : ''} />
+                      ))}
+                    </div>
+                  )}
                 </div>
                 {t.building ? (
                   <div className={s.tkbuild}>
                     <span className={cx(s.doctrine, s[t.building.doctrine.toLowerCase()])}>{t.building.doctrine}</span>
                     <span className={s.tkweeks}>{t.building.weeksLeft} week{t.building.weeksLeft === 1 ? '' : 's'} remaining</span>
                     {t.building.doctrine === 'SPRINT' && <span className={s.tkdebt}>+ technical debt</span>}
-                    <button className={s.tkcancel} onClick={() => onCancelBuild?.(t)}>CANCEL</button>
+                    {onOpenTechnology
+                      ? <button className={s.tkcancel} onClick={() => onOpenTechnology(t)}>MANAGE</button>
+                      : <button className={s.tkcancel} onClick={() => onCancelBuild?.(t)}>CANCEL</button>}
                   </div>
                 ) : (
                   <div className={s.tkacts}>
                     {t.debt && <span className={s.tkdebt}>carrying debt</span>}
-                    <button className={s.tkbtn} disabled={t.level >= t.maxLevel}
-                      onClick={() => setBuildTrack(t)}>
-                      {t.level >= t.maxLevel ? 'MAXED' : `BUILD TIER ${t.level + 1}`}
+                    <button className={cx(s.tkbtn, onOpenTechnology ? s.tkopen : '')} disabled={t.level >= t.maxLevel}
+                      onClick={() => (onOpenTechnology ? onOpenTechnology(t) : setBuildTrack(t))}>
+                      {t.level >= t.maxLevel ? 'MAXED' : onOpenTechnology ? 'UPGRADE →' : `BUILD TIER ${t.level + 1}`}
                     </button>
                   </div>
                 )}

@@ -1,3 +1,5 @@
+import { canQueueStockControlNotice, markStockControlEligibilityLost } from './stockControlNotices';
+import { PUBLIC_CONTROL_PERCENT, getPublicControlReadiness } from './publicStockControl';
 import type {
     Business,
     BusinessStaff,
@@ -71,15 +73,15 @@ const getAvailableRoutes = (
     const routes: StockTakeoverRoute[] = [];
     if (ownershipPercent >= 20) routes.push('SHAREHOLDER_ALLIANCE');
     if (ownershipPercent >= 30) routes.push('FRIENDLY_TAKEOVER', 'HOSTILE_TAKEOVER');
-    if (ownershipPercent >= 51 || effectiveControlPercent >= 51) routes.push('CONTROL_TRANSFER');
+    if (ownershipPercent >= PUBLIC_CONTROL_PERCENT) routes.push('CONTROL_TRANSFER');
     return routes;
 };
 
 const getNextUnlockLabel = (language: GameLanguage, ownershipPercent: number, effectiveControlPercent: number) => {
-    if (effectiveControlPercent >= 51) return t(language, 'services.stockTakeover.nextUnlock.ready');
+    if (ownershipPercent >= PUBLIC_CONTROL_PERCENT) return t(language, 'services.stockTakeover.nextUnlock.ready');
     if (ownershipPercent < 20) return t(language, 'services.stockTakeover.nextUnlock.shareholderAlliance');
     if (ownershipPercent < 30) return t(language, 'services.stockTakeover.nextUnlock.friendlyHostile');
-    if (ownershipPercent < 51) return t(language, 'services.stockTakeover.nextUnlock.controlTransfer');
+    if (ownershipPercent < PUBLIC_CONTROL_PERCENT) return t(language, 'services.stockTakeover.nextUnlock.controlTransfer');
     return t(language, 'services.stockTakeover.nextUnlock.ready');
 };
 
@@ -93,7 +95,8 @@ export const getStockTakeoverSnapshot = (
     const activeCase = getActiveCase(player, stock.id);
     const alliedSupportPercent = roundPercent(activeCase?.status === 'CONTROLLED' ? 0 : activeCase?.alliedSupportPercent || 0);
     const effectiveControlPercent = roundPercent(Math.min(100, ownershipPercent + alliedSupportPercent));
-    const availableRoutes = getAvailableRoutes(ownershipPercent, effectiveControlPercent, stock);
+    const readiness = getPublicControlReadiness(player, { id: stock.relatedStudioId || '', name: stock.name, archetype: 'LEGACY', isPlayerOwned: false, acquisitionState: 'PUBLICLY_TRADED' });
+    const availableRoutes = getAvailableRoutes(readiness.eligible ? PUBLIC_CONTROL_PERCENT : Math.min(ownershipPercent, PUBLIC_CONTROL_PERCENT - 0.000001), effectiveControlPercent, stock);
     const reservedPlatform = isStreamingPlatformStudio({ id: stock.relatedStudioId });
     return {
         stockId: stock.id,
@@ -451,6 +454,7 @@ export const processStockTakeoverEvents = (player: Player): Player => {
     const pendingEvents = Array.isArray(player.pendingEvents) ? player.pendingEvents : [];
     const dismissed = (player.flags || {}).stockTakeoverEventDismissals || {};
     let nextPendingEvents = pendingEvents;
+    let noticePlayer = player;
 
     player.stocks
         .filter(stock => stock.sector === 'MEDIA' && Boolean(stock.relatedStudioId))
@@ -460,14 +464,15 @@ export const processStockTakeoverEvents = (player: Player): Player => {
             if (dismissed[stock.id]) return;
             if (nextPendingEvents.some(event => event.data?.stockDecisionType === 'TAKEOVER_CONTROL' && event.data?.stockId === stock.id)) return;
             const snapshot = getStockTakeoverSnapshot(player, stock, language);
-            if (!snapshot.canTransferControl) return;
+            if (!snapshot.canTransferControl) { noticePlayer = markStockControlEligibilityLost(noticePlayer, stock.id); return; }
+            if (!canQueueStockControlNotice(noticePlayer, stock.id)) return;
             nextPendingEvents = [...nextPendingEvents, createTakeoverControlEvent(stock, snapshot, player, language)].slice(0, 12);
         });
 
     return nextPendingEvents === pendingEvents
-        ? player
+        ? noticePlayer
         : {
-            ...player,
+            ...noticePlayer,
             pendingEvents: nextPendingEvents,
         };
 };

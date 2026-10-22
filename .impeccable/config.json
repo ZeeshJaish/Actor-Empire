@@ -57,6 +57,33 @@
         ],
         "createdAt": "2026-10-19T23:01:38.531Z",
         "reason": "Agent review: the two 2px borders mark contract-redlining guidance and transaction status/results notices, including role=status feedback; these are purposeful message rails rather than decorative card tabs."
+      },
+      {
+        "rule": "gray-on-color",
+        "value": "*",
+        "files": [
+          "views/mobile/StocksApp.tsx"
+        ],
+        "createdAt": "2026-10-22T17:16:21.738Z",
+        "reason": "Codex review: the enabled acquisition button uses near-black slate-950 on emerald-400 for strong text contrast; the detector treats the intentional near-black foreground as washed-out gray."
+      },
+      {
+        "rule": "bounce-easing",
+        "value": "cubic-bezier(.2, 1.6, .3, 1)",
+        "files": [
+          "views/mobile/components/StudioAcquisitionDealRoom.tsx"
+        ],
+        "createdAt": "2026-10-22T17:38:59.828Z",
+        "reason": "Codex review: pre-existing .sa-inkstamp.slam animates a literal physical ink-stamp strike with impact/recoil in the acquisition ceremony; domain-appropriate motion, verified unchanged from HEAD."
+      },
+      {
+        "rule": "bounce-easing",
+        "value": "cubic-bezier(.2, 1.8, .3, 1)",
+        "files": [
+          "views/mobile/components/StudioAcquisitionDealRoom.tsx"
+        ],
+        "createdAt": "2026-10-22T17:38:59.918Z",
+        "reason": "Codex review: pre-existing .sa-waxseal uses sa-slamseal to animate a literal physical seal strike with impact/recoil; domain-appropriate motion, verified unchanged from HEAD."
       }
     ]
   }

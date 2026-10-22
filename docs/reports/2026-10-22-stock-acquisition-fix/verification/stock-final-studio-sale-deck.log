@@ -1,0 +1,10 @@
+
+> pr-6.6.3@1.0.25 audit:studio-sale-deck
+> node scripts/audit-studio-sale-deck.mjs && esbuild scripts/audit-studio-sale-economics.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-studio-sale-economics.mjs && node /tmp/audit-studio-sale-economics.mjs
+
+studio sale deck audit passed
+
+  ../../../../tmp/audit-studio-sale-economics.mjs  4.7mb ⚠️
+
+⚡ Done in 73ms
+Studio sale economics audit passed.

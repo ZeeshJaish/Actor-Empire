@@ -1,0 +1,173 @@
+{
+  "kind": "FOURTEEN_SYNTHETIC_BROWSER_CONTEXTS_REAL_COMPONENTS_AND_STORAGE",
+  "sourceBefore": {
+    "types.ts": "af0d3189d756cbf586958b90725db70f68b2423b1f2bc6f8f9de2a68005e3899",
+    "App.tsx": "0c43bf58b66fe34c8b34c830a2e8a82d3e542dbf31befe4da6941537e3c66135",
+    "views/mobile/MobilePage.tsx": "33ed2fce5c89dd3b7886e0f2b7f0f49351fe44c828fcbe88adce77ee8530b06e",
+    "views/mobile/components/ForbesStudioProfile.tsx": "f4d980623db7c3b9b570d7b798165d234ad387e2613ed7619be0bb6e597e4fc4",
+    "views/mobile/ForbesApp.tsx": "2360884286c305d0d5e0cc53be2f0292dc99478119854a7ed9e2973fa42cda0b",
+    "views/mobile/StocksApp.tsx": "99360b28a531ad384e6b9c6823f8c6f68c88315d6d87d73791fe0f4057fa06f1",
+    "views/mobile/components/StudioAcquisitionDesk.tsx": "a7e0a5eea6e9da84d8819e265b4a9b89fa67572c608b88dfab7aa493adda7cf3",
+    "views/mobile/components/StudioAcquisitionDealRoom.tsx": "19f5b2e42aa4670b70317a55067f82be4fd5dd4ddb253e44587894be88c01791",
+    "components/StockControlEventModal.tsx": "b72b6e444354ee2d630dc5a66bb22ff54ae58ccea4f02703c11826ba0b827dbb",
+    "services/studioAcquisition.ts": "37744d36a60586a3a3681abfdb649f7c025f8433f455344db374a5c698b10ad2",
+    "services/publicStockControl.ts": "5528062935399d74c3e773fa5f0b11e463b20d87b4707a4c32da31a44e26bcb5",
+    "services/acquisitionSigningQuote.ts": "a5c1c236eafac8e160424b80551686a9cf2d61ca4e8d4f14b1b5f445ad61ecc5",
+    "services/stockTakeover.ts": "6eaa2e34145039117bdd96b7d15963adaac1a617a5c415acccb87f56678d959f",
+    "services/stockControlNotices.ts": "b23341e693129a2b6daf8265ef904e83b799e1b8ffdecec93aeca743d39212aa",
+    "services/stockLogic.ts": "56b9cedf5b9328f655c560c57ea55de483b9488a363cb71c3be21d983b3fc6e7",
+    "services/stockCashOwnership.ts": "faa4fdb7f807f1a682cc0f770a72f9cac197f7833835604aeb0140cab7e1a465",
+    "services/stockSettlement.ts": "ec3ed9df84ab5782295112d438ff2ea585f3f87e64519539542051aeb4ed032e",
+    "services/stockValuation.ts": "1f769aaffb3681ea0dbdc765cc89b24aebde336bab33fb242638b68a172e5be6",
+    "services/stockMarketClock.ts": "ccb31caa811f4ee7f97eeb00cbb5494cbef6522f72ab13fb68222e3f6888d7a1",
+    "services/saveMigration.ts": "1d98bbdf4cc2f420dd0f5d9863aed6a98c2d019761adeb283e384905b634caf7",
+    "services/stockSaveCompatibility.ts": "f4ae5ae79343eae7ad6f20849a21ee0522dfb6bcdd39aaa29cfa88c374d05a90",
+    "services/saveIntegrity.ts": "f76f9c26b1f018fbe4e2866c1ce97174ebc5bc5812494e79076e7920f7984e38",
+    "services/saveGenerations.ts": "6437751f440024f88776476af61f0e82042d6ba6a1ab96c6ac60746fbe43be51",
+    "services/storage.ts": "f4dc245a60da60434f8a35c6356ed3bc8218dbdb05517d54b02c2f7e0f2d21b4",
+    "services/forbesStudioProfile.ts": "4f25da3f01d82aa3050dce9fbc4179febc9bf9315b9b5d4395bcfd954e0ed807",
+    "services/studioEcosystem.ts": "df60f166923746f0bde9be48d89e8d9d5b4027f71177ca191b820cbdbad11aac",
+    "services/gameLoop.ts": "a999f9d49564f0d3eaf2d02c72951480b293bcafedf2662745e450409beebf38",
+    "services/shareholderVoting.ts": "0ee98312f60adff6561d9e40a55b69f20ed8f0a7e7bbed2cf5d04e27deed639a",
+    "services/industryWorld/studioOwnershipMaterializer.ts": "3a7ce3f7b9d2b9183bd5acebb6dc5680765adc9b422ef061e72252bd115d7a85",
+    "services/studioAi/studioAiFinance.ts": "26a02ed3a2f5e8eb299cabb7936195a3576c3078900073b448c0d7a540ede6b3",
+    "services/savePreparation.ts": "b44fee4fbbeb73699f35b5342bdc8dcd2ec446d0860c0cf4dcb7eb1917ba4655",
+    "lab/stockAcquisitionSafety.tsx": "6ab76e2b32d4dab6f145ba8f47f13c2e797fa2322c1049c439b30c34f3731d4f"
+  },
+  "cases": [
+    {
+      "name": "fresh-paramount-50",
+      "exitCode": 0,
+      "status": "PASSED",
+      "steps": 15,
+      "errors": []
+    },
+    {
+      "name": "fresh-paramount-51",
+      "exitCode": 0,
+      "status": "PASSED",
+      "steps": 15,
+      "errors": []
+    },
+    {
+      "name": "fresh-paramount-100",
+      "exitCode": 0,
+      "status": "PASSED",
+      "steps": 15,
+      "errors": []
+    },
+    {
+      "name": "fresh-warner-51",
+      "exitCode": 0,
+      "status": "PASSED",
+      "steps": 15,
+      "errors": []
+    },
+    {
+      "name": "fresh-universal-51",
+      "exitCode": 0,
+      "status": "PASSED",
+      "steps": 15,
+      "errors": []
+    },
+    {
+      "name": "fresh-paramount-real-debt",
+      "exitCode": 0,
+      "status": "PASSED",
+      "steps": 15,
+      "errors": []
+    },
+    {
+      "name": "legacy-counter",
+      "exitCode": 0,
+      "status": "PASSED",
+      "steps": 12,
+      "errors": []
+    },
+    {
+      "name": "legacy-rejection",
+      "exitCode": 0,
+      "status": "PASSED",
+      "steps": 12,
+      "errors": []
+    },
+    {
+      "name": "legacy-accepted",
+      "exitCode": 0,
+      "status": "PASSED",
+      "steps": 12,
+      "errors": []
+    },
+    {
+      "name": "legacy-draft-100",
+      "exitCode": 0,
+      "status": "PASSED",
+      "steps": 12,
+      "errors": []
+    },
+    {
+      "name": "low-energy",
+      "exitCode": 0,
+      "status": "PASSED",
+      "steps": 5,
+      "errors": []
+    },
+    {
+      "name": "stale-signing-debt-reload",
+      "exitCode": 0,
+      "status": "PASSED",
+      "steps": 5,
+      "errors": []
+    },
+    {
+      "name": "repaired-quote-disclosure",
+      "exitCode": 0,
+      "status": "PASSED",
+      "steps": 2,
+      "errors": []
+    },
+    {
+      "name": "sx-wallet",
+      "exitCode": 0,
+      "status": "PASSED",
+      "steps": 2,
+      "errors": []
+    }
+  ],
+  "sourceAfter": {
+    "types.ts": "af0d3189d756cbf586958b90725db70f68b2423b1f2bc6f8f9de2a68005e3899",
+    "App.tsx": "0c43bf58b66fe34c8b34c830a2e8a82d3e542dbf31befe4da6941537e3c66135",
+    "views/mobile/MobilePage.tsx": "33ed2fce5c89dd3b7886e0f2b7f0f49351fe44c828fcbe88adce77ee8530b06e",
+    "views/mobile/components/ForbesStudioProfile.tsx": "f4d980623db7c3b9b570d7b798165d234ad387e2613ed7619be0bb6e597e4fc4",
+    "views/mobile/ForbesApp.tsx": "2360884286c305d0d5e0cc53be2f0292dc99478119854a7ed9e2973fa42cda0b",
+    "views/mobile/StocksApp.tsx": "99360b28a531ad384e6b9c6823f8c6f68c88315d6d87d73791fe0f4057fa06f1",
+    "views/mobile/components/StudioAcquisitionDesk.tsx": "a7e0a5eea6e9da84d8819e265b4a9b89fa67572c608b88dfab7aa493adda7cf3",
+    "views/mobile/components/StudioAcquisitionDealRoom.tsx": "19f5b2e42aa4670b70317a55067f82be4fd5dd4ddb253e44587894be88c01791",
+    "components/StockControlEventModal.tsx": "b72b6e444354ee2d630dc5a66bb22ff54ae58ccea4f02703c11826ba0b827dbb",
+    "services/studioAcquisition.ts": "37744d36a60586a3a3681abfdb649f7c025f8433f455344db374a5c698b10ad2",
+    "services/publicStockControl.ts": "5528062935399d74c3e773fa5f0b11e463b20d87b4707a4c32da31a44e26bcb5",
+    "services/acquisitionSigningQuote.ts": "a5c1c236eafac8e160424b80551686a9cf2d61ca4e8d4f14b1b5f445ad61ecc5",
+    "services/stockTakeover.ts": "6eaa2e34145039117bdd96b7d15963adaac1a617a5c415acccb87f56678d959f",
+    "services/stockControlNotices.ts": "b23341e693129a2b6daf8265ef904e83b799e1b8ffdecec93aeca743d39212aa",
+    "services/stockLogic.ts": "56b9cedf5b9328f655c560c57ea55de483b9488a363cb71c3be21d983b3fc6e7",
+    "services/stockCashOwnership.ts": "faa4fdb7f807f1a682cc0f770a72f9cac197f7833835604aeb0140cab7e1a465",
+    "services/stockSettlement.ts": "ec3ed9df84ab5782295112d438ff2ea585f3f87e64519539542051aeb4ed032e",
+    "services/stockValuation.ts": "1f769aaffb3681ea0dbdc765cc89b24aebde336bab33fb242638b68a172e5be6",
+    "services/stockMarketClock.ts": "ccb31caa811f4ee7f97eeb00cbb5494cbef6522f72ab13fb68222e3f6888d7a1",
+    "services/saveMigration.ts": "1d98bbdf4cc2f420dd0f5d9863aed6a98c2d019761adeb283e384905b634caf7",
+    "services/stockSaveCompatibility.ts": "f4ae5ae79343eae7ad6f20849a21ee0522dfb6bcdd39aaa29cfa88c374d05a90",
+    "services/saveIntegrity.ts": "f76f9c26b1f018fbe4e2866c1ce97174ebc5bc5812494e79076e7920f7984e38",
+    "services/saveGenerations.ts": "6437751f440024f88776476af61f0e82042d6ba6a1ab96c6ac60746fbe43be51",
+    "services/storage.ts": "f4dc245a60da60434f8a35c6356ed3bc8218dbdb05517d54b02c2f7e0f2d21b4",
+    "services/forbesStudioProfile.ts": "4f25da3f01d82aa3050dce9fbc4179febc9bf9315b9b5d4395bcfd954e0ed807",
+    "services/studioEcosystem.ts": "df60f166923746f0bde9be48d89e8d9d5b4027f71177ca191b820cbdbad11aac",
+    "services/gameLoop.ts": "a999f9d49564f0d3eaf2d02c72951480b293bcafedf2662745e450409beebf38",
+    "services/shareholderVoting.ts": "0ee98312f60adff6561d9e40a55b69f20ed8f0a7e7bbed2cf5d04e27deed639a",
+    "services/industryWorld/studioOwnershipMaterializer.ts": "3a7ce3f7b9d2b9183bd5acebb6dc5680765adc9b422ef061e72252bd115d7a85",
+    "services/studioAi/studioAiFinance.ts": "26a02ed3a2f5e8eb299cabb7936195a3576c3078900073b448c0d7a540ede6b3",
+    "services/savePreparation.ts": "b44fee4fbbeb73699f35b5342bdc8dcd2ec446d0860c0cf4dcb7eb1917ba4655",
+    "lab/stockAcquisitionSafety.tsx": "6ab76e2b32d4dab6f145ba8f47f13c2e797fa2322c1049c439b30c34f3731d4f"
+  },
+  "sourcesUnchanged": true,
+  "status": "PASSED"
+}

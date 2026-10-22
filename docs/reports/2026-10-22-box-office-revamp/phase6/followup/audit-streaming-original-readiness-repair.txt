@@ -1,0 +1,37 @@
+
+> pr-6.6.3@1.0.25 audit:streaming-original-readiness-repair
+> esbuild scripts/audit-streaming-original-readiness-repair.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-streaming-original-readiness-repair.mjs && node /tmp/audit-streaming-original-readiness-repair.mjs
+
+PASS legacy completed commitment recovers catalogue without editing commission
+PASS legacy completed commitment recovers subscription route
+PASS live status agrees with catalogue
+PASS readiness does not mutate cash, IDs, signatures or saved input
+PASS PRE_PRODUCTION commitment stays unavailable
+PASS PRODUCTION commitment stays unavailable
+PASS POST_PRODUCTION commitment stays unavailable
+PASS PLANNING commitment stays unavailable
+PASS SCHEDULED commitment stays unavailable
+PASS canonical DELIVERED agrees across catalogue and route
+PASS canonical AWAITING_RELEASE agrees across catalogue and route
+PASS canonical RELEASED agrees across catalogue and route
+PASS canonical PRE_PRODUCTION agrees across catalogue and route
+PASS canonical PRODUCTION agrees across catalogue and route
+PASS canonical POST_PRODUCTION agrees across catalogue and route
+PASS canonical ON_HOLD agrees across catalogue and route
+PASS canonical CANCELLED agrees across catalogue and route
+PASS canonical TURNAROUND agrees across catalogue and route
+PASS canonical PLANNED agrees across catalogue and route
+PASS unfinished commitment cannot be bypassed by a stale released mirror
+PASS cancelled canonical production overrides released mirrors
+PASS released project upgrades completed canonical production to released
+PASS finished production does not bypass scheduled premiere
+PASS postlaunch Original cannot bypass authorized future premiere
+PASS Original cannot play before localization delivery
+PASS greenlit without canonical completion remains blocked
+PASS Originals modal owns a fixed inset viewport above HQ
+PASS Originals content can shrink and scroll inside viewport
+28/28 Original readiness checks passed
+
+  ../../../../tmp/audit-streaming-original-readiness-repair.mjs  489.2kb
+
+⚡ Done in 24ms

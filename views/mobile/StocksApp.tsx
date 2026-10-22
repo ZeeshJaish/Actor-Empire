@@ -13,6 +13,7 @@ import type { Player, Stock } from '../../types';
 import { formatMoney } from '../../services/formatUtils';
 import {
     calculatePortfolioValue,
+    executeStockTrade,
     calculateStockTradeQuote,
     getEstimatedAnnualDividend,
     getSharesForCashOrder,
@@ -143,6 +144,7 @@ export const StocksApp: React.FC<StocksAppProps> = ({
     const [sharesInput, setSharesInput] = useState('');
     const [orderMode, setOrderMode] = useState<StockOrderMode>('SHARES');
     const [controlFeedback, setControlFeedback] = useState('');
+    const [tradeFeedback, setTradeFeedback] = useState('');
     const stockScrollRef = useRef<HTMLDivElement>(null);
     const language = getPlayerLanguage(player);
     const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
@@ -196,15 +198,32 @@ export const StocksApp: React.FC<StocksAppProps> = ({
         const hasSynergy = player.activeSponsorships.some(sponsorship => sponsorship.brandName === selectedStock.relatedBrandName);
         const chartMin = Math.min(...selectedStock.priceHistory) * 0.9;
         const chartMax = Math.max(...selectedStock.priceHistory) * 1.1;
-        const positionInvested = holding?.totalInvested ?? ((holding?.shares || 0) * (holding?.averageCost || selectedStock.price));
-        const averageCost = holding?.averageCost || (holding?.shares ? selectedStock.price : 0);
-        const gainLoss = snapshot.positionValue - positionInvested;
+        const positionInvested = holding?.totalInvested ?? (holding?.averageCost !== undefined ? holding.shares * holding.averageCost : holding?.shares ? undefined : 0);
+        const averageCost = holding?.averageCost ?? (holding?.shares ? undefined : 0);
+        const gainLoss = positionInvested === undefined ? undefined : snapshot.positionValue - positionInvested;
+        const quoteRepair = player.flags?.stockQuoteRepairs?.[selectedStock.id];
         const influence = getShareholderInfluence(snapshot.ownershipPercent, language);
         const influenceProgress = influence.nextThreshold
             ? Math.min(100, (snapshot.ownershipPercent / influence.nextThreshold) * 100)
             : 100;
         const takeoverSnapshot = getStockTakeoverSnapshot(player, selectedStock, language);
         const takeoverCase = takeoverSnapshot.activeCase;
+        const submitTrade = (amount: number) => {
+            const checked = executeStockTrade(player, selectedStock.id, amount);
+            if (!checked.success) {
+                setTradeFeedback(checked.reason === 'UNREPRESENTABLE_AMOUNT'
+                    ? 'This saved balance cannot settle this amount safely. Your cash and shares are unchanged. Recover a verified backup before trading.'
+                    : checked.reason === 'INVALID_SHARE_REGISTER'
+                        ? 'This share register needs verified recovery. Your cash, shares and company ownership are unchanged.'
+                        : checked.reason === 'OWNER_NOT_FOUND' || checked.reason === 'LIVE_SALE_LISTING'
+                            ? 'The company owner or its live sale prevents this trade. Nothing was charged.'
+                            : 'This trade could not be completed. Your cash and shares are unchanged.');
+                return;
+            }
+            setTradeFeedback('');
+            onTrade(selectedStock.id, amount);
+            setSharesInput('');
+        };
         const openAcquisitionDesk = () => {
             if (!selectedStock.relatedStudioId || !onOpenStudioAcquisition) {
                 setControlFeedback('Acquisition desk route is not available for this stock yet.');
@@ -240,6 +259,12 @@ export const StocksApp: React.FC<StocksAppProps> = ({
                 </div>
 
                 <div ref={stockScrollRef} className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+                    {tradeFeedback && <div role="alert" className="mb-4 rounded-xl border border-amber-500 p-3 text-sm text-amber-100">{tradeFeedback}</div>}
+                    {quoteRepair && <div role="note" aria-label="Saved stock quote correction" className="mb-4 rounded-xl border border-sky-900 bg-sky-950/30 p-3 text-xs leading-relaxed text-sky-100">
+                        <div className="font-bold">Saved quote corrected</div>
+                        <div className="break-words font-mono">{Number.isFinite(Number(quoteRepair.originalPrice)) ? formatMoney(Number(quoteRepair.originalPrice)) : quoteRepair.originalPrice} → {formatMoney(quoteRepair.repairedPrice)} per share</div>
+                        <div>The correction changes quoted portfolio value. Cash, shares and recorded purchase costs were kept.</div>
+                    </div>}
                     <div className="mb-4 rounded-xl border border-zinc-800 bg-zinc-900 p-4">
                         <div className="mb-3 flex items-center justify-between gap-3">
                             <div className="text-xs font-bold uppercase text-zinc-500">{tr('stocks.trade')}</div>
@@ -305,8 +330,7 @@ export const StocksApp: React.FC<StocksAppProps> = ({
                                 disabled={!canSell}
                                 onClick={() => {
                                     if (!canSell) return;
-                                    onTrade(selectedStock.id, -inputAmount);
-                                    setSharesInput('');
+                                    submitTrade(-inputAmount);
                                 }}
                                 className={`rounded-xl py-3 text-sm font-bold ${
                                     canSell ? 'bg-zinc-800 text-white' : 'bg-zinc-800 text-zinc-600'
@@ -319,8 +343,7 @@ export const StocksApp: React.FC<StocksAppProps> = ({
                                 disabled={!canAfford}
                                 onClick={() => {
                                     if (!canAfford) return;
-                                    onTrade(selectedStock.id, inputAmount);
-                                    setSharesInput('');
+                                    submitTrade(inputAmount);
                                 }}
                                 className={`rounded-xl py-3 text-sm font-bold ${
                                     canAfford ? 'bg-blue-600 text-white' : 'bg-blue-900/50 text-blue-300/50'
@@ -427,12 +450,12 @@ export const StocksApp: React.FC<StocksAppProps> = ({
                             </div>
                             <div className="px-3 py-3">
                                 <div className="text-[8px] font-bold uppercase tracking-wide text-zinc-600">{tr('stocks.averageCost')}</div>
-                                <div className="mt-1 font-mono text-xs font-bold text-zinc-300">{formatMoney(averageCost)}</div>
+                                <div className="mt-1 font-mono text-xs font-bold text-zinc-300">{averageCost === undefined ? 'Unknown' : formatMoney(averageCost)}</div>
                             </div>
                             <div className="px-3 py-3">
                                 <div className="text-[8px] font-bold uppercase tracking-wide text-zinc-600">{tr('stocks.gainLoss')}</div>
-                                <div className={`mt-1 font-mono text-xs font-bold ${gainLoss >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                    {gainLoss >= 0 ? '+' : ''}{formatCompactMoney(gainLoss)}
+                                <div className={`mt-1 font-mono text-xs font-bold ${gainLoss === undefined ? 'text-zinc-400' : gainLoss >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                    {gainLoss === undefined ? 'Unknown' : `${gainLoss >= 0 ? '+' : ''}${formatCompactMoney(gainLoss)}`}
                                 </div>
                             </div>
                         </div>
@@ -453,7 +476,7 @@ export const StocksApp: React.FC<StocksAppProps> = ({
                                 ['10%', tr('stocks.influence.vote')],
                                 ['20%', tr('stocks.influence.influence')],
                                 ['30%', tr('stocks.influence.board')],
-                                ['51%', tr('stocks.influence.control')],
+                                ['50%', tr('stocks.influence.control')],
                             ].map(([threshold, label]) => {
                                 const unlocked = snapshot.ownershipPercent >= Number(threshold.replace('%', ''));
                                 return (

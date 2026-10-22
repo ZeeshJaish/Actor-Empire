@@ -1,0 +1,10 @@
+[
+  {
+    "stage": "before",
+    "exit": 0
+  },
+  {
+    "stage": "after",
+    "exit": 0
+  }
+]

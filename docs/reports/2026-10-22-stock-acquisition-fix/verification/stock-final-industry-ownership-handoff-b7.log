@@ -1,0 +1,9 @@
+
+> pr-6.6.3@1.0.25 audit:industry-ownership-handoff-b7
+> esbuild scripts/audit-industry-ownership-handoff-b7.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-industry-ownership-handoff-b7.mjs && node /tmp/audit-industry-ownership-handoff-b7.mjs
+
+
+  ../../../../tmp/audit-industry-ownership-handoff-b7.mjs  4.9mb ⚠️
+
+⚡ Done in 365ms
+Industry world B7 ownership handoff audit passed.

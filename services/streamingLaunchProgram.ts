@@ -599,7 +599,12 @@ export const saveStreamingPricingPlan = (
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
     const nextPlatform = compactOwnedStreamingPlatformForPersistence({
         ...platform,
-        subscriptionPrices: {
+        /* Live copy (deviation from main): once launched, the legacy tier
+           prices are left alone. The live offer reads serviceConfiguration.pricing
+           only, while Build seeds network drafts from subscriptionPrices and
+           validates them against the three-tier ladder; mirroring a $0 ad tier
+           there would block every later network revision. */
+        subscriptionPrices: platform.launchCommit ? platform.subscriptionPrices : {
             BASIC: priceFor('BASIC', 0, platform.subscriptionPrices.BASIC),
             PREMIUM: priceFor('PREMIUM', 1, platform.subscriptionPrices.PREMIUM),
             FAMILY: priceFor('FAMILY', 2, platform.subscriptionPrices.FAMILY),

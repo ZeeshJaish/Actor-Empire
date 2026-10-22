@@ -2341,6 +2341,8 @@ export interface CastMember {
     roleType?: RoleType;
     actorId?: string;
     actorName?: string;
+    /** Casting-time fallback for procedural actors absent from a later runtime's catalogue. */
+    cinemaRecognition?: { version: 1; personId: string; fame: number; stature: number };
     status?: 'PENDING' | 'CONFIRMED' | 'REJECTED';
     characterId?: string;
     characterName?: string;
@@ -8158,6 +8160,11 @@ export interface Stock {
     relatedStudioId?: StudioId;
     priceHistory: number[];
     lastDividendPayoutWeek: number;
+    /** Absolute game-week markers avoid replay and year-rollover ambiguity. */
+    lastMarketProcessedAbsoluteWeek?: number;
+    lastDividendPayoutAbsoluteWeek?: number;
+    lastDividendSettledAbsoluteWeek?: number;
+    lastShareIssueAbsoluteWeek?: number;
 }
 
 export type ShareholderInfluenceLevel =
@@ -8285,6 +8292,7 @@ export interface YearlyFinance {
 
 export interface IndustryProject {
     cinema?: CinemaProjectMarker;
+    cinemaCast?: CastMember[];
     id: string;
     title: string;
     genre: Genre;
@@ -9761,6 +9769,7 @@ export interface PlatformState {
 }
 
 export interface NPCStudioState {
+    listedValuationAdjustment?: { version: 1; originalValuationBillions: number; firstAdjustedAbsoluteWeek: number; ceilingBillions: number };
     id: StudioId;
     name: string;
     valuation: number; // in billions

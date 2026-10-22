@@ -1,3 +1,5 @@
+import { buildAcquisitionSigningQuote } from '../../../services/acquisitionSigningQuote';
+import { getPublicControlReadiness } from '../../../services/publicStockControl';
 import React from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
@@ -87,7 +89,8 @@ interface StudioAcquisitionDeskProps {
     onReviseOffer: (offerAmount: number) => { success: boolean };
     onBeatRival: (offerAmount: number) => { success: boolean };
     onWalkAway: () => { success: boolean };
-    onCompleteAcquisition: () => ReturnType<typeof completeAcquisitionTransaction>;
+    onCompleteAcquisition: (quoteKey?: string) => ReturnType<typeof completeAcquisitionTransaction>;
+    onBeginControlTransfer?: () => { success: boolean; reason?: string };
     onCompleteStockControl: () => ReturnType<typeof completeStockControlAcquisition>;
     onUpdatePresentation: (patch: NonNullable<AcquisitionCase['presentation']>) => ReturnType<typeof updateAcquisitionPresentation>;
 }
@@ -2435,6 +2438,14 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = (prop
     } = props;
     const language = getPlayerLanguage(player);
     const report = acquisitionCase?.diligence?.report;
+    const signingQuote = buildAcquisitionSigningQuote({ player, profile });
+    const controlReadiness = getPublicControlReadiness(player, profile);
+    const eligibility = getAcquisitionEligibility(profile, acquisitionCase, player);
+    const resumableOffer = ['OFFER_SUBMITTED', 'COUNTERED', 'RIVAL_BID', 'ACCEPTED'].includes(acquisitionCase?.status || '');
+    const entryBlockReason = eligibility.reason === 'PLAYER_OWNED' || eligibility.reason === 'STREAMING_PLATFORM_RESERVED'
+        ? eligibility.reason
+        : !controlReadiness.eligible && !resumableOffer
+            && (eligibility.reason === 'NOT_FOR_SALE' || eligibility.reason === 'COOLDOWN_ACTIVE') ? eligibility.reason : undefined;
     const fundingAmount = acquisitionCase?.offer?.amount || report?.adjustedEnterpriseValue || profile.valuation;
     const studioFunding = getFundingOptions({
         player,
@@ -2453,20 +2464,27 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = (prop
         stock.id === companyPosition.linkedStockId || stock.relatedStudioId === profile.id
     ));
     const outstandingShares = linkedStock ? getStockOutstandingShares(linkedStock) : 0;
-    const controlGapPercent = Math.max(0, 50 - companyPosition.ownershipPercent);
-    // Private tender blocks below 5% are impractical. The extra shares simply
-    // become the player's post-closing buffer above 50% control.
+    const controlGapPercent = controlReadiness.minimumTenderPercent;
+    // Public offers use whole percentage blocks (minimum 5%). Round new gaps
+    // upward; retain already-negotiated blocks exactly as accepted.
+    const existingTenderPercent = resumableOffer ? acquisitionCase?.offer?.minorityPercent : undefined;
     const tenderPercent = profile.acquisitionState === 'PUBLICLY_TRADED'
-        ? controlGapPercent <= 0 ? 0 : Math.min(49, Math.max(5, controlGapPercent))
+        ? controlGapPercent <= 0 ? 0
+            : typeof existingTenderPercent === 'number' && Number.isFinite(existingTenderPercent) && existingTenderPercent > 0
+                ? existingTenderPercent
+                : getOfferPresets({ profile, minorityPercent: controlGapPercent }).MINORITY.percent || 5
         : 0;
     const sharesRequiredForControl = linkedStock
         ? Math.max(0, Math.ceil(outstandingShares * (tenderPercent / 100)))
         : 0;
-    const acquisitionValuation = report?.adjustedEnterpriseValue || profile.valuation;
+    const acquisitionValuation = profile.acquisitionState === 'PUBLICLY_TRADED' ? signingQuote.equityValue : report?.adjustedEnterpriseValue || profile.valuation;
     const privateControlConversion = acquisitionCase?.controlConversion?.kind === 'PRIVATE_STAKE_TO_CONTROL'
         ? acquisitionCase.controlConversion
         : undefined;
-    const remainingControlPercent = privateControlConversion?.remainingPercent ?? tenderPercent;
+    const remainingControlPercent = privateControlConversion?.remainingPercent
+        ?? (profile.acquisitionState === 'PUBLICLY_TRADED' ? tenderPercent
+            : acquisitionCase?.offer?.type === 'MINORITY' ? acquisitionCase.offer.minorityPercent || 25
+                : acquisitionCase?.closing?.outcome === 'MINORITY_STAKE' ? companyPosition.negotiatedPercent : 100);
     const controlBlockValue = privateControlConversion
         ? Math.round(Math.max(0, acquisitionValuation) * (privateControlConversion.remainingPercent / 100))
         : Math.round(Math.max(0, acquisitionValuation) * 0.5);
@@ -2486,6 +2504,11 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = (prop
     }, [] as string[]).slice(0, 12);
     const config: StudioAcqConfig = {
         playerName: player.name,
+        signingQuoteKey: signingQuote.quoteKey,
+        signingTermsValid: signingQuote.valid,
+        signingPrice: signingQuote.additionalPrice,
+        publicControlReady: controlReadiness.eligible,
+        entryBlockReason,
         groupName: player.studio?.name || player.businesses.find(business => business.type === 'PRODUCTION_HOUSE')?.name || 'Your Studio Group',
         studioName: profile.name,
         archetype: profile.archetype,
@@ -2495,9 +2518,9 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = (prop
         hitRate: Math.round((profile.hits / totalOutcomes) * 100),
         reputation: Math.round(profile.reputation),
         keyTalent,
-        verifiedDebt: report?.verifiedDebt ?? Math.max(0, profile.debt),
-        hiddenLiabilities: report?.hiddenLiabilities ?? Math.round(Math.max(0, profile.valuation) * 0.035),
-        expectedIncome: report?.expectedAnnualIncome ?? Math.max(0, profile.profitability),
+        verifiedDebt: signingQuote.verifiedDebt,
+        hiddenLiabilities: signingQuote.hiddenLiabilities,
+        expectedIncome: signingQuote.expectedAnnualIncome,
         riskFlags: report?.obligations?.length
             ? [report.primaryRisk, ...report.obligations]
             : ['Market estimates only until diligence is complete.', 'Seller obligations will be verified before closing.'],
@@ -2554,6 +2577,7 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = (prop
             acquisitionCase={acquisitionCase}
             studioFunding={privateStudioFunding}
             onClose={props.onClose}
+            onOpenStocks={props.onOpenStocks}
             onRunDiligence={onRunDiligence}
             onSubmitOffer={onSubmitOffer}
             onAcceptCounter={onAcceptCounter}
@@ -2561,6 +2585,7 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = (prop
             onBeatRival={onBeatRival}
             onWalkAway={onWalkAway}
             onCompleteAcquisition={onCompleteAcquisition}
+            onBeginControlTransfer={props.onBeginControlTransfer}
             onSetOperatingModel={onSetOperatingModel}
             onUpdatePresentation={onUpdatePresentation}
             onImmersiveChange={props.onImmersiveChange}

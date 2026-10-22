@@ -824,16 +824,16 @@ const buildContentState = (
 
   const slate: SlateWeek[] = [
     { week: 1, releases: [] },
-    { week: 2, releases: [{ id: 'r1', title: 'Vault Classics', kind: 'LICENSED', marketing: 'LIGHT', hue: 38 }] },
-    { week: 3, releases: [{ id: 'r2', title: 'Cold Open', kind: 'ORIGINAL', marketing: 'HEAVY', hue: 38 }] },
+    { week: 2, releases: [{ id: 'r1', title: 'Vault Classics', kind: 'LICENSED', marketing: 'STANDARD', hue: 38 }] },
+    { week: 3, releases: [{ id: 'r2', title: 'Cold Open', kind: 'ORIGINAL', marketing: 'EVENT', hue: 38 }] },
     { week: 4, releases: [] },
-    { week: 5, releases: [{ id: 'r3', title: 'Night Ledger — S2', kind: 'LICENSED', marketing: 'LIGHT', hue: 352, rightsRisk: true }] },
-    { week: 6, releases: [{ id: 'r4', title: 'Dead Signal', kind: 'ORIGINAL', marketing: 'HEAVY', hue: 352 }] },
+    { week: 5, releases: [{ id: 'r3', title: 'Night Ledger — S2', kind: 'LICENSED', marketing: 'STANDARD', hue: 352, rightsRisk: true }] },
+    { week: 6, releases: [{ id: 'r4', title: 'Dead Signal', kind: 'ORIGINAL', marketing: 'EVENT', hue: 352 }] },
     { week: 7, releases: [] },
     { week: 8, releases: [] },
     { week: 9, releases: [] },
-    { week: 10, releases: [{ id: 'r5', title: 'Harbour Lights', kind: 'LICENSED', marketing: 'LIGHT', hue: 168 }] },
-    { week: 11, releases: [{ id: 'r6', title: 'The Long Quiet', kind: 'ORIGINAL', marketing: 'NONE', hue: 214 }] },
+    { week: 10, releases: [{ id: 'r5', title: 'Harbour Lights', kind: 'LICENSED', marketing: 'STANDARD', hue: 168 }] },
+    { week: 11, releases: [{ id: 'r6', title: 'The Long Quiet', kind: 'ORIGINAL', marketing: 'LEAN', hue: 214 }] },
     { week: 12, releases: [] },
   ];
 

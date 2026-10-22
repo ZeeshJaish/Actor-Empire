@@ -1,0 +1,223 @@
+{
+  "baseline": "849cf7de70b9f1529978cc99c5bc1a7ae18eee94",
+  "entries": [
+    {
+      "number": 1,
+      "ref": "refs/ae-live/entries/001"
+    },
+    {
+      "number": 2,
+      "ref": "refs/ae-live/entries/002"
+    },
+    {
+      "number": 3,
+      "ref": "refs/ae-live/entries/003"
+    },
+    {
+      "number": 4,
+      "ref": "refs/ae-live/entries/004"
+    },
+    {
+      "number": 5,
+      "ref": "refs/ae-live/entries/005"
+    }
+  ],
+  "files": [
+    {
+      "path": "components/StreamingAcquisitionCommand.tsx",
+      "disposition": "Transplanted / merged"
+    },
+    {
+      "path": "components/StreamingPlatformHQ.tsx",
+      "disposition": "Transplanted / merged"
+    },
+    {
+      "path": "components/StreamingPromotionWarRoom.tsx",
+      "disposition": "Transplanted / merged"
+    },
+    {
+      "path": "components/StreamingRightsExchange.tsx",
+      "disposition": "Transplanted / merged"
+    },
+    {
+      "path": "components/streaming-transplant/AudienceAtlas.tsx",
+      "disposition": "Transplanted / merged"
+    },
+    {
+      "path": "components/streaming-transplant/AudienceCountrySheet.tsx",
+      "disposition": "Transplanted / merged"
+    },
+    {
+      "path": "components/streaming-transplant/AudienceMarketEntry.tsx",
+      "disposition": "Transplanted / merged"
+    },
+    {
+      "path": "components/streaming-transplant/AudiencePanels.tsx",
+      "disposition": "Transplanted / merged"
+    },
+    {
+      "path": "components/streaming-transplant/ContentPanels.tsx",
+      "disposition": "Transplanted / merged"
+    },
+    {
+      "path": "components/streaming-transplant/NetworkMap.tsx",
+      "disposition": "Transplanted / merged"
+    },
+    {
+      "path": "components/streaming-transplant/PlatformNetwork.tsx",
+      "disposition": "Transplanted / merged"
+    },
+    {
+      "path": "components/streaming-transplant/PlatformOffer.tsx",
+      "disposition": "Transplanted / merged"
+    },
+    {
+      "path": "components/streaming-transplant/SharingPolicyCard.tsx",
+      "disposition": "Transplanted / merged"
+    },
+    {
+      "path": "components/streaming-transplant/StreamingAudienceExperience.tsx",
+      "disposition": "Transplanted / merged"
+    },
+    {
+      "path": "components/streaming-transplant/StreamingBoardroomExperience.tsx",
+      "disposition": "Transplanted / merged"
+    },
+    {
+      "path": "components/streaming-transplant/StreamingContentExperience.tsx",
+      "disposition": "Transplanted / merged"
+    },
+    {
+      "path": "components/streaming-transplant/StreamingNetworkExperience.tsx",
+      "disposition": "Transplanted / merged"
+    },
+    {
+      "path": "components/streaming-transplant/StreamingPlatformCommandDeck.tsx",
+      "disposition": "Transplanted / merged"
+    },
+    {
+      "path": "components/streaming-transplant/StreamingPrototypeOrchestrator.tsx",
+      "disposition": "Transplanted / merged"
+    },
+    {
+      "path": "components/streaming-transplant/audienceAtlasGeometry.ts",
+      "disposition": "Transplanted / merged"
+    },
+    {
+      "path": "components/streaming-transplant/audienceAtlasModel.ts",
+      "disposition": "Transplanted / merged"
+    },
+    {
+      "path": "components/streaming-transplant/createCanonicalStreamingPresentation.ts",
+      "disposition": "Transplanted / merged"
+    },
+    {
+      "path": "components/streaming-transplant/presentation/screens/AudienceDesk/AudienceAtlas.module.css",
+      "disposition": "Transplanted / merged"
+    },
+    {
+      "path": "components/streaming-transplant/presentation/screens/AudienceDesk/AudienceMarketEntry.module.css",
+      "disposition": "Transplanted / merged"
+    },
+    {
+      "path": "components/streaming-transplant/presentation/screens/AudienceDesk/SharingPolicy.module.css",
+      "disposition": "Transplanted / merged"
+    },
+    {
+      "path": "components/streaming-transplant/presentation/screens/Boardroom/BoardroomRoom.module.css",
+      "disposition": "Transplanted / merged"
+    },
+    {
+      "path": "components/streaming-transplant/presentation/screens/ContentDesk/ContentDesk.module.css",
+      "disposition": "Transplanted / merged"
+    },
+    {
+      "path": "components/streaming-transplant/presentation/screens/ContentDesk/ContentRoom.module.css",
+      "disposition": "Transplanted / merged"
+    },
+    {
+      "path": "components/streaming-transplant/presentation/screens/NetworkDesk/NetworkDesk.module.css",
+      "disposition": "Transplanted / merged"
+    },
+    {
+      "path": "components/streaming-transplant/presentation/screens/NetworkDesk/NetworkMap.module.css",
+      "disposition": "Transplanted / merged"
+    },
+    {
+      "path": "components/streaming-transplant/presentation/screens/NetworkDesk/PlatformNetwork.module.css",
+      "disposition": "Transplanted / merged"
+    },
+    {
+      "path": "components/streaming-transplant/presentation/screens/NetworkDesk/PlatformOffer.module.css",
+      "disposition": "Transplanted / merged"
+    },
+    {
+      "path": "content-room-lab.html",
+      "disposition": "SKIP sandbox only"
+    },
+    {
+      "path": "lab/contentRoomLab.tsx",
+      "disposition": "SKIP sandbox only"
+    },
+    {
+      "path": "scripts/audit-streaming-content-desk-consolidation.tsx",
+      "disposition": "Transplanted / merged"
+    },
+    {
+      "path": "scripts/audit-streaming-hq-phase4.ts",
+      "disposition": "Transplanted / merged"
+    },
+    {
+      "path": "scripts/audit-streaming-rights-marketplace-phase16.ts",
+      "disposition": "Transplanted / merged"
+    },
+    {
+      "path": "scripts/audit-world-streaming-we5-ui.tsx",
+      "disposition": "Transplanted / merged"
+    },
+    {
+      "path": "services/streamingAudienceMarket.ts",
+      "disposition": "Transplanted / merged"
+    },
+    {
+      "path": "services/streamingBuildMarketAccess.ts",
+      "disposition": "Already in main"
+    },
+    {
+      "path": "services/streamingLaunchProgram.ts",
+      "disposition": "Transplanted / merged"
+    },
+    {
+      "path": "services/streamingMarkets.ts",
+      "disposition": "Already in main"
+    },
+    {
+      "path": "services/streamingNetworkMapView.ts",
+      "disposition": "Transplanted / merged"
+    },
+    {
+      "path": "services/streamingNetworkSignals.ts",
+      "disposition": "Transplanted / merged"
+    },
+    {
+      "path": "services/streamingPlatformOffer.ts",
+      "disposition": "Transplanted / merged"
+    },
+    {
+      "path": "services/streamingSharingPolicy.ts",
+      "disposition": "Transplanted / merged"
+    },
+    {
+      "path": "services/streamingWeeklyLoop.ts",
+      "disposition": "Transplanted / merged"
+    },
+    {
+      "path": "services/worldEconomy/worldStreamingCustomers.ts",
+      "disposition": "Transplanted / merged"
+    }
+  ],
+  "retired": [
+    "components/streaming-transplant/StreamingAudienceMap.tsx"
+  ],
+  "additionalCanonicalGuard": "services/streamingInfrastructure.ts"
+}

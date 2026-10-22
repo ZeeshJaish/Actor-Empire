@@ -985,7 +985,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                         player={props.player}
                         onBack={() => setAppMode('HOME')}
                         onUpdatePlayer={handleUpdatePlayer}
-                        onOpenStocks={() => setAppMode('STOCKS')}
+                        onOpenStocks={(stockId) => { setInitialStockId(stockId || null); setAppMode('STOCKS'); }}
                         onImmersiveChange={setIsImmersiveForbesScene}
                         initialStudioId={forbesStudioTargetId || undefined}
                         initialStudioName={forbesStudioTargetName || undefined}

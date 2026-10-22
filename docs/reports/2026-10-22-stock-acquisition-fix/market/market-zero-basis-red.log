@@ -1,0 +1,39 @@
+PASS SX cash cannot buy a share with a no-op debit
+PASS SX corporate treasury cannot consume a share on an unrepresentable sale credit
+PASS unrepresentable historical basis cannot be silently consumed on a partial sale
+PASS contradictory corporate share rights cannot silently become a personal trade
+PASS large mixed holdings allocate receipts to the exact owners
+FAIL zero historical basis remains zero through partial disposal AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+false !== true
+
+PASS same absolute week cannot reprice stock twice
+PASS an inherited future market clock cannot freeze the heir market
+PASS quarterly dividends continue across year boundaries without repeating a stale marker
+PASS settled dividends cannot be offered again after reload in the same week
+PASS old releases cannot keep moving stock decades later
+PASS a new hit can move price but project pressure is bounded
+PASS cent rounding does not exceed a company market capitalization ceiling
+PASS raw runaway stock values cannot leak through the market display selector
+PASS nonfinite money is unavailable rather than a fabricated quote
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: 1/15 stock market safety checks failed
+
+1 !== 0
+
+    at file:///private/tmp/audit-stock-market-safety.mjs:70892:8
+    at ModuleJob.run (node:internal/modules/esm/module_job:377:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:671:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 1,
+  expected: 0,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.11.1

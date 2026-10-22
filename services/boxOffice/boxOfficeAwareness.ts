@@ -129,6 +129,9 @@ export const projectCinemaForecastInput = (input: CinemaWeekInput, known: Cinema
     cohorts: structuredClone(known.cohorts),
     countries: structuredClone(input.countries), supply: structuredClone(input.supply),
     marketState: structuredClone(input.marketState), history: structuredClone(input.history),
+    streamingAlternatives: input.streamingAlternatives?.map(a=>({platformId:a.platformId,countryId:a.countryId,cohortId:a.cohortId,
+        accessiblePeople:a.accessiblePeople,catalogueStrength:a.catalogueStrength,serviceQuality:a.serviceQuality,localization:a.localization,
+        freshness:a.freshness,preferredGenres:[...a.preferredGenres],evidenceWeek:a.evidenceWeek})),
     titles: known.titles.map(title => {
         const [low, high] = title.delivery.qualityRange;
         if (!Number.isFinite(low) || !Number.isFinite(high) || low < 0 || high > 100 || low > high) throw new RangeError('Invalid visible cinema quality range');

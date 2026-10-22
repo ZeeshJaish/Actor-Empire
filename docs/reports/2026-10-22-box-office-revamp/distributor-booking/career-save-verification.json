@@ -1,0 +1,367 @@
+{
+  "kind": "ACTUAL_GAME_WEEK_AND_VERIFIED_SAVE_COORDINATOR",
+  "weeks": 245,
+  "saves": [
+    {
+      "name": "founder-small",
+      "ordinaryTitleIds": [],
+      "campaigns": [],
+      "evidence": "AUTHORED_EXISTING_SAVE",
+      "horizonWeeks": 26,
+      "weeks": 26,
+      "startingMoney": 2000,
+      "endingMoney": 2000,
+      "endingHealth": 70.75000000000014,
+      "endingBody": 51.49999999999993,
+      "endingMood": 61.49999999999993,
+      "sawProduction": true,
+      "sawOpening": true,
+      "sawRepeat": true,
+      "sawExit": false,
+      "sawStreaming": false,
+      "crashRetried": true,
+      "reloads": 3,
+      "checkpoints": [
+        {
+          "week": 1528,
+          "opening": false,
+          "repeat": false,
+          "exit": false,
+          "streaming": false
+        },
+        {
+          "week": 1540,
+          "opening": true,
+          "repeat": false,
+          "exit": false,
+          "streaming": false
+        },
+        {
+          "week": 1541,
+          "opening": false,
+          "repeat": true,
+          "exit": false,
+          "streaming": false
+        }
+      ],
+      "saveBytes": 11808727,
+      "retainedCinemaWeeks": 26,
+      "actionsByType": {},
+      "retainedTitleCount": 1
+    },
+    {
+      "name": "established-studio",
+      "ordinaryTitleIds": [],
+      "campaigns": [],
+      "evidence": "AUTHORED_EXISTING_SAVE",
+      "horizonWeeks": 26,
+      "weeks": 26,
+      "startingMoney": 2000,
+      "endingMoney": 2000,
+      "endingHealth": 70.75000000000014,
+      "endingBody": 51.49999999999993,
+      "endingMood": 61.49999999999993,
+      "sawProduction": true,
+      "sawOpening": true,
+      "sawRepeat": true,
+      "sawExit": false,
+      "sawStreaming": false,
+      "crashRetried": true,
+      "reloads": 4,
+      "checkpoints": [
+        {
+          "week": 1528,
+          "opening": false,
+          "repeat": false,
+          "exit": false,
+          "streaming": false
+        },
+        {
+          "week": 1538,
+          "opening": true,
+          "repeat": false,
+          "exit": false,
+          "streaming": false
+        },
+        {
+          "week": 1539,
+          "opening": false,
+          "repeat": true,
+          "exit": false,
+          "streaming": false
+        },
+        {
+          "week": 1541,
+          "opening": false,
+          "repeat": false,
+          "exit": false,
+          "streaming": false
+        }
+      ],
+      "saveBytes": 11836951,
+      "retainedCinemaWeeks": 26,
+      "actionsByType": {},
+      "retainedTitleCount": 1
+    },
+    {
+      "name": "offered-universe",
+      "ordinaryTitleIds": [],
+      "campaigns": [],
+      "evidence": "AUTHORED_EXISTING_SAVE",
+      "horizonWeeks": 26,
+      "weeks": 26,
+      "startingMoney": 2000,
+      "endingMoney": 2000,
+      "endingHealth": 70.75000000000014,
+      "endingBody": 51.49999999999993,
+      "endingMood": 61.49999999999993,
+      "sawProduction": false,
+      "sawOpening": true,
+      "sawRepeat": true,
+      "sawExit": false,
+      "sawStreaming": false,
+      "crashRetried": true,
+      "reloads": 3,
+      "checkpoints": [
+        {
+          "week": 1528,
+          "opening": true,
+          "repeat": false,
+          "exit": false,
+          "streaming": false
+        },
+        {
+          "week": 1529,
+          "opening": false,
+          "repeat": true,
+          "exit": false,
+          "streaming": false
+        },
+        {
+          "week": 1541,
+          "opening": false,
+          "repeat": false,
+          "exit": false,
+          "streaming": false
+        }
+      ],
+      "saveBytes": 11998965,
+      "retainedCinemaWeeks": 26,
+      "actionsByType": {},
+      "retainedTitleCount": 1
+    },
+    {
+      "name": "legacy-active",
+      "ordinaryTitleIds": [],
+      "campaigns": [],
+      "evidence": "AUTHORED_EXISTING_SAVE",
+      "horizonWeeks": 26,
+      "weeks": 26,
+      "startingMoney": 2000,
+      "endingMoney": 10057,
+      "endingHealth": 70.75000000000014,
+      "endingBody": 51.49999999999993,
+      "endingMood": 61.49999999999993,
+      "sawProduction": false,
+      "sawOpening": true,
+      "sawRepeat": true,
+      "sawExit": true,
+      "sawStreaming": true,
+      "crashRetried": true,
+      "reloads": 3,
+      "checkpoints": [
+        {
+          "week": 1528,
+          "opening": true,
+          "repeat": true,
+          "exit": false,
+          "streaming": false
+        },
+        {
+          "week": 1541,
+          "opening": false,
+          "repeat": false,
+          "exit": false,
+          "streaming": false
+        },
+        {
+          "week": 1546,
+          "opening": false,
+          "repeat": false,
+          "exit": true,
+          "streaming": true
+        }
+      ],
+      "saveBytes": 11386678,
+      "retainedCinemaWeeks": 26,
+      "actionsByType": {},
+      "retainedTitleCount": 1
+    },
+    {
+      "name": "late-handoff",
+      "ordinaryTitleIds": [],
+      "campaigns": [],
+      "evidence": "AUTHORED_EXISTING_SAVE",
+      "horizonWeeks": 26,
+      "weeks": 26,
+      "startingMoney": 2000,
+      "endingMoney": 2000,
+      "endingHealth": 70.75000000000014,
+      "endingBody": 51.49999999999993,
+      "endingMood": 61.49999999999993,
+      "sawProduction": false,
+      "sawOpening": false,
+      "sawRepeat": false,
+      "sawExit": true,
+      "sawStreaming": true,
+      "crashRetried": true,
+      "reloads": 3,
+      "checkpoints": [
+        {
+          "week": 1528,
+          "opening": false,
+          "repeat": false,
+          "exit": false,
+          "streaming": false
+        },
+        {
+          "week": 1529,
+          "opening": false,
+          "repeat": false,
+          "exit": true,
+          "streaming": true
+        },
+        {
+          "week": 1541,
+          "opening": false,
+          "repeat": false,
+          "exit": false,
+          "streaming": false
+        }
+      ],
+      "saveBytes": 11119080,
+      "retainedCinemaWeeks": 26,
+      "actionsByType": {},
+      "retainedTitleCount": 1
+    },
+    {
+      "name": "ordinary-starter",
+      "ordinaryTitleIds": [
+        "aud_active_1800000000710_0.5484461120795459",
+        "aud_active_1800000001220_0.5059728594496846"
+      ],
+      "starterStyle": "sustainable",
+      "campaigns": [],
+      "evidence": "INITIAL_PLAYER $2000; current jobs fund catalogue genre training and wellbeing; current audition applications spend 25 energy and pass the real shortlist; 20-energy practice with actual job overwork; Career organic promotion; studio controls its cash marketing; no grants or casting override",
+      "horizonWeeks": 164,
+      "weeks": 115,
+      "startingMoney": 2000,
+      "endingMoney": 43890,
+      "endingHealth": 74.34999999999897,
+      "endingBody": 60.30000000000014,
+      "endingMood": 64.70000000000051,
+      "sawProduction": true,
+      "sawOpening": true,
+      "sawRepeat": false,
+      "sawExit": false,
+      "sawStreaming": false,
+      "crashRetried": true,
+      "reloads": 10,
+      "checkpoints": [
+        {
+          "week": 729,
+          "opening": false,
+          "repeat": false,
+          "exit": false,
+          "streaming": false
+        },
+        {
+          "week": 742,
+          "opening": false,
+          "repeat": false,
+          "exit": false,
+          "streaming": false
+        },
+        {
+          "week": 755,
+          "opening": false,
+          "repeat": false,
+          "exit": false,
+          "streaming": false
+        },
+        {
+          "week": 768,
+          "opening": false,
+          "repeat": false,
+          "exit": false,
+          "streaming": false
+        },
+        {
+          "week": 781,
+          "opening": false,
+          "repeat": false,
+          "exit": false,
+          "streaming": false
+        },
+        {
+          "week": 794,
+          "opening": false,
+          "repeat": false,
+          "exit": false,
+          "streaming": false
+        },
+        {
+          "week": 807,
+          "opening": false,
+          "repeat": false,
+          "exit": false,
+          "streaming": false
+        },
+        {
+          "week": 820,
+          "opening": false,
+          "repeat": false,
+          "exit": false,
+          "streaming": false
+        },
+        {
+          "week": 833,
+          "opening": false,
+          "repeat": false,
+          "exit": false,
+          "streaming": false
+        },
+        {
+          "week": 843,
+          "opening": true,
+          "repeat": false,
+          "exit": false,
+          "streaming": false
+        }
+      ],
+      "saveBytes": 60229593,
+      "retainedCinemaWeeks": 52,
+      "actionsByType": {
+        "Train DRAMA": 119,
+        "Accept current job: Tutor": 2,
+        "Life choice: life.event.early.workshop.attend.label": 1,
+        "Morning Jog": 66,
+        "Life choice: life.event.early.sideHustle.auditions.label": 1,
+        "Apply current audition: Red Heart": 1,
+        "Audition rehearsal": 38,
+        "Accept current job: Ride Share Driver": 1,
+        "Meditation": 6,
+        "Apply current audition: Neon Heart": 1,
+        "Production rehearsal": 36,
+        "Production choice: production.crisis.copyrightClaim.pay.label": 1,
+        "Career Instagram promotion": 12
+      },
+      "retainedTitleCount": 43
+    }
+  ],
+  "limits": [
+    "Ordinary career action policy is deterministic and conditional, not a guaranteed timeline",
+    "Prepared existing-save cases are authored fixtures, not newcomer proof",
+    "Headless engine actions use the real production/money/save pipeline; separate full App taps verify UI wiring"
+  ]
+}

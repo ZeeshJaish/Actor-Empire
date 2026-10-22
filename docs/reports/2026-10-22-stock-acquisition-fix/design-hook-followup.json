@@ -1,0 +1,60 @@
+{
+  "productionCodeChanged": false,
+  "newRegressionsAttributed": 0,
+  "exceptions": 2,
+  "standingExistingFindings": 5,
+  "findings": [
+    {
+      "rule": "side-tab",
+      "snippet": "border-left:4px solid #8f1524",
+      "presentInHead": true,
+      "presentInCurrent": true,
+      "disposition": "standing; existing press-card accent; no redesign authorized"
+    },
+    {
+      "rule": "bounce-easing",
+      "snippet": "cubic-bezier(.3,1.4,.4,1)",
+      "presentInHead": true,
+      "presentInCurrent": true,
+      "disposition": "standing; existing gauge motion"
+    },
+    {
+      "rule": "bounce-easing",
+      "snippet": "cubic-bezier(.2,1.6,.3,1)",
+      "presentInHead": true,
+      "presentInCurrent": true,
+      "disposition": "file/value exception; literal stamp impact"
+    },
+    {
+      "rule": "bounce-easing",
+      "snippet": "cubic-bezier(.3,1.2,.4,1)",
+      "presentInHead": true,
+      "presentInCurrent": true,
+      "disposition": "standing; existing envelope motion"
+    },
+    {
+      "rule": "bounce-easing",
+      "snippet": "cubic-bezier(.2,1.8,.3,1)",
+      "presentInHead": true,
+      "presentInCurrent": true,
+      "disposition": "file/value exception; literal seal impact"
+    },
+    {
+      "rule": "bounce-easing",
+      "snippet": "cubic-bezier(.2,1.4,.4,1)",
+      "presentInHead": true,
+      "presentInCurrent": true,
+      "disposition": "standing; existing feed-card motion"
+    },
+    {
+      "rule": "layout-transition",
+      "snippet": "transition:width .6s cubic-bezier(.3,1,.4,1)",
+      "presentInHead": true,
+      "presentInCurrent": true,
+      "disposition": "standing; existing signing progress-meter width animation"
+    }
+  ],
+  "scope": "Design-hook triage only; later authorized acquisition logic changes are documented in route-recheck.",
+  "styleMatchesHead": true,
+  "currentStyleSha256": "a89de30d41791d147fce2081f5a56258f0051464037842e563e8d7ab8dd0188e"
+}

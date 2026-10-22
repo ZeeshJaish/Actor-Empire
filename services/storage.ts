@@ -6,6 +6,7 @@ import { waitForIndexedDbOpen, waitForIndexedDbTransaction } from './indexedDbRe
 import {
   loadVerifiedGameData as loadVerifiedGeneration,
   recoverPreviousGameData as recoverPreviousGeneration,
+  peekVerifiedPreviousGameData as peekPreviousGeneration,
   saveVerifiedGameData as saveVerifiedGeneration,
   stageVerifiedGameDataBatch as stageVerifiedGenerationBatch,
   promoteStagedGameDataBatch as promoteStagedGenerationBatch,
@@ -137,6 +138,21 @@ const readGameRecord = async (key: string): Promise<unknown | null> => {
     const request = transaction.objectStore(STORE_NAME).get(key);
     await waitForIndexedDbTransaction(transaction, { operation: `read save record ${key}` });
     return request.result ?? null;
+  } finally {
+    db.close();
+  }
+};
+
+/** Player and integrity must belong to the same committed generation. Separate
+ * transactions can straddle an autosave promotion and falsely report damage. */
+const readGameRecords = async (keys: readonly string[]): Promise<Array<unknown | null>> => {
+  const db = await openDB();
+  try {
+    const transaction = db.transaction(STORE_NAME, 'readonly');
+    const store = transaction.objectStore(STORE_NAME);
+    const requests = keys.map(key => store.get(key));
+    await waitForIndexedDbTransaction(transaction, { operation: 'read verified save snapshot' });
+    return requests.map(request => request.result ?? null);
   } finally {
     db.close();
   }
@@ -301,6 +317,7 @@ const promoteIndexedDbGenerationBatch = async ({ keys }: PromoteSaveGenerationBa
 
 const indexedDbGenerationStore: SaveGenerationStore = {
   read: readGameRecord,
+  readMany: readGameRecords,
   write: writeGameRecord,
   remove: removeGameRecord,
   promoteGeneration: promoteIndexedDbGeneration,
@@ -317,6 +334,10 @@ export const saveVerifiedGameData = async (
 
 export const loadVerifiedGameData = async (key: string): Promise<VerifiedGameLoad> => (
   loadVerifiedGeneration(indexedDbGenerationStore, key)
+);
+
+export const peekVerifiedPreviousGameData = async (key: string): Promise<Player | null> => (
+  peekPreviousGeneration(indexedDbGenerationStore, key)
 );
 
 export const recoverPreviousGameData = async (key: string): Promise<Player> => (

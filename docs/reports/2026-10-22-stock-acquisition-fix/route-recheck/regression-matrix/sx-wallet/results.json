@@ -1,0 +1,109 @@
+{
+  "kind": "PRODUCTION_COMPONENTS_REAL_WEEK_AND_VERIFIED_INDEXEDDB",
+  "studio": "PARAMOUNT",
+  "scenario": "sxWallet",
+  "percent": 51,
+  "steps": [
+    {
+      "label": "loaded synthetic fixture through real migration",
+      "money": 1.06e+22,
+      "age": 35,
+      "week": 8,
+      "energy": 100,
+      "holdings": [],
+      "businesses": [],
+      "debt": {
+        "entries": [],
+        "totalOriginalPrincipal": 0,
+        "totalRemainingPrincipal": 0,
+        "weeklyInterestDue": 0,
+        "weightedAverageRate": 0,
+        "pressureScore": 0,
+        "highestRate": 0,
+        "nextServiceLabel": "No service due"
+      },
+      "reminders": [],
+      "history": [],
+      "stock": {
+        "id": "stk_para",
+        "symbol": "PARA",
+        "name": "Paramount Global",
+        "sector": "MEDIA",
+        "price": 13,
+        "outstandingShares": 650000000,
+        "publicFloatPercent": 88,
+        "volatility": 0.06,
+        "dividendYield": 0.03,
+        "relatedStudioId": "PARAMOUNT",
+        "priceHistory": [
+          13.22,
+          13.25,
+          13,
+          13.08,
+          12.82,
+          13.02,
+          13.29,
+          13.26,
+          13.37,
+          13.1,
+          13.4,
+          12.8
+        ],
+        "lastDividendPayoutWeek": 0
+      },
+      "loadStatus": "MISSING"
+    },
+    {
+      "label": "SX purchase rejected atomically",
+      "money": 1.06e+22,
+      "age": 35,
+      "week": 8,
+      "energy": 100,
+      "holdings": [],
+      "businesses": [],
+      "debt": {
+        "entries": [],
+        "totalOriginalPrincipal": 0,
+        "totalRemainingPrincipal": 0,
+        "weeklyInterestDue": 0,
+        "weightedAverageRate": 0,
+        "pressureScore": 0,
+        "highestRate": 0,
+        "nextServiceLabel": "No service due"
+      },
+      "reminders": [],
+      "history": [],
+      "stock": {
+        "id": "stk_para",
+        "symbol": "PARA",
+        "name": "Paramount Global",
+        "sector": "MEDIA",
+        "price": 13,
+        "outstandingShares": 650000000,
+        "publicFloatPercent": 88,
+        "volatility": 0.06,
+        "dividendYield": 0.03,
+        "relatedStudioId": "PARAMOUNT",
+        "priceHistory": [
+          13.22,
+          13.25,
+          13,
+          13.08,
+          12.82,
+          13.02,
+          13.29,
+          13.26,
+          13.37,
+          13.1,
+          13.4,
+          12.8
+        ],
+        "lastDividendPayoutWeek": 0
+      },
+      "loadStatus": "MISSING"
+    }
+  ],
+  "console": [],
+  "status": "PASSED",
+  "errors": []
+}

@@ -1,0 +1,21 @@
+FAIL private minority signing quote matches the actual equity-only closing Expected values to be strictly equal:
+
+5500000000 !== 0
+
+PASS public tender may explicitly quote the full 50 percent control block
+PASS 50 percent shareholder influence matches actual control eligibility
+PASS exactly 50 percent actual shares unlocks manual stock control
+PASS 49.99 percent does not unlock control
+PASS paid diligence financial terms survive public signing unchanged
+PASS repeat acquisition cannot create duplicate businesses or liabilities
+file:///private/tmp/ae-control-tests/audit-public-control-resume.js:73320
+if (failed) throw Error(`${failed}/${cases.length} public control regressions failed`);
+                  ^
+
+Error: 1/7 public control regressions failed
+    at file:///private/tmp/ae-control-tests/audit-public-control-resume.js:73320:19
+    at ModuleJob.run (node:internal/modules/esm/module_job:377:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:671:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+
+Node.js v24.11.1

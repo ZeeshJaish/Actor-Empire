@@ -5,7 +5,8 @@ import { allocateCinemaResources, apportionCinemaIntegers, cinemaCount, cinemaKe
 import { CINEMA_AUDIENCE_PROFILE, CINEMA_MARKET_TUNING_VERSION, CINEMA_SUPPLY_PROFILE as P } from './boxOfficeProfiles';
 import { splitRealizedCinemaGross } from './boxOfficeSettlement';
 import { quoteCinemaSupply } from './boxOfficeSupply';
-import type { CinemaAdmissionAllocation, CinemaSupplyPool, CinemaWeekInput, CinemaWeekResult } from './boxOfficeTypes';
+import { planCinemaBookings, cinemaOperatingCostPerShow } from './boxOfficeBooking';
+import type { CinemaAdmissionAllocation, CinemaWeekInput, CinemaWeekResult } from './boxOfficeTypes';
 
 const group = <T>(rows:readonly T[],key:(r:T)=>string):Map<string,T[]> => {
     const result=new Map<string,T[]>();for(const row of rows){const id=key(row);const list=result.get(id)||[];list.push(row);result.set(id,list)}return result;
@@ -32,39 +33,17 @@ const validate = (input:CinemaWeekInput):void => {
             if(m.eligiblePeople>c.people) throw new RangeError('Cinema eligibility exceeds cohort');
         }
     }
+    const cohortIndex=new Map(input.cohorts.map(c=>[c.id,c]));
     for(const t of input.marketState?.titles || []) {
         unique(t.cells.map(c=>c.cohortId),'state cohort');
         for(const c of t.cells) {
             cinemaCount(c.awarePeople,'aware people');cinemaCount(c.discoveryContactsUsed || 0,'discovery contacts');
             const seen=cinemaSum(c.seenBands.map(b=>cinemaCount(b.people,'seen people')));
-            const cohort=input.cohorts.find(r=>r.id===c.cohortId);
+            const cohort=cohortIndex.get(c.cohortId);
             if(cohort && (c.awarePeople>cohort.people || seen>c.awarePeople)) throw new RangeError('Cinema seen/aware population inconsistent');
             for(const b of c.seenBands) {cinemaCount(b.repeatAdmissions,'repeat history');if(!Number.isFinite(b.satisfaction)||b.satisfaction<0||b.satisfaction>100)throw new RangeError('Invalid cinema satisfaction')}
         }
     }
-};
-
-/** Pack aggregate planned shows into real screen-days, preserving turnaround and daily closing. */
-const packShows = (pool:CinemaSupplyPool,desired:readonly {id:string;wanted:number;minutes:number}[],seed:number,week:number):Map<string,number> => {
-    const fair=allocateCinemaResources(desired.map(r=>({...r,units:[r.minutes]})),[pool.weeklyScreenMinutes],seed,week);
-    const bins=new Map<number,number>();
-    const full=Math.floor(pool.weeklyScreenMinutes/P.openingMinutesPerDay),partial=pool.weeklyScreenMinutes%P.openingMinutesPerDay;
-    if(full) bins.set(P.openingMinutesPerDay,full);if(partial) bins.set(partial,1);
-    const packed=new Map(desired.map(r=>[r.id,0]));
-    const add=(minutes:number,count:number)=>{if(count>0 && minutes>0)bins.set(minutes,(bins.get(minutes)||0)+count)};
-    const order=[...desired].sort((a,b)=>b.minutes-a.minutes || cinemaKey(seed,week,a.id)-cinemaKey(seed,week,b.id)||a.id.localeCompare(b.id));
-    for(const row of order) {
-        let left=fair.get(row.id) || 0;
-        for(const [minutes,count] of [...bins].sort(([a],[b])=>a-b)) {
-            if(!left)break;const perBin=Math.floor(minutes/row.minutes);if(!perBin)continue;
-            const fullBins=Math.min(count,Math.floor(left/perBin));
-            let touched=fullBins,used=fullBins*perBin;
-            if(count>fullBins && left-used>0){const part=Math.min(perBin,left-used);touched++;used+=part;add(minutes-part*row.minutes,1)}
-            bins.set(minutes,(bins.get(minutes)||0)-touched);add(minutes-perBin*row.minutes,fullBins);
-            left-=used;packed.set(row.id,packed.get(row.id)!+used);
-        }
-    }
-    return packed;
 };
 
 /** Population changes update current modeled segments, never immutable historical financial facts. */
@@ -93,7 +72,8 @@ const reconcilePopulation = (input:CinemaWeekInput):CinemaWeekInput => {
     return {...input,marketState:state};
 };
 const fingerprint = (value:unknown):string => {
-    const canonical=(v:unknown):unknown=>Array.isArray(v)?v.map(canonical).sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)))
+    const canonical=(v:unknown):unknown=>Array.isArray(v)?v.map(canonical).map(value=>({value,key:JSON.stringify(value)}))
+        .sort((a,b)=>a.value===undefined?(b.value===undefined?0:1):b.value===undefined?-1:a.key!.localeCompare(b.key!)).map(row=>row.value)
         : v && typeof v==='object'?Object.fromEntries(Object.entries(v).sort(([a],[b])=>a.localeCompare(b)).map(([k,x])=>[k,canonical(x)])):v;
     return `cinema-shadow-v1:${cinemaKey(0,0,JSON.stringify(canonical(value))).toString(16)}`;
 };
@@ -105,7 +85,7 @@ export const simulateCinemaWeek = (input:CinemaWeekInput):CinemaWeekResult => {
     const supply=input.supply ? structuredClone(input.supply) : quoteCinemaSupply(input);
     unique(supply.pools.map(p=>p.id),'supply pool');unique(supply.offers.map(o=>`${o.titleId}:${o.poolId}`),'supply offer');
     for(const p of supply.pools) {
-        [p.screens,p.seatsPerShow,p.weeklyScreenMinutes,p.ticketPriceCents,p.bookingCentsPerShow].forEach(n=>cinemaCount(n,'supply resource'));
+        [p.screens,p.seatsPerShow,p.weeklyScreenMinutes,p.ticketPriceCents,p.bookingCentsPerShow,...(p.operatingCentsPerShow===undefined?[]:[p.operatingCentsPerShow])].forEach(n=>cinemaCount(n,'supply resource'));
         if(!p.seatsPerShow || !p.ticketPriceCents || p.weeklyScreenMinutes>p.screens*P.daysPerWeek*P.openingMinutesPerDay)throw new RangeError('Invalid cinema physical/price supply');
         splitRealizedCinemaGross({grossCents:0,exhibitorBasisPoints:p.exhibitorBasisPoints,distributionBasisPoints:p.distributionBasisPoints});
     }
@@ -113,6 +93,7 @@ export const simulateCinemaWeek = (input:CinemaWeekInput):CinemaWeekResult => {
     const exhibition:NonNullable<CinemaWeekResult['exhibition']>=[];
     const titleIndex=new Map(input.titles.map(t=>[t.id,t])),poolIndex=new Map(supply.pools.map(p=>[p.id,p]));
     const inputCohortIndex=new Map(input.cohorts.map(c=>[c.id,c]));
+    const inputCohortsByCountry=group(input.cohorts,c=>c.countryId);
     for(const o of supply.offers)if(!titleIndex.has(o.titleId)||!poolIndex.has(o.poolId))throw new Error('Unknown cinema offer identity');
     supply.offers=supply.offers.filter(o=>{
         const t=titleIndex.get(o.titleId)!,pool=poolIndex.get(o.poolId)!;
@@ -146,9 +127,9 @@ export const simulateCinemaWeek = (input:CinemaWeekInput):CinemaWeekResult => {
             const title=titleIndex.get(id)!;
             const demand=cinemaSum(candidates.filter(r=>r.titleId===id).map(r=>wanted.get(r.id)||0));
             const grace=input.absoluteWeek-title.market!.releaseWeek<P.discoveryGraceWeeks;
-            return {id,wanted:Math.max(grace?1:0,Math.ceil(demand/pool.seatsPerShow)),minutes:title.market!.runtimeMinutes+P.turnaroundMinutes};
+            return {id,demand,discovery:grace,prior:runs.find(r=>r.titleId===id&&r.poolId===pool.id),minutes:title.market!.runtimeMinutes+P.turnaroundMinutes};
         });
-        const shows=packShows(pool,desired,input.seed,input.absoluteWeek);
+        const booking=planCinemaBookings(pool,desired,input.seed,input.absoluteWeek),shows=booking.shows;
         const localCohorts=countryCohorts.filter(c=>candidatesByCohort.has(c.cohortId));
         const limits=[...localCohorts.flatMap(c=>[c.walletCents-c.spentCents,c.leisureMinutes-c.usedMinutes]),...titleIds.map(id=>(shows.get(id)||0)*pool.seatsPerShow)];
         const joint=allocateCinemaResources(candidates.map(r=>({id:r.id,wanted:r.remaining,units:[
@@ -171,8 +152,11 @@ export const simulateCinemaWeek = (input:CinemaWeekInput):CinemaWeekResult => {
             const prior=runs.find(r=>r.titleId===titleId && r.poolId===pool.id);
             const releaseAge=input.absoluteWeek-titleIndex.get(titleId)!.market!.releaseWeek;
             const hadDemand=rows.some(r=>(wanted.get(r.id)||0)>0);
-            const quietWeeks=showCount===0 && hadDemand ? prior?.quietWeeks || 0 : sold<pool.seatsPerShow*.1?(prior?.quietWeeks || 0)+1:0;
-            const run={titleId,poolId:pool.id,quietWeeks,closed:releaseAge>=P.discoveryGraceWeeks && quietWeeks>=P.quietWeeksBeforeExit};
+            const capacityDenied=showCount===0&&hadDemand&&(booking.requested.get(titleId)||0)>0;
+            const contribution=sold*pool.ticketPriceCents*pool.exhibitorBasisPoints/10_000-showCount*cinemaOperatingCostPerShow(pool);
+            const viable=showCount>0&&contribution>0&&sold/(showCount*pool.seatsPerShow)>=P.minimumOccupancy;
+            const quietWeeks=capacityDenied ? prior?.quietWeeks || 0 : viable?0:(prior?.quietWeeks || 0)+1;
+            const run={titleId,poolId:pool.id,quietWeeks,lastBookedWeek:input.absoluteWeek,lastShows:showCount,lastAdmissions:sold,closed:!capacityDenied && releaseAge>=P.discoveryGraceWeeks && quietWeeks>=P.quietWeeksBeforeExit};
             if(prior)Object.assign(prior,run);else runs.push(run);
             // A selected new market pays a launch booking even when nobody buys; subsequent costs follow actual shows.
             const cost=cinemaCount((showCount+(!prior?1:0))*pool.bookingCentsPerShow,'booking cost');
@@ -237,8 +221,8 @@ export const simulateCinemaWeek = (input:CinemaWeekInput):CinemaWeekResult => {
     for(const title of titles){
         const cells=snapshot.titles.find(t=>t.titleId===title.titleId)!.cells;
         const choices=snapshot.choices.filter(c=>c.titleId===title.titleId&&c.kind==='FIRST');
-        const countries=[...new Set(input.cohorts.map(c=>c.countryId))].sort().map(countryId=>{
-            const ids=new Set(input.cohorts.filter(c=>c.countryId===countryId).map(c=>c.id));
+        const countries=[...inputCohortsByCountry.keys()].sort().map(countryId=>{
+            const ids=new Set(inputCohortsByCountry.get(countryId)!.map(c=>c.id));
             const local=cells.filter(c=>ids.has(c.cohortId));
             return {countryId,awarePeople:cinemaSum(local.map(c=>c.awarePeople)),deferredPeople:cinemaSum(local.map(c=>c.deferredPeople))};
         }).filter(c=>c.awarePeople>0||c.deferredPeople>0);

@@ -1,0 +1,8 @@
+PASS live pricing: explicit save, default guard, no duplicate debit, immutable signed history and reload
+PASS storefront: unlocked save, research refusal, reload and no treasury/rights changes
+PASS retained ident service: exactly-once package charge and insufficient-cash refusal
+PASS price change then network revision: exact rehearsal, quoted debit, pending construction, duplicate/cash refusal
+PASS market filing: exact debit, energy/cash refusal, duplicate payment prevention and signed launch preservation
+PASS staged Offer rendering has no save/forecast side effects; sharing preview uses settled policy
+PASS 5,000-title rights and paid localization records survive normalization
+{"passed":7,"failed":0,"externalFixture":true}

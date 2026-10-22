@@ -1,6 +1,13 @@
 import type { CampaignFitSnapshot, CampaignForecastSnapshot, CampaignPositioning, CampaignRiskLevel, CampaignTimeline, Genre, MarketingChannelAllocations, MarketingChannelId, ProjectDetails, ProjectHiddenStats } from '../types';
 import { calculateProjectMusicImpact } from './musicIndustry';
 
+export const getMarketingAllocationStep = (budget: number): number => {
+    const available = Number.isFinite(budget) ? Math.max(0, budget) : 0;
+    const standard = Math.max(50_000, Math.round(Math.max(available * 0.1, 250_000) / 50_000) * 50_000);
+    // Small reserves need useful channel choices too; a zero pool still has a disabled + button.
+    return Math.min(standard, Math.max(1, Math.floor(available / 10)));
+};
+
 type CampaignPositioningOption = {
     id: CampaignPositioning;
     label: string;

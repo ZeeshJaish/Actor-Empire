@@ -1,0 +1,74 @@
+{
+  "kind": "FULL_APP_STRICTMODE_VERIFIED_INDEXEDDB",
+  "steps": [
+    "Fresh create, wellbeing, current job, current audition, quit, verified reload",
+    "Earned post-production save, real 10E publicity, cast portability, actual paid opening",
+    "Owned studio actual footprint, forecast, small campaign, one reserve settlement, release, finances, IMDb 320px"
+  ],
+  "freshWellbeing": {
+    "cash": 1850,
+    "energy": 75
+  },
+  "freshEnergy": {
+    "job": "Ride Share Driver",
+    "reserved": 15,
+    "afterHire": 60,
+    "afterApplication": 35,
+    "afterQuit": 50,
+    "reloadUnchanged": true
+  },
+  "actorPromotion": {
+    "before": 65,
+    "after": 55
+  },
+  "actorCast": [
+    {
+      "personId": "npc_rnd_3_1800000000003",
+      "name": "Vera Cross",
+      "roleType": "SUPPORTING",
+      "roleWeight": 0.65,
+      "fame": 1.929212394170463,
+      "stature": 0,
+      "isPlayer": false,
+      "characterIds": []
+    },
+    {
+      "personId": "PLAYER_SELF",
+      "name": "Phase 6 ordinary-starter",
+      "roleType": "MINOR",
+      "roleWeight": 0.1,
+      "fame": 0,
+      "stature": 0,
+      "isPlayer": true,
+      "characterIds": []
+    }
+  ],
+  "actorOpening": {
+    "age": 17,
+    "week": 12,
+    "money": 43890,
+    "gross": 17864.97,
+    "receipts": 9468.66
+  },
+  "footprintForecast": "Cinema audience forecast\nRefresh forecast\n\nCurrent audience, country prices and competing films. Before Greenlight, campaign spend is only a plan. Future competition and delivery may change.\n\nAttention potential\n80/100\nMarket awareness\n179,159,335\nTheater intent\n628,737–850,956\nOpening paid visits\n628,737–850,956\nOpening public gross\n$7.2M–$9.7M\nProducer receipts\n$3.4M–$4.7M\nOpening booking costs\n$457k–$610k\nAutomatic ticket prices\n$8–$16\nCost recovery visits\n188,777\n\nAvailable screens do not guarantee visits. Cost recovery uses estimated receipts per visit, production, planned campaign and opening booking; later costs can increase it. This is not a lifetime payout.\n\nAwareness by country",
+  "finalForecast": "Cinema audience forecast\nRefresh forecast\n\nCurrent audience, country prices and competing films. Before Greenlight, campaign spend is only a plan. Future competition and delivery may change.\n\nAttention potential\n80/100\nMarket awareness\n180,602,504\nTheater intent\n633,800–857,824\nOpening paid visits\n633,800–857,824\nOpening public gross\n$7.2M–$9.8M\nProducer receipts\n$3.5M–$4.7M\nOpening booking costs\n$461k–$613k\nAutomatic ticket prices\n$8–$16\nCost recovery visits\n198,698\n\nAvailable screens do not guarantee visits. Cost recovery uses estimated receipts per visit, production, planned campaign and opening booking; later costs can increase it. This is not a lifetime payout.\n\nAwareness by country",
+  "ownerOpening": {
+    "age": 30,
+    "week": 24,
+    "money": 2000,
+    "balance": 5876952.99,
+    "gross": 8477541.93,
+    "receipts": 4066909.91,
+    "campaignSpent": 50000,
+    "unusedReserveReturned": 50000,
+    "reloadUnchanged": true
+  },
+  "finance": "Project financial report\nPublic theatrical gross\n$8.5M\nTheatrical producer receipts\n$4.1M\nCollected producer receipts, all media\n$4.1M\nProduction and paid release costs\n$1.1M\nInvestor payouts\n$0\nTalent backend paid\n$0\nNet studio receipts\n$4.1M\nProject profit after costs\n$3.0M\n\nSigned actor backend paid since tracking began: $0\n\nTotal actor earnings are not recorded on this release.\n\nPublic gross includes the cinema share. Actor pay is reported separately; upfront pay is already in production cost.",
+  "imdb": "Cinema audience insights\n\n743,866 first visits · 0 paid repeat visits\n\nModeled paid visits; waiting interest is not a guaranteed stream.\n\nProven theater attendance\nUnconverted audience interest",
+  "viewport": {
+    "width": 320,
+    "scroll": 320
+  },
+  "status": "PASSED",
+  "errors": []
+}

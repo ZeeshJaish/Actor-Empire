@@ -1,0 +1,30 @@
+[
+  {
+    "path": "services/studioAcquisition.ts",
+    "sha256": "45e5d6f136b09139e0c5393256f7fbbcb704cf65d434a6826434bb563a3f2b75"
+  },
+  {
+    "path": "views/mobile/components/ForbesStudioProfile.tsx",
+    "sha256": "9a2fc48317680556e20bdf51a3cf50542e636ef6a707e43c7832a1caf8070c57"
+  },
+  {
+    "path": "views/mobile/components/StudioAcquisitionDesk.tsx",
+    "sha256": "3f48d67aada9870c6d5dbe636f57c2c015e0d0dbe0eef08823981134311f1cf2"
+  },
+  {
+    "path": "views/mobile/components/StudioAcquisitionDealRoom.tsx",
+    "sha256": "246905f2d6777193d4a2ae40fc7e1fa6d804f479dc89277e4e24d5021d7ed1b2"
+  },
+  {
+    "path": "views/mobile/ForbesApp.tsx",
+    "sha256": "36e1e4db63f7a44edeaf6b48f9bbb4eed6690006f7befa6abe4eb46c12b8f518"
+  },
+  {
+    "path": "views/mobile/MobilePage.tsx",
+    "sha256": "0c11658ce799224644ab2b840eef96413fc94a1bfbd86029ca91719bb2915dda"
+  },
+  {
+    "path": "package.json",
+    "sha256": "a7f30078acfc288168b54aaffe1f6aaca7f7062c082d2f4ede8463381a5bfced"
+  }
+]

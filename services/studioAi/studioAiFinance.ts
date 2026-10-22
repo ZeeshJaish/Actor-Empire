@@ -6,6 +6,7 @@ import type {
 } from '../../types';
 import { createDeterministicId } from '../deterministicRandom';
 import { getLegacyStudioValuationFloor } from '../studioEcosystem';
+import { boundListedStudioAppraisal } from '../stockValuation';
 import {
     attachNormalizedStudioAiState,
     STUDIO_AI_EVENT_LIMIT,
@@ -64,7 +65,7 @@ export const processStudioAiFinanceWeek = (
     absoluteWeek: number,
     input: StudioAiWeeklyFinanceInput = {},
 ): NPCStudioState => {
-    const normalized = attachNormalizedStudioAiState(studio, { absoluteWeek });
+    const normalized = attachNormalizedStudioAiState(boundListedStudioAppraisal(studio, studio.valuation, absoluteWeek), { absoluteWeek });
     const runtime = normalized.ai!;
     if (runtime.controller === 'PLAYER' || runtime.status === 'CLOSED' || runtime.status === 'SOLD_MERGED') return normalized;
     if (runtime.lastProcessedAbsoluteWeek >= absoluteWeek) return normalized;
@@ -123,9 +124,8 @@ export const processStudioAiFinanceWeek = (
     ));
 
     return {
-        ...normalized,
+        ...boundListedStudioAppraisal(normalized, valuation, absoluteWeek),
         cashReserve: cash,
-        valuation,
         ai: {
             ...runtime,
             status: nextStatus,

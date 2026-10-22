@@ -31,6 +31,7 @@ export const makeCalibrationFixture = (name:CalibrationCase,seed:number):CinemaW
  if(name==='overlapping-favorites')input.history=[...input.history!,...input.history!.map(h=>({...h,id:h.id+'duplicate'}))];
  if(name==='continuity-fatigue')input.history=Array.from({length:5},(_,i)=>input.history!.map(h=>({...h,id:h.id+':'+i,titleId:'precursor-'+i,absoluteWeek:94+i}))).flat();
  if(['short-streaming-window','no-streaming-deal'].includes(name)){if(name!=='no-streaming-deal')title.market!.streamingWindow={platformId:'streamer',countryIds:['US','GB'],absoluteWeek:name==='short-streaming-window'?101:112,publiclyKnown:true}}
+ if(name==='short-streaming-window')input.streamingAlternatives=input.cohorts.map(c=>({platformId:'streamer',countryId:c.countryId,cohortId:c.id,accessiblePeople:c.market!.eligiblePeople,catalogueStrength:80,serviceQuality:90,localization:90,freshness:80,preferredGenres:['ROMANCE'],evidenceWeek:99}));
  if(name==='streaming-catch-up'){event();prior();input.history=input.history!.map(h=>({...h,source:'STREAMING_ESTIMATE'}))}
  if(name==='high-price-low-income'){input.cohorts=input.cohorts.map(c=>({...c,market:{...c.market!,monthlyCinemaBudgetCents:Math.floor(c.market!.monthlyCinemaBudgetCents*.1)}}));input.countries=input.countries!.map(c=>({...c,purchasingPower:150,inflation:100}))}
  if(name==='recession')input.cohorts=input.cohorts.map(c=>({...c,market:{...c.market!,monthlyCinemaBudgetCents:Math.floor(c.market!.monthlyCinemaBudgetCents*.5)}}));

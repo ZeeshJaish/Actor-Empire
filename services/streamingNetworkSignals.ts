@@ -88,6 +88,12 @@ const statusSourceFor = (room: NetworkSignalSource, fibre: number): ReachSource 
     };
 };
 
+/** The reach source the signals read for one room, so a map can draw the
+    field the verdict was computed from (Platform room, Network page). */
+export const networkSignalSource = (room: NetworkSignalSource, fibreState?: StreamingFibreState | null): ReachSource | null => (
+    statusSourceFor(room, fibreMultiplier(fibreState))
+);
+
 /**
  * Read the player-facing geography signals from the same reach geometry used
  * by the network map. Capacity remains a separate operational signal: this

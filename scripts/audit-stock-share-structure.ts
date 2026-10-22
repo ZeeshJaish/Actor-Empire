@@ -1,3 +1,4 @@
+import { isStockSaveRecoveryError } from '../services/stockSaveCompatibility';
 import { INITIAL_PLAYER } from '../types';
 import {
     applyStockShareIssuance,
@@ -59,7 +60,8 @@ assert(
 );
 
 const corruptedOutstandingShares = 1e24;
-const repairedSave = migratePlayerSave({
+let corruptRecovery: unknown;
+try { migratePlayerSave({
     ...INITIAL_PLAYER,
     stocks: stocks.map(stock => stock.id === disney.id
         ? { ...stock, outstandingShares: corruptedOutstandingShares, price: 1e18, priceHistory: [1e18] }
@@ -70,12 +72,11 @@ const repairedSave = migratePlayerSave({
         averageCost: 1e18,
         totalInvested: 1e30,
     }],
-});
-const repairedDisney = repairedSave.stocks.find(stock => stock.id === disney.id)!;
-const repairedPosition = repairedSave.portfolio.find(position => position.stockId === disney.id)!;
-assert(repairedDisney.outstandingShares! <= getStockMaximumOutstandingShares(repairedDisney), 'Corrupt share counts should be repaired to the company maximum.');
-assert(repairedDisney.price <= getStockPriceCeiling(repairedDisney), 'Corrupt prices should be repaired during save migration.');
-assert(Math.abs((repairedPosition.shares / repairedDisney.outstandingShares!) - 0.1) < 0.001, 'Repair should preserve the player ownership percentage.');
+}); } catch (error) { corruptRecovery = error; }
+assert(isStockSaveRecoveryError(corruptRecovery), 'Unsafe legacy supply must request recoverable review rather than silently reissue holdings.');
+if (isStockSaveRecoveryError(corruptRecovery)) {
+    assert((corruptRecovery.rawStockState.portfolio as any[])[0].shares === corruptedOutstandingShares * 0.1, 'Recovery evidence preserves original represented share units.');
+}
 
 const originalRandom = Math.random;
 let runawayStocks = stocks.map(stock => stock.id === disney.id

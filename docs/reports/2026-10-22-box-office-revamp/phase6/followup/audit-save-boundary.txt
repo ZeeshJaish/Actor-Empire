@@ -1,0 +1,1 @@
+PASS canonical 160-entry paid studio ledger survives verified compaction with identical cash and receipt IDs

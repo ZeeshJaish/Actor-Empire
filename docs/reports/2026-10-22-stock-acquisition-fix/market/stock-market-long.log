@@ -1,0 +1,170 @@
+PASS SX cash cannot buy a share with a no-op debit
+PASS SX corporate treasury cannot consume a share on an unrepresentable sale credit
+PASS unrepresentable historical basis cannot be silently consumed on a partial sale
+PASS contradictory corporate share rights cannot silently become a personal trade
+PASS large mixed holdings allocate receipts to the exact owners
+PASS integer proceeds still preserve each owner's exact cent entitlement
+PASS mixed dividend payment preserves the personal half dollar
+PASS zero historical basis remains zero through partial disposal
+PASS legacy zero average cost cannot become an invented basis on purchase
+PASS purchase preserves an existing unknown historical basis
+PASS partial disposal preserves unknown historical basis and settles cash
+PASS a new holding records only its actual purchase cost
+PASS same absolute week cannot reprice stock twice
+PASS an inherited future market clock cannot freeze the heir market
+PASS quarterly dividends continue across year boundaries without repeating a stale marker
+PASS settled dividends cannot be offered again after reload in the same week
+PASS old releases cannot keep moving stock decades later
+PASS a new hit can move price but project pressure is bounded
+PASS cent rounding does not exceed a company market capitalization ceiling
+PASS raw runaway stock values cannot leak through the market display selector
+PASS nonfinite money is unavailable rather than a fabricated quote
+Stock market safety audit passed (21 checks).
+{
+  "longRunScenarios": [
+    {
+      "years": 50,
+      "mode": "bull",
+      "seed": 17,
+      "stocks": 16,
+      "payouts": 216,
+      "minimum": 12.5,
+      "maximum": 1744.18
+    },
+    {
+      "years": 50,
+      "mode": "bull",
+      "seed": 491,
+      "stocks": 16,
+      "payouts": 216,
+      "minimum": 12.5,
+      "maximum": 1744.18
+    },
+    {
+      "years": 50,
+      "mode": "bear",
+      "seed": 17,
+      "stocks": 16,
+      "payouts": 216,
+      "minimum": 0.5,
+      "maximum": 837.79
+    },
+    {
+      "years": 50,
+      "mode": "bear",
+      "seed": 491,
+      "stocks": 16,
+      "payouts": 216,
+      "minimum": 0.5,
+      "maximum": 837.79
+    },
+    {
+      "years": 50,
+      "mode": "seeded",
+      "seed": 17,
+      "stocks": 16,
+      "payouts": 216,
+      "minimum": 9.87,
+      "maximum": 983.98
+    },
+    {
+      "years": 50,
+      "mode": "seeded",
+      "seed": 491,
+      "stocks": 16,
+      "payouts": 216,
+      "minimum": 9.31,
+      "maximum": 1081.04
+    },
+    {
+      "years": 50,
+      "mode": "stale-hit",
+      "seed": 17,
+      "stocks": 16,
+      "payouts": 216,
+      "minimum": 9.87,
+      "maximum": 983.98
+    },
+    {
+      "years": 50,
+      "mode": "stale-hit",
+      "seed": 491,
+      "stocks": 16,
+      "payouts": 216,
+      "minimum": 9.31,
+      "maximum": 1081.04
+    },
+    {
+      "years": 100,
+      "mode": "bull",
+      "seed": 17,
+      "stocks": 16,
+      "payouts": 433,
+      "minimum": 12.5,
+      "maximum": 1744.18
+    },
+    {
+      "years": 100,
+      "mode": "bull",
+      "seed": 491,
+      "stocks": 16,
+      "payouts": 433,
+      "minimum": 12.5,
+      "maximum": 1744.18
+    },
+    {
+      "years": 100,
+      "mode": "bear",
+      "seed": 17,
+      "stocks": 16,
+      "payouts": 433,
+      "minimum": 0.5,
+      "maximum": 837.79
+    },
+    {
+      "years": 100,
+      "mode": "bear",
+      "seed": 491,
+      "stocks": 16,
+      "payouts": 433,
+      "minimum": 0.5,
+      "maximum": 837.79
+    },
+    {
+      "years": 100,
+      "mode": "seeded",
+      "seed": 17,
+      "stocks": 16,
+      "payouts": 433,
+      "minimum": 8.89,
+      "maximum": 983.98
+    },
+    {
+      "years": 100,
+      "mode": "seeded",
+      "seed": 491,
+      "stocks": 16,
+      "payouts": 433,
+      "minimum": 8.1,
+      "maximum": 1081.04
+    },
+    {
+      "years": 100,
+      "mode": "stale-hit",
+      "seed": 17,
+      "stocks": 16,
+      "payouts": 433,
+      "minimum": 8.89,
+      "maximum": 983.98
+    },
+    {
+      "years": 100,
+      "mode": "stale-hit",
+      "seed": 491,
+      "stocks": 16,
+      "payouts": 433,
+      "minimum": 8.1,
+      "maximum": 1081.04
+    }
+  ]
+}

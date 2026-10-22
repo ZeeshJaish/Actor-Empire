@@ -1,0 +1,20 @@
+
+> pr-6.6.3@1.0.25 audit:private-control-acquisition-ui
+> node scripts/audit-private-control-acquisition-ui.mjs
+
+PASS: Forbes position exposes the control route
+PASS: Existing stake credit is explained before opening the deal
+PASS: An active buyer search disables the control route
+PASS: The sell and manage dossier remains available
+PASS: Control and dossier actions share one compact readable row
+PASS: The profile limits conversion to available private non-owned studios
+PASS: The profile removes the duplicate acquisition card for an existing private stake
+PASS: Forbes starts the conversion through the domain service
+PASS: Successful conversion persists before the deal room opens
+PASS: Deal-room config carries the conversion marker
+PASS: Deal-room offer uses a remaining-block reference
+PASS: The dossier explains that old shares are not charged again
+PASS: Minority controls are hidden in a conversion route
+PASS: The wrapper derives remaining percent from conversion state
+PASS: The wrapper passes the dedicated offer reference
+Private control acquisition UI audit passed (15 checks).

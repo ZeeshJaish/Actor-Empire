@@ -1,0 +1,24 @@
+
+> pr-6.6.3@1.0.25 audit:public-tender-contract
+> esbuild scripts/audit-public-tender-contract.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-public-tender-contract.mjs && node /tmp/audit-public-tender-contract.mjs
+
+
+  ../../../../tmp/audit-public-tender-contract.mjs  4.8mb ⚠️
+
+⚡ Done in 85ms
+PASS accepted 5% cannot silently buy50%
+PASS accepted 49% cannot silently buy50%
+PASS accepted full50% grants only its actual paid block
+PASS legacy49% completes after buying the missing1% through Stocks
+PASS invalid accepted percentage undefined rejects unchanged
+PASS invalid accepted percentage 0 rejects unchanged
+PASS invalid accepted percentage NaN rejects unchanged
+PASS invalid accepted percentage Infinity rejects unchanged
+PASS invalid accepted percentage -5 rejects unchanged
+PASS invalid accepted percentage 60 rejects unchanged
+PASS invalid accepted percentage 5.5 rejects unchanged
+PASS already-ready51% ignores old small unpaid tender and charges0
+PASS new fractional19.2% gap uses a priced20% block and grants exactly50.8%
+PASS exact 194999999 shares derives a sufficient new21% block
+PASS exact 324999999 shares derives a sufficient new5% block
+15 accepted tender contract cases passed

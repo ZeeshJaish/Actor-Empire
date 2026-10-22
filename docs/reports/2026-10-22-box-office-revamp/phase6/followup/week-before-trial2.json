@@ -1,0 +1,198 @@
+{
+  "kind": "DESKTOP_NODE_FULL_WEEK_WITH_VERIFIED_MEMORY_STORE",
+  "node": "v24.11.1",
+  "platform": "darwin",
+  "arch": "arm64",
+  "rows": [
+    {
+      "name": "early",
+      "comparableStateSha256": "9249287d163923e6d5c1cfd93bc15b2f1a4202aa988408fc1bdaab1668699036",
+      "finalStateSha256": "9249287d163923e6d5c1cfd93bc15b2f1a4202aa988408fc1bdaab1668699036",
+      "metrics": {
+        "compute": {
+          "n": 4,
+          "minMs": 347.5988329999998,
+          "p50Ms": 355.250083,
+          "p95Ms": 400.6991250000001,
+          "maxMs": 400.6991250000001
+        },
+        "prepare": {
+          "n": 4,
+          "minMs": 12.414999999999964,
+          "p50Ms": 12.93120799999997,
+          "p95Ms": 18.575167000000192,
+          "maxMs": 18.575167000000192
+        },
+        "persistence": {
+          "n": 4,
+          "minMs": 89.48991699999988,
+          "p50Ms": 91.75412499999993,
+          "p95Ms": 95.953708,
+          "maxMs": 95.953708
+        },
+        "uiCommit": {
+          "n": 4,
+          "minMs": 0.5489590000001954,
+          "p50Ms": 0.5670420000001286,
+          "p95Ms": 0.6120829999999842,
+          "maxMs": 0.6120829999999842
+        },
+        "total": {
+          "n": 4,
+          "minMs": 452.318125,
+          "p50Ms": 466.872792,
+          "p95Ms": 512.111375,
+          "maxMs": 512.111375
+        },
+        "market": {
+          "n": 4,
+          "minMs": 58.940207999999984,
+          "p50Ms": 62.549625000000106,
+          "p95Ms": 69.70179099999996,
+          "maxMs": 69.70179099999996
+        }
+      },
+      "saveBytes": 7878447,
+      "heapBefore": 56506832,
+      "heapAfter": 285177008,
+      "allocationRows": 0,
+      "slowStages": [
+        [
+          "world_streaming_viewing_choices_ready → world_streaming_viewing_ai_catalogue_ready",
+          143.30325000000005
+        ],
+        [
+          "world_streaming_viewing_rival_viewing_ready → world_streaming_viewing_done",
+          128.27991699999995
+        ],
+        [
+          "streaming_industry_start → streaming_industry_done",
+          107.9671659999999
+        ],
+        [
+          "world_streaming_viewing_ai_catalogue_ready → world_streaming_viewing_rival_viewing_ready",
+          38.34204100000011
+        ],
+        [
+          "world_streaming_customers_start → world_streaming_customers_inputs_ready",
+          32.18104200000005
+        ],
+        [
+          "world_streaming_viewing_customers_ready → world_streaming_viewing_choices_ready",
+          30.094915999999955
+        ],
+        [
+          "world_streaming_customers_inputs_ready → world_streaming_customers_desired_ready",
+          23.18179199999986
+        ],
+        [
+          "world_streaming_competition_start → world_streaming_competition_done",
+          18.83604200000002
+        ]
+      ],
+      "cinemaWeeks": 5,
+      "counts": {
+        "projects": 0,
+        "rights": 0
+      }
+    },
+    {
+      "name": "late",
+      "comparableStateSha256": "62588ccca2a70f938732ee51acc1add69924b1ae5202a0b2ee599c9fe2f73e57",
+      "finalStateSha256": "62588ccca2a70f938732ee51acc1add69924b1ae5202a0b2ee599c9fe2f73e57",
+      "metrics": {
+        "compute": {
+          "n": 4,
+          "minMs": 9642.101957999996,
+          "p50Ms": 9798.350292000003,
+          "p95Ms": 9841.76225,
+          "maxMs": 9841.76225
+        },
+        "prepare": {
+          "n": 4,
+          "minMs": 199.27570800000103,
+          "p50Ms": 214.26866700000392,
+          "p95Ms": 231.08766699999978,
+          "maxMs": 231.08766699999978
+        },
+        "persistence": {
+          "n": 4,
+          "minMs": 2569.7524580000027,
+          "p50Ms": 2583.5079169999954,
+          "p95Ms": 3059.692416999991,
+          "maxMs": 3059.692416999991
+        },
+        "uiCommit": {
+          "n": 4,
+          "minMs": 0.5480419999948936,
+          "p50Ms": 0.6640000000043074,
+          "p95Ms": 0.6953750000029686,
+          "maxMs": 0.6953750000029686
+        },
+        "total": {
+          "n": 4,
+          "minMs": 12425.583083000001,
+          "p50Ms": 12583.046667000002,
+          "p95Ms": 13129.246208000004,
+          "maxMs": 13129.246208000004
+        },
+        "market": {
+          "n": 4,
+          "minMs": 622.403333000002,
+          "p50Ms": 656.640790999998,
+          "p95Ms": 764.5585830000055,
+          "maxMs": 764.5585830000055
+        }
+      },
+      "saveBytes": 232924250,
+      "heapBefore": 828723584,
+      "heapAfter": 2009554424,
+      "allocationRows": 18791,
+      "slowStages": [
+        [
+          "streaming_industry_start → streaming_industry_done",
+          10820.933417
+        ],
+        [
+          "world_streaming_viewing_ai_catalogue_ready → world_streaming_viewing_rival_viewing_ready",
+          5724.380417
+        ],
+        [
+          "world_streaming_viewing_rival_viewing_ready → world_streaming_viewing_done",
+          2829.7114580000016
+        ],
+        [
+          "world_streaming_platform_economy_done → owned_streaming_processed",
+          296.3336249999993
+        ],
+        [
+          "start → state_cloned",
+          243.8068329999951
+        ],
+        [
+          "world_streaming_platform_economy_start → world_streaming_platform_economy_done",
+          215.33933300000353
+        ],
+        [
+          "world_streaming_viewing_choices_ready → world_streaming_viewing_ai_catalogue_ready",
+          94.45720799999981
+        ],
+        [
+          "world_streaming_customers_start → world_streaming_customers_inputs_ready",
+          78.6972910000004
+        ]
+      ],
+      "cinemaWeeks": 5,
+      "counts": {
+        "projects": 1522,
+        "rights": 6053
+      }
+    }
+  ],
+  "limitations": [
+    "Total excludes React paint, IndexedDB and native bridge; browser measured separately",
+    "Retained heap measurements are not cumulative allocation volume",
+    "Each row reports its actual sample count; compare repeated paired trials",
+    "Fixed input JSON generated by baseline, never from a real user save"
+  ]
+}

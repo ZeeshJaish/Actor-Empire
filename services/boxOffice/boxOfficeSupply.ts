@@ -1,10 +1,22 @@
 import { CINEMA_CHAINS } from '../cinemaChains';
-import { WORLD_COUNTRY_DEFINITIONS_BY_ID } from '../worldEconomy/worldCountryRegistry';
+import { WORLD_COUNTRY_DEFINITIONS, WORLD_COUNTRY_DEFINITIONS_BY_ID } from '../worldEconomy/worldCountryRegistry';
 import { apportionCinemaIntegers, cinemaCount } from './boxOfficeMath';
 import { CINEMA_SUPPLY_PROFILE as P } from './boxOfficeProfiles';
 import type { CinemaSupplyQuote, CinemaWeekInput } from './boxOfficeTypes';
 
-/** Country weights partition one chain's physical regional footprint, independent of slate/budgets. */
+// Existing NPC infrastructure is a fixed partition of the complete registry, not
+// an investment/expansion system. Current population/access changes demand, not
+// the location of these screens. Baseline access weights are versioned supply assumptions.
+const baselineAccess = { LOW:21, EMERGING:43, DEVELOPED:68, ADVANCED:79 } as const;
+const existingFootprint = new Map<string,number>();
+for(const chain of CINEMA_CHAINS) for(const region of Object.keys(chain.regionalTerms)) {
+    const countries=WORLD_COUNTRY_DEFINITIONS.filter(c=>c.regionId===region);
+    const shares=apportionCinemaIntegers(chain.regionalTerms[countries[0].regionId].screens,
+        countries.map(c=>({id:c.id,weight:Math.round(c.baselinePopulation*baselineAccess[c.developmentProfile])})),0,0);
+    for(const country of countries)existingFootprint.set(`${chain.id}:${country.id}`,shares.get(country.id)||0);
+}
+
+/** Country quotes read the existing complete-world network, independent of the caller's subset. */
 export const quoteCinemaSupply = (input: CinemaWeekInput): CinemaSupplyQuote => {
     const pools: CinemaSupplyQuote['pools']=[], offers: CinemaSupplyQuote['offers']=[];
     const countries=[...(input.countries || [])].sort((a,b)=>a.id.localeCompare(b.id));
@@ -15,10 +27,8 @@ export const quoteCinemaSupply = (input: CinemaWeekInput): CinemaSupplyQuote => 
     for(const chain of CINEMA_CHAINS) for(const region of [...new Set(countries.map(c=>c.regionId))].sort()) {
         const terms=chain.regionalTerms[region];
         const regional=countries.filter(c=>c.regionId===region);
-        const weights=regional.map(c=>({id:c.id,weight:Math.round(c.population*Math.max(0,Math.min(100,c.cinemaAccess))/100)}));
-        const screens=apportionCinemaIntegers(terms.screens,weights,input.seed,input.absoluteWeek);
         for(const country of regional) {
-            const total=screens.get(country.id) || 0;
+            const total=existingFootprint.get(`${chain.id}:${country.id}`) || 0;
             const premium=Math.floor(total*P.premiumScreenShare);
             for(const format of ['STANDARD','PREMIUM'] as const) {
                 const count=format==='PREMIUM'?premium:total-premium;
@@ -31,6 +41,7 @@ export const quoteCinemaSupply = (input: CinemaWeekInput): CinemaSupplyQuote => 
                 pools.push({id:`${country.id}:${chain.id}:${format}`,countryId:country.id,chainId:chain.id,format,screens:count,
                     seatsPerShow:P.seatsPerShow,weeklyScreenMinutes:count*P.openingMinutesPerDay*P.daysPerWeek,ticketPriceCents,
                     exhibitorBasisPoints:Math.round(terms.exhibitorCut*10_000),distributionBasisPoints:500,
+                    operatingCentsPerShow:Math.max(1,Math.round(P.standardOperatingCentsPerShow*economy*inflation*chainPremium*(format==='PREMIUM'?1.2:1))),
                     bookingCentsPerShow:Math.max(1,Math.round(terms.bookingCost*100/(terms.screens*P.daysPerWeek*4)))});
             }
         }

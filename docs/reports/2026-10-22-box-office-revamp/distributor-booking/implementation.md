@@ -1,0 +1,20 @@
+# Existing distributor booking implementation
+
+The revision uses the current cinema networks and release selections. It adds no chain ownership, acquisition, construction or expansion flow. Tuning 3 changes future unsettled weeks; historical paid facts and signed contracts remain unchanged.
+
+- Supply is a deterministic partition of the complete country registry. Subsets, campaign reach, weekly seeds and demographic movement cannot relocate screens. Country/economy/chain prices remain automatic.
+- Public expectations inform the opening. Renewals blend current funded local demand and prior actual admissions. The scheduler ranks expected exhibitor contribution per screen minute and packs real screen-days with feasible minimums. Operating estimates guide booking; existing producer booking charges settle once.
+- Actual local occupancy and contribution decide renewals and closure. Capacity denial preserves a viable run. Two discovery weeks and quiet observations are local decision rules, not a forced film age. Gross and budget have no hard return cap.
+- Delivered response becomes informative after a sample of the reached audience. Hidden final craft/payoff cannot determine an unviewed opening. Worldwide access cannot manufacture awareness or theater intent.
+- Rival home options require real prior funded customers, playable route/plan rights, current territory and production/language readiness. Valid existing rentals and vested purchases remain valid alternatives. The audience chooses among overlapping options once; the projection creates no customers, viewing, spending or cash.
+- Forecast and live paths consume the same alternative inputs. Batch caches are immutable and local to one read; no persisted finance cache bypasses settlement revalidation.
+
+CPU profiling caught an avoidable full-library scan for each individual purchased/rented rival title. The canonical AI route reader now accepts an optional title selector, retaining contract order and the same permission evaluator; dated playback still checks every matching position. Default three-argument reads are unchanged. The targeted regression failed before the change, then passed alongside all route controls. All 1,704 rows of the late-save projection retain exactly the same SHA-256, while its warm profiled read falls from about 1.7 seconds to 0.31 seconds. Whole-week and actual App timings are reported separately.
+
+An additional save-reader regression proved that two separate read transactions could straddle an atomic autosave promotion. IndexedDB now reads player and manifest in one readonly transaction. Verification, promotion, previous-generation recovery and exactly-once money settlement stay enabled. The real IndexedDB control also confirms that actual tampering still produces recovery rather than CURRENT.
+
+The existing save-transfer audit also exposed sparse legacy active releases with no producer ID. Migration now preserves an explicitly unknown `legacy-owner:<title-id>` instead of writing an undefined audience owner or matching an unrelated player business. Only that same saved/current legacy identity can use the external net-receipt ledger; an explicit missing producer or a reassigned identity still rejects settlement atomically. Historical gross, collected receipts and cash are unchanged by migration. Focused tests verify the exact new net ledger amount, unchanged real studios and no second payment after replay.
+
+[Full-world calibration](calibration.md) retains all 76 controlled results. [Career and save verification](career-save-verification.json) records 245 actual engine weeks across the ordinary starter and five authored existing-save routes. The first ordinary 112-week strategy failed to reach an opening; the fully funded genre-training strategy reached one in 115 weeks. These are conditional strategies, not promised timelines.
+
+Verification and measured scenario results are recorded separately in this directory after the runs complete. Physical-device/native memory and GPU performance remain outside desktop verification.

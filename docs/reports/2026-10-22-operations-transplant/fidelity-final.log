@@ -1,0 +1,16 @@
+
+> pr-6.6.3@1.0.25 audit:streaming-zip-fidelity
+> node scripts/audit-streaming-zip-fidelity.mjs
+
+file:///Users/zeesh/Vibe%20code/Actor%20empire/scripts/audit-streaming-zip-fidelity.mjs:5
+  if (!condition) throw new Error(message);
+                        ^
+
+Error: Buildout/Buildout.module.css has drifted from the reviewed transplant.
+    at assert (file:///Users/zeesh/Vibe%20code/Actor%20empire/scripts/audit-streaming-zip-fidelity.mjs:5:25)
+    at file:///Users/zeesh/Vibe%20code/Actor%20empire/scripts/audit-streaming-zip-fidelity.mjs:65:3
+    at ModuleJob.run (node:internal/modules/esm/module_job:377:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:671:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+
+Node.js v24.11.1

@@ -1,0 +1,56 @@
+
+> pr-6.6.3@1.0.25 audit:public-tender-contract
+> esbuild scripts/audit-public-tender-contract.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-public-tender-contract.mjs && node /tmp/audit-public-tender-contract.mjs
+
+
+  ../../../../tmp/audit-public-tender-contract.mjs  4.8mb ⚠️
+
+⚡ Done in 31ms
+PASS accepted 5% cannot silently buy50%
+PASS accepted 49% cannot silently buy50%
+PASS accepted full50% grants only its actual paid block
+PASS legacy49% completes after buying the missing1% through Stocks
+PASS invalid accepted percentage undefined rejects unchanged
+PASS invalid accepted percentage 0 rejects unchanged
+PASS invalid accepted percentage NaN rejects unchanged
+PASS invalid accepted percentage Infinity rejects unchanged
+PASS invalid accepted percentage -5 rejects unchanged
+PASS invalid accepted percentage 60 rejects unchanged
+PASS invalid accepted percentage 5.5 rejects unchanged
+PASS already-ready51% ignores old small unpaid tender and charges0
+PASS new fractional19.2% gap uses a priced20% block and grants exactly50.8%
+FAIL exact 194999999 shares derives a sufficient new21% block AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
+
++ 2040680000
+- 2040675000
+       ^
+
+FAIL exact 324999999 shares derives a sufficient new5% block AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
+
++ 485880000
+- 485875000
+      ^
+
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: 2/15 accepted tender contract cases failed
+
+2 !== 0
+
+    at file:///private/tmp/audit-public-tender-contract.mjs:73555:8
+    at ModuleJob.run (node:internal/modules/esm/module_job:377:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:671:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 2,
+  expected: 0,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.11.1

@@ -25,7 +25,7 @@ export const inspectCinemaSavedState = (state:unknown):string[] => {
     if(typeof state.schemaVersion==='number' && state.schemaVersion>1)return ['CINEMA_FUTURE_SCHEMA'];
     if(state.schemaVersion===0)return (Array.isArray(state.weeks)&&state.weeks.length || object(state.titles)&&Object.keys(state.titles).length)?['CINEMA_UNKNOWN_SETTLEMENT_BASIS']:[];
     if(state.schemaVersion!==1 || !integer(state.clockEpoch)||!integer(state.activationWeek)||!integer(state.lastProcessedAbsoluteWeek)
-        ||![1,CINEMA_MARKET_TUNING_VERSION].includes(state.tuningVersion as number)||!object(state.market)||!object(state.titles)||!Array.isArray(state.weeks)
+        ||![1,2,3,CINEMA_MARKET_TUNING_VERSION].includes(state.tuningVersion as number)||!object(state.market)||!object(state.titles)||!Array.isArray(state.weeks)
         ||!Array.isArray(state.market.titles)||!Array.isArray(state.market.affinities)||!Array.isArray(state.market.runs))return ['CINEMA_STATE_INCOMPLETE'];
     if(state.market.schemaVersion!==1 || state.market.tuningVersion!==state.tuningVersion)return ['CINEMA_STATE_INCOMPLETE'];
     if(!finiteTree(state)||state.weeks.length>52||state.market.lastProcessedAbsoluteWeek!==state.lastProcessedAbsoluteWeek)return ['CINEMA_STATE_CORRUPT'];
@@ -44,7 +44,8 @@ export const inspectCinemaSavedState = (state:unknown):string[] => {
     }
     const nonempty=(v:unknown)=>typeof v==='string'&&v.length>0;
     for(const a of state.market.affinities)if(!object(a)||!nonempty(a.cohortId)||!nonempty(a.id)||!['ACTOR','STUDIO','UNIVERSE'].includes(String(a.kind))||!integer(a.people)||!integer(a.lastWeek)||typeof a.strength!=='number'||a.strength<0||a.strength>100)return ['CINEMA_AFFINITY_CORRUPT'];
-    for(const r of state.market.runs)if(!object(r)||!nonempty(r.titleId)||!nonempty(r.poolId)||!integer(r.quietWeeks)||typeof r.closed!=='boolean')return ['CINEMA_RUN_CORRUPT'];
+    for(const r of state.market.runs)if(!object(r)||!nonempty(r.titleId)||!nonempty(r.poolId)||!integer(r.quietWeeks)||typeof r.closed!=='boolean'
+        ||['lastBookedWeek','lastShows','lastAdmissions'].some(k=>r[k]!==undefined&&!integer(r[k])))return ['CINEMA_RUN_CORRUPT'];
     const receiptIds=new Set<string>();
     for(const w of state.weeks){
         if(!object(w)||!nonempty(w.id)||!integer(w.absoluteWeek)||!integer(w.clockEpoch)||!nonempty(w.inputFingerprint)||!nonempty(w.receiptSignature)||!Array.isArray(w.titles)||receiptIds.has(w.id as string))return ['CINEMA_WEEK_RECEIPT_CORRUPT'];
@@ -97,14 +98,15 @@ export const migrateCinemaState = (player:Player,absoluteWeek:number):CinemaMigr
     const population=normalizeWorldPopulationState(player.world.worldPopulation,absoluteWeek);
     const audience=normalizeWorldAudienceEconomyState(player.world.worldAudienceEconomy,population,absoluteWeek);
     const participation=normalizeWorldAudienceParticipationState(player.world.worldAudienceParticipation,population,audience,absoluteWeek);
-    const worldAudience=readCinemaWorldAudience({...player,world:{...player.world,worldPopulation:population,worldAudienceEconomy:audience,worldAudienceParticipation:participation}});
+    const worldAudience=readCinemaWorldAudience({...player,world:{...player.world,worldPopulation:population,worldAudienceEconomy:audience,worldAudienceParticipation:participation}},{includeStreamingAlternatives:false});
     const supply=quoteCinemaSupply({...worldAudience,titles:[],absoluteWeek,seed:0,tuningVersion:CINEMA_MARKET_TUNING_VERSION,knowledge:'OBSERVED'});
     const diagnostics:CinemaMigrationResult['diagnostics']=[];
     const activeReleases=(player.activeReleases || []).map(release=>{
         if(release.type!=='MOVIE')return release;
+        const ownerId=release.projectDetails.studioId || `legacy-owner:${release.id}`;
         const active=release.distributionPhase==='THEATRICAL' && release.status!=='FINISHED';
         const basis=active?'LEGACY_ACTIVE' as const:'LEGACY_FULLY_SETTLED' as const;
-        state.titles[release.id]=makeCinemaSettledTitle(release.id,release.projectDetails.studioId,basis,activationWeek,release.totalGross,release.totalStudioReceipts);
+        state.titles[release.id]=makeCinemaSettledTitle(release.id,ownerId,basis,activationWeek,release.totalGross,release.totalStudioReceipts);
         if(active && release.totalGross>0) {
             const regions=getReleaseRegionIdsForProject(release.projectDetails);
             const cohortCountries=new Set(worldAudience.countries!.filter(c=>regions.includes(c.regionId)).map(c=>c.id));
@@ -118,7 +120,7 @@ export const migrateCinemaState = (player:Player,absoluteWeek:number):CinemaMigr
             const meanPrice=Math.max(1,Math.round(prices.reduce((n,p)=>n+p.ticketPriceCents*p.screens,0)/Math.max(1,prices.reduce((n,p)=>n+p.screens,0))));
             const seen=Math.min(capacity,Math.floor(cents(release.totalGross)/meanPrice*.5));
             const allocated=apportionCinemaIntegers(seen,weights,0,absoluteWeek);
-            const title=normalizeCinemaTitle({titleId:release.id,project:release.projectDetails,player,owner:{id:release.projectDetails.studioId,route:'ACCEPTED_ROLE'}});
+            const title=normalizeCinemaTitle({titleId:release.id,project:release.projectDetails,player,owner:{id:ownerId,route:'ACCEPTED_ROLE'}});
             state.market.titles.push({titleId:release.id,ownerId:title.owner.id,cast:title.cast,universeId:release.projectDetails.universeId,
                 releaseWeek:Math.max(0,absoluteWeek-Math.max(0,release.weekNum-1)),
                 appliedExposureIds:(release.projectDetails.cinemaExposure?.events || []).filter(e=>e.absoluteWeek<=absoluteWeek).map(e=>e.id),

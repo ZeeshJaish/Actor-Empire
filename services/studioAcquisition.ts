@@ -1,3 +1,5 @@
+import { settleStockCash } from './stockSettlement';
+import { getRecordedStockBasis } from './stockCashOwnership';
 import type { Business, BusinessStaff, GameLanguage, NewsItem, Player, XPost } from '../types';
 import type { ForbesStudioProfile, StudioAcquisitionState } from './forbesStudioProfile';
 import { createDefaultStudioState } from './businessLogic';
@@ -20,6 +22,8 @@ import { materializeStudioOwnership } from './industryWorld/studioOwnershipMater
 import { getGenderedAvatar } from './npcLogic';
 import { captureStudioEquityCashBasis } from './studioEquityCash';
 import { getStudioSaleTreasuryLock } from './studioGroup';
+import { getPublicControlReadiness } from './publicStockControl';
+import { buildAcquisitionSigningQuote, getAcquisitionContractPrice } from './acquisitionSigningQuote';
 
 export type AcquisitionCaseStatus = 'DRAFT' | 'OFFER_SUBMITTED' | 'COUNTERED' | 'RIVAL_BID' | 'ACCEPTED' | 'REJECTED' | 'CLOSED' | 'ACQUIRED';
 export type AcquisitionOfferType = 'CONSERVATIVE' | 'FAIR' | 'AGGRESSIVE' | 'MINORITY';
@@ -87,6 +91,7 @@ export interface AcquisitionCase {
     approachedWeek: number;
     approachedYear: number;
     status: AcquisitionCaseStatus;
+    publicControlIntent?: { kind: 'PUBLIC_MAJORITY'; initiatedYear: number; initiatedWeek: number };
     /** A closed approach returns to the market after a short cooling-off period. */
     reapproachAfterWeek?: number;
     reapproachAfterYear?: number;
@@ -134,6 +139,7 @@ export interface AcquisitionCase {
     presentation?: {
         responseSeenKey?: string;
         closingStage?: 'RESPONSE' | 'CLOSING' | 'SIGNING';
+        reviewedQuoteKey?: string;
     };
     closing?: {
         finalPrice: number;
@@ -514,7 +520,7 @@ export const updateAcquisitionPresentation = ({
 export const getAcquisitionEligibility = (
     profile: Pick<ForbesStudioProfile, 'isPlayerOwned' | 'acquisitionState'> & Partial<Pick<ForbesStudioProfile, 'id' | 'archetype'>>,
     existingCase?: AcquisitionCase,
-    player?: Pick<Player, 'age' | 'currentWeek'>,
+    player?: Pick<Player, 'age' | 'currentWeek'> & Partial<Pick<Player, 'businesses'>>,
 ): AcquisitionEligibility => {
     const privateControlConversion = existingCase?.controlConversion?.kind === 'PRIVATE_STAKE_TO_CONTROL';
     const allowedOfferTypes: AcquisitionOfferType[] = privateControlConversion
@@ -529,7 +535,7 @@ export const getAcquisitionEligibility = (
         || profile.acquisitionState === 'PUBLICLY_TRADED'
     ) ? 'MINORITY' : 'FAIR';
 
-    if (profile.isPlayerOwned) {
+    if (profile.isPlayerOwned || player?.businesses?.some(business => business.id === profile.id)) {
         return { canApproach: false, reason: 'PLAYER_OWNED', allowedOfferTypes: [], recommendedOfferType };
     }
     if (isStreamingPlatformStudio(profile)) {
@@ -549,10 +555,7 @@ export const getAcquisitionEligibility = (
     }
     // A shareholder can value, hold, or sell a private stake, but cannot use it
     // to bypass a board that is explicitly not entertaining control proposals.
-    if (
-        profile.acquisitionState === 'NOT_FOR_SALE'
-        && existingCase?.status !== 'CLOSED'
-    ) {
+    if (profile.acquisitionState === 'NOT_FOR_SALE') {
         return { canApproach: false, reason: 'NOT_FOR_SALE', allowedOfferTypes: [], recommendedOfferType };
     }
     if (existingCase && ['OFFER_SUBMITTED', 'COUNTERED', 'RIVAL_BID', 'ACCEPTED'].includes(existingCase.status)) {
@@ -739,11 +742,11 @@ export const getFundingOptions = ({
         label: t(language, 'services.studioAcquisition.funding.personal.label'),
         balance: personalBalance,
         remainingBalance: personalBalance - safeAmount,
-        affordable: personalBalance >= safeAmount,
+        affordable: personalBalance >= safeAmount && settleStockCash(personalBalance, -safeAmount).success,
         complianceRisk: 0,
         complianceBand: 'ROUTINE',
         taxTreatment: t(language, 'services.studioAcquisition.funding.personal.taxTreatment'),
-        unavailableReason: personalBalance >= safeAmount ? undefined : t(language, 'services.studioAcquisition.funding.personal.unavailable'),
+        unavailableReason: !settleStockCash(personalBalance, -safeAmount).success ? 'This balance cannot settle the charge safely. Your money is unchanged.' : personalBalance >= safeAmount ? undefined : t(language, 'services.studioAcquisition.funding.personal.unavailable'),
     }];
 
     const studios = (player.businesses || []).filter(business => business.type === 'PRODUCTION_HOUSE');
@@ -764,11 +767,11 @@ export const getFundingOptions = ({
             label: t(language, 'services.studioAcquisition.funding.studio.label', { studio: business.name }),
             balance,
             remainingBalance: balance - safeAmount,
-            affordable: balance >= safeAmount && !saleLock && !merged,
+            affordable: balance >= safeAmount && !saleLock && !merged && settleStockCash(balance, -safeAmount).success,
             complianceRisk,
             complianceBand: getComplianceBand(complianceRisk),
             taxTreatment: t(language, 'services.studioAcquisition.funding.studio.taxTreatment'),
-            unavailableReason: saleLock || (merged ? 'This studio is not an active funding company.' : balance >= safeAmount ? undefined : t(language, 'services.studioAcquisition.funding.studio.unavailable')),
+            unavailableReason: saleLock || (!settleStockCash(balance, -safeAmount).success ? 'This treasury cannot settle the charge safely.' : merged ? 'This studio is not an active funding company.' : balance >= safeAmount ? undefined : t(language, 'services.studioAcquisition.funding.studio.unavailable')),
         });
     }
     return options;
@@ -784,13 +787,14 @@ const buildDiligenceReport = (
     const distressMultiplier = profile.acquisitionState === 'DISTRESSED' || profile.acquisitionState === 'AUCTION_EXPECTED'
         ? 1.7
         : 1;
-    const verifiedDebt = roundMoney(Math.max(0, profile.debt * debtFactor));
-    const hiddenLiabilities = roundMoney(profile.valuation * riskFactor * distressMultiplier);
-    const expectedAnnualIncome = roundMoney(Math.max(
+    const publicCompany = profile.acquisitionState === 'PUBLICLY_TRADED';
+    const verifiedDebt = publicCompany ? Math.round(Math.max(0, profile.debt) * 100) / 100 : roundMoney(Math.max(0, profile.debt * debtFactor));
+    const hiddenLiabilities = publicCompany ? 0 : roundMoney(profile.valuation * riskFactor * distressMultiplier);
+    const expectedAnnualIncome = publicCompany ? Math.round(Math.max(0, profile.profitability) * 100) / 100 : roundMoney(Math.max(
         profile.profitability * (0.92 + (((hash >>> 10) % 19) / 100)),
         profile.valuation * 0.015,
     ));
-    const adjustedEnterpriseValue = roundMoney(Math.max(
+    const adjustedEnterpriseValue = publicCompany ? profile.valuation : roundMoney(Math.max(
         profile.valuation * 0.35,
         profile.valuation + profile.capital - verifiedDebt - hiddenLiabilities,
     ));
@@ -844,12 +848,7 @@ const deductImmediateExpense = (
     };
 };
 
-const getFinalAcquisitionPrice = (acquisitionCase: AcquisitionCase): number => roundMoney(
-    acquisitionCase.sellerResponse?.agreedAmount
-    || acquisitionCase.sellerResponse?.counterAmount
-    || acquisitionCase.offer?.amount
-    || 0,
-);
+const getFinalAcquisitionPrice = getAcquisitionContractPrice;
 
 const getSigningLiabilities = (
     acquisitionCase: AcquisitionCase,
@@ -1001,7 +1000,10 @@ export const runDueDiligence = ({
 } => {
     const language = getPlayerLanguage(player);
     const existingCase = getAcquisitionCase(player, profile.id);
-    if (!getAcquisitionEligibility(profile, existingCase, player).canApproach && existingCase?.status !== 'DRAFT') {
+    const eligibility = getAcquisitionEligibility(profile, existingCase, player);
+    const hardBlocked = eligibility.reason === 'PLAYER_OWNED'
+        || eligibility.reason === 'STREAMING_PLATFORM_RESERVED' || eligibility.reason === 'NOT_FOR_SALE';
+    if (hardBlocked || (!eligibility.canApproach && !getPublicControlReadiness(player, profile).eligible && existingCase?.status !== 'DRAFT')) {
         return { success: false, player, reason: 'INELIGIBLE' };
     }
     if (existingCase?.diligence?.status === 'COMPLETE') {
@@ -1064,11 +1066,11 @@ const getAcquisitionBlockReferenceValue = ({
     acquisitionCase,
     offerType,
 }: {
-    profile: Pick<ForbesStudioProfile, 'valuation'>;
+    profile: Pick<ForbesStudioProfile, 'valuation'> & Partial<Pick<ForbesStudioProfile, 'acquisitionState'>>;
     acquisitionCase?: AcquisitionCase;
     offerType: AcquisitionOfferType;
 }): number => {
-    const enterpriseValue = acquisitionCase?.diligence?.report.adjustedEnterpriseValue
+    const enterpriseValue = profile.acquisitionState === 'PUBLICLY_TRADED' ? profile.valuation : acquisitionCase?.diligence?.report.adjustedEnterpriseValue
         || acquisitionCase?.publicValuation
         || profile.valuation;
     if (
@@ -1088,7 +1090,7 @@ export const getOfferPresets = ({
     acquisitionCase,
     minorityPercent = 25,
 }: {
-    profile: Pick<ForbesStudioProfile, 'valuation'>;
+    profile: Pick<ForbesStudioProfile, 'valuation'> & Partial<Pick<ForbesStudioProfile, 'acquisitionState'>>;
     acquisitionCase?: AcquisitionCase;
     minorityPercent?: number;
 }): Record<AcquisitionOfferType, AcquisitionOfferPreset> => {
@@ -1102,7 +1104,11 @@ export const getOfferPresets = ({
         acquisitionCase,
         offerType: 'MINORITY',
     });
-    const safeMinorityPercent = clamp(Math.round(minorityPercent), 5, 49);
+    // New public blocks must cover the whole control gap. Existing accepted
+    // contracts are never rewritten by this offer builder.
+    const safeMinorityPercent = profile.acquisitionState === 'PUBLICLY_TRADED'
+        ? clamp(Math.ceil(minorityPercent), 5, 50)
+        : clamp(Math.round(minorityPercent), 5, 49);
     return {
         CONSERVATIVE: {
             type: 'CONSERVATIVE',
@@ -1145,7 +1151,7 @@ export const analyzeCustomOffer = ({
     existingOwnershipPercent = 0,
     strategicThreshold = 25,
 }: {
-    profile: Pick<ForbesStudioProfile, 'valuation'>;
+    profile: Pick<ForbesStudioProfile, 'valuation'> & Partial<Pick<ForbesStudioProfile, 'acquisitionState'>>;
     acquisitionCase?: AcquisitionCase;
     offerType: AcquisitionOfferType;
     offerAmount: number;
@@ -1160,7 +1166,9 @@ export const analyzeCustomOffer = ({
     });
     const normalizedAmount = Number.isFinite(offerAmount) ? Math.max(0, Math.round(offerAmount)) : 0;
     const normalizedMinorityPercent = Number.isFinite(minorityPercent)
-        ? Math.round((minorityPercent || 0) * 100) / 100
+        ? profile.acquisitionState === 'PUBLICLY_TRADED'
+            ? Math.ceil(minorityPercent || 0)
+            : Math.round((minorityPercent || 0) * 100) / 100
         : 0;
     const isMinority = offerType === 'MINORITY';
     const impliedCompanyValue = isMinority && normalizedMinorityPercent > 0
@@ -1177,8 +1185,8 @@ export const analyzeCustomOffer = ({
     let validationReason: string | undefined;
     if (normalizedAmount <= 0) {
         validationReason = 'Enter an offer amount greater than zero.';
-    } else if (isMinority && (normalizedMinorityPercent < 5 || normalizedMinorityPercent > 49)) {
-        validationReason = 'Minority stakes must be between 5% and 49%.';
+    } else if (isMinority && (normalizedMinorityPercent < 5 || normalizedMinorityPercent > (profile.acquisitionState === 'PUBLICLY_TRADED' ? 50 : 49))) {
+        validationReason = profile.acquisitionState === 'PUBLICLY_TRADED' ? 'Public tenders must be between 5% and 50%.' : 'Minority stakes must be between 5% and 49%.';
     } else if (comparisonRatio < 0.5) {
         validationReason = isMinority
             ? 'The implied company value must be at least 50% of the reference value.'
@@ -1934,7 +1942,7 @@ export const completeStockControlAcquisition = ({
     player: Player;
     acquisitionCase?: AcquisitionCase;
     acquiredBusiness?: Business;
-    reason?: 'CONTROL_NOT_READY' | 'ALREADY_OWNED' | 'STREAMING_PLATFORM_RESERVED';
+    reason?: 'CONTROL_NOT_READY' | 'ALREADY_OWNED' | 'STREAMING_PLATFORM_RESERVED' | 'UNREPRESENTABLE_AMOUNT';
 } => {
     const language = getPlayerLanguage(player);
     const existingCase = getAcquisitionCase(player, profile.id);
@@ -1946,13 +1954,13 @@ export const completeStockControlAcquisition = ({
     }
 
     const companyPosition = getCompanyPosition(player, profile);
-    if (profile.acquisitionState !== 'PUBLICLY_TRADED' || companyPosition.ownershipPercent < 50) {
+    if (!getPublicControlReadiness(player, profile).eligible) {
         return { success: false, player, acquisitionCase: existingCase, reason: 'CONTROL_NOT_READY' };
     }
 
-    const hiddenLiabilities = roundMoney(Math.max(0, profile.valuation || 0) * 0.02);
-    const verifiedDebt = roundMoney(Math.max(0, profile.debt || 0));
-    const expectedAnnualIncome = roundMoney(Math.max(profile.profitability || 0, (profile.valuation || 0) * 0.018));
+    const signingQuote = buildAcquisitionSigningQuote({ player, profile });
+    if (!signingQuote.valid) return { success: false, player, acquisitionCase: existingCase, reason: 'UNREPRESENTABLE_AMOUNT' };
+    const { hiddenLiabilities, verifiedDebt, expectedAnnualIncome } = signingQuote;
     const closing: NonNullable<AcquisitionCase['closing']> = {
         finalPrice: 0,
         acquiredBusinessId: profile.id,
@@ -1968,7 +1976,7 @@ export const completeStockControlAcquisition = ({
             rights: profile.rightsCount,
         }),
     };
-    const acquiredBusiness = buildAcquiredStudioBusiness({ player, profile, closing });
+    const acquiredBusiness = buildAcquiredStudioBusiness({ player, profile: { ...profile, capital: signingQuote.inheritedCapital, valuation: signingQuote.equityValue }, closing });
     const acquiredCase: AcquisitionCase = {
         ...(existingCase || {
             studioId: profile.id,
@@ -2161,11 +2169,11 @@ const completePublicTenderAcquisition = ({
     player: Player;
     acquisitionCase?: AcquisitionCase;
     acquiredBusiness?: Business;
-    reason?: 'CASE_NOT_ACCEPTED' | 'CONTROL_NOT_READY' | 'STOCK_NOT_FOUND' | 'FUNDING_SOURCE_UNAVAILABLE' | 'INSUFFICIENT_FUNDS' | 'ALREADY_OWNED' | 'STREAMING_PLATFORM_RESERVED';
+    reason?: 'CASE_NOT_ACCEPTED' | 'CONTROL_NOT_READY' | 'STOCK_NOT_FOUND' | 'FUNDING_SOURCE_UNAVAILABLE' | 'INSUFFICIENT_FUNDS' | 'ALREADY_OWNED' | 'STREAMING_PLATFORM_RESERVED' | 'UNREPRESENTABLE_AMOUNT' | 'TENDER_BLOCK_TOO_SMALL' | 'INVALID_OFFER_TERMS';
 } => {
     const acquisitionCase = getAcquisitionCase(player, profile.id);
     const position = getCompanyPosition(player, profile);
-    if (position.ownershipPercent >= 50) return completeStockControlAcquisition({ player, profile });
+    if (getPublicControlReadiness(player, profile).eligible) return completeStockControlAcquisition({ player, profile });
     if (!acquisitionCase || acquisitionCase.status !== 'ACCEPTED' || acquisitionCase.offer?.type !== 'MINORITY') {
         return { success: false, player, acquisitionCase, reason: 'CASE_NOT_ACCEPTED' };
     }
@@ -2176,8 +2184,15 @@ const completePublicTenderAcquisition = ({
     const stockControlTarget = Math.max(0, 50 - position.negotiatedPercent);
     const targetShares = Math.ceil(outstandingShares * (stockControlTarget / 100));
     const minimumSharesForControl = Math.max(0, targetShares - position.shares);
-    const requestedTenderShares = Math.ceil(outstandingShares * (Math.max(0, acquisitionCase.offer.minorityPercent || 0) / 100));
-    const sharesNeeded = Math.max(minimumSharesForControl, requestedTenderShares);
+    const tenderPercent = acquisitionCase.offer.minorityPercent;
+    if (typeof tenderPercent !== 'number' || !Number.isFinite(tenderPercent) || !Number.isInteger(tenderPercent) || tenderPercent < 5 || tenderPercent > 50) {
+        return { success: false, player, acquisitionCase, reason: 'INVALID_OFFER_TERMS' };
+    }
+    const requestedTenderShares = Math.ceil(outstandingShares * (tenderPercent / 100));
+    if (requestedTenderShares < minimumSharesForControl) {
+        return { success: false, player, acquisitionCase, reason: 'TENDER_BLOCK_TOO_SMALL' };
+    }
+    const sharesNeeded = requestedTenderShares;
     if (sharesNeeded <= 0) return completeStockControlAcquisition({ player, profile });
 
     const quote = calculateStockTradeQuote(player, stock, sharesNeeded);
@@ -2197,26 +2212,32 @@ const completePublicTenderAcquisition = ({
     // share counts, ownership math, price impact, history, and portfolio cost.
     const tradeBase: Player = {
         ...player,
-        money: Math.max(player.money, quote.estimatedValue) + quote.estimatedValue,
+        money: quote.estimatedValue * 2,
     };
     const tradeResult = executeStockTrade(tradeBase, stock.id, sharesNeeded);
     if (!tradeResult.success) {
         return { success: false, player, acquisitionCase, reason: 'CONTROL_NOT_READY' };
     }
+    const oldHolding = player.portfolio.find(holding => holding.stockId === stock.id);
+    const oldBasis = getRecordedStockBasis(oldHolding);
+    const basis = oldBasis === undefined ? { success: true as const, balance: undefined } : settleStockCash(oldBasis, finalPrice);
+    if (basis.success === false) return { success: false, player, acquisitionCase, reason: 'UNREPRESENTABLE_AMOUNT' };
     const chargedPlayer = deductImmediateExpense(player, finalPrice, funding);
     const tenderedPlayer: Player = {
         ...tradeResult.player,
         money: chargedPlayer.money,
         businesses: chargedPlayer.businesses,
-        portfolio: tradeResult.player.portfolio.map(holding => holding.stockId === stock.id && funding.source === 'STUDIO' && funding.businessId
-            ? { ...holding, equityFunding: [...(holding.equityFunding || []), { ownerStudioId: funding.businessId, shares: quote.shares }] } : holding),
+        portfolio: tradeResult.player.portfolio.map(holding => holding.stockId === stock.id
+            ? { ...holding, totalInvested: basis.balance, averageCost: basis.balance === undefined ? undefined : basis.balance / holding.shares,
+                ...(funding.source === 'STUDIO' && funding.businessId
+                    ? { equityFunding: [...(holding.equityFunding || []), { ownerStudioId: funding.businessId, shares: quote.shares }] } : {}) } : holding),
         flags: chargedPlayer.flags,
         inbox: chargedPlayer.inbox,
         news: tradeResult.player.news,
         x: tradeResult.player.x,
     };
     const controlResult = completeStockControlAcquisition({ player: tenderedPlayer, profile });
-    if (!controlResult.success || !controlResult.acquisitionCase?.closing) return controlResult;
+    if (!controlResult.success || !controlResult.acquisitionCase?.closing) return { ...controlResult, player };
 
     if (controlResult.acquiredBusiness?.studioState && funding.source === 'STUDIO' && funding.businessId) {
         controlResult.acquiredBusiness.studioState.equityFunding = [
@@ -2253,11 +2274,19 @@ const completePublicTenderAcquisition = ({
 export const completeAcquisitionTransaction = ({
     player,
     profile,
+    expectedQuoteKey,
 }: {
     player: Player;
     profile: AcquisitionProfile;
+    expectedQuoteKey?: string;
 }) => {
     const acquisitionCase = getAcquisitionCase(player, profile.id);
+    const quote = buildAcquisitionSigningQuote({ player, profile });
+    if (expectedQuoteKey && (expectedQuoteKey !== quote.quoteKey
+        || (acquisitionCase?.presentation?.reviewedQuoteKey && acquisitionCase.presentation.reviewedQuoteKey !== expectedQuoteKey))) {
+        return { success: false, player, acquisitionCase, reason: 'QUOTE_CHANGED' as const };
+    }
+    if (!quote.valid) return { success: false, player, acquisitionCase, reason: 'UNREPRESENTABLE_AMOUNT' as const };
     let result;
     if (profile.acquisitionState === 'PUBLICLY_TRADED') {
         result = completePublicTenderAcquisition({ player, profile });

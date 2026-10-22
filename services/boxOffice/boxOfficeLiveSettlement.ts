@@ -121,7 +121,9 @@ export const commitCinemaWeek = (player: Player, result: CinemaWeekResult): Cine
             if (studio.ai)
                 studio.ai.ledger = [...studio.ai.ledger, { id: sourceId, absoluteWeek: result.absoluteWeek, category: 'RIGHTS_INCOME' as const, amountMillions: net / 1e8, balanceAfterMillions: studio.cashReserve, description: `${title.id}: net collected cinema receipts after signed shares and booking costs` }].slice(-STUDIO_AI_LEDGER_LIMIT);
         }
-        else if (outside) {
+        else if (outside || (prior.basis==='LEGACY_ACTIVE' && prior.ownerId===`legacy-owner:${title.id}` && title.owner.id===prior.ownerId)) {
+            // Sparse legacy imports can lack producer identity. Keep their new
+            // net receipts in the existing external ledger; never guess a studio.
             state.externalProducerBalancesCents = { ...state.externalProducerBalancesCents, [title.owner.id]: sum([state.externalProducerBalancesCents?.[title.owner.id] || 0, net]) };
         }
         else

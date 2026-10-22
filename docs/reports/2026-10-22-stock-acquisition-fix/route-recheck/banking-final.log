@@ -1,0 +1,83 @@
+
+> pr-6.6.3@1.0.25 audit:bank-acquisition-accounting
+> esbuild scripts/audit-bank-studio-equity.ts scripts/audit-bank-transfer-cashflow.ts scripts/audit-studio-funded-equity.ts scripts/audit-corporate-stock-cash.ts scripts/audit-acquisition-banking-flow.ts --bundle --platform=node --format=esm --loader:.csv=text --outdir=/tmp/actor-bank-acquisition-accounting && node /tmp/actor-bank-acquisition-accounting/audit-bank-studio-equity.js && node /tmp/actor-bank-acquisition-accounting/audit-bank-transfer-cashflow.js && node /tmp/actor-bank-acquisition-accounting/audit-studio-funded-equity.js && node /tmp/actor-bank-acquisition-accounting/audit-corporate-stock-cash.js && node /tmp/actor-bank-acquisition-accounting/audit-acquisition-banking-flow.js
+
+
+  ...or-bank-acquisition-accounting/audit-acquisition-banking-flow.js  9.5mb ⚠️
+  ...mp/actor-bank-acquisition-accounting/audit-bank-studio-equity.js  6.3mb ⚠️
+  .../actor-bank-acquisition-accounting/audit-studio-funded-equity.js  4.9mb ⚠️
+  .../actor-bank-acquisition-accounting/audit-corporate-stock-cash.js  4.7mb ⚠️
+  ...ctor-bank-acquisition-accounting/audit-bank-transfer-cashflow.js  4.7mb ⚠️
+
+⚡ Done in 174ms
+PASS legacy studio operating value is preserved before a capital move
+PASS shared business capital helpers retain studio cash-neutral equity
+PASS personal withdrawal does not duplicate studio cash in bank collateral
+PASS cash injected beyond the old valuation remains worth one dollar per dollar
+PASS HQ to subsidiary and return preserve consolidated collateral
+PASS founder HQ withdrawal preserves collateral
+PASS minority distribution removes only the player attributable value
+PASS an acquired studio used as HQ still respects minority ownership
+PASS company-funded private shares replace spent cash without granting minority equity to the player
+PASS twelve round trips cannot create collateral or borrowing capacity
+PASS same-week real business cash receipts remain additional assets
+PASS save reload and migration retain the corrected cash basis
+PASS fresh valuation refresh is honored and later withdrawals stay neutral
+PASS a real appraisal prices cash at par irrespective of the studio risk multiple
+PASS weekly revaluation rebases current cash and later withdrawals stay neutral
+PASS withdrawal then acquisition debt paydown does not double deduct or duplicate equity
+PASS world reaction cannot revive withdrawn cash or apply its premium to deposited cash
+PASS acquisition market pulse cannot revive withdrawn cash or apply its premium to deposited cash
+Bank studio equity audit passed (18 checks).
+PASS withdraw/reinject capital cannot manufacture operating income or a credit upgrade
+PASS borrowed principal, repayments and sale proceeds are capital not operating income
+PASS real salary royalties operating revenue and rental income remain bankable
+PASS future and out-of-window entries do not inflate current operating income
+PASS actual bank funding and repayment conserve principal and never become operating cashflow
+PASS same-week manual payment splitting does not farm successful payment credit
+PASS actual bank actions reject invalid amounts terms stale IDs and insufficient cash
+PASS capital spam cannot evict a real operating loss and improve the credit quote
+PASS acquisition principal paydown remains capital while real interest remains operating expense
+PASS corporate-funded portfolio contributes only beneficial shares to personal borrowing assets
+Bank cashflow/actions audit passed: 10 total checks.
+PASS Studio-funded full buyout preserves 52% beneficial ownership
+PASS Funding debit preserves personal wallet
+PASS Distribution is limited to beneficial ownership
+PASS Source sale includes its funded subsidiary
+PASS Live source ownership updates descendant ownership
+PASS Personal acquisitions remain 100% owned
+PASS Legacy closing funding evidence preserves ownership after reload
+PASS Minority investment retains corporate holder and exits to company wallet
+PASS Corporate minority exit proceeds return to the funding company, not personal cash
+PASS Mixed personal/corporate private exit preserves each wallet and remaining allocation
+PASS Corporate quarterly dividends remain company capital
+PASS Live source listing blocks its subsidiary transfers and acquisition funding
+PASS Source sale transfers funded children and corporate private stakes exactly once
+PASS Corporate ownership cycles cannot create personal equity
+PASS Legacy missing or ambiguous corporate evidence does not invent ownership links
+PASS Source sale transfers only corporate stock shares and preserves personal shares/cost basis
+PASS Acquisition funding cannot drain a live listed holding company
+PASS Direct corporate-child sale proceeds stay in the corporate owner wallet
+PASS Mixed corporate stock/private control compounds both tranches
+PASS Corporate subsidiary royalties return to source and deduplicate across reload
+PASS Underwater bundled debt cannot mint corporate receipts beyond buyer cash
+PASS Controlled private positions are not counted twice as source sale assets
+Studio-funded equity checks: 22
+PASS company-funded stock sale returns proceeds to company, not personal wallet
+PASS personal purchases preserve existing corporate funding allocation
+PASS corporate dividends are excluded from direct personal dividend payout
+PASS mixed stock sale allocates proceeds and remaining share ownership
+PASS unknown corporate holder cannot cash out through personal wallet
+PASS live studio listing locks disposal of included corporate shares
+PASS untagged legacy personal shares still sell entirely to personal wallet
+PASS small mixed share splits conserve cash shares and each ownership bucket
+Corporate stock cash audit passed (8 checks).
+PASS actual $500M withdrawal preserves wealth and borrowing capacity
+PASS valid loan credits cash once and retains matching debt
+PASS real submitted accepted acquisition debits exact purchase and retains inherited debt
+PASS new studio withdrawal pays bank principal without deleting company liabilities
+PASS inherited company principal is paid separately exactly once
+PASS save reload retains balances ownership loan rates and capital classification
+PASS actual weekly engine posts corporate public dividends once to company ledger
+PASS next week after save reload does not duplicate corporate dividend
+Acquisition banking end-to-end audit passed (8 checks).

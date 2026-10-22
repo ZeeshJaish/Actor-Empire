@@ -1,0 +1,9 @@
+PASS company-funded stock sale returns proceeds to company, not personal wallet
+PASS personal purchases preserve existing corporate funding allocation
+PASS corporate dividends are excluded from direct personal dividend payout
+PASS mixed stock sale allocates proceeds and remaining share ownership
+PASS unknown corporate holder cannot cash out through personal wallet
+PASS live studio listing locks disposal of included corporate shares
+PASS untagged legacy personal shares still sell entirely to personal wallet
+PASS small mixed share splits conserve cash shares and each ownership bucket
+Corporate stock cash audit passed (8 checks).

@@ -1,0 +1,162 @@
+{"name":"PARAMOUNT-0","studio":"PARAMOUNT","state":"PUBLICLY_TRADED","eligibility":{"canApproach":true,"allowedOfferTypes":["MINORITY"],"recommendedOfferType":"MINORITY"},"readiness":{"eligible":false,"shares":0,"outstandingShares":650000000,"ownershipPercent":0,"linkedStockId":"stk_para"},"stocksControl":false,"renderedButtons":["","Open Stock Position","Approach Studio"],"signed":false,"signingReason":"CASE_NOT_ACCEPTED","signingCashDelta":0,"businessesAdded":0,"originalUntouched":true}
+{"name":"PARAMOUNT-49","studio":"PARAMOUNT","state":"PUBLICLY_TRADED","eligibility":{"canApproach":true,"allowedOfferTypes":["MINORITY"],"recommendedOfferType":"MINORITY"},"readiness":{"eligible":false,"shares":318500000,"outstandingShares":650000000,"ownershipPercent":49,"linkedStockId":"stk_para"},"stocksControl":false,"renderedButtons":["","Open Stock Position","Approach Studio"],"signed":false,"signingReason":"CASE_NOT_ACCEPTED","signingCashDelta":0,"businessesAdded":0,"originalUntouched":true}
+{"name":"PARAMOUNT-50","studio":"PARAMOUNT","state":"PUBLICLY_TRADED","eligibility":{"canApproach":true,"allowedOfferTypes":["MINORITY"],"recommendedOfferType":"MINORITY"},"readiness":{"eligible":true,"shares":325000000,"outstandingShares":650000000,"ownershipPercent":50,"additionalPrice":0,"linkedStockId":"stk_para"},"stocksControl":true,"renderedButtons":["","Open Stock Position","Approach Studio"],"signed":true,"signingCashDelta":0,"businessesAdded":1,"originalUntouched":true}
+{"name":"PARAMOUNT-51","studio":"PARAMOUNT","state":"PUBLICLY_TRADED","eligibility":{"canApproach":true,"allowedOfferTypes":["MINORITY"],"recommendedOfferType":"MINORITY"},"readiness":{"eligible":true,"shares":331500000,"outstandingShares":650000000,"ownershipPercent":51,"additionalPrice":0,"linkedStockId":"stk_para"},"stocksControl":true,"renderedButtons":["","Open Stock Position","Approach Studio"],"signed":true,"signingCashDelta":0,"businessesAdded":1,"originalUntouched":true}
+{"name":"PARAMOUNT-100","studio":"PARAMOUNT","state":"PUBLICLY_TRADED","eligibility":{"canApproach":true,"allowedOfferTypes":["MINORITY"],"recommendedOfferType":"MINORITY"},"readiness":{"eligible":true,"shares":650000000,"outstandingShares":650000000,"ownershipPercent":100,"additionalPrice":0,"linkedStockId":"stk_para"},"stocksControl":true,"renderedButtons":["","Open Stock Position","Approach Studio"],"signed":true,"signingCashDelta":0,"businessesAdded":1,"originalUntouched":true}
+{"name":"WARNER_BROS-0","studio":"WARNER_BROS","state":"PUBLICLY_TRADED","eligibility":{"canApproach":true,"allowedOfferTypes":["MINORITY"],"recommendedOfferType":"MINORITY"},"readiness":{"eligible":false,"shares":0,"outstandingShares":2450000000,"ownershipPercent":0,"linkedStockId":"stk_wbd"},"stocksControl":false,"renderedButtons":["","Open Stock Position","Approach Studio"],"signed":false,"signingReason":"CASE_NOT_ACCEPTED","signingCashDelta":0,"businessesAdded":0,"originalUntouched":true}
+{"name":"WARNER_BROS-49","studio":"WARNER_BROS","state":"PUBLICLY_TRADED","eligibility":{"canApproach":true,"allowedOfferTypes":["MINORITY"],"recommendedOfferType":"MINORITY"},"readiness":{"eligible":false,"shares":1200500000,"outstandingShares":2450000000,"ownershipPercent":49,"linkedStockId":"stk_wbd"},"stocksControl":false,"renderedButtons":["","Open Stock Position","Approach Studio"],"signed":false,"signingReason":"CASE_NOT_ACCEPTED","signingCashDelta":0,"businessesAdded":0,"originalUntouched":true}
+{"name":"WARNER_BROS-50","studio":"WARNER_BROS","state":"PUBLICLY_TRADED","eligibility":{"canApproach":true,"allowedOfferTypes":["MINORITY"],"recommendedOfferType":"MINORITY"},"readiness":{"eligible":true,"shares":1225000000,"outstandingShares":2450000000,"ownershipPercent":50,"additionalPrice":0,"linkedStockId":"stk_wbd"},"stocksControl":true,"renderedButtons":["","Open Stock Position","Approach Studio"],"signed":true,"signingCashDelta":0,"businessesAdded":1,"originalUntouched":true}
+{"name":"WARNER_BROS-51","studio":"WARNER_BROS","state":"PUBLICLY_TRADED","eligibility":{"canApproach":true,"allowedOfferTypes":["MINORITY"],"recommendedOfferType":"MINORITY"},"readiness":{"eligible":true,"shares":1249500000,"outstandingShares":2450000000,"ownershipPercent":51,"additionalPrice":0,"linkedStockId":"stk_wbd"},"stocksControl":true,"renderedButtons":["","Open Stock Position","Approach Studio"],"signed":true,"signingCashDelta":0,"businessesAdded":1,"originalUntouched":true}
+{"name":"WARNER_BROS-100","studio":"WARNER_BROS","state":"PUBLICLY_TRADED","eligibility":{"canApproach":true,"allowedOfferTypes":["MINORITY"],"recommendedOfferType":"MINORITY"},"readiness":{"eligible":true,"shares":2450000000,"outstandingShares":2450000000,"ownershipPercent":100,"additionalPrice":0,"linkedStockId":"stk_wbd"},"stocksControl":true,"renderedButtons":["","Open Stock Position","Approach Studio"],"signed":true,"signingCashDelta":0,"businessesAdded":1,"originalUntouched":true}
+{"name":"UNIVERSAL-0","studio":"UNIVERSAL","state":"PUBLICLY_TRADED","eligibility":{"canApproach":true,"allowedOfferTypes":["MINORITY"],"recommendedOfferType":"MINORITY"},"readiness":{"eligible":false,"shares":0,"outstandingShares":3900000000,"ownershipPercent":0,"linkedStockId":"stk_cmcsa"},"stocksControl":false,"renderedButtons":["","Open Stock Position","Approach Studio"],"signed":false,"signingReason":"CASE_NOT_ACCEPTED","signingCashDelta":0,"businessesAdded":0,"originalUntouched":true}
+{"name":"UNIVERSAL-49","studio":"UNIVERSAL","state":"PUBLICLY_TRADED","eligibility":{"canApproach":true,"allowedOfferTypes":["MINORITY"],"recommendedOfferType":"MINORITY"},"readiness":{"eligible":false,"shares":1911000000,"outstandingShares":3900000000,"ownershipPercent":49,"linkedStockId":"stk_cmcsa"},"stocksControl":false,"renderedButtons":["","Open Stock Position","Approach Studio"],"signed":false,"signingReason":"CASE_NOT_ACCEPTED","signingCashDelta":0,"businessesAdded":0,"originalUntouched":true}
+{"name":"UNIVERSAL-50","studio":"UNIVERSAL","state":"PUBLICLY_TRADED","eligibility":{"canApproach":true,"allowedOfferTypes":["MINORITY"],"recommendedOfferType":"MINORITY"},"readiness":{"eligible":true,"shares":1950000000,"outstandingShares":3900000000,"ownershipPercent":50,"additionalPrice":0,"linkedStockId":"stk_cmcsa"},"stocksControl":true,"renderedButtons":["","Open Stock Position","Approach Studio"],"signed":true,"signingCashDelta":0,"businessesAdded":1,"originalUntouched":true}
+{"name":"UNIVERSAL-51","studio":"UNIVERSAL","state":"PUBLICLY_TRADED","eligibility":{"canApproach":true,"allowedOfferTypes":["MINORITY"],"recommendedOfferType":"MINORITY"},"readiness":{"eligible":true,"shares":1989000000,"outstandingShares":3900000000,"ownershipPercent":51,"additionalPrice":0,"linkedStockId":"stk_cmcsa"},"stocksControl":true,"renderedButtons":["","Open Stock Position","Approach Studio"],"signed":true,"signingCashDelta":0,"businessesAdded":1,"originalUntouched":true}
+{"name":"UNIVERSAL-100","studio":"UNIVERSAL","state":"PUBLICLY_TRADED","eligibility":{"canApproach":true,"allowedOfferTypes":["MINORITY"],"recommendedOfferType":"MINORITY"},"readiness":{"eligible":true,"shares":3900000000,"outstandingShares":3900000000,"ownershipPercent":100,"additionalPrice":0,"linkedStockId":"stk_cmcsa"},"stocksControl":true,"renderedButtons":["","Open Stock Position","Approach Studio"],"signed":true,"signingCashDelta":0,"businessesAdded":1,"originalUntouched":true}
+{"name":"PARAMOUNT-51-DRAFT","studio":"PARAMOUNT","state":"PUBLICLY_TRADED","caseStatus":"DRAFT","eligibility":{"canApproach":true,"allowedOfferTypes":["MINORITY"],"recommendedOfferType":"MINORITY"},"readiness":{"eligible":true,"shares":331500000,"outstandingShares":650000000,"ownershipPercent":51,"additionalPrice":0,"linkedStockId":"stk_para"},"stocksControl":true,"renderedButtons":["","Open Stock Position","Approach Studio"],"signed":true,"signingCashDelta":0,"businessesAdded":1,"originalUntouched":true}
+{"name":"PARAMOUNT-51-ACCEPTED","studio":"PARAMOUNT","state":"PUBLICLY_TRADED","caseStatus":"ACCEPTED","eligibility":{"canApproach":false,"reason":"OFFER_ALREADY_SUBMITTED","allowedOfferTypes":["MINORITY"],"recommendedOfferType":"MINORITY"},"readiness":{"eligible":true,"shares":331500000,"outstandingShares":650000000,"ownershipPercent":51,"additionalPrice":0,"linkedStockId":"stk_para"},"stocksControl":true,"renderedButtons":["","Open Stock Position","View Accepted Terms"],"signed":true,"signingCashDelta":0,"businessesAdded":1,"originalUntouched":true}
+{"name":"PARAMOUNT-51-COUNTERED","studio":"PARAMOUNT","state":"PUBLICLY_TRADED","caseStatus":"COUNTERED","eligibility":{"canApproach":false,"reason":"OFFER_ALREADY_SUBMITTED","allowedOfferTypes":["MINORITY"],"recommendedOfferType":"MINORITY"},"readiness":{"eligible":true,"shares":331500000,"outstandingShares":650000000,"ownershipPercent":51,"additionalPrice":0,"linkedStockId":"stk_para"},"stocksControl":true,"renderedButtons":["","Open Stock Position","Review Counter"],"signed":true,"signingCashDelta":0,"businessesAdded":1,"originalUntouched":true}
+{"name":"PARAMOUNT-51-REJECTED","studio":"PARAMOUNT","state":"PUBLICLY_TRADED","caseStatus":"REJECTED","eligibility":{"canApproach":true,"allowedOfferTypes":["MINORITY"],"recommendedOfferType":"MINORITY"},"readiness":{"eligible":true,"shares":331500000,"outstandingShares":650000000,"ownershipPercent":51,"additionalPrice":0,"linkedStockId":"stk_para"},"stocksControl":true,"renderedButtons":["","Open Stock Position","Revise offer (2 left)"],"signed":true,"signingCashDelta":0,"businessesAdded":1,"originalUntouched":true}
+{"name":"PARAMOUNT-51-FINAL_REJECTION","studio":"PARAMOUNT","state":"PUBLICLY_TRADED","caseStatus":"REJECTED","eligibility":{"canApproach":false,"reason":"COOLDOWN_ACTIVE","allowedOfferTypes":[],"recommendedOfferType":"MINORITY"},"readiness":{"eligible":true,"shares":331500000,"outstandingShares":650000000,"ownershipPercent":51,"additionalPrice":0,"linkedStockId":"stk_para"},"stocksControl":true,"renderedButtons":["","Open Stock Position"],"signed":true,"signingCashDelta":0,"businessesAdded":1,"originalUntouched":true}
+{"name":"PARAMOUNT-51-CLOSED","studio":"PARAMOUNT","state":"PUBLICLY_TRADED","caseStatus":"CLOSED","eligibility":{"canApproach":false,"reason":"COOLDOWN_ACTIVE","allowedOfferTypes":[],"recommendedOfferType":"MINORITY"},"readiness":{"eligible":true,"shares":331500000,"outstandingShares":650000000,"ownershipPercent":51,"additionalPrice":0,"linkedStockId":"stk_para"},"stocksControl":true,"renderedButtons":["","Open Stock Position"],"signed":true,"signingCashDelta":0,"businessesAdded":1,"originalUntouched":true}
+{"name":"NETFLIX-100-reserved","studio":"NETFLIX","state":"PUBLICLY_TRADED","eligibility":{"canApproach":false,"reason":"STREAMING_PLATFORM_RESERVED","allowedOfferTypes":[],"recommendedOfferType":"MINORITY"},"readiness":{"eligible":false,"shares":430000000,"outstandingShares":430000000,"ownershipPercent":100,"linkedStockId":"stk_nflx"},"stocksControl":false,"renderedButtons":["","Open Stock Position","Monitor Studio"],"signed":false,"signingReason":"STREAMING_PLATFORM_RESERVED","signingCashDelta":0,"businessesAdded":0,"originalUntouched":true}
+{"name":"NETFLIX-100-reserved-old-DRAFT","studio":"NETFLIX","state":"PUBLICLY_TRADED","caseStatus":"DRAFT","eligibility":{"canApproach":false,"reason":"STREAMING_PLATFORM_RESERVED","allowedOfferTypes":[],"recommendedOfferType":"MINORITY"},"readiness":{"eligible":false,"shares":430000000,"outstandingShares":430000000,"ownershipPercent":100,"linkedStockId":"stk_nflx"},"stocksControl":false,"renderedButtons":["","Open Stock Position","Approach Studio"],"signed":false,"signingReason":"STREAMING_PLATFORM_RESERVED","signingCashDelta":0,"businessesAdded":0,"originalUntouched":true,"diligence":{"success":true,"cashDelta":-25000000}}
+{"name":"APPLE_TV-100-reserved","studio":"APPLE_TV","state":"PUBLICLY_TRADED","eligibility":{"canApproach":false,"reason":"STREAMING_PLATFORM_RESERVED","allowedOfferTypes":[],"recommendedOfferType":"MINORITY"},"readiness":{"eligible":false,"shares":15300000000,"outstandingShares":15300000000,"ownershipPercent":100,"linkedStockId":"stk_apple"},"stocksControl":false,"renderedButtons":["","Open Stock Position","Monitor Studio"],"signed":false,"signingReason":"STREAMING_PLATFORM_RESERVED","signingCashDelta":0,"businessesAdded":0,"originalUntouched":true}
+{"name":"APPLE_TV-100-reserved-old-DRAFT","studio":"APPLE_TV","state":"PUBLICLY_TRADED","caseStatus":"DRAFT","eligibility":{"canApproach":false,"reason":"STREAMING_PLATFORM_RESERVED","allowedOfferTypes":[],"recommendedOfferType":"MINORITY"},"readiness":{"eligible":false,"shares":15300000000,"outstandingShares":15300000000,"ownershipPercent":100,"linkedStockId":"stk_apple"},"stocksControl":false,"renderedButtons":["","Open Stock Position","Approach Studio"],"signed":false,"signingReason":"STREAMING_PLATFORM_RESERVED","signingCashDelta":0,"businessesAdded":0,"originalUntouched":true,"diligence":{"success":true,"cashDelta":-25000000}}
+{"name":"DISNEY_PLUS-100-reserved","studio":"DISNEY_PLUS","state":"PUBLICLY_TRADED","eligibility":{"canApproach":false,"reason":"STREAMING_PLATFORM_RESERVED","allowedOfferTypes":[],"recommendedOfferType":"MINORITY"},"readiness":{"eligible":false,"shares":1820000000,"outstandingShares":1820000000,"ownershipPercent":100,"linkedStockId":"stk_dis"},"stocksControl":false,"renderedButtons":["","Open Stock Position","Monitor Studio"],"signed":false,"signingReason":"STREAMING_PLATFORM_RESERVED","signingCashDelta":0,"businessesAdded":0,"originalUntouched":true}
+{"name":"DISNEY_PLUS-100-reserved-old-DRAFT","studio":"DISNEY_PLUS","state":"PUBLICLY_TRADED","caseStatus":"DRAFT","eligibility":{"canApproach":false,"reason":"STREAMING_PLATFORM_RESERVED","allowedOfferTypes":[],"recommendedOfferType":"MINORITY"},"readiness":{"eligible":false,"shares":1820000000,"outstandingShares":1820000000,"ownershipPercent":100,"linkedStockId":"stk_dis"},"stocksControl":false,"renderedButtons":["","Open Stock Position","Approach Studio"],"signed":false,"signingReason":"STREAMING_PLATFORM_RESERVED","signingCashDelta":0,"businessesAdded":0,"originalUntouched":true,"diligence":{"success":true,"cashDelta":-25000000}}
+{"name":"private-OPEN_TO_OFFERS","studio":"PRIVATE_AUDIT","state":"OPEN_TO_OFFERS","eligibility":{"canApproach":true,"allowedOfferTypes":["CONSERVATIVE","FAIR","AGGRESSIVE","MINORITY"],"recommendedOfferType":"FAIR"},"readiness":{"eligible":false,"shares":0,"outstandingShares":0,"ownershipPercent":0},"renderedButtons":["","Approach Studio"],"signed":false,"signingReason":"CASE_NOT_ACCEPTED","signingCashDelta":0,"businessesAdded":0,"originalUntouched":true}
+{"name":"private-NOT_FOR_SALE","studio":"PRIVATE_AUDIT","state":"NOT_FOR_SALE","eligibility":{"canApproach":false,"reason":"NOT_FOR_SALE","allowedOfferTypes":[],"recommendedOfferType":"FAIR"},"readiness":{"eligible":false,"shares":0,"outstandingShares":0,"ownershipPercent":0},"renderedButtons":["","Monitor Studio"],"signed":false,"signingReason":"CASE_NOT_ACCEPTED","signingCashDelta":0,"businessesAdded":0,"originalUntouched":true}
+{"name":"public-zero-desk","renderedButtons":["←","Bid Blind →","Run Due Diligence · $12.7M"],"hasOpenStocks":false,"hasPublicPosition":true}
+{"name":"stock-catalog-AAPL","relatedStudioId":"APPLE_TV","transferReady":false,"unlocks":[],"nextUnlock":"Streaming Phase acquisition later"}
+{"name":"stock-catalog-AMZN","transferReady":false,"unlocks":[],"nextUnlock":"Control Transfer ready"}
+{"name":"stock-catalog-GOOG","transferReady":false,"unlocks":[],"nextUnlock":"Control Transfer ready"}
+{"name":"stock-catalog-NFLX","relatedStudioId":"NETFLIX","transferReady":false,"unlocks":[],"nextUnlock":"Streaming Phase acquisition later"}
+{"name":"stock-catalog-DIS","relatedStudioId":"DISNEY_PLUS","transferReady":false,"unlocks":[],"nextUnlock":"Streaming Phase acquisition later"}
+{"name":"stock-catalog-WBD","relatedStudioId":"WARNER_BROS","transferReady":true,"unlocks":["SHAREHOLDER_ALLIANCE","FRIENDLY_TAKEOVER","HOSTILE_TAKEOVER","CONTROL_TRANSFER"],"nextUnlock":"Control Transfer ready"}
+{"name":"stock-catalog-PARA","relatedStudioId":"PARAMOUNT","transferReady":true,"unlocks":["SHAREHOLDER_ALLIANCE","FRIENDLY_TAKEOVER","HOSTILE_TAKEOVER","CONTROL_TRANSFER"],"nextUnlock":"Control Transfer ready"}
+{"name":"stock-catalog-CMCSA","relatedStudioId":"UNIVERSAL","transferReady":true,"unlocks":["SHAREHOLDER_ALLIANCE","FRIENDLY_TAKEOVER","HOSTILE_TAKEOVER","CONTROL_TRANSFER"],"nextUnlock":"Control Transfer ready"}
+{"name":"stock-catalog-NKE","transferReady":false,"unlocks":[],"nextUnlock":"Control Transfer ready"}
+{"name":"stock-catalog-KER","transferReady":false,"unlocks":[],"nextUnlock":"Control Transfer ready"}
+{"name":"stock-catalog-KO","transferReady":false,"unlocks":[],"nextUnlock":"Control Transfer ready"}
+{"name":"stock-catalog-PEP","transferReady":false,"unlocks":[],"nextUnlock":"Control Transfer ready"}
+{"name":"stock-catalog-TSLA","transferReady":false,"unlocks":[],"nextUnlock":"Control Transfer ready"}
+{"name":"stock-catalog-TM","transferReady":false,"unlocks":[],"nextUnlock":"Control Transfer ready"}
+{"name":"stock-catalog-RACE","transferReady":false,"unlocks":[],"nextUnlock":"Control Transfer ready"}
+{"name":"stock-catalog-LVMH","transferReady":false,"unlocks":[],"nextUnlock":"Control Transfer ready"}
+FAIL PARAMOUNT-50 exposes current control transfer in Forbes AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+  ok(row.renderedButtons.includes("Complete Control Transfer"))
+
+FAIL PARAMOUNT-51 exposes current control transfer in Forbes AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+  ok(row.renderedButtons.includes("Complete Control Transfer"))
+
+FAIL PARAMOUNT-100 exposes current control transfer in Forbes AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+  ok(row.renderedButtons.includes("Complete Control Transfer"))
+
+FAIL WARNER_BROS-50 exposes current control transfer in Forbes AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+  ok(row.renderedButtons.includes("Complete Control Transfer"))
+
+FAIL WARNER_BROS-51 exposes current control transfer in Forbes AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+  ok(row.renderedButtons.includes("Complete Control Transfer"))
+
+FAIL WARNER_BROS-100 exposes current control transfer in Forbes AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+  ok(row.renderedButtons.includes("Complete Control Transfer"))
+
+FAIL UNIVERSAL-50 exposes current control transfer in Forbes AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+  ok(row.renderedButtons.includes("Complete Control Transfer"))
+
+FAIL UNIVERSAL-51 exposes current control transfer in Forbes AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+  ok(row.renderedButtons.includes("Complete Control Transfer"))
+
+FAIL UNIVERSAL-100 exposes current control transfer in Forbes AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+  ok(row.renderedButtons.includes("Complete Control Transfer"))
+
+FAIL PARAMOUNT-51-DRAFT exposes current control transfer in Forbes AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+  ok(row.renderedButtons.includes("Complete Control Transfer"))
+
+FAIL PARAMOUNT-51-ACCEPTED exposes current control transfer in Forbes AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+  ok(row.renderedButtons.includes("Complete Control Transfer"))
+
+FAIL PARAMOUNT-51-COUNTERED exposes current control transfer in Forbes AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+  ok(row.renderedButtons.includes("Complete Control Transfer"))
+
+FAIL PARAMOUNT-51-REJECTED exposes current control transfer in Forbes AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+  ok(row.renderedButtons.includes("Complete Control Transfer"))
+
+FAIL PARAMOUNT-51-FINAL_REJECTION exposes current control transfer in Forbes AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+  ok(row.renderedButtons.includes("Complete Control Transfer"))
+
+FAIL PARAMOUNT-51-CLOSED exposes current control transfer in Forbes AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+  ok(row.renderedButtons.includes("Complete Control Transfer"))
+
+FAIL NETFLIX-100-reserved-old-DRAFT cannot sell unusable acquisition diligence AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+true !== false
+
+FAIL APPLE_TV-100-reserved-old-DRAFT cannot sell unusable acquisition diligence AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+true !== false
+
+FAIL DISNEY_PLUS-100-reserved-old-DRAFT cannot sell unusable acquisition diligence AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+true !== false
+
+FAIL PARAMOUNT-0 labels the public tender separately AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+  ok(row.renderedButtons.includes("Open Public Tender"))
+
+FAIL PARAMOUNT-49 labels the public tender separately AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+  ok(row.renderedButtons.includes("Open Public Tender"))
+
+FAIL WARNER_BROS-0 labels the public tender separately AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+  ok(row.renderedButtons.includes("Open Public Tender"))
+
+FAIL WARNER_BROS-49 labels the public tender separately AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+  ok(row.renderedButtons.includes("Open Public Tender"))
+
+FAIL UNIVERSAL-0 labels the public tender separately AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+  ok(row.renderedButtons.includes("Open Public Tender"))
+
+FAIL UNIVERSAL-49 labels the public tender separately AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+  ok(row.renderedButtons.includes("Open Public Tender"))
+
+FAIL public dossier offers both Stocks and public tender routes AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+  ok(r.renderedButtons.includes("Buy Shares in Stocks"))
+
+/private/tmp/probe-stock-forbes-routes.cjs:137091
+  if (failures.length) throw Error(`${failures.length} acquisition entry-route regressions failed`);
+                       ^
+
+Error: 25 acquisition entry-route regressions failed
+    at Object.<anonymous> (/private/tmp/probe-stock-forbes-routes.cjs:137091:30)
+    at Module._compile (node:internal/modules/cjs/loader:1761:14)
+    at Object..js (node:internal/modules/cjs/loader:1893:10)
+    at Module.load (node:internal/modules/cjs/loader:1481:32)
+    at Module._load (node:internal/modules/cjs/loader:1300:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+    at node:internal/main/run_main_module:33:47
+
+Node.js v24.11.1

@@ -14,6 +14,8 @@ import { getStreamingPlatformAnalytics } from '../services/streamingAnalytics';
 import { processOwnedStreamingPlatformWeek } from '../services/streamingWeeklyLoop';
 import { createCanonicalAudienceState } from '../components/streaming-transplant/createCanonicalStreamingPresentation';
 import { AudienceDesk } from '../components/streaming-transplant/StreamingAudienceExperience';
+import { PlatformOffer } from '../components/streaming-transplant/PlatformOffer';
+import { getStreamingPlatformOfferView } from '../services/streamingPlatformOffer';
 import StreamingWeeklyCeoLoop from '../components/StreamingWeeklyCeoLoop';
 
 const player = structuredClone(INITIAL_PLAYER) as Player;
@@ -82,14 +84,36 @@ const audienceMarkup = renderToStaticMarkup(<AudienceDesk
     brand={brand}
     state={createCanonicalAudienceState(processed)}
     initialTab="ANALYTICS"
-    initialAnalyticsScope="MARKET"
+    /* Entry #2 (live): paid access and the sharing policy are the player's own
+       service, so they moved from the industry overview to Your Platform. */
+    initialAnalyticsScope="PLATFORM"
     initialMarketView="OVERVIEW"
     onBack={() => undefined}
     accessPolicy={processed.ownedStreamingPlatform.audienceAccessPolicy}
-    onAccessPolicyChange={() => undefined}
+    onOpenPlatformOffer={() => undefined}
 />);
-['PAID ACCOUNTS', 'SHARED ACCESS', 'PIRACY REACH', 'SHARING POSTURE', 'ENFORCEMENT'].forEach(text => (
+['PAID ACCOUNTS', 'SHARED ACCESS', 'PIRACY REACH'].forEach(text => (
     assert.ok(audienceMarkup.includes(text), `Audience Market renders ${text}`)
+));
+/* Entry #3: the sharing policy is configuration, so it moved to the Platform
+   room's Offer page, fed by the same settled WE5 figures. */
+const offerView = getStreamingPlatformOfferView(processed);
+assert.equal(offerView.sharing.settled.paidAccounts, customer.endingPaidAccounts, 'Platform Offer reads canonical WE5 paid accounts');
+assert.equal(offerView.sharing.settled.sharedHomes, customer.externalSharedHouseholds, 'Platform Offer reads WE5 shared homes');
+const offerMarkup = renderToStaticMarkup(<PlatformOffer
+    accent="#6d4aff"
+    offer={offerView}
+    actions={{}}
+    sharing={{
+        policy: processed.ownedStreamingPlatform.audienceAccessPolicy,
+        settled: offerView.sharing.settled,
+        available: offerView.sharing.available,
+        appliesNextWeek: false,
+        onApply: () => undefined,
+    }}
+/>);
+['SHARING POSTURE', 'ENFORCEMENT'].forEach(text => (
+    assert.ok(offerMarkup.includes(text), `Platform Offer renders ${text}`)
 ));
 assert.ok(!audienceMarkup.includes('UTILITY SCORE'), 'player UI never exposes raw utility scores');
 

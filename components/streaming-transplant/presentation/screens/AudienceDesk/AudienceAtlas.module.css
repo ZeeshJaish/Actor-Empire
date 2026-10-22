@@ -1,0 +1,410 @@
+/* ============================================================================
+   AUDIENCE ATLAS — the living map, the region tiles, the country card.
+
+   The map is the Build wizard's map, stop for stop: the same sea, shelf, relief,
+   grey land and coast, so a player recognises the picture they built their
+   launch on. Everything around it speaks the Audience room's own dark language
+   (--epx-ad-c is the platform's brand colour, set on the desk root).
+
+   Numbers that matter are set in Anton — the game's display face, the one the
+   Build map writes its figures in. Labels are Archivo, uppercase, spaced.
+   ========================================================================== */
+
+/* Note: the HQ shell resets every button's font (`.streaming-hq-shell button{font:inherit}`, 0-1-1),
+   so any rule here that sets a font on a button itself is written at 0-2-0 or above. */
+
+/* ── the frame ── */
+.atlas{position:relative;height:216px;margin-top:12px;border-radius:18px;overflow:hidden;isolation:isolate;contain:layout paint;
+  background:#07131f;border:1px solid rgba(255,255,255,.1);
+  box-shadow:0 24px 46px -28px rgba(0,0,0,.95),0 0 0 1px rgba(0,0,0,.45)}
+.atlas:after{content:'';position:absolute;inset:0;z-index:4;border-radius:inherit;pointer-events:none;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.16),inset 0 0 0 1px rgba(255,255,255,.04)}
+.atlasSvg{display:block;width:100%;height:100%;touch-action:pan-y;pointer-events:none;user-select:none;-webkit-user-select:none}
+/* the rings' own layer: their animation repaints only this, never the map */
+.atlasPulse{position:absolute;inset:0;z-index:1;width:100%;height:100%;pointer-events:none;will-change:transform}
+.sea,.hits path,.hits circle{pointer-events:auto}
+.sea{cursor:zoom-out}
+.hits path,.hits circle{fill:transparent;cursor:pointer;-webkit-tap-highlight-color:transparent}
+
+/* ── the world: the shared atlas, as the Build wizard draws it ── */
+.grid{fill:none;stroke:#fff;stroke-opacity:.07;stroke-width:1;pointer-events:none}
+.shelf path{fill:none;stroke:#bae6fd;stroke-opacity:var(--o,.1);pointer-events:none}
+.relief{fill:#075985;fill-opacity:.28;pointer-events:none}
+.reliefDeep{fill:#082f49;fill-opacity:.18}
+/* land that is no market at all (Greenland, Western Sahara…): a shade quieter than open ground */
+.landQuiet{fill:#4b5768;fill-opacity:.5;pointer-events:none}
+.coast{fill:none;stroke:#f8fbff;stroke-opacity:.34;stroke-width:1.1;stroke-linejoin:round;pointer-events:none}
+
+/* ── your markets: washed in your colour, held in a bright edge (as in Build) ── */
+.markets{pointer-events:none}
+.market{stroke-linejoin:round;stroke-width:1.3;transition:fill-opacity .5s ease,stroke-opacity .5s ease}
+.market_live{fill:var(--atlas-accent);fill-opacity:.46;stroke:var(--atlas-accent);stroke-opacity:.96}
+.market_opening{fill:#f5b544;fill-opacity:.34;stroke:#f5b544;stroke-opacity:.96}
+.market_paused{fill:#ff6b6b;fill-opacity:.32;stroke:#ff6b6b;stroke-opacity:.92}
+/* picked on the market-entry page: bright, so the plan reads at a glance */
+.market_picked{fill:#fff;fill-opacity:.5;stroke:#fff;stroke-opacity:1;stroke-width:1.6}
+.marketQuiet{fill-opacity:.1}
+.selected{fill:#fff;fill-opacity:.14;stroke:#fff;stroke-width:2.2;stroke-linejoin:round;pointer-events:none;
+  filter:drop-shadow(0 0 3px rgba(255,255,255,.75))}
+
+/* ── lights: the audience, sized by how many ── */
+.lights{pointer-events:none}
+.lightGlow{fill:var(--tone);fill-opacity:.2}
+.lightCore{fill:var(--tone);stroke:rgba(4,12,22,.55)}
+.lightSpark{fill:#fff;fill-opacity:.55}
+.lightRing{fill:none;stroke:var(--tone);stroke-opacity:.85;stroke-width:1.3;vector-effect:non-scaling-stroke;
+  transform-box:fill-box;transform-origin:center;animation:atlasRing 3.2s cubic-bezier(.22,.8,.3,1) infinite}
+@keyframes atlasRing{0%{transform:scale(.7);opacity:.9}70%{transform:scale(2.2);opacity:0}100%{transform:scale(2.2);opacity:0}}
+
+/* ── labels: written on the map, carried by their own shadow ── */
+.labels text{paint-order:stroke;stroke:#06121f;stroke-opacity:.92;stroke-linejoin:round;pointer-events:none}
+.labelValue{font-family:'Anton','Archivo',system-ui,sans-serif;fill:#fff;letter-spacing:.01em}
+.labelName{font-family:'Archivo','Inter',system-ui,sans-serif;font-weight:800;fill:rgba(236,243,251,.92);letter-spacing:.09em}
+.labelValuePending{fill:#f5b544}
+.regionLabelMuted{opacity:.55}
+
+/* ── on the picture: where you are, the key, the reading ── */
+.crumb{position:absolute;z-index:3;top:9px;left:9px;display:flex;gap:1px;padding:2px;border-radius:999px;
+  background:rgba(4,10,18,.66);border:1px solid rgba(226,240,255,.16);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.atlas .crumb button{padding:5px 9px;border-radius:999px;color:rgba(226,236,248,.74);font:800 9.5px/1 'Archivo','Inter',sans-serif;
+  letter-spacing:.08em;text-transform:uppercase;transition:color .16s ease,background .16s ease}
+.atlas .crumb button.on{color:var(--epx-brand-ink,#fff);background:var(--atlas-accent)}
+.legend{position:absolute;z-index:3;top:10px;right:10px;display:flex;flex-direction:column;align-items:flex-end;gap:4px;pointer-events:none}
+.legend span{display:flex;align-items:center;gap:5px;padding:4px 7px;border-radius:999px;background:rgba(4,10,18,.6);
+  font:800 8.5px/1 'Archivo','Inter',sans-serif;letter-spacing:.06em;text-transform:uppercase;color:rgba(226,236,248,.86)}
+.legend i{display:block;width:8px;height:8px;border-radius:3px}
+.keyLive{background:var(--atlas-accent);box-shadow:0 0 0 1px rgba(255,255,255,.4)}
+.keyOpening{background:#f5b544}
+.keyPicked{background:#fff}
+.keyLight{border-radius:50% !important;background:var(--atlas-accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--atlas-accent) 32%,transparent)}
+.keyViewer{border-radius:50% !important;background:conic-gradient(#e50914 0 33%,#113ccf 0 66%,#00a8e1 0)}
+.read{position:absolute;inset:auto 0 0 0;z-index:2;display:grid;grid-template-columns:1fr auto;align-items:end;gap:0 12px;
+  padding:26px 12px 12px;pointer-events:none;
+  background:linear-gradient(180deg,rgba(3,9,17,0) 0%,rgba(3,9,17,.48) 58%,rgba(3,9,17,.76) 100%)}
+.readSide{display:flex;flex-direction:column;gap:3px;min-width:0}
+.readEnd{align-items:flex-end;text-align:right}
+.readSide b{font:400 26px/.92 'Anton','Archivo',sans-serif;color:#f7f5f1;letter-spacing:.01em;font-feature-settings:'tnum' 1;
+  text-shadow:0 1px 2px rgba(2,8,16,.95),0 0 12px rgba(2,8,16,.8)}
+.readEnd b{font-size:19px}
+.readSide em{font:800 8.5px/1.15 'Archivo','Inter',sans-serif;font-style:normal;letter-spacing:.08em;text-transform:uppercase;
+  color:rgba(226,236,248,.88);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 1px 2px rgba(2,8,16,.95)}
+.gauge{position:absolute;inset:auto 0 0 0;height:3px;background:rgba(3,9,17,.75)}
+.gauge s{position:absolute;inset:0 auto 0 0;display:block;background:var(--atlas-accent);transition:width .52s cubic-bezier(.22,.8,.3,1)}
+.tone_good{color:#4ade80 !important}.tone_bad{color:#ff6b6b !important}.tone_warn{color:#f5b544 !important}
+
+/* ── the region strip under the map: seven cells that always fit the width ── */
+.regionStrip{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:2px;margin-top:9px;padding:3px;border-radius:14px;
+  background:#0b0e14;border:1px solid rgba(255,255,255,.08)}
+.regionStrip button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;min-width:0;padding:8px 1px 7px;
+  border-radius:11px;text-align:center;transition:background .16s ease,box-shadow .16s ease}
+.regionStrip button.on{background:color-mix(in srgb,var(--epx-ad-c) 17%,#0b0e14);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--epx-ad-c) 55%,transparent)}
+.regionStrip small{max-width:100%;overflow:hidden;font:800 6.5px/1 'Archivo','Inter',sans-serif;letter-spacing:.06em;color:#7d8698;white-space:nowrap}
+.regionStrip button.on small{color:color-mix(in srgb,var(--epx-ad-c) 62%,#fff)}
+.regionStrip b{max-width:100%;overflow:hidden;font:400 13.5px/1 'Anton','Archivo',sans-serif;color:#f3f5f9;letter-spacing:.01em;white-space:nowrap}
+.regionStrip b.muted{color:#4c5462}
+.countryRail::-webkit-scrollbar{display:none}
+
+/* ── section heads in this file's pieces ── */
+.secHead{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:20px 0 10px}
+.secHead h2{font-size:16px;font-weight:900;letter-spacing:-.01em}
+.secHead span{font-size:9.5px;color:#7d8698}
+
+/* ── top countries: a carousel of flags and numbers ── */
+.countryRail{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin:0 -14px;padding:0 14px 4px;scroll-snap-type:x proximity}
+.countryChip{position:relative;flex:0 0 128px;overflow:hidden;padding:11px;border-radius:15px;text-align:left;scroll-snap-align:start;content-visibility:auto;contain-intrinsic-size:128px 150px;
+  background:linear-gradient(160deg,rgba(255,255,255,.055),rgba(255,255,255,.014));border:1px solid rgba(255,255,255,.085);
+  transition:transform .16s ease,border-color .16s ease}
+.countryChip:active{transform:scale(.97)}
+.countryChip:before{content:'';position:absolute;inset:-40% -30% auto auto;width:90px;height:90px;border-radius:50%;
+  background:radial-gradient(closest-side,color-mix(in srgb,var(--chip-tone,var(--epx-ad-c)) 30%,transparent),transparent);pointer-events:none}
+.countryChip .chipFlag{display:block;width:28px;height:19px;border-radius:4px;overflow:hidden;box-shadow:0 0 0 1px rgba(255,255,255,.2),0 4px 10px rgba(0,0,0,.35)}
+.countryChip .chipFlag svg{display:block;width:100%;height:100%}
+.countryChip strong{display:block;margin-top:10px;font:400 22px/1 'Anton','Archivo',sans-serif;letter-spacing:.01em;color:#f7f5f1}
+.countryChip span{display:block;margin-top:3px;font-size:11px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.countryChip small{display:block;margin-top:2px;font-size:8.5px;font-weight:700;letter-spacing:.06em;color:#7d8698;text-transform:uppercase}
+.countryChip i{display:block;height:3px;margin-top:9px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden}
+.countryChip i b{display:block;height:100%;border-radius:3px;background:var(--chip-tone,var(--epx-ad-c))}
+.countryChip em{position:absolute;top:10px;right:10px;font:900 7px/1 'Archivo','Inter',sans-serif;letter-spacing:.1em;font-style:normal;
+  padding:4px 6px;border-radius:99px;background:rgba(0,0,0,.35);color:#4ade80}
+.countryChip em.down{color:#ff6b6b}
+
+/* ── who holds the homes: one bar instead of a grid of numbers ── */
+.homesTop{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.homesTop div>span{display:block;font:800 7.5px/1 'Archivo','Inter',sans-serif;letter-spacing:.13em;color:#7d8698}
+.homesTop div>b{display:block;margin-top:5px;font:400 26px/1 'Anton','Archivo',sans-serif;letter-spacing:.01em}
+.homesTop div>small{display:block;margin-top:3px;font-size:9px;color:#8b93a5}
+.homesTop .homesYou b{color:var(--epx-ad-c)}
+.homesBar{display:flex;gap:2px;height:16px;margin:13px 0 11px;border-radius:7px;overflow:hidden;background:rgba(255,255,255,.05)}
+.homesBar i{display:block;height:100%;min-width:2px;transition:width .6s cubic-bezier(.22,.8,.3,1)}
+.homesBar .open{background:repeating-linear-gradient(135deg,rgba(255,255,255,.16) 0 4px,rgba(255,255,255,.06) 4px 8px)}
+.homesBar .you{box-shadow:inset 0 0 0 1px rgba(255,255,255,.55)}
+.homesKeys{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px}
+.homesKeys div{display:grid;grid-template-columns:8px minmax(0,1fr) auto;align-items:center;gap:6px}
+.homesKeys div>i{width:8px;height:8px;border-radius:2px}
+.homesKeys div>span{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#a5adbc}
+.homesKeys div>b{font:800 10px/1 ui-monospace,Menlo,monospace;color:#e9edf3}
+.homesKeys .youKey span{color:#fff;font-weight:900}
+.homesKeys .openKey i{background:repeating-linear-gradient(135deg,rgba(255,255,255,.4) 0 2px,rgba(255,255,255,.12) 2px 4px)}
+
+/* ── from homes to you: bars that narrow ── */
+.funnel{padding:14px;border-radius:17px;background:#0c0f15;border:1px solid rgba(255,255,255,.075)}
+.funnelRow+.funnelRow{margin-top:12px}
+.funnelHead{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.funnelHead span{font:800 7.5px/1 'Archivo','Inter',sans-serif;letter-spacing:.13em;color:#7d8698}
+.funnelHead b{font:400 20px/1 'Anton','Archivo',sans-serif;letter-spacing:.01em;color:#f3f5f9;white-space:nowrap}
+.funnelHead b small{font:700 9px/1 'Inter',system-ui,sans-serif;letter-spacing:0;color:#8b93a5}
+.funnelHead em{font-size:9.5px;font-style:normal;font-weight:700;color:#8b93a5}
+.funnelBar{height:10px;margin-top:6px;border-radius:5px;background:rgba(255,255,255,.05);overflow:hidden}
+.funnelBar i{display:block;height:100%;min-width:3px;border-radius:5px;background:#55627a;transition:width .6s cubic-bezier(.22,.8,.3,1)}
+.funnelRow:first-child .funnelBar i{background:#323d50}
+.funnelYou .funnelHead span{color:color-mix(in srgb,var(--funnel-accent) 70%,#fff)}
+.funnelYou .funnelHead b{color:var(--funnel-accent)}
+.funnelYou .funnelBar i{background:var(--funnel-accent);box-shadow:0 0 10px var(--funnel-accent)}
+.funnelFacts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 14px;margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.06)}
+.funnelFacts b{display:block;font:400 17px/1 'Anton','Archivo',sans-serif;letter-spacing:.01em;color:#f3f5f9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.funnelFacts span{display:block;margin-top:5px;font:800 7px/1.2 'Archivo','Inter',sans-serif;letter-spacing:.12em;color:#7d8698}
+.funnelOverlap{margin-top:13px}
+.funnelOverlap>span{display:block;font:800 7.5px/1 'Archivo','Inter',sans-serif;letter-spacing:.13em;color:#7d8698}
+.overlapBar{display:flex;gap:2px;height:20px;margin-top:7px;border-radius:7px;overflow:hidden}
+.overlapBar i{display:flex;align-items:center;justify-content:center;min-width:20px;height:100%;background:color-mix(in srgb,var(--funnel-accent) 72%,#0c0f15)}
+.overlapBar i:nth-child(2){background:color-mix(in srgb,var(--funnel-accent) 46%,#0c0f15)}
+.overlapBar i:nth-child(3){background:color-mix(in srgb,var(--funnel-accent) 26%,#0c0f15)}
+.overlapBar b{font:900 8px/1 'Archivo','Inter',sans-serif;color:#fff}
+.overlapKeys{display:flex;justify-content:space-between;gap:6px;margin-top:5px}
+.overlapKeys small{font-size:8.5px;color:#8b93a5}
+.funnelNote{margin-top:10px;font-size:9.5px;line-height:1.5;color:#8b93a5}
+.funnelNote+.funnelNote{margin-top:5px}
+
+/* ── who wins: homes and watch time, one bar above the other ── */
+.winners{padding:14px;border-radius:17px;background:#0c0f15;border:1px solid rgba(255,255,255,.075)}
+.winBars{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:8px 9px;margin:14px 0 12px}
+.winBars>span{font:800 7px/1 'Archivo','Inter',sans-serif;letter-spacing:.12em;color:#7d8698}
+.winBar{display:flex;gap:2px;height:14px;border-radius:6px;overflow:hidden;background:rgba(255,255,255,.05)}
+.winBar i{display:block;height:100%;min-width:2px}
+.winBar .you{box-shadow:inset 0 0 0 1px rgba(255,255,255,.6)}
+.winBar .open{background:repeating-linear-gradient(135deg,rgba(255,255,255,.16) 0 4px,rgba(255,255,255,.06) 4px 8px)}
+.winKeys{display:flex;flex-direction:column;gap:6px}
+.winKeys>div{display:grid;grid-template-columns:minmax(0,1fr) 46px 46px;align-items:center;gap:6px}
+.winKeys>div>span{display:flex;align-items:center;gap:7px;min-width:0;font-size:10px;color:#a5adbc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.winKeys>div>span i{flex:0 0 8px;width:8px;height:8px;border-radius:2px}
+.winKeys>div>b{text-align:right;font:800 10px/1 ui-monospace,Menlo,monospace;color:#e9edf3}
+.winKeys .winKeysHead small{text-align:right;font:800 6.5px/1 'Archivo','Inter',sans-serif;letter-spacing:.12em;color:#5f6875}
+.winKeys .youKey>span{color:#fff;font-weight:900}
+.winKeys .openKey>span i{background:repeating-linear-gradient(135deg,rgba(255,255,255,.4) 0 2px,rgba(255,255,255,.12) 2px 4px)}
+
+/* ── the market's pulse: a number and the year behind it ── */
+.pulse{padding:13px 14px 10px;border-radius:17px;background:#0c0f15;border:1px solid rgba(255,255,255,.075)}
+.pulseHead{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.pulseHead b{display:block;font:400 26px/1 'Anton','Archivo',sans-serif;letter-spacing:.01em;color:#f7f5f1}
+.pulseHead span{display:block;margin-top:4px;font-size:9.5px;color:#8b93a5}
+.pulseHead em{display:flex;flex-direction:column;align-items:flex-end;gap:4px;font:400 18px/1 'Anton','Archivo',sans-serif;font-style:normal;color:#4ade80}
+.pulseHead em.down{color:#ff6b6b}
+.pulseHead em small{font:800 7px/1 'Archivo','Inter',sans-serif;letter-spacing:.12em;color:#7d8698;text-transform:uppercase}
+.pulse svg{display:block;width:100%;height:58px;margin-top:8px;overflow:visible}
+.pulse polygon{fill:var(--pulse-accent);opacity:.14}
+.pulse polyline{fill:none;stroke:var(--pulse-accent);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+.pulse circle{fill:var(--pulse-accent);stroke:#0c0f15;stroke-width:2}
+
+
+/* ── market status counters (Markets tab) ── */
+.statusRow{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:9px}
+.statusRow div{position:relative;overflow:hidden;padding:10px 11px;border-radius:13px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.075)}
+.statusRow div:before{content:'';position:absolute;left:0;top:10px;bottom:10px;width:3px;border-radius:0 3px 3px 0;background:var(--st)}
+.statusRow span{display:block;font:800 7.5px/1 'Archivo','Inter',sans-serif;letter-spacing:.12em;color:#7d8698}
+.statusRow b{display:block;margin-top:5px;font:400 22px/1 'Anton','Archivo',sans-serif;letter-spacing:.01em}
+.enterCta{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;margin-top:9px;padding:13px 14px;border-radius:14px;
+  background:linear-gradient(120deg,var(--epx-ad-c),color-mix(in srgb,var(--epx-ad-c) 72%,#000));color:var(--epx-brand-ink,#05080d);
+  box-shadow:0 12px 26px -14px color-mix(in srgb,var(--epx-ad-c) 80%,transparent)}
+.enterCta b{font:900 10px/1 'Archivo','Inter',sans-serif;letter-spacing:.12em;text-transform:uppercase}
+.enterCta span{font-size:10px;font-weight:700;opacity:.8}
+
+/* ── region tiles: each continent as its own small map ── */
+.regionGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+/* Flat panels, no glow: the continent itself carries the colour, drawn over
+   the atlas grid, with the region's own colour as one solid dot. */
+.regionTile{position:relative;overflow:hidden;min-height:146px;padding:11px 11px 10px;border-radius:17px;text-align:left;
+  background:#0c0f15;border:1px solid rgba(255,255,255,.075);transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease}
+.regionTile:active{transform:scale(.98)}
+.regionTile.on{border-color:transparent;box-shadow:inset 0 0 0 1.5px var(--epx-ad-c)}
+.tileMap{position:absolute;right:-6px;top:4px;width:70%;height:78px;pointer-events:none}
+.tileGrid{fill:none;stroke:#fff;stroke-opacity:.06;stroke-width:.7}
+.tileLand{fill:#1b212c;stroke:#323b4a;stroke-width:.8}
+.tileLive{fill:var(--epx-ad-c);fill-opacity:.92;stroke:color-mix(in srgb,var(--epx-ad-c) 55%,#fff);stroke-width:.8}
+.tileOpening{fill:#f5b544;fill-opacity:.75}
+.regionTile small{position:relative;display:flex;align-items:center;gap:5px;font:800 7.5px/1 'Archivo','Inter',sans-serif;letter-spacing:.12em;color:#c9cfda}
+.regionTile small i{width:6px;height:6px;border-radius:2px;background:var(--tile)}
+.regionTile strong{position:relative;display:block;margin-top:46px;font:400 26px/1 'Anton','Archivo',sans-serif;letter-spacing:.01em;color:#f7f5f1}
+.regionTile strong.muted{color:#6b7484}
+.regionTile em{position:relative;display:block;margin-top:3px;font-size:9px;font-style:normal;font-weight:700;color:#8b93a5}
+.strip{position:relative;display:grid;grid-template-columns:repeat(14,1fr);gap:2px;margin-top:9px}
+.strip i{display:block;height:5px;border-radius:2px;background:rgba(255,255,255,.1)}
+.strip .s_LIVE{background:var(--epx-ad-c)}
+.strip .s_OPENING{background:#f5b544}
+.strip .s_PAUSED{background:#ff6b6b}
+.tileFoot{position:relative;display:flex;justify-content:space-between;gap:6px;margin-top:6px;font:800 7.5px/1 'Archivo','Inter',sans-serif;letter-spacing:.08em;color:#6f7888}
+.tileFoot b{color:#c9cfda}
+
+/* ── country rows: flag, name, number ── */
+.countryList{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.countryRow{display:grid;grid-template-columns:32px minmax(0,1fr) auto;align-items:center;gap:10px;width:100%;padding:10px 11px;border-radius:13px;text-align:left;content-visibility:auto;contain-intrinsic-size:auto 66px;
+  background:rgba(255,255,255,.028);border:1px solid rgba(255,255,255,.07);transition:background .16s ease}
+.countryRow:active{background:rgba(255,255,255,.06)}
+.rowFlag{display:block;width:32px;height:22px;border-radius:4px;overflow:hidden;box-shadow:0 0 0 1px rgba(255,255,255,.16)}
+.rowFlag svg{display:block;width:100%;height:100%}
+.rowName{min-width:0}
+.rowName b{display:block;font-size:12.5px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rowName small{display:block;margin-top:2px;font-size:9px;color:#7d8698;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rowValue{text-align:right}
+.rowValue b{display:block;font:400 17px/1 'Anton','Archivo',sans-serif;letter-spacing:.01em}
+.rowValue small{display:block;margin-top:3px;font:900 7px/1 'Archivo','Inter',sans-serif;letter-spacing:.1em;text-transform:uppercase}
+.rowMeter{grid-column:2/-1;height:3px;margin-top:-2px;border-radius:3px;background:rgba(255,255,255,.07);overflow:hidden}
+.rowMeter i{display:block;height:100%;border-radius:3px;background:var(--epx-ad-c)}
+.st_LIVE{color:#4ade80}.st_OPENING{color:#f5b544}.st_PAUSED{color:#ff6b6b}.st_AVAILABLE{color:#7d8698}
+.moreRow.moreRow{display:block;width:100%;margin-top:6px;padding:10px;border-radius:12px;border:1px dashed rgba(255,255,255,.12);
+  font:800 8.5px/1 'Archivo','Inter',sans-serif;letter-spacing:.12em;color:#8b93a5;text-align:center;text-transform:uppercase}
+
+/* ── the country card ── */
+.sheetBackdrop{position:fixed;inset:0;z-index:80;display:flex;align-items:flex-end;justify-content:center;
+  background:rgba(2,4,8,.64);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);animation:sheetFade .2s ease both}
+.sheet{position:relative;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;overscroll-behavior:contain;
+  padding:8px 16px max(16px,env(safe-area-inset-bottom));border-radius:26px 26px 0 0;
+  background:radial-gradient(120% 40% at 50% -4%,color-mix(in srgb,var(--epx-ad-c) 16%,transparent),transparent 60%),linear-gradient(180deg,#10131b,#08090d 42%);
+  border:1px solid rgba(255,255,255,.1);border-bottom:none;box-shadow:0 -26px 60px rgba(0,0,0,.62);
+  animation:sheetUp .34s cubic-bezier(.22,.8,.3,1) both}
+@keyframes sheetFade{from{opacity:0}}
+@keyframes sheetUp{from{transform:translateY(40px);opacity:0}}
+.sheetHandle{display:block;width:38px;height:4px;margin:2px auto 12px;border-radius:4px;background:rgba(255,255,255,.22)}
+.sheetHead{display:grid;grid-template-columns:46px minmax(0,1fr) auto;align-items:center;gap:11px}
+.sheetFlag{display:block;width:46px;height:32px;border-radius:6px;overflow:hidden;box-shadow:0 0 0 1px rgba(255,255,255,.22),0 8px 18px rgba(0,0,0,.45)}
+.sheetFlag svg{display:block;width:100%;height:100%}
+.sheetHead small{display:block;font:800 7.5px/1.2 'Archivo','Inter',sans-serif;letter-spacing:.13em;color:#7d8698;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sheetHead h3{margin-top:3px;font:400 26px/1 'Anton','Archivo',sans-serif;letter-spacing:.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sheetClose.sheetClose{width:34px;height:34px;border-radius:11px;background:rgba(255,255,255,.06);color:#aeb6c4;font-size:15px;display:flex;align-items:center;justify-content:center}
+.statePill{display:inline-flex;align-items:center;gap:5px;margin-top:12px;padding:6px 9px;border-radius:99px;
+  font:900 8px/1 'Archivo','Inter',sans-serif;letter-spacing:.12em;text-transform:uppercase;background:rgba(255,255,255,.06)}
+.statePill i{width:6px;height:6px;border-radius:50%;background:currentColor;box-shadow:0 0 0 3px color-mix(in srgb,currentColor 25%,transparent)}
+.sheetHero{position:relative;display:grid;grid-template-columns:118px minmax(0,1fr);gap:14px;align-items:center;margin-top:12px;padding:14px;border-radius:19px;overflow:hidden;
+  background:radial-gradient(90% 120% at 0% 50%,color-mix(in srgb,var(--hero-tone) 22%,transparent),transparent 70%),linear-gradient(150deg,#0e121b,#090b11);
+  border:1px solid color-mix(in srgb,var(--hero-tone) 30%,rgba(255,255,255,.08))}
+.silhouette{display:block;width:118px;height:88px;overflow:hidden}
+.silhouette path{fill:color-mix(in srgb,var(--hero-tone) 80%,#fff 0%);fill-opacity:.88;stroke:#fff;stroke-opacity:.7;stroke-linejoin:round;
+  filter:drop-shadow(0 0 8px color-mix(in srgb,var(--hero-tone) 70%,transparent))}
+.silhouette circle{fill:var(--hero-tone);stroke:#fff;stroke-width:1.5}
+.heroFigure{min-width:0}
+.heroFigure span{display:block;font:800 7.5px/1 'Archivo','Inter',sans-serif;letter-spacing:.13em;color:#8b93a5}
+.heroFigure b{display:block;margin-top:6px;font:400 38px/.95 'Anton','Archivo',sans-serif;letter-spacing:.01em;color:#f7f5f1}
+.heroFigure em{display:block;margin-top:4px;font-size:10px;font-style:normal;color:#9aa3b3}
+.heroFigure em.good{color:#4ade80}.heroFigure em.bad{color:#ff6b6b}
+.sheetSection{margin-top:18px}
+.sheetSection>h4{display:flex;justify-content:space-between;gap:8px;margin-bottom:9px;font:800 7.5px/1 'Archivo','Inter',sans-serif;letter-spacing:.14em;color:#7d8698;text-transform:uppercase}
+.sheetSection>h4 span{color:#5f6875;letter-spacing:.06em}
+.factGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.factGrid div{padding:10px 9px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07)}
+.factGrid span{display:block;font:800 7px/1 'Archivo','Inter',sans-serif;letter-spacing:.1em;color:#6f7888}
+.factGrid b{display:block;margin-top:5px;font:400 17px/1 'Anton','Archivo',sans-serif;letter-spacing:.01em}
+.factGrid small{display:block;margin-top:3px;font-size:8.5px;color:#7d8698}
+.progressTrack{height:6px;margin-top:9px;border-radius:6px;background:rgba(255,255,255,.07);overflow:hidden}
+.progressTrack i{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,#f5b544,#ffd88a)}
+.dossierFold{margin-top:18px;border-radius:16px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.08);overflow:hidden}
+.dossierFold summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 14px;cursor:pointer}
+.dossierFold summary::-webkit-details-marker{display:none}
+.dossierFold summary b{display:block;font-size:12px;font-weight:900}
+.dossierFold summary small{display:block;margin-top:3px;font-size:9px;color:#7d8698}
+.dossierFold summary em{font-style:normal;font-size:15px;color:var(--epx-ad-c);transition:transform .2s ease}
+.dossierFold[open] summary em{transform:rotate(45deg)}
+.dossierBody{padding:2px 14px 16px}
+:global(.sf).dossierScope{height:auto;min-height:0;max-width:none;display:block;overflow:visible;background:none}
+.sheetActions{position:sticky;bottom:calc(-1 * max(16px,env(safe-area-inset-bottom)));display:flex;gap:8px;margin:18px -16px 0;
+  padding:12px 16px max(16px,env(safe-area-inset-bottom));background:linear-gradient(180deg,rgba(8,9,13,0),#08090d 34%)}
+.sheetPrimary.sheetPrimary{flex:1;padding:14px;border-radius:14px;background:var(--epx-ad-c);color:var(--epx-brand-ink,#05080d);font:900 10px/1 'Archivo','Inter',sans-serif;letter-spacing:.12em;text-transform:uppercase;text-align:center;
+  box-shadow:0 12px 26px -14px color-mix(in srgb,var(--epx-ad-c) 85%,transparent)}
+.sheetSecondary.sheetSecondary{padding:14px 15px;border-radius:14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:#d9dee7;
+  font:900 10px/1 'Archivo','Inter',sans-serif;letter-spacing:.12em;text-transform:uppercase;text-align:center}
+
+/* ── the region panel (Regions tab, after a tile is chosen) ── */
+.regionPanelHead{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;margin-top:16px}
+.regionPanelHead small{display:block;font:800 7.5px/1 'Archivo','Inter',sans-serif;letter-spacing:.13em;color:#7d8698}
+.regionPanelHead h3{margin-top:4px;font:400 24px/1 'Anton','Archivo',sans-serif;letter-spacing:.01em}
+.regionPanelHead.regionPanelHead button{padding:8px 11px;border-radius:99px;border:1px solid rgba(255,255,255,.12);font:900 8px/1 'Archivo','Inter',sans-serif;letter-spacing:.12em;color:#aeb6c4}
+
+/* ── campaigns before launch: say so instead of buttons that do nothing ── */
+.prelaunchCard{margin-top:14px;padding:18px 16px;border-radius:17px;text-align:center;
+  background:radial-gradient(90% 70% at 50% 0%,color-mix(in srgb,var(--epx-ad-c) 16%,transparent),transparent 70%),rgba(255,255,255,.025);
+  border:1px solid rgba(255,255,255,.08)}
+.prelaunchCard b{display:block;font:400 20px/1.05 'Anton','Archivo',sans-serif;letter-spacing:.01em}
+.prelaunchCard span{display:block;margin-top:8px;font-size:10.5px;line-height:1.5;color:#8b93a5}
+
+@media (max-width:360px){
+  .atlas{height:196px}.readSide b{font-size:22px}.regionTile strong{font-size:22px}.heroFigure b{font-size:32px}
+  .sheetHero{grid-template-columns:96px minmax(0,1fr)}.silhouette{width:96px;height:72px}
+}
+@media (prefers-reduced-motion:reduce){
+  .lightRing{animation:none}
+  .sheet,.sheetBackdrop{animation:none}
+}
+
+/* ── a subscription service that also earns from ads or a store ── */
+.alsoEarning{display:flex;align-items:center;flex-wrap:wrap;gap:6px 14px;margin-top:9px;padding:10px 12px;border-radius:13px;background:#0c0f15;border:1px solid rgba(255,255,255,.075)}
+.alsoEarning>span{flex-basis:100%;font:800 7.5px/1 'Archivo','Inter',sans-serif;letter-spacing:.13em;color:#7d8698}
+.alsoEarning div{display:flex;align-items:baseline;gap:5px}
+.alsoEarning b{font:400 17px/1 'Anton','Archivo',sans-serif;letter-spacing:.01em;color:#f3f5f9}
+.alsoEarning small{font-size:9px;color:#8b93a5}
+/* the line under a model tile (ad-supported and store services keep no weekly trend) */
+.tileNote{font-size:9px;font-style:normal;font-weight:700;color:#7d8698}
+
+/* ── who watches your service: the load your network carries ── */
+.access{padding:14px;border-radius:17px;background:#0c0f15;border:1px solid rgba(255,255,255,.075)}
+.accessHead{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.accessHead span{font:800 7.5px/1 'Archivo','Inter',sans-serif;letter-spacing:.13em;color:#7d8698}
+.accessHead b{font:400 22px/1 'Anton','Archivo',sans-serif;letter-spacing:.01em;color:#f3f5f9}
+.accessHead b small{font:700 9px/1 'Inter',system-ui,sans-serif;letter-spacing:0;color:#8b93a5}
+.accessBar{display:flex;gap:2px;height:14px;margin:11px 0 12px;border-radius:6px;overflow:hidden;background:rgba(255,255,255,.05)}
+.accessBar i{display:block;height:100%;min-width:2px;background:var(--access-accent)}
+.accessBar .accessShared{background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--access-accent) 60%,transparent) 0 4px,color-mix(in srgb,var(--access-accent) 22%,transparent) 4px 8px)}
+.accessKeys{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.accessKeys div{display:grid;grid-template-columns:8px minmax(0,1fr);align-items:center;gap:3px 6px}
+.accessKeys div>i{width:8px;height:8px;border-radius:2px}
+.accessKeys div>span{font:800 7px/1 'Archivo','Inter',sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#7d8698;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.accessKeys div>b{grid-column:1/-1;font:400 17px/1 'Anton','Archivo',sans-serif;letter-spacing:.01em;color:#f3f5f9}
+.accessKeys div>small{grid-column:1/-1;font-size:8.5px;color:#8b93a5}
+.accessKeys .accessSharedKey{background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--access-accent) 70%,transparent) 0 2px,color-mix(in srgb,var(--access-accent) 25%,transparent) 2px 4px)}
+.accessKeys .accessPiracyKey{background:repeating-linear-gradient(135deg,rgba(255,107,107,.75) 0 2px,rgba(255,107,107,.25) 2px 4px)}
+.accessNote{margin-top:11px;font-size:9.5px;line-height:1.5;color:#8b93a5}
+
+/* ── the funnel's reach strip: where every home stands ── */
+.funnelReach{margin-top:13px;padding-top:12px;border-top:1px solid rgba(255,255,255,.06)}
+.reachBar{display:flex;gap:2px;height:9px;border-radius:5px;overflow:hidden;background:rgba(255,255,255,.05)}
+.reachBar i{display:block;height:100%}
+.reachKeys{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-top:8px}
+.reachKeys span{display:grid;grid-template-columns:7px minmax(0,1fr) auto;align-items:center;gap:6px;font:800 7px/1 'Archivo','Inter',sans-serif;letter-spacing:.11em;color:#7d8698}
+.reachKeys span i{width:7px;height:7px;border-radius:2px}
+.reachKeys span b{font:400 12px/1 'Anton','Archivo',sans-serif;letter-spacing:.01em;color:#e9edf3}
+/* ── who wins: demand at today's offer, and the rule of the race ── */
+.winDemand{display:grid;grid-template-columns:auto auto minmax(0,1fr);align-items:baseline;gap:4px 8px;margin-top:12px;padding:9px 11px;border-radius:11px;background:#080a0f;border:1px solid rgba(255,255,255,.06)}
+.winDemand span{font:800 7px/1 'Archivo','Inter',sans-serif;letter-spacing:.12em;color:#7d8698}
+.winDemand b{font:400 15px/1 'Anton','Archivo',sans-serif;letter-spacing:.01em;color:color-mix(in srgb,var(--winners-accent) 70%,#fff)}
+.winDemand small{font-size:8.5px;line-height:1.3;color:#8b93a5}
+/* which of your plans the homes you win pick, and the price they really pay */
+.planMix{margin-top:10px;padding:10px 11px;border-radius:11px;background:#080a0f;border:1px solid rgba(255,255,255,.06)}
+.planMixHead{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;margin-bottom:8px}
+.planMixHead>span{font:800 7px/1 'Archivo','Inter',sans-serif;letter-spacing:.12em;color:#7d8698}
+.planMixHead div{display:flex;align-items:baseline;gap:5px}
+.planMixHead small{font:800 6.5px/1 'Archivo','Inter',sans-serif;letter-spacing:.12em;color:#6f7888}
+.planMixHead b{font:400 16px/1 'Anton','Archivo',sans-serif;letter-spacing:.01em;color:#f3f5f9}
+.planMixBar{display:flex;gap:2px;height:8px;border-radius:4px;overflow:hidden}
+.planMixBar i{display:block;min-width:3px;flex-basis:0;background:color-mix(in srgb,var(--winners-accent) var(--tint),#1b212b)}
+.planMixKeys{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:8px}
+.planMixKeys span{display:flex;align-items:center;gap:5px;font-size:9.5px;color:#a5adbc}
+.planMixKeys i{width:7px;height:7px;border-radius:2px;background:color-mix(in srgb,var(--winners-accent) var(--tint),#1b212b)}
+.planMixKeys b{font-weight:800;color:#eef0f5}
+.planMixNone{display:block;font-size:9px;color:#6f7888}
+.winNote{margin-top:11px;font-size:9.5px;line-height:1.5;color:#8b93a5}
+
+/* ── the door to Platform · Offer, where pricing and sharing are changed ── */
+.offerLink.offerLink{position:relative;display:grid;gap:4px;width:100%;margin-top:14px;padding:13px 40px 13px 14px;border-radius:16px;
+  background:#0c0f15;border:1px solid rgba(255,255,255,.08);text-align:left}
+.offerLink span{font:800 7.5px/1 'Archivo','Inter',sans-serif;letter-spacing:.14em;color:color-mix(in srgb,var(--epx-ad-c) 70%,#fff)}
+.offerLink b{font:800 13px/1.2 'Inter',system-ui,sans-serif;color:#eef0f5}
+.offerLink small{font-size:9.5px;color:#8b93a5}
+.offerLink i{position:absolute;right:15px;top:50%;transform:translateY(-50%);font:700 16px/1 'Inter',system-ui,sans-serif;font-style:normal;color:#7d8698}
+.offerLink:active{background:#11151d}

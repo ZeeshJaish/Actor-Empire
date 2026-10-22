@@ -1,0 +1,2003 @@
+{
+  "kind": "CANONICAL_FULL_WORLD_CONTROLLED_SLATE",
+  "tuningVersion": 3,
+  "seeds": 1,
+  "horizon": 104,
+  "rows": [
+    {
+      "name": "focused-small",
+      "seed": 0,
+      "countries": 197,
+      "cohorts": 2363,
+      "homeAlternatives": 1560,
+      "budgetCents": 200000000,
+      "campaignCents": 50000000,
+      "grossCents": 2602284476,
+      "receiptsCents": 1292232266,
+      "bookingCents": 166858019,
+      "profitCents": 875374247,
+      "first": 1854355,
+      "repeats": 30248,
+      "openingCents": 329247088,
+      "weeks": 34,
+      "week95": 14,
+      "offeredWeeks": 34,
+      "censored": false,
+      "weekly": [
+        329247088,
+        367915223,
+        371214512,
+        298765923,
+        241769091,
+        195882307,
+        158572117,
+        128131435,
+        103313746,
+        83103663,
+        66717282,
+        53461248,
+        42765320,
+        34144609,
+        27243312,
+        21707545,
+        16898167,
+        13447000,
+        10687362,
+        8478630,
+        6733733,
+        5338088,
+        4233716,
+        3155076,
+        2497310,
+        1805300,
+        1421887,
+        943930,
+        746876,
+        591162,
+        465764,
+        367926,
+        289380,
+        228748
+      ],
+      "localRunWeeks": {
+        "p10": 3,
+        "median": 16,
+        "p90": 27
+      },
+      "weekMs": {
+        "p10": 767.2732500000002,
+        "median": 1328.8426660000005,
+        "p90": 2192.7075839999998
+      },
+      "bookingEvidence": [
+        {
+          "week": 1,
+          "shows": 2680,
+          "bookedPools": 12,
+          "commercialPools": 6,
+          "quietPools": 6,
+          "seats": 482400,
+          "admissions": 238441,
+          "occupancy": 0.49428067993366503
+        },
+        {
+          "week": 2,
+          "shows": 2911,
+          "bookedPools": 12,
+          "commercialPools": 6,
+          "quietPools": 6,
+          "seats": 523980,
+          "admissions": 266443,
+          "occupancy": 0.5084984159700752
+        },
+        {
+          "week": 3,
+          "shows": 2989,
+          "bookedPools": 6,
+          "commercialPools": 6,
+          "quietPools": 0,
+          "seats": 538020,
+          "admissions": 268833,
+          "occupancy": 0.4996710159473626
+        },
+        {
+          "week": 4,
+          "shows": 2576,
+          "bookedPools": 6,
+          "commercialPools": 6,
+          "quietPools": 0,
+          "seats": 463680,
+          "admissions": 216366,
+          "occupancy": 0.46662784679089025
+        },
+        {
+          "week": 5,
+          "shows": 2079,
+          "bookedPools": 6,
+          "commercialPools": 6,
+          "quietPools": 0,
+          "seats": 374220,
+          "admissions": 175089,
+          "occupancy": 0.4678771845438512
+        },
+        {
+          "week": 6,
+          "shows": 1687,
+          "bookedPools": 6,
+          "commercialPools": 6,
+          "quietPools": 0,
+          "seats": 303660,
+          "admissions": 141858,
+          "occupancy": 0.46716064018968584
+        },
+        {
+          "week": 7,
+          "shows": 1379,
+          "bookedPools": 6,
+          "commercialPools": 6,
+          "quietPools": 0,
+          "seats": 248220,
+          "admissions": 114838,
+          "occupancy": 0.4626460398034002
+        },
+        {
+          "week": 8,
+          "shows": 1120,
+          "bookedPools": 6,
+          "commercialPools": 6,
+          "quietPools": 0,
+          "seats": 201600,
+          "admissions": 92793,
+          "occupancy": 0.4602827380952381
+        },
+        {
+          "week": 9,
+          "shows": 903,
+          "bookedPools": 6,
+          "commercialPools": 6,
+          "quietPools": 0,
+          "seats": 162540,
+          "admissions": 74820,
+          "occupancy": 0.4603174603174603
+        },
+        {
+          "week": 10,
+          "shows": 735,
+          "bookedPools": 6,
+          "commercialPools": 6,
+          "quietPools": 0,
+          "seats": 132300,
+          "admissions": 60184,
+          "occupancy": 0.45490551776266064
+        },
+        {
+          "week": 11,
+          "shows": 581,
+          "bookedPools": 6,
+          "commercialPools": 6,
+          "quietPools": 0,
+          "seats": 104580,
+          "admissions": 48317,
+          "occupancy": 0.462009944540065
+        },
+        {
+          "week": 12,
+          "shows": 476,
+          "bookedPools": 6,
+          "commercialPools": 6,
+          "quietPools": 0,
+          "seats": 85680,
+          "admissions": 38717,
+          "occupancy": 0.45187908496732027
+        },
+        {
+          "week": 13,
+          "shows": 392,
+          "bookedPools": 6,
+          "commercialPools": 6,
+          "quietPools": 0,
+          "seats": 70560,
+          "admissions": 30971,
+          "occupancy": 0.43893140589569163
+        },
+        {
+          "week": 14,
+          "shows": 308,
+          "bookedPools": 6,
+          "commercialPools": 6,
+          "quietPools": 0,
+          "seats": 55440,
+          "admissions": 24728,
+          "occupancy": 0.44603174603174606
+        },
+        {
+          "week": 15,
+          "shows": 252,
+          "bookedPools": 6,
+          "commercialPools": 4,
+          "quietPools": 2,
+          "seats": 45360,
+          "admissions": 19730,
+          "occupancy": 0.4349647266313933
+        },
+        {
+          "week": 16,
+          "shows": 210,
+          "bookedPools": 6,
+          "commercialPools": 4,
+          "quietPools": 2,
+          "seats": 37800,
+          "admissions": 15721,
+          "occupancy": 0.4158994708994709
+        },
+        {
+          "week": 17,
+          "shows": 154,
+          "bookedPools": 4,
+          "commercialPools": 4,
+          "quietPools": 0,
+          "seats": 27720,
+          "admissions": 12241,
+          "occupancy": 0.4415945165945166
+        },
+        {
+          "week": 18,
+          "shows": 126,
+          "bookedPools": 4,
+          "commercialPools": 4,
+          "quietPools": 0,
+          "seats": 22680,
+          "admissions": 9741,
+          "occupancy": 0.4294973544973545
+        },
+        {
+          "week": 19,
+          "shows": 105,
+          "bookedPools": 4,
+          "commercialPools": 4,
+          "quietPools": 0,
+          "seats": 18900,
+          "admissions": 7742,
+          "occupancy": 0.4096296296296296
+        },
+        {
+          "week": 20,
+          "shows": 84,
+          "bookedPools": 4,
+          "commercialPools": 4,
+          "quietPools": 0,
+          "seats": 15120,
+          "admissions": 6142,
+          "occupancy": 0.4062169312169312
+        },
+        {
+          "week": 21,
+          "shows": 70,
+          "bookedPools": 4,
+          "commercialPools": 4,
+          "quietPools": 0,
+          "seats": 12600,
+          "admissions": 4878,
+          "occupancy": 0.3871428571428571
+        },
+        {
+          "week": 22,
+          "shows": 56,
+          "bookedPools": 4,
+          "commercialPools": 3,
+          "quietPools": 1,
+          "seats": 10080,
+          "admissions": 3867,
+          "occupancy": 0.3836309523809524
+        },
+        {
+          "week": 23,
+          "shows": 49,
+          "bookedPools": 4,
+          "commercialPools": 3,
+          "quietPools": 1,
+          "seats": 8820,
+          "admissions": 3067,
+          "occupancy": 0.34773242630385487
+        },
+        {
+          "week": 24,
+          "shows": 35,
+          "bookedPools": 3,
+          "commercialPools": 2,
+          "quietPools": 1,
+          "seats": 6300,
+          "admissions": 2288,
+          "occupancy": 0.36317460317460315
+        },
+        {
+          "week": 25,
+          "shows": 35,
+          "bookedPools": 3,
+          "commercialPools": 2,
+          "quietPools": 1,
+          "seats": 6300,
+          "admissions": 1811,
+          "occupancy": 0.28746031746031747
+        },
+        {
+          "week": 26,
+          "shows": 21,
+          "bookedPools": 2,
+          "commercialPools": 1,
+          "quietPools": 1,
+          "seats": 3780,
+          "admissions": 1309,
+          "occupancy": 0.34629629629629627
+        },
+        {
+          "week": 27,
+          "shows": 21,
+          "bookedPools": 2,
+          "commercialPools": 1,
+          "quietPools": 1,
+          "seats": 3780,
+          "admissions": 1031,
+          "occupancy": 0.27275132275132274
+        },
+        {
+          "week": 28,
+          "shows": 14,
+          "bookedPools": 1,
+          "commercialPools": 1,
+          "quietPools": 0,
+          "seats": 2520,
+          "admissions": 685,
+          "occupancy": 0.2718253968253968
+        },
+        {
+          "week": 29,
+          "shows": 7,
+          "bookedPools": 1,
+          "commercialPools": 1,
+          "quietPools": 0,
+          "seats": 1260,
+          "admissions": 542,
+          "occupancy": 0.4301587301587302
+        },
+        {
+          "week": 30,
+          "shows": 7,
+          "bookedPools": 1,
+          "commercialPools": 1,
+          "quietPools": 0,
+          "seats": 1260,
+          "admissions": 429,
+          "occupancy": 0.3404761904761905
+        },
+        {
+          "week": 31,
+          "shows": 7,
+          "bookedPools": 1,
+          "commercialPools": 1,
+          "quietPools": 0,
+          "seats": 1260,
+          "admissions": 338,
+          "occupancy": 0.26825396825396824
+        },
+        {
+          "week": 32,
+          "shows": 7,
+          "bookedPools": 1,
+          "commercialPools": 1,
+          "quietPools": 0,
+          "seats": 1260,
+          "admissions": 267,
+          "occupancy": 0.2119047619047619
+        },
+        {
+          "week": 33,
+          "shows": 7,
+          "bookedPools": 1,
+          "commercialPools": 0,
+          "quietPools": 1,
+          "seats": 1260,
+          "admissions": 210,
+          "occupancy": 0.16666666666666666
+        },
+        {
+          "week": 34,
+          "shows": 7,
+          "bookedPools": 1,
+          "commercialPools": 0,
+          "quietPools": 1,
+          "seats": 1260,
+          "admissions": 166,
+          "occupancy": 0.13174603174603175
+        }
+      ]
+    },
+    {
+      "name": "peak-release",
+      "seed": 0,
+      "countries": 197,
+      "cohorts": 2363,
+      "homeAlternatives": 1560,
+      "budgetCents": 200000000,
+      "campaignCents": 50000000,
+      "grossCents": 565093283,
+      "receiptsCents": 295911187,
+      "bookingCents": 31108788,
+      "profitCents": 14802399,
+      "first": 380964,
+      "repeats": 1803,
+      "openingCents": 18967318,
+      "weeks": 34,
+      "week95": 20,
+      "offeredWeeks": 34,
+      "censored": false,
+      "weekly": [
+        18967318,
+        21061350,
+        21138476,
+        19138884,
+        20215290,
+        19285436,
+        22632408,
+        21495836,
+        19478496,
+        70395060,
+        64612108,
+        52278874,
+        42002782,
+        33574472,
+        26811534,
+        19789834,
+        15499358,
+        12326695,
+        9827903,
+        7826121,
+        6230204,
+        4954594,
+        3927458,
+        2928955,
+        2319445,
+        1677055,
+        1326749,
+        875030,
+        694512,
+        551200,
+        431314,
+        340366,
+        268710,
+        209456
+      ],
+      "localRunWeeks": {
+        "p10": 8,
+        "median": 17,
+        "p90": 27
+      },
+      "weekMs": {
+        "p10": 1579.3990840000042,
+        "median": 2725.852749999991,
+        "p90": 4952.562540999992
+      },
+      "bookingEvidence": [
+        {
+          "week": 1,
+          "shows": 77,
+          "bookedPools": 11,
+          "commercialPools": 11,
+          "quietPools": 0,
+          "seats": 13860,
+          "admissions": 13007,
+          "occupancy": 0.9384559884559884
+        },
+        {
+          "week": 2,
+          "shows": 84,
+          "bookedPools": 12,
+          "commercialPools": 12,
+          "quietPools": 0,
+          "seats": 15120,
+          "admissions": 14355,
+          "occupancy": 0.9494047619047619
+        },
+        {
+          "week": 3,
+          "shows": 84,
+          "bookedPools": 12,
+          "commercialPools": 12,
+          "quietPools": 0,
+          "seats": 15120,
+          "admissions": 14404,
+          "occupancy": 0.9526455026455026
+        },
+        {
+          "week": 4,
+          "shows": 77,
+          "bookedPools": 11,
+          "commercialPools": 11,
+          "quietPools": 0,
+          "seats": 13860,
+          "admissions": 13116,
+          "occupancy": 0.9463203463203463
+        },
+        {
+          "week": 5,
+          "shows": 84,
+          "bookedPools": 12,
+          "commercialPools": 12,
+          "quietPools": 0,
+          "seats": 15120,
+          "admissions": 13810,
+          "occupancy": 0.9133597883597884
+        },
+        {
+          "week": 6,
+          "shows": 84,
+          "bookedPools": 12,
+          "commercialPools": 12,
+          "quietPools": 0,
+          "seats": 15120,
+          "admissions": 13214,
+          "occupancy": 0.8739417989417989
+        },
+        {
+          "week": 7,
+          "shows": 105,
+          "bookedPools": 10,
+          "commercialPools": 10,
+          "quietPools": 0,
+          "seats": 18900,
+          "admissions": 15339,
+          "occupancy": 0.8115873015873016
+        },
+        {
+          "week": 8,
+          "shows": 105,
+          "bookedPools": 10,
+          "commercialPools": 10,
+          "quietPools": 0,
+          "seats": 18900,
+          "admissions": 14568,
+          "occupancy": 0.7707936507936508
+        },
+        {
+          "week": 9,
+          "shows": 98,
+          "bookedPools": 10,
+          "commercialPools": 10,
+          "quietPools": 0,
+          "seats": 17640,
+          "admissions": 13239,
+          "occupancy": 0.7505102040816326
+        },
+        {
+          "week": 10,
+          "shows": 399,
+          "bookedPools": 10,
+          "commercialPools": 10,
+          "quietPools": 0,
+          "seats": 71820,
+          "admissions": 46220,
+          "occupancy": 0.6435533277638541
+        },
+        {
+          "week": 11,
+          "shows": 476,
+          "bookedPools": 10,
+          "commercialPools": 10,
+          "quietPools": 0,
+          "seats": 85680,
+          "admissions": 42438,
+          "occupancy": 0.49530812324929974
+        },
+        {
+          "week": 12,
+          "shows": 399,
+          "bookedPools": 10,
+          "commercialPools": 10,
+          "quietPools": 0,
+          "seats": 71820,
+          "admissions": 34440,
+          "occupancy": 0.47953216374269003
+        },
+        {
+          "week": 13,
+          "shows": 322,
+          "bookedPools": 10,
+          "commercialPools": 10,
+          "quietPools": 0,
+          "seats": 57960,
+          "admissions": 27777,
+          "occupancy": 0.47924430641821947
+        },
+        {
+          "week": 14,
+          "shows": 266,
+          "bookedPools": 9,
+          "commercialPools": 9,
+          "quietPools": 0,
+          "seats": 47880,
+          "admissions": 22323,
+          "occupancy": 0.4662280701754386
+        },
+        {
+          "week": 15,
+          "shows": 210,
+          "bookedPools": 9,
+          "commercialPools": 7,
+          "quietPools": 2,
+          "seats": 37800,
+          "admissions": 17908,
+          "occupancy": 0.47375661375661376
+        },
+        {
+          "week": 16,
+          "shows": 154,
+          "bookedPools": 6,
+          "commercialPools": 4,
+          "quietPools": 2,
+          "seats": 27720,
+          "admissions": 14331,
+          "occupancy": 0.516991341991342
+        },
+        {
+          "week": 17,
+          "shows": 140,
+          "bookedPools": 5,
+          "commercialPools": 5,
+          "quietPools": 0,
+          "seats": 25200,
+          "admissions": 11184,
+          "occupancy": 0.4438095238095238
+        },
+        {
+          "week": 18,
+          "shows": 119,
+          "bookedPools": 4,
+          "commercialPools": 4,
+          "quietPools": 0,
+          "seats": 21420,
+          "admissions": 8929,
+          "occupancy": 0.41685340802987864
+        },
+        {
+          "week": 19,
+          "shows": 98,
+          "bookedPools": 4,
+          "commercialPools": 4,
+          "quietPools": 0,
+          "seats": 17640,
+          "admissions": 7119,
+          "occupancy": 0.4035714285714286
+        },
+        {
+          "week": 20,
+          "shows": 77,
+          "bookedPools": 4,
+          "commercialPools": 4,
+          "quietPools": 0,
+          "seats": 13860,
+          "admissions": 5669,
+          "occupancy": 0.409018759018759
+        },
+        {
+          "week": 21,
+          "shows": 70,
+          "bookedPools": 4,
+          "commercialPools": 4,
+          "quietPools": 0,
+          "seats": 12600,
+          "admissions": 4513,
+          "occupancy": 0.3581746031746032
+        },
+        {
+          "week": 22,
+          "shows": 56,
+          "bookedPools": 4,
+          "commercialPools": 3,
+          "quietPools": 1,
+          "seats": 10080,
+          "admissions": 3589,
+          "occupancy": 0.3560515873015873
+        },
+        {
+          "week": 23,
+          "shows": 49,
+          "bookedPools": 4,
+          "commercialPools": 3,
+          "quietPools": 1,
+          "seats": 8820,
+          "admissions": 2845,
+          "occupancy": 0.322562358276644
+        },
+        {
+          "week": 24,
+          "shows": 35,
+          "bookedPools": 3,
+          "commercialPools": 2,
+          "quietPools": 1,
+          "seats": 6300,
+          "admissions": 2124,
+          "occupancy": 0.33714285714285713
+        },
+        {
+          "week": 25,
+          "shows": 35,
+          "bookedPools": 3,
+          "commercialPools": 2,
+          "quietPools": 1,
+          "seats": 6300,
+          "admissions": 1682,
+          "occupancy": 0.266984126984127
+        },
+        {
+          "week": 26,
+          "shows": 21,
+          "bookedPools": 2,
+          "commercialPools": 1,
+          "quietPools": 1,
+          "seats": 3780,
+          "admissions": 1216,
+          "occupancy": 0.3216931216931217
+        },
+        {
+          "week": 27,
+          "shows": 21,
+          "bookedPools": 2,
+          "commercialPools": 1,
+          "quietPools": 1,
+          "seats": 3780,
+          "admissions": 962,
+          "occupancy": 0.2544973544973545
+        },
+        {
+          "week": 28,
+          "shows": 14,
+          "bookedPools": 1,
+          "commercialPools": 1,
+          "quietPools": 0,
+          "seats": 2520,
+          "admissions": 635,
+          "occupancy": 0.251984126984127
+        },
+        {
+          "week": 29,
+          "shows": 7,
+          "bookedPools": 1,
+          "commercialPools": 1,
+          "quietPools": 0,
+          "seats": 1260,
+          "admissions": 504,
+          "occupancy": 0.4
+        },
+        {
+          "week": 30,
+          "shows": 7,
+          "bookedPools": 1,
+          "commercialPools": 1,
+          "quietPools": 0,
+          "seats": 1260,
+          "admissions": 400,
+          "occupancy": 0.31746031746031744
+        },
+        {
+          "week": 31,
+          "shows": 7,
+          "bookedPools": 1,
+          "commercialPools": 1,
+          "quietPools": 0,
+          "seats": 1260,
+          "admissions": 313,
+          "occupancy": 0.24841269841269842
+        },
+        {
+          "week": 32,
+          "shows": 7,
+          "bookedPools": 1,
+          "commercialPools": 1,
+          "quietPools": 0,
+          "seats": 1260,
+          "admissions": 247,
+          "occupancy": 0.19603174603174603
+        },
+        {
+          "week": 33,
+          "shows": 7,
+          "bookedPools": 1,
+          "commercialPools": 0,
+          "quietPools": 1,
+          "seats": 1260,
+          "admissions": 195,
+          "occupancy": 0.15476190476190477
+        },
+        {
+          "week": 34,
+          "shows": 7,
+          "bookedPools": 1,
+          "commercialPools": 0,
+          "quietPools": 1,
+          "seats": 1260,
+          "admissions": 152,
+          "occupancy": 0.12063492063492064
+        }
+      ]
+    },
+    {
+      "name": "earned-event",
+      "seed": 0,
+      "countries": 197,
+      "cohorts": 2363,
+      "homeAlternatives": 1560,
+      "budgetCents": 20000000000,
+      "campaignCents": 3000000000,
+      "grossCents": 60298182707,
+      "receiptsCents": 29504910246,
+      "bookingCents": 4043633253,
+      "profitCents": 2461276993,
+      "first": 53897156,
+      "repeats": 622273,
+      "openingCents": 7937896990,
+      "weeks": 44,
+      "week95": 14,
+      "offeredWeeks": 44,
+      "censored": false,
+      "weekly": [
+        7937896990,
+        8743930713,
+        8798423150,
+        6996847057,
+        5626569374,
+        4507081621,
+        3609040444,
+        2887885173,
+        2307587147,
+        1841924272,
+        1468366656,
+        1169387493,
+        929720245,
+        738189138,
+        586174429,
+        463761434,
+        368565501,
+        291647119,
+        230100650,
+        140227319,
+        143574373,
+        113182044,
+        89372065,
+        70085917,
+        54348292,
+        42609341,
+        33065043,
+        25973214,
+        19792076,
+        15534457,
+        12178289,
+        9051786,
+        7000746,
+        5232903,
+        3933043,
+        3114116,
+        2152115,
+        1311233,
+        1041357,
+        818322,
+        628280,
+        493054,
+        205383,
+        159333
+      ],
+      "localRunWeeks": {
+        "p10": 3,
+        "median": 3,
+        "p90": 14
+      },
+      "weekMs": {
+        "p10": 694.0103750000126,
+        "median": 1025.845874999999,
+        "p90": 1339.7697500000068
+      },
+      "bookingEvidence": [
+        {
+          "week": 1,
+          "shows": 71739,
+          "bookedPools": 1037,
+          "commercialPools": 171,
+          "quietPools": 866,
+          "seats": 12913020,
+          "admissions": 7184216,
+          "occupancy": 0.5563544391629534
+        },
+        {
+          "week": 2,
+          "shows": 74542,
+          "bookedPools": 1037,
+          "commercialPools": 172,
+          "quietPools": 865,
+          "seats": 13417560,
+          "admissions": 7908473,
+          "occupancy": 0.5894121583954162
+        },
+        {
+          "week": 3,
+          "shows": 74957,
+          "bookedPools": 176,
+          "commercialPools": 167,
+          "quietPools": 9,
+          "seats": 13492260,
+          "admissions": 7961475,
+          "occupancy": 0.5900771998167839
+        },
+        {
+          "week": 4,
+          "shows": 65968,
+          "bookedPools": 164,
+          "commercialPools": 163,
+          "quietPools": 1,
+          "seats": 11874240,
+          "admissions": 6326094,
+          "occupancy": 0.5327578017624707
+        },
+        {
+          "week": 5,
+          "shows": 56022,
+          "bookedPools": 164,
+          "commercialPools": 157,
+          "quietPools": 7,
+          "seats": 10083960,
+          "admissions": 5090688,
+          "occupancy": 0.5048302452607905
+        },
+        {
+          "week": 6,
+          "shows": 46619,
+          "bookedPools": 163,
+          "commercialPools": 153,
+          "quietPools": 10,
+          "seats": 8391420,
+          "admissions": 4076633,
+          "occupancy": 0.48580967226047556
+        },
+        {
+          "week": 7,
+          "shows": 32524,
+          "bookedPools": 157,
+          "commercialPools": 146,
+          "quietPools": 11,
+          "seats": 5854320,
+          "admissions": 3263563,
+          "occupancy": 0.557462352587491
+        },
+        {
+          "week": 8,
+          "shows": 31339,
+          "bookedPools": 153,
+          "commercialPools": 141,
+          "quietPools": 12,
+          "seats": 5641020,
+          "admissions": 2610810,
+          "occupancy": 0.462825871916781
+        },
+        {
+          "week": 9,
+          "shows": 25158,
+          "bookedPools": 146,
+          "commercialPools": 134,
+          "quietPools": 12,
+          "seats": 4528440,
+          "admissions": 2085803,
+          "occupancy": 0.46060078084285094
+        },
+        {
+          "week": 10,
+          "shows": 20125,
+          "bookedPools": 141,
+          "commercialPools": 128,
+          "quietPools": 13,
+          "seats": 3622500,
+          "admissions": 1664563,
+          "occupancy": 0.45950669427191165
+        },
+        {
+          "week": 11,
+          "shows": 16176,
+          "bookedPools": 134,
+          "commercialPools": 117,
+          "quietPools": 17,
+          "seats": 2911680,
+          "admissions": 1326655,
+          "occupancy": 0.4556321436421585
+        },
+        {
+          "week": 12,
+          "shows": 12957,
+          "bookedPools": 128,
+          "commercialPools": 106,
+          "quietPools": 22,
+          "seats": 2332260,
+          "admissions": 1056329,
+          "occupancy": 0.4529207721266068
+        },
+        {
+          "week": 13,
+          "shows": 10318,
+          "bookedPools": 117,
+          "commercialPools": 99,
+          "quietPools": 18,
+          "seats": 1857240,
+          "admissions": 839591,
+          "occupancy": 0.4520638151235166
+        },
+        {
+          "week": 14,
+          "shows": 8267,
+          "bookedPools": 106,
+          "commercialPools": 92,
+          "quietPools": 14,
+          "seats": 1488060,
+          "admissions": 666572,
+          "occupancy": 0.44794699138475597
+        },
+        {
+          "week": 15,
+          "shows": 6622,
+          "bookedPools": 99,
+          "commercialPools": 86,
+          "quietPools": 13,
+          "seats": 1191960,
+          "admissions": 529133,
+          "occupancy": 0.4439184200812108
+        },
+        {
+          "week": 16,
+          "shows": 5236,
+          "bookedPools": 92,
+          "commercialPools": 78,
+          "quietPools": 14,
+          "seats": 942480,
+          "admissions": 418400,
+          "occupancy": 0.44393514981750276
+        },
+        {
+          "week": 17,
+          "shows": 4256,
+          "bookedPools": 86,
+          "commercialPools": 67,
+          "quietPools": 19,
+          "seats": 766080,
+          "admissions": 332700,
+          "occupancy": 0.4342888471177945
+        },
+        {
+          "week": 18,
+          "shows": 3395,
+          "bookedPools": 78,
+          "commercialPools": 63,
+          "quietPools": 15,
+          "seats": 611100,
+          "admissions": 263178,
+          "occupancy": 0.43066273932253313
+        },
+        {
+          "week": 19,
+          "shows": 2688,
+          "bookedPools": 67,
+          "commercialPools": 58,
+          "quietPools": 9,
+          "seats": 483840,
+          "admissions": 207574,
+          "occupancy": 0.4290137235449735
+        },
+        {
+          "week": 20,
+          "shows": 1610,
+          "bookedPools": 63,
+          "commercialPools": 52,
+          "quietPools": 11,
+          "seats": 289800,
+          "admissions": 118618,
+          "occupancy": 0.40930986887508625
+        },
+        {
+          "week": 21,
+          "shows": 1603,
+          "bookedPools": 58,
+          "commercialPools": 49,
+          "quietPools": 9,
+          "seats": 288540,
+          "admissions": 129284,
+          "occupancy": 0.4480626602897345
+        },
+        {
+          "week": 22,
+          "shows": 1407,
+          "bookedPools": 52,
+          "commercialPools": 43,
+          "quietPools": 9,
+          "seats": 253260,
+          "admissions": 101798,
+          "occupancy": 0.4019505646371318
+        },
+        {
+          "week": 23,
+          "shows": 1120,
+          "bookedPools": 49,
+          "commercialPools": 35,
+          "quietPools": 14,
+          "seats": 201600,
+          "admissions": 80361,
+          "occupancy": 0.3986160714285714
+        },
+        {
+          "week": 24,
+          "shows": 910,
+          "bookedPools": 43,
+          "commercialPools": 32,
+          "quietPools": 11,
+          "seats": 163800,
+          "admissions": 62956,
+          "occupancy": 0.38434676434676435
+        },
+        {
+          "week": 25,
+          "shows": 721,
+          "bookedPools": 35,
+          "commercialPools": 26,
+          "quietPools": 9,
+          "seats": 129780,
+          "admissions": 48904,
+          "occupancy": 0.3768223146863924
+        },
+        {
+          "week": 26,
+          "shows": 567,
+          "bookedPools": 32,
+          "commercialPools": 24,
+          "quietPools": 8,
+          "seats": 102060,
+          "admissions": 38383,
+          "occupancy": 0.3760826964530668
+        },
+        {
+          "week": 27,
+          "shows": 448,
+          "bookedPools": 26,
+          "commercialPools": 18,
+          "quietPools": 8,
+          "seats": 80640,
+          "admissions": 29666,
+          "occupancy": 0.36788194444444444
+        },
+        {
+          "week": 28,
+          "shows": 371,
+          "bookedPools": 24,
+          "commercialPools": 17,
+          "quietPools": 7,
+          "seats": 66780,
+          "admissions": 23289,
+          "occupancy": 0.34874213836477985
+        },
+        {
+          "week": 29,
+          "shows": 266,
+          "bookedPools": 18,
+          "commercialPools": 16,
+          "quietPools": 2,
+          "seats": 47880,
+          "admissions": 17704,
+          "occupancy": 0.3697577276524645
+        },
+        {
+          "week": 30,
+          "shows": 224,
+          "bookedPools": 17,
+          "commercialPools": 12,
+          "quietPools": 5,
+          "seats": 40320,
+          "admissions": 13903,
+          "occupancy": 0.3448164682539683
+        },
+        {
+          "week": 31,
+          "shows": 196,
+          "bookedPools": 16,
+          "commercialPools": 11,
+          "quietPools": 5,
+          "seats": 35280,
+          "admissions": 10879,
+          "occupancy": 0.3083616780045351
+        },
+        {
+          "week": 32,
+          "shows": 133,
+          "bookedPools": 12,
+          "commercialPools": 9,
+          "quietPools": 3,
+          "seats": 23940,
+          "admissions": 8093,
+          "occupancy": 0.33805346700083544
+        },
+        {
+          "week": 33,
+          "shows": 112,
+          "bookedPools": 11,
+          "commercialPools": 7,
+          "quietPools": 4,
+          "seats": 20160,
+          "admissions": 6271,
+          "occupancy": 0.31106150793650794
+        },
+        {
+          "week": 34,
+          "shows": 91,
+          "bookedPools": 9,
+          "commercialPools": 7,
+          "quietPools": 2,
+          "seats": 16380,
+          "admissions": 4695,
+          "occupancy": 0.2866300366300366
+        },
+        {
+          "week": 35,
+          "shows": 70,
+          "bookedPools": 7,
+          "commercialPools": 5,
+          "quietPools": 2,
+          "seats": 12600,
+          "admissions": 3402,
+          "occupancy": 0.27
+        },
+        {
+          "week": 36,
+          "shows": 63,
+          "bookedPools": 7,
+          "commercialPools": 2,
+          "quietPools": 5,
+          "seats": 11340,
+          "admissions": 2694,
+          "occupancy": 0.23756613756613756
+        },
+        {
+          "week": 37,
+          "shows": 42,
+          "bookedPools": 5,
+          "commercialPools": 2,
+          "quietPools": 3,
+          "seats": 7560,
+          "admissions": 1899,
+          "occupancy": 0.2511904761904762
+        },
+        {
+          "week": 38,
+          "shows": 21,
+          "bookedPools": 2,
+          "commercialPools": 2,
+          "quietPools": 0,
+          "seats": 3780,
+          "admissions": 1141,
+          "occupancy": 0.30185185185185187
+        },
+        {
+          "week": 39,
+          "shows": 14,
+          "bookedPools": 2,
+          "commercialPools": 2,
+          "quietPools": 0,
+          "seats": 2520,
+          "admissions": 906,
+          "occupancy": 0.3595238095238095
+        },
+        {
+          "week": 40,
+          "shows": 14,
+          "bookedPools": 2,
+          "commercialPools": 2,
+          "quietPools": 0,
+          "seats": 2520,
+          "admissions": 713,
+          "occupancy": 0.28293650793650793
+        },
+        {
+          "week": 41,
+          "shows": 14,
+          "bookedPools": 2,
+          "commercialPools": 1,
+          "quietPools": 1,
+          "seats": 2520,
+          "admissions": 574,
+          "occupancy": 0.22777777777777777
+        },
+        {
+          "week": 42,
+          "shows": 14,
+          "bookedPools": 2,
+          "commercialPools": 1,
+          "quietPools": 1,
+          "seats": 2520,
+          "admissions": 450,
+          "occupancy": 0.17857142857142858
+        },
+        {
+          "week": 43,
+          "shows": 7,
+          "bookedPools": 1,
+          "commercialPools": 0,
+          "quietPools": 1,
+          "seats": 1260,
+          "admissions": 223,
+          "occupancy": 0.176984126984127
+        },
+        {
+          "week": 44,
+          "shows": 7,
+          "bookedPools": 1,
+          "commercialPools": 0,
+          "quietPools": 1,
+          "seats": 1260,
+          "admissions": 173,
+          "occupancy": 0.1373015873015873
+        }
+      ]
+    },
+    {
+      "name": "weak-event",
+      "seed": 0,
+      "countries": 197,
+      "cohorts": 2363,
+      "homeAlternatives": 1560,
+      "budgetCents": 20000000000,
+      "campaignCents": 3000000000,
+      "grossCents": 22124524576,
+      "receiptsCents": 10803196199,
+      "bookingCents": 1647574046,
+      "profitCents": -13844377847,
+      "first": 20102231,
+      "repeats": 0,
+      "openingCents": 7937896990,
+      "weeks": 37,
+      "week95": 12,
+      "offeredWeeks": 37,
+      "censored": false,
+      "weekly": [
+        7937896990,
+        3152175319,
+        2678357626,
+        1900962999,
+        1442044162,
+        1101644909,
+        851831838,
+        664493219,
+        520536464,
+        408059684,
+        320885357,
+        251569911,
+        198416097,
+        155943733,
+        122373248,
+        96138656,
+        75118279,
+        58770069,
+        45659798,
+        27927770,
+        27685300,
+        20984012,
+        16335934,
+        12552166,
+        9347306,
+        7230610,
+        5558363,
+        3978669,
+        2953220,
+        2338679,
+        1466176,
+        998095,
+        789280,
+        621397,
+        502111,
+        210806,
+        166324
+      ],
+      "localRunWeeks": {
+        "p10": 3,
+        "median": 3,
+        "p90": 10
+      },
+      "weekMs": {
+        "p10": 426.3160000000207,
+        "median": 657.6914579999866,
+        "p90": 853.03575000001
+      },
+      "bookingEvidence": [
+        {
+          "week": 1,
+          "shows": 71739,
+          "bookedPools": 1037,
+          "commercialPools": 171,
+          "quietPools": 866,
+          "seats": 12913020,
+          "admissions": 7184216,
+          "occupancy": 0.5563544391629534
+        },
+        {
+          "week": 2,
+          "shows": 40196,
+          "bookedPools": 1037,
+          "commercialPools": 169,
+          "quietPools": 868,
+          "seats": 7235280,
+          "admissions": 2888268,
+          "occupancy": 0.39919229110690946
+        },
+        {
+          "week": 3,
+          "shows": 28959,
+          "bookedPools": 166,
+          "commercialPools": 156,
+          "quietPools": 10,
+          "seats": 5212620,
+          "admissions": 2449301,
+          "occupancy": 0.4698790627362056
+        },
+        {
+          "week": 4,
+          "shows": 20517,
+          "bookedPools": 161,
+          "commercialPools": 145,
+          "quietPools": 16,
+          "seats": 3693060,
+          "admissions": 1729875,
+          "occupancy": 0.4684123734789037
+        },
+        {
+          "week": 5,
+          "shows": 16274,
+          "bookedPools": 155,
+          "commercialPools": 138,
+          "quietPools": 17,
+          "seats": 2929320,
+          "admissions": 1310563,
+          "occupancy": 0.44739495855693473
+        },
+        {
+          "week": 6,
+          "shows": 12474,
+          "bookedPools": 145,
+          "commercialPools": 130,
+          "quietPools": 15,
+          "seats": 2245320,
+          "admissions": 1000266,
+          "occupancy": 0.44548928437817326
+        },
+        {
+          "week": 7,
+          "shows": 9716,
+          "bookedPools": 138,
+          "commercialPools": 121,
+          "quietPools": 17,
+          "seats": 1748880,
+          "admissions": 772756,
+          "occupancy": 0.4418576460363204
+        },
+        {
+          "week": 8,
+          "shows": 7672,
+          "bookedPools": 130,
+          "commercialPools": 108,
+          "quietPools": 22,
+          "seats": 1380960,
+          "admissions": 602487,
+          "occupancy": 0.4362812825860271
+        },
+        {
+          "week": 9,
+          "shows": 6013,
+          "bookedPools": 121,
+          "commercialPools": 100,
+          "quietPools": 21,
+          "seats": 1082340,
+          "admissions": 471655,
+          "occupancy": 0.4357734168560711
+        },
+        {
+          "week": 10,
+          "shows": 4781,
+          "bookedPools": 108,
+          "commercialPools": 85,
+          "quietPools": 23,
+          "seats": 860580,
+          "admissions": 369631,
+          "occupancy": 0.42951381626345025
+        },
+        {
+          "week": 11,
+          "shows": 3829,
+          "bookedPools": 100,
+          "commercialPools": 80,
+          "quietPools": 20,
+          "seats": 689220,
+          "admissions": 290454,
+          "occupancy": 0.4214242186819883
+        },
+        {
+          "week": 12,
+          "shows": 2996,
+          "bookedPools": 85,
+          "commercialPools": 72,
+          "quietPools": 13,
+          "seats": 539280,
+          "admissions": 227646,
+          "occupancy": 0.4221295060080107
+        },
+        {
+          "week": 13,
+          "shows": 2394,
+          "bookedPools": 80,
+          "commercialPools": 63,
+          "quietPools": 17,
+          "seats": 430920,
+          "admissions": 179446,
+          "occupancy": 0.41642532256567344
+        },
+        {
+          "week": 14,
+          "shows": 1932,
+          "bookedPools": 72,
+          "commercialPools": 57,
+          "quietPools": 15,
+          "seats": 347760,
+          "admissions": 141002,
+          "occupancy": 0.4054577869795261
+        },
+        {
+          "week": 15,
+          "shows": 1554,
+          "bookedPools": 63,
+          "commercialPools": 48,
+          "quietPools": 15,
+          "seats": 279720,
+          "admissions": 110500,
+          "occupancy": 0.39503789503789505
+        },
+        {
+          "week": 16,
+          "shows": 1218,
+          "bookedPools": 57,
+          "commercialPools": 43,
+          "quietPools": 14,
+          "seats": 219240,
+          "admissions": 86733,
+          "occupancy": 0.39560755336617404
+        },
+        {
+          "week": 17,
+          "shows": 966,
+          "bookedPools": 48,
+          "commercialPools": 37,
+          "quietPools": 11,
+          "seats": 173880,
+          "admissions": 67560,
+          "occupancy": 0.388543823326432
+        },
+        {
+          "week": 18,
+          "shows": 805,
+          "bookedPools": 43,
+          "commercialPools": 31,
+          "quietPools": 12,
+          "seats": 144900,
+          "admissions": 52871,
+          "occupancy": 0.3648792270531401
+        },
+        {
+          "week": 19,
+          "shows": 609,
+          "bookedPools": 37,
+          "commercialPools": 28,
+          "quietPools": 9,
+          "seats": 109620,
+          "admissions": 41109,
+          "occupancy": 0.37501368363437326
+        },
+        {
+          "week": 20,
+          "shows": 378,
+          "bookedPools": 31,
+          "commercialPools": 21,
+          "quietPools": 10,
+          "seats": 68040,
+          "admissions": 23729,
+          "occupancy": 0.348750734861846
+        },
+        {
+          "week": 21,
+          "shows": 392,
+          "bookedPools": 28,
+          "commercialPools": 19,
+          "quietPools": 9,
+          "seats": 70560,
+          "admissions": 24833,
+          "occupancy": 0.35194160997732427
+        },
+        {
+          "week": 22,
+          "shows": 287,
+          "bookedPools": 21,
+          "commercialPools": 16,
+          "quietPools": 5,
+          "seats": 51660,
+          "admissions": 18784,
+          "occupancy": 0.36360820751064654
+        },
+        {
+          "week": 23,
+          "shows": 238,
+          "bookedPools": 19,
+          "commercialPools": 12,
+          "quietPools": 7,
+          "seats": 42840,
+          "admissions": 14638,
+          "occupancy": 0.34169000933706817
+        },
+        {
+          "week": 24,
+          "shows": 203,
+          "bookedPools": 16,
+          "commercialPools": 11,
+          "quietPools": 5,
+          "seats": 36540,
+          "admissions": 11219,
+          "occupancy": 0.30703338806787084
+        },
+        {
+          "week": 25,
+          "shows": 133,
+          "bookedPools": 12,
+          "commercialPools": 10,
+          "quietPools": 2,
+          "seats": 23940,
+          "admissions": 8360,
+          "occupancy": 0.3492063492063492
+        },
+        {
+          "week": 26,
+          "shows": 112,
+          "bookedPools": 11,
+          "commercialPools": 7,
+          "quietPools": 4,
+          "seats": 20160,
+          "admissions": 6478,
+          "occupancy": 0.3213293650793651
+        },
+        {
+          "week": 27,
+          "shows": 98,
+          "bookedPools": 10,
+          "commercialPools": 6,
+          "quietPools": 4,
+          "seats": 17640,
+          "admissions": 5009,
+          "occupancy": 0.28395691609977325
+        },
+        {
+          "week": 28,
+          "shows": 70,
+          "bookedPools": 7,
+          "commercialPools": 6,
+          "quietPools": 1,
+          "seats": 12600,
+          "admissions": 3610,
+          "occupancy": 0.2865079365079365
+        },
+        {
+          "week": 29,
+          "shows": 56,
+          "bookedPools": 6,
+          "commercialPools": 3,
+          "quietPools": 3,
+          "seats": 10080,
+          "admissions": 2715,
+          "occupancy": 0.2693452380952381
+        },
+        {
+          "week": 30,
+          "shows": 49,
+          "bookedPools": 6,
+          "commercialPools": 2,
+          "quietPools": 4,
+          "seats": 8820,
+          "admissions": 2150,
+          "occupancy": 0.2437641723356009
+        },
+        {
+          "week": 31,
+          "shows": 28,
+          "bookedPools": 3,
+          "commercialPools": 2,
+          "quietPools": 1,
+          "seats": 5040,
+          "admissions": 1329,
+          "occupancy": 0.2636904761904762
+        },
+        {
+          "week": 32,
+          "shows": 14,
+          "bookedPools": 2,
+          "commercialPools": 2,
+          "quietPools": 0,
+          "seats": 2520,
+          "admissions": 915,
+          "occupancy": 0.3630952380952381
+        },
+        {
+          "week": 33,
+          "shows": 14,
+          "bookedPools": 2,
+          "commercialPools": 2,
+          "quietPools": 0,
+          "seats": 2520,
+          "admissions": 724,
+          "occupancy": 0.2873015873015873
+        },
+        {
+          "week": 34,
+          "shows": 14,
+          "bookedPools": 2,
+          "commercialPools": 1,
+          "quietPools": 1,
+          "seats": 2520,
+          "admissions": 570,
+          "occupancy": 0.2261904761904762
+        },
+        {
+          "week": 35,
+          "shows": 14,
+          "bookedPools": 2,
+          "commercialPools": 1,
+          "quietPools": 1,
+          "seats": 2520,
+          "admissions": 439,
+          "occupancy": 0.1742063492063492
+        },
+        {
+          "week": 36,
+          "shows": 7,
+          "bookedPools": 1,
+          "commercialPools": 0,
+          "quietPools": 1,
+          "seats": 1260,
+          "admissions": 218,
+          "occupancy": 0.173015873015873
+        },
+        {
+          "week": 37,
+          "shows": 7,
+          "bookedPools": 1,
+          "commercialPools": 0,
+          "quietPools": 1,
+          "seats": 1260,
+          "admissions": 172,
+          "occupancy": 0.1365079365079365
+        }
+      ]
+    }
+  ],
+  "distributions": [
+    {
+      "name": "focused-small",
+      "runs": 1,
+      "profitable": 1,
+      "censored": 0,
+      "metrics": {
+        "grossCents": {
+          "p10": 2602284476,
+          "median": 2602284476,
+          "p90": 2602284476
+        },
+        "receiptsCents": {
+          "p10": 1292232266,
+          "median": 1292232266,
+          "p90": 1292232266
+        },
+        "profitCents": {
+          "p10": 875374247,
+          "median": 875374247,
+          "p90": 875374247
+        },
+        "first": {
+          "p10": 1854355,
+          "median": 1854355,
+          "p90": 1854355
+        },
+        "repeats": {
+          "p10": 30248,
+          "median": 30248,
+          "p90": 30248
+        },
+        "weeks": {
+          "p10": 34,
+          "median": 34,
+          "p90": 34
+        },
+        "week95": {
+          "p10": 14,
+          "median": 14,
+          "p90": 14
+        },
+        "openingCents": {
+          "p10": 329247088,
+          "median": 329247088,
+          "p90": 329247088
+        },
+        "bookingCents": {
+          "p10": 166858019,
+          "median": 166858019,
+          "p90": 166858019
+        }
+      }
+    },
+    {
+      "name": "peak-release",
+      "runs": 1,
+      "profitable": 1,
+      "censored": 0,
+      "metrics": {
+        "grossCents": {
+          "p10": 565093283,
+          "median": 565093283,
+          "p90": 565093283
+        },
+        "receiptsCents": {
+          "p10": 295911187,
+          "median": 295911187,
+          "p90": 295911187
+        },
+        "profitCents": {
+          "p10": 14802399,
+          "median": 14802399,
+          "p90": 14802399
+        },
+        "first": {
+          "p10": 380964,
+          "median": 380964,
+          "p90": 380964
+        },
+        "repeats": {
+          "p10": 1803,
+          "median": 1803,
+          "p90": 1803
+        },
+        "weeks": {
+          "p10": 34,
+          "median": 34,
+          "p90": 34
+        },
+        "week95": {
+          "p10": 20,
+          "median": 20,
+          "p90": 20
+        },
+        "openingCents": {
+          "p10": 18967318,
+          "median": 18967318,
+          "p90": 18967318
+        },
+        "bookingCents": {
+          "p10": 31108788,
+          "median": 31108788,
+          "p90": 31108788
+        }
+      }
+    },
+    {
+      "name": "earned-event",
+      "runs": 1,
+      "profitable": 1,
+      "censored": 0,
+      "metrics": {
+        "grossCents": {
+          "p10": 60298182707,
+          "median": 60298182707,
+          "p90": 60298182707
+        },
+        "receiptsCents": {
+          "p10": 29504910246,
+          "median": 29504910246,
+          "p90": 29504910246
+        },
+        "profitCents": {
+          "p10": 2461276993,
+          "median": 2461276993,
+          "p90": 2461276993
+        },
+        "first": {
+          "p10": 53897156,
+          "median": 53897156,
+          "p90": 53897156
+        },
+        "repeats": {
+          "p10": 622273,
+          "median": 622273,
+          "p90": 622273
+        },
+        "weeks": {
+          "p10": 44,
+          "median": 44,
+          "p90": 44
+        },
+        "week95": {
+          "p10": 14,
+          "median": 14,
+          "p90": 14
+        },
+        "openingCents": {
+          "p10": 7937896990,
+          "median": 7937896990,
+          "p90": 7937896990
+        },
+        "bookingCents": {
+          "p10": 4043633253,
+          "median": 4043633253,
+          "p90": 4043633253
+        }
+      }
+    },
+    {
+      "name": "weak-event",
+      "runs": 1,
+      "profitable": 0,
+      "censored": 0,
+      "metrics": {
+        "grossCents": {
+          "p10": 22124524576,
+          "median": 22124524576,
+          "p90": 22124524576
+        },
+        "receiptsCents": {
+          "p10": 10803196199,
+          "median": 10803196199,
+          "p90": 10803196199
+        },
+        "profitCents": {
+          "p10": -13844377847,
+          "median": -13844377847,
+          "p90": -13844377847
+        },
+        "first": {
+          "p10": 20102231,
+          "median": 20102231,
+          "p90": 20102231
+        },
+        "repeats": {
+          "p10": 0,
+          "median": 0,
+          "p90": 0
+        },
+        "weeks": {
+          "p10": 37,
+          "median": 37,
+          "p90": 37
+        },
+        "week95": {
+          "p10": 12,
+          "median": 12,
+          "p90": 12
+        },
+        "openingCents": {
+          "p10": 7937896990,
+          "median": 7937896990,
+          "p90": 7937896990
+        },
+        "bookingCents": {
+          "p10": 1647574046,
+          "median": 1647574046,
+          "p90": 1647574046
+        }
+      }
+    }
+  ],
+  "limitations": [
+    "Conditional seeded films and authored NPC rotation, not player-wide hit probabilities",
+    "Canonical 197 countries and mixed cohorts; prior actual platform offers/customers/playback projected read-only",
+    "No forced maximum run; horizon survivors are censored",
+    "Platform resources/economy held at the controlled world baseline during each run; full engine/save progression is verified separately"
+  ]
+}

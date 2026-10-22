@@ -1,0 +1,64 @@
+FAIL unheld abnormal quote cannot debit unrelated wallet cash: Expected values to be strictly equal:
++ actual - expected
+
++ 10000000000000
+- 25000000000000
+
+FAIL normal quote reload preserves high historical cost and corporate rights: Expected values to be strictly deep-equal:
++ actual - expected
+
+  [
+    {
++     averageCost: 39,
+-     averageCost: 10000,
+-     equityFunding: [
+-       {
+-         ownerStudioId: 'funding-co',
+-         shares: 60
+-       }
+-     ],
+      shares: 100,
+      stockId: 'stk_para',
++     totalInvested: 3900
+-     totalInvested: 1000000
+    }
+  ]
+
+FAIL explicit zero average cost and zero invested basis are preserved: Expected values to be strictly deep-equal:
++ actual - expected
+
+  [
+    {
++     averageCost: 13,
+-     averageCost: 0,
+      shares: 100,
+      stockId: 'stk_para',
+      totalInvested: 0
+    }
+  ]
+
+FAIL abnormal quote repair retains its original and is idempotent: The expression evaluated to a falsy value:
+
+  assert.ok(provenance?.stk_para)
+
+FAIL unsafe supply never silently rescales shares or rewrites basis: Missing expected exception.
+FAIL duplicate holdings and contradictory owner allocations require recoverable review: Missing expected exception.
+FAIL new integrity signature rejects disappearing company-funded rights: Expected values to be strictly equal:
+
+true !== false
+
+FAIL new integrity signature rejects altered quote-repair provenance: Expected values to be strictly equal:
+
+true !== false
+
+file:///private/tmp/audit-stock-save-safety.mjs:99050
+if (failed) throw new Error(`${failed}/${tests.length} stock save safety checks failed`);
+                  ^
+
+Error: 8/8 stock save safety checks failed
+    at file:///private/tmp/audit-stock-save-safety.mjs:99050:19
+    at ModuleJob.run (node:internal/modules/esm/module_job:377:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:671:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+
+Node.js v24.11.1

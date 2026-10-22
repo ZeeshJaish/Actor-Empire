@@ -320,10 +320,12 @@ assert(styles.includes('@media (max-width: 560px)') && styles.includes('prefers-
 /* The launcher moved from the retired Content/Market rooms to the Command
    Deck's CONTENT chips and the Content Desk's renew/lapse actions. Asserting
    the live route rather than the old button's label. */
+/* Entry #4 (live): the Content Desk opens the exchange on its Calendar tab,
+   where renewals are decided (onOpenRightsCalendar / onRenew). */
 assert(
     hq.includes('showRightsExchange')
     && hq.includes("chip === 'RIGHTS'")
-    && hq.includes('onRenew={() => setShowRightsExchange(true)}'),
+    && hq.includes("onOpenRightsCalendar={() => { setRightsExchangeInitialTab('CALENDAR'); setShowRightsExchange(true); }}"),
     'The rights exchange must be reachable from the Content division and the Content Desk.',
 );
 

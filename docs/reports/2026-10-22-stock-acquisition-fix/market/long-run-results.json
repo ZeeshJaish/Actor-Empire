@@ -1,0 +1,148 @@
+{
+  "longRunScenarios": [
+    {
+      "years": 50,
+      "mode": "bull",
+      "seed": 17,
+      "stocks": 16,
+      "payouts": 216,
+      "minimum": 12.5,
+      "maximum": 1744.18
+    },
+    {
+      "years": 50,
+      "mode": "bull",
+      "seed": 491,
+      "stocks": 16,
+      "payouts": 216,
+      "minimum": 12.5,
+      "maximum": 1744.18
+    },
+    {
+      "years": 50,
+      "mode": "bear",
+      "seed": 17,
+      "stocks": 16,
+      "payouts": 216,
+      "minimum": 0.5,
+      "maximum": 837.79
+    },
+    {
+      "years": 50,
+      "mode": "bear",
+      "seed": 491,
+      "stocks": 16,
+      "payouts": 216,
+      "minimum": 0.5,
+      "maximum": 837.79
+    },
+    {
+      "years": 50,
+      "mode": "seeded",
+      "seed": 17,
+      "stocks": 16,
+      "payouts": 216,
+      "minimum": 9.87,
+      "maximum": 983.98
+    },
+    {
+      "years": 50,
+      "mode": "seeded",
+      "seed": 491,
+      "stocks": 16,
+      "payouts": 216,
+      "minimum": 9.31,
+      "maximum": 1081.04
+    },
+    {
+      "years": 50,
+      "mode": "stale-hit",
+      "seed": 17,
+      "stocks": 16,
+      "payouts": 216,
+      "minimum": 9.87,
+      "maximum": 983.98
+    },
+    {
+      "years": 50,
+      "mode": "stale-hit",
+      "seed": 491,
+      "stocks": 16,
+      "payouts": 216,
+      "minimum": 9.31,
+      "maximum": 1081.04
+    },
+    {
+      "years": 100,
+      "mode": "bull",
+      "seed": 17,
+      "stocks": 16,
+      "payouts": 433,
+      "minimum": 12.5,
+      "maximum": 1744.18
+    },
+    {
+      "years": 100,
+      "mode": "bull",
+      "seed": 491,
+      "stocks": 16,
+      "payouts": 433,
+      "minimum": 12.5,
+      "maximum": 1744.18
+    },
+    {
+      "years": 100,
+      "mode": "bear",
+      "seed": 17,
+      "stocks": 16,
+      "payouts": 433,
+      "minimum": 0.5,
+      "maximum": 837.79
+    },
+    {
+      "years": 100,
+      "mode": "bear",
+      "seed": 491,
+      "stocks": 16,
+      "payouts": 433,
+      "minimum": 0.5,
+      "maximum": 837.79
+    },
+    {
+      "years": 100,
+      "mode": "seeded",
+      "seed": 17,
+      "stocks": 16,
+      "payouts": 433,
+      "minimum": 8.89,
+      "maximum": 983.98
+    },
+    {
+      "years": 100,
+      "mode": "seeded",
+      "seed": 491,
+      "stocks": 16,
+      "payouts": 433,
+      "minimum": 8.1,
+      "maximum": 1081.04
+    },
+    {
+      "years": 100,
+      "mode": "stale-hit",
+      "seed": 17,
+      "stocks": 16,
+      "payouts": 433,
+      "minimum": 8.89,
+      "maximum": 983.98
+    },
+    {
+      "years": 100,
+      "mode": "stale-hit",
+      "seed": 491,
+      "stocks": 16,
+      "payouts": 433,
+      "minimum": 8.1,
+      "maximum": 1081.04
+    }
+  ]
+}

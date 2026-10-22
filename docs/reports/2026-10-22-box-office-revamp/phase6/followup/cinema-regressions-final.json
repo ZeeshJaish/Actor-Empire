@@ -1,0 +1,82 @@
+[
+  {
+    "suite": "inputs",
+    "exit": 0
+  },
+  {
+    "suite": "delivery",
+    "exit": 0
+  },
+  {
+    "suite": "finance",
+    "exit": 0
+  },
+  {
+    "suite": "finance-contracts",
+    "exit": 0
+  },
+  {
+    "suite": "finance-ui",
+    "exit": 0
+  },
+  {
+    "suite": "phase1-integration",
+    "exit": 0
+  },
+  {
+    "suite": "awareness",
+    "exit": 0
+  },
+  {
+    "suite": "phase2-integration",
+    "exit": 0
+  },
+  {
+    "suite": "audience",
+    "exit": 0
+  },
+  {
+    "suite": "market",
+    "exit": 0
+  },
+  {
+    "suite": "migration",
+    "exit": 0
+  },
+  {
+    "suite": "integration",
+    "exit": 0
+  },
+  {
+    "suite": "presentation",
+    "exit": 0
+  },
+  {
+    "suite": "rights",
+    "exit": 0
+  },
+  {
+    "suite": "placement",
+    "exit": 0
+  },
+  {
+    "suite": "release-announcement",
+    "exit": 0
+  },
+  {
+    "suite": "save-boundary",
+    "exit": 0
+  },
+  {
+    "suite": "viewing-routes",
+    "exit": 0
+  },
+  {
+    "suite": "royalty-batch",
+    "exit": 0
+  },
+  {
+    "suite": "career-actions",
+    "exit": 0
+  }
+]

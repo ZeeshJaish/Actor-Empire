@@ -1,5 +1,5 @@
 export const formatMoney = (val: number) => {
-    if (!Number.isFinite(val)) return '$999T+';
+    if (!Number.isFinite(val)) return 'Unavailable';
     const absVal = Math.abs(val);
     const sign = val < 0 ? '-' : '';
     const suffixes = [

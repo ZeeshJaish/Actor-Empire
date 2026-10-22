@@ -1,0 +1,5 @@
+
+  ../../../../private/tmp/actor-localization-followup.cjs  14.1mb ⚠️
+
+⚡ Done in 214ms
+English baseline passed: 8173 frozen keys, 14720 deterministic reaction cases, producers and bank structure unchanged; player/context mutation checks passed.

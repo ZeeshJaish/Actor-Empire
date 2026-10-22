@@ -1,5 +1,6 @@
 import { normalizeStreamingLanguageId } from '../streamingLocalizationCapabilities';
 import { buildCinemaExposure } from './boxOfficeAwareness';
+import { cinemaHomeChoice } from './boxOfficeAlternatives';
 import { CINEMA_AUDIENCE_PROFILE as P, CINEMA_EXPOSURE_PROFILE } from './boxOfficeProfiles';
 import type { CinemaChoiceRequest, CinemaTitleAudienceState, CinemaViewingEvidence, CinemaWeekInput } from './boxOfficeTypes';
 
@@ -41,8 +42,14 @@ const evidence = (input: CinemaWeekInput): CinemaViewingEvidence[] => {
 /** Exposes the proposed awareness state for the shadow allocator. Never persists or charges it. */
 export const buildCinemaAudienceSnapshot = (input: CinemaWeekInput): {choices: CinemaChoiceRequest[]; titles: CinemaTitleAudienceState[]} => {
     const choices: CinemaChoiceRequest[] = [], states: CinemaTitleAudienceState[] = [], history = evidence(input);
+    const alternativesByCohort=new Map<string,NonNullable<CinemaWeekInput['streamingAlternatives']>[number][]>();
+    for(const a of input.streamingAlternatives||[]){const rows=alternativesByCohort.get(a.cohortId)||[];rows.push(a);alternativesByCohort.set(a.cohortId,rows)}
     const historyByCohort=new Map<string,CinemaViewingEvidence[]>();
     for(const h of history){const list=historyByCohort.get(h.cohortId)||[];list.push(h);historyByCohort.set(h.cohortId,list)}
+    const affinitiesByCohort=new Map<string,NonNullable<CinemaWeekInput['marketState']>['affinities']>();
+    for(const affinity of input.marketState?.affinities||[]){
+        const local=affinitiesByCohort.get(affinity.cohortId)||[];local.push(affinity);affinitiesByCohort.set(affinity.cohortId,local);
+    }
     const pools=new Map(input.supply?.pools.map(p=>[p.id,p]));
     for (const title of [...input.titles].sort((a,b)=>a.id.localeCompare(b.id))) {
         const facts = title.market;
@@ -82,7 +89,8 @@ export const buildCinemaAudienceSnapshot = (input: CinemaWeekInput): {choices: C
             aware += discovery; cell.awarePeople=aware;
             if (contacts) {cell.lastDiscoveryWeek=input.absoluteWeek;cell.discoveryContactsUsed+=contacts}
             const matching = own.filter(h=>h.titleId!==title.id && h.universeId && h.universeId===facts.universeId);
-            const compact=(input.marketState?.affinities || []).filter(a=>a.cohortId===cohort.id && a.kind==='UNIVERSE' && a.id===facts.universeId);
+            const cohortAffinities=affinitiesByCohort.get(cohort.id)||[];
+            const compact=cohortAffinities.filter(a=>a.kind==='UNIVERSE' && a.id===facts.universeId);
             const familiarity = Math.max(0,...matching.map(h=>clamp(h.people/Math.max(1,cohort.people))*fraction(h.satisfaction)),
                 ...compact.map(a=>clamp(a.people/Math.max(1,cohort.people))*fraction(a.strength)));
             // Overlapping fan segments use a maximum reach. Their affection follows ALL actual
@@ -92,7 +100,7 @@ export const buildCinemaAudienceSnapshot = (input: CinemaWeekInput): {choices: C
                     const oldWeight=kind==='STUDIO' ? (h.ownerId===id?1:0) : Math.max(0,...h.cast.filter(c=>c.personId===id).map(c=>c.roleWeight));
                     return oldWeight>0 ? [{people:h.people,quality:h.satisfaction,weight:Math.min(currentWeight,oldWeight)}] : [];
                 });
-                for(const a of input.marketState?.affinities || []) if(a.cohortId===cohort.id && a.kind===kind && a.id===id)
+                for(const a of cohortAffinities) if(a.kind===kind && a.id===id)
                     experienced.push({people:a.people,quality:a.strength,weight:currentWeight});
                 const weight=experienced.reduce((n,e)=>n+e.people*e.weight,0);
                 const quality=weight ? experienced.reduce((n,e)=>n+e.people*e.weight*e.quality,0)/weight : 0;
@@ -104,7 +112,9 @@ export const buildCinemaAudienceSnapshot = (input: CinemaWeekInput): {choices: C
                 const character=p.characterIds.filter(id=>facts.returningCharacterIds?.includes(id));
                 return castUnique(title.cast).filter(c=>c.characterIds.some(id=>character.includes(id))).map(c=>Math.min(c.roleWeight,p.roleWeight));
             })));
-            const buildup = familiarity * fraction(facts.payoff) * returning;
+            // An unviewed film's final payoff is not public opening knowledge.
+            const expectedPayoff=seen ? facts.payoff : title.delivery.estimatedQuality ?? 55;
+            const buildup = familiarity * fraction(expectedPayoff) * returning;
             // Cadence fatigue applied once, after overlap; no precursor-count gate.
             const recent = matching.filter(h=>input.absoluteWeek-h.absoluteWeek < 8).length;
             const fatigue = 1/(1+Math.max(0,recent-1)*.1);
@@ -119,23 +129,41 @@ export const buildCinemaAudienceSnapshot = (input: CinemaWeekInput): {choices: C
             const perPersonWallet = weeklyWallet/Math.max(1,eligible);
             const affordability = price>0 ? clamp(perPersonWallet/price,.03,1) : 0;
             const timeFit = clamp(m.weeklyLeisureMinutes/Math.max(1,eligible*minutes));
-            const reachable = accessible ? people(Math.min(aware-seen,(cohort.people-seen)*eligible/Math.max(1,cohort.people))*localFit) : 0;
+            // Language is a preference in utility, not a second loss of physical access.
+            // Keeping it here too squared the foreign-language preference (30% -> 9%).
+            const reachable = accessible ? people(Math.min(aware-seen,(cohort.people-seen)*eligible/Math.max(1,cohort.people))) : 0;
             const observedSatisfaction=seen ? seenBands.reduce((n,b)=>n+b.people*b.satisfaction,0)/seen/100 : 0;
-            const feedback=seen ? 1+(.3+observedSatisfaction*.95-1)*clamp(seen/Math.max(1,cohort.people*.03)) : 1;
+            // Reviews inform the reached audience after a small real sample.
+            // Requiring 3% of an entire country/persona to attend hid a weak
+            // response from almost every remaining viewer in large markets.
+            const responseConfidence=clamp(seen/Math.max(50,aware*.01));
+            const feedback=seen ? 1+(.05+observedSatisfaction*1.2-1)*responseConfidence : 1;
             const utility = clamp(fraction(m.interest)*fit*(.65+.35*fraction(facts.urgency))
                 *(1+Math.min(P.maxFavoriteLift,attachment*P.favoriteLift)+buildup*.5)*fatigue*feedback
-                *(facts.universeId ? .65+.35*fraction(facts.accessibility)+familiarity*.15 : 1));
-            const windows=facts.streamingWindows || (facts.streamingWindow ? [facts.streamingWindow] : []);
-            const knownWait = windows.some(window=>window.publiclyKnown && !!window.platformId && window.countryIds.includes(cohort.countryId)
-                && window.absoluteWeek-input.absoluteWeek<=8) ? .6*(1-fraction(facts.urgency)*.65) : 0;
+                *(facts.universeId ? .65+.35*fraction(seen?facts.accessibility:title.delivery.estimatedQuality??55)+familiarity*.15 : 1));
+            const home=cinemaHomeChoice({absoluteWeek:input.absoluteWeek,streamingAlternatives:alternativesByCohort.get(cohort.id)},cohort,title.genre,facts);
             const releaseAge = Math.max(0,input.absoluteWeek-facts.releaseWeek-P.openingInterestGraceWeeks);
-            const firstTiming = 2 ** (-releaseAge/P.firstInterestHalfLifeWeeks);
+            // A real recommendation can keep an already-aware viewer interested.
+            // Final quality alone cannot buy staying power before anyone has watched.
+            // Marketing/discovery cannot dilute an already earned review sample.
+            // Scale the sample to the paying market, with bounded statistical needs.
+            const holdConfidence=clamp(seen/Math.max(50,Math.min(1000,eligible*.01)));
+            const excellentResponse=clamp((observedSatisfaction-.75)/.25)*holdConfidence;
+            const firstHalfLife=P.firstInterestHalfLifeWeeks*(1+P.excellentResponseHold*excellentResponse**2*fraction(facts.urgency));
+            const firstTiming = 2 ** (-releaseAge/firstHalfLife);
             const repeatTiming = 2 ** (-releaseAge/P.repeatInterestHalfLifeWeeks);
             // New recommendations carry fresh urgency; older unconverted awareness fades.
             const freshReach = Math.min(reachable,discovery+localDiscovery);
             const timedReach = (reachable-freshReach)*firstTiming+freshReach;
-            const interest = people(timedReach*utility*P.firstWeeklyIntent);
-            const buyShare = clamp(affordability**(.25+fraction(m.priceSensitivity)*.5)*timeFit*(1-knownWait));
+            // Existing fans notice a reached release more readily and plan a visit.
+            // This is a subset of real awareness/eligibility, never an extra audience.
+            // Conservatively subtract all current viewers before offering loyal first visits.
+            const loyalUnseen=Math.max(0,cohort.people*Math.max(attachment,buildup)-seen);
+            const noticed=1-(1-clamp(aware/Math.max(1,cohort.people)))**P.loyalAttentionOpportunities;
+            const loyalAware=Math.min(Math.max(0,aware-seen),loyalUnseen*noticed);
+            const loyalReach=timedReach*clamp(loyalAware/Math.max(1,aware-seen));
+            const interest = people(utility*(timedReach*P.firstWeeklyIntent+loyalReach*(P.loyalWeeklyIntent-P.firstWeeklyIntent)));
+            const buyShare = clamp(affordability**(.25+fraction(m.priceSensitivity)*.5)*timeFit*(1-home.share));
             const first = people(interest*buyShare);
             const repeatEligible = accessible ? people(seenBands.filter(b=>b.satisfaction>55).reduce((n,b)=>n+b.people,0)*eligible/Math.max(1,cohort.people)*localFit) : 0;
             const repeat = people(Math.min(repeatEligible,seenBands.reduce((n,b)=>n + b.people*fraction(Math.max(0,b.satisfaction-55)/.45)
@@ -148,7 +176,7 @@ export const buildCinemaAudienceSnapshot = (input: CinemaWeekInput): {choices: C
             const carried = (old?.deferredPeople || 0)*P.deferredRetentionPerWeek**Math.max(1,input.absoluteWeek-(old?.lastChoiceWeek ?? input.marketState?.lastProcessedAbsoluteWeek ?? input.absoluteWeek-1));
             const deferred = Math.min(Math.max(0,aware-seen-first),Math.max(interest-first,people(carried)));
             cell.deferredPeople=deferred;
-            choices.push({...common,kind:'DEFER',requestedAdmissions:0,interestedPeople:deferred,reasons:[knownWait?'KNOWN_STREAMING_WINDOW':'AFFORDABILITY_TIME_OR_OUTSIDE_CHOICE']});
+            choices.push({...common,kind:'DEFER',requestedAdmissions:0,interestedPeople:deferred,reasons:[...(home.wait?['KNOWN_STREAMING_WINDOW']:[]),...(home.other?['RELEVANT_STREAMING_ALTERNATIVE']:[]),'AFFORDABILITY_TIME_OR_OUTSIDE_CHOICE']});
         }
         states.push(next);
     }

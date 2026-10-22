@@ -1,0 +1,40 @@
+PASS PARAMOUNT real purchases conserve basis and debit
+PASS PARAMOUNT zero second share charge and matching signed liabilities
+PASS PARAMOUNT actual migration reload retains rights
+PASS PARAMOUNT duplicate signing has no side effect
+Advancing actual week 35 8
+PASS Actual next week 0 retains acquisition without reminder
+Advancing actual week 35 9
+PASS Actual next week 1 retains acquisition without reminder
+Advancing actual week 35 10
+PASS Actual next week 2 retains acquisition without reminder
+PASS WARNER_BROS real purchases conserve basis and debit
+PASS WARNER_BROS zero second share charge and matching signed liabilities
+PASS WARNER_BROS actual migration reload retains rights
+PASS WARNER_BROS duplicate signing has no side effect
+PASS UNIVERSAL real purchases conserve basis and debit
+PASS UNIVERSAL zero second share charge and matching signed liabilities
+PASS UNIVERSAL actual migration reload retains rights
+PASS UNIVERSAL duplicate signing has no side effect
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: stock cost basis must equal actual accepted tender cash paid
++ actual - expected
+
++ 4478500000
+- 13475000000
+
+    at file:///private/tmp/audit-stock-acquisition-integration.mjs:165280:12
+    at check (file:///private/tmp/audit-stock-acquisition-integration.mjs:165190:3)
+    at file:///private/tmp/audit-stock-acquisition-integration.mjs:165276:3 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 4478500000,
+  expected: 13475000000,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.11.1

@@ -120,6 +120,11 @@ export interface StudioAcqConfig {
   rivalMaxRounds?: number;
   /** demo-only: force a seller decision instead of the ratio heuristic */
   forcedDecision?: SellerDecision;
+  signingQuoteKey?: string;
+  signingPrice?: number;
+  signingTermsValid?: boolean;
+  publicControlReady?: boolean;
+  entryBlockReason?: string;
 }
 
 export interface StudioAcqResult {
@@ -145,6 +150,7 @@ export interface StudioAcquisitionDealRoomProps {
   studioFunding?: AcquisitionFundingSelection;
   onImmersiveChange?: (immersive: boolean) => void;
   onClose: () => void;
+  onOpenStocks?: () => void;
   onRunDiligence: (funding: AcquisitionFundingSelection) => DealRoomAction;
   onSubmitOffer: (input: {
     offerType: AcquisitionOfferType;
@@ -157,7 +163,8 @@ export interface StudioAcquisitionDealRoomProps {
   onReviseOffer: (offerAmount: number) => DealRoomAction;
   onBeatRival: (offerAmount: number) => DealRoomAction;
   onWalkAway: () => DealRoomAction;
-  onCompleteAcquisition: () => DealRoomAction;
+  onCompleteAcquisition: (quoteKey?: string) => DealRoomAction;
+  onBeginControlTransfer?: () => DealRoomAction;
   onSetOperatingModel: (model: SubsidiaryOperatingModel) => DealRoomAction;
   onUpdatePresentation?: (patch: NonNullable<AcquisitionCase['presentation']>) => DealRoomAction;
 }
@@ -333,7 +340,8 @@ const DossierScene: React.FC<{
   onRunDiligence: (funding: FundingSource) => boolean;
   onContinue: () => void;
   onClose: () => void;
-}> = ({ cfg, diligenceDone, onRunDiligence, onContinue, onClose }) => {
+  onOpenStocks?: () => void;
+}> = ({ cfg, diligenceDone, onRunDiligence, onContinue, onClose, onOpenStocks }) => {
   const [revealing, setRevealing] = useState(false);
   const [pickFunding, setPickFunding] = useState(false);
   const wait = useTimers();
@@ -395,13 +403,14 @@ const DossierScene: React.FC<{
                 </div>
                 <div className="sa-position-track"><i style={{ width: `${Math.min(100, ((cfg.currentOwnershipPercent || 0) / (cfg.controlTargetPercent || 50)) * 100)}%` }} /></div>
                 <div className="sa-position-note">
-                  {(cfg.sharesOwned || 0).toLocaleString()} shares already count toward control. You have already committed {fmtMoney(cfg.stockCostBasis || 0)} in the market; the tender only covers the remaining {(cfg.sharesRequiredForControl || 0).toLocaleString()} shares.
+                  {(cfg.sharesOwned || 0).toLocaleString()} shares already count toward control. Historical cash invested: {cfg.stockCostBasis === undefined ? 'Unknown' : fmtMoney(cfg.stockCostBasis)}. The tender only covers the remaining {(cfg.sharesRequiredForControl || 0).toLocaleString()} shares.
                 </div>
                 <div className="sa-position-ledger">
                   <div><span>50% control value</span><b>{fmtMoney(cfg.controlBlockValue || 0)}</b></div>
                   <div><span>Stake credit</span><b className="ok">−{fmtMoney(cfg.existingStakeCredit || 0)}</b></div>
                   <div><span>Remaining tender</span><b>{fmtMoney(Math.max(0, (cfg.controlBlockValue || 0) - (cfg.existingStakeCredit || 0)))}</b></div>
                 </div>
+                {!cfg.publicControlReady && onOpenStocks && <button type="button" className="sa-btn ghost wide" style={{ marginTop: 12 }} onClick={onOpenStocks}>Buy Shares in Stocks</button>}
               </div>
             )}
 
@@ -451,7 +460,7 @@ const DossierScene: React.FC<{
       <div className="sa-foot">
         {!diligenceDone ? (
           <>
-            <button className="sa-btn ghost" onClick={onContinue}>Bid Blind →</button>
+            <button className="sa-btn ghost" onClick={onContinue}>{cfg.marketType === 'PUBLIC' ? cfg.publicControlReady ? 'Continue Control Transfer →' : 'Open Public Tender →' : 'Bid Blind →'}</button>
             <button className="sa-btn gold" onClick={() => setPickFunding(true)}>
               Run Due Diligence · {fmtMoney(cfg.diligenceFee)}
             </button>
@@ -511,7 +520,7 @@ const WarRoomScene: React.FC<{
 }> = ({ cfg, diligenceDone, draft, setDraft, actionPending, onFile, onBack }) => {
   const publicTender = cfg.marketType === 'PUBLIC';
   const privateControlUpgrade = Boolean(cfg.isPrivateControlUpgrade);
-  const controlReady = publicTender && (cfg.currentOwnershipPercent || 0) >= (cfg.controlTargetPercent || 50);
+  const controlReady = publicTender && (cfg.publicControlReady ?? ((cfg.currentOwnershipPercent || 0) >= (cfg.controlTargetPercent || 50)));
   const reference = publicTender
     ? Math.max(1, Math.round(cfg.valuation * ((cfg.remainingControlPercent || 0) / 100)))
     : privateControlUpgrade
@@ -553,7 +562,7 @@ const WarRoomScene: React.FC<{
             <div className="sa-public-ledger" aria-label="Public control tender ledger">
               <div><span>Control block</span><b>{fmtMoney(cfg.controlBlockValue || reference)}</b></div>
               <div><span>Existing stake credit</span><b className="ok">−{fmtMoney(cfg.existingStakeCredit || 0)}</b></div>
-              <div><span>Cash already invested</span><b>{fmtMoney(cfg.stockCostBasis || 0)}</b></div>
+              <div><span>Cash already invested</span><b>{cfg.stockCostBasis === undefined ? 'Unknown' : fmtMoney(cfg.stockCostBasis)}</b></div>
               <div><span>Remaining reference</span><b>{fmtMoney(reference)}</b></div>
             </div>
             <p>{controlReady
@@ -1281,8 +1290,16 @@ const responseKeyForCase = (acquisitionCase?: AcquisitionCase): string => (
   `${acquisitionCase?.offer?.round || acquisitionCase?.sellerResponse?.round || 0}:${acquisitionCase?.sellerResponse?.decision || acquisitionCase?.status || 'NONE'}`
 );
 
-const phaseForCase = (acquisitionCase?: AcquisitionCase): AcqPhase => {
+export const phaseForCase = (acquisitionCase?: AcquisitionCase, controlReady = false, quoteKey?: string): AcqPhase => {
   if (acquisitionCase?.status === 'ACQUIRED') return 'ACQUIRED';
+  if (quoteKey && acquisitionCase?.presentation?.closingStage === 'SIGNING'
+      && acquisitionCase.presentation.reviewedQuoteKey !== quoteKey) return 'CLOSING';
+  if (controlReady) {
+    if (acquisitionCase?.presentation?.closingStage === 'SIGNING') return 'SIGNING';
+    if (acquisitionCase?.presentation?.closingStage === 'CLOSING') return 'CLOSING';
+    if (acquisitionCase?.presentation?.closingStage === 'RESPONSE') return 'RESPONSE';
+    return acquisitionCase?.publicControlIntent ? 'BREAKING' : 'DOSSIER';
+  }
   if (acquisitionCase?.status === 'OFFER_SUBMITTED') return 'ENVELOPE';
   if (acquisitionCase?.status === 'ACCEPTED' || acquisitionCase?.status === 'COUNTERED' || acquisitionCase?.status === 'RIVAL_BID' || acquisitionCase?.status === 'REJECTED') {
     if (acquisitionCase.presentation?.closingStage === 'SIGNING') return 'SIGNING';
@@ -1300,6 +1317,9 @@ const actionFailureCopy = (reason?: string): string => {
     return `You need ${energyMatch[1]} energy to continue. Your money and shares are safe.`;
   }
   switch (reason) {
+    case 'QUOTE_CHANGED': return 'The deal terms changed. Review the updated financial file before signing again.';
+    case 'TENDER_BLOCK_TOO_SMALL': return 'This accepted offer covers fewer shares than you need for control. Nothing was charged. Buy the remaining shares in Stocks, or submit a new public tender for the full control block.';
+    case 'UNREPRESENTABLE_AMOUNT': return 'These saved financial figures cannot be settled safely. Nothing changed. Recover a verified backup before continuing this deal.';
     case 'INSUFFICIENT_FUNDS': return 'You do not have enough money in the selected account. Nothing was charged.';
     case 'FUNDING_SOURCE_UNAVAILABLE': return 'That payment option is no longer available. Choose another way to pay.';
     case 'REGULATOR_REVIEW_ACTIVE': return 'This deal is temporarily on hold. Advance a few weeks, then try again.';
@@ -1330,6 +1350,7 @@ export const StudioAcquisitionDealRoom: React.FC<StudioAcquisitionDealRoomProps>
   studioFunding,
   onImmersiveChange,
   onClose,
+  onOpenStocks,
   onRunDiligence,
   onSubmitOffer,
   onAcceptCounter,
@@ -1337,6 +1358,7 @@ export const StudioAcquisitionDealRoom: React.FC<StudioAcquisitionDealRoomProps>
   onBeatRival,
   onWalkAway,
   onCompleteAcquisition,
+  onBeginControlTransfer,
   onSetOperatingModel,
   onUpdatePresentation,
 }) => {
@@ -1345,13 +1367,14 @@ export const StudioAcquisitionDealRoom: React.FC<StudioAcquisitionDealRoomProps>
     return () => onImmersiveChange?.(false);
   }, [onImmersiveChange]);
   const cfg = useMemo<StudioAcqConfig>(() => ({ ...DEFAULT_ACQ_CONFIG, ...config }), [config]);
-  const initialOfferReference = cfg.offerReferenceValue || (
+  const directControlReady = cfg.publicControlReady ?? (cfg.marketType === 'PUBLIC' && (cfg.currentOwnershipPercent || 0) >= (cfg.controlTargetPercent || 50));
+  const initialOfferReference = cfg.offerReferenceValue ?? (
     cfg.marketType === 'PUBLIC'
       ? Math.round(cfg.valuation * ((cfg.remainingControlPercent || 0) / 100))
       : cfg.valuation
   );
-  const caseKey = `${acquisitionCase?.status || 'DRAFT'}:${acquisitionCase?.offer?.round || 0}:${acquisitionCase?.sellerResponse?.respondedWeek || 0}:${acquisitionCase?.presentation?.responseSeenKey || ''}:${acquisitionCase?.presentation?.closingStage || ''}`;
-  const [phase, setPhase] = useState<AcqPhase>(() => phaseForCase(acquisitionCase));
+  const caseKey = `${acquisitionCase?.status || 'DRAFT'}:${acquisitionCase?.offer?.round || 0}:${acquisitionCase?.sellerResponse?.respondedWeek || 0}:${acquisitionCase?.presentation?.responseSeenKey || ''}:${acquisitionCase?.presentation?.closingStage || ''}:${!!acquisitionCase?.publicControlIntent}:${directControlReady}:${cfg.signingQuoteKey || ''}`;
+  const [phase, setPhase] = useState<AcqPhase>(() => phaseForCase(acquisitionCase, directControlReady, cfg.signingQuoteKey));
   const [notice, setNotice] = useState<string | null>(null);
   const [draft, setDraft] = useState<OfferDraft>(() => ({
     structure: cfg.isPrivateControlUpgrade ? 'FULL' : cfg.marketType === 'PUBLIC' || acquisitionCase?.offer?.type === 'MINORITY' ? 'MINORITY' : 'FULL',
@@ -1375,7 +1398,7 @@ export const StudioAcquisitionDealRoom: React.FC<StudioAcquisitionDealRoomProps>
       commitments: acquisitionCase?.offer?.commitments || [],
       funding: acquisitionCase?.offer?.funding.source || (cfg.marketType === 'PUBLIC' ? 'PERSONAL' : null),
     });
-    setPhase(phaseForCase(acquisitionCase));
+    setPhase(phaseForCase(acquisitionCase, directControlReady, cfg.signingQuoteKey));
     responseTransitionLock.current = false;
     actionPendingRef.current = false;
     setActionPending(false);
@@ -1383,13 +1406,14 @@ export const StudioAcquisitionDealRoom: React.FC<StudioAcquisitionDealRoomProps>
 
   const diligenceDone = acquisitionCase?.diligence?.status === 'COMPLETE';
   const sellerResponse = acquisitionCase?.sellerResponse;
-  const directControlReady = cfg.marketType === 'PUBLIC' && (cfg.currentOwnershipPercent || 0) >= (cfg.controlTargetPercent || 50);
-  const decision = (sellerResponse?.decision || (directControlReady ? 'ACCEPTED' : 'COUNTERED')) as SellerDecision;
-  const counterAmount = sellerResponse?.counterAmount || sellerResponse?.agreedAmount || 0;
+  const decision = (directControlReady ? 'ACCEPTED' : sellerResponse?.decision || 'COUNTERED') as SellerDecision;
+  const counterAmount = directControlReady ? 0 : sellerResponse?.counterAmount ?? sellerResponse?.agreedAmount ?? 0;
   const rivalAmount = sellerResponse?.rivalAmount || sellerResponse?.requiredBidAmount || 0;
   const round = sellerResponse?.round || acquisitionCase?.offer?.round || 1;
-  const finalPrice = sellerResponse?.agreedAmount || sellerResponse?.counterAmount || acquisitionCase?.offer?.amount || draft.amount;
-  const funding: FundingSource = acquisitionCase?.offer?.funding.source || draft.funding || 'PERSONAL';
+  const finalPrice = acquisitionCase?.status === 'ACQUIRED' && acquisitionCase.closing
+    ? acquisitionCase.closing.finalPrice
+    : directControlReady ? 0 : cfg.signingPrice ?? sellerResponse?.agreedAmount ?? sellerResponse?.counterAmount ?? acquisitionCase?.offer?.amount ?? draft.amount;
+  const funding: FundingSource = directControlReady ? 'PERSONAL' : acquisitionCase?.offer?.funding.source || draft.funding || 'PERSONAL';
   const commitments = acquisitionCase?.offer?.commitments || draft.commitments;
   const transactionOutcome: NonNullable<StudioAcqConfig['transactionOutcome']> = acquisitionCase?.closing?.outcome
     || (cfg.marketType === 'PUBLIC' ? 'CONTROL' : acquisitionCase?.offer?.type === 'MINORITY' || draft.structure === 'MINORITY' ? 'MINORITY_STAKE' : 'FULL_BUYOUT');
@@ -1428,6 +1452,7 @@ export const StudioAcquisitionDealRoom: React.FC<StudioAcquisitionDealRoomProps>
   };
   const fileOffer = () => {
     if (directControlReady) {
+      if (onBeginControlTransfer && !handleResult(onBeginControlTransfer())) return;
       setNotice(null);
       setPhase('BREAKING');
       return;
@@ -1452,7 +1477,11 @@ export const StudioAcquisitionDealRoom: React.FC<StudioAcquisitionDealRoomProps>
     if (handleResult(onWalkAway())) onClose();
   };
   const sign = () => {
-    const result = onCompleteAcquisition();
+    if (cfg.signingTermsValid === false) {
+      setNotice(actionFailureCopy('UNREPRESENTABLE_AMOUNT'));
+      return { success: false, reason: 'UNREPRESENTABLE_AMOUNT' };
+    }
+    const result = onCompleteAcquisition(cfg.signingQuoteKey);
     if (handleResult(result)) setPhase('ACQUIRED');
     return result;
   };
@@ -1482,8 +1511,20 @@ export const StudioAcquisitionDealRoom: React.FC<StudioAcquisitionDealRoomProps>
   };
   const enterSigning = () => {
     setPhase('SIGNING');
-    recordPresentation({ closingStage: 'SIGNING' });
+    recordPresentation({ closingStage: 'SIGNING', reviewedQuoteKey: cfg.signingQuoteKey });
   };
+
+  if (cfg.entryBlockReason && phase !== 'ACQUIRED') return (
+    <div className="sa-stage" role="dialog" aria-modal="true" aria-label={`${cfg.studioName} acquisition deal room`}>
+      <style>{STYLE}</style>
+      <div className="sa-scene sa-center">
+        <h2>Acquisition Unavailable</h2>
+        <p className="sa-block-copy">{actionFailureCopy(cfg.entryBlockReason)}</p>
+        {onOpenStocks && cfg.stockSymbol && <button type="button" className="sa-btn ghost wide" onClick={onOpenStocks}>View Shares in Stocks</button>}
+        <button type="button" className="sa-btn gold wide" onClick={onClose}>Return to Forbes</button>
+      </div>
+    </div>
+  );
 
   return (
     <div className="sa-stage" role="dialog" aria-modal="true" aria-label={`${cfg.studioName} acquisition deal room`}>
@@ -1499,11 +1540,11 @@ export const StudioAcquisitionDealRoom: React.FC<StudioAcquisitionDealRoomProps>
           </div>
         </div>
       )}
-      {phase === 'DOSSIER' && <DossierScene cfg={sceneCfg} diligenceDone={diligenceDone} onRunDiligence={runDiligence} onContinue={() => setPhase('WARROOM')} onClose={onClose} />}
+      {phase === 'DOSSIER' && <DossierScene cfg={sceneCfg} diligenceDone={diligenceDone} onRunDiligence={runDiligence} onContinue={() => setPhase('WARROOM')} onClose={onClose} onOpenStocks={onOpenStocks} />}
       {phase === 'WARROOM' && <WarRoomScene cfg={sceneCfg} diligenceDone={diligenceDone} draft={draft} setDraft={setDraft} actionPending={actionPending} onFile={fileOffer} onBack={() => setPhase('DOSSIER')} />}
       {phase === 'ENVELOPE' && <EnvelopeScene cfg={sceneCfg} draft={draft} onClose={onClose} />}
       {phase === 'BREAKING' && <BreakingScene cfg={sceneCfg} decision={decision} amount={decision === 'RIVAL_BID' ? rivalAmount : counterAmount || finalPrice} onDone={revealResponse} />}
-      {phase === 'RESPONSE' && <ResponseScene cfg={sceneCfg} decision={decision} offerAmount={acquisitionCase?.offer?.amount || draft.amount} counterAmount={counterAmount} rivalAmount={rivalAmount} requiredBidAmount={sellerResponse?.requiredBidAmount || rivalAmount} round={round} actionPending={actionPending} onAcceptCounter={acceptCounter} onRevise={revise} onBeatRival={beatRival} onWalkAway={walkAway} onProceedToClosing={proceedToClosing} onBackToWarRoom={() => setPhase('WARROOM')} onClose={onClose} />}
+      {phase === 'RESPONSE' && <ResponseScene cfg={sceneCfg} decision={decision} offerAmount={directControlReady ? 0 : acquisitionCase?.offer?.amount ?? draft.amount} counterAmount={counterAmount} rivalAmount={rivalAmount} requiredBidAmount={sellerResponse?.requiredBidAmount || rivalAmount} round={round} actionPending={actionPending} onAcceptCounter={acceptCounter} onRevise={revise} onBeatRival={beatRival} onWalkAway={walkAway} onProceedToClosing={proceedToClosing} onBackToWarRoom={() => setPhase('WARROOM')} onClose={onClose} />}
       {phase === 'CLOSING' && <ClosingScene cfg={sceneCfg} finalPrice={finalPrice} funding={funding} onEnterSigningRoom={enterSigning} onBack={() => setPhase('RESPONSE')} />}
       {phase === 'SIGNING' && <SigningScene cfg={sceneCfg} finalPrice={finalPrice} funding={funding} commitments={commitments} onSigned={sign} onBack={() => setPhase('CLOSING')} />}
       {phase === 'ACQUIRED' && <AcquiredScene cfg={sceneCfg} finalPrice={finalPrice} onFinish={finish} />}

@@ -1,0 +1,85 @@
+{
+  "baseline": "bb029e5 plus original 69 unrelated dirty files",
+  "status": "PASSED_DESKTOP_LESS_THAN_10_PERCENT_REGRESSION",
+  "rows": [
+    {
+      "kind": "NODE_VERIFIED_MEMORY_STORE",
+      "trial": 1,
+      "fixture": "early",
+      "warmSamplesPerSide": 8,
+      "beforeP95Ms": 491.50324999999975,
+      "afterP95Ms": 486.34591599999976,
+      "changePercent": -1.0492980463506552,
+      "comparableGameplayAndMoneyHashIdentical": true,
+      "beforeBytes": 8587994,
+      "afterBytes": 8587994
+    },
+    {
+      "kind": "NODE_VERIFIED_MEMORY_STORE",
+      "trial": 1,
+      "fixture": "late",
+      "warmSamplesPerSide": 8,
+      "beforeP95Ms": 14025.249416999999,
+      "afterP95Ms": 8257.947834000006,
+      "changePercent": -41.120848631821474,
+      "comparableGameplayAndMoneyHashIdentical": true,
+      "beforeBytes": 240493790,
+      "afterBytes": 240495311
+    },
+    {
+      "kind": "NODE_VERIFIED_MEMORY_STORE",
+      "trial": 2,
+      "fixture": "early",
+      "warmSamplesPerSide": 4,
+      "beforeP95Ms": 512.111375,
+      "afterP95Ms": 451.4994579999999,
+      "changePercent": -11.835690429645318,
+      "comparableGameplayAndMoneyHashIdentical": true,
+      "beforeBytes": 7878447,
+      "afterBytes": 7878447
+    },
+    {
+      "kind": "NODE_VERIFIED_MEMORY_STORE",
+      "trial": 2,
+      "fixture": "late",
+      "warmSamplesPerSide": 4,
+      "beforeP95Ms": 13129.246208000004,
+      "afterP95Ms": 7663.791000000005,
+      "changePercent": -41.62809594255115,
+      "comparableGameplayAndMoneyHashIdentical": true,
+      "beforeBytes": 232924250,
+      "afterBytes": 232925771
+    },
+    {
+      "kind": "FULL_APP_VERIFIED_INDEXEDDB_AND_PAINT",
+      "fixture": "early",
+      "warmSamplesPerSide": 4,
+      "beforeP95Ms": 486.69999998807907,
+      "afterP95Ms": 468.70000000298023,
+      "changePercent": -3.698376820534155,
+      "firstWeekBeforeMs": 1438.2000000029802,
+      "firstWeekAfterMs": 1429.5,
+      "recordedSavedFactsIdentical": true,
+      "scope": "Actual App; first week excluded from warm p95; saved clock, cash, health, project count and cumulative tracked cinema gross/receipts compared; normal medical Later outside timed interval"
+    },
+    {
+      "kind": "FULL_APP_VERIFIED_INDEXEDDB_AND_PAINT",
+      "fixture": "late",
+      "warmSamplesPerSide": 4,
+      "beforeP95Ms": 12451.09999999404,
+      "afterP95Ms": 6834.4000000059605,
+      "changePercent": -45.110070596098076,
+      "firstWeekBeforeMs": 11644.300000011921,
+      "firstWeekAfterMs": 5861.4000000059605,
+      "recordedSavedFactsIdentical": true,
+      "scope": "Actual App; first week excluded from warm p95; saved clock, cash, health, project count and cumulative tracked cinema gross/receipts compared; normal medical Later outside timed interval"
+    }
+  ],
+  "limitations": [
+    "Warm samples are descriptive on this desktop, not production percentiles",
+    "Node is not React paint or device/native bridge",
+    "App first-week metric excludes initial load/fixture setup",
+    "Large 233-240MB saves still take multiple seconds and use substantial memory",
+    "No physical device or native GPU claim"
+  ]
+}

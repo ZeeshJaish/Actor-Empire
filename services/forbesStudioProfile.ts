@@ -1,4 +1,5 @@
-import type { Business, IndustryProject, NpcVentureState, Universe } from '../types';
+import { getListedCompanyValuation } from './stockValuation';
+import type { Business, IndustryProject, NpcVentureState, Universe, Player } from '../types';
 
 export type StudioAcquisitionState =
     | 'NOT_FOR_SALE'
@@ -68,10 +69,14 @@ export interface ForbesStudioProfile {
     assetDataSource: 'SAVE_DATA' | 'MIXED' | 'FORBES_ESTIMATE';
     /** Publicly observable evidence. Internal AI company status is intentionally omitted. */
     publicSignals: string[];
+    valuationBasis?: 'LISTED_EQUITY';
+    enterpriseValue?: number;
+    financialsVerified?: boolean;
     distressEvidence: string[];
 }
 
 interface ForbesStudioProfileInput {
+    player?: Pick<Player, 'stocks' | 'world'>;
     studio: ForbesStudioRecord;
     rank: number;
     worldProjects: IndustryProject[];
@@ -201,12 +206,14 @@ export const buildForbesStudioProfile = (input: ForbesStudioProfileInput): Forbe
     const resolvedHits = venture?.hits ?? (catalog.length ? catalog.filter(project => isHit(project.outcome)).length : studio.recentHits || 0);
     const resolvedFlops = venture?.flops ?? catalog.filter(project => isFlop(project.outcome)).length;
     const hash = stableHash(studio.id);
-    const valuation = Math.max(0, studio.valuation || 0) * 1_000_000_000;
+    const linkedStock = !studio.isPlayerOwned && input.player?.stocks.find(stock => stock.relatedStudioId === studio.id);
+    const listed = linkedStock && input.player ? getListedCompanyValuation(input.player, linkedStock) : undefined;
+    const valuation = listed?.equityMarketCap ?? Math.max(0, studio.valuation || 0) * 1_000_000_000;
     const capital = playerBusiness
         ? Math.max(0, playerBusiness.balance || 0)
         : Math.max(0, venture?.cashReserve ?? studio.cashReserve ?? 0) * 1_000_000;
     const debtRatio = 0.08 + ((hash % 19) / 100);
-    const debt = studio.isPlayerOwned
+    const debt = listed ? listed.debt ?? 0 : studio.isPlayerOwned
         ? 0
         : venture
             ? Math.max(0, -venture.cashReserve) * 1_000_000
@@ -214,7 +221,12 @@ export const buildForbesStudioProfile = (input: ForbesStudioProfileInput): Forbe
     const ventureProfit = venture?.history.reduce((sum, entry) => sum + (entry.profit || 0), 0);
     const playerProfit = playerBusiness?.history.reduce((sum, entry) => sum + (entry.profit || 0), 0);
     const estimatedMargin = 0.035 + ((hash % 9) / 100);
-    const profitability = playerProfit ?? ventureProfit ?? Math.round((valuation * estimatedMargin) - (resolvedFlops * valuation * 0.008));
+    const actualOperatingLedger = input.player?.world.studios?.[studio.id]?.ai?.ledger || [];
+    const operatingEntries = actualOperatingLedger.filter(entry => ['CATALOGUE_OPERATIONS', 'OPERATING_COST', 'RIGHTS_INCOME', 'TALENT_BACKEND'].includes(entry.category));
+    const latestLedgerWeek = operatingEntries.reduce((n, entry) => Math.max(n, entry.absoluteWeek), -1);
+    const rollingOperatingProfit = operatingEntries.filter(entry => entry.absoluteWeek > latestLedgerWeek - 52)
+        .reduce((sum, entry) => sum + entry.amountMillions * 1_000_000, 0);
+    const profitability = listed ? rollingOperatingProfit : playerProfit ?? ventureProfit ?? Math.round((valuation * estimatedMargin) - (resolvedFlops * valuation * 0.008));
     const decidedOutcomes = resolvedHits + resolvedFlops;
     const studioUniverses = Object.values(universes || {}).filter(universe => universe.studioId === studio.id);
     const usesPlayerAssets = Boolean(studio.isPlayerOwned);
@@ -254,6 +266,7 @@ export const buildForbesStudioProfile = (input: ForbesStudioProfileInput): Forbe
     return {
         id: studio.id,
         name: studio.name,
+        ...(listed ? { valuationBasis: 'LISTED_EQUITY' as const, enterpriseValue: listed.enterpriseValue, financialsVerified: listed.financialsVerified } : {}),
         isPlayerOwned: Boolean(studio.isPlayerOwned),
         rank,
         archetype: studio.archetype,

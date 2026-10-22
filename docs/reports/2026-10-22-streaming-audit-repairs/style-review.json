@@ -1,0 +1,34 @@
+[
+  {
+    "path": "components/streaming-transplant/presentation/screens/Buildout/Buildout.module.css",
+    "expected": "1fe7bbd37256959b4b8711b2b3bcc2f933651af5075cae03f5429ef677e86b7a",
+    "actual": "c4159e58cc0efe5dd921b6106ded8a1bcb222c3b9cc80f58f0039041e8fa6208",
+    "pinnedCommit": null,
+    "matchesApprovedCheckpoint": true,
+    "matchesClaude": true
+  },
+  {
+    "path": "components/streaming-transplant/presentation/screens/Cinematics/Cinematics.module.css",
+    "expected": "081729cb462dcc01261ee508139a227c9f69cdfea6489bf01e55df66e68d8b20",
+    "actual": "83cbb4bd10c9c542eee5dae809ae7132fcae84765835bb039b4d00ec0361a441",
+    "pinnedCommit": "907e0271e963b0c5e606b5f684a6e639f4a074b6",
+    "matchesApprovedCheckpoint": true,
+    "matchesClaude": true
+  },
+  {
+    "path": "components/streaming-transplant/presentation/screens/CommandDesk/CommandDesk.module.css",
+    "expected": "48a807b437c19a46a503b5222eaaddaee76d37bbb160399bc0c1a0c6fea9512f",
+    "actual": "be15acee07289e706fb96624abc3e19b94c50970bdc753ff033b36604bb3f2aa",
+    "pinnedCommit": null,
+    "matchesApprovedCheckpoint": true,
+    "matchesClaude": true
+  },
+  {
+    "path": "components/streaming-transplant/presentation/screens/Shell/Shell.module.css",
+    "expected": "ec2ef091b92ae74dfa75ebea01a89b3f83e622737dbc42a251343c41eb66c529",
+    "actual": "e368a2d6f8921a5181935ff46ec50c15748dda9ba61f1520e8c172b331cdd66a",
+    "pinnedCommit": null,
+    "matchesApprovedCheckpoint": true,
+    "matchesClaude": true
+  }
+]

@@ -1,0 +1,145 @@
+{
+  "checks": 26,
+  "rows": [
+    {
+      "test": "backend majority closing",
+      "pct": 49.99,
+      "success": false,
+      "reason": "CASE_NOT_ACCEPTED",
+      "shares": 324935000,
+      "repeatProtected": false,
+      "reminderThreshold": false
+    },
+    {
+      "test": "backend majority closing",
+      "pct": 50,
+      "success": true,
+      "shares": 325000000,
+      "repeatProtected": true,
+      "reminderThreshold": false
+    },
+    {
+      "test": "backend majority closing",
+      "pct": 51,
+      "success": true,
+      "shares": 331500000,
+      "repeatProtected": true,
+      "reminderThreshold": true
+    },
+    {
+      "test": "backend majority closing",
+      "pct": 100,
+      "success": true,
+      "shares": 650000000,
+      "repeatProtected": true,
+      "reminderThreshold": true
+    },
+    {
+      "test": "presentation persistence",
+      "before": "DRAFT",
+      "after": "DRAFT",
+      "presentation": {
+        "closingStage": "CLOSING"
+      }
+    },
+    {
+      "test": "weekly requeue",
+      "initialEvents": 1,
+      "afterOpen": 0,
+      "nextWeek": 1,
+      "afterActualClosing": 0
+    },
+    {
+      "test": "diligence versus direct signing liabilities",
+      "report": {
+        "verifiedDebt": 5885000000,
+        "hiddenLiabilities": 2310000000,
+        "obligations": [
+          "1 key talent commitments",
+          "3 facility and lease obligations",
+          "Standard catalog continuity clauses"
+        ],
+        "adjustedEnterpriseValue": 16805000000,
+        "expectedAnnualIncome": 1069200000,
+        "confidence": 77,
+        "recommendedLow": 15124500000,
+        "recommendedHigh": 18149400000,
+        "primaryRisk": "Execution risk is concentrated in catalog and talent retention."
+      },
+      "closing": {
+        "finalPrice": 0,
+        "acquiredBusinessId": "PARAMOUNT",
+        "signedWeek": 11,
+        "signedYear": 40,
+        "funding": {
+          "source": "PERSONAL"
+        },
+        "verifiedDebt": 5500000000,
+        "hiddenLiabilities": 440000000,
+        "expectedAnnualIncome": 990000000,
+        "outcome": "CONTROL",
+        "assetSummary": "3 facilities - 1 rights - public-market control transfer"
+      }
+    },
+    {
+      "test": "Paramount pricing",
+      "stockMarketCapCeiling": 25350000000,
+      "initialStockMarketCap": 8450000000,
+      "initialForbesValue": 22000000000,
+      "capped51PercentCost": 12928500000,
+      "reportedForbesValue": 46438300000000,
+      "reportedForbesOverStockCeiling": 1831.8856015779093
+    },
+    {
+      "test": "inflated legacy valuation",
+      "worldBillions": 46438.3,
+      "profileDollars": 46438300000000,
+      "preservedOnMigration": 46438.3,
+      "closingSuccess": true,
+      "closingHiddenLiability": 928766000000
+    },
+    {
+      "test": "inflated legacy valuation",
+      "worldBillions": 100000000000000,
+      "profileDollars": 1e+23,
+      "preservedOnMigration": 100000000000000,
+      "closingSuccess": true,
+      "closingHiddenLiability": 2e+21
+    },
+    {
+      "test": "historical passive compounding only",
+      "years": 10,
+      "paramountBillions": 153.162,
+      "reputation": 100,
+      "hitCount": 0
+    },
+    {
+      "test": "historical passive compounding only",
+      "years": 20,
+      "paramountBillions": 1066.065,
+      "reputation": 100,
+      "hitCount": 0
+    },
+    {
+      "test": "historical passive compounding only",
+      "years": 30,
+      "paramountBillions": 7420.371,
+      "reputation": 100,
+      "hitCount": 0
+    },
+    {
+      "test": "historical passive compounding only",
+      "years": 40,
+      "paramountBillions": 51649.637,
+      "reputation": 100,
+      "hitCount": 0
+    },
+    {
+      "test": "historical passive compounding only",
+      "years": 45,
+      "paramountBillions": 136266.211,
+      "reputation": 100,
+      "hitCount": 0
+    }
+  ]
+}

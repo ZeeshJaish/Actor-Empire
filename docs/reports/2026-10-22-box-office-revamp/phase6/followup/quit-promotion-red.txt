@@ -1,0 +1,2 @@
+{"start":45,"first":75,"sourceAfterFirst":75,"replay":100}
+{"promotion":{"first":90,"sourceAfterFirst":90,"replay":80,"entries":2}}

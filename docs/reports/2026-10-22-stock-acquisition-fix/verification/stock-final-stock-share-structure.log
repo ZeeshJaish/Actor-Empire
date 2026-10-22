@@ -1,0 +1,9 @@
+
+> pr-6.6.3@1.0.25 audit:stock-share-structure
+> esbuild scripts/audit-stock-share-structure.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-stock-share-structure.mjs && node /tmp/audit-stock-share-structure.mjs
+
+
+  ../../../../tmp/audit-stock-share-structure.mjs  6.2mb ⚠️
+
+⚡ Done in 727ms
+Stock share structure audit passed.

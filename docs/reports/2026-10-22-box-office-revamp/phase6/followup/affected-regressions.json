@@ -1,0 +1,42 @@
+[
+  {
+    "audit": "audit:streaming-signed-royalties",
+    "exit": 0
+  },
+  {
+    "audit": "audit:streaming-ads-rental-backend",
+    "exit": 0
+  },
+  {
+    "audit": "audit:save-integrity",
+    "exit": 0
+  },
+  {
+    "audit": "audit:save-generations",
+    "exit": 0
+  },
+  {
+    "audit": "audit:large-save-integrity",
+    "exit": 0
+  },
+  {
+    "audit": "audit:streaming-rights-transactions-phase6",
+    "exit": 0
+  },
+  {
+    "audit": "audit:streaming-rights-calendar-phase4",
+    "exit": 0
+  },
+  {
+    "audit": "audit:streaming-original-readiness-repair",
+    "exit": 0
+  },
+  {
+    "audit": "audit:streaming-original-playback-repair",
+    "exit": 0
+  },
+  {
+    "audit": "audit:streaming-commercial-c4",
+    "exit": 0
+  }
+]

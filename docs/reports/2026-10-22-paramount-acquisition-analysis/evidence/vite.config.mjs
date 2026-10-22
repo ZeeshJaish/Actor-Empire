@@ -1,0 +1,2 @@
+import { defineConfig } from '/Users/zeesh/Vibe code/Actor empire/node_modules/vite/dist/node/index.js';
+export default defineConfig({root:'/private/tmp/ae-paramount-analysis', resolve:{alias:{react:'/Users/zeesh/Vibe code/Actor empire/node_modules/react', 'react-dom':'/Users/zeesh/Vibe code/Actor empire/node_modules/react-dom'}}, server:{host:'127.0.0.1',port:5189,strictPort:true,fs:{allow:['/private/tmp/ae-paramount-analysis','/Users/zeesh/Vibe code/Actor empire']}},define:{'process.env.API_KEY':'""','process.env.GEMINI_API_KEY':'""'}});

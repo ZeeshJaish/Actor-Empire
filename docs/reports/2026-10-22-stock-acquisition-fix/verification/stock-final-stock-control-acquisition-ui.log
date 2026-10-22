@@ -1,0 +1,5 @@
+
+> pr-6.6.3@1.0.25 audit:stock-control-acquisition-ui
+> node scripts/audit-stock-control-acquisition-ui.mjs
+
+Stock control acquisition UI audit passed.

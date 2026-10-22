@@ -12,6 +12,25 @@ const score = (value: unknown, fallback = 0): number => (
 export const isCinemaPlayerCredit = (member: Partial<CastMember>): boolean => (
     member.isPlayer === true || ['PLAYER_SELF', 'player'].includes(member.actorId || member.npcId || '')
 );
+const stature = (tier: string | undefined): number => ({ ICON:100,A_LIST:85,ESTABLISHED:60,RISING:30,INDIE:15,UNKNOWN:0 }[tier || 'UNKNOWN'] || 0);
+
+/** Persist only known identities and real catalogue facts. Missing legacy actors stay unknown. */
+type CinemaCastContext = Partial<Pick<Player, 'flags' | 'relationships'>>;
+export const preserveCinemaCastRecognition = (project: ProjectDetails, player?: CinemaCastContext): ProjectDetails => {
+    const actors = new Map([...NPC_DATABASE, ...(player?.flags?.extraNPCs || [])].map(actor => [actor.id, actor]));
+    let changed = false;
+    const castList = project.castList?.map(member => {
+        if (member.type === 'DIRECTOR' || isCinemaPlayerCredit(member)) return member;
+        const rawId = member.actorId || member.npcId || member.id;
+        const personId = player?.relationships?.find(row => row.id === rawId)?.npcId || rawId;
+        if (member.cinemaRecognition?.version === 1 && member.cinemaRecognition.personId === personId) return member;
+        const actor = actors.get(personId);
+        if (!actor || ['UNKNOWN','STUDIO_STAFF'].includes(personId)) return member;
+        changed = true;
+        return { ...member, cinemaRecognition: { version: 1 as const, personId, fame: score(actor.stats?.fame), stature: stature(actor.tier) } };
+    });
+    return changed ? { ...project, castList } : project;
+};
 
 export const normalizeCinemaTitle = ({ titleId, owner, project, player }: {
     titleId: string; owner: CinemaOwnerRef; project: ProjectDetails; player: Player;
@@ -29,11 +48,13 @@ export const normalizeCinemaTitle = ({ titleId, owner, project, player }: {
         const roleType = member.roleType && member.roleType in CINEMA_ROLE_WEIGHTS ? member.roleType : 'SUPPORTING';
         const roleWeight = CINEMA_ROLE_WEIGHTS[roleType];
         const existing = people.get(canonicalId);
+        const actor = actors.get(personId);
+        const snapshot = member.cinemaRecognition?.version === 1 && member.cinemaRecognition.personId === personId ? member.cinemaRecognition : undefined;
         const characterIds = [...new Set([...(existing?.characterIds || []), ...(member.characterId ? [member.characterId] : [])])];
         if (!existing || roleWeight > existing.roleWeight) {
             people.set(canonicalId, { personId: canonicalId, name: member.actorName || member.name,
-                roleType, roleWeight, fame: anonymous ? 0 : isPlayer ? score(player.stats.fame) : score(actors.get(personId)?.stats?.fame),
-                stature: anonymous || isPlayer ? 0 : ({ ICON:100,A_LIST:85,ESTABLISHED:60,RISING:30,INDIE:15,UNKNOWN:0 }[actors.get(personId)?.tier || 'UNKNOWN']),
+                roleType, roleWeight, fame: anonymous ? 0 : isPlayer ? score(player.stats.fame) : score(actor ? actor.stats?.fame : snapshot?.fame),
+                stature: anonymous || isPlayer ? 0 : actor ? stature(actor.tier) : score(snapshot?.stature),
                 isPlayer, characterIds });
         } else existing.characterIds = characterIds;
     }
@@ -52,10 +73,10 @@ export const normalizeCinemaTitle = ({ titleId, owner, project, player }: {
  * Authored studio casting, salaries, character roles and already populated offers stay intact.
  * Select real catalogue actors near the offered craft level; never synthesize star stats.
  */
-export const completeOfferedCinemaCast = (project: ProjectDetails): ProjectDetails => {
-    if (project.castPackageSource === 'AUTHORED') return project;
+export const completeOfferedCinemaCast = (project: ProjectDetails, player?: CinemaCastContext): ProjectDetails => {
+    if (project.castPackageSource === 'AUTHORED') return preserveCinemaCastRecognition(project, player);
     const cast = project.castList || [];
-    if (cast.some(member => member.type !== 'DIRECTOR' && !isCinemaPlayerCredit(member))) return project;
+    if (cast.some(member => member.type !== 'DIRECTOR' && !isCinemaPlayerCredit(member))) return preserveCinemaCastRecognition(project, player);
     const spectacle = ['ACTION', 'ADVENTURE', 'SCI_FI', 'SUPERHERO', 'FANTASY', 'ANIMATION'].includes(project.genre);
     const target = spectacle ? (project.estimatedBudget > 120_000_000 ? 7 : project.estimatedBudget > 45_000_000 ? 6 : 4)
         : project.estimatedBudget > 120_000_000 ? 4 : project.estimatedBudget > 45_000_000 ? 3 : 2;
@@ -70,5 +91,5 @@ export const completeOfferedCinemaCast = (project: ProjectDetails): ProjectDetai
         id: npc.id, npcId: npc.id, actorId: npc.id, actorName: npc.name, name: npc.name,
         role: 'Co-Star', roleType: 'SUPPORTING', isPlayer: false, image: npc.avatar, type: 'ACTOR',
     }));
-    return { ...project, castList: [...cast, ...additions], castPackageSource: 'OFFER_GENERATED' };
+    return preserveCinemaCastRecognition({ ...project, castList: [...cast, ...additions], castPackageSource: 'OFFER_GENERATED' }, player);
 };

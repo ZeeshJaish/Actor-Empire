@@ -1,0 +1,17 @@
+BENCH_PROGRESS early -1 792
+BENCH_PROGRESS early 0 516
+BENCH_PROGRESS early 1 513
+BENCH_PROGRESS early 2 475
+BENCH_PROGRESS early 3 542
+[
+  {
+    "name": "early",
+    "total": {
+      "n": 4,
+      "minMs": 475.4007919999999,
+      "p50Ms": 513.0988749999999,
+      "p95Ms": 542.4527499999999,
+      "maxMs": 542.4527499999999
+    }
+  }
+]

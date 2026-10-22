@@ -102,6 +102,12 @@
 .cd .pill.staged{background:rgba(255,255,255,.08);color:#8b93a5}
 .cd .pill.inproduction{background:color-mix(in srgb,var(--epx-cd-c) 20%,transparent);color:var(--epx-cd-c)}
 .cd .pill.own{background:rgba(255,255,255,.06);color:#7d8698}
+/* every availability state gets a colour, not only three of them */
+.cd .pill.readytoschedule{background:rgba(96,165,250,.14);color:#93c5fd}
+.cd .pill.scheduled{background:rgba(96,165,250,.14);color:#93c5fd}
+.cd .pill.awaitingavailability{background:rgba(245,181,68,.14);color:#f5c46a}
+.cd .pill.rightsexpired{background:rgba(255,90,95,.14);color:#ff9a9d}
+.cd .pill.rightsunavailable{background:rgba(255,90,95,.14);color:#ff9a9d}
 .cd .pill.win{background:rgba(255,255,255,.08);color:#aeb6c4}
 .cd .pill.win.soon{background:rgba(255,176,32,.16);color:#ffb020}
 .cd .tnums{flex:0 0 auto;text-align:right}
@@ -158,7 +164,7 @@
 @media (prefers-reduced-motion:reduce){ .cd *{animation:none!important;transition:none!important} }
 
 /* ── INHERITED FROM THE GLOBAL SHELL ──────────────────────────────────
-   These 1 rules were being supplied by EmpirePlusV2's global
+   These rules were being supplied by EmpirePlusV2's global
    stylesheet through generic class names. Copied in so this screen owns its
    own appearance and depends on no ambient CSS.
 
@@ -166,7 +172,6 @@
    `:where(*){margin:0;padding:0}` reset of equal specificity, so anything
    placed above it loses on source order and the padding silently goes to 0.
    ──────────────────────────────────────────────────────────────────── */
-.cd .chips{display:flex;gap:5px;flex-wrap:wrap;justify-content:center;margin-top:11px}
 .cd .localizationHero{padding:20px 17px;border-radius:16px;background:radial-gradient(circle at 85% 10%,color-mix(in srgb,var(--epx-cd-c) 25%,transparent),transparent 42%),#0e1016;border:1px solid color-mix(in srgb,var(--epx-cd-c) 34%,rgba(255,255,255,.08))}
 .cd .localizationHero>span{display:block;font-size:7px;font-weight:900;letter-spacing:.18em;color:var(--epx-cd-c)}.cd .localizationHero strong{display:inline-block;margin-top:8px;font-size:40px;line-height:1}.cd .localizationHero h3{display:inline;margin-left:7px;font-size:14px}.cd .localizationHero p{margin-top:10px;font-size:10px;line-height:1.5;color:#8790a0}
 .cd .localizationTracks{margin-top:10px;border-top:1px solid rgba(255,255,255,.09)}
@@ -181,3 +186,15 @@
 .cd .localizationPackages article>button{flex:0 0 auto;padding:8px 10px;border-radius:9px;text-align:center;background:color-mix(in srgb,var(--epx-cd-c) 16%,#11141b);border:1px solid color-mix(in srgb,var(--epx-cd-c) 42%,transparent);color:var(--epx-cd-c);font-size:6.5px;font-weight:950;letter-spacing:.1em}.cd .localizationPackages article>button strong{font-size:9px;line-height:1.5}
 .cd .localizationRule{margin-top:14px;padding-left:11px;border-left:2px solid color-mix(in srgb,var(--epx-cd-c) 72%,transparent);color:#7f8898;font-size:9px;line-height:1.55}
 .cd .localizationAction{width:100%;margin-top:12px;padding:13px;border-radius:12px;background:color-mix(in srgb,var(--epx-cd-c) 18%,#101219);border:1px solid color-mix(in srgb,var(--epx-cd-c) 40%,transparent);color:var(--epx-cd-c);font-size:8px;font-weight:950;letter-spacing:.13em;text-align:center}
+
+/* ── the poster thumbnail in a row, the finish bar, the languages stat ── */
+.cd .tposter{flex:0 0 auto;width:40px}
+.cd .tnums em.tdone{position:relative;display:block;width:64px;margin:5px 0 0 auto;padding-top:5px;font-style:normal;font-size:8.5px;color:#8b93a5;text-align:right}
+.cd .tnums em.tdone i{position:absolute;top:0;left:0;height:3px;border-radius:2px;background:#4ade80;box-shadow:0 0 0 0 transparent}
+.cd .tnums em.tdone:before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:2px;background:rgba(255,255,255,.1)}
+.cd .langStat{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;padding:12px 6px 11px;border-radius:15px;background:#0c0f15;border:1px solid rgba(255,255,255,.075);text-align:center}
+.cd .langStat b{font:400 26px/1 'Anton','Archivo',sans-serif;color:#fff}
+.cd .langStat span{font-size:7px;font-weight:900;letter-spacing:.12em;color:#8b93a5}
+.cd .langStat em{font-style:normal;font-size:8px;line-height:1.3;color:#6f7888}
+.cd .langStat em.isReady{color:#4ade80}
+

@@ -1,0 +1,42 @@
+import assert from 'node:assert/strict';
+import { INITIAL_PLAYER } from '../types';
+import { initializeStocks, executeStockTrade } from '../services/stockLogic';
+import { ensureStudioEcosystem } from '../services/studioEcosystem';
+import { buildForbesStudioProfile } from '../services/forbesStudioProfile';
+import { submitOpeningOffer, resolveStudioAcquisitionResponses, getAcquisitionCase, completeAcquisitionTransaction, getOfferPresets, analyzeCustomOffer } from '../services/studioAcquisition';
+import { getPublicControlReadiness } from '../services/publicStockControl';
+import { buildAcquisitionSigningQuote } from '../services/acquisitionSigningQuote';
+const accepted = (percent: number) => {
+ const p=structuredClone(INITIAL_PLAYER);Object.assign(p,{age:35,currentWeek:12,money:100e9,stocks:initializeStocks(),portfolio:[],businesses:[]});p.world=ensureStudioEcosystem(p.world);
+ const profile=buildForbesStudioProfile({player:p,studio:p.world.studios!.PARAMOUNT,rank:1,worldProjects:p.world.projects,universes:p.world.universes});
+ const offer=submitOpeningOffer({player:p,profile,offerType:'MINORITY',minorityPercent:percent,offerAmount:Math.round(profile.valuation*percent/100*1.25/10000)*10000,funding:{source:'PERSONAL'}});assert.ok(offer.success);
+ const player=resolveStudioAcquisitionResponses({...offer.player,currentWeek:13});assert.equal(getAcquisitionCase(player,profile.id)!.status,'ACCEPTED');return{player,profile};
+};
+let count=0,failed=0;const check=(name:string,fn:()=>void)=>{count++;try{fn();console.log('PASS',name)}catch(e){failed++;console.log('FAIL',name,String(e))}};
+for(const percent of [5,49])check(`accepted ${percent}% cannot silently buy50%`,()=>{const f=accepted(percent),before=JSON.stringify(f.player);const r=completeAcquisitionTransaction(f);assert.equal(r.success,false);assert.equal(r.player,f.player);assert.equal(JSON.stringify(r.player),before)});
+check('accepted full50% grants only its actual paid block',()=>{const f=accepted(50);const r=completeAcquisitionTransaction(f);assert.ok(r.success);assert.equal(r.player.portfolio[0].shares,325000000);assert.equal(f.player.money-r.player.money,getAcquisitionCase(r.player,f.profile.id)!.closing!.finalPrice)});
+check('legacy49% completes after buying the missing1% through Stocks',()=>{const f=accepted(49);const bought=executeStockTrade(f.player,'stk_para',6500000);assert.ok(bought.success);const r=completeAcquisitionTransaction({...f,player:bought.player});assert.ok(r.success);assert.equal(r.player.portfolio[0].shares,325000000);assert.equal(r.player.portfolio[0].totalInvested,bought.player.portfolio[0].totalInvested!+getAcquisitionCase(r.player,f.profile.id)!.closing!.finalPrice)});
+for(const percent of [undefined,0,NaN,Infinity,-5,60,5.5])check(`invalid accepted percentage ${String(percent)} rejects unchanged`,()=>{const f=accepted(5);getAcquisitionCase(f.player,f.profile.id)!.offer!.minorityPercent=percent;const r=completeAcquisitionTransaction(f);assert.equal(r.success,false);assert.equal(r.player,f.player)});
+check('already-ready51% ignores old small unpaid tender and charges0',()=>{const f=accepted(5);const bought=executeStockTrade(f.player,'stk_para',331500000);assert.ok(bought.success);const r=completeAcquisitionTransaction({...f,player:bought.player});assert.ok(r.success);assert.equal(r.player.money,bought.player.money);assert.deepEqual(r.player.portfolio,bought.player.portfolio)});
+check('new fractional19.2% gap uses a priced20% block and grants exactly50.8%',()=>{
+ const f=accepted(50);f.player.flags.studioAcquisitionCases=[];
+ const bought=executeStockTrade(f.player,'stk_para',200200000);assert.ok(bought.success);
+ const preset=getOfferPresets({profile:f.profile,minorityPercent:19.2}).MINORITY;assert.equal(preset.percent,20);
+ const amount=Math.round(f.profile.valuation*.20*1.25/10000)*10000;
+ const analysis=analyzeCustomOffer({profile:f.profile,offerType:'MINORITY',offerAmount:amount,minorityPercent:19.2,existingOwnershipPercent:30.8});assert.ok(analysis.valid);assert.equal(analysis.combinedOwnershipPercent,50.8);
+ const offered=submitOpeningOffer({player:bought.player,profile:f.profile,offerType:'MINORITY',minorityPercent:19.2,offerAmount:amount,funding:{source:'PERSONAL'}});assert.ok(offered.success);assert.equal(offered.acquisitionCase!.offer!.minorityPercent,20);assert.equal(offered.acquisitionCase!.offer!.amount,amount);
+ const player=resolveStudioAcquisitionResponses({...offered.player,currentWeek:14});assert.equal(getAcquisitionCase(player,f.profile.id)!.status,'ACCEPTED');
+ const r=completeAcquisitionTransaction({player,profile:f.profile});assert.ok(r.success);assert.equal(r.player.portfolio[0].shares,330200000);assert.equal(player.money-r.player.money,amount);assert.equal(r.player.portfolio[0].totalInvested,bought.player.portfolio[0].totalInvested!+amount);
+});
+for(const [shares,percent] of [[194999999,21],[324999999,5]])check(`exact ${shares} shares derives a sufficient new${percent}% block`,()=>{
+ const f=accepted(50);f.player.flags.studioAcquisitionCases=[];
+ const bought=executeStockTrade(f.player,'stk_para',shares);assert.ok(bought.success);
+ const readiness=getPublicControlReadiness(bought.player,f.profile);assert.equal(readiness.eligible,false);
+ const preset=getOfferPresets({profile:f.profile,minorityPercent:readiness.minimumTenderPercent}).MINORITY;assert.equal(preset.percent,percent);
+ const amount=Math.round(f.profile.valuation*percent/100*1.15);
+ const offered=submitOpeningOffer({player:bought.player,profile:f.profile,offerType:'MINORITY',minorityPercent:preset.percent,offerAmount:amount,funding:{source:'PERSONAL'}});assert.ok(offered.success);
+ const player=resolveStudioAcquisitionResponses({...offered.player,currentWeek:14});assert.equal(getAcquisitionCase(player,f.profile.id)!.status,'ACCEPTED');
+ assert.equal(buildAcquisitionSigningQuote({player,profile:f.profile}).additionalPrice,amount);
+ const r=completeAcquisitionTransaction({player,profile:f.profile});assert.ok(r.success);assert.equal(r.player.portfolio[0].shares,shares+6500000*percent);assert.equal(player.money-r.player.money,amount);assert.equal(r.player.portfolio[0].totalInvested,bought.player.portfolio[0].totalInvested!+amount);
+});
+assert.equal(failed,0,`${failed}/${count} accepted tender contract cases failed`);console.log(`${count} accepted tender contract cases passed`);

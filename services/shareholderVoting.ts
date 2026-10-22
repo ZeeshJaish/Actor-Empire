@@ -1,3 +1,4 @@
+import { PUBLIC_CONTROL_PERCENT } from './publicStockControl';
 import type {
     GameLanguage,
     Message,
@@ -76,11 +77,11 @@ const getHoldingPercent = (player: Pick<Player, 'portfolio'>, stock: Stock) => {
 };
 
 export const getShareholderInfluence = (ownershipPercent: number, language: GameLanguage = 'en'): ShareholderInfluence => {
-    if (ownershipPercent >= 51) {
+    if (ownershipPercent >= PUBLIC_CONTROL_PERCENT) {
         return {
             level: 'CONTROLLING_OWNER',
             label: t(language, 'services.shareholder.influence.CONTROLLING_OWNER.label'),
-            threshold: 51,
+            threshold: PUBLIC_CONTROL_PERCENT,
             rights: [
                 t(language, 'services.shareholder.influence.CONTROLLING_OWNER.rights.controlVotes'),
                 t(language, 'services.shareholder.influence.CONTROLLING_OWNER.rights.takeoverCommand'),
@@ -93,7 +94,7 @@ export const getShareholderInfluence = (ownershipPercent: number, language: Game
             level: 'BOARD_SEAT',
             label: t(language, 'services.shareholder.influence.BOARD_SEAT.label'),
             threshold: 30,
-            nextThreshold: 51,
+            nextThreshold: PUBLIC_CONTROL_PERCENT,
             rights: [
                 t(language, 'services.shareholder.influence.BOARD_SEAT.rights.boardSeat'),
                 t(language, 'services.shareholder.influence.BOARD_SEAT.rights.strategyPressure'),

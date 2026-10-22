@@ -1,0 +1,30 @@
+{
+  "requestedAudits": {
+    "audiencePhase2": "PASS",
+    "promotionPhase14": "PASS",
+    "zipFidelity": "PASS"
+  },
+  "auditCommands": {
+    "passed": 14,
+    "failed": 0
+  },
+  "lintExit": 0,
+  "buildExit": 0,
+  "percentageContractTests": {
+    "passed": 6,
+    "failed": 0
+  },
+  "fidelityMutationRejections": 7,
+  "savePaymentSafetyGroups": {
+    "passed": 7,
+    "failed": 0,
+    "includes5000TitleRetention": true
+  },
+  "unchangedApprovedClaudeStyles": 12,
+  "scopedZipStyleContracts": 17,
+  "runtimeFingerprintCheck": {
+    "trackedRuntimeFiles": 904,
+    "changed": []
+  },
+  "scope": "Audit scripts/helpers and report updates only. No runtime or UI source changed."
+}

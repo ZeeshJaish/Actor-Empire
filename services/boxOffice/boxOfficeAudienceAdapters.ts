@@ -1,9 +1,11 @@
 import type { Player } from '../../types';
 import { CINEMA_ROLE_WEIGHTS } from './boxOfficeProfiles';
+import { readCinemaStreamingAlternatives } from './boxOfficeAlternativeAdapters';
+import { getAbsoluteWeek } from '../legacyLogic';
 import type { CinemaCreditedPerson, CinemaViewingEvidence, CinemaWeekInput } from './boxOfficeTypes';
 
 /** Read-only boundary: participation owns wallet partitions and eligibility. Missing state stays unknown. */
-export const readCinemaWorldAudience = (player: Player): Pick<CinemaWeekInput,'cohorts'|'countries'|'history'> => {
+export const readCinemaWorldAudience = (player: Player,options:{includeStreamingAlternatives?:boolean}={}): Pick<CinemaWeekInput,'cohorts'|'countries'|'history'|'streamingAlternatives'> => {
     const countries = Object.values(player.world.worldPopulation?.countries || {}).map(c=>({id:c.id,regionId:c.regionId,population:c.population,
         cinemaAccess:c.cinemaAccessPercent,purchasingPower:c.macro.purchasingPowerIndex,inflation:c.macro.inflationPressure,languages:[...c.languages]}));
     const cohorts = Object.values(player.world.worldAudienceEconomy?.countries || {}).flatMap(country=>country.cohorts.map(c=>{
@@ -65,5 +67,6 @@ export const readCinemaWorldAudience = (player: Player): Pick<CinemaWeekInput,'c
             }
         }
     }
-    return {cohorts,countries,history:history.sort((a,b)=>a.id.localeCompare(b.id))};
+    const week=player.world.worldPopulation?.lastProcessedAbsoluteWeek??getAbsoluteWeek(player.age,player.currentWeek);
+    return {cohorts,countries,history:history.sort((a,b)=>a.id.localeCompare(b.id)),streamingAlternatives:options.includeStreamingAlternatives===false?[]:readCinemaStreamingAlternatives(player,week,cohorts)};
 };

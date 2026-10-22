@@ -84,6 +84,7 @@ import {
     calculateStreamingFundingPressure,
     getStreamingBlendedMonthlyPrice,
 } from './streamingPricingEconomy';
+import { streamingSharingEnforcementWeeklyCost } from './streamingSharingPolicy';
 
 const clamp = (value: number, minimum: number, maximum: number): number => (
     Math.min(maximum, Math.max(minimum, Number.isFinite(value) ? value : minimum))
@@ -833,12 +834,12 @@ export const processOwnedStreamingPlatformWeek = (
     const acquisitionIntegrationCost = roundMoney(acquisitionEffects.weeklyOperatingCost);
     const crisisRecoveryCost = roundMoney(crisisEffects.weeklyRecoveryCost);
     const infrastructureOperationsCost = roundMoney(infrastructureOperationsEffects.weeklyOperatingCost);
-    const audienceEnforcementCost = worldCustomerOutcome ? roundMoney((() => {
-        const policy = platform.audienceAccessPolicy.enforcementInvestment;
-        const fixed = policy === 'AGGRESSIVE' ? 350_000 : policy === 'STANDARD' ? 100_000 : 25_000;
-        const perAccessAccount = policy === 'AGGRESSIVE' ? .025 : policy === 'STANDARD' ? .012 : .005;
-        return fixed + worldCustomerOutcome.accessLoadAccounts * perAccessAccount;
-    })()) : 0;
+    /* Nothing to police without paid access: an ad-supported or store-only
+       service has no accounts to share, so it carries no sharing team. (It was
+       billed the team's fixed fee every week regardless.) */
+    const audienceEnforcementCost = worldCustomerOutcome && worldCustomerOutcome.accessLoadAccounts > 0
+        ? roundMoney(streamingSharingEnforcementWeeklyCost(platform.audienceAccessPolicy.enforcementInvestment, worldCustomerOutcome.accessLoadAccounts))
+        : 0;
     /* What the fibre costs to keep. Levels are bought once and held weekly, so
        "how high can I afford to sit" is a live question rather than a number
        you max out and forget. The generation itself carries no hold cost — that

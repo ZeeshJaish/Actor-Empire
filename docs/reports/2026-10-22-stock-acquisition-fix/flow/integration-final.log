@@ -1,0 +1,30 @@
+> pr-6.6.3@1.0.25 audit:stock-acquisition-integration
+> esbuild scripts/audit-stock-acquisition-integration.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-stock-acquisition-integration.mjs && node /tmp/audit-stock-acquisition-integration.mjs
+
+
+  ../../../../tmp/audit-stock-acquisition-integration.mjs  9.5mb ⚠️
+
+⚡ Done in 312ms
+PASS PARAMOUNT real purchases conserve basis and debit
+PASS PARAMOUNT zero second share charge and matching signed liabilities
+PASS PARAMOUNT actual migration reload retains rights
+PASS PARAMOUNT duplicate signing has no side effect
+Advancing actual week 35 8
+PASS Actual next week 0 retains acquisition without reminder
+Advancing actual week 35 9
+PASS Actual next week 1 retains acquisition without reminder
+Advancing actual week 35 10
+PASS Actual next week 2 retains acquisition without reminder
+PASS WARNER_BROS real purchases conserve basis and debit
+PASS WARNER_BROS zero second share charge and matching signed liabilities
+PASS WARNER_BROS actual migration reload retains rights
+PASS WARNER_BROS duplicate signing has no side effect
+PASS UNIVERSAL real purchases conserve basis and debit
+PASS UNIVERSAL zero second share charge and matching signed liabilities
+PASS UNIVERSAL actual migration reload retains rights
+PASS UNIVERSAL duplicate signing has no side effect
+PASS corporate public tender pays only accepted price from actual company
+PASS corporate tender funding and beneficial ownership survive migration
+PASS Actual500M canonical company debt creates exactly one matching entry
+PASS Actual500M debt and stock basis survive migration
+Stock purchase to acquisition integration passed (19 checks).

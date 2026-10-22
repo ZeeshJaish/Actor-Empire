@@ -26,7 +26,7 @@ import { normalizeOwnedStreamingPlatformState } from '../ownedStreamingPlatform'
 import { getStreamingInfrastructureOperationsEffects } from '../streamingInfrastructureOperations';
 import { deriveStreamingNetworkCoverage } from '../streamingNetworkCoverage';
 import { PEAK_CONCURRENCY_SHARE } from '../streamingNetworkReach';
-import { evaluatePlayerStreamingTitleRoute } from '../streamingContentAvailability';
+import { createStreamingCatalogueReadContext, evaluatePlayerStreamingTitleRoute } from '../streamingContentAvailability';
 import type { StreamingTitleAccessRoute } from '../streamingTitleAccess';
 import { normalizeStreamingLanguageId, resolveStreamingGlobalLocalizationCapability } from '../streamingLocalizationCapabilities';
 import { getOwnedStreamingProgramEntries } from '../streamingOriginals';
@@ -342,6 +342,12 @@ const projectRivalViewing = (
     const entitlementMap = new Map<string, WorldStreamingAiStoreEntitlement>();
     const aiStoreTransactions: WorldStreamingAiStoreTransaction[] = [];
     const royaltySourceReceipts: NonNullable<WorldStreamingViewingState['royaltySourceReceipts']> = [];
+    const titleFacts=createStreamingCatalogueReadContext(player);
+    const qualityByTitle=new Map<string,number>();
+    const titleQuality=(id:string):number=>{
+        if(!qualityByTitle.has(id))qualityByTitle.set(id,streamingTitleQuality(player,id,titleFacts));
+        return qualityByTitle.get(id)!;
+    };
     const titleResolvers = new Map([...offers.values()].filter(offer => !offer.isPlayer).map(offer => [
         offer.platformId, createAiTitleAccessResolver(player, offer, aiCatalogue),
     ]));
@@ -444,7 +450,7 @@ const projectRivalViewing = (
                 const eligiblePools = eligibleSources.map(sources=>sources.reduce((sum,source)=>sum+source.households,0));
                 const buyerPool = storeSources.filter(source=>titles.some(title=>canBuy(source,title.titleId,price)))
                     .reduce((sum,source)=>sum+source.households,0);
-                const quality = titles.reduce((sum,title)=>sum+streamingTitleQuality(player,title.titleId),0)/titles.length;
+                const quality = titles.reduce((sum,title)=>sum+titleQuality(title.titleId),0)/titles.length;
                 const weeksAvailable = titles.reduce((sum,title)=>sum+Math.max(1,absoluteWeek-title.startsAtAbsoluteWeek+1),0)/titles.length;
                 const wanted = calculateStreamingStoreConversion({ buyerPool, price, kind, quality, weeksAvailable });
                 const allocations = allocateStreamingStoreUnits(wanted, eligiblePools);

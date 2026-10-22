@@ -1,0 +1,128 @@
+{
+  "kind": "PRODUCTION_COMPONENTS_REAL_WEEK_AND_VERIFIED_INDEXEDDB",
+  "studio": "PARAMOUNT",
+  "scenario": "repairedQuote",
+  "percent": 51,
+  "steps": [
+    {
+      "label": "loaded synthetic fixture through real migration",
+      "money": 2000000000000,
+      "age": 35,
+      "week": 8,
+      "energy": 100,
+      "holdings": [
+        {
+          "stockId": "stk_para",
+          "shares": 100,
+          "averageCost": 0,
+          "totalInvested": 0
+        }
+      ],
+      "businesses": [],
+      "debt": {
+        "entries": [],
+        "totalOriginalPrincipal": 0,
+        "totalRemainingPrincipal": 0,
+        "weeklyInterestDue": 0,
+        "weightedAverageRate": 0,
+        "pressureScore": 0,
+        "highestRate": 0,
+        "nextServiceLabel": "No service due"
+      },
+      "reminders": [],
+      "history": [],
+      "stock": {
+        "id": "stk_para",
+        "symbol": "PARA",
+        "name": "Paramount Global",
+        "sector": "MEDIA",
+        "price": 39,
+        "outstandingShares": 650000000,
+        "publicFloatPercent": 88,
+        "volatility": 0.06,
+        "dividendYield": 0.03,
+        "relatedStudioId": "PARAMOUNT",
+        "priceHistory": [
+          39
+        ],
+        "lastDividendPayoutWeek": 0
+      },
+      "repairs": {
+        "stk_para": {
+          "version": 1,
+          "originalPrice": "1.06e+22",
+          "originalHistory": [
+            "1.06e+22"
+          ],
+          "repairedPrice": 39,
+          "repairedYear": 35,
+          "repairedWeek": 8,
+          "reason": "INVALID_OR_OUT_OF_BOUND_QUOTE"
+        }
+      },
+      "loadStatus": "MISSING"
+    },
+    {
+      "label": "repaired quote verified reload preserves archived source and zero cost basis",
+      "money": 2000000000000,
+      "age": 35,
+      "week": 8,
+      "energy": 100,
+      "holdings": [
+        {
+          "stockId": "stk_para",
+          "shares": 100,
+          "averageCost": 0,
+          "totalInvested": 0
+        }
+      ],
+      "businesses": [],
+      "debt": {
+        "entries": [],
+        "totalOriginalPrincipal": 0,
+        "totalRemainingPrincipal": 0,
+        "weeklyInterestDue": 0,
+        "weightedAverageRate": 0,
+        "pressureScore": 0,
+        "highestRate": 0,
+        "nextServiceLabel": "No service due"
+      },
+      "reminders": [],
+      "history": [],
+      "stock": {
+        "id": "stk_para",
+        "symbol": "PARA",
+        "name": "Paramount Global",
+        "sector": "MEDIA",
+        "price": 39,
+        "outstandingShares": 650000000,
+        "publicFloatPercent": 88,
+        "volatility": 0.06,
+        "dividendYield": 0.03,
+        "relatedStudioId": "PARAMOUNT",
+        "priceHistory": [
+          39
+        ],
+        "lastDividendPayoutWeek": 0
+      },
+      "repairs": {
+        "stk_para": {
+          "version": 1,
+          "originalPrice": "1.06e+22",
+          "originalHistory": [
+            "1.06e+22"
+          ],
+          "repairedPrice": 39,
+          "repairedYear": 35,
+          "repairedWeek": 8,
+          "reason": "INVALID_OR_OUT_OF_BOUND_QUOTE"
+        }
+      },
+      "loadStatus": "CURRENT"
+    }
+  ],
+  "console": [],
+  "repairDisclosure": "Saved quote corrected\n$10.6Sx → $39 per share\nThe correction changes quoted portfolio value. Cash, shares and recorded purchase costs were kept.",
+  "status": "PASSED",
+  "errors": []
+}

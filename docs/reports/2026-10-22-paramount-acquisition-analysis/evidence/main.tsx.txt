@@ -1,0 +1,24 @@
+import React, {useState} from 'react';
+import {createRoot} from 'react-dom/client';
+import {INITIAL_PLAYER} from '/@fs/Users/zeesh/Vibe code/Actor empire/types.ts';
+import {ForbesApp} from '/@fs/Users/zeesh/Vibe code/Actor empire/views/mobile/ForbesApp.tsx';
+import {initializeStocks,getStockOutstandingShares} from '/@fs/Users/zeesh/Vibe code/Actor empire/services/stockLogic.ts';
+import {ensureStudioEcosystem} from '/@fs/Users/zeesh/Vibe code/Actor empire/services/studioEcosystem.ts';
+import {runDueDiligence,getAcquisitionCase} from '/@fs/Users/zeesh/Vibe code/Actor empire/services/studioAcquisition.ts';
+import {buildForbesStudioProfile} from '/@fs/Users/zeesh/Vibe code/Actor empire/services/forbesStudioProfile.ts';
+const params=new URLSearchParams(location.search);
+const id=params.get('studio')||'PARAMOUNT';
+const pct=Number(params.get('pct')||51);
+const mode=params.get('case')||'draft';
+let seed=structuredClone(INITIAL_PLAYER);
+seed.id='paramount-analysis';seed.name='Analysis Buyer';seed.money=1e15;seed.age=40;seed.currentWeek=10;seed.energy={...seed.energy,current:100};
+seed.stocks=initializeStocks();seed.world=ensureStudioEcosystem(seed.world);seed.businesses=[];seed.portfolio=[];seed.pendingEvents=[];
+if(params.has('valuation')) seed.world.studios[id].valuation=Number(params.get('valuation'));
+const stock=seed.stocks.find(s=>s.relatedStudioId===id);
+if(stock){const shares=Math.floor(getStockOutstandingShares(stock)*pct/100);seed.portfolio=[{stockId:stock.id,shares,averageCost:stock.price,totalInvested:shares*stock.price}];}
+const profile=buildForbesStudioProfile({studio:seed.world.studios[id],rank:1,worldProjects:[],universes:{}});
+if(mode!=='none') seed=runDueDiligence({player:seed,profile,funding:{source:'PERSONAL'}}).player;
+if(['accepted','countered','rejected','closed'].includes(mode)){
+const ac=getAcquisitionCase(seed,id)!;ac.status=mode.toUpperCase() as any;ac.offer={type:stock?'MINORITY':'FAIR',amount:1e9,minorityPercent:49,funding:{source:'PERSONAL'},complianceRisk:0,complianceBand:'ROUTINE',submittedWeek:9,submittedYear:40,round:1};ac.sellerResponse={decision:mode.toUpperCase() as any,agreedAmount:mode==='accepted'?1e9:undefined,counterAmount:mode==='countered'?1.1e9:undefined,round:1,respondedWeek:10,respondedYear:40,summary:'Synthetic controlled case'};}
+function Harness(){const [player,setPlayer]=useState(seed);const [initial,setInitial]=useState(id);(window as any).__analysis={player,profile,case:getAcquisitionCase(player,id)};return <ForbesApp player={player} onBack={()=>{}} onOpenStocks={()=>{}} initialStudioId={initial} onInitialStudioConsumed={()=>setInitial('')} onUpdatePlayer={setPlayer}/>;}
+createRoot(document.getElementById('root')!).render(<Harness/>);

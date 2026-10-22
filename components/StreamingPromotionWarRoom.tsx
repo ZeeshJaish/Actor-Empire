@@ -60,7 +60,10 @@ interface Props {
   onUpdatePlayer: (player: Player) => void;
   onClose: () => void;
   initialProjectId?: string | null;
-  initialObjective?: StreamingRecommendationObjective;
+  /** An objective chosen elsewhere (the Audience room's recommendation engine).
+      Opens on the Recommendation tab with it already selected instead of quietly
+      starting again at Balanced. Nothing is saved until the action is locked. */
+  initialRecommendationObjective?: StreamingRecommendationObjective | null;
 }
 
 type WarRoomTab = 'CAMPAIGN' | 'RECOMMENDATION' | 'CREATIVE' | 'ATTRIBUTION';
@@ -109,17 +112,17 @@ export default function StreamingPromotionWarRoom({
   onUpdatePlayer,
   onClose,
   initialProjectId,
-  initialObjective,
+  initialRecommendationObjective,
 }: Props) {
   const center = useMemo(() => getStreamingPromotionCenter(player), [player]);
   const initialTitle = center.eligibleTitles.find(title => title.projectId === initialProjectId)
     || center.eligibleTitles[0]
     || null;
-  const [activeTab, setActiveTab] = useState<WarRoomTab>(initialObjective ? 'RECOMMENDATION' : 'CAMPAIGN');
+  const [activeTab, setActiveTab] = useState<WarRoomTab>(initialRecommendationObjective ? 'RECOMMENDATION' : 'CAMPAIGN');
   const [projectId, setProjectId] = useState(initialTitle?.projectId || '');
   const [channels, setChannels] = useState<StreamingCampaignChannelId[]>(['SOCIAL']);
   const [homepagePlacement, setHomepagePlacement] = useState<StreamingHomepagePlacement>('TOP_TEN');
-  const [recommendationObjective, setRecommendationObjective] = useState<StreamingRecommendationObjective>(initialObjective || 'BALANCED');
+  const [recommendationObjective, setRecommendationObjective] = useState<StreamingRecommendationObjective>(initialRecommendationObjective || 'BALANCED');
   const [explorationPercent, setExplorationPercent] = useState(25);
   const [artworkVariants, setArtworkVariants] = useState<StreamingArtworkVariant[]>([]);
   const [feedback, setFeedback] = useState('');

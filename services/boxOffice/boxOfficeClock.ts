@@ -8,6 +8,7 @@ export const rebaseCinemaSavedState = (state:CinemaSavedState,shift:number):Cine
         ...(state.streamingSeen ? {streamingSeen:Object.fromEntries(Object.entries(state.streamingSeen).map(([id,v])=>[id,{...v,lastWeek:week(v.lastWeek)}]))} : {}),
         titles:Object.fromEntries(Object.entries(state.titles).map(([id,t])=>[id,{...t,activationWeek:week(t.activationWeek),lastSettledWeek:week(t.lastSettledWeek)}])),
         market:{...state.market,lastProcessedAbsoluteWeek:week(state.market.lastProcessedAbsoluteWeek),
+            runs:state.market.runs.map(r=>({...r,...(r.lastBookedWeek===undefined?{}:{lastBookedWeek:week(r.lastBookedWeek)})})),
             titles:state.market.titles.map(t=>({...t,releaseWeek:week(t.releaseWeek),cells:t.cells.map(c=>({...c,
                 lastChoiceWeek:c.lastChoiceWeek===undefined?undefined:week(c.lastChoiceWeek),lastDiscoveryWeek:week(c.lastDiscoveryWeek),
                 lastAppliedLocalFootfallWeek:c.lastAppliedLocalFootfallWeek===undefined?undefined:week(c.lastAppliedLocalFootfallWeek),

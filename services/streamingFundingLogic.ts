@@ -231,8 +231,9 @@ export const applyLockedSeasonFunding = ({
     projectTitle = 'Season'
 }: LockedSeasonFundingInput): LockedSeasonFundingResult => {
     const safeBudget = Math.max(0, Math.floor(Number(budget) || 0));
-    const safeStudioBalance = Math.floor(Number(studioBalance) || 0);
-    const safeProductionFund = Math.max(0, Math.floor(Number(productionFund) || 0));
+    // Paid ticket receipts carry cents. A new Greenlight must preserve that cash.
+    const safeStudioBalance = Math.round((Number(studioBalance) || 0)*100)/100;
+    const safeProductionFund = Math.max(0, Math.round((Number(productionFund) || 0)*100)/100);
     const canUseLockedFunding = !!lockedFunding
         && !lockedFunding.usedByProjectId
         && Math.max(0, Math.floor(Number(lockedFunding.amount) || 0)) > 0;
@@ -254,10 +255,10 @@ export const applyLockedSeasonFunding = ({
     }
 
     const productionFundApplied = Math.min(safeProductionFund, remainingBudgetToPay);
-    remainingBudgetToPay -= productionFundApplied;
-    const nextProductionFund = safeProductionFund - productionFundApplied;
+    remainingBudgetToPay = Math.round((remainingBudgetToPay-productionFundApplied)*100)/100;
+    const nextProductionFund = Math.round((safeProductionFund-productionFundApplied)*100)/100;
     const studioSpend = remainingBudgetToPay;
-    const nextStudioBalance = safeStudioBalance - studioSpend;
+    const nextStudioBalance = Math.round((safeStudioBalance-studioSpend)*100)/100;
     const platformName = lockedFunding?.platformName || 'Platform';
     const fundingLabel = lockedFunding?.fundingSource === 'OWNED_STREAMING_PLATFORM'
         ? 'Original commission'

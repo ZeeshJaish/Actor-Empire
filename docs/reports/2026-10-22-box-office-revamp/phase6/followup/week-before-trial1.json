@@ -1,0 +1,198 @@
+{
+  "kind": "DESKTOP_NODE_FULL_WEEK_WITH_VERIFIED_MEMORY_STORE",
+  "node": "v24.11.1",
+  "platform": "darwin",
+  "arch": "arm64",
+  "rows": [
+    {
+      "name": "early",
+      "comparableStateSha256": "5d09b516cb89d78f05c8c295530b12b503d807d0256990b065859638d971ec86",
+      "finalStateSha256": "5d09b516cb89d78f05c8c295530b12b503d807d0256990b065859638d971ec86",
+      "metrics": {
+        "compute": {
+          "n": 8,
+          "minMs": 335.58058299999993,
+          "p50Ms": 354.15762500000005,
+          "p95Ms": 378.9336250000001,
+          "maxMs": 378.9336250000001
+        },
+        "prepare": {
+          "n": 8,
+          "minMs": 11.434500000000071,
+          "p50Ms": 13.841541999999663,
+          "p95Ms": 23.978749999999764,
+          "maxMs": 23.978749999999764
+        },
+        "persistence": {
+          "n": 8,
+          "minMs": 88.34670799999981,
+          "p50Ms": 92.01620899999989,
+          "p95Ms": 102.26266599999963,
+          "maxMs": 102.26266599999963
+        },
+        "uiCommit": {
+          "n": 8,
+          "minMs": 0.4556670000001759,
+          "p50Ms": 0.5427080000001752,
+          "p95Ms": 0.6127080000001115,
+          "maxMs": 0.6127080000001115
+        },
+        "total": {
+          "n": 8,
+          "minMs": 442.5708749999999,
+          "p50Ms": 467.08799999999997,
+          "p95Ms": 491.50324999999975,
+          "maxMs": 491.50324999999975
+        },
+        "market": {
+          "n": 8,
+          "minMs": 56.49754099999973,
+          "p50Ms": 61.69225000000006,
+          "p95Ms": 71.31225000000018,
+          "maxMs": 71.31225000000018
+        }
+      },
+      "saveBytes": 8587994,
+      "heapBefore": 56509136,
+      "heapAfter": 424360832,
+      "allocationRows": 0,
+      "slowStages": [
+        [
+          "world_streaming_viewing_choices_ready → world_streaming_viewing_ai_catalogue_ready",
+          148.28841600000004
+        ],
+        [
+          "world_streaming_viewing_rival_viewing_ready → world_streaming_viewing_done",
+          131.76858300000004
+        ],
+        [
+          "streaming_industry_start → streaming_industry_done",
+          107.080917
+        ],
+        [
+          "world_streaming_viewing_ai_catalogue_ready → world_streaming_viewing_rival_viewing_ready",
+          38.78770899999995
+        ],
+        [
+          "world_streaming_customers_start → world_streaming_customers_inputs_ready",
+          31.258250000000032
+        ],
+        [
+          "world_streaming_viewing_customers_ready → world_streaming_viewing_choices_ready",
+          29.960666999999944
+        ],
+        [
+          "world_streaming_customers_inputs_ready → world_streaming_customers_desired_ready",
+          24.248541999999986
+        ],
+        [
+          "world_streaming_competition_start → world_streaming_competition_done",
+          18.329541000000006
+        ]
+      ],
+      "cinemaWeeks": 9,
+      "counts": {
+        "projects": 0,
+        "rights": 0
+      }
+    },
+    {
+      "name": "late",
+      "comparableStateSha256": "313b127dadc89ea453a35f614172bc43a694c3e4d71fc0c9ddc33baa9b27fc3e",
+      "finalStateSha256": "313b127dadc89ea453a35f614172bc43a694c3e4d71fc0c9ddc33baa9b27fc3e",
+      "metrics": {
+        "compute": {
+          "n": 8,
+          "minMs": 9516.305958999998,
+          "p50Ms": 9865.750542000002,
+          "p95Ms": 10254.970166999992,
+          "maxMs": 10254.970166999992
+        },
+        "prepare": {
+          "n": 8,
+          "minMs": 197.61258299999463,
+          "p50Ms": 233.23583400000643,
+          "p95Ms": 333.25445799998124,
+          "maxMs": 333.25445799998124
+        },
+        "persistence": {
+          "n": 8,
+          "minMs": 2583.3821250000037,
+          "p50Ms": 2878.141125000009,
+          "p95Ms": 3457.946333,
+          "maxMs": 3457.946333
+        },
+        "uiCommit": {
+          "n": 8,
+          "minMs": 0.5714999999909196,
+          "p50Ms": 0.6553330000024289,
+          "p95Ms": 1.3892500000001746,
+          "maxMs": 1.3892500000001746
+        },
+        "total": {
+          "n": 8,
+          "minMs": 12437.465499999998,
+          "p50Ms": 13220.398542000003,
+          "p95Ms": 14025.249416999999,
+          "maxMs": 14025.249416999999
+        },
+        "market": {
+          "n": 8,
+          "minMs": 599.5393750000003,
+          "p50Ms": 681.0968750000029,
+          "p95Ms": 902.1656669999938,
+          "maxMs": 902.1656669999938
+        }
+      },
+      "saveBytes": 240493790,
+      "heapBefore": 835572448,
+      "heapAfter": 5666252560,
+      "allocationRows": 40573,
+      "slowStages": [
+        [
+          "streaming_industry_start → streaming_industry_done",
+          11087.281374999999
+        ],
+        [
+          "world_streaming_viewing_ai_catalogue_ready → world_streaming_viewing_rival_viewing_ready",
+          5669.205875
+        ],
+        [
+          "world_streaming_viewing_rival_viewing_ready → world_streaming_viewing_done",
+          2802.768500000002
+        ],
+        [
+          "world_streaming_platform_economy_done → owned_streaming_processed",
+          296.1569159999999
+        ],
+        [
+          "start → state_cloned",
+          292.7953339999949
+        ],
+        [
+          "world_streaming_platform_economy_start → world_streaming_platform_economy_done",
+          222.7510829999992
+        ],
+        [
+          "music_industry_start → music_industry_done",
+          199.41908300000068
+        ],
+        [
+          "world_streaming_viewing_choices_ready → world_streaming_viewing_ai_catalogue_ready",
+          93.82687499999884
+        ]
+      ],
+      "cinemaWeeks": 9,
+      "counts": {
+        "projects": 1524,
+        "rights": 6062
+      }
+    }
+  ],
+  "limitations": [
+    "Total excludes React paint, IndexedDB and native bridge; browser measured separately",
+    "Retained heap measurements are not cumulative allocation volume",
+    "Each row reports its actual sample count; compare repeated paired trials",
+    "Fixed input JSON generated by baseline, never from a real user save"
+  ]
+}

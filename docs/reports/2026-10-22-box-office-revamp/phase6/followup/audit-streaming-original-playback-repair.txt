@@ -1,0 +1,84 @@
+
+> pr-6.6.3@1.0.25 audit:streaming-original-playback-repair
+> esbuild scripts/audit-streaming-original-playback-repair.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-streaming-original-playback-repair.mjs && node /tmp/audit-streaming-original-playback-repair.mjs
+
+{
+  "openingWeek": 2039,
+  "funding": 20000000,
+  "gatedRows": [
+    {
+      "gate": "LOCALIZATION",
+      "viewers": 0,
+      "receipts": 0
+    },
+    {
+      "gate": "PREMIERE",
+      "viewers": 0,
+      "receipts": 0
+    },
+    {
+      "gate": "RIGHTS",
+      "viewers": 0,
+      "receipts": 0
+    }
+  ],
+  "rows": [
+    {
+      "week": 2040,
+      "originalStatus": "GREENLIT",
+      "availability": "LIVE",
+      "viewers": 275931,
+      "fundedNonStoreReceipts": 185874,
+      "revenue": 276639,
+      "advertising": 182428,
+      "rentals": 73754,
+      "purchases": 17011,
+      "platformSubscriptionRevenue": 7674,
+      "amortization": 192307
+    },
+    {
+      "week": 2041,
+      "originalStatus": "GREENLIT",
+      "availability": "LIVE",
+      "viewers": 349529,
+      "fundedNonStoreReceipts": 233376,
+      "revenue": 347006,
+      "advertising": 228020,
+      "rentals": 92341,
+      "purchases": 21289,
+      "platformSubscriptionRevenue": 12191,
+      "amortization": 192308
+    },
+    {
+      "week": 2042,
+      "originalStatus": "GREENLIT",
+      "availability": "LIVE",
+      "viewers": 421322,
+      "fundedNonStoreReceipts": 284225,
+      "revenue": 416850,
+      "advertising": 276593,
+      "rentals": 107778,
+      "purchases": 24847,
+      "platformSubscriptionRevenue": 16885,
+      "amortization": 192308
+    },
+    {
+      "week": 2043,
+      "originalStatus": "GREENLIT",
+      "availability": "LIVE",
+      "viewers": 481215,
+      "fundedNonStoreReceipts": 328150,
+      "revenue": 477059,
+      "advertising": 318590,
+      "rentals": 121003,
+      "purchases": 27906,
+      "platformSubscriptionRevenue": 21288,
+      "amortization": 192307
+    }
+  ]
+}
+Prepared-network Original launch → actual weekly viewing/receipts → Finance/replay/reload passed.
+
+  ../../../../tmp/audit-streaming-original-playback-repair.mjs  9.5mb ⚠️
+
+⚡ Done in 142ms

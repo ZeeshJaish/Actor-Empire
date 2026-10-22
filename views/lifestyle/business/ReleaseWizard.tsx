@@ -6,7 +6,7 @@ import { FESTIVALS, CALENDAR_EVENTS } from '../../../services/worldLogic';
 import { mergeUniverseRosterWithProject, normalizeUniverseMap } from '../../../services/universeLogic';
 import { getAbsoluteWeek } from '../../../services/legacyLogic';
 import { calculateBalancedNextSeasonFundingCap, getPlatformFundingRelationshipMultiplier, PLAYER_STREAMING_FUNDING_DEADLINE_WEEKS } from '../../../services/streamingFundingLogic';
-import { CAMPAIGN_POSITIONING_OPTIONS, CAMPAIGN_TIMELINE_OPTIONS, MARKETING_CHANNEL_OPTIONS, calculateCampaignFit, calculateCampaignForecast, normalizeMarketingChannelAllocations } from '../../../services/marketingStrategy';
+import { CAMPAIGN_POSITIONING_OPTIONS, CAMPAIGN_TIMELINE_OPTIONS, MARKETING_CHANNEL_OPTIONS, calculateCampaignFit, calculateCampaignForecast, normalizeMarketingChannelAllocations, getMarketingAllocationStep } from '../../../services/marketingStrategy';
 import { BOX_OFFICE_REGIONS, getBoxOfficeRegionLabel, getBoxOfficeRegionShortLabel, getCinemaChainById, getCinemaChainTerms, getCinemaChainsForRegion } from '../../../services/cinemaChains';
 import { getDefaultReleaseRegionIds, getRegionMapSummary, normalizeReleaseRegionIds } from '../../../services/regionMap';
 import { CinemaForecastPanel } from '../../../components/CinemaForecastPanel';
@@ -1185,7 +1185,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                 ? '#facc15'
                 : '#fb7185';
     const forecastGaugeRingOffset = 100 - forecastGaugeScore;
-    const allocationStep = Math.max(50_000, Math.round(Math.max(legacyCampaignBudgetCap * 0.1, 250_000) / 50_000) * 50_000);
+    const allocationStep = getMarketingAllocationStep(legacyCampaignBudgetCap);
     const formatCampaignMillions = (value: number) => {
         const millions = Math.max(0, value) / 1000000;
         if (millions >= 100) return millions.toFixed(0);

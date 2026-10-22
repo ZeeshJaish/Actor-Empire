@@ -301,7 +301,7 @@ export const enrichAuditionOpportunity = (
 
 export const applyOpportunityIdentityToProject = (
     opportunity: AuditionOpportunity,
-    player: Pick<Player, 'name' | 'avatar'>
+    player: Pick<Player, 'name' | 'avatar'> & Partial<Pick<Player, 'flags' | 'relationships'>>
 ): ProjectDetails => {
     const profile = getOpportunityCharacterProfile(opportunity);
     const storyCompass = inferStoryCompass(opportunity.project);
@@ -331,7 +331,7 @@ export const applyOpportunityIdentityToProject = (
         ...opportunity.project,
         storyCompass,
         castList,
-    });
+    }, player);
 };
 
 export const getStoryCompassLabels = (compass: StoryCompass): string[] => [

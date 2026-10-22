@@ -1,0 +1,9 @@
+
+> pr-6.6.3@1.0.25 audit:acquisition-event-cadence
+> esbuild scripts/audit-acquisition-event-cadence.ts --bundle --platform=node --format=esm --outfile=/tmp/audit-acquisition-event-cadence.mjs && node /tmp/audit-acquisition-event-cadence.mjs
+
+
+  ../../../../tmp/audit-acquisition-event-cadence.mjs  4.0mb ⚠️
+
+⚡ Done in 326ms
+Acquisition event cadence audit passed.

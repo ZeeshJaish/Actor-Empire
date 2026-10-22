@@ -1,0 +1,35 @@
+
+> pr-6.6.3@1.0.25 audit:save-generations
+> esbuild scripts/audit-save-generations.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-save-generations.mjs && node /tmp/audit-save-generations.mjs
+
+▲ [WARNING] Import "peekVerifiedPreviousGameData" will always be undefined because there is no matching export in "services/saveGenerations.ts" [import-is-undefined]
+
+    scripts/audit-save-generations.ts:205:44:
+      205 │ ...ationApi as any).peekVerifiedPreviousGameData as (store: SaveG...
+          ╵                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+1 warning
+
+  ../../../../tmp/audit-save-generations.mjs  978.4kb
+
+⚡ Done in 460ms
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: A verified previous generation must be inspectable without promotion.
++ actual - expected
+
++ 'undefined'
+- 'function'
+
+    at file:///private/tmp/audit-save-generations.mjs:25031:8 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 'undefined',
+  expected: 'function',
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.11.1

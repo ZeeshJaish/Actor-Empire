@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { applyOpportunityIdentityToProject } from '../services/characterIdentityLogic';
 import { NPC_DATABASE, calculateProjectFameMultiplier, isCastableActor } from '../services/npcLogic';
 import { generateRandomUniverseOpportunity } from '../services/universeLogic';
-import { normalizeCinemaTitle, completeOfferedCinemaCast } from '../services/boxOffice/boxOfficeInputs';
+import { normalizeCinemaTitle, completeOfferedCinemaCast, preserveCinemaCastRecognition } from '../services/boxOffice/boxOfficeInputs';
 import { makeCinemaFixture } from './fixtures/boxOfficeScenarios';
 
 const cases: Array<[string, () => void]> = [];
@@ -81,6 +81,28 @@ test('duplicate player rows cannot stand in for missing co-stars',()=>{
 });
 test('canonical custom actor fame is retained without a global database entry',()=>{
  assert.equal(calculateProjectFameMultiplier(['custom-actor'],'Unknown',0,undefined,0,new Map([['custom-actor',80]])),2.6);
+});
+test('saved cast recognition survives a missing procedural catalogue actor without inventing a replacement',()=>{
+ const f=makeCinemaFixture(17);
+ const actor={id:'procedural-cast-session-a',name:'Known at casting',tier:'RISING',stats:{fame:24}} as any;
+ f.player.flags.extraNPCs=[actor];
+ f.project.castList=[{id:'lead-credit',actorId:actor.id,name:actor.name,role:'Lead',roleType:'LEAD',isPlayer:false,type:'ACTOR',image:''}];
+ const original=structuredClone(f.project),saved=preserveCinemaCastRecognition(f.project,f.player);
+ assert.deepEqual(f.project,original);
+ const normalize=(project:any)=>normalizeCinemaTitle({titleId:'reload-film',owner:{id:'UNIVERSAL',route:'ACCEPTED_ROLE'},project,player:f.player});
+ const before=normalize(saved);
+ f.player.flags.extraNPCs=[];
+ assert.deepEqual(normalize(JSON.parse(JSON.stringify(saved))).cast,before.cast);
+ const corrupt=structuredClone(saved);corrupt.castList![0].cinemaRecognition!.personId='different-person';
+ assert.equal(normalize(corrupt).cast[0].fame,0,'An unrelated saved identity must not supply star reach');
+ f.player.flags.extraNPCs=[{...actor,stats:{fame:31}}];
+ assert.equal(normalize(saved).cast[0].fame,31,'A current canonical actor still takes precedence');
+});
+test('offered ensemble captures actual catalogue recognition at casting',()=>{
+ const f=makeCinemaFixture(18);f.project.castList=[];
+ const project=completeOfferedCinemaCast(f.project,f.player);
+ const actors=project.castList!.filter(c=>!c.isPlayer&&c.type==='ACTOR');
+ assert.ok(actors.length>0);assert.ok(actors.every(c=>c.cinemaRecognition?.personId===c.actorId));
 });
 let failures = 0;
 for (const [name, run] of cases) { try { run(); console.log('PASS', name); } catch (error) { failures++; console.error('FAIL', name, error instanceof Error ? error.message : error); } }

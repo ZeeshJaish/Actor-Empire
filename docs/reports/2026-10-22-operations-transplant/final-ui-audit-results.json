@@ -1,0 +1,32 @@
+[
+  {
+    "name": "audit:world-audience-we2-ui",
+    "exit": 0,
+    "seconds": 1.0
+  },
+  {
+    "name": "audit:world-audience-we3-ui",
+    "exit": 0,
+    "seconds": 0.88
+  },
+  {
+    "name": "audit:world-streaming-we4-ui",
+    "exit": 0,
+    "seconds": 0.89
+  },
+  {
+    "name": "audit:world-streaming-we5-ui",
+    "exit": 0,
+    "seconds": 0.77
+  },
+  {
+    "name": "audit:streaming-hq-phase4",
+    "exit": 0,
+    "seconds": 0.25
+  },
+  {
+    "name": "audit:streaming-content-desk-consolidation",
+    "exit": 0,
+    "seconds": 0.21
+  }
+]

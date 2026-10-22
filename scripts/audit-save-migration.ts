@@ -1,3 +1,4 @@
+import { isStockSaveRecoveryError } from '../services/stockSaveCompatibility';
 import { INITIAL_PLAYER, type Player } from '../types';
 import { migratePlayerSave } from '../services/saveMigration';
 import { getStockOutstandingShares, getStockOwnershipPercent, getStockPriceCeiling } from '../services/stockLogic';
@@ -64,6 +65,12 @@ assert(
     'Fresh migration must preserve the explicit empty Platform AI administration state.',
 );
 
+const assertThrowsRecovery = (run: () => unknown) => {
+    let caught: unknown;try { run(); } catch (error) { caught = error; }
+    assert(isStockSaveRecoveryError(caught), 'Contradictory positive stock rights must request recoverable review.');
+};
+assertThrowsRecovery(() => migratePlayerSave({ ...INITIAL_PLAYER, portfolio: [{ stockId: 'missing_stock', shares: 100, averageCost: 10, totalInvested: 1000 }] }));
+
 const legacyMessy = migratePlayerSave({
     ...INITIAL_PLAYER,
     id: 'legacy_phase_10_save',
@@ -83,7 +90,6 @@ const legacyMessy = migratePlayerSave({
     } as any],
     portfolio: [
         { stockId: 'stk_wbd', shares: -200, averageCost: -5, totalInvested: -100 },
-        { stockId: 'missing_stock', shares: 100, averageCost: 10, totalInvested: 1000 },
     ],
     shareholderVotes: [{ id: 'bad_vote', stockId: 'missing_stock' } as any],
     stockTakeovers: [{
@@ -200,7 +206,8 @@ assert(
     'Migration should dismiss an in-progress ceremony containing only removed legacy categories.'
 );
 
-const ownershipGlitch = migratePlayerSave({
+// A contradictory positive register requires recoverable review, not guessed unit changes.
+assertThrowsRecovery(() => migratePlayerSave({
     ...INITIAL_PLAYER,
     id: 'stock_ownership_glitch_save',
     money: 500,
@@ -217,10 +224,7 @@ const ownershipGlitch = migratePlayerSave({
         lastDividendPayoutWeek: 0,
     } as any],
     portfolio: [{ stockId: 'stk_apple', shares: 1, averageCost: 185, totalInvested: 185 }],
-} as any);
-const migratedApple = ownershipGlitch.stocks.find(stock => stock.id === 'stk_apple')!;
-assert(getStockOutstandingShares(migratedApple) === 15_300_000_000, 'Migration should restore canonical Apple outstanding shares when old saves stored one share.');
-assert(getStockOwnershipPercent(1, migratedApple) < 0.01, 'One Apple share must not migrate into full ownership.');
+} as any));
 
 const runawayStockSave = migratePlayerSave({
     ...INITIAL_PLAYER,
@@ -232,7 +236,7 @@ const runawayStockSave = migratePlayerSave({
         name: 'Disney',
         sector: 'MEDIA',
         price: 2.4e50,
-        outstandingShares: 1,
+        outstandingShares: 1_820_000_000,
         volatility: 0.03,
         dividendYield: 0.01,
         priceHistory: [110, 5e20, 2.4e50],
@@ -244,7 +248,8 @@ const runawayStockSave = migratePlayerSave({
 const migratedDisney = runawayStockSave.stocks.find(stock => stock.id === 'stk_dis')!;
 assert(migratedDisney.price <= getStockPriceCeiling(migratedDisney), 'Runaway Disney prices should be capped during migration.');
 assert(migratedDisney.priceHistory.every(price => price <= getStockPriceCeiling(migratedDisney)), 'Runaway Disney price history should be capped during migration.');
-assert(runawayStockSave.money === 10_000_000_000_000, 'Runaway stock cash should be capped during migration repair.');
+assert(runawayStockSave.money === 23_800_000_000_000_000_000, 'An abnormal stock quote cannot claw back wallet cash.');
+assert(runawayStockSave.flags.stockQuoteRepairs.stk_dis.originalPrice === '2.4e+50', 'Quote repair must retain original evidence.');
 
 const corruptImport = migratePlayerSave({
     id: null,

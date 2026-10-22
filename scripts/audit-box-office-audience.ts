@@ -20,11 +20,34 @@ test('recent repeated visits reduce repeat requests',()=>{const f=fixture('satis
 test('real satisfied exposure enables bounded local discovery',()=>{const f=fixture('indie-discovery');const r=buildCinemaChoices(f).find(r=>r.kind==='FIRST')!;assert.ok(r.discoveryPeople>0);assert.ok(r.discoveryPeople<=100_000*1.8);assert.ok(r.discoveryPeople<900_000)});
 test('discovery source cannot replay in the same week',()=>{const f=fixture('indie-discovery');f.marketState!.titles[0].cells[0].lastDiscoveryWeek=100;assert.equal(buildCinemaChoices(f).find(r=>r.kind==='FIRST')!.discoveryPeople,0)});
 test('known nearby streaming window increases zero-admission defer',()=>{const wait=fixture('streaming-wait'),no=fixture('no-streaming-deal');assert.ok(count(wait)<count(no));const d=buildCinemaChoices(wait).find(r=>r.kind==='DEFER')!;assert.ok(d.interestedPeople>0);assert.equal(d.requestedAdmissions,0)});
-test('private or foreign streaming window cannot invent local waiting',()=>{const f=fixture('streaming-wait');f.titles[0].market!.streamingWindow!.publiclyKnown=false;assert.equal(count(f),count(fixture('no-streaming-deal')));f.titles[0].market!.streamingWindow!.publiclyKnown=true;f.titles[0].market!.streamingWindow!.countryIds=['JP'];assert.equal(count(f),count(fixture('no-streaming-deal')))});
+test('private or foreign streaming window cannot invent local waiting',()=>{const f=fixture('streaming-wait'),sameHome=structuredClone(f);delete sameHome.titles[0].market!.streamingWindow;f.titles[0].market!.streamingWindow!.publiclyKnown=false;assert.equal(count(f),count(sameHome));f.titles[0].market!.streamingWindow!.publiclyKnown=true;f.titles[0].market!.streamingWindow!.countryIds=['JP'];assert.equal(count(f),count(sameHome))});
 test('actual precursor experience earns event interest',()=>{assert.ok(count(fixture('earned-event'))>count(fixture('unearned-event')))});
+test('a reached loyal audience can plan an opening instead of inheriting the casual weekly attendance rate',()=>{
+  const casual=fixture('unearned-event'),loyal=structuredClone(casual);
+  loyal.history=[{id:'paid-precursor',titleId:'paid-precursor',ownerId:'studio',cohortId:'US:audience',people:800_000,
+    satisfaction:95,absoluteWeek:80,cast:structuredClone(loyal.titles[0].cast),universeId:'universe',source:'THEATER'}];
+  assert.ok(count(loyal)>=count(casual)*2,'A predominantly satisfied returning audience must have materially stronger intent than the casual segment');
+  assert.ok(count(loyal)<=buildCinemaChoices(loyal).find(r=>r.kind==='FIRST')!.reachableUnseenPeople);
+});
+test('loyalty cannot create awareness or tickets for an unannounced unknown title',()=>{
+  const f=fixture('earned-event');f.titles[0].exposure!.events=[];
+  assert.equal(count(f),0);
+});
+test('duplicate prior viewing rows cannot multiply loyal audience intent',()=>{
+  const f=fixture('earned-event'),before=buildCinemaChoices(f);
+  f.history=[...f.history!,...f.history!.map(h=>({...h,id:'duplicate-source'}))];assert.deepEqual(buildCinemaChoices(f),before);
+});
 test('catalogue-only missing history earns no universe familiarity',()=>{assert.equal(buildCinemaChoices(fixture('unearned-event')).find(r=>r.kind==='FIRST')!.universeFamiliarity,0)});
 test('duplicate cast and overlapping favorite credits cannot add people',()=>{const f=fixture('overlapping-favorites'),before=buildCinemaChoices(f);f.titles[0].cast.push(...structuredClone(f.titles[0].cast));assert.deepEqual(buildCinemaChoices(f),before)});
 test('expensive travel and language friction reduce reachable demand',()=>{const f=fixture(),before=count(f);f.cohorts[0].market!.languages=['ja'];f.cohorts[0].market!.travelMinutes=180;assert.ok(count(f)<before)});
+test('foreign-language preference reduces conversion once without removing aware people who have cinema access',()=>{
+  const native=fixture('unearned-event'),foreign=structuredClone(native);
+  foreign.cohorts[0].market!.languages=['ja'];
+  const a=buildCinemaChoices(native).find(r=>r.kind==='FIRST')!,b=buildCinemaChoices(foreign).find(r=>r.kind==='FIRST')!;
+  assert.equal(b.awarePeople,a.awarePeople);
+  assert.equal(b.reachableUnseenPeople,a.reachableUnseenPeople,'Language preference must not be charged as a second loss of physical access');
+  assert.ok(Math.abs(b.requestedAdmissions/a.requestedAdmissions-.3)<.001,'The existing 30% foreign-language preference applies once to ticket intent');
+});
 test('missing participation does not fabricate paying audience',()=>{const f=fixture();delete f.cohorts[0].market;assert.equal(count(f),0)});
 test('future release has no current tickets',()=>{const f=fixture();f.titles[0].market!.releaseWeek=101;assert.equal(count(f),0)});
 test('choices are pure and order independent',()=>{const f=fixture('earned-event'),copy=structuredClone(f);buildCinemaChoices(f);assert.deepEqual(f,copy);assert.deepEqual(buildCinemaChoices({...f,cohorts:[...f.cohorts].reverse(),titles:[...f.titles].reverse()}),buildCinemaChoices(f))});
@@ -84,6 +107,39 @@ test('duplicate character credits union independently of order',()=>{
 });
 test('canonical language labels match normalized language IDs',()=>{
   const f=fixture();f.titles[0].market!.languages=['english'];f.cohorts[0].market!.languages=['english'];const before=count(f);f.cohorts[0].market!.languages=['English'];assert.equal(count(f),before);
+});
+test('an observed weak response informs the reached audience before a large country has all attended',()=>{
+  const weak=fixture('satisfied-repeat');weak.titles[0].exposure!.events=[];
+  weak.marketState!.titles[0].cells[0].awarePeople=100_000;
+  weak.marketState!.titles[0].cells[0].seenBands=[{people:1_000,satisfaction:20,repeatAdmissions:0,lastViewedWeek:99}];
+  weak.marketState!.titles[0].cells[0].discoveryContactsUsed=10_000;
+  const unviewed=structuredClone(weak);unviewed.marketState!.titles[0].cells[0].seenBands=[];
+  assert.ok(count(weak)<count(unviewed)*.5,'A reliable 1% sample of reached people must have a material response effect');
+});
+test('a reliable excellent paid response can sustain later intent beyond an ordinary response',()=>{
+  const excellent=fixture('satisfied-repeat');excellent.absoluteWeek=110;excellent.titles[0].market!.releaseWeek=100;
+  const cell=excellent.marketState!.titles[0].cells[0];cell.awarePeople=100_000;
+  cell.seenBands=[{people:1_000,satisfaction:96,repeatAdmissions:0,lastViewedWeek:109}];cell.discoveryContactsUsed=100_000;
+  const ordinary=structuredClone(excellent);ordinary.marketState!.titles[0].cells[0].seenBands[0].satisfaction=75;
+  assert.ok(count(excellent)>count(ordinary)*2,'Excellent observed response must sustain interest, not just inherit the same fixed decay');
+  assert.ok(count(excellent)<=buildCinemaChoices(excellent).find(r=>r.kind==='FIRST')!.reachableUnseenPeople);
+});
+test('unseen final quality cannot buy longer legs, and a tiny observed sample cannot renew a whole market',()=>{
+  const unknown=fixture('unearned-event');unknown.absoluteWeek=110;unknown.titles[0].market!.releaseWeek=100;
+  const other=structuredClone(unknown);other.titles[0].delivery.deliveredQuality=1;other.titles[0].market!.payoff=1;
+  assert.equal(count(unknown),count(other));
+  const tiny=fixture('satisfied-repeat');tiny.absoluteWeek=110;tiny.titles[0].market!.releaseWeek=100;
+  const cell=tiny.marketState!.titles[0].cells[0];cell.awarePeople=100_000;cell.discoveryContactsUsed=100_000;
+  cell.seenBands=[{people:1,satisfaction:100,repeatAdmissions:0,lastViewedWeek:109}];
+  const ordinary=structuredClone(tiny);ordinary.marketState!.titles[0].cells[0].seenBands[0].satisfaction=75;
+  assert.ok(count(tiny)<=count(ordinary)*1.02+1);
+});
+test('later awareness cannot erase staying power earned from the same paid review sample',()=>{
+  const f=fixture('satisfied-repeat');f.absoluteWeek=120;f.titles[0].market!.releaseWeek=100;
+  const cell=f.marketState!.titles[0].cells[0];cell.awarePeople=100_000;cell.discoveryContactsUsed=100_000;
+  cell.seenBands=[{people:1_000,satisfaction:96,repeatAdmissions:0,lastViewedWeek:119}];
+  const old=count(f);cell.awarePeople=200_000;
+  assert.ok(count(f)>=old,'Adding reached people with the same paid response cannot reduce total intent');
 });
 test('known streaming remains a waiting option after its public start',()=>{
   const f=fixture('streaming-wait');f.titles[0].market!.streamingWindow!.absoluteWeek=99;assert.ok(count(f)<count(fixture('no-streaming-deal')));

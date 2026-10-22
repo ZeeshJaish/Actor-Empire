@@ -1,3 +1,5 @@
+import { settleStockCash } from './stockSettlement';
+import { markStockDividendsSettled } from './stockLogic';
 import { recordCinemaStreamingAudience } from './boxOffice/boxOfficeStreamingAudience';
 import { commitCinemaAnnouncement } from './boxOffice/boxOfficeExposureAdapters';
 import { quoteCinemaRightsForBuyer, registerQuotedCinemaStreamingRights, settleQuotedCinemaStreamingSale } from './boxOffice/boxOfficeRightsAdapter';
@@ -1996,9 +1998,15 @@ export const processGameWeek = async (
 
     // Transaction Helper
     const addTransaction = (amount: number, category: TransactionCategory, description: string) => {
-        const safeAmount = Math.trunc(ensureFiniteNumber(amount));
+        // Mixed personal/company stock dividends can contain real cents. Other
+        // weekly transactions retain their established whole-dollar accounting.
+        const safeAmount = category === 'DIVIDEND' ? amount : Math.trunc(ensureFiniteNumber(amount));
         if (safeAmount === 0) return;
-        nextPlayer.money = ensureFiniteNumber(nextPlayer.money) + safeAmount;
+        if (category === 'DIVIDEND') {
+            const settlement = settleStockCash(nextPlayer.money, safeAmount);
+            if (!settlement.success) throw new RangeError('Stock dividend cannot be credited safely; the previous save remains available.');
+            nextPlayer.money = settlement.balance;
+        } else nextPlayer.money = ensureFiniteNumber(nextPlayer.money) + safeAmount;
         nextPlayer.finance.history.unshift({
             id: `tx_${Date.now()}_${Math.random()}`,
             week: nextPlayer.currentWeek,
@@ -4256,7 +4264,7 @@ export const processGameWeek = async (
                     const isOwnedProduction = nextPlayer.businesses?.some(business => business.id === updatedC.projectDetails!.studioId && business.type === 'PRODUCTION_HOUSE');
                     if (!isOwnedProduction && updatedC.type === 'ACTING_GIG') {
                         if (!updatedC.projectDetails.castList?.length) updatedC.projectDetails.castList = generateCastList(nextPlayer, updatedC.projectDetails, updatedC.roleType || 'MINOR');
-                        updatedC.projectDetails = completeOfferedCinemaCast(updatedC.projectDetails);
+                        updatedC.projectDetails = completeOfferedCinemaCast(updatedC.projectDetails, nextPlayer);
                     }
                     // A real premiere is public even when an offered role already carried its release strategy.
                     // The release wizard may have announced it earlier; the event is idempotent.
@@ -7360,6 +7368,7 @@ export const processGameWeek = async (
     for (const receipt of corporateStockDividends) {
         nextPlayer = creditCorporateStockReceipt(nextPlayer, receipt.ownerStudioId, receipt.amount, 'DIVIDEND', receipt.stockId);
     }
+    nextPlayer = markStockDividendsSettled(nextPlayer, player.currentWeek, player.age);
     // Persist the full completed-week statement after theatrical, soundtrack, platform and subsidiary flows.
     nextPlayer = recordStudioSaleEarnings(nextPlayer, targetAbsoluteWeek, player);
 

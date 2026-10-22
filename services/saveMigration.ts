@@ -1,4 +1,6 @@
+import { inspectStockSaveContainers, inspectStockSaveCompatibility, migrateStockPortfolio, recordStockQuoteRepairs, StockSaveRecoveryError } from './stockSaveCompatibility';
 import { CinemaMigrationError, inspectCinemaSavedState, migrateCinemaState } from './boxOffice/boxOfficeMigration';
+import { preserveCinemaCastRecognition } from './boxOffice/boxOfficeInputs';
 import { repairTalentNegotiations } from './talentNegotiation';
 import { normalizeCinemaReceiptHistory } from './boxOffice/boxOfficeReceiptHistory';
 import { INITIAL_PLAYER, type Business, type Message, type NewsItem, type Player, type PortfolioItem, type Relationship, type ScheduledEvent, type Stock, type StockTakeoverCase } from '../types';
@@ -8,7 +10,6 @@ import { normalizeNewPlayerTutorialState } from './newPlayerTutorial';
 import { createGlobalActorPackNPCs } from './npcLogic';
 import {
     getStockOutstandingShares,
-    getStockPriceCeiling,
     initializeStocks,
     normalizeStockPrice,
     normalizeStockPriceHistory,
@@ -69,8 +70,7 @@ import { normalizeWorldStreamingViewingState } from './worldEconomy/worldStreami
 import { normalizeWorldStreamingPlatformEconomyState } from './worldEconomy/worldStreamingPlatformEconomy';
 import { createWorldEconomyHealthSummary } from './worldEconomy/worldEconomyIntegrity';
 
-export const SAVE_MIGRATION_VERSION = 52;
-const RUNAWAY_STOCK_CASH_CEILING = 10_000_000_000_000;
+export const SAVE_MIGRATION_VERSION = 53;
 const ACQUISITION_RIVAL_BID_MAX_ROUNDS = 3;
 
 const clone = <T,>(value: T): T => {
@@ -397,39 +397,6 @@ export const migrateStocksForSave = (stocks: Partial<Stock>[] | undefined): Stoc
     return dedupeByKey(migrated, stock => stock.id);
 };
 
-const migratePortfolio = (
-    portfolio: Partial<PortfolioItem>[] | undefined,
-    stocks: Stock[],
-    rawStocks: Partial<Stock>[] | undefined,
-): PortfolioItem[] => {
-    const stockIds = new Set(stocks.map(stock => stock.id));
-    const rawStockById = new Map(toArray<Partial<Stock>>(rawStocks).map(stock => [String(stock.id || ''), stock]));
-    return dedupeByKey(toArray<Partial<PortfolioItem>>(portfolio)
-        .filter(position => stockIds.has(String(position.stockId || '')))
-        .map(position => {
-            const stock = stocks.find(candidate => candidate.id === position.stockId);
-            const outstandingShares = stock ? getStockOutstandingShares(stock) : 0;
-            const rawStock = rawStockById.get(String(position.stockId || ''));
-            const rawOutstandingShares = Math.max(0, Number(rawStock?.outstandingShares || 0));
-            const rawShares = Math.max(0, Math.floor(Number(position.shares || 0)));
-            const repairedOwnershipShares = rawOutstandingShares > outstandingShares && rawOutstandingShares > 0
-                ? Math.round(Math.min(1, rawShares / rawOutstandingShares) * outstandingShares)
-                : rawShares;
-            const shares = Math.min(outstandingShares, repairedOwnershipShares);
-            const rawAverageCost = Math.max(0, Number(position.averageCost || stock?.price || 0));
-            const averageCost = stock ? Math.min(rawAverageCost, getStockPriceCeiling(stock)) : rawAverageCost;
-            const rawTotalInvested = Math.max(0, Number(position.totalInvested ?? (shares * averageCost)));
-            const totalInvested = Math.min(rawTotalInvested, shares * Math.max(averageCost, stock?.price || 0));
-            return {
-                stockId: String(position.stockId),
-                shares,
-                averageCost,
-                totalInvested,
-            };
-        })
-        .filter(position => position.shares > 0), position => position.stockId);
-};
-
 const migrateTakeovers = (takeovers: Partial<StockTakeoverCase>[] | undefined, stocks: Stock[], player: Player): StockTakeoverCase[] => {
     const stockById = new Map(stocks.map(stock => [stock.id, stock]));
     return dedupeByKey(toArray<Partial<StockTakeoverCase>>(takeovers)
@@ -462,22 +429,6 @@ const migrateTakeovers = (takeovers: Partial<StockTakeoverCase>[] | undefined, s
             };
         }), takeover => takeover.id)
         .slice(0, 20);
-};
-
-const hasRunawayStockValues = (rawStocks: Partial<Stock>[] | undefined, migratedStocks: Stock[]): boolean => {
-    const stockById = new Map(migratedStocks.map(stock => [stock.id, stock]));
-    return toArray<Partial<Stock>>(rawStocks).some(stock => {
-        if (stock.price === undefined) return false;
-        const migrated = stockById.get(String(stock.id || ''));
-        if (!migrated) return false;
-        const rawPrice = Number(stock.price);
-        return !Number.isFinite(rawPrice) || rawPrice > getStockPriceCeiling(migrated) * 1.5;
-    });
-};
-
-const normalizeMigratedCash = (money: unknown, repairRunawayStockCash: boolean): number => {
-    const safeMoney = Number.isFinite(Number(money)) ? Math.max(0, Number(money)) : INITIAL_PLAYER.money;
-    return repairRunawayStockCash ? Math.min(safeMoney, RUNAWAY_STOCK_CASH_CEILING) : safeMoney;
 };
 
 const migrateProjectDetails = (details: any) => {
@@ -1083,9 +1034,22 @@ const reverseLegacyImportedAcquisitionDebtCharge = (player: Player): Player => {
 const withCinemaMigration = (player: Player): Player => {
     const result=migrateCinemaState(player,getAbsoluteWeek(player.age,player.currentWeek));
     if(result.status==='REJECTED')throw new CinemaMigrationError(result.diagnostics.map(d=>d.code));
-    return result.player;
+    const migrated = result.player;
+    // Capture resolvable legacy cast without touching any prior settlement or guessing lost identities.
+    const commitments = migrated.commitments.map(c => {
+        const projectDetails = c.projectDetails?.type === 'MOVIE' ? preserveCinemaCastRecognition(c.projectDetails, migrated) : c.projectDetails;
+        return projectDetails === c.projectDetails ? c : { ...c, projectDetails };
+    });
+    const activeReleases = migrated.activeReleases.map(r => {
+        const projectDetails = r.type === 'MOVIE' ? preserveCinemaCastRecognition(r.projectDetails, migrated) : r.projectDetails;
+        return projectDetails === r.projectDetails ? r : { ...r, projectDetails };
+    });
+    return commitments.some((c,i) => c !== migrated.commitments[i]) || activeReleases.some((r,i) => r !== migrated.activeReleases[i])
+        ? { ...migrated, commitments, activeReleases } : migrated;
 };
 export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
+    const stockContainerIssues = inspectStockSaveContainers(input);
+    if (stockContainerIssues.length) throw new StockSaveRecoveryError(stockContainerIssues, input);
     const cinemaErrors=inspectCinemaSavedState(input.world?.cinemaMarket);
     // Validate present raw financial facts before legacy defaults can erase corruption.
     const badMoney=(v:unknown)=>v!==undefined && (typeof v!=='number'||!Number.isFinite(v)||v<0);
@@ -1103,7 +1067,9 @@ export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
     const migratedAge = Math.max(1, Math.round(Number(base.age || INITIAL_PLAYER.age)));
     const migratedCurrentWeek = Math.min(52, Math.max(1, Math.round(Number(base.currentWeek || INITIAL_PLAYER.currentWeek))));
     const stocks = migrateStocksForSave(base.stocks as Partial<Stock>[] | undefined);
-    const repairRunawayStockCash = hasRunawayStockValues(base.stocks as Partial<Stock>[] | undefined, stocks);
+    const stockIssues = inspectStockSaveCompatibility(input, stocks);
+    if (stockIssues.length) throw new StockSaveRecoveryError(stockIssues, input);
+    const stockSafeFlags = recordStockQuoteRepairs(base, stocks);
     const migratedPendingEvent = base.pendingEvent
         ? sanitizeMigratedAwardEvent(base.pendingEvent)
         : null;
@@ -1129,7 +1095,7 @@ export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
         age: migratedAge,
         totalPlayTimeMs: Math.max(0, Math.min(Number.MAX_SAFE_INTEGER, Math.round(Number(base.totalPlayTimeMs || 0)))),
         currentWeek: migratedCurrentWeek,
-        money: normalizeMigratedCash(base.money, repairRunawayStockCash),
+        money: Number.isFinite(Number(base.money)) ? Math.max(0, Number(base.money)) : INITIAL_PLAYER.money,
         world: {
             ...base.world,
             platformAiCatalogueDistressDeals: normalizePlatformAiCatalogueDistressDeals(
@@ -1163,11 +1129,7 @@ export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
             ),
         },
         stocks,
-        portfolio: migratePortfolio(
-            base.portfolio as Partial<PortfolioItem>[] | undefined,
-            stocks,
-            base.stocks as Partial<Stock>[] | undefined,
-        ),
+        portfolio: migrateStockPortfolio(base.portfolio as Partial<PortfolioItem>[] | undefined, stocks),
         shareholderVotes: toArray<any>(base.shareholderVotes).filter(vote => stocks.some(stock => stock.id === vote?.stockId)).slice(0, 24),
         stockTakeovers: migrateTakeovers(base.stockTakeovers as Partial<StockTakeoverCase>[] | undefined, stocks, base),
         ownedStreamingPlatform: normalizeOwnedStreamingPlatformState(
@@ -1361,7 +1323,7 @@ export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
     };
     const migratedPlayerWithoutHealth = {
         ...playerWithWorldStreamingPlatformEconomy,
-        flags: migrateFlags(base.flags, playerWithWorldStreamingPlatformEconomy),
+        flags: migrateFlags(stockSafeFlags, playerWithWorldStreamingPlatformEconomy),
     };
     const migratedPlayer: Player = {
         ...migratedPlayerWithoutHealth,

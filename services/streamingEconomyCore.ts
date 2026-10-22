@@ -88,13 +88,18 @@ export const calculateStreamingSignedRoyaltyAllocations = (input: {
         const license = licenses.get(row.contractId);
         return license?.backendBasis !== 'ADS_RENTAL_RECEIPTS' || row.sourceKind === 'ADVERTISING' || row.sourceKind === 'RENTAL';
     });
+    // Preserve receipt order and arithmetic while totaling each contract once.
+    // Rescanning the complete country/mode archive per contract is quadratic.
+    const adjustedGrossByContract = new Map<string, number>();
+    for (const receipt of receipts) adjustedGrossByContract.set(receipt.contractId,
+        (adjustedGrossByContract.get(receipt.contractId) || 0) + receipt.grossReceipts);
     const allocations = calculateStreamingStoreRevenueShareAllocations({
         licenses: input.licenses.filter(license => (license.lastRoyaltyReceiptAbsoluteWeek ?? -1) < input.absoluteWeek
             && license.startsAtAbsoluteWeek <= input.absoluteWeek && input.absoluteWeek < license.expiresAtAbsoluteWeek),
         receipts, absoluteWeek: input.absoluteWeek,
     });
-    return allocations.map(row => ({...row, adjustedGrossReceipts:receipts.filter(receipt=>receipt.contractId===row.contractId)
-        .reduce((sum,receipt)=>sum+receipt.grossReceipts,0),lastRoyaltyReceiptAbsoluteWeek: input.absoluteWeek}));
+    return allocations.map(row => ({...row, adjustedGrossReceipts:adjustedGrossByContract.get(row.contractId) || 0,
+        lastRoyaltyReceiptAbsoluteWeek: input.absoluteWeek}));
 };
 
 export interface StreamingStoreRevenueShareInput {
@@ -105,11 +110,14 @@ export interface StreamingStoreRevenueShareInput {
 }
 
 export const calculateStreamingStoreRevenueShareAllocations = (input: StreamingStoreRevenueShareInput) => {
+    const licensesById = new Map<string, StreamingRevenueShareLicense>();
+    // Match .find: an old imported duplicate keeps its first-position meaning.
+    for (const license of input.licenses) if (!licensesById.has(license.id)) licensesById.set(license.id, license);
     const grossByContract = new Map<string, number>();
     for (const row of input.receipts) grossByContract.set(row.contractId,
         (grossByContract.get(row.contractId) || 0) + bounded(row.grossReceipts));
     return [...grossByContract].flatMap(([contractId, grossReceipts]) => {
-        const license = input.licenses.find(row => row.id === contractId);
+        const license = licensesById.get(contractId);
         if (!license || license.status !== 'ACTIVE' || !isStreamingLicenseActiveAt(license, input.absoluteWeek)
             || license.origin === 'OWNED_STUDIO_TRANSFER' || license.permanentPurchase) return [];
         return [{contractId, ...calculateStreamingContractRoyalty({

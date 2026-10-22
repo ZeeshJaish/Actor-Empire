@@ -1,7 +1,8 @@
 import type { Player } from '../types';
 import type { ForbesStudioProfile } from './forbesStudioProfile';
-import { getStockOwnershipPercent } from './stockLogic';
+import { getStockOwnershipPercent, normalizeStockPrice } from './stockLogic';
 import { getStudioOwnershipPercent } from './studioOwnership';
+import { getRecordedStockBasis } from './stockCashOwnership';
 
 export interface CompanyEquityPosition {
     /** Absolute company percentage held by each corporate funding source. */
@@ -39,7 +40,7 @@ export interface CompanyPosition {
     shares: number;
     stockValue: number;
     /** Cash originally committed to the shares still held. */
-    stockCostBasis: number;
+    stockCostBasis?: number;
     stockPercent: number;
     negotiatedPercent: number;
     investedValue: number;
@@ -148,8 +149,8 @@ export const getCompanyPosition = (
         ? (player.portfolio || []).find(item => item.stockId === linkedStock.id)
         : undefined;
     const shares = Math.max(0, holding?.shares || 0);
-    const stockValue = linkedStock ? shares * Math.max(0, linkedStock.price || 0) : 0;
-    const stockCostBasis = Math.max(0, holding?.totalInvested ?? (shares * Math.max(0, holding?.averageCost || linkedStock?.price || 0)));
+    const stockValue = linkedStock ? shares * normalizeStockPrice(linkedStock, linkedStock.price) : 0;
+    const stockCostBasis = getRecordedStockBasis(holding);
     const stockPercent = linkedStock ? getStockOwnershipPercent(shares, linkedStock) : 0;
     const negotiatedPositions = getCompanyEquityPositions(player).filter(position => position.studioId === profile.id);
     const negotiatedPercent = roundPercent(negotiatedPositions.reduce((sum, position) => sum + position.percent, 0));

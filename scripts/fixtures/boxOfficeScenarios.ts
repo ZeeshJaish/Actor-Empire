@@ -59,6 +59,7 @@ export const makeCinemaMarketFixture = (variant: typeof CINEMA_MARKET_SCENARIOS[
     countries:[{id:'US',regionId:'NORTH_AMERICA',population:1_000_000,cinemaAccess:80,purchasingPower:90,inflation:10,languages:['en']}],
     supply:{pools:[{id:'US:NOVA_CIRCUIT:STANDARD',countryId:'US',chainId:'NOVA_CIRCUIT',format:'STANDARD',screens:1000,seatsPerShow:180,weeklyScreenMinutes:5_040_000,ticketPriceCents:1000,exhibitorBasisPoints:4500,distributionBasisPoints:500,bookingCentsPerShow:1000}],offers:[{titleId:'film',poolId:'US:NOVA_CIRCUIT:STANDARD'}]},
   };
+  if(variant==='streaming-wait') input.streamingAlternatives=[{platformId:'streamer',countryId:'US',cohortId:'US:audience',accessiblePeople:800_000,catalogueStrength:80,serviceQuality:90,localization:90,freshness:80,preferredGenres:['DRAMA'],evidenceWeek:99}];
   if(variant==='scarce-seat' || variant==='runtime') {input.supply!.pools[0].screens=1;input.supply!.pools[0].weeklyScreenMinutes=5040}
   if(variant==='scarce-wallet') input.cohorts[0].market!.monthlyCinemaBudgetCents=20_000_000;
   if(variant==='low-access-language'){input.cohorts[0].market!.eligiblePeople=200_000;input.cohorts[0].market!.languages=['ja'];input.cohorts[0].market!.travelMinutes=180}

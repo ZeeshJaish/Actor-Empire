@@ -1,0 +1,153 @@
+
+> pr-6.6.3@1.0.25 audit:stock-acquisition-safety
+> npm run audit:stock-save-safety && npm run audit:stock-market-safety && npm run audit:public-control-resume && npm run audit:listed-company-profile && npm run audit:stock-signing-guards && npm run audit:stock-control-notices && npm run audit:stock-dividend-week && npm run audit:stock-acquisition-integration
+
+
+> pr-6.6.3@1.0.25 audit:stock-save-safety
+> esbuild scripts/audit-stock-save-safety.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-stock-save-safety.mjs && node /tmp/audit-stock-save-safety.mjs
+
+
+  ../../../../tmp/audit-stock-save-safety.mjs  6.2mb ⚠️
+
+⚡ Done in 50ms
+PASS unheld abnormal quote cannot debit unrelated wallet cash
+PASS normal quote reload preserves high historical cost and corporate rights
+PASS explicit zero average cost and zero invested basis are preserved
+PASS abnormal quote repair retains its original and is idempotent
+PASS unsafe supply never silently rescales shares or rewrites basis
+PASS duplicate holdings and contradictory owner allocations require recoverable review
+PASS new integrity signature rejects disappearing company-funded rights
+PASS new integrity signature rejects altered quote-repair provenance
+PASS finite SX cash survives migration and nonfinite cash requires recovery
+PASS shipped schema3 signature still verifies its exact historical projection
+PASS missing historical cost remains unknown instead of inventing the current quote
+PASS malformed positive register containers request explicit recovery
+PASS nonfinite corporate rights cannot verify as a healthy signed generation
+PASS safe-integer supply still requires recovery when no cent quote fits the company cap
+PASS valid custom registry keeps its explicit supported supply and holding units
+Stock save safety audit passed: 15 checks.
+
+> pr-6.6.3@1.0.25 audit:stock-market-safety
+> esbuild scripts/audit-stock-market-safety.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-stock-market-safety.mjs && node /tmp/audit-stock-market-safety.mjs
+
+
+  ../../../../tmp/audit-stock-market-safety.mjs  4.7mb ⚠️
+
+⚡ Done in 31ms
+PASS SX cash cannot buy a share with a no-op debit
+PASS SX corporate treasury cannot consume a share on an unrepresentable sale credit
+PASS unrepresentable historical basis cannot be silently consumed on a partial sale
+PASS contradictory corporate share rights cannot silently become a personal trade
+PASS large mixed holdings allocate receipts to the exact owners
+PASS integer proceeds still preserve each owner's exact cent entitlement
+PASS mixed dividend payment preserves the personal half dollar
+PASS zero historical basis remains zero through partial disposal
+PASS legacy zero average cost cannot become an invented basis on purchase
+PASS purchase preserves an existing unknown historical basis
+PASS partial disposal preserves unknown historical basis and settles cash
+PASS a new holding records only its actual purchase cost
+PASS same absolute week cannot reprice stock twice
+PASS an inherited future market clock cannot freeze the heir market
+PASS quarterly dividends continue across year boundaries without repeating a stale marker
+PASS settled dividends cannot be offered again after reload in the same week
+PASS old releases cannot keep moving stock decades later
+PASS a new hit can move price but project pressure is bounded
+PASS cent rounding does not exceed a company market capitalization ceiling
+PASS raw runaway stock values cannot leak through the market display selector
+PASS nonfinite money is unavailable rather than a fabricated quote
+Stock market safety audit passed (21 checks).
+
+> pr-6.6.3@1.0.25 audit:public-control-resume
+> esbuild scripts/audit-public-control-resume.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-public-control-resume.mjs && node /tmp/audit-public-control-resume.mjs
+
+
+  ../../../../tmp/audit-public-control-resume.mjs  4.8mb ⚠️
+
+⚡ Done in 34ms
+PASS selling below control blocks a filed transfer and regaining shares unlocks it
+PASS unfunded accepted public tender preserves all rights unchanged
+PASS partial tender preserves unknown historical basis instead of today’s quote
+PASS private minority signing quote matches the actual equity-only closing
+PASS public tender may explicitly quote the full 50 percent control block
+PASS 50 percent shareholder influence matches actual control eligibility
+PASS exactly 50 percent actual shares unlocks manual stock control
+PASS 49.99 percent does not unlock control
+PASS paid diligence financial terms survive public signing unchanged
+PASS repeat acquisition cannot create duplicate businesses or liabilities
+10 public control regressions passed
+
+> pr-6.6.3@1.0.25 audit:listed-company-profile
+> esbuild scripts/audit-listed-company-profile.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-listed-company-profile.mjs && node /tmp/audit-listed-company-profile.mjs
+
+
+  ../../../../tmp/audit-listed-company-profile.mjs  4.8mb ⚠️
+
+⚡ Done in 30ms
+Listed equity, actual ledger liabilities/income, and legacy evidence preservation passed
+
+> pr-6.6.3@1.0.25 audit:stock-signing-guards
+> esbuild scripts/audit-stock-signing-guards.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-stock-signing-guards.mjs && node /tmp/audit-stock-signing-guards.mjs
+
+
+  ../../../../tmp/audit-stock-signing-guards.mjs  4.8mb ⚠️
+
+⚡ Done in 33ms
+PASS unsafe known debt
+PASS nonfinite known debt
+PASS unsafe known cash
+PASS duplicate holding rejects control
+PASS malformed corporate rights reject unchanged
+PASS malformed corporate rights reject unchanged
+PASS malformed corporate rights reject unchanged
+PASS malformed corporate rights reject unchanged
+PASS malformed corporate rights reject unchanged
+PASS impossible minimum-cent register rejects unchanged
+
+> pr-6.6.3@1.0.25 audit:stock-control-notices
+> esbuild scripts/audit-stock-control-notices.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-stock-control-notices.mjs && node /tmp/audit-stock-control-notices.mjs
+
+
+  ../../../../tmp/audit-stock-control-notices.mjs  4.6mb ⚠️
+
+⚡ Done in 32ms
+Stock control acknowledgement, 12-week defer and regain behavior passed
+
+> pr-6.6.3@1.0.25 audit:stock-dividend-week
+> esbuild scripts/audit-stock-dividend-week.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-stock-dividend-week.mjs && node /tmp/audit-stock-dividend-week.mjs
+
+
+  ../../../../tmp/audit-stock-dividend-week.mjs  9.4mb ⚠️
+
+⚡ Done in 67ms
+Actual weekly mixed dividend cents, source clock, reload and next week passed
+
+> pr-6.6.3@1.0.25 audit:stock-acquisition-integration
+> esbuild scripts/audit-stock-acquisition-integration.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-stock-acquisition-integration.mjs && node /tmp/audit-stock-acquisition-integration.mjs
+
+
+  ../../../../tmp/audit-stock-acquisition-integration.mjs  9.5mb ⚠️
+
+⚡ Done in 67ms
+PASS PARAMOUNT real purchases conserve basis and debit
+PASS PARAMOUNT zero second share charge and matching signed liabilities
+PASS PARAMOUNT actual migration reload retains rights
+PASS PARAMOUNT duplicate signing has no side effect
+Advancing actual week 35 8
+PASS Actual next week 0 retains acquisition without reminder
+Advancing actual week 35 9
+PASS Actual next week 1 retains acquisition without reminder
+Advancing actual week 35 10
+PASS Actual next week 2 retains acquisition without reminder
+PASS WARNER_BROS real purchases conserve basis and debit
+PASS WARNER_BROS zero second share charge and matching signed liabilities
+PASS WARNER_BROS actual migration reload retains rights
+PASS WARNER_BROS duplicate signing has no side effect
+PASS UNIVERSAL real purchases conserve basis and debit
+PASS UNIVERSAL zero second share charge and matching signed liabilities
+PASS UNIVERSAL actual migration reload retains rights
+PASS UNIVERSAL duplicate signing has no side effect
+PASS corporate public tender pays only accepted price from actual company
+PASS corporate tender funding and beneficial ownership survive migration
+PASS Actual500M canonical company debt creates exactly one matching entry
+PASS Actual500M debt and stock basis survive migration
+Stock purchase to acquisition integration passed (19 checks).

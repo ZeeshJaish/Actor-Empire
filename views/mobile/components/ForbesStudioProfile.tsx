@@ -39,6 +39,7 @@ import {
     type PrivateControlAcquisitionStartResult,
 } from '../../../services/studioAcquisition';
 import { ForbesCompanyPosition } from './ForbesCompanyPosition';
+import { getPublicControlReadiness } from '../../../services/publicStockControl';
 import type {
     PrivateEquityActionResult,
 } from '../../../services/privateEquityLogic';
@@ -82,18 +83,22 @@ export const ForbesStudioProfile: React.FC<ForbesStudioProfileProps> = ({
     const isProfitable = profile.profitability >= 0;
     const [ownershipCommandFeedback, setOwnershipCommandFeedback] = React.useState<string | null>(null);
     const acquisitionEligibility = getAcquisitionEligibility(profile, acquisitionCase, player);
+    const publicControlReady = getPublicControlReadiness(player, profile).eligible;
+    const hardBlocked = acquisitionEligibility.reason === 'PLAYER_OWNED' || acquisitionEligibility.reason === 'STREAMING_PLATFORM_RESERVED';
     const reapproachWeeksRemaining = getAcquisitionReapproachWeeksRemaining(acquisitionCase, player);
     const offersUsed = getAcquisitionOfferAttemptCount(acquisitionCase);
     const offersRemaining = getAcquisitionOfferAttemptsRemaining(acquisitionCase);
-    const privateControlAvailable = profile.acquisitionState !== 'PUBLICLY_TRADED'
+    const privateControlAvailable = !hardBlocked && profile.acquisitionState !== 'PUBLICLY_TRADED'
         && profile.acquisitionState !== 'NOT_FOR_SALE'
         && !profile.isPlayerOwned
         && companyPosition.negotiatedPercent > 0;
     const hasLegacyFinalRejection = acquisitionCase?.status === 'REJECTED' && offersRemaining === 0;
-    const canOpenAcquisition = acquisitionEligibility.canApproach
-        || acquisitionCase?.status === 'DRAFT'
-        || ['OFFER_SUBMITTED', 'COUNTERED', 'RIVAL_BID', 'ACCEPTED'].includes(acquisitionCase?.status || '');
-    const acquisitionStatusCopy = acquisitionCase?.status === 'COUNTERED'
+    const canOpenAcquisition = !hardBlocked && (publicControlReady || acquisitionEligibility.canApproach
+        || (acquisitionCase?.status === 'DRAFT' && acquisitionEligibility.reason !== 'NOT_FOR_SALE')
+        || ['OFFER_SUBMITTED', 'COUNTERED', 'RIVAL_BID', 'ACCEPTED'].includes(acquisitionCase?.status || ''));
+    const acquisitionStatusCopy = publicControlReady
+        ? { title: 'Public voting control secured', note: 'Your existing shares already meet the control threshold. Complete the transfer into your studio group without buying those shares again.', action: 'Complete Control Transfer' }
+        : acquisitionCase?.status === 'COUNTERED'
         ? { title: tr('forbes.studioProfile.status.countered.title'), note: tr('forbes.studioProfile.status.countered.note'), action: tr('forbes.studioProfile.status.countered.action') }
         : acquisitionCase?.status === 'RIVAL_BID'
             ? { title: tr('forbes.studioProfile.status.rivalBid.title'), note: tr('forbes.studioProfile.status.rivalBid.note'), action: tr('forbes.studioProfile.status.rivalBid.action') }
@@ -109,7 +114,9 @@ export const ForbesStudioProfile: React.FC<ForbesStudioProfileProps> = ({
                     }
                     : acquisitionCase?.status === 'OFFER_SUBMITTED'
                         ? { title: tr('forbes.studioProfile.status.offerSubmitted.title'), note: tr('forbes.studioProfile.status.offerSubmitted.note'), action: tr('forbes.studioProfile.status.offerSubmitted.action') }
-                        : null;
+                        : profile.acquisitionState === 'PUBLICLY_TRADED'
+                            ? { title: 'Public share tender available', note: 'Buy shares in Stocks, or negotiate a public tender here for the remaining control block. This is a share purchase, followed by a control transfer.', action: 'Open Public Tender' }
+                            : null;
     const ownershipCommand = canOpenAcquisition
         ? null
         : getForbesOwnershipCommand(profile.acquisitionState, profile.isPlayerOwned, language);

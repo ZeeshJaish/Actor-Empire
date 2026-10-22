@@ -1,0 +1,73 @@
+{
+  "completeLocalTransplant": true,
+  "entries": [
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "lintExit": 0,
+  "buildExit": 0,
+  "productionStreamingTypesExit": 0,
+  "targetedExistingAuditPasses": 19,
+  "safetyGroups": {
+    "passed": 7,
+    "failed": 0
+  },
+  "approvedScopedStyles": 12,
+  "browserScreens": 33,
+  "browserRuntimeErrors": [],
+  "browserFiling": {
+    "before": {
+      "treasury": 980471578981,
+      "revision": 3,
+      "layout": "cinema",
+      "sound": "PULSE",
+      "package": "STANDARD",
+      "price": 7.99,
+      "launch": "LAUNCHED",
+      "rights": 55
+    },
+    "after": {
+      "treasury": 980442978981,
+      "revision": 3,
+      "layout": "cinema",
+      "sound": "PULSE",
+      "package": "STANDARD",
+      "price": 7.99,
+      "launch": "LAUNCHED",
+      "rights": 55
+    },
+    "charged": 28600000,
+    "passed": true
+  },
+  "performance": {
+    "case": "disposable 5000 titles, dev Chromium 390px, individual runs; not device percentiles",
+    "before": {
+      "ms": 2074.705375,
+      "nodes": 180505,
+      "svgs": 5014
+    },
+    "after": {
+      "ms": 658.610458,
+      "nodes": 2669,
+      "svgs": 74
+    }
+  },
+  "local": {
+    "url": "http://localhost:5174/",
+    "pid": 85951,
+    "cwd": "/Users/zeesh/Vibe code/Actor empire",
+    "iabVerified": "Actor Empire 2.0 / START CAREER / VERSION 1.0.25",
+    "userSaveModified": false
+  },
+  "finalBaseHead": "a25cdafd91e1e665f9ce6880d7952af9fb90c69f",
+  "resolvedHistoricalFailures": [
+    "Audience phase2 persona reconciliation (same pre-transplant overlay failure)",
+    "Promotion phase14 discovery mix (same pre-transplant overlay failure)",
+    "Legacy global ZIP guard: unchanged Buildout stylesheet baseline; Operations approved-style guard passes"
+  ],
+  "knownUnrelatedFailures": [],
+  "auditRepairVerification": "../2026-10-22-streaming-audit-repairs/verification.json"
+}

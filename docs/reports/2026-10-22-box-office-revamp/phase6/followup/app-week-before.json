@@ -1,0 +1,166 @@
+[
+  {
+    "fixture": "early",
+    "metrics": [
+      {
+        "index": 0,
+        "eventToPaintMs": 1438.2000000029802,
+        "saved": {
+          "age": 15,
+          "week": 2,
+          "money": 2000,
+          "isDead": false,
+          "health": 79.85,
+          "cinemaWeek": 729,
+          "projects": 0,
+          "paidGrossCents": 0,
+          "paidProducerReceiptsCents": 0
+        }
+      },
+      {
+        "index": 1,
+        "eventToPaintMs": 470.40000000596046,
+        "saved": {
+          "age": 15,
+          "week": 3,
+          "money": 2000,
+          "isDead": false,
+          "health": 79.69999999999999,
+          "cinemaWeek": 730,
+          "projects": 0,
+          "paidGrossCents": 0,
+          "paidProducerReceiptsCents": 0
+        }
+      },
+      {
+        "index": 2,
+        "eventToPaintMs": 468.30000001192093,
+        "saved": {
+          "age": 15,
+          "week": 4,
+          "money": 2000,
+          "isDead": false,
+          "health": 79.54999999999998,
+          "cinemaWeek": 731,
+          "projects": 0,
+          "paidGrossCents": 0,
+          "paidProducerReceiptsCents": 0
+        }
+      },
+      {
+        "index": 3,
+        "eventToPaintMs": 479.1000000089407,
+        "saved": {
+          "age": 15,
+          "week": 5,
+          "money": 2000,
+          "isDead": false,
+          "health": 79.39999999999998,
+          "cinemaWeek": 732,
+          "projects": 0,
+          "paidGrossCents": 0,
+          "paidProducerReceiptsCents": 0
+        }
+      },
+      {
+        "index": 4,
+        "eventToPaintMs": 486.69999998807907,
+        "saved": {
+          "age": 15,
+          "week": 6,
+          "money": 2000,
+          "isDead": false,
+          "health": 79.24999999999997,
+          "cinemaWeek": 733,
+          "projects": 0,
+          "paidGrossCents": 0,
+          "paidProducerReceiptsCents": 0
+        }
+      }
+    ],
+    "errors": [],
+    "evidence": "Real index.tsx App.tsx / StrictMode; actual Age Up, verified IndexedDB before displayed week, two animation frames; authored isolated slot; headless Chromium dev build, no device claim"
+  },
+  {
+    "fixture": "late",
+    "metrics": [
+      {
+        "index": 0,
+        "eventToPaintMs": 11644.300000011921,
+        "saved": {
+          "age": 82,
+          "week": 50,
+          "money": 4500000000,
+          "isDead": false,
+          "health": 79.85,
+          "cinemaWeek": 4261,
+          "projects": 1528,
+          "paidGrossCents": 5968317044,
+          "paidProducerReceiptsCents": 2924499203
+        }
+      },
+      {
+        "index": 1,
+        "eventToPaintMs": 12451.09999999404,
+        "saved": {
+          "age": 82,
+          "week": 51,
+          "money": 4500000000,
+          "isDead": false,
+          "health": 54,
+          "cinemaWeek": 4262,
+          "projects": 1524,
+          "paidGrossCents": 29720121338,
+          "paidProducerReceiptsCents": 14635050695
+        }
+      },
+      {
+        "index": 2,
+        "eventToPaintMs": 12305.20000000298,
+        "saved": {
+          "age": 82,
+          "week": 52,
+          "money": 4500000000,
+          "isDead": false,
+          "health": 49.85,
+          "cinemaWeek": 4263,
+          "projects": 1525,
+          "paidGrossCents": 53126294908,
+          "paidProducerReceiptsCents": 26181446965
+        }
+      },
+      {
+        "index": 3,
+        "eventToPaintMs": 12275.39999999106,
+        "saved": {
+          "age": 83,
+          "week": 1,
+          "money": 4500000000,
+          "isDead": false,
+          "health": 38.7,
+          "cinemaWeek": 4264,
+          "projects": 1523,
+          "paidGrossCents": 73954536534,
+          "paidProducerReceiptsCents": 36496435927
+        }
+      },
+      {
+        "index": 4,
+        "eventToPaintMs": 12117.29999999702,
+        "saved": {
+          "age": 83,
+          "week": 2,
+          "money": 4500000000,
+          "isDead": false,
+          "health": 34.550000000000004,
+          "cinemaWeek": 4265,
+          "projects": 1522,
+          "paidGrossCents": 90798351307,
+          "paidProducerReceiptsCents": 44855032614
+        }
+      }
+    ],
+    "errors": [],
+    "evidence": "Real index.tsx App.tsx / StrictMode; actual Age Up, verified IndexedDB before displayed week, two animation frames; authored isolated slot; headless Chromium dev build, no device claim"
+  }
+]

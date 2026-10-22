@@ -1,0 +1,13 @@
+PASS accepted 5% cannot silently buy50%
+PASS accepted 49% cannot silently buy50%
+PASS accepted full50% grants only its actual paid block
+PASS legacy49% completes after buying the missing1% through Stocks
+PASS invalid accepted percentage undefined rejects unchanged
+PASS invalid accepted percentage 0 rejects unchanged
+PASS invalid accepted percentage NaN rejects unchanged
+PASS invalid accepted percentage Infinity rejects unchanged
+PASS invalid accepted percentage -5 rejects unchanged
+PASS invalid accepted percentage 60 rejects unchanged
+PASS invalid accepted percentage 5.5 rejects unchanged
+PASS already-ready51% ignores old small unpaid tender and charges0
+12 accepted tender contract cases passed

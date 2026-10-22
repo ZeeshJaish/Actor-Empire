@@ -1,0 +1,18 @@
+
+> pr-6.6.3@1.0.25 audit:streaming-ads-rental-backend
+> esbuild scripts/audit-streaming-ads-rental-backend.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-streaming-ads-rental-backend.mjs && node /tmp/audit-streaming-ads-rental-backend.mjs
+
+PASS one percentage pays only actual advertising plus rental
+PASS legacy missing policy keeps full signed basis
+PASS unknown source cannot manufacture new-policy royalties
+PASS duplicate eligible receipt cannot double payment
+PASS disabled modes have no new payable but retain accrued balances
+PASS one cumulative cap covers ads and rental together
+PASS earned-week replay is inert
+PASS fresh license records new policy
+PASS canonical reconstruction preserves balances and new policy
+{"checks":9,"failures":[]}
+
+  ../../../../tmp/audit-streaming-ads-rental-backend.mjs  152.3kb
+
+⚡ Done in 26ms

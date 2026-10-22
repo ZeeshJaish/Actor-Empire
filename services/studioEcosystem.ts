@@ -2,6 +2,8 @@ import { moveCinemaNpcCash } from './boxOffice/boxOfficeSettlement';
 import type { IndustryProject, NPCStudioState, Player, Stock, StudioId, WorldState } from '../types';
 import { getEstimatedBudget } from './roleLogic';
 import { STUDIO_CATALOG } from './studioLogic';
+import { getStockMarketAbsoluteWeek } from './stockMarketClock';
+import { boundListedStudioAppraisal } from './stockValuation';
 
 export type StudioReleaseOutcome = 'HIT' | 'SOLID' | 'FLOP';
 
@@ -175,9 +177,9 @@ export const applyStudioProjectOutcome = (
             : 3 + Math.min(4, outcome.profitMillions / 200);
     const reputationDelta = outcome.outcome === 'HIT' ? 3 : outcome.outcome === 'FLOP' ? -4 : 1;
 
+    const appraised = boundListedStudioAppraisal(studio, Math.max(valuationFloor, roundThree(studio.valuation * valuationMultiplier)), getStockMarketAbsoluteWeek(project.year, project.weekReleased));
     nextWorld.studios![project.studioId] = normalizeStudioState({
-        ...studio,
-        valuation: Math.max(valuationFloor, roundThree(studio.valuation * valuationMultiplier)),
+        ...appraised,
         cashReserve: exactSettlement?.cashAlreadySettled ? studio.cashReserve : moveCinemaNpcCash(studio.cashReserve,Math.max(studio.isNpcVenture ? -30 : 0, nextCash)-studio.cashReserve),
         reputation: clamp(studio.reputation + reputationDelta + qualitySignal * 4, 5, 100),
         recentHits: outcome.outcome === 'HIT'
@@ -238,20 +240,21 @@ const getRecentStudioProjects = (player: Pick<Player, 'world'>, studioId?: strin
 };
 
 export const getStudioStockPerformanceMultiplier = (
-    player: Pick<Player, 'world'> | undefined,
+    player: (Pick<Player, 'world'> & Partial<Pick<Player, 'age' | 'currentWeek'>>) | undefined,
     stock: Pick<Stock, 'relatedStudioId' | 'sector'>,
 ): number => {
     if (!player || stock.sector !== 'MEDIA' || !stock.relatedStudioId) return 1;
     const studio = player.world.studios?.[stock.relatedStudioId];
-    const recentProjects = getRecentStudioProjects(player, stock.relatedStudioId);
-    const projectSignal = recentProjects.reduce((score, project) => {
+    const absoluteWeek = player.age !== undefined && player.currentWeek !== undefined
+        ? getStockMarketAbsoluteWeek(player.age, player.currentWeek) : undefined;
+    const projectSignal = absoluteWeek === undefined ? 0 : getRecentStudioProjects(player, stock.relatedStudioId).reduce((score, project) => {
+        const age = absoluteWeek - getStockMarketAbsoluteWeek(project.year, project.weekReleased);
+        if (age < 0 || age >= 13) return score;
         const outcome = evaluateStudioProjectOutcome(project);
-        if (outcome.outcome === 'HIT') return score + 0.07;
-        if (outcome.outcome === 'FLOP') return score - 0.045;
-        return score + 0.008;
+        const pressure = outcome.outcome === 'HIT' ? .01 : outcome.outcome === 'FLOP' ? -.01 : .001;
+        return score + pressure * (1 - age / 13);
     }, 0);
-    const momentumSignal = studio ? Math.max(-0.032, Math.min(0.036, ((studio.slateMomentum || 50) - 50) * 0.00055)) : 0;
-    const reputationSignal = studio ? Math.max(-0.018, Math.min(0.024, ((studio.reputation || 50) - 55) * 0.00032)) : 0;
-
-    return Math.max(0.86, Math.min(1.16, 1 + projectSignal + momentumSignal + reputationSignal));
+    const momentum = studio ? ((studio.slateMomentum ?? 50) - 50) * .00005 : 0;
+    const reputation = studio ? ((studio.reputation ?? 55) - 55) * .000025 : 0;
+    return 1 + Math.max(-.01, Math.min(.01, projectSignal)) + Math.max(-.0025, Math.min(.0025, momentum + reputation));
 };

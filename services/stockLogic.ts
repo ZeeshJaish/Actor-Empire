@@ -1,8 +1,11 @@
 
 import { Stock, Player, PortfolioItem, NewsItem } from '../types';
 import { getStudioStockPerformanceMultiplier } from './studioEcosystem';
-import { creditCorporateStockReceipt, getStockHoldingAllocations, splitStockReceipt } from './stockCashOwnership';
+import { creditCorporateStockReceipt, getRecordedStockBasis, getStockHoldingAllocations, splitStockReceipt } from './stockCashOwnership';
 import { getStudioSaleTreasuryLock } from './studioGroup';
+import { roundStockCash, settleStockCash } from './stockSettlement';
+import { getStockMarketAbsoluteWeek, stockLegacyMarkerAbsoluteWeek } from './stockMarketClock';
+import { canCreditCorporateStockReceipt } from './stockCashOwnership';
 
 const KNOWN_OUTSTANDING_SHARES: Record<string, number> = {
     stk_apple: 15_300_000_000,
@@ -98,10 +101,11 @@ export const getStockOutstandingShares = (stock: Pick<Stock, 'id' | 'outstanding
     const baseShares = getStockBaseOutstandingShares(stock);
     const maximumShares = getStockMaximumOutstandingShares(stock);
     if (!Number.isFinite(explicitShares)) return baseShares;
+    if (!KNOWN_OUTSTANDING_SHARES[stock.id] && Number.isSafeInteger(explicitShares) && explicitShares > 0) return explicitShares;
     return Math.round(clampFinite(explicitShares, baseShares, maximumShares));
 };
 
-const getStockReferencePrice = (stock: Pick<Stock, 'id'> & Partial<Pick<Stock, 'sector' | 'price'>>): number => {
+export const getStockReferencePrice = (stock: Pick<Stock, 'id'> & Partial<Pick<Stock, 'sector' | 'price'>>): number => {
     const reference = KNOWN_REFERENCE_PRICES[stock.id];
     if (reference) return reference;
     const baseShares = getStockBaseOutstandingShares(stock);
@@ -126,7 +130,7 @@ export const getStockPriceCeiling = (
     stock: Pick<Stock, 'id' | 'outstandingShares'> & Partial<Pick<Stock, 'sector' | 'price'>>,
 ): number => {
     const outstandingShares = getStockOutstandingShares(stock);
-    return roundPrice(Math.max(1, getStockMarketCapCeiling(stock) / outstandingShares));
+    return Math.max(0.01, Math.floor(getStockMarketCapCeiling(stock) / outstandingShares * 100) / 100);
 };
 
 export const normalizeStockPrice = (
@@ -134,8 +138,8 @@ export const normalizeStockPrice = (
     price: number,
 ): number => {
     const referencePrice = getStockReferencePrice(stock);
-    const floor = Math.max(0.01, referencePrice * 0.04);
     const ceiling = getStockPriceCeiling(stock);
+    const floor = Math.min(ceiling, Math.max(0.01, referencePrice * 0.04));
     const safePrice = Number.isFinite(price) && price > 0 ? price : referencePrice;
     return roundPrice(clampFinite(safePrice, floor, ceiling));
 };
@@ -200,7 +204,7 @@ export interface StockTradeResult {
     success: boolean;
     player: Player;
     quote?: StockTradeQuote;
-    reason?: 'STOCK_NOT_FOUND' | 'INVALID_AMOUNT' | 'INSUFFICIENT_CASH' | 'INSUFFICIENT_SHARES' | 'OWNER_NOT_FOUND' | 'LIVE_SALE_LISTING';
+    reason?: 'STOCK_NOT_FOUND' | 'INVALID_AMOUNT' | 'INSUFFICIENT_CASH' | 'INSUFFICIENT_SHARES' | 'OWNER_NOT_FOUND' | 'LIVE_SALE_LISTING' | 'UNREPRESENTABLE_AMOUNT' | 'INVALID_SHARE_REGISTER';
 }
 
 export type StockShareIssueReason =
@@ -359,7 +363,7 @@ export const calculateStockTradeQuote = (
     const liquidityImpact = Math.min(0.12, ownershipDelta * 0.85);
     const priceImpactPercent = liquidityImpact * 100 * (direction === 'BUY' ? 1 : -1);
     const projectedPrice = normalizeStockPrice(stock, currentPrice * (1 + (priceImpactPercent / 100)));
-    const estimatedValue = shares * ((currentPrice + projectedPrice) / 2);
+    const estimatedValue = roundStockCash(shares * ((currentPrice + projectedPrice) / 2));
 
     return {
         shares,
@@ -410,8 +414,28 @@ export const executeStockTrade = (
 ): StockTradeResult => {
     const stock = player.stocks.find(candidate => candidate.id === stockId);
     if (!stock) return { success: false, player, reason: 'STOCK_NOT_FOUND' };
+    const relevantHoldings = player.portfolio.filter(item => item.stockId === stockId);
+    const invalidFunding = relevantHoldings.some(item => {
+        if (item.equityFunding === undefined) return false;
+        if (!Array.isArray(item.equityFunding)) return true;
+        let allocated = 0;
+        for (const row of item.equityFunding) {
+            if (!row || typeof row.ownerStudioId !== 'string' || !row.ownerStudioId.trim()
+                || !Number.isSafeInteger(row.shares) || row.shares < 0) return true;
+            allocated += row.shares;
+            if (!Number.isSafeInteger(allocated) || allocated > item.shares) return true;
+        }
+        return false;
+    });
+    if ((stock.outstandingShares !== undefined && (!Number.isSafeInteger(stock.outstandingShares) || Number(stock.outstandingShares) <= 0
+        || Number(stock.outstandingShares) !== getStockOutstandingShares(stock)
+        || getStockOutstandingShares(stock) * .01 > getStockMarketCapCeiling(stock)))
+        || relevantHoldings.length > 1 || invalidFunding
+        || relevantHoldings.some(item => !Number.isSafeInteger(item.shares) || item.shares < 0 || item.shares > getStockOutstandingShares(stock))) {
+        return { success: false, player, reason: 'INVALID_SHARE_REGISTER' };
+    }
     const requestedShares = Math.floor(Math.abs(signedShares));
-    if (!Number.isFinite(requestedShares) || requestedShares <= 0) return { success: false, player, reason: 'INVALID_AMOUNT' };
+    if (!Number.isSafeInteger(requestedShares) || requestedShares <= 0) return { success: false, player, reason: 'INVALID_AMOUNT' };
 
     const quote = calculateStockTradeQuote(player, stock, signedShares);
     const shares = quote.shares;
@@ -420,16 +444,23 @@ export const executeStockTrade = (
 
     if (quote.direction === 'BUY') {
         if (player.money < quote.estimatedValue) return { success: false, player, quote, reason: 'INSUFFICIENT_CASH' };
+        const settlement = settleStockCash(player.money, -quote.estimatedValue);
+        if (!settlement.success) return { success: false, player, quote, reason: 'UNREPRESENTABLE_AMOUNT' };
         const existingShares = holding?.shares || 0;
-        const existingInvested = holding?.totalInvested ?? (existingShares * (holding?.averageCost || quote.currentPrice));
-        const totalInvested = existingInvested + quote.estimatedValue;
+        const existingInvested = getRecordedStockBasis(holding);
+        let totalInvested: number | undefined;
+        if (existingInvested !== undefined) {
+            const basisSettlement = settleStockCash(existingInvested, quote.estimatedValue);
+            if (!basisSettlement.success) return { success: false, player, quote, reason: 'UNREPRESENTABLE_AMOUNT' };
+            totalInvested = basisSettlement.balance;
+        }
         const nextShares = existingShares + shares;
         const nextHolding: PortfolioItem = {
             ...holding,
             stockId,
             shares: nextShares,
             totalInvested,
-            averageCost: totalInvested / nextShares,
+            averageCost: totalInvested === undefined ? undefined : totalInvested / nextShares,
         };
         const portfolio = holding
             ? player.portfolio.map(item => item.stockId === stockId ? nextHolding : item)
@@ -439,7 +470,7 @@ export const executeStockTrade = (
             quote,
             player: {
                 ...player,
-                money: player.money - quote.estimatedValue,
+                money: settlement.balance,
                 stocks: player.stocks.map(candidate => candidate.id === stockId
                     ? {
                         ...candidate,
@@ -470,9 +501,22 @@ export const executeStockTrade = (
     if (corporateReceipts.some(row => getStudioSaleTreasuryLock(player, row.ownerStudioId))) {
         return { success: false, player, quote, reason: 'LIVE_SALE_LISTING' };
     }
-    const averageCost = holding.averageCost || quote.currentPrice;
+    const personalProceeds = split.receipts.find(row => !row.ownerStudioId)?.proceeds || 0;
+    const settlement = settleStockCash(player.money, personalProceeds);
+    if (!settlement.success || corporateReceipts.some(row => !canCreditCorporateStockReceipt(player, row.ownerStudioId, row.proceeds, 'SALE'))) {
+        return { success: false, player, quote, reason: 'UNREPRESENTABLE_AMOUNT' };
+    }
     const nextShares = holding.shares - shares;
-    const remainingInvested = Math.max(0, (holding.totalInvested ?? (holding.shares * averageCost)) - (averageCost * shares));
+    const previousInvested = getRecordedStockBasis(holding);
+    // The recorded total is authoritative, including a valid zero-cost holding.
+    // Release its proportional basis rather than inventing one from today's quote.
+    let remainingInvested: number | undefined;
+    if (previousInvested !== undefined) {
+        const disposedBasis = roundStockCash(previousInvested * (shares / holding.shares));
+        const basisSettlement = nextShares > 0 ? settleStockCash(previousInvested, -disposedBasis) : { success: true as const, balance: 0 };
+        if (!basisSettlement.success) return { success: false, player, quote, reason: 'UNREPRESENTABLE_AMOUNT' };
+        remainingInvested = Math.max(0, basisSettlement.balance);
+    }
     const portfolio = nextShares === 0
         ? player.portfolio.filter(item => item.stockId !== stockId)
         : player.portfolio.map(item => item.stockId === stockId
@@ -480,7 +524,7 @@ export const executeStockTrade = (
                 ...item,
                 shares: nextShares,
                 totalInvested: remainingInvested,
-                averageCost,
+                averageCost: remainingInvested === undefined ? undefined : remainingInvested / nextShares,
                 equityFunding: split.remainingFunding,
             }
             : item);
@@ -492,7 +536,7 @@ export const executeStockTrade = (
         quote,
         player: {
             ...creditedPlayer,
-            money: player.money + (split.receipts.find(row => !row.ownerStudioId)?.proceeds || 0),
+            money: settlement.balance,
             stocks: player.stocks.map(candidate => candidate.id === stockId
                 ? {
                     ...candidate,
@@ -541,6 +585,12 @@ const INITIAL_STOCKS: Omit<Stock, 'priceHistory' | 'lastDividendPayoutWeek'>[] =
     { id: 'stk_lvmh', symbol: 'LVMH', name: 'LVMH', sector: 'FASHION', price: 850.00, outstandingShares: 502_000_000, publicFloatPercent: 51, volatility: 0.03, dividendYield: 0.015, relatedBrandName: 'Louis Vuitton' },
 ];
 
+/** Deterministic metadata lookup for valuation policy; never generates market history. */
+export const getInitialStockForStudio = (studioId: string): Stock | undefined => {
+    const metadata = INITIAL_STOCKS.find(stock => stock.relatedStudioId === studioId);
+    return metadata ? { ...metadata, priceHistory: [], lastDividendPayoutWeek: 0 } : undefined;
+};
+
 export const initializeStocks = (): Stock[] => {
     return INITIAL_STOCKS.map(s => ({
         ...s,
@@ -567,13 +617,12 @@ const getAutomaticShareIssueReason = (stock: Stock): StockShareIssueReason => {
     return 'GENERAL_CAPITAL';
 };
 
-const shouldIssueSharesThisWeek = (stock: Stock, week: number) => {
+const shouldIssueSharesThisWeek = (stock: Stock, absoluteWeek: number, lastIssue: number) => {
     if (getStockOutstandingShares(stock) >= getStockMaximumOutstandingShares(stock)) return false;
-    if (week < 12) return false;
-    if (stock.lastShareIssueWeek && week - stock.lastShareIssueWeek < 52) return false;
+    if (absoluteWeek - lastIssue < 52) return false;
     const cadence = 52 + (stableShareHash(`${stock.id}:cadence`) % 53);
     const targetWeek = stableShareHash(`${stock.id}:issue-week`) % cadence;
-    return week % cadence === targetWeek;
+    return absoluteWeek % cadence === targetWeek;
 };
 
 export const processStockMarket = (
@@ -581,76 +630,73 @@ export const processStockMarket = (
     week: number,
     player?: Pick<Player, 'age' | 'world' | 'businesses' | 'flags'>,
 ): MarketUpdateResult => {
-    let dividendsTotal = 0;
-    const notifications: string[] = [];
-    const news: NewsItem[] = [];
+    const notifications: string[] = [], news: NewsItem[] = [];
     const corporateActions: StockCorporateAction[] = [];
-    const updatedStocks = stocks.map(stock => {
+    const age = player?.age || 1;
+    const absoluteWeek = getStockMarketAbsoluteWeek(age, week);
+    const updatedStocks = stocks.map(originalStock => {
+        // An heir can restart the actor-age clock while retaining the parent's securities.
+        // Translate intervals from the last known market date; never replay old payouts.
+        let stock = originalStock;
+        if (Number.isSafeInteger(stock.lastMarketProcessedAbsoluteWeek) && stock.lastMarketProcessedAbsoluteWeek! > absoluteWeek) {
+            const offset = stock.lastMarketProcessedAbsoluteWeek! - absoluteWeek;
+            const rebase = (value?: number) => value === undefined ? undefined : value - offset;
+            stock = { ...stock, lastMarketProcessedAbsoluteWeek: absoluteWeek - 1,
+                lastDividendPayoutAbsoluteWeek: rebase(stock.lastDividendPayoutAbsoluteWeek),
+                lastDividendSettledAbsoluteWeek: rebase(stock.lastDividendSettledAbsoluteWeek),
+                lastShareIssueAbsoluteWeek: rebase(stock.lastShareIssueAbsoluteWeek) };
+        }
+        if (stock.lastMarketProcessedAbsoluteWeek !== undefined && stock.lastMarketProcessedAbsoluteWeek >= absoluteWeek) return stock;
         const normalizedPrice = normalizeStockPrice(stock, stock.price);
         const normalizedHistory = normalizeStockPriceHistory(stock);
         if (isStockRetiredByMerger(player, stock) || isStockRetiredBySale(player, stock)) {
-            return {
-                ...stock,
-                outstandingShares: getStockOutstandingShares(stock),
-                price: normalizedPrice,
-                priceHistory: normalizedHistory,
-            };
+            return { ...stock, lastMarketProcessedAbsoluteWeek: absoluteWeek,
+                outstandingShares: getStockOutstandingShares(stock), price: normalizedPrice, priceHistory: normalizedHistory };
         }
-        let newPrice = normalizedPrice;
-        
-        // 1. Random Walk Logic
-        const volatility = stock.volatility;
-        const trend = (Math.random() - 0.48); // Slight bias upwards (market grows long term)
-        const changePercent = trend * volatility; // e.g. 0.02 * 0.05 = 0.001 (0.1%) to 5% swings
-        
-        const rawMultiplier = (1 + changePercent) * getStudioStockPerformanceMultiplier(player, stock);
-        const boundedMultiplier = clampFinite(rawMultiplier, 1 - MAX_WEEKLY_PRICE_MOVE, 1 + MAX_WEEKLY_PRICE_MOVE);
-        newPrice = normalizeStockPrice(stock, newPrice * boundedMultiplier);
-        
-        // 2. Dividend Logic (Quarterly - Every 12 weeks approx)
+        const volatility = clampFinite(stock.volatility, 0, .2);
+        const changePercent = (Math.random() - 0.48) * volatility;
+        const supportedReference = getStockReferencePrice(stock);
+        const meanReversion = clampFinite(Math.log(supportedReference / normalizedPrice) * .002, -.0025, .0025);
+        const performance = getStudioStockPerformanceMultiplier(player ? { ...player, currentWeek: week } : undefined, stock);
+        const rawMultiplier = (1 + changePercent + meanReversion) * performance;
+        const newPrice = normalizeStockPrice(stock, normalizedPrice * clampFinite(rawMultiplier, 1 - MAX_WEEKLY_PRICE_MOVE, 1 + MAX_WEEKLY_PRICE_MOVE));
+        let lastPayoutAbsolute = stock.lastDividendPayoutAbsoluteWeek
+            ?? stockLegacyMarkerAbsoluteWeek(age, week, stock.lastDividendPayoutWeek);
         let lastPayout = stock.lastDividendPayoutWeek || 0;
-        if (stock.dividendYield > 0 && (week - lastPayout >= 12)) {
-            // Payout is approximately (Price * Yield) / 4 (Quarterly)
-            // But simplify: Yield is annual %
-            const quarterlyYield = stock.dividendYield / 4;
-            // Note: Actual cash addition happens if player owns shares, handled in gameLoop
-            // Here we just mark it
+        if (stock.dividendYield > 0 && absoluteWeek - lastPayoutAbsolute >= 12) {
+            lastPayoutAbsolute = absoluteWeek;
             lastPayout = week;
-            // In a real simulation, price drops by dividend amount, but we skip that for "fun" factor
         }
-
-        const nextStock: Stock = {
-            ...stock,
-            outstandingShares: getStockOutstandingShares(stock),
-            price: newPrice,
-            priceHistory: [...normalizedHistory, newPrice].slice(-20),
-            lastDividendPayoutWeek: lastPayout
-        };
-
-        if (shouldIssueSharesThisWeek(nextStock, week)) {
-            const issuePercent = 2 + (stableShareHash(`${nextStock.id}:${week}:issue-percent`) % 5);
-            const issuance = applyStockShareIssuance(nextStock, {
-                issuePercent,
-                week,
-                year: player?.age || 0,
-                reason: getAutomaticShareIssueReason(nextStock),
-            });
-            corporateActions.push(issuance.action);
-            news.push(issuance.action.news);
-            notifications.push(issuance.action.notification);
-            return issuance.stock;
+        const lastIssue = stock.lastShareIssueAbsoluteWeek
+            ?? (stock.lastShareIssueWeek ? stockLegacyMarkerAbsoluteWeek(age, week, stock.lastShareIssueWeek) : getStockMarketAbsoluteWeek(age, 1) - 1);
+        const nextStock: Stock = { ...stock, outstandingShares: getStockOutstandingShares(stock), price: newPrice,
+            priceHistory: [...normalizedHistory, newPrice].slice(-20), lastDividendPayoutWeek: lastPayout,
+            lastDividendPayoutAbsoluteWeek: lastPayoutAbsolute, lastMarketProcessedAbsoluteWeek: absoluteWeek,
+            lastShareIssueAbsoluteWeek: lastIssue };
+        if (shouldIssueSharesThisWeek(nextStock, absoluteWeek, lastIssue)) {
+            const issuePercent = 2 + (stableShareHash(`${nextStock.id}:${absoluteWeek}:issue-percent`) % 5);
+            const issuance = applyStockShareIssuance(nextStock, { issuePercent, week, year: age, reason: getAutomaticShareIssueReason(nextStock) });
+            corporateActions.push(issuance.action); news.push(issuance.action.news); notifications.push(issuance.action.notification);
+            return { ...issuance.stock, lastShareIssueAbsoluteWeek: absoluteWeek };
         }
-
         return nextStock;
     });
+    return { stocks: updatedStocks, dividendsTotal: 0, notifications, news, corporateActions };
+};
 
-    return {
-        stocks: updatedStocks,
-        dividendsTotal, // Handled in gameLoop via portfolio check
-        notifications,
-        news,
-        corporateActions,
-    };
+/** Call only after both personal and corporate dividend receipts have settled successfully. */
+export const markStockDividendsSettled = (player: Player, week: number, age = player.age): Player => {
+    const absoluteWeek = getStockMarketAbsoluteWeek(age, week);
+    return { ...player, stocks: player.stocks.map(stock => stock.lastDividendPayoutAbsoluteWeek === absoluteWeek
+        ? { ...stock, lastDividendSettledAbsoluteWeek: absoluteWeek } : stock) };
+};
+
+const hasDividendDue = (stock: Stock, week: number, player?: Pick<Player, 'age'>): boolean => {
+    if (stock.lastDividendPayoutAbsoluteWeek !== undefined) {
+        const absoluteWeek = player ? getStockMarketAbsoluteWeek(player.age, week) : stock.lastMarketProcessedAbsoluteWeek;
+        return stock.lastDividendPayoutAbsoluteWeek === absoluteWeek && stock.lastDividendSettledAbsoluteWeek !== absoluteWeek;
+    }
+    return stock.lastDividendPayoutWeek === week;
 };
 
 export const calculatePortfolioValue = (portfolio: PortfolioItem[], stocks: Stock[]): number => {
@@ -705,27 +751,28 @@ export const getDividendPayout = (
     player?: Player,
 ): number => {
     let total = 0;
+    let mixedPersonalTotal = 0;
     portfolio.forEach(item => {
         const stock = stocks.find(s => s.id === item.stockId);
         if (stock && player && (isStockRetiredByMerger(player, stock) || isStockRetiredBySale(player, stock))) return;
-        if (stock && stock.dividendYield > 0 && stock.lastDividendPayoutWeek === week) {
+        if (stock && stock.dividendYield > 0 && hasDividendDue(stock, week, player)) {
             const gross = player
                 ? getEstimatedAnnualDividend(player, stock, item.shares) / 4
                 : ((normalizeStockPrice(stock, stock.price) * stock.dividendYield * item.shares) / 4);
             const allocations = getStockHoldingAllocations(item);
-            total += allocations.corporate.length
-                ? (splitStockReceipt(item, item.shares, Math.floor(gross)).receipts.find(row => !row.ownerStudioId)?.proceeds || 0)
-                : gross;
+            if (allocations.corporate.length) {
+                mixedPersonalTotal += splitStockReceipt(item, item.shares, Math.floor(gross)).receipts.find(row => !row.ownerStudioId)?.proceeds || 0;
+            } else total += gross;
         }
     });
-    return Math.floor(total);
+    return roundStockCash(Math.floor(total) + mixedPersonalTotal);
 };
 
 export const getCorporateStockDividendReceipts = (player: Player, week: number): Array<{ ownerStudioId: string; stockId: string; amount: number }> => {
     const receipts: Array<{ ownerStudioId: string; stockId: string; amount: number }> = [];
     for (const item of player.portfolio) {
         const stock = player.stocks.find(candidate => candidate.id === item.stockId);
-        if (!stock || stock.dividendYield <= 0 || stock.lastDividendPayoutWeek !== week
+        if (!stock || stock.dividendYield <= 0 || !hasDividendDue(stock, week, player)
             || isStockRetiredByMerger(player, stock) || isStockRetiredBySale(player, stock)) continue;
         const amount = Math.floor(getEstimatedAnnualDividend(player, stock, item.shares) / 4);
         const split = splitStockReceipt(item, item.shares, amount);

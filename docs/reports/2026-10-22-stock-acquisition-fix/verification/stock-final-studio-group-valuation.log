@@ -1,0 +1,9 @@
+
+> pr-6.6.3@1.0.25 audit:studio-group-valuation
+> esbuild scripts/audit-studio-group-valuation.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-studio-group-valuation.mjs && node /tmp/audit-studio-group-valuation.mjs
+
+
+  ../../../../tmp/audit-studio-group-valuation.mjs  4.6mb ⚠️
+
+⚡ Done in 245ms
+Studio group valuation audit passed.

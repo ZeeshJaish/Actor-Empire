@@ -579,7 +579,7 @@ export default function StreamingAcquisitionCommand({
         sceneId="marketRoom"
         className="acq-scene"
         imageLoading="eager"
-        eyebrow="CORPORATE DEVELOPMENT • PHASE 21"
+        eyebrow="CORPORATE DEVELOPMENT"
         title="Build the company through conviction."
         description="Scout the market, expose the risks, win control and prove the combination in operations."
         status={{ label: `${view.cases.filter(item => !['WITHDRAWN'].includes(item.status)).length} FILES`, detail: `${formatMoney(view.platform.treasuryCash)} treasury`, tone: 'warning' }}

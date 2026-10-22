@@ -1,0 +1,9 @@
+
+> pr-6.6.3@1.0.25 audit:streaming-audience-market-phase2
+> esbuild scripts/audit-streaming-audience-market-phase2.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-streaming-audience-market-phase2.mjs && node /tmp/audit-streaming-audience-market-phase2.mjs
+
+
+  ../../../../tmp/audit-streaming-audience-market-phase2.mjs  4.6mb ⚠️
+
+⚡ Done in 39ms
+Streaming Phase 2 Living Audience and Rival Market audit passed.

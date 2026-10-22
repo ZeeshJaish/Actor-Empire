@@ -1,0 +1,1524 @@
+{
+  "counts": {
+    "TARGETED_REPAIR": 5,
+    "UNCHANGED": 228,
+    "CONCURRENT_UNRELATED_EDIT_PRESERVED": 18,
+    "ARCHIVE_RENAMED_BYTES_PRESERVED": 1
+  },
+  "files": [
+    {
+      "path": "App.tsx",
+      "initialSha256": "311b1131eb7d07e34e1ad42a04a6e3370cea816c872111daf91016929d59fb8e",
+      "currentSha256": "0c43bf58b66fe34c8b34c830a2e8a82d3e542dbf31befe4da6941537e3c66135",
+      "status": "TARGETED_REPAIR"
+    },
+    {
+      "path": "components/LifeEventModal.tsx",
+      "initialSha256": "3d2bb456583508f6956e1fe0fff4fb9ae72549a04aabb243eb08a81eacc84eb6",
+      "currentSha256": "3d2bb456583508f6956e1fe0fff4fb9ae72549a04aabb243eb08a81eacc84eb6",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "components/StreamingAcquisitionCommand.tsx",
+      "initialSha256": "959c00d49a59671a5b74248ffc51620dfc310be04f9317ebb9cc6d651e334093",
+      "currentSha256": "959c00d49a59671a5b74248ffc51620dfc310be04f9317ebb9cc6d651e334093",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "components/StreamingPlatformHQ.tsx",
+      "initialSha256": "c9ce267136d93155fefb62f8411f841250a99aba5f9a8eaab7dd0834b18551f5",
+      "currentSha256": "c9ce267136d93155fefb62f8411f841250a99aba5f9a8eaab7dd0834b18551f5",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "components/StreamingPromotionWarRoom.tsx",
+      "initialSha256": "d8fb33e665043d1c456d8559064957e2fb72dd7e28ea5e8d1f73ac0e327d1e2f",
+      "currentSha256": "d8fb33e665043d1c456d8559064957e2fb72dd7e28ea5e8d1f73ac0e327d1e2f",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "components/StreamingRightsExchange.tsx",
+      "initialSha256": "6785110df55785c15548a77ec0858fc32e9badbd4ffd767299094e5b95b83e03",
+      "currentSha256": "6785110df55785c15548a77ec0858fc32e9badbd4ffd767299094e5b95b83e03",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "components/streaming-transplant/StreamingAudienceExperience.tsx",
+      "initialSha256": "c669ad2c96f8ed1493ac0fb2943372f00e8adc52dc4ee1dab1dce215f9e62941",
+      "currentSha256": "c669ad2c96f8ed1493ac0fb2943372f00e8adc52dc4ee1dab1dce215f9e62941",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "components/streaming-transplant/StreamingBoardroomExperience.tsx",
+      "initialSha256": "ad0529190d3b9e1c903dea8ac0dd3b282e8bce40fcbee4465dcfa432c22dc25b",
+      "currentSha256": "ad0529190d3b9e1c903dea8ac0dd3b282e8bce40fcbee4465dcfa432c22dc25b",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "components/streaming-transplant/StreamingContentExperience.tsx",
+      "initialSha256": "00c0fd9064a1f89b167476d6d2e8062bef60b9b09441262db1f234206a26bafd",
+      "currentSha256": "00c0fd9064a1f89b167476d6d2e8062bef60b9b09441262db1f234206a26bafd",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "components/streaming-transplant/StreamingNetworkExperience.tsx",
+      "initialSha256": "38b67691448d22fb82378fc0ac70f822478fed54453fcb052952f6bd24fca606",
+      "currentSha256": "38b67691448d22fb82378fc0ac70f822478fed54453fcb052952f6bd24fca606",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "components/streaming-transplant/StreamingPlatformCommandDeck.tsx",
+      "initialSha256": "a94947e2765d2707ad787fdc41151f3e7cba26ed932724dd747b502ff0fd4c56",
+      "currentSha256": "a94947e2765d2707ad787fdc41151f3e7cba26ed932724dd747b502ff0fd4c56",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "components/streaming-transplant/StreamingPrototypeOrchestrator.tsx",
+      "initialSha256": "98bea96c4fe4757071b86a7bc2265a74c3d2a23d8785dc1178b4ad0ce35e3073",
+      "currentSha256": "98bea96c4fe4757071b86a7bc2265a74c3d2a23d8785dc1178b4ad0ce35e3073",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "components/streaming-transplant/createCanonicalStreamingPresentation.ts",
+      "initialSha256": "98ad98058a259ff04af3b9dcf518203c0c8425d4e675e78c341d5e0784a53790",
+      "currentSha256": "98ad98058a259ff04af3b9dcf518203c0c8425d4e675e78c341d5e0784a53790",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "components/streaming-transplant/presentation/screens/AudienceDesk/AudienceDesk.module.css",
+      "initialSha256": "2b93bf8303343ec7c286fe42d4083336af066ad8fb1142a9428ed8eb2ca7dca5",
+      "currentSha256": "2b93bf8303343ec7c286fe42d4083336af066ad8fb1142a9428ed8eb2ca7dca5",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "components/streaming-transplant/presentation/screens/ContentDesk/ContentDesk.module.css",
+      "initialSha256": "89f86b7687f9cf5c60c4d19a89773cf437025f72ce1bd3798979625598942539",
+      "currentSha256": "89f86b7687f9cf5c60c4d19a89773cf437025f72ce1bd3798979625598942539",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "components/streaming-transplant/presentation/screens/NetworkDesk/NetworkDesk.module.css",
+      "initialSha256": "feea3483fcf4fc928c63e8c3203d0e8fc76441c27f1cbc84743151cb768c9ed1",
+      "currentSha256": "feea3483fcf4fc928c63e8c3203d0e8fc76441c27f1cbc84743151cb768c9ed1",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/README.md",
+      "initialSha256": "8b37acc6147b8f67b529f7b404ffaada657ceac6087bff3947c68eb03f21ade6",
+      "currentSha256": "71b49002dbc4a5ec1cde7d4eb90df767ca91b56964bb55b3d0c5295fd6d192ed",
+      "status": "CONCURRENT_UNRELATED_EDIT_PRESERVED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/verification-matrix.json",
+      "initialSha256": "6c2debeda8d314d9f7b83390bbba8f81d4be0a5f2b00ed0b946b17e1b776be8e",
+      "currentSha256": "6c2debeda8d314d9f7b83390bbba8f81d4be0a5f2b00ed0b946b17e1b776be8e",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-10-22-fair-box-office.md",
+      "initialSha256": "02c6cd36869eef9b9301c786b2d124587066e8af2296e76a9ae04e9e792e9050",
+      "currentSha256": "02c6cd36869eef9b9301c786b2d124587066e8af2296e76a9ae04e9e792e9050",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "hooks/useGameActions.ts",
+      "initialSha256": "8ed7a6e4c3fb167ae1a587d6cbf80912e9d41704390b1f66f724a75991d0b3d4",
+      "currentSha256": "8ed7a6e4c3fb167ae1a587d6cbf80912e9d41704390b1f66f724a75991d0b3d4",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "lab/streamingOperationsVite.config.mjs",
+      "initialSha256": "1097f5ed9107c0e0bcc4ddb5e5049983260a22f919ab822058d7caf8712d9a21",
+      "currentSha256": "1097f5ed9107c0e0bcc4ddb5e5049983260a22f919ab822058d7caf8712d9a21",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "scripts/audit-box-office-audience.ts",
+      "initialSha256": "064ad559c66167f7caf43f762da8e16719a4d68444c38b722ed5f13099388a37",
+      "currentSha256": "73176f0ae7011fdaacd2fd33c2ce0aa957f2fca3ebfbfd3f9e4f8cc7b0a05a01",
+      "status": "CONCURRENT_UNRELATED_EDIT_PRESERVED"
+    },
+    {
+      "path": "scripts/audit-box-office-inputs.ts",
+      "initialSha256": "69646452d22099efdf42f8169121ae5512fc04f6cd9248ed343e7deea478b652",
+      "currentSha256": "69646452d22099efdf42f8169121ae5512fc04f6cd9248ed343e7deea478b652",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "scripts/audit-box-office-long-save.ts",
+      "initialSha256": "9e157a255f1087019d7c22265238378f49456e56b46d0c3b157a34732d68bb89",
+      "currentSha256": "fe06f77c5f46e0346ba58361c5cf94eb462c2e7724a5d180eb4d54da09647899",
+      "status": "CONCURRENT_UNRELATED_EDIT_PRESERVED"
+    },
+    {
+      "path": "scripts/audit-box-office-market.ts",
+      "initialSha256": "899e1ead51970c5bbc2200d22d63606f4be8141fa96700f09d1eb6efec1722a5",
+      "currentSha256": "899e1ead51970c5bbc2200d22d63606f4be8141fa96700f09d1eb6efec1722a5",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "scripts/audit-box-office-migration.ts",
+      "initialSha256": "1893be22dedbfcf8df6281c1cb7d27dcbac0286c5331cb554c0d0fee7f925b68",
+      "currentSha256": "2ca4b8c0ddfc416d575112eb70380ede9a8496b9cc4c5dd1e46e477521b9a472",
+      "status": "CONCURRENT_UNRELATED_EDIT_PRESERVED"
+    },
+    {
+      "path": "scripts/audit-box-office-viewing-routes.ts",
+      "initialSha256": "3120632ee39bf69766f06f200606c242c9aeb2611a73837c80aa10d4340ba4ab",
+      "currentSha256": "3120632ee39bf69766f06f200606c242c9aeb2611a73837c80aa10d4340ba4ab",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "scripts/audit-streaming-audience-market-phase2.ts",
+      "initialSha256": "603e34c06ae620379332b37c28c2a144e6be98907b3a5e57527281f5e666d84d",
+      "currentSha256": "603e34c06ae620379332b37c28c2a144e6be98907b3a5e57527281f5e666d84d",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "scripts/audit-streaming-content-desk-consolidation.tsx",
+      "initialSha256": "31d409261e7d5c7377a713180cfb065df8ea833378c6a9351203fa80b33eee6e",
+      "currentSha256": "31d409261e7d5c7377a713180cfb065df8ea833378c6a9351203fa80b33eee6e",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "scripts/audit-streaming-hq-phase4.ts",
+      "initialSha256": "3c9ed0fb4e1022de76e9a9e0a8080dc68893688e253b02f8f46e75e5fcc85fc5",
+      "currentSha256": "3c9ed0fb4e1022de76e9a9e0a8080dc68893688e253b02f8f46e75e5fcc85fc5",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "scripts/audit-streaming-operations-ui.tsx",
+      "initialSha256": "6614a5cc76d2bb57483089cca4fb44d9f6b26fe23ec405ee2723dddc331b9cc9",
+      "currentSha256": "6614a5cc76d2bb57483089cca4fb44d9f6b26fe23ec405ee2723dddc331b9cc9",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "scripts/audit-streaming-promotion-phase14.ts",
+      "initialSha256": "24dd1b403d894886019388a03519ef12283270036048956ce4f21e41808c7ca4",
+      "currentSha256": "24dd1b403d894886019388a03519ef12283270036048956ce4f21e41808c7ca4",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "scripts/audit-streaming-rights-marketplace-phase16.ts",
+      "initialSha256": "980b96f90e4067f450b6e95fe371c5b9bb750f3330297dbb6cab679dedeba92b",
+      "currentSha256": "980b96f90e4067f450b6e95fe371c5b9bb750f3330297dbb6cab679dedeba92b",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "scripts/audit-streaming-zip-fidelity.mjs",
+      "initialSha256": "f021abf6881cb6be9f016b78b559b42adad26e3b725be7343ed40487c3cb5528",
+      "currentSha256": "f021abf6881cb6be9f016b78b559b42adad26e3b725be7343ed40487c3cb5528",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "scripts/audit-world-streaming-we5-ui.tsx",
+      "initialSha256": "72d35cc16ba8a04e2270eef1de822743e5a16bbd976f41fa2e633d21550bba1c",
+      "currentSha256": "72d35cc16ba8a04e2270eef1de822743e5a16bbd976f41fa2e633d21550bba1c",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "scripts/benchmark-box-office-week.ts",
+      "initialSha256": "4c5e0247990b9433da541c28b5437628524dfd87d4351babb5ace596515de2fa",
+      "currentSha256": "4c5e0247990b9433da541c28b5437628524dfd87d4351babb5ace596515de2fa",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "scripts/fixtures/boxOfficeCalibration.ts",
+      "initialSha256": "ef8f280606984825e3548641a1980dac4155703f3952695152b6e1e914261be5",
+      "currentSha256": "ef8f280606984825e3548641a1980dac4155703f3952695152b6e1e914261be5",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "scripts/fixtures/boxOfficeLongRun.ts",
+      "initialSha256": "91c295c57c52014de7265fc4e8b3cb249e3d6eee69f987c9c0f294bd3fa63f8d",
+      "currentSha256": "91c295c57c52014de7265fc4e8b3cb249e3d6eee69f987c9c0f294bd3fa63f8d",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "scripts/fixtures/boxOfficeScenarios.ts",
+      "initialSha256": "025f2a54e69353f96ba0ac5151fc16c728e64a118161841ea923a5bda9746acb",
+      "currentSha256": "025f2a54e69353f96ba0ac5151fc16c728e64a118161841ea923a5bda9746acb",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "scripts/run-box-office-audit.mjs",
+      "initialSha256": "d3ec3077aa9f129fad3afe212b5f1a455330e2cffac4bef16600aedc795a7e82",
+      "currentSha256": "b09b86a737f2fc32c240567660b08c8ceb3d1a694367325199200a1a6568bab3",
+      "status": "CONCURRENT_UNRELATED_EDIT_PRESERVED"
+    },
+    {
+      "path": "services/boxOffice/boxOfficeAudience.ts",
+      "initialSha256": "479af14817548b5d0d5998afc27ed215beb2f210b9fbbce425d6d27be03732e9",
+      "currentSha256": "69c6080909eb068e103d0cf735cd4b8b6c6275b8bd7f15f44cc30b5d130151ae",
+      "status": "CONCURRENT_UNRELATED_EDIT_PRESERVED"
+    },
+    {
+      "path": "services/boxOffice/boxOfficeAudienceAdapters.ts",
+      "initialSha256": "749b3bd8cb8654f15b9674f2300c84db339f9ee26f6cf21f588a77f8a8b89fae",
+      "currentSha256": "749b3bd8cb8654f15b9674f2300c84db339f9ee26f6cf21f588a77f8a8b89fae",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "services/boxOffice/boxOfficeAwareness.ts",
+      "initialSha256": "186b7c9d182b1b48b4c36a14ab37c29270e2667525c195779c1f410aeac0f013",
+      "currentSha256": "186b7c9d182b1b48b4c36a14ab37c29270e2667525c195779c1f410aeac0f013",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "services/boxOffice/boxOfficeClock.ts",
+      "initialSha256": "4b55d94152f0f910dde06cb88adb14afefbf5facbc769a96f78db4a55546446d",
+      "currentSha256": "4b55d94152f0f910dde06cb88adb14afefbf5facbc769a96f78db4a55546446d",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "services/boxOffice/boxOfficeForecastAdapter.ts",
+      "initialSha256": "1786f220d562fc8b73d4cf900df901c64d5ad18029b0a2a2558f09a32f09e4d4",
+      "currentSha256": "1786f220d562fc8b73d4cf900df901c64d5ad18029b0a2a2558f09a32f09e4d4",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "services/boxOffice/boxOfficeInputs.ts",
+      "initialSha256": "093ada50bbc2406132230e2f0c1d6d0a5c7c96b39cc8bdd6eabf6095fa809b39",
+      "currentSha256": "093ada50bbc2406132230e2f0c1d6d0a5c7c96b39cc8bdd6eabf6095fa809b39",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "services/boxOffice/boxOfficeMarket.ts",
+      "initialSha256": "668b215ee110ebaf9105edc7d4a0a596906ae2c2fd4f487efc2fefaf0c44d653",
+      "currentSha256": "668b215ee110ebaf9105edc7d4a0a596906ae2c2fd4f487efc2fefaf0c44d653",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "services/boxOffice/boxOfficeMigration.ts",
+      "initialSha256": "4a973d597173f4b0e0c53aef762e451b6e46ec338fdf5ba3abe936a43b3bda3d",
+      "currentSha256": "1783926a4ddf53c7f61a9def60f5077f6c4821f63c7697d0704e1ca5aac123e6",
+      "status": "CONCURRENT_UNRELATED_EDIT_PRESERVED"
+    },
+    {
+      "path": "services/boxOffice/boxOfficeProfiles.ts",
+      "initialSha256": "4eab5fa92bb46a42bdfc8be0bfe5a83885180e4b4c37640ab432afb57c64a25b",
+      "currentSha256": "0bec832a8679eb35360f4bbbfb10e753a6a15b020b4c48a07aba3bf701ff96f8",
+      "status": "CONCURRENT_UNRELATED_EDIT_PRESERVED"
+    },
+    {
+      "path": "services/boxOffice/boxOfficeSupply.ts",
+      "initialSha256": "5d513c7619e2b136196e38df185d3fd4db4f5071c61c61a9c0dbb2a3c491021c",
+      "currentSha256": "5d513c7619e2b136196e38df185d3fd4db4f5071c61c61a9c0dbb2a3c491021c",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "services/boxOffice/boxOfficeTypes.ts",
+      "initialSha256": "168044f369e683ecad69c043474b57e1319e4c5bcca1ea44e3d675332635a8ca",
+      "currentSha256": "168044f369e683ecad69c043474b57e1319e4c5bcca1ea44e3d675332635a8ca",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "services/boxOffice/boxOfficeWeek.ts",
+      "initialSha256": "8ac21a10eb04278c7fade2330e61101aab67d45be4c3647be0ff05fb52a0e120",
+      "currentSha256": "1e1fb8308b38da17c99ed075a5b78f66461ae745a8ecdcf954f356e76180ba75",
+      "status": "CONCURRENT_UNRELATED_EDIT_PRESERVED"
+    },
+    {
+      "path": "services/characterIdentityLogic.ts",
+      "initialSha256": "a1b4c1bf280ff1ea8731294ee329accdc169ba9b9bee322ec73ad20b6aca13f4",
+      "currentSha256": "a1b4c1bf280ff1ea8731294ee329accdc169ba9b9bee322ec73ad20b6aca13f4",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "services/gameLoop.ts",
+      "initialSha256": "7e9b92531d58ed3a7d5e5a1b09101950ffce84154f4750d5bb60509b43ce3a8d",
+      "currentSha256": "a999f9d49564f0d3eaf2d02c72951480b293bcafedf2662745e450409beebf38",
+      "status": "TARGETED_REPAIR"
+    },
+    {
+      "path": "services/marketingStrategy.ts",
+      "initialSha256": "286a6a58e051a22af9445640d603cade47515355df13409955c6d026626ee498",
+      "currentSha256": "286a6a58e051a22af9445640d603cade47515355df13409955c6d026626ee498",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "services/productionService.ts",
+      "initialSha256": "1149edad97f565456596772c9a34d1de354f3fd887ef22206c41a70f464f8f15",
+      "currentSha256": "1149edad97f565456596772c9a34d1de354f3fd887ef22206c41a70f464f8f15",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "services/roleLogic.ts",
+      "initialSha256": "a780d54de693e330c4332b6884fa9d1e63916aa88b54fe8244f0467c333c8e16",
+      "currentSha256": "a780d54de693e330c4332b6884fa9d1e63916aa88b54fe8244f0467c333c8e16",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "services/saveMigration.ts",
+      "initialSha256": "8300bd90183dadd41c3d37d494b8dde3a4ab20903ad967cc5965d46e08e371db",
+      "currentSha256": "1d98bbdf4cc2f420dd0f5d9863aed6a98c2d019761adeb283e384905b634caf7",
+      "status": "TARGETED_REPAIR"
+    },
+    {
+      "path": "services/streamingAudienceMarket.ts",
+      "initialSha256": "6982fce44433179f17af2eef2e363a18a8849fc2be4108712735724ac9e4d1ac",
+      "currentSha256": "6982fce44433179f17af2eef2e363a18a8849fc2be4108712735724ac9e4d1ac",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "services/streamingContentAvailability.ts",
+      "initialSha256": "b7cf2242a1e9cd42dd794fce24335c1e05bb0d025aaa62f29e6902d5c6980f78",
+      "currentSha256": "b7cf2242a1e9cd42dd794fce24335c1e05bb0d025aaa62f29e6902d5c6980f78",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "services/streamingEconomyCore.ts",
+      "initialSha256": "971e0a6ce9bf9f8375060c9b07512a486b51ca14b8b7d3b0a8a1f1580e9697b5",
+      "currentSha256": "971e0a6ce9bf9f8375060c9b07512a486b51ca14b8b7d3b0a8a1f1580e9697b5",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "services/streamingInfrastructure.ts",
+      "initialSha256": "b622a0463356c36a81dc206816512217a575ed92803a2b1723d4ac9a5db1a78c",
+      "currentSha256": "b622a0463356c36a81dc206816512217a575ed92803a2b1723d4ac9a5db1a78c",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "services/streamingLaunchProgram.ts",
+      "initialSha256": "546729c268c977c9eb51708480b926fd35b580a6346b7ecad87b51b3cfce40d8",
+      "currentSha256": "546729c268c977c9eb51708480b926fd35b580a6346b7ecad87b51b3cfce40d8",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "services/streamingNetworkSignals.ts",
+      "initialSha256": "c812a872423375a04127e0f4f6894458378c1c5a1325c8b273e8956edd40e82b",
+      "currentSha256": "c812a872423375a04127e0f4f6894458378c1c5a1325c8b273e8956edd40e82b",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "services/streamingWeeklyLoop.ts",
+      "initialSha256": "0779341115fbb1cac743c3cd709128fa485ab17bb13c04b8480d38c2ce5aab5c",
+      "currentSha256": "0779341115fbb1cac743c3cd709128fa485ab17bb13c04b8480d38c2ce5aab5c",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "services/worldEconomy/worldStreamingCustomers.ts",
+      "initialSha256": "94d58321efe6ba74e271a09b92a6f71e3c6c46ff84834387aa5c71d14952060d",
+      "currentSha256": "94d58321efe6ba74e271a09b92a6f71e3c6c46ff84834387aa5c71d14952060d",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "services/worldEconomy/worldStreamingRoyaltyAttribution.ts",
+      "initialSha256": "f88a7ed6ca968dc5dae4a03c77849360d668b187872d22718d7641c55414cb89",
+      "currentSha256": "f88a7ed6ca968dc5dae4a03c77849360d668b187872d22718d7641c55414cb89",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "services/worldEconomy/worldStreamingViewing.ts",
+      "initialSha256": "e50cbb1dd7429bc1cda01e27224800b623d46794c7daaa811558a38bfdf1cdde",
+      "currentSha256": "e50cbb1dd7429bc1cda01e27224800b623d46794c7daaa811558a38bfdf1cdde",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "types.ts",
+      "initialSha256": "1fb2ed94f9d42af1978ecbc9af48cf9a158ffa880ea1ed9691d66408e447b5d6",
+      "currentSha256": "af0d3189d756cbf586958b90725db70f68b2423b1f2bc6f8f9de2a68005e3899",
+      "status": "TARGETED_REPAIR"
+    },
+    {
+      "path": "views/lifestyle/business/ReleaseWizard.tsx",
+      "initialSha256": "ed976315f5fddd73b0abd395c4bca8fd83ca17f562811f7ac17ed5dab4ac44ba",
+      "currentSha256": "ed976315f5fddd73b0abd395c4bca8fd83ca17f562811f7ac17ed5dab4ac44ba",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "views/lifestyle/business/greenlightProjectBuilder.ts",
+      "initialSha256": "aabf458b49b15bb8660115109c4eb11e9267893fea8938b64f8dfd8732b54f71",
+      "currentSha256": "aabf458b49b15bb8660115109c4eb11e9267893fea8938b64f8dfd8732b54f71",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "components/streaming-transplant/AudienceAtlas.tsx",
+      "initialSha256": "dfb83311cdbdbb52f7ab4cacee131386a87d08d11d6192461b8e81229b1b6c0c",
+      "currentSha256": "dfb83311cdbdbb52f7ab4cacee131386a87d08d11d6192461b8e81229b1b6c0c",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "components/streaming-transplant/AudienceCountrySheet.tsx",
+      "initialSha256": "38785adf16c2b943e6865f1cbe87c68df670f0b5b24254bb6f7c43579ab1c9f3",
+      "currentSha256": "38785adf16c2b943e6865f1cbe87c68df670f0b5b24254bb6f7c43579ab1c9f3",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "components/streaming-transplant/AudienceMarketEntry.tsx",
+      "initialSha256": "740512b2983fc18867ab016e80bb10cc2f758adc76afddb8abf133c6334818de",
+      "currentSha256": "740512b2983fc18867ab016e80bb10cc2f758adc76afddb8abf133c6334818de",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "components/streaming-transplant/AudiencePanels.tsx",
+      "initialSha256": "55a78803038d17e2c96e6e32b58920d7a96967da600a482d09f16f985b32d80f",
+      "currentSha256": "55a78803038d17e2c96e6e32b58920d7a96967da600a482d09f16f985b32d80f",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "components/streaming-transplant/ContentPanels.tsx",
+      "initialSha256": "502388168d5e411de5eaf866826c442b82f6a62bbe8c37dd4c24ded118e5c10b",
+      "currentSha256": "502388168d5e411de5eaf866826c442b82f6a62bbe8c37dd4c24ded118e5c10b",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "components/streaming-transplant/NetworkMap.tsx",
+      "initialSha256": "4aed930c2c3929a416d6f14716cc399e3d8eec0f69248bd2c00341d68676c2b0",
+      "currentSha256": "4aed930c2c3929a416d6f14716cc399e3d8eec0f69248bd2c00341d68676c2b0",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "components/streaming-transplant/PlatformNetwork.tsx",
+      "initialSha256": "9313e50bf0f8eae41b680911542122c0bbd6a3d6d8654b50591b962c6ff8ae84",
+      "currentSha256": "9313e50bf0f8eae41b680911542122c0bbd6a3d6d8654b50591b962c6ff8ae84",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "components/streaming-transplant/PlatformOffer.tsx",
+      "initialSha256": "21a7122a4bef5160a508cf4ad752b82cee4d2479fdc6612c8553c8040c29c7b2",
+      "currentSha256": "21a7122a4bef5160a508cf4ad752b82cee4d2479fdc6612c8553c8040c29c7b2",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "components/streaming-transplant/SharingPolicyCard.tsx",
+      "initialSha256": "90c87e3fb88acb81009689fae3bd32ad5de7bae8137eee95a66de944f36eb755",
+      "currentSha256": "90c87e3fb88acb81009689fae3bd32ad5de7bae8137eee95a66de944f36eb755",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "components/streaming-transplant/audienceAtlasGeometry.ts",
+      "initialSha256": "4c2569b0c127e3eeb7fed0392c0b550b3dcf18a4cf6d22cf381d7e4bf94f029f",
+      "currentSha256": "4c2569b0c127e3eeb7fed0392c0b550b3dcf18a4cf6d22cf381d7e4bf94f029f",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "components/streaming-transplant/audienceAtlasModel.ts",
+      "initialSha256": "40f36383d2518f79ed4671c10601ff948bef5fbbe66bdf6df9c200ee25b4f79c",
+      "currentSha256": "40f36383d2518f79ed4671c10601ff948bef5fbbe66bdf6df9c200ee25b4f79c",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "components/streaming-transplant/presentation/screens/AudienceDesk/AudienceAtlas.module.css",
+      "initialSha256": "87bd8393564ed4431dbaec0bdaa1efb952ac1e0ab3733fa25f271f1ce943259d",
+      "currentSha256": "87bd8393564ed4431dbaec0bdaa1efb952ac1e0ab3733fa25f271f1ce943259d",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "components/streaming-transplant/presentation/screens/AudienceDesk/AudienceMarketEntry.module.css",
+      "initialSha256": "a194f8fe7281de0887c8f651391add219e8c9ca519175b430d80c455fc806419",
+      "currentSha256": "a194f8fe7281de0887c8f651391add219e8c9ca519175b430d80c455fc806419",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "components/streaming-transplant/presentation/screens/AudienceDesk/SharingPolicy.module.css",
+      "initialSha256": "2fb7622e81d60ff91c2a92bdd1b9c9a5811d2c42111d887cac739ddf250047a2",
+      "currentSha256": "2fb7622e81d60ff91c2a92bdd1b9c9a5811d2c42111d887cac739ddf250047a2",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "components/streaming-transplant/presentation/screens/Boardroom/BoardroomRoom.module.css",
+      "initialSha256": "04d4a043e60ea035e2154a107d895a5591b66c6e3d796be14e45db3cc505dcb1",
+      "currentSha256": "04d4a043e60ea035e2154a107d895a5591b66c6e3d796be14e45db3cc505dcb1",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "components/streaming-transplant/presentation/screens/ContentDesk/ContentRoom.module.css",
+      "initialSha256": "59de39cac1eddcb3b46f9d4fe67bdc5232ae46aa02eb1b9d31f48e65bd24a47e",
+      "currentSha256": "59de39cac1eddcb3b46f9d4fe67bdc5232ae46aa02eb1b9d31f48e65bd24a47e",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "components/streaming-transplant/presentation/screens/NetworkDesk/NetworkMap.module.css",
+      "initialSha256": "8b497558be01382438af12cb7d75d89f484a37810e1eaeb1a784c236b288d13f",
+      "currentSha256": "8b497558be01382438af12cb7d75d89f484a37810e1eaeb1a784c236b288d13f",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "components/streaming-transplant/presentation/screens/NetworkDesk/PlatformNetwork.module.css",
+      "initialSha256": "08d28cf70ec6384868551bcb1bec9604c9287da83d34390ddc4c87477163765b",
+      "currentSha256": "08d28cf70ec6384868551bcb1bec9604c9287da83d34390ddc4c87477163765b",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "components/streaming-transplant/presentation/screens/NetworkDesk/PlatformOffer.module.css",
+      "initialSha256": "9348d323a43268d713b72631f8b493f10bddb35cafc57d5fd9cc362253d7c340",
+      "currentSha256": "9348d323a43268d713b72631f8b493f10bddb35cafc57d5fd9cc362253d7c340",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/README-checkpoint-bb029e5.md",
+      "initialSha256": "75be021d70090ef2d439e87ebd15c420e79a6846d416ca3c9b5a31ac937b9a4a",
+      "currentSha256": "75be021d70090ef2d439e87ebd15c420e79a6846d416ca3c9b5a31ac937b9a4a",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup-progress.md",
+      "initialSha256": "e7f9fdeba64d54606ab32990cf0236c17015ab4d33c49b56dbbfc933ff70d14c",
+      "currentSha256": "e7f9fdeba64d54606ab32990cf0236c17015ab4d33c49b56dbbfc933ff70d14c",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/audit-delivery.txt",
+      "initialSha256": "2057fc6baa03b71dc02de93f5c0dab25005f7e5d81152af13feb6d69a3ecd12d",
+      "currentSha256": "2057fc6baa03b71dc02de93f5c0dab25005f7e5d81152af13feb6d69a3ecd12d",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/cinema-regressions-final.json",
+      "initialSha256": "6ab8a98378154a7ac6d4133d38c99c8de11428702988955b5aff506a90d118df",
+      "currentSha256": "6ab8a98378154a7ac6d4133d38c99c8de11428702988955b5aff506a90d118df",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/source-manifest.json",
+      "initialSha256": "b931894be34cee7b38c3ac70e6cfd7695012903e4f3ed30ae877777c0f3b848a",
+      "currentSha256": "b931894be34cee7b38c3ac70e6cfd7695012903e4f3ed30ae877777c0f3b848a",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/unrelated-preservation.json",
+      "initialSha256": "8a09c1e1c5af90958fe313d6011a43745f6849bedfd56efdaf4a42745e9f8212",
+      "currentSha256": "8a09c1e1c5af90958fe313d6011a43745f6849bedfd56efdaf4a42745e9f8212",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/audit-placement.txt",
+      "initialSha256": "536bc2617d6b44de201f913ed9cc029b0df121319ae36f840beeaa7c105b0ce7",
+      "currentSha256": "536bc2617d6b44de201f913ed9cc029b0df121319ae36f840beeaa7c105b0ce7",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/app-week-before.json",
+      "initialSha256": "398855eda3e28bb32f21201ae43a5b1b00c171008913e27cc4b30f7c8992548b",
+      "currentSha256": "398855eda3e28bb32f21201ae43a5b1b00c171008913e27cc4b30f7c8992548b",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/viewing-final.json",
+      "initialSha256": "0a7092c51fc860364003c0029a1e8d755c711f9643579a4554da9542157936c9",
+      "currentSha256": "0a7092c51fc860364003c0029a1e8d755c711f9643579a4554da9542157936c9",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/paired-week-runs.json",
+      "initialSha256": "666381e6e125749c060f9f3fdc4d5acecdea0c032456af44fe5623bb779c2eea",
+      "currentSha256": "666381e6e125749c060f9f3fdc4d5acecdea0c032456af44fe5623bb779c2eea",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/audit-market.txt",
+      "initialSha256": "8ec8c2b7cb41e0025a42778e23a12490161e064bddd20cc7c3fac515accc4e7f",
+      "currentSha256": "8ec8c2b7cb41e0025a42778e23a12490161e064bddd20cc7c3fac515accc4e7f",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/small-campaign-red.txt",
+      "initialSha256": "75413e0fdd313af5c1b60345bc726f68e3f35953b92fc7277b070dbf73208f27",
+      "currentSha256": "75413e0fdd313af5c1b60345bc726f68e3f35953b92fc7277b070dbf73208f27",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/audit-streaming-rights-calendar-phase4.txt",
+      "initialSha256": "7d0cad0d9fd0ce9574d0872e4f5726e3c16b8036bc3bc2efc1ea2aa8a6b45577",
+      "currentSha256": "7d0cad0d9fd0ce9574d0872e4f5726e3c16b8036bc3bc2efc1ea2aa8a6b45577",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/audit-finance.txt",
+      "initialSha256": "c86325a30c3af10fa069c0c0a8bb12b752f3694ea43012c76766b481798abb21",
+      "currentSha256": "c86325a30c3af10fa069c0c0a8bb12b752f3694ea43012c76766b481798abb21",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/week-after-trial2.json",
+      "initialSha256": "9940a6df324b10aa3b4028779cdaeb8d69ee7fbb9fa97fdfe31f07c52d1ae983",
+      "currentSha256": "9940a6df324b10aa3b4028779cdaeb8d69ee7fbb9fa97fdfe31f07c52d1ae983",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/audit-awareness.txt",
+      "initialSha256": "74359b91bf0a555a1e9f63ff444f262bbc1f930a171a1b84c72ed31fd1976a4a",
+      "currentSha256": "74359b91bf0a555a1e9f63ff444f262bbc1f930a171a1b84c72ed31fd1976a4a",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/paired-app-runs.json",
+      "initialSha256": "fe795a478d64031955134caf94d44ba6e36c92c2da710e680bd6b725ae068a43",
+      "currentSha256": "fe795a478d64031955134caf94d44ba6e36c92c2da710e680bd6b725ae068a43",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/lint-final.txt",
+      "initialSha256": "4d009f7343606e5c16aaefe77ed90fd2f20baf198e0cbb04d3a9e90a035f322a",
+      "currentSha256": "4d009f7343606e5c16aaefe77ed90fd2f20baf198e0cbb04d3a9e90a035f322a",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/english-final.txt",
+      "initialSha256": "2e0d7c98d38be06f9c75f80569fbe1d85974f19641a8c9be11b29a9808cb35a2",
+      "currentSha256": "2e0d7c98d38be06f9c75f80569fbe1d85974f19641a8c9be11b29a9808cb35a2",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/app-week-after.json",
+      "initialSha256": "ff118123f29ebdb5de7eceb330da27a5e26d216ae51c24779cb296542a057a78",
+      "currentSha256": "ff118123f29ebdb5de7eceb330da27a5e26d216ae51c24779cb296542a057a78",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/audit-rights.txt",
+      "initialSha256": "204e12c53f7149a6df9245ff9b1d470d47db47d781282e1766f6eaef8144d0b4",
+      "currentSha256": "204e12c53f7149a6df9245ff9b1d470d47db47d781282e1766f6eaef8144d0b4",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/audit-migration.txt",
+      "initialSha256": "29053140586a9545400d5fb591b95a7f881813e43ea2c52e903868641437a13e",
+      "currentSha256": "29053140586a9545400d5fb591b95a7f881813e43ea2c52e903868641437a13e",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/cast-snapshot-green.txt",
+      "initialSha256": "cfe1eae75a40ffc47b65bd329d5aa906a41723228dcc846f9517e96350ab474b",
+      "currentSha256": "cfe1eae75a40ffc47b65bd329d5aa906a41723228dcc846f9517e96350ab474b",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/app-studio-focused.json",
+      "initialSha256": "8c8df16bba15a54e372b1007ec53a1c45febd61aed31dae4f5d97bb7f8e49c94",
+      "currentSha256": "8c8df16bba15a54e372b1007ec53a1c45febd61aed31dae4f5d97bb7f8e49c94",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/audit-finance-contracts.txt",
+      "initialSha256": "97b437a265ffbeed7bb2b2bfcc4b10f51e2cbc09a1941fd6c3cbaa2435fc5ff6",
+      "currentSha256": "97b437a265ffbeed7bb2b2bfcc4b10f51e2cbc09a1941fd6c3cbaa2435fc5ff6",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/week-before-trial1.json",
+      "initialSha256": "a30a0c82d7fcbdc7eff396592361a47527266c7aa2b9a394745ea7bcc442c7ef",
+      "currentSha256": "a30a0c82d7fcbdc7eff396592361a47527266c7aa2b9a394745ea7bcc442c7ef",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/audit-royalty-batch.txt",
+      "initialSha256": "c0d5c2cf67320c738ecc9fb542fedbb10cf7d10da8c091bbe561e095c17bc215",
+      "currentSha256": "c0d5c2cf67320c738ecc9fb542fedbb10cf7d10da8c091bbe561e095c17bc215",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/audit-streaming-rights-transactions-phase6.txt",
+      "initialSha256": "1344e31aed1108686f68d9f51e713a28d377299ec7ac068ffe2b226b23c24e49",
+      "currentSha256": "1344e31aed1108686f68d9f51e713a28d377299ec7ac068ffe2b226b23c24e49",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/audit-streaming-ads-rental-backend.txt",
+      "initialSha256": "65645de2b8a38c062a0e2f978e372b94a4fead6fb3c2bfde5964233e82e80710",
+      "currentSha256": "65645de2b8a38c062a0e2f978e372b94a4fead6fb3c2bfde5964233e82e80710",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/audit-streaming-signed-royalties.txt",
+      "initialSha256": "982c85d70344190788ea5e0ee2cdea1874b1660e431372c052667b1d0c7b90f3",
+      "currentSha256": "982c85d70344190788ea5e0ee2cdea1874b1660e431372c052667b1d0c7b90f3",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/audit-audience.txt",
+      "initialSha256": "cab9906f1bba6207f6a735b54862e84201eb37c1339e9b172f489353509c964a",
+      "currentSha256": "cab9906f1bba6207f6a735b54862e84201eb37c1339e9b172f489353509c964a",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/audit-phase2-integration.txt",
+      "initialSha256": "61a8f4e301ab8bdb2fd6c5128965effed6ad5e17ec87a0fb6dc33223df6f66f2",
+      "currentSha256": "61a8f4e301ab8bdb2fd6c5128965effed6ad5e17ec87a0fb6dc33223df6f66f2",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/long-saves-combined.json",
+      "initialSha256": "2249d8bc2c6432adce8ad03f86353d908a3fce369be468d6e07416d68a363cff",
+      "currentSha256": "2249d8bc2c6432adce8ad03f86353d908a3fce369be468d6e07416d68a363cff",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/audit-streaming-original-playback-repair.txt",
+      "initialSha256": "fc5bf6441448d9ea62b23626caed967fcd3e3d4af2ee3092cc47d8bff425bb6c",
+      "currentSha256": "fc5bf6441448d9ea62b23626caed967fcd3e3d4af2ee3092cc47d8bff425bb6c",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/audit-release-announcement.txt",
+      "initialSha256": "aa6cf67e228ea532d38d0e70a489ffc5cab2b810d888475edd3a5556aa6b752e",
+      "currentSha256": "aa6cf67e228ea532d38d0e70a489ffc5cab2b810d888475edd3a5556aa6b752e",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/viewing-before-seeded.json",
+      "initialSha256": "06ddf8db8f01cd5f902e16f9220d0667e5b80357d2230cb68a49f56d5845697e",
+      "currentSha256": "06ddf8db8f01cd5f902e16f9220d0667e5b80357d2230cb68a49f56d5845697e",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/audit-presentation.txt",
+      "initialSha256": "2c3659e210f5ec40fadf46f62c9d1dcf04047c69c8efb702df16c372e9f6b315",
+      "currentSha256": "2c3659e210f5ec40fadf46f62c9d1dcf04047c69c8efb702df16c372e9f6b315",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/app-results.json",
+      "initialSha256": "ec76bd29ac86b41ed38711afbedaf515b297ea177df21ee242fb0f00f30396bf",
+      "currentSha256": "ec76bd29ac86b41ed38711afbedaf515b297ea177df21ee242fb0f00f30396bf",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/audit-career-actions.txt",
+      "initialSha256": "751c3f93378755179d6420e08fe806bd7a6898ea5c92db428b0fa956d87b8188",
+      "currentSha256": "751c3f93378755179d6420e08fe806bd7a6898ea5c92db428b0fa956d87b8188",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/audit-save-generations.txt",
+      "initialSha256": "a48f9bc2efebe20c80fa48eeb19f42f486b13435fed4e63f4c2db2b56ea47775",
+      "currentSha256": "a48f9bc2efebe20c80fa48eeb19f42f486b13435fed4e63f4c2db2b56ea47775",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/paired-app-progress.txt",
+      "initialSha256": "48789afab72d9d9806ebaecf91a9d6f663a45f6535497ee713ef2c86e603a229",
+      "currentSha256": "48789afab72d9d9806ebaecf91a9d6f663a45f6535497ee713ef2c86e603a229",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/week-before-trial2.json",
+      "initialSha256": "62b18ab3d014cc2cc0095b664e257123628168ba2908617838f1ba878984339e",
+      "currentSha256": "62b18ab3d014cc2cc0095b664e257123628168ba2908617838f1ba878984339e",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/reproduce.md",
+      "initialSha256": "c682cb65a39bc2590a44522cbac6f7baf66ae156e809ed3a1034d3b45101d657",
+      "currentSha256": "c682cb65a39bc2590a44522cbac6f7baf66ae156e809ed3a1034d3b45101d657",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/audit-save-integrity.txt",
+      "initialSha256": "7aea73e970b355262f73371191eddad420b0e9d67cc8400261f590993e67c6d8",
+      "currentSha256": "7aea73e970b355262f73371191eddad420b0e9d67cc8400261f590993e67c6d8",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/audit-finance-ui.txt",
+      "initialSha256": "790491659a40372448a25ce1600d52881fa74c2aaac86f29d78873c9c14250cd",
+      "currentSha256": "790491659a40372448a25ce1600d52881fa74c2aaac86f29d78873c9c14250cd",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/audit-large-save-integrity.txt",
+      "initialSha256": "5f51889a60cb8026c07bc9177dcf83ce5df135fda35c7ea27936f8f0fcee4731",
+      "currentSha256": "5f51889a60cb8026c07bc9177dcf83ce5df135fda35c7ea27936f8f0fcee4731",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/audit-inputs.txt",
+      "initialSha256": "cfe1eae75a40ffc47b65bd329d5aa906a41723228dcc846f9517e96350ab474b",
+      "currentSha256": "cfe1eae75a40ffc47b65bd329d5aa906a41723228dcc846f9517e96350ab474b",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/performance-summary.json",
+      "initialSha256": "c3a669622ed85bcc084b969128b41b2907bfdb6b717e5be86c616a78c960b3ff",
+      "currentSha256": "c3a669622ed85bcc084b969128b41b2907bfdb6b717e5be86c616a78c960b3ff",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/quit-promotion-red.txt",
+      "initialSha256": "06c0353364bc3c32aa32f9ad7ba4f64ff79c1c091dcc628c906d4fdde07ca3cf",
+      "currentSha256": "06c0353364bc3c32aa32f9ad7ba4f64ff79c1c091dcc628c906d4fdde07ca3cf",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/affected-regressions.json",
+      "initialSha256": "79521c824452bc7895670e2791dd0a4023f4e99982ac025d775ae3a7ce97f6bf",
+      "currentSha256": "79521c824452bc7895670e2791dd0a4023f4e99982ac025d775ae3a7ce97f6bf",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/audit-viewing-routes.txt",
+      "initialSha256": "d8db6facd4787cdef2747a52adecd8f34ac1498bfce01dc337021bf9641e62e4",
+      "currentSha256": "d8db6facd4787cdef2747a52adecd8f34ac1498bfce01dc337021bf9641e62e4",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/week-after-trial1.json",
+      "initialSha256": "15ffea13a4188033a8bd8f601b90541e51bd1b1a5d4a6467042aa0a27d5a4e63",
+      "currentSha256": "15ffea13a4188033a8bd8f601b90541e51bd1b1a5d4a6467042aa0a27d5a4e63",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/audit-streaming-original-readiness-repair.txt",
+      "initialSha256": "e2282866eed7a3be29940d4ef0d6ce1ae61d96545635be8d9fb601e2ff9c7278",
+      "currentSha256": "e2282866eed7a3be29940d4ef0d6ce1ae61d96545635be8d9fb601e2ff9c7278",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/full-app-open-profile.txt",
+      "initialSha256": "7fd3c9645237dec1054f3259e5c2bd050a7987ca8f492f2b10e67dbf1b7c7f17",
+      "currentSha256": "7fd3c9645237dec1054f3259e5c2bd050a7987ca8f492f2b10e67dbf1b7c7f17",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/audit-phase1-integration.txt",
+      "initialSha256": "9cb2ca43a882ef7b7c749244de353a1aee03988bcc4dd8c0be7b256ae6013bb0",
+      "currentSha256": "9cb2ca43a882ef7b7c749244de353a1aee03988bcc4dd8c0be7b256ae6013bb0",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/audit-save-boundary.txt",
+      "initialSha256": "3df3b304ca18c00f7c90da5df8cd00104bd4605fb5dfb209fb044b20cc040321",
+      "currentSha256": "3df3b304ca18c00f7c90da5df8cd00104bd4605fb5dfb209fb044b20cc040321",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/paired-week-progress.txt",
+      "initialSha256": "3b77c11d7f2fa20383a042955167b6f15bcdb1ba8fd0403866fa0fc25c7107e2",
+      "currentSha256": "3b77c11d7f2fa20383a042955167b6f15bcdb1ba8fd0403866fa0fc25c7107e2",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/cast-snapshot-red.txt",
+      "initialSha256": "d700f502318f92bc81a34223d8acf74c0d7a329796114be3fa4345b5421c36e0",
+      "currentSha256": "d700f502318f92bc81a34223d8acf74c0d7a329796114be3fa4345b5421c36e0",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/build-final.txt",
+      "initialSha256": "cb24ec0e3d7c14505acf5b90eca4e50378bab3a613e99a46c42a9d45c8898237",
+      "currentSha256": "cb24ec0e3d7c14505acf5b90eca4e50378bab3a613e99a46c42a9d45c8898237",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/audit-integration.txt",
+      "initialSha256": "e5cbfbac71d8570ecc9fbb44f1948f9df69e4ae0eddd98d107582befcef1c7fc",
+      "currentSha256": "e5cbfbac71d8570ecc9fbb44f1948f9df69e4ae0eddd98d107582befcef1c7fc",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/audit-streaming-commercial-c4.txt",
+      "initialSha256": "4d3c39723b934994b527735d175271a73d5db3c300b343f7a1a47ccf28a23de4",
+      "currentSha256": "4d3c39723b934994b527735d175271a73d5db3c300b343f7a1a47ccf28a23de4",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/screenshots/app-review.png",
+      "initialSha256": "bf8fb06bc144f825d68911ea52169bf64da829f2cbbc19d9b6037bfd3bbe3e43",
+      "currentSha256": "bf8fb06bc144f825d68911ea52169bf64da829f2cbbc19d9b6037bfd3bbe3e43",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/screenshots/app-finance.png",
+      "initialSha256": "a8f9f9ef1a9106687747b0ce670942ab98475da6be829b9372ae5d422514e1bd",
+      "currentSha256": "a8f9f9ef1a9106687747b0ce670942ab98475da6be829b9372ae5d422514e1bd",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/screenshots/app-imdb-320.png",
+      "initialSha256": "d4916d4935cb613effbc53f6b7b441f14beb42aa4875f2ba020ecf1f8e069f9d",
+      "currentSha256": "d4916d4935cb613effbc53f6b7b441f14beb42aa4875f2ba020ecf1f8e069f9d",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/screenshots/app-fresh-energy.png",
+      "initialSha256": "ce3069f79bdacb79fcebd88323643fd2bffd3e177d361124243cff96f2b4220f",
+      "currentSha256": "ce3069f79bdacb79fcebd88323643fd2bffd3e177d361124243cff96f2b4220f",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/followup/screenshots/app-campaign.png",
+      "initialSha256": "0d496166ed9cfc4ab8d75f9b241878477fd7ec7934cbb05d54556013a09edd39",
+      "currentSha256": "0d496166ed9cfc4ab8d75f9b241878477fd7ec7934cbb05d54556013a09edd39",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/scenario-results.csv",
+      "initialSha256": "62de6ec3c0063a1a58ac3d1fb7e5b6733a8b3837d7e44c5b0d51415fa3c29249",
+      "currentSha256": "62de6ec3c0063a1a58ac3d1fb7e5b6733a8b3837d7e44c5b0d51415fa3c29249",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/scenario-results.md",
+      "initialSha256": "eba4542edb1120e770f45622d1704b7b527e445df5057a18dfcf0caf9ad6fdb2",
+      "currentSha256": "eba4542edb1120e770f45622d1704b7b527e445df5057a18dfcf0caf9ad6fdb2",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-box-office-revamp/phase6/verification-matrix-checkpoint-bb029e5.json",
+      "initialSha256": "deb2ade1808d9876df8aea18acf4b675eddd8ffa261b45adc95d66333813a64a",
+      "currentSha256": "deb2ade1808d9876df8aea18acf4b675eddd8ffa261b45adc95d66333813a64a",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-operations-transplant/content-5000.png",
+      "initialSha256": "5c260076fa8c8689ac6a9001793ce794b566bd059397cb8593817c9f6c9629de",
+      "currentSha256": "5c260076fa8c8689ac6a9001793ce794b566bd059397cb8593817c9f6c9629de",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-operations-transplant/operations-ui-final.log",
+      "initialSha256": "93250ff68ef194b05f902a2cf1daa66b11661dab17034e430ba82d05b6f3819b",
+      "currentSha256": "93250ff68ef194b05f902a2cf1daa66b11661dab17034e430ba82d05b6f3819b",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-operations-transplant/disposition.json",
+      "initialSha256": "03167534e33d5a446fceda069d67106a97ff4b42eac04ef4c17b77be96ce4a7c",
+      "currentSha256": "03167534e33d5a446fceda069d67106a97ff4b42eac04ef4c17b77be96ce4a7c",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-operations-transplant/boardroom-390.png",
+      "initialSha256": "a929045548052493694e8969df461b46bbb5a8bbf0c9ac49eeb5db84d97816e7",
+      "currentSha256": "a929045548052493694e8969df461b46bbb5a8bbf0c9ac49eeb5db84d97816e7",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-operations-transplant/lint.log",
+      "initialSha256": "4d009f7343606e5c16aaefe77ed90fd2f20baf198e0cbb04d3a9e90a035f322a",
+      "currentSha256": "4d009f7343606e5c16aaefe77ed90fd2f20baf198e0cbb04d3a9e90a035f322a",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-operations-transplant/fidelity-final.log",
+      "initialSha256": "2a8899287efd0e63d26499428754181c13b1ca6bc31c6d482067f9cd49a67ea9",
+      "currentSha256": "2a8899287efd0e63d26499428754181c13b1ca6bc31c6d482067f9cd49a67ea9",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-operations-transplant/offer-390.png",
+      "initialSha256": "8d3173b426a41e996b63de134b4050afeeff2e28d7e576ea73ce5bfc943825a8",
+      "currentSha256": "8d3173b426a41e996b63de134b4050afeeff2e28d7e576ea73ce5bfc943825a8",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-operations-transplant/audit-results.json",
+      "initialSha256": "24de7e9f0c3c54507c743f5db1ec5c115d711ab88910208e5071ffee13b706be",
+      "currentSha256": "24de7e9f0c3c54507c743f5db1ec5c115d711ab88910208e5071ffee13b706be",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-operations-transplant/expansion-results.json",
+      "initialSha256": "3fbcc311831dbc91949e462ad8a1f91a1533fe888a7d2f194a2d8eb79265f70d",
+      "currentSha256": "3fbcc311831dbc91949e462ad8a1f91a1533fe888a7d2f194a2d8eb79265f70d",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-operations-transplant/final-ui-audit-results.json",
+      "initialSha256": "961a0a9404e03177a7c99a1bdcceac98a77486d1604e98c9644631cb49cf7b4b",
+      "currentSha256": "961a0a9404e03177a7c99a1bdcceac98a77486d1604e98c9644631cb49cf7b4b",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-operations-transplant/build-final.log",
+      "initialSha256": "0d327b8b7619d6fe9fbbb3f1b0a9ce0fb149d53bd98f44aecfe300988c3c8e93",
+      "currentSha256": "0d327b8b7619d6fe9fbbb3f1b0a9ce0fb149d53bd98f44aecfe300988c3c8e93",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-operations-transplant/README.md",
+      "initialSha256": "e3e6f6575a5160d5164533b936d42a76e4820262696022888ffe040ff9f2e3bf",
+      "currentSha256": "e3e6f6575a5160d5164533b936d42a76e4820262696022888ffe040ff9f2e3bf",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-operations-transplant/network-390.png",
+      "initialSha256": "4b73e5218bfb694f7b8cb842482eae3ea51a76ac1c29efa9e2c720c5a3bca5ee",
+      "currentSha256": "4b73e5218bfb694f7b8cb842482eae3ea51a76ac1c29efa9e2c720c5a3bca5ee",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-operations-transplant/browser-final.log",
+      "initialSha256": "653c579ec845f43d0587c8e9ad6f2d79170d5af3f295e4af0073cf2e4a103057",
+      "currentSha256": "653c579ec845f43d0587c8e9ad6f2d79170d5af3f295e4af0073cf2e4a103057",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-operations-transplant/browser-results.json",
+      "initialSha256": "7224cf191f72e70f95e72fcdeeaef09f96cfb9b49c02bc00a94f99ead94ab3ef",
+      "currentSha256": "7224cf191f72e70f95e72fcdeeaef09f96cfb9b49c02bc00a94f99ead94ab3ef",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-operations-transplant/lint-final.log",
+      "initialSha256": "4d009f7343606e5c16aaefe77ed90fd2f20baf198e0cbb04d3a9e90a035f322a",
+      "currentSha256": "4d009f7343606e5c16aaefe77ed90fd2f20baf198e0cbb04d3a9e90a035f322a",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-operations-transplant/production-streaming-types.log",
+      "initialSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "currentSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-operations-transplant/safety-final.log",
+      "initialSha256": "372b8a8c70e8208ca523b5baeba72a2640912cab2ceda6624264ffe405c6be5b",
+      "currentSha256": "372b8a8c70e8208ca523b5baeba72a2640912cab2ceda6624264ffe405c6be5b",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-operations-transplant/verification.json",
+      "initialSha256": "6ededcc3c1fef24133bcafbec359a65b7c89044337fb559e0d9f7791d6ef6693",
+      "currentSha256": "6ededcc3c1fef24133bcafbec359a65b7c89044337fb559e0d9f7791d6ef6693",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-operations-transplant/expansion-picked.png",
+      "initialSha256": "0a1b2f41037a873f62e0663107f55d64561112455f55d00bd13003d3e77fd8a2",
+      "currentSha256": "0a1b2f41037a873f62e0663107f55d64561112455f55d00bd13003d3e77fd8a2",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-operations-transplant/expansion-filed.png",
+      "initialSha256": "24cb1ca896ffc4eaf1e5af492ca15f26c61e6e11ea29dbd5c88e2b7cdf1490b7",
+      "currentSha256": "24cb1ca896ffc4eaf1e5af492ca15f26c61e6e11ea29dbd5c88e2b7cdf1490b7",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-operations-transplant/content-390.png",
+      "initialSha256": "af4497fb40d6769209d99ea3f35f6622e76720c3c21b0b5b7cd788a87542c874",
+      "currentSha256": "af4497fb40d6769209d99ea3f35f6622e76720c3c21b0b5b7cd788a87542c874",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-operations-transplant/audience-390.png",
+      "initialSha256": "b4784190cd1f12329ea9ea3c0030269c9e640aa12c09e24bce30915a3d707a3e",
+      "currentSha256": "b4784190cd1f12329ea9ea3c0030269c9e640aa12c09e24bce30915a3d707a3e",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-operations-transplant/approved-ui-styles.json",
+      "initialSha256": "594210f6d75427c93f26e20c4428147b854432c1eea7717eb407d3293064a6c1",
+      "currentSha256": "594210f6d75427c93f26e20c4428147b854432c1eea7717eb407d3293064a6c1",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-operations-transplant/extra-audit-results.json",
+      "initialSha256": "2789c8796564844618f04bbbdbd000ff740e1d3572a368d22df6095cc0907985",
+      "currentSha256": "2789c8796564844618f04bbbdbd000ff740e1d3572a368d22df6095cc0907985",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-paramount-acquisition-analysis/README.md",
+      "initialSha256": "dd3082d8b5dad5e8db7f4074f1d88568da1ab9d26ebd0e13c766161ac00dc419",
+      "currentSha256": "dd3082d8b5dad5e8db7f4074f1d88568da1ab9d26ebd0e13c766161ac00dc419",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-paramount-acquisition-analysis/evidence/service-analysis.ts",
+      "initialSha256": "2a1b5982d86154b4aaa7afa587bd090559184dfc833b909b694736fcf112be56",
+      "currentSha256": "2a1b5982d86154b4aaa7afa587bd090559184dfc833b909b694736fcf112be56",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-paramount-acquisition-analysis/evidence/audit-stock-decision-events.log",
+      "initialSha256": "5745740853d3e2ae2321b43cf2ffd6d3f0f640434f790bdf3c91df21f8d17d20",
+      "currentSha256": "5745740853d3e2ae2321b43cf2ffd6d3f0f640434f790bdf3c91df21f8d17d20",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-paramount-acquisition-analysis/evidence/main.tsx",
+      "initialSha256": "b69978d4c1ec02755efdabfc6ead1d859ca16779918fc0d79ce7f5ac6b66b476",
+      "currentSha256": null,
+      "renamedSha256": "b69978d4c1ec02755efdabfc6ead1d859ca16779918fc0d79ce7f5ac6b66b476",
+      "status": "ARCHIVE_RENAMED_BYTES_PRESERVED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-paramount-acquisition-analysis/evidence/index.html",
+      "initialSha256": "6e65bcad831b6a2c7db3883cb7fe8ae58206e91d933f50cb3008ec6ece2448ed",
+      "currentSha256": "6e65bcad831b6a2c7db3883cb7fe8ae58206e91d933f50cb3008ec6ece2448ed",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-paramount-acquisition-analysis/evidence/vite.config.mjs",
+      "initialSha256": "90a347ad77e6caa89ace663ebf7dcbd91a6fc9b89e16b79d9a2601f2d25556e9",
+      "currentSha256": "90a347ad77e6caa89ace663ebf7dcbd91a6fc9b89e16b79d9a2601f2d25556e9",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-paramount-acquisition-analysis/evidence/reproduced-loop.png",
+      "initialSha256": "d5aeecd0172fce40514accf828a8733b21f2e35283fa8864424b5a196d8425ef",
+      "currentSha256": "d5aeecd0172fce40514accf828a8733b21f2e35283fa8864424b5a196d8425ef",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-paramount-acquisition-analysis/evidence/browser.cjs",
+      "initialSha256": "2a39fe8eae49a794b2ac34f81d6805f08274f2b12336389ee349e83379c28c60",
+      "currentSha256": "2a39fe8eae49a794b2ac34f81d6805f08274f2b12336389ee349e83379c28c60",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-paramount-acquisition-analysis/evidence/service-results.json",
+      "initialSha256": "df87b1bb92b318e80f14ed46bc010680d32fdeee40a6b8e3cd48d6c1a1e3c55e",
+      "currentSha256": "df87b1bb92b318e80f14ed46bc010680d32fdeee40a6b8e3cd48d6c1a1e3c55e",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-paramount-acquisition-analysis/evidence/source-sha256.json",
+      "initialSha256": "5b151ff1f980d643ab71eb09946bf87d55976972d3548574e282bb8fdd61ea3c",
+      "currentSha256": "5b151ff1f980d643ab71eb09946bf87d55976972d3548574e282bb8fdd61ea3c",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-paramount-acquisition-analysis/evidence/audit-stock-control-acquisition-ui.log",
+      "initialSha256": "287e8b94ef60b150d6fd27417083ccb8469b8eae576d753f3ed0816d4134e4ce",
+      "currentSha256": "287e8b94ef60b150d6fd27417083ccb8469b8eae576d753f3ed0816d4134e4ce",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-paramount-acquisition-analysis/evidence/audit-stock-control-acquisition.log",
+      "initialSha256": "06a966eabbd78881abdff0cb0f06ba9912d61b69bdfe9c13a8958011cee4aa8b",
+      "currentSha256": "06a966eabbd78881abdff0cb0f06ba9912d61b69bdfe9c13a8958011cee4aa8b",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-paramount-acquisition-analysis/evidence/historicalStudioEcosystem.ts",
+      "initialSha256": "c4cb2938d483ed33830b5f9936202ad976002d592c871ee170fefee3db0420e7",
+      "currentSha256": "c4cb2938d483ed33830b5f9936202ad976002d592c871ee170fefee3db0420e7",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-paramount-acquisition-analysis/evidence/audit-acquisition-event-cadence.log",
+      "initialSha256": "1b78da305cc2646a549cb223ce1525eda07eef40cb8ccaf71c546b8f2d2d34ef",
+      "currentSha256": "1b78da305cc2646a549cb223ce1525eda07eef40cb8ccaf71c546b8f2d2d34ef",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-paramount-acquisition-analysis/evidence/browser-results.json",
+      "initialSha256": "2e503433da80e329bc13f95671eaaadfca118dd7e2b9c40a4dba224efa889023",
+      "currentSha256": "2e503433da80e329bc13f95671eaaadfca118dd7e2b9c40a4dba224efa889023",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-paramount-acquisition-analysis/evidence/audit-studio-acquisition.log",
+      "initialSha256": "c6700fb7b3c28b3a9b7bc246ab67e4e18f3914aeb4b57e3027cd23998bb48620",
+      "currentSha256": "c6700fb7b3c28b3a9b7bc246ab67e4e18f3914aeb4b57e3027cd23998bb48620",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-paramount-acquisition-analysis/evidence/audit-stock-takeovers.log",
+      "initialSha256": "ccd251329b756cd972e9cd98b86ed3e36187328d632671144ae5c544a7eabd2e",
+      "currentSha256": "ccd251329b756cd972e9cd98b86ed3e36187328d632671144ae5c544a7eabd2e",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-paramount-acquisition-analysis/evidence/audit-entertainment-stocks.log",
+      "initialSha256": "e8f01055194e3e94c3ee58a5734f71503a9b2468011b2f5862e6eff9e213b999",
+      "currentSha256": "e8f01055194e3e94c3ee58a5734f71503a9b2468011b2f5862e6eff9e213b999",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-paramount-acquisition-analysis/sx-followup/probe.ts",
+      "initialSha256": "289b60a012af1dbe7c6696c2b6894122ff2262ce83ba4f8323106b1613a9b4d5",
+      "currentSha256": "289b60a012af1dbe7c6696c2b6894122ff2262ce83ba4f8323106b1613a9b4d5",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-paramount-acquisition-analysis/sx-followup/results.json",
+      "initialSha256": "05b8cb22dd95164c8134b1258870944e51d9b094db4231eed4de4d81a96fd86d",
+      "currentSha256": "05b8cb22dd95164c8134b1258870944e51d9b094db4231eed4de4d81a96fd86d",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-paramount-acquisition-analysis/sx-followup/README.md",
+      "initialSha256": "c5b514f35f68963fa237618f7dd6e8d2a48e101ccfd824659f0201bf7020ce2a",
+      "currentSha256": "c5b514f35f68963fa237618f7dd6e8d2a48e101ccfd824659f0201bf7020ce2a",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-streaming-audit-repairs/before.json",
+      "initialSha256": "ec825ce8f822f11601cd330dbd24d72c199503fe96d3820a23645838a1a863b7",
+      "currentSha256": "ec825ce8f822f11601cd330dbd24d72c199503fe96d3820a23645838a1a863b7",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-streaming-audit-repairs/lint.log",
+      "initialSha256": "4d009f7343606e5c16aaefe77ed90fd2f20baf198e0cbb04d3a9e90a035f322a",
+      "currentSha256": "4d009f7343606e5c16aaefe77ed90fd2f20baf198e0cbb04d3a9e90a035f322a",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-streaming-audit-repairs/fidelity.log",
+      "initialSha256": "9956bd4a12c666075c332ba220734b60dbea09a81846a72dfa7767c9ac10bbd2",
+      "currentSha256": "9956bd4a12c666075c332ba220734b60dbea09a81846a72dfa7767c9ac10bbd2",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-streaming-audit-repairs/runtime-unchanged.json",
+      "initialSha256": "edca7a46f3bd66ef3e87246c5511d196a6663e6050a01e95cd9ee68b8d74dedf",
+      "currentSha256": "edca7a46f3bd66ef3e87246c5511d196a6663e6050a01e95cd9ee68b8d74dedf",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-streaming-audit-repairs/results.json",
+      "initialSha256": "3c2dda5ecbbaa42cc90fec28137c1b4e4adcb9ddbf53cf7d408177607d86c783",
+      "currentSha256": "3c2dda5ecbbaa42cc90fec28137c1b4e4adcb9ddbf53cf7d408177607d86c783",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-streaming-audit-repairs/approved-claude-styles.log",
+      "initialSha256": "f471aa0bb0dbb28b354e28214b86092505f13ac1620a0a720e9bca58c8bb083f",
+      "currentSha256": "f471aa0bb0dbb28b354e28214b86092505f13ac1620a0a720e9bca58c8bb083f",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-streaming-audit-repairs/README.md",
+      "initialSha256": "7a689bee98e21fee884f1beb9ea5d9761cd94f06797bee18d1b7c2265c0e4b90",
+      "currentSha256": "7a689bee98e21fee884f1beb9ea5d9761cd94f06797bee18d1b7c2265c0e4b90",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-streaming-audit-repairs/promotion.log",
+      "initialSha256": "0c81a221e146da9f61f1679adf70b4ca828f3c255b10678fd60a9e3b6c662ae8",
+      "currentSha256": "0c81a221e146da9f61f1679adf70b4ca828f3c255b10678fd60a9e3b6c662ae8",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-streaming-audit-repairs/safety.log",
+      "initialSha256": "372b8a8c70e8208ca523b5baeba72a2640912cab2ceda6624264ffe405c6be5b",
+      "currentSha256": "372b8a8c70e8208ca523b5baeba72a2640912cab2ceda6624264ffe405c6be5b",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-streaming-audit-repairs/verification.json",
+      "initialSha256": "4a0631e3b6acefa406b7f8ad4fdda4e4a5ba90ed323b533797c1c079dd04b825",
+      "currentSha256": "4a0631e3b6acefa406b7f8ad4fdda4e4a5ba90ed323b533797c1c079dd04b825",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-streaming-audit-repairs/percentage-contracts.log",
+      "initialSha256": "107209da71e4215026e52af022baffe087efd196ab79c7bc3f8abe66f719b153",
+      "currentSha256": "107209da71e4215026e52af022baffe087efd196ab79c7bc3f8abe66f719b153",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-streaming-audit-repairs/fidelity-negative-contracts.log",
+      "initialSha256": "84222a97992893db111e1dbc39791f5619442cb77c8870919e09d9ad56639b84",
+      "currentSha256": "84222a97992893db111e1dbc39791f5619442cb77c8870919e09d9ad56639b84",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-streaming-audit-repairs/style-review.json",
+      "initialSha256": "0e2bd6c708113d364471435a56717e94f9cc506697ef342350c46eef06c90158",
+      "currentSha256": "0e2bd6c708113d364471435a56717e94f9cc506697ef342350c46eef06c90158",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-streaming-audit-repairs/audience.log",
+      "initialSha256": "8579a7913514dd581e76ff2e840acc665687d501e716b0cbb4be642f2404c149",
+      "currentSha256": "8579a7913514dd581e76ff2e840acc665687d501e716b0cbb4be642f2404c149",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/reports/2026-10-22-streaming-audit-repairs/build.log",
+      "initialSha256": "a8fc5103e45cfc01d0e63821fa8143ab4cbbaf7fe61984954953852a0d1c6c41",
+      "currentSha256": "a8fc5103e45cfc01d0e63821fa8143ab4cbbaf7fe61984954953852a0d1c6c41",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-10-22-distributor-booking.md",
+      "initialSha256": "e782a4270fa8ea2b4e3fdaebd881a5e94601e5e29f02154bd4fe70edf6ea47c3",
+      "currentSha256": "00921076e235a71390a24c8b499e9e72f24fea79753f35295f50d59db812c9ae",
+      "status": "CONCURRENT_UNRELATED_EDIT_PRESERVED"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-10-22-stock-acquisition-save-safety.md",
+      "initialSha256": "dd64e7602574f26c768a7b94acb122eb2a684a5c0a1814e6dafa617cbb8e6906",
+      "currentSha256": "a52efeb27871b6586fc00dd8b6d92b667e1fb9337475218b8c05bab5a7f53b2c",
+      "status": "TARGETED_REPAIR"
+    },
+    {
+      "path": "docs/superpowers/specs/2026-10-22-distributor-booking-design.md",
+      "initialSha256": "684a16f22b9990469a035b866bcdf6cb596c66bd293c15c359ab0ad4790e5f5a",
+      "currentSha256": "684a16f22b9990469a035b866bcdf6cb596c66bd293c15c359ab0ad4790e5f5a",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "docs/superpowers/specs/2026-10-22-stock-acquisition-save-safety-design.md",
+      "initialSha256": "4c7a7d74f065df46cb586f8938bb6630fcab5135149a025d0f72ba75cb0d83a2",
+      "currentSha256": "4c7a7d74f065df46cb586f8938bb6630fcab5135149a025d0f72ba75cb0d83a2",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "scripts/audit-box-office-alternative-batching.ts",
+      "initialSha256": "9faad406ed9502a4a47cd6472a0f730c5713db2ce8f97ca52a6a5eff366b029f",
+      "currentSha256": "a917ceec352bb7a09a3f721a54fab5510c119dbbc5dd0bd1a86e1c73847ff92e",
+      "status": "CONCURRENT_UNRELATED_EDIT_PRESERVED"
+    },
+    {
+      "path": "scripts/audit-box-office-alternative-routes.ts",
+      "initialSha256": "af6ade357d1d2ee503290c61782fe5b06439252372cb6a0c83eea0287ac0fc07",
+      "currentSha256": "af6ade357d1d2ee503290c61782fe5b06439252372cb6a0c83eea0287ac0fc07",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "scripts/audit-box-office-alternatives.ts",
+      "initialSha256": "a0ea9bfffe714551902f17d1e42e82c851babb7b6310ff9a3e9d138e7096fa0a",
+      "currentSha256": "a0ea9bfffe714551902f17d1e42e82c851babb7b6310ff9a3e9d138e7096fa0a",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "scripts/audit-box-office-booking.ts",
+      "initialSha256": "1761dbeeb013f006608f34de9fa1b8174fb7a6693e4b6a68ac7fbd99153a0519",
+      "currentSha256": "1761dbeeb013f006608f34de9fa1b8174fb7a6693e4b6a68ac7fbd99153a0519",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "scripts/audit-box-office-career-actions.ts",
+      "initialSha256": "b0dbf49ab719ebc1a65012e83d16aa1bc33d685a0709346def6390940d95037a",
+      "currentSha256": "b0dbf49ab719ebc1a65012e83d16aa1bc33d685a0709346def6390940d95037a",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "scripts/audit-box-office-fingerprint.ts",
+      "initialSha256": "dcf6c1e947afc5da91ef81574577e70a4465e31fad06c26a92b08b23e3b0229a",
+      "currentSha256": "dcf6c1e947afc5da91ef81574577e70a4465e31fad06c26a92b08b23e3b0229a",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "scripts/audit-box-office-full-world.ts",
+      "initialSha256": "6bfeba0a8b7e2023a70ed2bbf34ebd15707e3335896a9160ccc7f94ff6e61508",
+      "currentSha256": "f88c741e9e0565f56d0d1690069ecaf2c10e56bb848fdba430187936266eb613",
+      "status": "CONCURRENT_UNRELATED_EDIT_PRESERVED"
+    },
+    {
+      "path": "scripts/audit-box-office-phase6-app.cjs",
+      "initialSha256": "e86fb5d2285e03d409a6bcb55846fe34de8070d86119ce21fd95aede92cf11fc",
+      "currentSha256": "dcd3cf76f7c0ba3fcdee075c40260e45c6d108585be1d1cac6e9adc7d7d9b5ff",
+      "status": "CONCURRENT_UNRELATED_EDIT_PRESERVED"
+    },
+    {
+      "path": "scripts/audit-box-office-royalty-batch.ts",
+      "initialSha256": "00c4d7ddbfb9574f9db24cdef2cc56a4e363a3b89c989f502a0b5d5d8a7c58c7",
+      "currentSha256": "00c4d7ddbfb9574f9db24cdef2cc56a4e363a3b89c989f502a0b5d5d8a7c58c7",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "scripts/audit-streaming-fidelity-contracts.mjs",
+      "initialSha256": "67861da7646220c7d0e4e7c48a37d2cb70d31b0c784a7bf13af5b1aba0707320",
+      "currentSha256": "67861da7646220c7d0e4e7c48a37d2cb70d31b0c784a7bf13af5b1aba0707320",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "scripts/audit-streaming-operations-styles.mjs",
+      "initialSha256": "33f129aa1c55cbe2a65788e6395430adb4da141666bfc51ede63548491471c9a",
+      "currentSha256": "33f129aa1c55cbe2a65788e6395430adb4da141666bfc51ede63548491471c9a",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "scripts/audit-streaming-percentage-contracts.ts",
+      "initialSha256": "b89d90bcbc5e4d19d96bb670121ad5d059806981cb352958815be06dfe9243df",
+      "currentSha256": "b89d90bcbc5e4d19d96bb670121ad5d059806981cb352958815be06dfe9243df",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "scripts/audit-streaming-transplant-safety.tsx",
+      "initialSha256": "809ef9db05c0c2fdb9cddd5c9be85742182008a78e43f6f3e0dd34f563113415",
+      "currentSha256": "809ef9db05c0c2fdb9cddd5c9be85742182008a78e43f6f3e0dd34f563113415",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "scripts/benchmark-box-office-app.cjs",
+      "initialSha256": "d754adf2880023e94a7247a7a28aead8e4fcc9832012cd5e302e6b38feab0d3c",
+      "currentSha256": "19605443f77f454c9b1ce91c73a708285e370d2a0f5999789c1243d2900a50b1",
+      "status": "CONCURRENT_UNRELATED_EDIT_PRESERVED"
+    },
+    {
+      "path": "scripts/fixtures/boxOfficeFullWorld.ts",
+      "initialSha256": "862bda9c95340296ca5d6c4d763aae39b49028bf51c8f08e5ccd41007974c049",
+      "currentSha256": "57652cc418f33abc14363ba61e364437592af6991377ebf4f07e42c877bf9758",
+      "status": "CONCURRENT_UNRELATED_EDIT_PRESERVED"
+    },
+    {
+      "path": "scripts/fixtures/ordinaryCinemaCareer.ts",
+      "initialSha256": "38d79d609eae94d15c0b6d45f39201f46d040ab18f8a55a514cbb7356f8e6e87",
+      "currentSha256": "c1240b5eee1a2e1e74de44cf46df55e215432f254b2b3a1c9fbea2abe42df6d6",
+      "status": "CONCURRENT_UNRELATED_EDIT_PRESERVED"
+    },
+    {
+      "path": "scripts/helpers/streamingPercentageAssertions.ts",
+      "initialSha256": "86a42a5a537057cc55f7b717a9d88f5679610900df3df6bc457c4b172f92d36d",
+      "currentSha256": "86a42a5a537057cc55f7b717a9d88f5679610900df3df6bc457c4b172f92d36d",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "scripts/verify-box-office-full-world.mjs",
+      "initialSha256": "7c728541ef234b029e82ba468c037ede5e4d64196b4e4c008eede6b7cde287a3",
+      "currentSha256": "3524eabae60250a930c3f82ca1e0e08da69a6bc3ef9da76dfe30c3da96161d20",
+      "status": "CONCURRENT_UNRELATED_EDIT_PRESERVED"
+    },
+    {
+      "path": "scripts/write-box-office-app-fixture.ts",
+      "initialSha256": "4e0df68fd4c2f52f00fd07750c609144b9ad0aac6edde7e21821e435b184276f",
+      "currentSha256": "4e0df68fd4c2f52f00fd07750c609144b9ad0aac6edde7e21821e435b184276f",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "services/boxOffice/boxOfficeAlternativeAccess.ts",
+      "initialSha256": "084bc00b2ca56407e8613405a3324e25827d04c174f1ad6b2c245d385c09edbd",
+      "currentSha256": "6df6c6236800348e96b8187a0c688bfe443703f0d0dd199f9183b9869e6b0693",
+      "status": "CONCURRENT_UNRELATED_EDIT_PRESERVED"
+    },
+    {
+      "path": "services/boxOffice/boxOfficeAlternativeAdapters.ts",
+      "initialSha256": "bf852d91865680becf83229bca64ff2cde81f9ad0625ef83c3b613217b7459a9",
+      "currentSha256": "bf852d91865680becf83229bca64ff2cde81f9ad0625ef83c3b613217b7459a9",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "services/boxOffice/boxOfficeAlternatives.ts",
+      "initialSha256": "53b5f9b9e18fa038474fcd3445de267f5e385fe13929689f22ec2f50eecc226a",
+      "currentSha256": "53b5f9b9e18fa038474fcd3445de267f5e385fe13929689f22ec2f50eecc226a",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "services/boxOffice/boxOfficeBooking.ts",
+      "initialSha256": "b17f69296ed31b5d549d5c0a52e1535b026e02679e6036d261405cfc1a1c8882",
+      "currentSha256": "b17f69296ed31b5d549d5c0a52e1535b026e02679e6036d261405cfc1a1c8882",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "services/careerApplicationActions.ts",
+      "initialSha256": "8b3916b01270ce9e881463e66e414fe501619cd7fd56b854b10b5a837fc718a0",
+      "currentSha256": "8b3916b01270ce9e881463e66e414fe501619cd7fd56b854b10b5a837fc718a0",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "services/lifeEventFallback.ts",
+      "initialSha256": "36e723ec54f9acb9da64f0b59d0a76f4c770f088f87d6fbf0d9cca3f48d63e3a",
+      "currentSha256": "36e723ec54f9acb9da64f0b59d0a76f4c770f088f87d6fbf0d9cca3f48d63e3a",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "services/streamingNetworkMapView.ts",
+      "initialSha256": "869be5009cc3e7243f62b723580d0d0fa727b6ac4f2f6eca54acc432c2c46ff2",
+      "currentSha256": "869be5009cc3e7243f62b723580d0d0fa727b6ac4f2f6eca54acc432c2c46ff2",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "services/streamingPlatformOffer.ts",
+      "initialSha256": "424ecb394e53c4bf3237b1b7d1ba02b0502ce490168128585f0e384b38b7470f",
+      "currentSha256": "424ecb394e53c4bf3237b1b7d1ba02b0502ce490168128585f0e384b38b7470f",
+      "status": "UNCHANGED"
+    },
+    {
+      "path": "services/streamingSharingPolicy.ts",
+      "initialSha256": "2edc20a7e7e060122b772eb7129598fb2eaa0b47f03dfbecc406621bd776f820",
+      "currentSha256": "2edc20a7e7e060122b772eb7129598fb2eaa0b47f03dfbecc406621bd776f820",
+      "status": "UNCHANGED"
+    }
+  ],
+  "note": "Final route follow-up inventory of initial252 dirty/untracked files. Concurrent unrelated changes retained; no blanket reset, checkout replacement, commit, push or deployment."
+}

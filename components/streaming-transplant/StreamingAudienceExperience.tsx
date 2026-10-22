@@ -15,19 +15,33 @@
  * varying length, and every line chart ships a hover layer.
  */
 import css from './presentation/screens/AudienceDesk/AudienceDesk.module.css';
+import atlas from './presentation/screens/AudienceDesk/AudienceAtlas.module.css';
 import { cx } from './presentation/cx';
 import { brandVars } from './presentation/brand';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { StreamingAudienceMap } from './StreamingAudienceMap';
-import { Brand, Mark, brandColor } from './StreamingBrandVisuals';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Brand, Mark, brandColor, hslHex } from './StreamingBrandVisuals';
+import { AudienceAtlas } from './AudienceAtlas';
+import { AudienceCountrySheet } from './AudienceCountrySheet';
+import { AccessBoard, CountryRows, MarketFunnel, MarketPulse, RegionRail, RegionTiles, TopCountryRail, WinnersBoard, type CountryRowItem, type TopCountryCard } from './AudiencePanels';
+import { ENFORCEMENT_WORDS, SHARING_POSTURE_WORDS } from './SharingPolicyCard';
+import { AudienceMarketEntry, type MarketEntryActions } from './AudienceMarketEntry';
+import {
+  AUDIENCE_WORDS,
+  buildAtlasCountries,
+  compact,
+  formatShare,
+  sharesOf,
+  signedCompact,
+  summariseRegions,
+  type AtlasCountry,
+  type AtlasRegionId,
+  type AudienceKind,
+} from './audienceAtlasModel';
 import type {
   OwnedStreamingMarketOperation,
-  StreamingEnforcementInvestment,
-  StreamingSharingPosture,
   WorldStreamingCustomerAccessPolicy,
 } from '../../types';
 import type {
-  StreamingAudienceCountryView,
   StreamingAudienceMarketView,
   StreamingAudiencePlatformView,
 } from '../../services/streamingAudienceMarket';
@@ -86,6 +100,9 @@ export interface AudienceState {
 }
 
 type Tab = 'ANALYTICS' | 'TOP 10' | 'CAMPAIGNS' | 'REGIONS' | 'MARKETS';
+/* Map-led tabs first: what is happening, where you stand, by continent; then
+   the levers and the chart. */
+const TAB_ORDER: Tab[] = ['ANALYTICS', 'MARKETS', 'REGIONS', 'CAMPAIGNS', 'TOP 10'];
 type Range = '7D' | '28D' | '90D';
 type AnalyticsScope = 'PLATFORM' | 'MARKET';
 type MarketView = 'OVERVIEW' | 'PEOPLE' | 'SWITCHING' | 'RIVALS';
@@ -100,6 +117,8 @@ const count = (n: number) => n >= 1e9 ? `${(n / 1e9).toFixed(2)}B`
   : n >= 1e3 ? `${(n / 1e3).toFixed(0)}K` : `${n}`;
 const pct = (n: number) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${Math.abs(n).toFixed(1)}%`;
 const plainPct = (n: number) => `${n.toFixed(n < 10 ? 1 : 0)}%`;
+/** A home's monthly entertainment budget: dollars, with cents only when they matter. */
+const budgetLabel = (n: number) => `$${n >= 100 ? Math.round(n) : n.toFixed(1)}`;
 
 /** A sparkline: 2px line, no axes, no markers. */
 const Spark: React.FC<{ data: number[]; good: boolean }> = ({ data, good }) => {
@@ -118,40 +137,6 @@ const Spark: React.FC<{ data: number[]; good: boolean }> = ({ data, good }) => {
     </svg>
   );
 };
-
-const MarketLine: React.FC<{ data: number[]; color: string; label: string }> = ({ data, color, label }) => {
-  const w = 320, h = 104, pad = 8;
-  const safe = data.length > 1 ? data : [0, data[0] ?? 0];
-  const min = Math.min(...safe), max = Math.max(...safe), span = max - min || 1;
-  const points = safe.map((value, index) => {
-    const x = pad + (index / Math.max(1, safe.length - 1)) * (w - pad * 2);
-    const y = h - pad - ((value - min) / span) * (h - pad * 2);
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  }).join(' ');
-  return (
-    <svg className={css.marketLine} viewBox={`0 0 ${w} ${h}`} role="img" aria-label={label} preserveAspectRatio="none">
-      {[.25, .55, .85].map(row => <line key={row} x1={pad} x2={w - pad} y1={h * row} y2={h * row} />)}
-      <polygon points={`${pad},${h - pad} ${points} ${w - pad},${h - pad}`} style={{ fill: color }} />
-      <polyline points={points} style={{ stroke: color }} />
-      <circle cx={w - pad} cy={Number(points.split(' ').at(-1)?.split(',')[1] ?? h / 2)} r="4" style={{ fill: color }} />
-    </svg>
-  );
-};
-
-const ShareBoard: React.FC<{ shares: StreamingAudienceMarketView['globalWatchShare'] }> = ({ shares }) => (
-  <div className={css.shareBoard}>
-    <div className={css.shareTrack} role="img" aria-label={shares.map(item => `${item.name} ${plainPct(item.sharePercent)}`).join(', ')}>
-      {shares.filter(item => item.sharePercent >= .25).map(item => (
-        <i key={item.id} style={{ width: `${item.sharePercent}%`, background: item.color }} />
-      ))}
-    </div>
-    <div className={css.shareKeys}>
-      {shares.slice(0, 7).map(item => (
-        <div key={item.id}><i style={{ background: item.color }} /><span>{item.name}</span><b>{plainPct(item.sharePercent)}</b></div>
-      ))}
-    </div>
-  </div>
-);
 
 const RivalMarketCard: React.FC<{ platform: StreamingAudiencePlatformView }> = ({ platform }) => (
   <article className={css.marketRival} style={{ ['--epx-rival' as string]: platform.color }}>
@@ -181,21 +166,6 @@ const RivalMarketCard: React.FC<{ platform: StreamingAudiencePlatformView }> = (
   </article>
 );
 
-const CountryMarketCard: React.FC<{ country: StreamingAudienceCountryView; color: string }> = ({ country, color }) => (
-  <article className={cx(css.countryMarket, country.selectedForLaunch ? css.openMarket : '')}>
-    <header><div><span>{country.regionName}</span><b>{country.country}</b></div><em>{country.selectedForLaunch ? 'OPEN' : 'MARKET'}</em></header>
-    <div className={css.countryNumbers}>
-      <div><span>VIEWERS</span><b>{count(country.activeViewers)}</b></div>
-      <div><span>ADOPTION</span><b>{plainPct(country.streamingAdoptionPercent)}</b></div>
-      <div><span>GROWTH</span><b>+{country.annualGrowthPercent}%</b></div>
-    </div>
-    <MarketLine data={country.trend.map(point => point.value)} color={color} label={`${country.country} active viewer trend`} />
-    <div className={css.countryLeader}><span>WATCH-TIME LEADER</span><b>{country.topPlatformName} · {plainPct(country.topPlatformSharePercent)}</b></div>
-    <p>{country.audienceReason}</p>
-    <details><summary>Market behavior <span>＋</span></summary><div>{country.subscriptionsPerHousehold} paid services per home · {plainPct(country.switchingPercent)} switch in a typical active week.<br />{money(country.averageMonthlyEntertainmentBudget)} monthly entertainment capacity · {count(country.nonParticipantHouseholds)} homes currently outside the commercial market.<br />Streaming reach: {count(country.streamingReachableHouseholds)} homes · cinema reach: {count(country.cinemaReachableHouseholds)} homes · both: {count(country.dualParticipantHouseholds)}.<br />Main barriers: {country.topStreamingBarrier} for streaming · {country.topCinemaBarrier} for cinema.<br />Local pressure: {country.regionalServices.join(' · ')}.</div></details>
-  </article>
-);
-
 /* ============================================================
    THE PAGE
    ============================================================ */
@@ -206,40 +176,46 @@ export const AudienceDesk: React.FC<{
   initialTab?: Tab;
   initialAnalyticsScope?: AnalyticsScope;
   initialMarketView?: MarketView;
+  initialMapSelection?: { regionId: string | null; countryId: string | null };
+  onNavigationChange?: (navigation: { tab: Tab; regionId: string | null; countryId: string | null }) => void;
+  initialEntry?: { tab: 'CHOOSE' | 'CLEARANCE' } | null;
+  onEntryClose?: () => void;
   onNewCampaign?: () => void;
   onObjective?: (o: RecObjective) => void;
+  /** Kept for callers; regions now open in place on the Regions tab. */
   onOpenRegion?: (r: RegionRow) => void;
   marketOperations?: OwnedStreamingMarketOperation[];
-  onManageMarkets?: (countryId?: string) => void;
-  onReviewClearance?: (countryId?: string) => void;
-  onOpenPricing?: () => void;
-  initialRegionId?: string | null;
-  initialMapSelection?: {regionId:string|null;countryId:string|null};
-  onNavigationChange?: (state:{tab:Tab;regionId:string|null;countryId:string|null})=>void;
+  /** Before launch: opens the opening-markets step of Define the Launch. */
+  onManageMarkets?: () => void;
+  /** After launch: the purse and canonical actions behind the Enter New Markets page. */
+  marketEntry?: MarketEntryActions;
+  /** Named on the link to the Platform room, where the policy is changed. */
   accessPolicy?: WorldStreamingCustomerAccessPolicy;
-  onAccessPolicyChange?: (policy: {
-    sharingPosture: StreamingSharingPosture;
-    enforcementInvestment: StreamingEnforcementInvestment;
-  }) => void;
-}> = ({ brand, state, onBack, initialTab, initialAnalyticsScope, initialMarketView, onNewCampaign, onObjective, onOpenRegion, marketOperations = [], onManageMarkets, onReviewClearance, onOpenPricing, initialRegionId, initialMapSelection, onNavigationChange, accessPolicy, onAccessPolicyChange }) => {
+  /** Opens the Platform room's Offer page (prices, plans, account sharing). */
+  onOpenPlatformOffer?: () => void;
+}> = ({ brand, state, onBack, initialTab, initialAnalyticsScope, initialMarketView, initialMapSelection, onNavigationChange, initialEntry, onEntryClose, onNewCampaign, onObjective, marketOperations = [], onManageMarkets, marketEntry, accessPolicy, onOpenPlatformOffer }) => {
   const c = brandColor(brand);
+  /* After launch, entering a market happens on this room's own page. */
+  const [entry, setEntry] = useState<{ picked: string[]; region: AtlasRegionId | null; tab?: 'CHOOSE' | 'CLEARANCE' } | null>(() => initialEntry && state.live && marketEntry ? { picked: [], region: initialMapSelection?.regionId as AtlasRegionId || null, tab: initialEntry.tab } : null);
+  const canEnterHere = state.live && Boolean(marketEntry);
+  const setEntryPicked = useCallback((update: (current: string[]) => string[]) => (
+    setEntry(current => (current ? { ...current, picked: update(current.picked) } : current))
+  ), []);
   /* a console chip can open this page straight on the tab it names */
   const [tab, setTab] = useState<Tab>(initialTab ?? 'ANALYTICS');
   const [range, setRange] = useState<Range>('28D');
   const [hover, setHover] = useState<number | null>(null);
   const [analyticsScope, setAnalyticsScope] = useState<AnalyticsScope>(initialAnalyticsScope ?? (state.live ? 'PLATFORM' : 'MARKET'));
   const [marketView, setMarketView] = useState<MarketView>(initialMarketView ?? 'OVERVIEW');
-  const [countryRegion, setCountryRegion] = useState<string>(initialMapSelection?.regionId || initialRegionId || 'ALL');
-  const [mapCountry, setMapCountry] = useState<string | null>(initialMapSelection?.countryId || null);
-  const [portfolioLimit, setPortfolioLimit] = useState(8);
+  /* The living map: one camera for the room, one open country card. */
+  const [focusRegion, setFocusRegion] = useState<AtlasRegionId | null>(initialMapSelection?.regionId as AtlasRegionId || null);
+  const [openCountryId, setOpenCountryId] = useState<string | null>(initialMapSelection?.countryId || null);
   const navigationRef = useRef(onNavigationChange); navigationRef.current = onNavigationChange;
-  useEffect(() => { navigationRef.current?.({tab,regionId:countryRegion === 'ALL' ? null : countryRegion,countryId:mapCountry}); }, [tab,countryRegion,mapCountry]);
+  useEffect(() => { navigationRef.current?.({ tab, regionId: focusRegion, countryId: openCountryId }); }, [tab, focusRegion, openCountryId]);
+  const [showAllCountries, setShowAllCountries] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
   const countryMarketOperations = useMemo(() => marketOperations.filter(operation => operation.scope === 'COUNTRY' && operation.status !== 'EXITED'), [marketOperations]);
   const plannedAudience = countryMarketOperations.reduce((sum, operation) => sum + (operation.countryProfile?.audienceSize || 0), 0);
-  const averagePolicyRate = countryMarketOperations.length
-    ? countryMarketOperations.reduce((sum, operation) => sum + (operation.policySnapshot?.effectiveTaxPercent || operation.countryProfile?.taxBaselinePercent || 0) + (operation.policySnapshot?.streamingLevyPercent || operation.countryProfile?.streamingLevyBaselinePercent || 0), 0) / countryMarketOperations.length
-    : 0;
 
   /* the visible window of the trend, driven by the range chips */
   const shown = useMemo(() => {
@@ -271,20 +247,129 @@ export const AudienceDesk: React.FC<{
   const totalAttr = state.attribution.reduce((a, x) => a + x.value, 0) || 1;
   const climbing = state.chart.filter(r => r.mine).length;
   const market = state.market;
-  const countries = useMemo(() => {
-    if (!market) return [];
-    return countryRegion === 'ALL' ? market.countries : market.countries.filter(country => country.regionId === countryRegion);
-  }, [market, countryRegion]);
-  const countryRegions = useMemo(() => market
-    ? Array.from(new Map(market.countries.map(country => [country.regionId, country.regionName])).entries())
-    : [], [market]);
-  const mapRegion = countryRegion === 'ALL' ? null : countryRegion;
-  const selectMapRegion = (id: string | null) => { setCountryRegion(id || 'ALL'); setPortfolioLimit(8); };
-  const focusedCountry = market?.countries.find(row => row.id === mapCountry);
-  const portfolio = countryMarketOperations.filter(operation => !mapCountry || operation.countryId === mapCountry).filter(operation => !mapRegion || market?.countries.find(row => row.id === operation.countryId)?.regionId === mapRegion);
-  const audienceMap = (scope: 'INDUSTRY' | 'PLATFORM' | 'MARKETS') => market ? <StreamingAudienceMap countries={market.countries} operations={marketOperations} scope={scope} live={state.live}
-    regionId={mapRegion} onRegionChange={selectMapRegion} countryId={mapCountry} onCountryChange={setMapCountry} onManage={onManageMarkets} onClearance={onReviewClearance}/> : null;
   const marketTrend = market?.globalTrend.map(point => point.activeViewers) ?? [];
+
+  /* ── the living map's model: every country, where you stand in it ── */
+  const accentHex = useMemo(() => hslHex(brand.hue, brand.sat, 58), [brand.hue, brand.sat]);
+  const atlasCountries = useMemo(() => buildAtlasCountries(market?.worldCountries, marketOperations), [market, marketOperations]);
+  const atlasRegions = useMemo(() => summariseRegions(atlasCountries), [atlasCountries]);
+  const regionById = useMemo(() => new Map(atlasRegions.map(region => [region.id, region])), [atlasRegions]);
+  const focusSummary = focusRegion ? regionById.get(focusRegion) : undefined;
+  const scoped = useMemo(() => (focusRegion ? atlasCountries.filter(country => country.regionId === focusRegion) : atlasCountries), [atlasCountries, focusRegion]);
+  const liveCountries = atlasCountries.filter(country => country.state === 'LIVE');
+  const openingCountries = atlasCountries.filter(country => country.state === 'OPENING');
+  const pausedCountries = atlasCountries.filter(country => country.state === 'PAUSED');
+  const openGroundCount = Math.max(0, atlasCountries.length - liveCountries.length - openingCountries.length - pausedCountries.length);
+  /* "Your audience" in the words of the business model: paid accounts for a
+     subscription service, homes watching free for an ad-supported one, buyers
+     for a rent-or-buy store (see AUDIENCE_WORDS). */
+  const audienceKind: AudienceKind = market?.playerModel.primary ?? 'ACCOUNTS';
+  const words = AUDIENCE_WORDS[audienceKind];
+  const subscriptionModel = audienceKind === 'ACCOUNTS';
+  const playerAudienceTotal = atlasCountries.reduce((sum, country) => sum + country.view.playerAudience, 0);
+  const playerNetTotal = atlasCountries.reduce((sum, country) => sum + country.view.playerNetChange, 0);
+  const revenueOf = (list: AtlasCountry[]) => list.reduce((sum, country) => sum + country.view.playerMonthlyRevenueTotal, 0);
+  const commercial = market?.playerCommercial;
+  const settledNote = (text: string) => (commercial?.available ? text : 'settles next week');
+  const modelTiles = !commercial ? [] : audienceKind === 'AD_HOMES' ? [
+    { label: 'HOMES WATCHING', value: compact(commercial.adHouseholds), note: settledNote('free with ads, this week') },
+    { label: 'AD IMPRESSIONS', value: compact(commercial.adImpressions), note: settledNote('ads served this week') },
+    { label: 'AD REVENUE', value: `$${compact(commercial.adRevenueWeekly)}`, note: settledNote('this week') },
+    { label: 'HOURS WATCHED', value: compact(commercial.hoursViewed), note: settledNote('on your service') },
+  ] : [
+    { label: 'BUYERS', value: compact(commercial.storeBuyers), note: settledNote('this week') },
+    { label: 'RENTALS', value: compact(commercial.rentals), note: settledNote('this week') },
+    { label: 'PURCHASES', value: compact(commercial.purchases), note: settledNote('this week') },
+    { label: 'STORE REVENUE', value: `$${compact(commercial.storeRevenueWeekly)}`, note: settledNote('this week') },
+  ];
+  const alsoEarning = subscriptionModel && commercial?.available ? [
+    ...(market?.playerModel.ads ? [{ label: 'from ads', value: `$${compact(commercial.adRevenueWeekly)}` }] : []),
+    ...(market?.playerModel.store ? [{ label: 'from the store', value: `$${compact(commercial.storeRevenueWeekly)}` }] : []),
+    ...(commercial.otherRevenueWeekly > 0 ? [{ label: 'passes and add-ons', value: `$${compact(commercial.otherRevenueWeekly)}` }] : []),
+  ] : [];
+  const worldShares = useMemo(() => sharesOf(atlasCountries.map(country => country.view)), [atlasCountries]);
+  const youShare = worldShares.shares.find(item => item.id === 'PLAYER');
+  /* The homes that pay you: from the customer ledger once a week has settled,
+     the same ledger as the industry's paying homes above it in the funnel. */
+  const yourHomes = market
+    ? (market.customerAccess.available ? market.customerAccess.payingHouseholds : market.streamingCompetition.playerHouseholds)
+    : 0;
+  /* The funnel's last row and the "who wins" corner, in the model's own unit. */
+  const yourAudienceHomes = audienceKind === 'AD_HOMES' ? (market?.playerCommercial.adHouseholds ?? 0)
+    : audienceKind === 'BUYERS' ? (market?.playerCommercial.storeBuyers ?? 0)
+      : yourHomes;
+  /* Paying homes settle a little each week toward the homes that want the offer. */
+  const demand = market?.streamingCompetition.playerHouseholds ?? 0;
+  const demandNote = !state.live || !subscriptionModel || !demand ? ''
+    : demand > yourHomes * 1.05 ? `${compact(demand)} homes want your offer at today's price; more of them start paying each week. `
+      : demand < yourHomes * .95 ? `Only ${compact(demand)} homes want your offer at today's price, fewer than pay today: expect cancellations. `
+        : '';
+  const reachTotal = atlasCountries.reduce((sum, country) => sum + country.view.reachableHouseholds, 0);
+  const unclaimedTotal = atlasCountries.reduce((sum, country) => sum + country.view.unclaimedHouseholds, 0);
+  const openCountry = openCountryId ? atlasCountries.find(country => country.id === openCountryId) ?? null : null;
+  const openCountryRegion = openCountry ? (regionById.get(openCountry.regionId)?.label ?? openCountry.regionId) : '';
+  const openCard = useCallback((countryId: string) => setOpenCountryId(countryId), []);
+  const focusOn = useCallback((regionId: AtlasRegionId | null) => { setFocusRegion(regionId); setShowAllCountries(false); }, []);
+
+  /* Cards for the top-countries rail: your accounts once you are live, the
+     industry's viewers before that or when looking at the whole market. */
+  const topCountryCards = (scope: 'PLATFORM' | 'MARKET'): TopCountryCard[] => {
+    if (scope === 'PLATFORM') {
+      const rows = scoped.filter(country => country.view.playerAudience > 0).sort((left, right) => right.view.playerAudience - left.view.playerAudience).slice(0, 8);
+      const max = rows[0]?.view.playerAudience || 1;
+      return rows.map(country => {
+        const share = sharesOf([country.view]).shares.find(item => item.id === 'PLAYER')?.share ?? 0;
+        const caption = subscriptionModel ? `${formatShare(share)} of homes` : audienceKind === 'AD_HOMES' ? 'watching free' : 'bought this week';
+        return { country, value: compact(country.view.playerAudience), caption, meter: country.view.playerAudience / max, tone: c, change: subscriptionModel ? country.view.playerNetChange : undefined };
+      });
+    }
+    const rows = [...scoped].sort((left, right) => right.view.activeViewers - left.view.activeViewers).slice(0, 8);
+    const max = rows[0]?.view.activeViewers || 1;
+    return rows.map(country => {
+      const leader = country.view.platformHouseholds[0];
+      return { country, value: compact(country.view.activeViewers), caption: leader ? `led by ${leader.name}` : 'no leader yet', meter: country.view.activeViewers / max, tone: leader?.id === 'PLAYER' ? c : leader?.color || '#9aa3b3' };
+    });
+  };
+
+  /* Rows under a map: your files first, then the biggest open ground. */
+  const countryRowsFor = (list: AtlasCountry[], limit: number): CountryRowItem[] => {
+    const rank = (country: AtlasCountry) => (country.state === 'LIVE' ? 3 : country.state === 'OPENING' ? 2 : country.state === 'PAUSED' ? 1 : 0);
+    const sorted = [...list].sort((left, right) => rank(right) - rank(left)
+      || right.view.playerAudience - left.view.playerAudience
+      || right.view.activeViewers - left.view.activeViewers);
+    /* Each bar is measured against its own kind: your accounts against your
+       biggest country, an audience against the biggest audience in the list. */
+    const maxAccounts = Math.max(1, ...sorted.map(country => country.view.playerAudience));
+    const maxViewers = Math.max(1, ...sorted.map(country => country.view.activeViewers));
+    return sorted.slice(0, limit).map(country => {
+      const mine = state.live && country.view.playerAudience > 0;
+      if (mine) {
+        return {
+          country,
+          value: compact(country.view.playerAudience),
+          caption: `${words.short} · ${compact(country.view.activeViewers)} watching`,
+          meter: country.view.playerAudience / maxAccounts,
+        };
+      }
+      if (country.view.activeViewers <= 0) {
+        return { country, value: '—', caption: `${compact(country.view.population)} people · no streaming audience yet` };
+      }
+      return {
+        country,
+        value: compact(country.view.activeViewers),
+        caption: `${compact(country.view.activeViewers)} watching · ${compact(country.view.population)} people`,
+        meter: country.view.activeViewers / maxViewers,
+      };
+    });
+  };
+
+  /* Derived lists, memoised so the flag cards are not rebuilt on every tap. */
+  const platformCards = useMemo(() => topCountryCards('PLATFORM'), [scoped, c]); // eslint-disable-line react-hooks/exhaustive-deps
+  const marketCards = useMemo(() => topCountryCards('MARKET'), [scoped, c]); // eslint-disable-line react-hooks/exhaustive-deps
+  const regionRows = useMemo(() => countryRowsFor(scoped, showAllCountries ? scoped.length : 12), [scoped, showAllCountries, state.live]); // eslint-disable-line react-hooks/exhaustive-deps
+  const yourMarkets = useMemo(() => scoped.filter(country => country.state !== 'AVAILABLE'), [scoped]);
+  const marketRows = useMemo(() => countryRowsFor(yourMarkets, showAllCountries ? yourMarkets.length : 12), [yourMarkets, showAllCountries, state.live]); // eslint-disable-line react-hooks/exhaustive-deps
+  const openGroundRows = useMemo(() => countryRowsFor(scoped.filter(country => country.state === 'AVAILABLE'), 6), [scoped, state.live]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className={css.ad} data-epx-root style={brandVars(brand)}>
@@ -298,23 +383,19 @@ export const AudienceDesk: React.FC<{
       </div>
 
       <div className={css.adstats}>
-        <div><span>SUBSCRIBERS</span><b>{state.metrics[0]?.value ?? '—'}</b></div>
+        <div><span>{words.header}</span><b>{subscriptionModel ? (state.metrics[0]?.value ?? '—') : state.live ? compact(playerAudienceTotal) : '—'}</b></div>
         <div><span>ON CHART</span><b className={climbing ? css.good : ''}>{climbing}</b></div>
         <div><span>CAMPAIGNS</span><b>{state.campaigns.filter(x => x.live).length}</b></div>
-        <div><span>REGIONS</span><b>{state.regions.length}</b></div>
+        <div><span>{!atlasCountries.length ? 'REGIONS' : state.live ? 'COUNTRIES' : 'MARKETS'}</span><b>{!atlasCountries.length ? state.regions.length : state.live ? liveCountries.length : liveCountries.length + openingCountries.length}</b></div>
       </div>
 
       <div className={css.adtabs}>
-        {(['ANALYTICS', 'TOP 10', 'CAMPAIGNS', 'REGIONS', 'MARKETS'] as Tab[]).map(t => (
+        {TAB_ORDER.map(t => (
           <button key={t} className={tab === t ? css.on : ''} onClick={() => setTab(t)}>{t}</button>
         ))}
       </div>
 
       <div className={css.adscroll}>
-        <div className={css.operationsActions}>
-          <button type="button" onClick={onOpenPricing}>Pricing & offers <span>→</span></button>
-          <button type="button" onClick={()=>onReviewClearance?.()}>Market clearance <span>→</span></button>
-        </div>
 
         {/* ── ANALYTICS ── */}
         {tab === 'ANALYTICS' && (
@@ -336,98 +417,180 @@ export const AudienceDesk: React.FC<{
               </div>
             ) : analyticsScope === 'PLATFORM' ? (
               <>
-                {audienceMap('PLATFORM')}
-                {/* filters in one row, above the charts */}
-                <div className={css.ranges}>
-                  {(['7D', '28D', '90D'] as Range[]).map(r => (
-                    <button key={r} className={range === r ? css.on : ''} onClick={() => setRange(r)}>{r}</button>
-                  ))}
-                </div>
+                {/* the living map: your countries, lit by the accounts you hold there */}
+                {atlasCountries.length > 0 && (
+                  <>
+                    <AudienceAtlas
+                      mode="PLATFORM"
+                      countries={atlasCountries}
+                      regions={atlasRegions}
+                      accent={c}
+                      focusRegion={focusRegion}
+                      selectedCountryId={openCountryId}
+                      onFocusRegion={focusOn}
+                      onSelectCountry={openCard}
+                      reading={focusSummary
+                        ? { value: focusSummary.playerAudience > 0 ? compact(focusSummary.playerAudience) : '—', caption: `${focusSummary.label} · ${focusSummary.live} live` }
+                        : { value: playerAudienceTotal > 0 ? compact(playerAudienceTotal) : (subscriptionModel ? (state.metrics[0]?.value ?? '0') : '0'), caption: `${words.plural} · ${liveCountries.length} ${liveCountries.length === 1 ? 'country' : 'countries'} live` }}
+                      aside={subscriptionModel ? {
+                        value: signedCompact(focusSummary ? focusSummary.playerNetChange : playerNetTotal),
+                        caption: 'this week',
+                        tone: (focusSummary ? focusSummary.playerNetChange : playerNetTotal) > 0 ? 'good' : (focusSummary ? focusSummary.playerNetChange : playerNetTotal) < 0 ? 'bad' : undefined,
+                      } : {
+                        /* ads and store keep no week-over-week history: show what they earn */
+                        value: `$${compact(revenueOf(focusRegion ? scoped : atlasCountries))}`,
+                        caption: 'a month',
+                      }}
+                      audienceKind={audienceKind}
+                    />
+                    <RegionRail regions={atlasRegions} focus={focusRegion} onFocus={focusOn}
+                      valueOf={region => region.playerAudience} worldValue={playerAudienceTotal} />
+                    <div className={atlas.secHead}><h2>Where your audience is</h2><span>{focusSummary ? focusSummary.label : 'top countries'}</span></div>
+                    <TopCountryRail cards={platformCards} onOpen={openCard} />
+                  </>
+                )}
 
-                <div className={css.tiles}>
-                  {state.metrics.map(m => {
-                    const good = m.inverse ? m.delta <= 0 : m.delta >= 0;
-                    return (
-                      <div className={css.tile} key={m.id}>
-                        <span className={css.tlabel}>{m.label}</span>
-                        <b className={css.tval}>{m.value}</b>
-                        <div className={css.trow}>
-                          <em className={good ? css.up : css.down}>{pct(m.delta)}</em>
-                          <Spark data={m.spark} good={good} />
+                {subscriptionModel ? (
+                  <>
+                  {/* filters in one row, above the charts */}
+                  <div className={css.ranges}>
+                    {(['7D', '28D', '90D'] as Range[]).map(r => (
+                      <button key={r} className={range === r ? css.on : ''} onClick={() => setRange(r)}>{r}</button>
+                    ))}
+                  </div>
+
+                  <div className={css.tiles}>
+                    {state.metrics.map(m => {
+                      const good = m.inverse ? m.delta <= 0 : m.delta >= 0;
+                      return (
+                        <div className={css.tile} key={m.id}>
+                          <span className={css.tlabel}>{m.label}</span>
+                          <b className={css.tval}>{m.value}</b>
+                          <div className={css.trow}>
+                            <em className={good ? css.up : css.down}>{pct(m.delta)}</em>
+                            <Spark data={m.spark} good={good} />
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* one series, one axis — the title names it, so no legend box */}
-                <section className={css.adsec}>
-                  <div className={css.adhead}>
-                    <h2>{state.trendLabel}</h2>
-                    <span>{range === '90D' ? 'last 90 days' : `last ${range === '7D' ? 7 : 28} days`}</span>
+                      );
+                    })}
                   </div>
-                  <div className={css.chartwrap}>
-                    <svg ref={svgRef} className={css.trendchart} viewBox={`0 0 ${geom.w} ${geom.h}`}
-                      onPointerMove={onMove} onPointerLeave={() => setHover(null)}>
-                      <defs>
-                        <linearGradient id="adfill" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor={c} stopOpacity=".34" />
-                          <stop offset="100%" stopColor={c} stopOpacity="0" />
-                        </linearGradient>
-                      </defs>
-                      {/* recessive grid */}
-                      {[0, .33, .66, 1].map(f => (
-                        <line key={f} x1="6" x2={geom.w - 6}
-                          y1={10 + f * (geom.h - 30)} y2={10 + f * (geom.h - 30)}
-                          stroke="#fff" strokeOpacity=".07" strokeWidth="1" />
-                      ))}
-                      <polygon points={geom.area} fill="url(#adfill)" />
-                      <polyline points={geom.line} fill="none" stroke={c}
-                        strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  {alsoEarning.length > 0 && (
+                    /* a subscription service that also sells ads or a store: what those added */
+                    <div className={atlas.alsoEarning}>
+                      <span>ALSO EARNING THIS WEEK</span>
+                      {alsoEarning.map(item => <div key={item.label}><b>{item.value}</b><small>{item.label}</small></div>)}
+                    </div>
+                  )}
+
+                  {/* one series, one axis — the title names it, so no legend box */}
+                  <section className={css.adsec}>
+                    <div className={css.adhead}>
+                      <h2>{state.trendLabel}</h2>
+                      <span>{range === '90D' ? 'last 90 days' : `last ${range === '7D' ? 7 : 28} days`}</span>
+                    </div>
+                    <div className={css.chartwrap}>
+                      <svg ref={svgRef} className={css.trendchart} viewBox={`0 0 ${geom.w} ${geom.h}`}
+                        onPointerMove={onMove} onPointerLeave={() => setHover(null)}>
+                        <defs>
+                          <linearGradient id="adfill" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor={c} stopOpacity=".34" />
+                            <stop offset="100%" stopColor={c} stopOpacity="0" />
+                          </linearGradient>
+                        </defs>
+                        {/* recessive grid */}
+                        {[0, .33, .66, 1].map(f => (
+                          <line key={f} x1="6" x2={geom.w - 6}
+                            y1={10 + f * (geom.h - 30)} y2={10 + f * (geom.h - 30)}
+                            stroke="#fff" strokeOpacity=".07" strokeWidth="1" />
+                        ))}
+                        <polygon points={geom.area} fill="url(#adfill)" />
+                        <polyline points={geom.line} fill="none" stroke={c}
+                          strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        {hover !== null && (
+                          <>
+                            <line x1={geom.x(hover)} x2={geom.x(hover)} y1="10" y2={geom.h - geom.b}
+                              stroke="#fff" strokeOpacity=".3" strokeWidth="1" />
+                            <circle cx={geom.x(hover)} cy={geom.y(shown[hover].value)} r="5"
+                              fill={c} stroke="#050609" strokeWidth="2" />
+                          </>
+                        )}
+                        {/* the last point is direct-labelled — never a number on every point */}
+                        <circle cx={geom.x(shown.length - 1)} cy={geom.y(shown[shown.length - 1].value)} r="4"
+                          fill={c} stroke="#050609" strokeWidth="2" />
+                      </svg>
                       {hover !== null && (
-                        <>
-                          <line x1={geom.x(hover)} x2={geom.x(hover)} y1="10" y2={geom.h - geom.b}
-                            stroke="#fff" strokeOpacity=".3" strokeWidth="1" />
-                          <circle cx={geom.x(hover)} cy={geom.y(shown[hover].value)} r="5"
-                            fill={c} stroke="#050609" strokeWidth="2" />
-                        </>
+                        <div className={css.tip} style={{ left: `${(geom.x(hover) / geom.w) * 100}%` }}>
+                          <b>{count(shown[hover].value)}</b>
+                          <span>{shown[hover].label}</span>
+                        </div>
                       )}
-                      {/* the last point is direct-labelled — never a number on every point */}
-                      <circle cx={geom.x(shown.length - 1)} cy={geom.y(shown[shown.length - 1].value)} r="4"
-                        fill={c} stroke="#050609" strokeWidth="2" />
-                    </svg>
-                    {hover !== null && (
-                      <div className={css.tip} style={{ left: `${(geom.x(hover) / geom.w) * 100}%` }}>
-                        <b>{count(shown[hover].value)}</b>
-                        <span>{shown[hover].label}</span>
+                      <div className={css.axis}>
+                        <span>{shown[0]?.label}</span>
+                        <span>{shown[shown.length - 1]?.label}</span>
                       </div>
-                    )}
-                    <div className={css.axis}>
-                      <span>{shown[0]?.label}</span>
-                      <span>{shown[shown.length - 1]?.label}</span>
                     </div>
-                  </div>
-                </section>
+                  </section>
 
-                {/* attribution as small multiples of one magnitude — no rainbow needed */}
-                <section className={css.adsec}>
-                  <div className={css.adhead}>
-                    <h2>What moved it</h2>
-                    <span>this week's net adds</span>
-                  </div>
-                  {state.attribution.map(a => (
-                    <div className={css.attr} key={a.id}>
-                      <div className={css.attrtop}>
-                        <b>{a.label}</b>
-                        <em>{count(a.value)}</em>
-                      </div>
-                      <div className={css.attrbar}>
-                        <i style={{ width: `${Math.max(2, (a.value / totalAttr) * 100)}%` }} />
-                      </div>
-                      <span className={css.attrnote}>{a.note}</span>
+                  {/* attribution as small multiples of one magnitude — no rainbow needed */}
+                  <section className={css.adsec}>
+                    <div className={css.adhead}>
+                      <h2>What moved it</h2>
+                      <span>this week's net adds</span>
                     </div>
-                  ))}
-                </section>
+                    {state.attribution.map(a => (
+                      <div className={css.attr} key={a.id}>
+                        <div className={css.attrtop}>
+                          <b>{a.label}</b>
+                          <em>{count(a.value)}</em>
+                        </div>
+                        <div className={css.attrbar}>
+                          <i style={{ width: `${Math.max(2, (a.value / totalAttr) * 100)}%` }} />
+                        </div>
+                        <span className={css.attrnote}>{a.note}</span>
+                      </div>
+                    ))}
+                  </section>
+                  </>
+                ) : (
+                  /* An ad-supported or rent-or-buy service: what it did in the week that
+                     just settled. These figures keep no weekly history, so there is no
+                     trend chart here, only the week. */
+                  <div className={css.tiles}>
+                    {modelTiles.map(tile => (
+                      <div className={css.tile} key={tile.label}>
+                        <span className={css.tlabel}>{tile.label}</span>
+                        <b className={css.tval}>{tile.value}</b>
+                        <div className={css.trow}><em className={atlas.tileNote}>{tile.note}</em></div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* who watches your service, and the sharing rule that shapes it */}
+                {market && subscriptionModel && (
+                  <>
+                    <div className={atlas.secHead}><h2>Who watches your service</h2><span>{market.customerAccess.available ? 'last settled week' : 'settles next week'}</span></div>
+                    <AccessBoard
+                      accent={c}
+                      paidAccounts={market.customerAccess.paidAccounts}
+                      sharedHomes={market.customerAccess.externalSharedHouseholds}
+                      sharedViewers={market.customerAccess.sharedActiveViewers}
+                      piracyReach={market.customerAccess.piracyReach}
+                      accessLoadAccounts={market.customerAccess.accessLoadAccounts}
+                      monthlySubscriptionRevenue={market.customerAccess.monthlySubscriptionRevenue}
+                    />
+                  </>
+                )}
+                {/* Pricing and the sharing rules are configuration, so they live
+                    in the Platform room's Offer page; this room reads results. */}
+                {market && onOpenPlatformOffer && (
+                  <button type="button" className={atlas.offerLink} onClick={onOpenPlatformOffer}>
+                    <span>PLATFORM · OFFER</span>
+                    <b>{audienceKind === 'AD_HOMES' ? 'Ad breaks and how you earn' : audienceKind === 'BUYERS' ? 'Store prices and how you earn' : 'Prices, plans and account sharing'}</b>
+                    <small>{accessPolicy && subscriptionModel ? `Sharing: ${SHARING_POSTURE_WORDS[accessPolicy.sharingPosture]} · ${ENFORCEMENT_WORDS[accessPolicy.enforcementInvestment]} checks` : 'Change how the service earns'}</small>
+                    <i aria-hidden="true">→</i>
+                  </button>
+                )}
               </>
             ) : market ? (
               <>
@@ -444,105 +607,98 @@ export const AudienceDesk: React.FC<{
 
                 {marketView === 'OVERVIEW' && (
                   <>
-                    {audienceMap('INDUSTRY')}
-                    <div className={css.marketKpis}>
-                      <div><span>PAYING HOMES</span><b>{count(market.payingHouseholds)}</b></div>
-                      <div><span>PAID SUBSCRIPTIONS</span><b>{count(market.paidSubscriptions)}</b></div>
-                      <div><span>SUBS / HOME</span><b>{market.subscriptionsPerHousehold}</b></div>
-                      <div><span>WATCH HOURS / WK</span><b>{count(market.weeklyWatchHours)}</b></div>
-                      <div><span>HOUSEHOLD BUDGET</span><b>{money(market.householdEconomy.averageMonthlyEntertainmentBudget)}/mo</b></div>
-                      <div><span>OUTSIDE MARKET</span><b>{count(market.householdEconomy.nonParticipantHouseholds)}</b></div>
-                    </div>
-                    <p className={css.marketExplain}>This is spending capacity, not automatic streaming revenue. Every service still has to win a place in the household budget.</p>
-                    <section className={css.adsec}>
-                      <div className={css.adhead}><h2>Subscription competition</h2><span>{market.streamingCompetition.offerCount} active offers</span></div>
-                      <div className={css.marketKpis}>
-                        <div><span>HOMES WON</span><b>{count(market.streamingCompetition.playerHouseholds)}</b></div>
-                        <div><span>UNCLAIMED HOMES</span><b>{count(market.streamingCompetition.unclaimedHouseholds)}</b></div>
-                        <div><span>EFFECTIVE PRICE</span><b>{money(market.streamingCompetition.playerEffectiveMonthlyPrice)}/mo</b></div>
-                        <div><span>YOUR PLAN MIX</span><b>{market.streamingCompetition.playerPlanAllocations.length || '—'}</b></div>
-                      </div>
-                      {market.streamingCompetition.playerPlanAllocations.length > 0 && (
-                        <div className={css.overlapGrid}>
-                          {market.streamingCompetition.playerPlanAllocations.map(plan => (
-                            <div key={plan.planId}><strong>{count(plan.households)}</strong><span>{plan.planName} · {money(plan.effectiveMonthlyPrice)}</span></div>
-                          ))}
-                        </div>
-                      )}
-                      <p className={css.marketExplain}>Every active service competes for the same finite country households. Price, plan fit, catalogue, localization and trust decide who wins; homes may still choose nobody.</p>
-                    </section>
-<details className={css.audienceMore}><summary>Audience economics & access</summary>
-                    <section className={css.adsec}>
-                      <div className={css.adhead}><h2>Paid audience and access</h2><span>{market.customerAccess.available ? 'canonical customers' : 'forecast'}</span></div>
-                      <div className={css.marketKpis}>
-                        <div><span>PAID ACCOUNTS</span><b>{count(market.customerAccess.paidAccounts)}</b></div>
-                        <div><span>PAYING HOMES</span><b>{count(market.customerAccess.payingHouseholds)}</b></div>
-                        <div><span>SHARED ACCESS</span><b>{count(market.customerAccess.externalSharedHouseholds)}</b></div>
-                        <div><span>PIRACY REACH</span><b>{count(market.customerAccess.piracyReach)}</b></div>
-                        <div><span>ACCESS LOAD</span><b>{count(market.customerAccess.accessLoadAccounts)}</b></div>
-                        <div><span>MONTHLY SUBS</span><b>{money(market.customerAccess.monthlySubscriptionRevenue)}</b></div>
-                      </div>
-                      <p className={css.marketExplain}>Only paid accounts create subscription revenue. Shared viewers still use delivery capacity; piracy is reach outside the paid service.</p>
-                      {accessPolicy && onAccessPolicyChange ? (
-                        <div className={css.accessPolicy}>
-                          <div>
-                            <span>SHARING POSTURE</span>
-                            <div className={css.marketTabs}>
-                              {([
-                                ['REACH_FIRST', 'Reach first'],
-                                ['BALANCED', 'Balanced'],
-                                ['HOUSEHOLD_ONLY', 'Household only'],
-                              ] as [StreamingSharingPosture, string][]).map(([id, label]) => (
-                                <button key={id} type="button" className={accessPolicy.sharingPosture === id ? css.on : ''} onClick={() => onAccessPolicyChange({ sharingPosture: id, enforcementInvestment: accessPolicy.enforcementInvestment })}>{label}</button>
-                              ))}
-                            </div>
-                          </div>
-                          <div>
-                            <span>ENFORCEMENT</span>
-                            <div className={css.marketTabs}>
-                              {([
-                                ['LIGHT', 'Light'],
-                                ['STANDARD', 'Standard'],
-                                ['AGGRESSIVE', 'Aggressive'],
-                              ] as [StreamingEnforcementInvestment, string][]).map(([id, label]) => (
-                                <button key={id} type="button" className={accessPolicy.enforcementInvestment === id ? css.on : ''} onClick={() => onAccessPolicyChange({ sharingPosture: accessPolicy.sharingPosture, enforcementInvestment: id })}>{label}</button>
-                              ))}
-                            </div>
-                          </div>
-                          <small>{accessPolicy.source === 'LEADERSHIP_DEFAULT' ? 'Leadership default. Choosing a control makes this a direct player policy.' : 'Direct player policy.'}</small>
-                        </div>
-                      ) : null}
-                    </section>
-                    <section className={css.adsec}>
-                      <div className={css.adhead}><h2>Where households can participate</h2><span>industry access</span></div>
-                      <div className={css.marketKpis}>
-                        <div><span>STREAMING REACH</span><b>{count(market.industryParticipation.streamingReachableHouseholds)}</b></div>
-                        <div><span>CINEMA REACH</span><b>{count(market.industryParticipation.cinemaReachableHouseholds)}</b></div>
-                        <div><span>BOTH</span><b>{count(market.industryParticipation.dualParticipantHouseholds)}</b></div>
-                        <div><span>NEITHER</span><b>{count(market.industryParticipation.neitherHouseholds)}</b></div>
-                      </div>
-                      <p className={css.marketExplain}>This is market potential, not automatic customers or revenue. Streaming and cinema still have to win attention and a place in each household budget.</p>
-                    </section>
-                    <section className={css.adsec}>
-                      <div className={css.adhead}><h2>Streaming adoption</h2><span>last 52 game weeks</span></div>
-                      <MarketLine data={marketTrend} color={c} label="Global active streaming viewers over the last 52 game weeks" />
-                      <div className={css.marketAxis}><span>52 weeks ago</span><span>{count(market.activeViewers)} now</span></div>
-                    </section>
-                    <section className={css.adsec}>
-                      <div className={css.adhead}><h2>Who owns watch time?</h2><span>all services</span></div>
-                      <p className={css.marketExplain}>Viewing time is different from subscriber count. Free and local services can win attention without owning the household bill.</p>
-                      <ShareBoard shares={market.globalWatchShare} />
-                    </section>
-                    <section className={css.adsec}>
-                      <div className={css.adhead}><h2>One home, many subscriptions</h2><span>subscriber overlap</span></div>
-                      <div className={css.overlapGrid}>
-                        <div><strong>{plainPct(market.subscriberOverlap.oneServicePercent)}</strong><span>one service</span></div>
-                        <div><strong>{plainPct(market.subscriberOverlap.twoServicesPercent)}</strong><span>two services</span></div>
-                        <div><strong>{plainPct(market.subscriberOverlap.threePlusPercent)}</strong><span>three or more</span></div>
-                      </div>
-                      <p className={css.marketCallout}>You do not always need to replace Netflix. Winning the second subscription slot can be the first victory.</p>
-                    </section>
-                    </details>
+                    {atlasCountries.length > 0 ? (
+                      <>
+                        {/* the living market, on the map the player built their launch on */}
+                        <AudienceAtlas
+                          mode="MARKET"
+                          countries={atlasCountries}
+                          regions={atlasRegions}
+                          accent={c}
+                          focusRegion={focusRegion}
+                          selectedCountryId={openCountryId}
+                          onFocusRegion={focusOn}
+                          onSelectCountry={openCard}
+                          reading={focusSummary
+                            ? { value: compact(focusSummary.activeViewers), caption: `${focusSummary.label} · people watching` }
+                            : { value: compact(market.activeViewers), caption: `active streaming viewers · wk ${market.generatedAtAbsoluteWeek}` }}
+                          aside={{ value: compact(focusSummary ? focusSummary.payingHouseholds : market.payingHouseholds), caption: 'paying homes' }}
+                        />
+                        <RegionRail regions={atlasRegions} focus={focusRegion} onFocus={focusOn}
+                          valueOf={region => region.activeViewers} worldValue={market.activeViewers} />
+                        <div className={atlas.secHead}><h2>Where people watch</h2><span>{focusSummary ? focusSummary.label : 'biggest audiences'}</span></div>
+                        <TopCountryRail cards={marketCards} onOpen={openCard} />
+                      </>
+                    ) : (
+                      <section className={css.marketHero}>
+                        <span>THE LIVING MARKET · WK {market.generatedAtAbsoluteWeek}</span>
+                        <strong>{count(market.activeViewers)}</strong>
+                        <h2>active streaming viewers</h2>
+                        <p>{count(market.globalPopulation)} people · {count(market.payingHouseholds)} paying homes</p>
+                      </section>
+                    )}
+                    {/* the market as three pictures: who can and who pays, who wins, and the curve */}
+                    <div className={atlas.secHead}><h2>From homes to you</h2><span>can stream · pay · {words.funnel.toLowerCase()}</span></div>
+                    <MarketFunnel
+                      accent={c}
+                      rows={[
+                        { label: 'CAN STREAM', value: market.industryParticipation.streamingReachableHouseholds, unit: 'homes' },
+                        { label: 'PAY FOR STREAMING', value: market.payingHouseholds, unit: 'homes' },
+                        state.live
+                          ? { label: words.funnel, value: yourAudienceHomes, unit: audienceKind === 'BUYERS' ? 'buyers' : 'homes', you: true }
+                          : { label: words.funnel, value: 0, unit: 'homes', you: true, pending: 'opens at launch' },
+                      ]}
+                      reach={{
+                        streamingOnly: market.industryParticipation.streamingOnlyHouseholds,
+                        dual: market.industryParticipation.dualParticipantHouseholds,
+                        cinemaOnly: market.industryParticipation.cinemaOnlyHouseholds,
+                        neither: market.industryParticipation.neitherHouseholds,
+                        streamingReach: market.industryParticipation.streamingReachableHouseholds,
+                        cinemaReach: market.industryParticipation.cinemaReachableHouseholds,
+                      }}
+                      facts={[
+                        { value: market.subscriptionsPerHousehold.toFixed(1), label: 'SUBS / HOME' },
+                        { value: compact(market.weeklyWatchHours), label: 'WATCH HOURS / WK' },
+                        { value: `${budgetLabel(market.householdEconomy.averageMonthlyEntertainmentBudget)}/mo`, label: 'HOUSEHOLD BUDGET' },
+                        { value: compact(market.householdEconomy.nonParticipantHouseholds), label: 'OUTSIDE MARKET' },
+                      ]}
+                      overlap={{
+                        one: market.subscriberOverlap.oneServicePercent,
+                        two: market.subscriberOverlap.twoServicesPercent,
+                        three: market.subscriberOverlap.threePlusPercent,
+                      }}
+                      notes={[
+                        demandNote.trim(),
+                        'This is spending capacity, not automatic streaming revenue; reach is market potential, not automatic customers or revenue.',
+                        "Winning a home's second subscription slot counts too.",
+                      ]}
+                    />
+                    <div className={atlas.secHead}><h2>Who wins</h2><span>{market.streamingCompetition.offerCount} services competing</span></div>
+                    <WinnersBoard
+                      accent={c}
+                      homes={worldShares}
+                      homesWon={subscriptionModel ? (youShare?.households ?? yourHomes) : yourAudienceHomes}
+                      homesWonLabel={!state.live ? 'HOMES WON' : audienceKind === 'AD_HOMES' ? 'WATCHING YOU FREE' : audienceKind === 'BUYERS' ? 'BUYERS THIS WEEK' : 'HOMES PAYING YOU'}
+                      homesWonCaption={!state.live ? 'opens at launch'
+                        : !subscriptionModel ? `${audienceKind === 'AD_HOMES' ? 'free with ads' : 'rent or buy'} · not in the paid race`
+                          : youShare ? `${formatShare(youShare.share)} of homes that can stream` : 'none yet'}
+                      unclaimedHomes={unclaimedTotal}
+                      unclaimedCaption={`${Math.round(unclaimedTotal / Math.max(1, reachTotal) * 100)}% of homes that can stream pay for nothing`}
+                      demandHomes={state.live && subscriptionModel ? market.streamingCompetition.playerHouseholds : undefined}
+                      /* every saved plan, with the homes the competition model
+                         gives it at today's offer (none before the offer is live) */
+                      planMix={subscriptionModel && market.playerPlans.length ? {
+                        plans: market.playerPlans.map(plan => ({
+                          id: plan.id,
+                          name: plan.name,
+                          households: market.streamingCompetition.playerPlanAllocations.find(row => row.planId === plan.id)?.households ?? 0,
+                        })),
+                        effectivePrice: market.streamingCompetition.playerEffectiveMonthlyPrice,
+                      } : undefined}
+                      watch={market.globalWatchShare}
+                    />
+                    <div className={atlas.secHead}><h2>Streaming adoption</h2><span>last 52 game weeks</span></div>
+                    <MarketPulse accent={c} data={marketTrend} now={market.activeViewers} caption="people watching streaming now" />
                   </>
                 )}
 
@@ -644,8 +800,16 @@ export const AudienceDesk: React.FC<{
           </section>
         )}
 
+        {/* ── CAMPAIGNS before launch: say so, rather than offer buttons that do nothing ── */}
+        {tab === 'CAMPAIGNS' && !state.live && (
+          <div className={atlas.prelaunchCard}>
+            <b>Campaigns start after launch</b>
+            <span>Your opening campaign is planned in Build the Platform, on the Money stage. Once the service is live, new campaigns and the recommendation engine are run from here.</span>
+          </div>
+        )}
+
         {/* ── CAMPAIGNS — the Boost / Promote pattern ── */}
-        {tab === 'CAMPAIGNS' && (
+        {tab === 'CAMPAIGNS' && state.live && (
           <>
             <section className={css.adsec}>
               <div className={css.adhead}>
@@ -677,8 +841,8 @@ export const AudienceDesk: React.FC<{
 
             <section className={css.adsec}>
               <div className={css.adhead}>
-                <h2>Recommendation plan</h2>
-                <span>{state.live ? 'Review and lock for the next week' : 'Available after opening'}</span>
+                <h2>Recommendation engine</h2>
+                <span>what the algorithm optimises for</span>
               </div>
               <div className={css.objgrid}>
                 {([
@@ -688,7 +852,7 @@ export const AudienceDesk: React.FC<{
                   ['BREAKOUT', 'Breakout creation', 'Bet everything on making one title huge'],
                 ] as [RecObjective, string, string][]).map(([id, label, note]) => (
                   <button key={id} className={cx(css.obj, (state.objective === id ? css.on : ''))}
-                    disabled={!state.live || !onObjective} onClick={() => onObjective?.(id)}>
+                    onClick={() => onObjective?.(id)}>
                     <b>{label}</b>
                     <span>{note}</span>
                   </button>
@@ -698,60 +862,154 @@ export const AudienceDesk: React.FC<{
           </>
         )}
 
-        {/* ── REGIONS ── */}
-        {tab === 'REGIONS' && <>
-          {audienceMap('INDUSTRY')}
-          {focusedCountry && <CountryMarketCard country={focusedCountry} color={c}/>}
-          <section className={css.adsec}><div className={css.adhead}><h2>Your regions</h2><span>{state.live ? 'platform performance' : 'opening footprint'}</span></div>
-            {state.regions.map(region => <button className={css.reg} key={region.id} onClick={() => { selectMapRegion(region.id); setMapCountry(null); onOpenRegion?.(region); }}>
-              <div className={css.regtop}><b>{region.label}</b><em>{count(region.subs)} subscribers</em></div>
-              <div className={css.regfoot}><span>Industry watch share {region.sharePct.toFixed(1)}%</span><span>Explore countries →</span></div>
-            </button>)}
-          </section>
-        </>}
+        {/* ── REGIONS: every continent as its own small map ── */}
+        {tab === 'REGIONS' && (
+          atlasCountries.length > 0 ? (
+            <>
+              <RegionTiles
+                regions={atlasRegions}
+                countries={atlasCountries}
+                live={state.live}
+                focus={focusRegion}
+                audienceKind={audienceKind}
+                onOpen={regionId => focusOn(focusRegion === regionId ? null : regionId)}
+              />
+              {focusSummary ? (
+                <>
+                  <div className={atlas.regionPanelHead}>
+                    <div><small>{focusSummary.live} LIVE · {focusSummary.countries} COUNTRIES</small><h3>{focusSummary.label}</h3></div>
+                    <button type="button" onClick={() => focusOn(null)}>ALL REGIONS</button>
+                  </div>
+                  <AudienceAtlas
+                    mode={state.live ? 'PLATFORM' : 'OPERATIONS'}
+                    countries={atlasCountries}
+                    regions={atlasRegions}
+                    accent={c}
+                    focusRegion={focusRegion}
+                    selectedCountryId={openCountryId}
+                    onFocusRegion={focusOn}
+                    onSelectCountry={openCard}
+                    reading={state.live
+                      ? { value: focusSummary.playerAudience > 0 ? compact(focusSummary.playerAudience) : '—', caption: `${words.region} here` }
+                      : { value: compact(focusSummary.activeViewers), caption: 'people watching here' }}
+                    aside={{ value: `${focusSummary.live}/${focusSummary.countries}`, caption: 'countries live' }}
+                    gauge={focusSummary.countries ? focusSummary.live / focusSummary.countries : 0}
+                  />
+                  <CountryRows rows={regionRows} onOpen={openCard} />
+                  {scoped.length > 12 && !showAllCountries && (
+                    <button type="button" className={atlas.moreRow} onClick={() => setShowAllCountries(true)}>Show all {scoped.length} countries</button>
+                  )}
+                </>
+              ) : (
+                <p className={css.marketExplain} style={{ marginTop: 12 }}>Tap a region to fly there and see every country in it.</p>
+              )}
+            </>
+          ) : (
+            <div className={css.adpending}><b>Regions unavailable</b><span>The world map appears when this save's market data is ready.</span></div>
+          )
+        )}
 
-        {/* Markets owns territory entry and expansion. Regions remains analytics. */}
+        {/* ── MARKETS: where you stand, country by country ── */}
         {tab === 'MARKETS' && (
           <>
-            {audienceMap('MARKETS')}
-            <div className={css.marketPortfolioSummary}>
-              <div><span>Live</span><b>{countryMarketOperations.filter(row=>row.status==='ACTIVE').length}</b></div>
-              <div><span>Selected / filed</span><b>{countryMarketOperations.filter(row=>row.status!=='ACTIVE').length}</b></div>
-              <div><span>Open requests</span><b>{countryMarketOperations.filter(row=>row.clearance?.outcome==='ADDITIONAL_REQUIREMENT'||row.clearance?.outcome==='TEMPORARILY_REJECTED').length}</b></div>
+            {atlasCountries.length > 0 && (
+              <>
+                <AudienceAtlas
+                  mode="OPERATIONS"
+                  countries={atlasCountries}
+                  regions={atlasRegions}
+                  accent={c}
+                  focusRegion={focusRegion}
+                  selectedCountryId={openCountryId}
+                  onFocusRegion={focusOn}
+                  onSelectCountry={openCard}
+                  reading={{
+                    value: String(focusSummary ? focusSummary.live : liveCountries.length),
+                    caption: focusSummary ? `${focusSummary.label} · countries live` : (liveCountries.length === 1 ? 'country live' : 'countries live'),
+                  }}
+                  aside={{
+                    value: String(focusSummary ? focusSummary.opening : openingCountries.length),
+                    caption: 'on their way',
+                    tone: (focusSummary ? focusSummary.opening : openingCountries.length) > 0 ? 'warn' : undefined,
+                  }}
+                  gauge={(focusSummary ? focusSummary.live / Math.max(1, focusSummary.countries) : liveCountries.length / Math.max(1, atlasCountries.length))}
+                />
+                <RegionRail regions={atlasRegions} focus={focusRegion} onFocus={focusOn}
+                  valueOf={region => (state.live ? region.live : region.live + region.opening)} format={value => String(value)}
+                  worldValue={state.live ? liveCountries.length : liveCountries.length + openingCountries.length} />
+              </>
+            )}
+            <div className={atlas.statusRow}>
+              <div style={{ ['--st' as string]: '#4ade80' }}><span>LIVE</span><b>{liveCountries.length}</b></div>
+              <div style={{ ['--st' as string]: '#f5b544' }}><span>ON ITS WAY</span><b>{openingCountries.length + pausedCountries.length}</b></div>
+              <div style={{ ['--st' as string]: '#7d8698' }}><span>OPEN GROUND</span><b>{openGroundCount}</b></div>
             </div>
-            <div className={css.operationsActions}>
-              <button type="button" onClick={()=>onManageMarkets?.()}>Plan market entry →</button>
-              <button type="button" onClick={()=>onReviewClearance?.()}>Clearance & requests →</button>
-            </div>
-            <section className={css.adsec}>
-              <div className={css.adhead}><h2>Country portfolio</h2><span>one living record per market</span></div>
-              <div className={css.marketOpsList}>
-                {portfolio.length ? portfolio.slice(0,portfolioLimit).map(operation => (
-                  <details key={operation.id} className={css.marketOpsFile}>
-                    <summary>
-                      <span><b>{operation.countryProfile?.country || operation.countryId || operation.scopeId}</b><small>{operation.entryKind === 'OPENING' ? 'Opening territory' : 'Expansion'} · {count(operation.countryProfile?.audienceSize || 0)} viewers</small></span>
-                      <em className={css[`status${operation.status}`] || ''}>{operation.status.replaceAll('_', ' ')}</em>
-                    </summary>
-                    <div className={css.marketOpsDetail}>
-                      {operation.clearance && <div className={css.marketOpsReview}><span><small>REVIEW STAGE</small><b>{operation.clearance.stage.replaceAll('_', ' ')}</b></span><strong>{Math.round(operation.clearance.progressPercent)}%</strong><i><b style={{ width: `${operation.clearance.progressPercent}%` }} /></i></div>}
-                      <div className={css.marketOpsTerms}>
-                        <span><small>TAX</small><b>{operation.policySnapshot?.effectiveTaxPercent ?? operation.countryProfile?.taxBaselinePercent ?? 0}%</b></span>
-                        <span><small>LEVY</small><b>{operation.policySnapshot?.streamingLevyPercent ?? operation.countryProfile?.streamingLevyBaselinePercent ?? 0}%</b></span>
-                        <span><small>LOCAL</small><b>{operation.policySnapshot?.localContentObligationPercent ?? operation.countryProfile?.localContentObligationPercent ?? 0}%</b></span>
-                      </div>
-                      <p>{operation.clearance?.condition || `${operation.countryProfile?.localizationPreference.replaceAll('_', ' ').toLowerCase() || 'mixed'} audience preference · ${operation.countryProfile?.privacyComplianceLevel || 'standard'} privacy review.`}</p>
-                      {operation.policySnapshot && <small className={css.marketOpsElection}>NEXT POLICY CYCLE · WEEK {operation.policySnapshot.nextElectionAtAbsoluteWeek}</small>}
-                    </div>
-                  </details>
-                )) : <div className={css.adpending}><b>No entries in this view</b><span>Choose World to see your full portfolio, or plan an entry here.</span></div>}
-              </div>
-              {portfolio.length > portfolioLimit && <button type="button" className={css.adadd} onClick={()=>setPortfolioLimit(limit=>limit+8)}>Show 8 more · {portfolio.length-portfolioLimit} remaining</button>}
-            </section>
+            {(canEnterHere || onManageMarkets) && (
+              /* After launch this opens the room's own Enter New Markets page;
+                 before launch, the opening-markets step of Define the Launch. Once
+                 every country is entered there is nothing new to enter, only the
+                 footprint (and any files in review) to look over. */
+              <button type="button" className={atlas.enterCta} onClick={canEnterHere ? () => setEntry({ picked: [], region: focusRegion }) : onManageMarkets}>
+                <b>{atlasCountries.length > 0 && openGroundCount === 0 ? 'Review your markets →' : state.live ? 'Enter a new market →' : 'Choose opening markets →'}</b>
+                <span>{compact(plannedAudience)} reach in play</span>
+              </button>
+            )}
+            <div className={atlas.secHead}><h2>Your markets</h2><span>{focusSummary ? focusSummary.label : 'tap for the country card'}</span></div>
+            {yourMarkets.length > 0 ? (
+              <>
+                <CountryRows rows={marketRows} onOpen={openCard} />
+                {yourMarkets.length > 12 && !showAllCountries && (
+                  <button type="button" className={atlas.moreRow} onClick={() => setShowAllCountries(true)}>Show all {yourMarkets.length} markets</button>
+                )}
+              </>
+            ) : (
+              <div className={css.adpending}><b>No market entries {focusSummary ? 'here ' : ''}yet</b><span>Tap a country on the map to read its card, then enter it.</span></div>
+            )}
+            {scoped.some(country => country.state === 'AVAILABLE') && (
+              <>
+                <div className={atlas.secHead}><h2>Biggest open ground</h2><span>not entered yet</span></div>
+                <CountryRows rows={openGroundRows} onOpen={openCard} />
+              </>
+            )}
           </>
         )}
 
         <div className={css.adfoot} />
       </div>
+
+      {openCountry && (
+        <AudienceCountrySheet
+          country={openCountry}
+          live={state.live}
+          audienceKind={audienceKind}
+          regionLabel={openCountryRegion}
+          accent={c}
+          accentHex={accentHex}
+          onClose={() => setOpenCountryId(null)}
+          onEnterMarket={canEnterHere
+            ? (entry
+              /* already on the entry page: the card's button adds or removes the country from the pick */
+              ? () => { const countryId = openCountry.id; setOpenCountryId(null); setEntryPicked(current => (current.includes(countryId) ? current.filter(id => id !== countryId) : [...current, countryId])); }
+              : () => { const countryId = openCountry.id; setOpenCountryId(null); setEntry({ picked: [countryId], region: openCountry.regionId }); })
+            : onManageMarkets ? () => { setOpenCountryId(null); onManageMarkets(); } : undefined}
+          enterLabel={entry ? (entry.picked.includes(openCountry.id) ? 'Remove from pick' : 'Pick for entry') : undefined}
+          onShowRegion={() => { const regionId = openCountry.regionId; setOpenCountryId(null); setEntry(null); setTab('REGIONS'); focusOn(regionId); }}
+        />
+      )}
+      {entry && marketEntry && (
+        <AudienceMarketEntry
+          accent={c}
+          countries={atlasCountries}
+          operations={marketOperations}
+          actions={marketEntry}
+          picked={entry.picked}
+          onPickedChange={setEntryPicked}
+          initialRegion={entry.region}
+          initialTab={entry.tab}
+          onOpenCountry={openCard}
+          onClose={() => { setEntry(null); onEntryClose?.(); }}
+        />
+      )}
     </div>
   );
 };

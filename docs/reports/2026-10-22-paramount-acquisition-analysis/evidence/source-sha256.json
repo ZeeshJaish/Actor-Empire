@@ -1,0 +1,10 @@
+{
+  "views/mobile/components/StudioAcquisitionDesk.tsx": "371dba3efb002fb9cdcbd5b501eb4f9d2af350c3a257c4d1f32deb26b25d0515",
+  "views/mobile/components/StudioAcquisitionDealRoom.tsx": "769fe7c79eb5da02cd6d602c5803aef321f9d5ed232a98a339627eab88261f4c",
+  "views/mobile/ForbesApp.tsx": "c6fb8ea179bef60c580d7bad7f9de53a0b1e6f0eb06c5b760b7a304ae7738d80",
+  "services/studioAcquisition.ts": "489fb04f53234b01164bb798d3701e43a66cb7dff62135e976e40c03cc97d365",
+  "services/stockTakeover.ts": "88daf8839d8d7fcf77e2c7c1dc2df9f93080d5203aa2bbdc85c826da29a1f80f",
+  "services/stockLogic.ts": "bf1dbbce9c069f817bd159b78f0f440faad051a9eb3d81016ce0f4f7bc019747",
+  "services/studioEcosystem.ts": "ebca8bf64dea62b836050143ba914584e70e71287a0050db3918ef0267927daf",
+  "services/forbesStudioProfile.ts": "2f4c23df6c2901fba1ec92e94b077f2c0d95f2e75114d4f610295f4dca38db62"
+}

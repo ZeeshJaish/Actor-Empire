@@ -1,0 +1,371 @@
+{
+  "kind": "FROZEN_MATCHED_DESKTOP_PERFORMANCE",
+  "node": {
+    "baseline": {
+      "early": {
+        "n": 32,
+        "p50Ms": 478,
+        "p95Ms": 551,
+        "maxMs": 593,
+        "samplesRoundedMs": [
+          459,
+          451,
+          441,
+          438,
+          538,
+          469,
+          459,
+          457,
+          516,
+          513,
+          475,
+          542,
+          488,
+          487,
+          462,
+          504,
+          521,
+          545,
+          521,
+          551,
+          464,
+          492,
+          448,
+          444,
+          451,
+          495,
+          468,
+          479,
+          497,
+          478,
+          464,
+          593
+        ]
+      },
+      "late": {
+        "name": "late",
+        "comparableStateSha256": "64dbd52430dc8e2ade5c239997273ee4fe7c824fb189b84688e733c46a0ca31f",
+        "finalStateSha256": "6faee2c21e7698a400c69a4f29a15ff0af9db08f725150bdb142fe530e85edd2",
+        "metrics": {
+          "compute": {
+            "n": 8,
+            "minMs": 3965.2753749999993,
+            "p50Ms": 4088.2324579999986,
+            "p95Ms": 4519.636207999996,
+            "maxMs": 4519.636207999996
+          },
+          "prepare": {
+            "n": 8,
+            "minMs": 210.72429099999863,
+            "p50Ms": 230.86704100000134,
+            "p95Ms": 325.30749999999534,
+            "maxMs": 325.30749999999534
+          },
+          "persistence": {
+            "n": 8,
+            "minMs": 2753.213542000005,
+            "p50Ms": 2876.3695420000004,
+            "p95Ms": 3647.500625000008,
+            "maxMs": 3647.500625000008
+          },
+          "uiCommit": {
+            "n": 8,
+            "minMs": 0.5421669999996084,
+            "p50Ms": 0.5890000000072177,
+            "p95Ms": 0.7617910000044503,
+            "maxMs": 0.7617910000044503
+          },
+          "total": {
+            "n": 8,
+            "minMs": 6938.796709,
+            "p50Ms": 7324.466625000001,
+            "p95Ms": 8222.944958,
+            "maxMs": 8222.944958
+          },
+          "market": {
+            "n": 8,
+            "minMs": 605.8379999999997,
+            "p50Ms": 717.5637500000012,
+            "p95Ms": 829.7976249999992,
+            "maxMs": 829.7976249999992
+          }
+        },
+        "saveBytes": 240499011,
+        "heapBefore": 836446856,
+        "heapAfter": 6368200088,
+        "allocationRows": 40573,
+        "slowStages": [
+          [
+            "streaming_industry_start \u2192 streaming_industry_done",
+            1741.6737499999945
+          ],
+          [
+            "world_streaming_viewing_rival_viewing_ready \u2192 world_streaming_viewing_done",
+            1222.5123330000006
+          ],
+          [
+            "world_streaming_viewing_ai_catalogue_ready \u2192 world_streaming_viewing_rival_viewing_ready",
+            642.7585410000029
+          ],
+          [
+            "world_streaming_platform_economy_done \u2192 owned_streaming_processed",
+            306.7955409999995
+          ],
+          [
+            "world_streaming_platform_economy_start \u2192 world_streaming_platform_economy_done",
+            266.9402919999993
+          ],
+          [
+            "start \u2192 state_cloned",
+            259.31095800000185
+          ],
+          [
+            "world_streaming_customers_start \u2192 world_streaming_customers_inputs_ready",
+            114.20254199999908
+          ],
+          [
+            "world_streaming_viewing_choices_ready \u2192 world_streaming_viewing_ai_catalogue_ready",
+            87.50387500000033
+          ]
+        ],
+        "cinemaWeeks": 9,
+        "counts": {
+          "projects": 1524,
+          "rights": 6062
+        }
+      }
+    },
+    "current": {
+      "early": {
+        "n": 32,
+        "p50Ms": 468,
+        "p95Ms": 584,
+        "maxMs": 612,
+        "samplesRoundedMs": [
+          447,
+          446,
+          429,
+          490,
+          465,
+          452,
+          612,
+          497,
+          454,
+          448,
+          428,
+          470,
+          453,
+          437,
+          419,
+          424,
+          528,
+          468,
+          461,
+          485,
+          461,
+          459,
+          502,
+          482,
+          516,
+          514,
+          532,
+          475,
+          563,
+          584,
+          487,
+          578
+        ]
+      },
+      "late": {
+        "name": "late",
+        "comparableStateSha256": "e8c51524b7234633c629f3f8b9bf9a84aa7511a1c48a0a9a874d52f1bc1cb935",
+        "finalStateSha256": "ee69159935a79a64204ce417568b55432dd4512be67d2e547277a3d4028eec1d",
+        "metrics": {
+          "compute": {
+            "n": 8,
+            "minMs": 4289.343292,
+            "p50Ms": 4837.631291999998,
+            "p95Ms": 5260.511333000002,
+            "maxMs": 5260.511333000002
+          },
+          "prepare": {
+            "n": 8,
+            "minMs": 197.65962500000023,
+            "p50Ms": 234.1880420000016,
+            "p95Ms": 340.50587500000256,
+            "maxMs": 340.50587500000256
+          },
+          "persistence": {
+            "n": 8,
+            "minMs": 2522.115417000001,
+            "p50Ms": 2936.3967089999933,
+            "p95Ms": 3586.352374999995,
+            "maxMs": 3586.352374999995
+          },
+          "uiCommit": {
+            "n": 8,
+            "minMs": 0.5047919999997248,
+            "p50Ms": 0.6362500000104774,
+            "p95Ms": 1.4055000000007567,
+            "maxMs": 1.4055000000007567
+          },
+          "total": {
+            "n": 8,
+            "minMs": 7009.624708000001,
+            "p50Ms": 8291.75175000001,
+            "p95Ms": 8631.634584,
+            "maxMs": 8631.634584
+          },
+          "market": {
+            "n": 8,
+            "minMs": 752.8889579999995,
+            "p50Ms": 895.8217500000028,
+            "p95Ms": 1093.5200420000037,
+            "maxMs": 1093.5200420000037
+          }
+        },
+        "saveBytes": 240403213,
+        "heapBefore": 836854728,
+        "heapAfter": 4119103576,
+        "allocationRows": 29027,
+        "slowStages": [
+          [
+            "streaming_industry_start \u2192 streaming_industry_done",
+            2366.6528749999998
+          ],
+          [
+            "world_streaming_viewing_rival_viewing_ready \u2192 world_streaming_viewing_done",
+            1297.788582999994
+          ],
+          [
+            "world_streaming_viewing_ai_catalogue_ready \u2192 world_streaming_viewing_rival_viewing_ready",
+            581.9285420000015
+          ],
+          [
+            "world_streaming_platform_economy_done \u2192 owned_streaming_processed",
+            320.89416699999856
+          ],
+          [
+            "start \u2192 state_cloned",
+            292.09916599999997
+          ],
+          [
+            "weekly_offers_start \u2192 weekly_offers_done",
+            237.88570799998706
+          ],
+          [
+            "world_streaming_platform_economy_start \u2192 world_streaming_platform_economy_done",
+            230.95466699999815
+          ],
+          [
+            "commitments_releases_start \u2192 commitments_releases_done",
+            183.66037500000675
+          ]
+        ],
+        "cinemaWeeks": 9,
+        "counts": {
+          "projects": 1524,
+          "rights": 6062
+        }
+      }
+    }
+  },
+  "app": {
+    "baseline": {
+      "early": {
+        "n": 4,
+        "p50Ms": 525.5999999940395,
+        "p95Ms": 593.4000000059605,
+        "maxMs": 593.4000000059605,
+        "firstMs": 1053.5
+      },
+      "late": {
+        "n": 4,
+        "p50Ms": 9836.59999999404,
+        "p95Ms": 10100.79999999702,
+        "maxMs": 10100.79999999702,
+        "firstMs": 7313.600000008941
+      }
+    },
+    "current": {
+      "early": {
+        "n": 4,
+        "p50Ms": 451.40000000596046,
+        "p95Ms": 464.70000000298023,
+        "maxMs": 464.70000000298023,
+        "firstMs": 1429.7000000029802
+      },
+      "late": {
+        "n": 4,
+        "p50Ms": 7295.899999991059,
+        "p95Ms": 8557.90000000596,
+        "maxMs": 8557.90000000596,
+        "firstMs": 6905.70000000298
+      }
+    }
+  },
+  "bootstrapControl": {
+    "evidence": "Early two-week pre-optimization/optimized full state is byte-identical under the fixed module bootstrap",
+    "sha256": "2c07152fba60c421d0c13d7696dae2f3db182106d6fe8263835ff317f7b280cf"
+  },
+  "limitations": [
+    "Early Node has 32 pooled matched warm weeks from 8, 4 and 20-week batches; raw maxima retained",
+    "Late Node has eight warm weeks; actual App has four warm weeks plus its first calculation per fixture/side",
+    "Small-sample p95 estimates are descriptive maxima or near-maxima, not production percentiles",
+    "Actual App measures Age Up through verified IndexedDB and two animation frames; Node uses a verified memory store",
+    "Fixed authored saves, deterministic bootstrap and per-week RNG/clock; never a real user save",
+    "Late stress saves remain multi-second and memory-heavy; physical devices/native bridge/GPU unverified"
+  ],
+  "fixtureInputs": {
+    "early": {
+      "bytes": 6416728,
+      "sha256": "df71ad39a8055426871e3cdf9fb9a41d67d54898c0da1c7881ff4f5ea4adf077"
+    },
+    "late": {
+      "bytes": 218393131,
+      "sha256": "eb7ab469b13a95666824b04ca145a12e80bc09ea34224ed12eec1dd01f2fbf61"
+    }
+  },
+  "comparison": [
+    {
+      "kind": "node",
+      "fixture": "early",
+      "baselineP50Ms": 478,
+      "currentP50Ms": 468,
+      "baselineP95Ms": 551,
+      "currentP95Ms": 584,
+      "p95ChangePercent": 5.989110707803991,
+      "withinTenPercentP95": true
+    },
+    {
+      "kind": "node",
+      "fixture": "late",
+      "baselineP50Ms": 7324.466625000001,
+      "currentP50Ms": 8291.75175000001,
+      "baselineP95Ms": 8222.944958,
+      "currentP95Ms": 8631.634584,
+      "p95ChangePercent": 4.9701126310275345,
+      "withinTenPercentP95": true
+    },
+    {
+      "kind": "app",
+      "fixture": "early",
+      "baselineP50Ms": 525.5999999940395,
+      "currentP50Ms": 451.40000000596046,
+      "baselineP95Ms": 593.4000000059605,
+      "currentP95Ms": 464.70000000298023,
+      "p95ChangePercent": -21.688574317776798,
+      "withinTenPercentP95": true
+    },
+    {
+      "kind": "app",
+      "fixture": "late",
+      "baselineP50Ms": 9836.59999999404,
+      "currentP50Ms": 7295.899999991059,
+      "baselineP95Ms": 10100.79999999702,
+      "currentP95Ms": 8557.90000000596,
+      "p95ChangePercent": -15.275027720492584,
+      "withinTenPercentP95": true
+    }
+  ]
+}

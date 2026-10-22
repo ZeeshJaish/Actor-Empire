@@ -1,0 +1,243 @@
+{
+  "sx": 1.06e+22,
+  "formatted": "$10.6Sx",
+  "smallSpendChangesBalance": false,
+  "rows": [
+    {
+      "case": "SX raw quote migration",
+      "held": false,
+      "formatted": "$10.6Sx",
+      "cashBefore": 25000000000000,
+      "cashAfter": 10000000000000,
+      "quoteBefore": 1.06e+22,
+      "quoteAfter": 39
+    },
+    {
+      "case": "SX raw quote migration",
+      "held": true,
+      "formatted": "$10.6Sx",
+      "cashBefore": 25000000000000,
+      "cashAfter": 10000000000000,
+      "quoteBefore": 1.06e+22,
+      "quoteAfter": 39,
+      "holdingBefore": {
+        "stockId": "stk_para",
+        "shares": 100,
+        "averageCost": 100,
+        "totalInvested": 10000
+      },
+      "holdingAfter": {
+        "stockId": "stk_para",
+        "shares": 100,
+        "averageCost": 39,
+        "totalInvested": 3900
+      }
+    },
+    {
+      "case": "normal quote, high historical cost and company allocation",
+      "cashBefore": 25000000000000,
+      "cashAfter": 25000000000000,
+      "holdingBefore": {
+        "stockId": "stk_para",
+        "shares": 100,
+        "averageCost": 10000,
+        "totalInvested": 1000000,
+        "equityFunding": [
+          {
+            "ownerStudioId": "funding-co",
+            "shares": 60
+          }
+        ]
+      },
+      "holdingAfter": {
+        "stockId": "stk_para",
+        "shares": 100,
+        "averageCost": 39,
+        "totalInvested": 3900
+      }
+    },
+    {
+      "case": "huge supply migration",
+      "supplyBefore": 1e+24,
+      "supplyAfter": 1950000000,
+      "holdingBefore": {
+        "stockId": "stk_para",
+        "shares": 5.1e+23,
+        "averageCost": 13,
+        "totalInvested": 6.63e+24
+      },
+      "holdingAfter": {
+        "stockId": "stk_para",
+        "shares": 994500000,
+        "averageCost": 13,
+        "totalInvested": 12928500000
+      }
+    },
+    {
+      "case": "ageing release signal",
+      "age40": 1.0977000000000001,
+      "age90": 1.0977000000000001
+    },
+    {
+      "case": "SX wallet transaction precision",
+      "success": true,
+      "cashBefore": 1.06e+22,
+      "cashAfter": 1.06e+22,
+      "sharesBefore": 0,
+      "sharesAfter": 1,
+      "quotedCharge": 13
+    },
+    {
+      "case": "actual year/week dividend clock isolation",
+      "events": [
+        {
+          "year": 18,
+          "week": 12,
+          "markerChanged": true
+        },
+        {
+          "year": 18,
+          "week": 24,
+          "markerChanged": true
+        },
+        {
+          "year": 18,
+          "week": 36,
+          "markerChanged": true
+        },
+        {
+          "year": 18,
+          "week": 48,
+          "markerChanged": true
+        },
+        {
+          "year": 19,
+          "week": 48,
+          "markerChanged": false
+        },
+        {
+          "year": 20,
+          "week": 48,
+          "markerChanged": false
+        }
+      ]
+    },
+    {
+      "case": "20 year maximally positive random-walk isolation",
+      "stocks": [
+        {
+          "id": "stk_apple",
+          "price": 222.81,
+          "ceiling": 222.81,
+          "capitalization": 5000079756330.12,
+          "withinBound": true
+        },
+        {
+          "id": "stk_amzn",
+          "price": 156.39,
+          "ceiling": 156.39,
+          "capitalization": 3015953319304.7695,
+          "withinBound": true
+        },
+        {
+          "id": "stk_goog",
+          "price": 204.25,
+          "ceiling": 204.25,
+          "capitalization": 3936028999009.5,
+          "withinBound": true
+        },
+        {
+          "id": "stk_nflx",
+          "price": 904.93,
+          "ceiling": 904.93,
+          "capitalization": 749995856928.37,
+          "withinBound": true
+        },
+        {
+          "id": "stk_dis",
+          "price": 192.65,
+          "ceiling": 192.65,
+          "capitalization": 600605018896.4,
+          "withinBound": true
+        },
+        {
+          "id": "stk_wbd",
+          "price": 18.75,
+          "ceiling": 18.75,
+          "capitalization": 91892293856.25,
+          "withinBound": true
+        },
+        {
+          "id": "stk_para",
+          "price": 25.39,
+          "ceiling": 25.39,
+          "capitalization": 25351985101.79,
+          "withinBound": true
+        },
+        {
+          "id": "stk_cmcsa",
+          "price": 60.48,
+          "ceiling": 60.48,
+          "capitalization": 491394441222.72,
+          "withinBound": true
+        },
+        {
+          "id": "stk_nke",
+          "price": 161.86,
+          "ceiling": 161.86,
+          "capitalization": 472492815365.10004,
+          "withinBound": true
+        },
+        {
+          "id": "stk_ker",
+          "price": 921.11,
+          "ceiling": 921.11,
+          "capitalization": 166050345604.44,
+          "withinBound": true
+        },
+        {
+          "id": "stk_ko",
+          "price": 64.98,
+          "ceiling": 64.98,
+          "capitalization": 750033524997.9,
+          "withinBound": true
+        },
+        {
+          "id": "stk_pep",
+          "price": 237.61,
+          "ceiling": 237.61,
+          "capitalization": 690490878199.24,
+          "withinBound": true
+        },
+        {
+          "id": "stk_tsla",
+          "price": 156.08,
+          "ceiling": 156.08,
+          "capitalization": 1000027932667.8401,
+          "withinBound": true
+        },
+        {
+          "id": "stk_tm",
+          "price": 328.14,
+          "ceiling": 328.14,
+          "capitalization": 931502038910.0399,
+          "withinBound": true
+        },
+        {
+          "id": "stk_race",
+          "price": 800.11,
+          "ceiling": 800.11,
+          "capitalization": 227550536697.26,
+          "withinBound": true
+        },
+        {
+          "id": "stk_lvmh",
+          "price": 763.67,
+          "ceiling": 763.67,
+          "capitalization": 650000649938.12,
+          "withinBound": true
+        }
+      ]
+    }
+  ]
+}

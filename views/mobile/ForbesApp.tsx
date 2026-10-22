@@ -1,3 +1,5 @@
+import { getListedCompanyValuation } from '../../services/stockValuation';
+import { beginPublicControlTransfer } from '../../services/publicStockControl';
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Business, NPCActor, Player, TalentCareerProfile } from '../../types';
@@ -52,7 +54,7 @@ interface ForbesAppProps {
   player: Player;
   onBack: () => void;
   onUpdatePlayer: (player: Player) => void;
-  onOpenStocks: () => void;
+  onOpenStocks: (stockId?: string) => void;
   onImmersiveChange?: (immersive: boolean) => void;
   initialStudioId?: string;
   initialStudioName?: string;
@@ -197,7 +199,11 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
     });
 
   const marketStudios = (player.world.studios ? (Object.values(player.world.studios) as any[]) : (Object.values(STUDIO_CATALOG) as any[]))
-      .filter(studio => !mergedStudioIds.has(studio.id));
+      .filter(studio => !mergedStudioIds.has(studio.id))
+      .map(studio => {
+          const stock = player.stocks.find(stock => stock.relatedStudioId === studio.id);
+          return stock ? { ...studio, valuation: getListedCompanyValuation(player, stock).equityMarketCap / 1e9 } : studio;
+      });
   const playerOwnedStudioById = new Map(playerOwnedStudios.map(studio => [studio.id, studio]));
   // A newly acquired studio may still exist in the market snapshot. The save
   // owns the truth, so its player-owned entry must replace the market version.
@@ -274,6 +280,7 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
           ...(playerBusiness.studioState?.scripts || []).map(script => script.franchiseId),
       ].filter((id): id is string => Boolean(id)) : [];
       setSelectedStudioProfile(buildForbesStudioProfile({
+          player,
           studio,
           rank,
           worldProjects: player.world.projects || [],
@@ -408,7 +415,7 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
                     });
                     setAcquisitionDeskOpen(true);
                 }}
-                onOpenStocks={onOpenStocks}
+                onOpenStocks={() => onOpenStocks((player.stocks || []).find(stock => stock.relatedStudioId === selectedStudioProfile.id)?.id)}
                 onStartPrivateControl={() => {
                     const result = beginPrivateControlAcquisition({
                         player: latestPlayerRef.current,
@@ -469,7 +476,7 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
                 profile={selectedStudioProfile}
                 acquisitionCase={getAcquisitionCase(player, selectedStudioProfile.id)}
                 onClose={() => setAcquisitionDeskOpen(false)}
-                onOpenStocks={onOpenStocks}
+                onOpenStocks={() => onOpenStocks((player.stocks || []).find(stock => stock.relatedStudioId === selectedStudioProfile.id)?.id)}
                 onImmersiveChange={onImmersiveChange}
                 onSetOperatingModel={(model) => {
                     const result = setSubsidiaryOperatingModel({
@@ -485,11 +492,11 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
                 }}
                 onRunDiligence={(funding) => {
                     const result = runDueDiligence({
-                        player,
+                        player: latestPlayerRef.current,
                         profile: selectedStudioProfile,
                         funding,
                     });
-                    if (result.success) onUpdatePlayer(result.player);
+                    if (result.success) { latestPlayerRef.current = result.player; onUpdatePlayer(result.player); }
                     return result;
                 }}
 	                onSubmitOffer={({ offerType, offerAmount, minorityPercent, funding, commitments }) => {
@@ -504,7 +511,7 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
 	                    });
 	                    if (!hasEnergyFor(acquisitionStrategyEnergyCost)) return energyBlockedResult(acquisitionStrategyEnergyCost);
 	                    const result = submitOpeningOffer({
-	                        player,
+	                        player: latestPlayerRef.current,
                         profile: selectedStudioProfile,
                         offerType,
                         offerAmount,
@@ -528,32 +535,38 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
 	                }}
 	                onAcceptCounter={() => {
 	                    if (!hasEnergyFor(acquisitionStrategyEnergyCost)) return energyBlockedResult(acquisitionStrategyEnergyCost);
-	                    const result = acceptAcquisitionCounter({ player, studioId: selectedStudioProfile.id });
+	                    const result = acceptAcquisitionCounter({ player: latestPlayerRef.current, studioId: selectedStudioProfile.id });
 	                    return spendEnergyFromResult(result, acquisitionStrategyEnergyCost);
 	                }}
 	                onReviseOffer={(offerAmount) => {
 	                    if (!hasEnergyFor(acquisitionStrategyEnergyCost)) return energyBlockedResult(acquisitionStrategyEnergyCost);
-	                    const result = reviseAcquisitionOffer({ player, studioId: selectedStudioProfile.id, offerAmount });
+	                    const result = reviseAcquisitionOffer({ player: latestPlayerRef.current, studioId: selectedStudioProfile.id, offerAmount });
 	                    return spendEnergyFromResult(result, acquisitionStrategyEnergyCost);
 	                }}
 	                onBeatRival={(offerAmount) => {
 	                    if (!hasEnergyFor(acquisitionStrategyEnergyCost)) return energyBlockedResult(acquisitionStrategyEnergyCost);
-	                    const result = beatAcquisitionRivalBid({ player, studioId: selectedStudioProfile.id, offerAmount });
+	                    const result = beatAcquisitionRivalBid({ player: latestPlayerRef.current, studioId: selectedStudioProfile.id, offerAmount });
 	                    return spendEnergyFromResult(result, acquisitionStrategyEnergyCost);
 	                }}
                 onWalkAway={() => {
-                    const result = walkAwayFromAcquisition({ player, studioId: selectedStudioProfile.id });
+                    const result = walkAwayFromAcquisition({ player: latestPlayerRef.current, studioId: selectedStudioProfile.id });
                     if (result.success) {
                         onUpdatePlayer(result.player);
                         setAcquisitionDeskOpen(false);
                     }
                     return result;
                 }}
-	                onCompleteAcquisition={() => {
+	                onBeginControlTransfer={() => {
+                    const result = beginPublicControlTransfer({ player: latestPlayerRef.current, profile: selectedStudioProfile });
+                    if (result.success) { latestPlayerRef.current = result.player; onUpdatePlayer(result.player); }
+                    return result;
+                }}
+	                onCompleteAcquisition={(expectedQuoteKey) => {
 	                    if (!hasEnergyFor(acquisitionSigningEnergyCost)) return energyBlockedResult(acquisitionSigningEnergyCost);
 	                    const result = completeAcquisitionTransaction({
-	                        player,
+	                        player: latestPlayerRef.current,
 	                        profile: selectedStudioProfile,
+                            expectedQuoteKey,
 	                    });
 	                    if (result.success) {
 	                        const resultAfterEnergy = spendEnergyFromResult(result, acquisitionSigningEnergyCost);
@@ -578,17 +591,17 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
 	                }}
 	                onUpdatePresentation={(patch) => {
 	                    const result = updateAcquisitionPresentation({
-	                        player,
+	                        player: latestPlayerRef.current,
 	                        studioId: selectedStudioProfile.id,
 	                        patch,
 	                    });
-	                    if (result.success) onUpdatePlayer(result.player);
+	                    if (result.success) { latestPlayerRef.current = result.player; onUpdatePlayer(result.player); }
 	                    return result;
 	                }}
 	                onCompleteStockControl={() => {
 	                    if (!hasEnergyFor(stockControlEnergyCost)) return energyBlockedResult(stockControlEnergyCost);
 	                    const result = completeAcquisitionTransaction({
-	                        player,
+	                        player: latestPlayerRef.current,
 	                        profile: selectedStudioProfile,
 	                    });
 		                    if (result.success) {

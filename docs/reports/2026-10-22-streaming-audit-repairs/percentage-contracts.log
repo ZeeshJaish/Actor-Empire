@@ -1,0 +1,14 @@
+✔ canonical decimal shares cover 100% despite floating-point addition (0.353167ms)
+✔ actual gaps, double counting and empty populations still fail (0.121ms)
+✔ non-finite, negative, missing and out-of-range values cannot be hidden (0.069833ms)
+✔ four-channel legacy discovery supports absent or undefined optional fields (0.053125ms)
+✔ all six recorded channels must reconcile together (0.052166ms)
+✔ missing required channels and invalid optional values still fail (0.066417ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3.379917

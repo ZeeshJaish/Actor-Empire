@@ -8,6 +8,7 @@ interface StockControlEventModalProps {
     event: ScheduledEvent;
     onOpenAcquisitionDesk: () => void;
     onReviewStock: () => void;
+    onDefer?: () => void;
 }
 
 const formatPercent = (value: number) => `${Number(value || 0).toFixed(1)}%`;
@@ -17,6 +18,7 @@ export const StockControlEventModal: React.FC<StockControlEventModalProps> = ({
     event,
     onOpenAcquisitionDesk,
     onReviewStock,
+    onDefer,
 }) => {
     const data = event.data || {};
     const stock = player.stocks.find(candidate => candidate.id === data.stockId);
@@ -113,6 +115,7 @@ export const StockControlEventModal: React.FC<StockControlEventModalProps> = ({
                             </div>
                             <ArrowRight className="shrink-0 text-zinc-500 transition group-active:translate-x-1" size={20} />
                         </button>
+                        {onDefer && <button type="button" className="min-h-12 w-full rounded-xl border border-zinc-700 p-3 text-sm text-zinc-300" onClick={onDefer}>Remind me in 12 weeks</button>}
                     </div>
                 </div>
             </div>

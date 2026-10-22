@@ -1,0 +1,49 @@
+
+> pr-6.6.3@1.0.25 audit:studio-sale-security
+> esbuild scripts/audit-studio-sale-history.ts scripts/audit-studio-sale-exploits.ts scripts/audit-studio-sale-treasury-lock.ts --bundle --platform=node --format=esm --loader:.csv=text --outdir=/tmp/actor-studio-sale-security && node /tmp/actor-studio-sale-security/audit-studio-sale-history.js && node /tmp/actor-studio-sale-security/audit-studio-sale-exploits.js && node /tmp/actor-studio-sale-security/audit-studio-sale-treasury-lock.js
+
+
+  ..../../tmp/actor-studio-sale-security/audit-studio-sale-history.js  9.4mb ⚠️
+  .../../tmp/actor-studio-sale-security/audit-studio-sale-exploits.js  4.8mb ⚠️
+  ...mp/actor-studio-sale-security/audit-studio-sale-treasury-lock.js  4.7mb ⚠️
+
+⚡ Done in 133ms
+PASS new studio lock tracks 4, 12 and 13 completed weeks across year rollover
+PASS renaming and renovating cannot reset founding date
+PASS acquired studio clock starts at acquisition, even if company is old
+PASS ambiguous old founding week and short history do not impose a new lock
+PASS legacy acquired marker still enforces known acquisition date
+PASS invalid legacy founding or acquisition dates do not create an arbitrary lock
+PASS inheritance to a younger heir preserves studio tenure and trailing earnings
+PASS inheritance does not bypass the remaining lock of a recently acquired studio
+PASS pre-patch heir save with future parent acquisition date remains eligible
+PASS between-turn receipts merge immediately into an existing canonical week, net of investor payouts
+PASS legacy ReleaseWizard net receipts do not deduct their informational investor payout twice
+PASS multiple same-week UI receipts survive the following statement and reload without duplication
+PASS one-off receipt counts once, never latest-week times 52
+PASS young studio uses all actual observed weeks without annual extrapolation
+PASS 52-week window excludes stale future and duplicate entries
+PASS missing history never manufactures income from current weekly scalar
+PASS legacy actual profit history is retained without annualization
+PASS legacy finance ledger recovers receipts, excluding capital and production funding
+PASS final receipt capture is immutable, survives reload, and is idempotent per completed week
+PASS first capture does not duplicate legacy baseline/current operating profit
+PASS new acquisition forecast is not treated as a completed earnings week
+PASS real between-turn catalogue signing with investor payout, save, and next engine tick counts once
+FAIL actual 13-week engine capture and migration AssertionError [ERR_ASSERTION]: real theatrical release must generate receipts
+    at file:///private/tmp/actor-studio-sale-security/audit-studio-sale-history.js:164228:14 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}
+file:///private/tmp/actor-studio-sale-security/audit-studio-sale-history.js:164243
+if (failures.length) throw new Error(`${failures.length} studio-sale history checks failed: ${failures.join(", ")}`);
+                           ^
+
+Error: 1 studio-sale history checks failed: actual 13-week engine capture and migration
+    at file:///private/tmp/actor-studio-sale-security/audit-studio-sale-history.js:164243:28
+
+Node.js v24.11.1

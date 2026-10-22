@@ -1,0 +1,70 @@
+/* ============================================================================
+   PLATFORM · NETWORK — gauges, the revision banner, markets that need work,
+   the site list. --net-accent is the brand colour. Button text rules are
+   written at 0-2-0+ (the HQ shell resets button fonts at 0-1-1).
+   ========================================================================== */
+
+.network{--na:var(--net-accent,var(--epx-nw-c,#8b5cf6));padding-top:2px}
+.secHead{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:20px 0 10px}
+.secHead h2{font:900 16px/1.15 'Inter',system-ui,sans-serif;letter-spacing:-.01em;color:#eef0f5}
+.secHead span{font-size:9.5px;color:#7d8698;text-align:right}
+
+.good{color:#4ade80}
+.warn{color:#ffb020}
+.bad{color:#ff5a5f}
+
+/* ── three gauges ── */
+.gauges{display:grid;grid-template-columns:1.2fr 1.2fr 1fr;gap:7px;margin-top:10px}
+.gauge{display:flex;flex-direction:column;gap:5px;min-width:0;padding:11px 10px;border-radius:15px;background:#0c0f15;border:1px solid rgba(255,255,255,.075)}
+.gauge>span{font:800 7px/1 'Archivo','Inter',sans-serif;letter-spacing:.14em;color:#7d8698}
+.gauge>b{font:400 22px/1 'Anton','Archivo',sans-serif;letter-spacing:.01em;color:#f3f5f9}
+.gauge>small{font-size:8.5px;line-height:1.35;color:#8b93a5}
+.bar{display:block;height:5px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden}
+.bar em{display:block;height:100%;border-radius:3px;background:currentColor}
+.bar em.accentFill{background:var(--na)}
+
+/* ── a revision under construction ── */
+.pending{display:flex;gap:10px;align-items:flex-start;margin-top:10px;padding:11px 12px;border-radius:14px;
+  background:rgba(245,181,68,.07);border:1px solid rgba(245,181,68,.3)}
+.pending i{flex:0 0 auto;width:9px;height:9px;margin-top:3px;border-radius:50%;background:#f5b544;box-shadow:0 0 9px rgba(245,181,68,.8);animation:netPulse 1.6s ease-in-out infinite}
+@keyframes netPulse{0%,100%{opacity:1}50%{opacity:.35}}
+.pending b{display:block;font:800 11.5px/1.25 'Inter',system-ui,sans-serif;color:#fde7b8}
+.pending span{display:block;margin-top:2px;font-size:9.5px;line-height:1.45;color:#d9c7a1}
+
+/* ── markets that need work ── */
+.markets{display:flex;flex-wrap:wrap;gap:5px}
+.marketChip{display:inline-flex;align-items:baseline;gap:5px;padding:6px 9px;border-radius:9px;font-size:9px;color:#a5adbc;background:#0c0f15;border:1px solid rgba(255,255,255,.08)}
+.marketChip b{font:800 10px/1 'Inter',system-ui,sans-serif;color:#eef0f5}
+.marketChip.thin{border-color:rgba(245,181,68,.4)}
+.marketChip.thin b{color:#fde7b8}
+.marketChip.dark{border-color:rgba(255,107,107,.45)}
+.marketChip.dark b{color:#ffc4c4}
+
+.network .more{padding:6px 10px;border-radius:9px;border:1px dashed rgba(255,255,255,.18);font:800 9px/1 'Archivo','Inter',sans-serif;letter-spacing:.06em;color:#c9cfda}
+.network .more.moreWide{display:block;width:100%;padding:11px;text-align:center}
+
+/* ── sites ── */
+.sites{display:flex;flex-direction:column;gap:6px}
+.network .site{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;padding:11px 12px;border-radius:14px;
+  background:#0c0f15;border:1px solid rgba(255,255,255,.075);text-align:left}
+.network .site.siteOn{border-color:color-mix(in srgb,var(--na) 60%,transparent);background:color-mix(in srgb,var(--na) 8%,#0c0f15)}
+.siteDot{width:10px;height:10px;border-radius:50%;background:#fff;box-shadow:0 0 0 2px var(--na)}
+.siteDot.siteCore{box-shadow:0 0 0 2px var(--na),0 0 0 4px rgba(255,255,255,.55)}
+.siteMain{display:flex;flex-direction:column;gap:3px;min-width:0}
+.siteMain b{font:800 12.5px/1.15 'Inter',system-ui,sans-serif;color:#eef0f5;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.siteMain span{font-size:9px;color:#7d8698;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.siteSide{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.siteSide em{font:800 6.5px/1 'Archivo','Inter',sans-serif;font-style:normal;letter-spacing:.14em;padding:3px 5px;border-radius:4px;
+  color:color-mix(in srgb,var(--na) 70%,#fff);border:1px solid color-mix(in srgb,var(--na) 45%,transparent)}
+.siteSide span{font-size:8.5px;color:#8b93a5;white-space:nowrap}
+
+/* ── empty and the door to Build ── */
+.empty{display:flex;flex-direction:column;align-items:flex-start;gap:8px;margin-top:16px;padding:16px 14px;border-radius:16px;background:#0c0f15;border:1px dashed rgba(255,255,255,.14)}
+.empty b{font:900 15px/1.2 'Inter',system-ui,sans-serif;color:#eef0f5}
+.empty span{font-size:10px;line-height:1.5;color:#8b93a5}
+.network .primary{padding:13px 14px;border-radius:12px;background:var(--na);font:900 10px/1 'Archivo','Inter',sans-serif;letter-spacing:.1em;text-transform:uppercase;color:var(--epx-brand-ink,#fff);text-align:center}
+.network .wide{display:block;width:100%;margin-top:14px}
+.foot{display:block;margin-top:7px;font-size:9px;color:#6f7888;text-align:center}
+
+@media (max-width:370px){.gauges{grid-template-columns:1fr 1fr}.gauge:last-child{grid-column:1/-1}}
+@media (prefers-reduced-motion:reduce){.pending i{animation:none}}

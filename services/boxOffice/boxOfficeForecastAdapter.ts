@@ -14,6 +14,8 @@ export const forecastCinemaProject=(player:Player,project:ProjectDetails,titleId
     const week=Math.max(releaseWeek||now+1,(migrated.player.world.cinemaMarket?.lastProcessedAbsoluteWeek||now)+1);
     const prepared=prepareCinemaAudienceWorld(migrated.player,week),world=readCinemaWorldAudience(prepared);
     const input=buildCinemaWeekInput(prepared,week);
+    // A draft is not yet a live candidate, but its forecast still faces the same home alternatives.
+    input.streamingAlternatives=world.streamingAlternatives;
     // Draft campaign is an explicit hypothetical, using exactly the confirmation adapter and costs.
     const draft=commitCinemaReleaseExposure({player:prepared,project,titleId,absoluteWeek:now,allocations:project.marketingChannelAllocations||{}});
     const title=normalizeLiveTitle(prepared,titleId,draft,week,'PLAYER_STUDIO',world);

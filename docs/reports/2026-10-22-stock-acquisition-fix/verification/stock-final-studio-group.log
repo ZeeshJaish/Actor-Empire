@@ -1,0 +1,9 @@
+
+> pr-6.6.3@1.0.25 audit:studio-group
+> esbuild scripts/audit-studio-group.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-studio-group.mjs && node /tmp/audit-studio-group.mjs
+
+
+  ../../../../tmp/audit-studio-group.mjs  4.6mb ⚠️
+
+⚡ Done in 322ms
+Studio Group audit passed.

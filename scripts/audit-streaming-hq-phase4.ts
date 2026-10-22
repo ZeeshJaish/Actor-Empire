@@ -191,14 +191,21 @@ assert(!componentSource.includes('className="hq-bottom-nav"'), 'The retired bott
 assert(commandDeckSource.includes('PLATFORM CONTROL CONSOLE'), 'The transplanted command deck should remain the canonical Home presentation.');
 assert(contentDeskSource.includes('CONTENT DESK'), 'The transplanted Content Desk should remain mounted as a real division.');
 assert(
+    /* Entry #3 (live): the room also owns the offer (pricing, sharing,
+       storefront), so its subtitle names all four of its pages. */
     networkDeskSource.includes('PLATFORM')
-        && networkDeskSource.includes('PRODUCT · TECHNOLOGY · DELIVERY'),
-    'The transplanted Platform room should own product, technology and delivery as a real division.',
+        && networkDeskSource.includes('OFFER · NETWORK · TECHNOLOGY · PRODUCT'),
+    'The transplanted Platform room should own the offer, network, technology and product as a real division.',
 );
 assert(audienceDeskSource.includes('AUDIENCE'), 'The transplanted Audience room should remain mounted as a real division.');
 assert(
-    boardroomSource.includes('Boardroom as BoardroomHub') && boardroomSource.includes('<BoardroomHub'),
-    'The transplanted Boardroom hub should remain mounted as a real division.',
+    /* Entry #5 (live): the Boardroom is the visual desk again (its reviewed
+       Boardroom.module.css), carrying the hub's briefing — the books-open
+       plaque, live deltas and what needs you — above its pictures. */
+    boardroomSource.includes("import css from './presentation/screens/Boardroom/Boardroom.module.css'")
+        && boardroomSource.includes('Books open')
+        && boardroomSource.includes('treasuryDelta'),
+    'The transplanted Boardroom should remain mounted as a real division with its weekly briefing.',
 );
 assert(!componentSource.includes('streaming-zip-extensions'), 'Approximation CSS must not override ZIP-authored rooms.');
 assert(styleSource.includes('env(safe-area-inset-bottom)'), 'HQ navigation and overlays should respect mobile safe areas.');
@@ -228,7 +235,8 @@ assert(
 assert(
     componentSource.includes("id: 'AUDIENCE', label: 'AUDIENCE', sub: 'Opening markets & clearance'")
         && componentSource.includes("id: 'CONTENT', label: 'CONTENT', sub: 'Catalogue, Content Market & Originals'")
-        && componentSource.includes("id: 'PLATFORM', label: 'PLATFORM', sub: 'Product, technology & delivery'")
+        /* entry #3 (live): the Platform room's Offer page joins its pre-launch work */
+        && componentSource.includes("id: 'PLATFORM', label: 'PLATFORM', sub: 'Offer, delivery, technology & product'")
         && componentSource.includes("id: 'BOARDROOM', label: 'BOARDROOM', sub: 'Treasury, capital & governance'"),
     'Each pre-launch Operation must expose its canonical responsibility.',
 );

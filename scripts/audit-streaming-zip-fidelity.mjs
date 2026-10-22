@@ -14,6 +14,17 @@ const transplantRoot = 'components/streaming-transplant';
  * design cannot drift by accident. A hash is only ever re-recorded for a
  * deliberate, reviewed change — never to make a red audit go green.
  *
+ * 2026-10-22: Zeesh approved Claude entries #1–#5 in the transplant request.
+ * AudienceDesk, ContentDesk and NetworkDesk now pin the exact approved live
+ * copy styles; the old flat-map/operation-controls additions are retired.
+ * This deliberately changes the visual baseline, with source hashes and
+ * browser evidence in docs/reports/2026-10-22-operations-transplant/.
+ *
+ * Audit repair, also approved on 2026-10-22: Buildout, Cinematics,
+ * CommandDesk and Shell below pin the existing 612efbb checkpoint. Each
+ * file was verified byte-identical to that commit AND Claude's live copy;
+ * no stylesheet was changed. See the audit-repairs report for the review.
+ *
  * Baseline moved twice, both under the EMPIRE+ UI/UX rebuild:
  *   · Shell.module.css    — design-system Phase A. The shell's local
  *     `--epx-line` copy was deleted so it inherits the token of the same
@@ -27,19 +38,19 @@ const transplantRoot = 'components/streaming-transplant';
  *     so it needed the affordances of one.
  */
 const contracts = [
-  ['StreamingAudienceExperience.tsx', 'AudienceDesk/AudienceDesk.module.css', 'css', 'adf03c78cebf082ac4d76cf52e020194464d81b5d12db397634eb7a2619345b2'],
+  ['StreamingAudienceExperience.tsx', 'AudienceDesk/AudienceDesk.module.css', 'css', '2b93bf8303343ec7c286fe42d4083336af066ad8fb1142a9428ed8eb2ca7dca5'],
   ['StreamingBoardroomExperience.tsx', 'Boardroom/Boardroom.module.css', 'css', '4018be34345f52806f7635d01aa56c654eca4c5d4cfc02aaf816efb1edd993ce'],
-  ['StreamingBuildoutExperience.tsx', 'Buildout/Buildout.module.css', 'css', '1fe7bbd37256959b4b8711b2b3bcc2f933651af5075cae03f5429ef677e86b7a'],
+  ['StreamingBuildoutExperience.tsx', 'Buildout/Buildout.module.css', 'css', 'c4159e58cc0efe5dd921b6106ded8a1bcb222c3b9cc80f58f0039041e8fa6208'],
   ['StreamingRaiseExperience.tsx', 'CapitalRaise/CapitalRaise.module.css', 'css', '79040a688789f35383c0a598467fe01c67994f1b901f34478cf210814e56d237'],
-  ['StreamingCinematicsExperience.tsx', 'Cinematics/Cinematics.module.css', 'css', '081729cb462dcc01261ee508139a227c9f69cdfea6489bf01e55df66e68d8b20'],
-  ['StreamingPlatformCommandDeck.tsx', 'CommandDesk/CommandDesk.module.css', 'css', '48a807b437c19a46a503b5222eaaddaee76d37bbb160399bc0c1a0c6fea9512f'],
-  ['StreamingContentExperience.tsx', 'ContentDesk/ContentDesk.module.css', 's', 'bc098e4e858c310c5b66dc4cbd9744c057b41d06f50da96929a4061275313f96'],
+  ['StreamingCinematicsExperience.tsx', 'Cinematics/Cinematics.module.css', 'css', '83cbb4bd10c9c542eee5dae809ae7132fcae84765835bb039b4d00ec0361a441'],
+  ['StreamingPlatformCommandDeck.tsx', 'CommandDesk/CommandDesk.module.css', 'css', 'be15acee07289e706fb96624abc3e19b94c50970bdc753ff033b36604bb3f2aa'],
+  ['StreamingContentExperience.tsx', 'ContentDesk/ContentDesk.module.css', 's', '89f86b7687f9cf5c60c4d19a89773cf437025f72ce1bd3798979625598942539'],
   ['StreamingStockExperience.tsx', 'LiveQuote/LiveQuote.module.css', 'css', '6a6b4970b35abb398c53e0b6c308f71acf1035a027bfbb2ad5e5e98d18f8262e'],
   ['StreamingMarketDesk.tsx', 'MarketDesk/MarketDesk.module.css', 'css', 'eb158ed6b61a99b8bb7d82a7b48165199b6a09190328864027ee4afe656da482'],
-  ['StreamingNetworkExperience.tsx', 'NetworkDesk/NetworkDesk.module.css', 's', 'a8586a6f159044192a00a55074877df6bb3e51082ad983e0967144b57d3a967d'],
+  ['StreamingNetworkExperience.tsx', 'NetworkDesk/NetworkDesk.module.css', 's', 'feea3483fcf4fc928c63e8c3203d0e8fc76441c27f1cbc84743151cb768c9ed1'],
   ['StreamingPremiereExperience.tsx', 'PremiereNight/PremiereNight.module.css', 'css', '71fdcfa6219abd4909284f61f02c950fd3d70c937d830ca4a5c4ca105ea6e251'],
   ['StreamingPricingExperience.tsx', 'Pricing/Pricing.module.css', 'css', '9f0b3d0a8b9e48f965ef99bb999bca1fdb4b3983e83c70da70cb7e86dc47214e'],
-  ['StreamingPrototypeOrchestrator.tsx', 'Shell/Shell.module.css', 'css', 'ec2ef091b92ae74dfa75ebea01a89b3f83e622737dbc42a251343c41eb66c529'],
+  ['StreamingPrototypeOrchestrator.tsx', 'Shell/Shell.module.css', 'css', 'e368a2d6f8921a5181935ff46ec50c15748dda9ba61f1520e8c172b331cdd66a'],
   ['StreamingListingExperience.tsx', 'TheListing/TheListing.module.css', 'css', '8c2dda2dbfa112f0bac86dde6365979e10a88fcb9ab9f5fa7d32e3e8403bab2c'],
   ['StreamingDossierExperience.tsx', 'TitleDossier/TitleDossier.module.css', 'css', '645da2ec47667cafd90c5ff034b47d5b9a6cda90f88dd26e6295782e9dcda67d'],
   ['StreamingViewerExperience.tsx', 'ViewerApp/ViewerApp.module.css', 'css', 'da71aacac3b074a2f153bb36e9b89b6115dc3508f8b5a9e1b869ad8068279a50'],
@@ -85,12 +96,16 @@ assert(shellCss.includes('--epx-deck-primary'), 'The live brand deck must retain
 assert(shellCss.includes('.deckPhone'), 'The live brand deck must retain its streaming lock-screen product preview.');
 assert(shellCss.includes('.manifestoEditor'), 'The public manifesto must retain its accessible inline editor treatment.');
 
-const shell = read(`${transplantRoot}/StreamingPrototypeOrchestrator.tsx`);
-assert(shell.includes('showPreview={false}'), 'The generic region-preview footer must stay removed from Day-One Markets.');
-assert(shell.includes('activeRegionId={activeMarketRegion}'), 'The map must visually separate the viewed region from selected launch regions.');
-assert(!shell.includes('if (!ids.some(id => marketIds.includes(id)))'), 'Browsing a map region must never auto-select every country.');
-assert(shell.includes('StreamingCountryFlagArt'), 'Day-One Markets must render cross-platform SVG flags instead of emoji.');
-assert(shell.includes('getStreamingMarketEntryProfile'), 'Day-One Markets must expose stable game-world entry consequences.');
+// Live opening-market controls moved out of the prototype orchestrator.
+// Guard the actual page and its canonical adapter instead of retired markup.
+const stepMarkets = read('components/studio-finance/components/launch/StepMarkets.tsx');
+const launchBridge = read('components/StreamingDefineLaunchExperience.tsx');
+const flagField = read('components/studio-finance/components/FlagField.tsx');
+assert(stepMarkets.includes('data.countries.filter((c) => c.region === region)'), 'Opening-market browsing must scope cards to the viewed region.');
+const regionHandler = stepMarkets.match(/onClick=\{\(\) => \{\s*(setRegion\(name\)[^}]+)\}\}/)?.[1];
+assert(regionHandler && !/patch\(|selectedCountryIds|addAll\(/.test(regionHandler), 'Browsing a region must not select or file its countries.');
+assert(stepMarkets.includes('<FlagField') && flagField.includes('<CountryFlagSvg'), 'Opening markets must retain cross-platform SVG flags.');
+assert(launchBridge.includes('getStreamingMarketEntryProfile(market.id)') && stepMarkets.includes('<CountryReport country={report}'), 'Country details must retain canonical entry consequences.');
 
 const cinematics = read(`${transplantRoot}/StreamingCinematicsExperience.tsx`);
 assert(!cinematics.includes("css['found' +"), 'Cinematic CSS module classes must not be composed into an unmapped key.');
@@ -109,16 +124,17 @@ const hq = read('components/StreamingPlatformHQ.tsx');
 [
   'StreamingPlatformCommandDeck',
   'StreamingContentDesk',
-  'StreamingNetworkDesk',
+  'StreamingPlatformDesk',
   'StreamingAudienceDesk',
   'StreamingBoardroom',
   'StreamingViewerApp',
   'StreamingBuildExperience',
-  'StreamingPricingExperience',
-  'StreamingRaiseExperience',
+  'StreamingFinanceRoom',
   'StreamingPremiereExperience',
   'StreamingDossierExperience',
-].forEach(fragment => assert(hq.includes(fragment), `HQ must route through ${fragment}.`));
+].forEach(fragment => assert(hq.includes(`<${fragment}`), `HQ must mount ${fragment}.`));
+assert(hq.includes('offer={platformOffer()}'), 'The live Platform room must receive the canonical Offer actions.');
+assert(hq.includes('onInjectCapital={injectFinanceCapital}') && hq.includes('onAcceptInvestment={acceptFinanceInvestment}'), 'Studio Finance must retain canonical capital and investment transactions.');
 
 assert(!hq.includes('StreamingMarketCommand'), 'Audience market intelligence must stay inside the ZIP Audience Desk instead of opening a parallel dashboard.');
 assert(!hq.includes('showMarketCommand'), 'Audience market intelligence must not keep a duplicate navigation state.');
@@ -128,7 +144,7 @@ assert(audience.includes('STREAMING MARKET'), 'The ZIP Audience Desk must expose
 assert(audience.includes('market.personas'), 'The ZIP Audience Desk must render canonical audience personas.');
 assert(audience.includes('market.switching'), 'The ZIP Audience Desk must render canonical churn and switching pressure.');
 assert(audience.includes('market.platforms'), 'The ZIP Audience Desk must render canonical global and regional rivals.');
-assert(audience.includes('market.countries'), 'The ZIP Audience Regions tab must retain country-level market intelligence.');
+assert(audience.includes('buildAtlasCountries(market?.worldCountries, marketOperations)') && audience.includes('<CountryRows'), 'The Audience atlas and region rows must retain canonical all-country market intelligence.');
 
 assert(hq.includes('className="streaming-zip-viewport"'), 'ZIP screens must own the HQ viewport.');
 assert(!hq.includes("import '../styles/streaming-transplant-host.css'"), 'The retired global host patch must not override CSS Modules.');

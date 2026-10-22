@@ -1,0 +1,336 @@
+FAIL SX cash cannot buy a share with a no-op debit AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+true !== false
+
+FAIL SX corporate treasury cannot consume a share on an unrepresentable sale credit AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+true !== false
+
+FAIL same absolute week cannot reprice stock twice AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
++ actual - expected
+... Skipped lines
+
+  [
+    {
+      dividendYield: 0.005,
+      id: 'stk_apple',
+      lastDividendPayoutWeek: 0,
+      name: 'Apple Inc.',
+      outstandingShares: 15300000000,
++     price: 182.99,
+-     price: 184.12,
+      priceHistory: [
+        182.31,
+        181.35,
+        185.03,
+        182.66,
+...
+        184.12,
++       182.99
+      ],
+      publicFloatPercent: 99,
+      relatedBrandName: 'Apple',
+      relatedStudioId: 'APPLE_TV',
+      sector: 'TECH',
+...
+      outstandingShares: 10400000000,
++     price: 144.42,
+-     price: 145.72,
+      priceHistory: [
+        142.66,
+        141.85,
+        142.97,
+        141.13,
+...
+        145.72,
++       144.42
+      ],
+      publicFloatPercent: 91,
+      sector: 'TECH',
+      symbol: 'AMZN',
+      volatility: 0.03
+...
+      outstandingShares: 12300000000,
++     price: 161.73,
+-     price: 160.92,
+      priceHistory: [
+        159.86,
+        161.91,
+        167.94,
+        164.35,
+...
+        160.92,
++       161.73
+      ],
+      publicFloatPercent: 86,
+      sector: 'TECH',
+      symbol: 'GOOG',
+      volatility: 0.025
+...
+      outstandingShares: 430000000,
++     price: 640.31,
+-     price: 625.08,
+      priceHistory: [
+        638.22,
+        605.84,
+        644.55,
+        599.29,
+...
+        625.08,
++       640.31
+      ],
+      publicFloatPercent: 98,
+      relatedStudioId: 'NETFLIX',
+      sector: 'MEDIA',
+      symbol: 'NFLX',
+...
+      outstandingShares: 1820000000,
++     price: 112.89,
+-     price: 112.48,
+      priceHistory: [
+        110.87,
+        111.69,
+        107.61,
+        112.67,
+...
+        112.48,
++       112.89
+      ],
+      publicFloatPercent: 92,
+      relatedStudioId: 'DISNEY_PLUS',
+      sector: 'MEDIA',
+      symbol: 'DIS',
+...
+      outstandingShares: 2450000000,
++     price: 13.25,
+-     price: 12.77,
+      priceHistory: [
+        12.18,
+        13.06,
+        12.85,
+        11.89,
+...
+        12.77,
++       13.25
+      ],
+      publicFloatPercent: 94,
+      relatedStudioId: 'WARNER_BROS',
+      sector: 'MEDIA',
+      symbol: 'WBD',
+...
+      outstandingShares: 650000000,
++     price: 13.85,
+-     price: 13.45,
+      priceHistory: [
+        12.99,
+        13.11,
+        12.84,
+        12.47,
+...
+        13.45,
++       13.85
+      ],
+      publicFloatPercent: 88,
+      relatedStudioId: 'PARAMOUNT',
+      sector: 'MEDIA',
+      symbol: 'PARA',
+...
+      outstandingShares: 3900000000,
++     price: 42.17,
+-     price: 42.05,
+      priceHistory: [
+        39.99,
+        43.89,
+        40.43,
+        43.59,
+...
+        42.05,
++       42.17
+      ],
+      publicFloatPercent: 83,
+      relatedStudioId: 'UNIVERSAL',
+      sector: 'MEDIA',
+      symbol: 'CMCSA',
+...
+      outstandingShares: 1500000000,
++     price: 106.28,
+-     price: 105.87,
+      priceHistory: [
+        108.65,
+        100,
+        109.61,
+        107.43,
+...
+        105.87,
++       106.28
+      ],
+      publicFloatPercent: 84,
+      relatedBrandName: 'Nike',
+      sector: 'FASHION',
+      symbol: 'NKE',
+...
+      outstandingShares: 123000000,
++     price: 435.48,
+-     price: 442.52,
+      priceHistory: [
+        463.75,
+        467.16,
+        437.94,
+        429.55,
+...
+        442.52,
++       435.48
+      ],
+      publicFloatPercent: 58,
+      relatedBrandName: 'Gucci',
+      sector: 'FASHION',
+      symbol: 'KER',
+...
+      outstandingShares: 4320000000,
++     price: 59.94,
+-     price: 59.75,
+      priceHistory: [
+        61.78,
+        60.39,
+        58.07,
+        57.24,
+...
+        59.75,
++       59.94
+      ],
+      publicFloatPercent: 91,
+      relatedBrandName: 'Coca-Cola',
+      sector: 'BEVERAGE',
+      symbol: 'KO',
+...
+      outstandingShares: 1370000000,
++     price: 167.69,
+-     price: 167.85,
+      priceHistory: [
+        174.29,
+        172.28,
+        174.96,
+        174.1,
+...
+        167.85,
++       167.69
+      ],
+      publicFloatPercent: 93,
+      relatedBrandName: 'Pepsi',
+      sector: 'BEVERAGE',
+      symbol: 'PEP',
+...
+      outstandingShares: 3200000000,
++     price: 174.14,
+-     price: 171.43,
+      priceHistory: [
+        178.81,
+        166.61,
+        167.13,
+        170.16,
+...
+        171.43,
++       174.14
+      ],
+      publicFloatPercent: 86,
+      relatedBrandName: 'Tesla',
+      sector: 'AUTOMOTIVE',
+      symbol: 'TSLA',
+...
+      outstandingShares: 1350000000,
++     price: 228.94,
+-     price: 229.64,
+      priceHistory: [
+        236.9,
+        238.08,
+        228.09,
+        233.07,
+...
+        229.64,
++       228.94
+      ],
+      publicFloatPercent: 77,
+      relatedBrandName: 'Toyota',
+      sector: 'AUTOMOTIVE',
+      symbol: 'TM',
+...
+      outstandingShares: 185000000,
++     price: 414.65,
+-     price: 412.91,
+      priceHistory: [
+        409.68,
+        427.35,
+        422.68,
+        430.38,
+...
+        412.91,
++       414.65
+      ],
+      publicFloatPercent: 72,
+      relatedBrandName: 'Ferrari',
+      sector: 'AUTOMOTIVE',
+      symbol: 'RACE',
+...
+      outstandingShares: 502000000,
++     price: 848.15,
+-     price: 852.66,
+      priceHistory: [
+        860.98,
+        867.58,
+        888.58,
+        881.17,
+...
+        852.66,
++       848.15
+      ],
+      publicFloatPercent: 51,
+      relatedBrandName: 'Louis Vuitton',
+      sector: 'FASHION',
+      symbol: 'LVMH',
+
+FAIL quarterly dividends continue across year boundaries without repeating a stale marker AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+6 !== 13
+
+FAIL old releases cannot keep moving stock decades later AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
+
++ 1.0796000000000001
+- 1
+
+FAIL a new hit can move price but project pressure is bounded AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+  assert.ok(m > 1 && m <= 1.01)
+
+FAIL cent rounding does not exceed a company market capitalization ceiling AssertionError [ERR_ASSERTION]: stk_amzn
+FAIL raw runaway stock values cannot leak through the market display selector AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+  assert.ok(snap.marketCap <= 2535e7)
+
+FAIL nonfinite money is unavailable rather than a fabricated quote AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
+
++ '$999T+'
+- 'Unavailable'
+
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: 9/9 stock market safety checks failed
+
+9 !== 0
+
+    at file:///private/tmp/audit-stock-market-safety.mjs:70755:8
+    at ModuleJob.run (node:internal/modules/esm/module_job:377:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:671:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 9,
+  expected: 0,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.11.1

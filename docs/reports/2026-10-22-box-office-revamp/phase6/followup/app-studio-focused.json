@@ -1,0 +1,27 @@
+{
+  "kind": "FULL_APP_STRICTMODE_VERIFIED_INDEXEDDB",
+  "steps": [
+    "Owned studio actual footprint, forecast, small campaign, one reserve settlement, release, finances, IMDb 320px"
+  ],
+  "footprintForecast": "Cinema audience forecast\nRefresh forecast\n\nCurrent audience, country prices and competing films. Before Greenlight, campaign spend is only a plan. Future competition and delivery may change.\n\nAttention potential\n80/100\nMarket awareness\n179,159,335\nTheater intent\n2,518,912–3,408,217\nOpening paid visits\n2,518,912–3,408,217\nOpening public gross\n$28.7M–$38.8M\nProducer receipts\n$13.8M–$18.6M\nOpening booking costs\n$863k–$1.2M\nAutomatic ticket prices\n$8–$16\nCost recovery visits\n276,264\n\nAvailable screens do not guarantee visits. Cost recovery uses estimated receipts per visit, production, planned campaign and opening booking; later costs can increase it. This is not a lifetime payout.\n\nAwareness by country",
+  "finalForecast": "Cinema audience forecast\nRefresh forecast\n\nCurrent audience, country prices and competing films. Before Greenlight, campaign spend is only a plan. Future competition and delivery may change.\n\nAttention potential\n80/100\nMarket awareness\n180,602,504\nTheater intent\n2,539,207–3,435,704\nOpening paid visits\n2,539,207–3,435,704\nOpening public gross\n$28.9M–$39.2M\nProducer receipts\n$13.9M–$18.8M\nOpening booking costs\n$869k–$1.2M\nAutomatic ticket prices\n$8–$16\nCost recovery visits\n286,843\n\nAvailable screens do not guarantee visits. Cost recovery uses estimated receipts per visit, production, planned campaign and opening booking; later costs can increase it. This is not a lifetime payout.\n\nAwareness by country",
+  "ownerOpening": {
+    "age": 30,
+    "week": 24,
+    "money": 2000,
+    "balance": 17661865.13,
+    "gross": 34050810.63,
+    "receipts": 16335762.51,
+    "campaignSpent": 50000,
+    "unusedReserveReturned": 50000,
+    "reloadUnchanged": true
+  },
+  "finance": "Project financial report\nPublic theatrical gross\n$34.1M\nTheatrical producer receipts\n$16.3M\nCollected producer receipts, all media\n$16.4M\nProduction and paid release costs\n$1.6M\nInvestor payouts\n$0\nTalent backend paid\n$0\nNet studio receipts\n$16.4M\nProject profit after costs\n$14.8M\n\nSigned actor backend paid since tracking began: $0\n\nTotal actor earnings are not recorded on this release.\n\nPublic gross includes the cinema share. Actor pay is reported separately; upfront pay is already in production cost.",
+  "imdb": "Cinema audience insights\n\n2,987,437 first visits · 0 paid repeat visits\n\nModeled paid visits; waiting interest is not a guaranteed stream.\n\nProven theater attendance\nUnconverted audience interest",
+  "viewport": {
+    "width": 320,
+    "scroll": 320
+  },
+  "status": "PASSED",
+  "errors": []
+}

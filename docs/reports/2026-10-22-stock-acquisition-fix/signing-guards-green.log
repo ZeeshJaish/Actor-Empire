@@ -1,0 +1,18 @@
+
+> pr-6.6.3@1.0.25 audit:stock-signing-guards
+> esbuild scripts/audit-stock-signing-guards.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-stock-signing-guards.mjs && node /tmp/audit-stock-signing-guards.mjs
+
+
+  ../../../../tmp/audit-stock-signing-guards.mjs  4.8mb ⚠️
+
+⚡ Done in 43ms
+PASS unsafe known debt
+PASS nonfinite known debt
+PASS unsafe known cash
+PASS duplicate holding rejects control
+PASS malformed corporate rights reject unchanged
+PASS malformed corporate rights reject unchanged
+PASS malformed corporate rights reject unchanged
+PASS malformed corporate rights reject unchanged
+PASS malformed corporate rights reject unchanged
+PASS impossible minimum-cent register rejects unchanged

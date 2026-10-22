@@ -1,0 +1,86 @@
+[
+  {
+    "name": "audience",
+    "exit": 0,
+    "seconds": 0.4,
+    "log": "/tmp/ae-audit-repairs/audience.log"
+  },
+  {
+    "name": "promotion",
+    "exit": 0,
+    "seconds": 0.29,
+    "log": "/tmp/ae-audit-repairs/promotion.log"
+  },
+  {
+    "name": "fidelity",
+    "exit": 0,
+    "seconds": 0.13,
+    "log": "/tmp/ae-audit-repairs/fidelity.log"
+  },
+  {
+    "name": "percentage-contracts",
+    "exit": 0,
+    "seconds": 0.04,
+    "log": "/tmp/ae-audit-repairs/percentage-contracts.log"
+  },
+  {
+    "name": "fidelity-negative-contracts",
+    "exit": 0,
+    "seconds": 0.08,
+    "log": "/tmp/ae-audit-repairs/fidelity-negative-contracts.log"
+  },
+  {
+    "name": "approved-claude-styles",
+    "exit": 0,
+    "seconds": 0.04,
+    "log": "/tmp/ae-audit-repairs/approved-claude-styles.log"
+  },
+  {
+    "name": "audit:save-generations",
+    "exit": 0,
+    "seconds": 0.23,
+    "log": "/tmp/ae-audit-repairs/audit-save-generations.log"
+  },
+  {
+    "name": "audit:streaming-rights-transactions-phase6",
+    "exit": 0,
+    "seconds": 1.3,
+    "log": "/tmp/ae-audit-repairs/audit-streaming-rights-transactions-phase6.log"
+  },
+  {
+    "name": "audit:streaming-global-localization",
+    "exit": 0,
+    "seconds": 0.24,
+    "log": "/tmp/ae-audit-repairs/audit-streaming-global-localization.log"
+  },
+  {
+    "name": "audit:streaming-launch-draft-continuity",
+    "exit": 0,
+    "seconds": 0.21,
+    "log": "/tmp/ae-audit-repairs/audit-streaming-launch-draft-continuity.log"
+  },
+  {
+    "name": "audit:streaming-hq-phase4",
+    "exit": 0,
+    "seconds": 0.35,
+    "log": "/tmp/ae-audit-repairs/audit-streaming-hq-phase4.log"
+  },
+  {
+    "name": "audit:streaming-content-desk-consolidation",
+    "exit": 0,
+    "seconds": 0.36,
+    "log": "/tmp/ae-audit-repairs/audit-streaming-content-desk-consolidation.log"
+  },
+  {
+    "name": "audit:world-streaming-we5-ui",
+    "exit": 0,
+    "seconds": 1.03,
+    "log": "/tmp/ae-audit-repairs/audit-world-streaming-we5-ui.log"
+  },
+  {
+    "name": "audit:streaming-infrastructure-phase5",
+    "exit": 0,
+    "seconds": 0.29,
+    "log": "/tmp/ae-audit-repairs/audit-streaming-infrastructure-phase5.log"
+  }
+]

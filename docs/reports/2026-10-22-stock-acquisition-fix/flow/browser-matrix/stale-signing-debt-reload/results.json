@@ -1,0 +1,579 @@
+{
+  "kind": "PRODUCTION_COMPONENTS_REAL_WEEK_AND_VERIFIED_INDEXEDDB",
+  "studio": "PARAMOUNT",
+  "scenario": "draft",
+  "percent": 51,
+  "steps": [
+    {
+      "label": "loaded synthetic fixture through real migration",
+      "money": 1999987320000,
+      "age": 35,
+      "week": 8,
+      "energy": 100,
+      "holdings": [
+        {
+          "stockId": "stk_para",
+          "shares": 331500000,
+          "averageCost": 13,
+          "totalInvested": 4309500000
+        }
+      ],
+      "case": {
+        "studioId": "PARAMOUNT",
+        "studioName": "Paramount Pictures",
+        "acquisitionState": "PUBLICLY_TRADED",
+        "publicValuation": 8450000000,
+        "approachedWeek": 8,
+        "approachedYear": 35,
+        "status": "DRAFT",
+        "diligence": {
+          "status": "COMPLETE",
+          "fee": 12680000,
+          "funding": {
+            "source": "PERSONAL"
+          },
+          "complianceRisk": 0,
+          "report": {
+            "verifiedDebt": 0,
+            "hiddenLiabilities": 0,
+            "obligations": [
+              "1 key talent commitments",
+              "3 facility and lease obligations",
+              "Standard catalog continuity clauses"
+            ],
+            "adjustedEnterpriseValue": 8450000000,
+            "expectedAnnualIncome": 0,
+            "confidence": 93,
+            "recommendedLow": 7605000000,
+            "recommendedHigh": 9126000000,
+            "primaryRisk": "Execution risk is concentrated in catalog and talent retention."
+          }
+        }
+      },
+      "businesses": [],
+      "debt": {
+        "entries": [],
+        "totalOriginalPrincipal": 0,
+        "totalRemainingPrincipal": 0,
+        "weeklyInterestDue": 0,
+        "weightedAverageRate": 0,
+        "pressureScore": 0,
+        "highestRate": 0,
+        "nextServiceLabel": "No service due"
+      },
+      "reminders": [],
+      "history": [],
+      "stock": {
+        "id": "stk_para",
+        "symbol": "PARA",
+        "name": "Paramount Global",
+        "sector": "MEDIA",
+        "price": 13,
+        "outstandingShares": 650000000,
+        "publicFloatPercent": 88,
+        "volatility": 0.06,
+        "dividendYield": 0.03,
+        "relatedStudioId": "PARAMOUNT",
+        "priceHistory": [
+          12.51,
+          13.61,
+          12.35,
+          13.52,
+          12.77,
+          12.61,
+          12.37,
+          13.62,
+          12.68,
+          12.42,
+          12.86,
+          12.96
+        ],
+        "lastDividendPayoutWeek": 0
+      },
+      "loadStatus": "MISSING"
+    },
+    {
+      "label": "legacy majority case opened actual Forbes route",
+      "money": 1999987320000,
+      "age": 35,
+      "week": 8,
+      "energy": 100,
+      "holdings": [
+        {
+          "stockId": "stk_para",
+          "shares": 331500000,
+          "averageCost": 13,
+          "totalInvested": 4309500000
+        }
+      ],
+      "case": {
+        "studioId": "PARAMOUNT",
+        "studioName": "Paramount Pictures",
+        "acquisitionState": "PUBLICLY_TRADED",
+        "publicValuation": 8450000000,
+        "approachedWeek": 8,
+        "approachedYear": 35,
+        "status": "DRAFT",
+        "diligence": {
+          "status": "COMPLETE",
+          "fee": 12680000,
+          "funding": {
+            "source": "PERSONAL"
+          },
+          "complianceRisk": 0,
+          "report": {
+            "verifiedDebt": 0,
+            "hiddenLiabilities": 0,
+            "obligations": [
+              "1 key talent commitments",
+              "3 facility and lease obligations",
+              "Standard catalog continuity clauses"
+            ],
+            "adjustedEnterpriseValue": 8450000000,
+            "expectedAnnualIncome": 0,
+            "confidence": 93,
+            "recommendedLow": 7605000000,
+            "recommendedHigh": 9126000000,
+            "primaryRisk": "Execution risk is concentrated in catalog and talent retention."
+          }
+        }
+      },
+      "businesses": [],
+      "debt": {
+        "entries": [],
+        "totalOriginalPrincipal": 0,
+        "totalRemainingPrincipal": 0,
+        "weeklyInterestDue": 0,
+        "weightedAverageRate": 0,
+        "pressureScore": 0,
+        "highestRate": 0,
+        "nextServiceLabel": "No service due"
+      },
+      "reminders": [],
+      "history": [],
+      "stock": {
+        "id": "stk_para",
+        "symbol": "PARA",
+        "name": "Paramount Global",
+        "sector": "MEDIA",
+        "price": 13,
+        "outstandingShares": 650000000,
+        "publicFloatPercent": 88,
+        "volatility": 0.06,
+        "dividendYield": 0.03,
+        "relatedStudioId": "PARAMOUNT",
+        "priceHistory": [
+          12.51,
+          13.61,
+          12.35,
+          13.52,
+          12.77,
+          12.61,
+          12.37,
+          13.62,
+          12.68,
+          12.42,
+          12.86,
+          12.96
+        ],
+        "lastDividendPayoutWeek": 0
+      },
+      "loadStatus": "MISSING"
+    },
+    {
+      "label": "closing reached without dossier reset",
+      "money": 1999987320000,
+      "age": 35,
+      "week": 8,
+      "energy": 100,
+      "holdings": [
+        {
+          "stockId": "stk_para",
+          "shares": 331500000,
+          "averageCost": 13,
+          "totalInvested": 4309500000
+        }
+      ],
+      "case": {
+        "studioId": "PARAMOUNT",
+        "studioName": "Paramount Pictures",
+        "acquisitionState": "PUBLICLY_TRADED",
+        "publicValuation": 8450000000,
+        "approachedWeek": 8,
+        "approachedYear": 35,
+        "status": "DRAFT",
+        "diligence": {
+          "status": "COMPLETE",
+          "fee": 12680000,
+          "funding": {
+            "source": "PERSONAL"
+          },
+          "complianceRisk": 0,
+          "report": {
+            "verifiedDebt": 0,
+            "hiddenLiabilities": 0,
+            "obligations": [
+              "1 key talent commitments",
+              "3 facility and lease obligations",
+              "Standard catalog continuity clauses"
+            ],
+            "adjustedEnterpriseValue": 8450000000,
+            "expectedAnnualIncome": 0,
+            "confidence": 93,
+            "recommendedLow": 7605000000,
+            "recommendedHigh": 9126000000,
+            "primaryRisk": "Execution risk is concentrated in catalog and talent retention."
+          }
+        },
+        "publicControlIntent": {
+          "kind": "PUBLIC_MAJORITY",
+          "initiatedYear": 35,
+          "initiatedWeek": 8
+        },
+        "presentation": {
+          "responseSeenKey": "0:DRAFT",
+          "closingStage": "CLOSING"
+        }
+      },
+      "businesses": [],
+      "debt": {
+        "entries": [],
+        "totalOriginalPrincipal": 0,
+        "totalRemainingPrincipal": 0,
+        "weeklyInterestDue": 0,
+        "weightedAverageRate": 0,
+        "pressureScore": 0,
+        "highestRate": 0,
+        "nextServiceLabel": "No service due"
+      },
+      "reminders": [],
+      "history": [],
+      "stock": {
+        "id": "stk_para",
+        "symbol": "PARA",
+        "name": "Paramount Global",
+        "sector": "MEDIA",
+        "price": 13,
+        "outstandingShares": 650000000,
+        "publicFloatPercent": 88,
+        "volatility": 0.06,
+        "dividendYield": 0.03,
+        "relatedStudioId": "PARAMOUNT",
+        "priceHistory": [
+          12.51,
+          13.61,
+          12.35,
+          13.52,
+          12.77,
+          12.61,
+          12.37,
+          13.62,
+          12.68,
+          12.42,
+          12.86,
+          12.96
+        ],
+        "lastDividendPayoutWeek": 0
+      },
+      "loadStatus": "MISSING"
+    },
+    {
+      "label": "entered signing with reviewed quote",
+      "money": 1999987320000,
+      "age": 35,
+      "week": 8,
+      "energy": 100,
+      "holdings": [
+        {
+          "stockId": "stk_para",
+          "shares": 331500000,
+          "averageCost": 13,
+          "totalInvested": 4309500000
+        }
+      ],
+      "case": {
+        "studioId": "PARAMOUNT",
+        "studioName": "Paramount Pictures",
+        "acquisitionState": "PUBLICLY_TRADED",
+        "publicValuation": 8450000000,
+        "approachedWeek": 8,
+        "approachedYear": 35,
+        "status": "DRAFT",
+        "diligence": {
+          "status": "COMPLETE",
+          "fee": 12680000,
+          "funding": {
+            "source": "PERSONAL"
+          },
+          "complianceRisk": 0,
+          "report": {
+            "verifiedDebt": 0,
+            "hiddenLiabilities": 0,
+            "obligations": [
+              "1 key talent commitments",
+              "3 facility and lease obligations",
+              "Standard catalog continuity clauses"
+            ],
+            "adjustedEnterpriseValue": 8450000000,
+            "expectedAnnualIncome": 0,
+            "confidence": 93,
+            "recommendedLow": 7605000000,
+            "recommendedHigh": 9126000000,
+            "primaryRisk": "Execution risk is concentrated in catalog and talent retention."
+          }
+        },
+        "publicControlIntent": {
+          "kind": "PUBLIC_MAJORITY",
+          "initiatedYear": 35,
+          "initiatedWeek": 8
+        },
+        "presentation": {
+          "responseSeenKey": "0:DRAFT",
+          "closingStage": "SIGNING",
+          "reviewedQuoteKey": "[\"PARAMOUNT\",{\"outcome\":\"CONTROL\",\"additionalPrice\":0,\"funding\":{\"source\":\"PERSONAL\"},\"verifiedDebt\":0,\"hiddenLiabilities\":0,\"expectedAnnualIncome\":0,\"ownershipPercent\":51,\"inheritedCapital\":3000000000,\"equityValue\":8450000000,\"sourceVersion\":1},{\"cashMillions\":3000,\"debtMillions\":0}]"
+        }
+      },
+      "businesses": [],
+      "debt": {
+        "entries": [],
+        "totalOriginalPrincipal": 0,
+        "totalRemainingPrincipal": 0,
+        "weeklyInterestDue": 0,
+        "weightedAverageRate": 0,
+        "pressureScore": 0,
+        "highestRate": 0,
+        "nextServiceLabel": "No service due"
+      },
+      "reminders": [],
+      "history": [],
+      "stock": {
+        "id": "stk_para",
+        "symbol": "PARA",
+        "name": "Paramount Global",
+        "sector": "MEDIA",
+        "price": 13,
+        "outstandingShares": 650000000,
+        "publicFloatPercent": 88,
+        "volatility": 0.06,
+        "dividendYield": 0.03,
+        "relatedStudioId": "PARAMOUNT",
+        "priceHistory": [
+          12.51,
+          13.61,
+          12.35,
+          13.52,
+          12.77,
+          12.61,
+          12.37,
+          13.62,
+          12.68,
+          12.42,
+          12.86,
+          12.96
+        ],
+        "lastDividendPayoutWeek": 0
+      },
+      "loadStatus": "MISSING"
+    },
+    {
+      "label": "changed live debt and reload require closing documents again",
+      "money": 1999987320000,
+      "age": 35,
+      "week": 8,
+      "energy": 100,
+      "holdings": [
+        {
+          "stockId": "stk_para",
+          "shares": 331500000,
+          "averageCost": 13,
+          "totalInvested": 4309500000
+        }
+      ],
+      "case": {
+        "studioId": "PARAMOUNT",
+        "studioName": "Paramount Pictures",
+        "acquisitionState": "PUBLICLY_TRADED",
+        "publicValuation": 8450000000,
+        "approachedWeek": 8,
+        "approachedYear": 35,
+        "status": "DRAFT",
+        "diligence": {
+          "status": "COMPLETE",
+          "fee": 12680000,
+          "funding": {
+            "source": "PERSONAL"
+          },
+          "complianceRisk": 0,
+          "report": {
+            "verifiedDebt": 0,
+            "hiddenLiabilities": 0,
+            "obligations": [
+              "1 key talent commitments",
+              "3 facility and lease obligations",
+              "Standard catalog continuity clauses"
+            ],
+            "adjustedEnterpriseValue": 8450000000,
+            "expectedAnnualIncome": 0,
+            "confidence": 93,
+            "recommendedLow": 7605000000,
+            "recommendedHigh": 9126000000,
+            "primaryRisk": "Execution risk is concentrated in catalog and talent retention."
+          }
+        },
+        "publicControlIntent": {
+          "kind": "PUBLIC_MAJORITY",
+          "initiatedYear": 35,
+          "initiatedWeek": 8
+        },
+        "presentation": {
+          "responseSeenKey": "0:DRAFT",
+          "closingStage": "SIGNING",
+          "reviewedQuoteKey": "[\"PARAMOUNT\",{\"outcome\":\"CONTROL\",\"additionalPrice\":0,\"funding\":{\"source\":\"PERSONAL\"},\"verifiedDebt\":0,\"hiddenLiabilities\":0,\"expectedAnnualIncome\":0,\"ownershipPercent\":51,\"inheritedCapital\":3000000000,\"equityValue\":8450000000,\"sourceVersion\":1},{\"cashMillions\":3000,\"debtMillions\":0}]"
+        }
+      },
+      "businesses": [],
+      "debt": {
+        "entries": [],
+        "totalOriginalPrincipal": 0,
+        "totalRemainingPrincipal": 0,
+        "weeklyInterestDue": 0,
+        "weightedAverageRate": 0,
+        "pressureScore": 0,
+        "highestRate": 0,
+        "nextServiceLabel": "No service due"
+      },
+      "reminders": [],
+      "history": [],
+      "stock": {
+        "id": "stk_para",
+        "symbol": "PARA",
+        "name": "Paramount Global",
+        "sector": "MEDIA",
+        "price": 13,
+        "outstandingShares": 650000000,
+        "publicFloatPercent": 88,
+        "volatility": 0.06,
+        "dividendYield": 0.03,
+        "relatedStudioId": "PARAMOUNT",
+        "priceHistory": [
+          12.51,
+          13.61,
+          12.35,
+          13.52,
+          12.77,
+          12.61,
+          12.37,
+          13.62,
+          12.68,
+          12.42,
+          12.86,
+          12.96
+        ],
+        "lastDividendPayoutWeek": 0
+      },
+      "loadStatus": "CURRENT"
+    }
+  ],
+  "console": [
+    {
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_NAME_NOT_RESOLVED"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_NAME_NOT_RESOLVED"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_NAME_NOT_RESOLVED"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_NAME_NOT_RESOLVED"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_NAME_NOT_RESOLVED"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_NAME_NOT_RESOLVED"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_NAME_NOT_RESOLVED"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_NAME_NOT_RESOLVED"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_NAME_NOT_RESOLVED"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_NAME_NOT_RESOLVED"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_NAME_NOT_RESOLVED"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_NAME_NOT_RESOLVED"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_NAME_NOT_RESOLVED"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_NAME_NOT_RESOLVED"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_NAME_NOT_RESOLVED"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_NAME_NOT_RESOLVED"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_NAME_NOT_RESOLVED"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_NAME_NOT_RESOLVED"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_NAME_NOT_RESOLVED"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_NAME_NOT_RESOLVED"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_NAME_NOT_RESOLVED"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_NAME_NOT_RESOLVED"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_NAME_NOT_RESOLVED"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_NAME_NOT_RESOLVED"
+    }
+  ],
+  "closingText": "←\nCLOSING PACKET\nStamp Every Document\nThree documents stand between you and Paramount Pictures. Tap each to stamp it.\nTender Agreement\n$0\n0 remaining shares at the accepted block price\nTAP TO STAMP\nMarket + Liability File\n51.00% already held · $0 exposure\nExisting shares remain credited to your position\nTAP TO STAMP\nControl Transfer\n50%+ voting control\nBoard authority changes at final signature\nTAP TO STAMP\nEnter the Signing Room\n⚡ 25E",
+  "staleQuoteText": "←\nCLOSING PACKET\nStamp Every Document\nThree documents stand between you and Paramount Pictures. Tap each to stamp it.\nTender Agreement\n$0\n0 remaining shares at the accepted block price\nTAP TO STAMP\nMarket + Liability File\n51.00% already held · $500M exposure\nExisting shares remain credited to your position\nTAP TO STAMP\nControl Transfer\n50%+ voting control\nBoard authority changes at final signature\nTAP TO STAMP\nEnter the Signing Room\n⚡ 25E",
+  "status": "PASSED",
+  "errors": []
+}

@@ -1,0 +1,19 @@
+{
+  "first": {
+    "status": "CURRENT",
+    "money": 2100,
+    "violations": []
+  },
+  "second": {
+    "status": "CURRENT",
+    "money": 2200
+  },
+  "damaged": {
+    "status": "RECOVERY_AVAILABLE",
+    "violations": [
+      "integrity digest does not match save payload"
+    ]
+  },
+  "oldMoney": 2100,
+  "nextMoney": 2200
+}

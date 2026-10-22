@@ -4,6 +4,16 @@ import { LockedStreamingFunding } from '../types';
 
 const { applyLockedSeasonFunding, markHiddenSeasonFundingUsed } = fundingLogic;
 
+// Break caught: Greenlight must not floor cents already earned from paid cinema receipts.
+const centBalance=applyLockedSeasonFunding({budget:1_000_000,projectId:'cinema-cent-balance',studioBalance:10_000_000.78,productionFund:0});
+assert.equal(centBalance.nextStudioBalance,9_000_000.78);
+assert.equal(centBalance.studioSpend,1_000_000);
+const centFund=applyLockedSeasonFunding({budget:1_000_000,projectId:'cinema-cent-fund',studioBalance:10_000_000.78,productionFund:.37});
+assert.equal(centFund.productionFundApplied,.37);
+assert.equal(centFund.studioSpend,999_999.63);
+assert.equal(centFund.nextStudioBalance,9_000_001.15);
+assert.equal(centFund.nextProductionFund,0);
+
 const netflixFund: LockedStreamingFunding = {
     id: 'fund_netflix_s2',
     platformId: 'NETFLIX',

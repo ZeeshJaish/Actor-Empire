@@ -149,7 +149,7 @@ const tamperedRollout = structuredClone(preExpansionPlayer) as Player;
 assert.equal(verifySaveIntegrity(tamperedRollout, rolloutV1Manifest).ok, false,
     'current-rollout v1 must still protect its historical catalogue');
 
-assert.equal(expandedManifest.digestSchemaVersion, 3,
+assert.equal(expandedManifest.digestSchemaVersion, 4,
     'new signatures must identify their projection so future fields cannot silently change it');
 const wrongSchema = { ...expandedManifest, digestSchemaVersion: 99 };
 assert.equal(verifySaveIntegrity(preExpansionPlayer, wrongSchema).ok, false,

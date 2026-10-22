@@ -1,0 +1,18 @@
+{
+  "source": "Claude entries #1\u2013#5, refs/ae-live/latest 045f98b",
+  "approved": "User explicitly approved all five entries on 2026-10-22",
+  "styles": {
+    "components/streaming-transplant/presentation/screens/AudienceDesk/AudienceAtlas.module.css": "87bd8393564ed4431dbaec0bdaa1efb952ac1e0ab3733fa25f271f1ce943259d",
+    "components/streaming-transplant/presentation/screens/AudienceDesk/AudienceDesk.module.css": "2b93bf8303343ec7c286fe42d4083336af066ad8fb1142a9428ed8eb2ca7dca5",
+    "components/streaming-transplant/presentation/screens/AudienceDesk/AudienceMarketEntry.module.css": "a194f8fe7281de0887c8f651391add219e8c9ca519175b430d80c455fc806419",
+    "components/streaming-transplant/presentation/screens/AudienceDesk/SharingPolicy.module.css": "2fb7622e81d60ff91c2a92bdd1b9c9a5811d2c42111d887cac739ddf250047a2",
+    "components/streaming-transplant/presentation/screens/Boardroom/Boardroom.module.css": "4018be34345f52806f7635d01aa56c654eca4c5d4cfc02aaf816efb1edd993ce",
+    "components/streaming-transplant/presentation/screens/Boardroom/BoardroomRoom.module.css": "04d4a043e60ea035e2154a107d895a5591b66c6e3d796be14e45db3cc505dcb1",
+    "components/streaming-transplant/presentation/screens/ContentDesk/ContentDesk.module.css": "89f86b7687f9cf5c60c4d19a89773cf437025f72ce1bd3798979625598942539",
+    "components/streaming-transplant/presentation/screens/ContentDesk/ContentRoom.module.css": "59de39cac1eddcb3b46f9d4fe67bdc5232ae46aa02eb1b9d31f48e65bd24a47e",
+    "components/streaming-transplant/presentation/screens/NetworkDesk/NetworkDesk.module.css": "feea3483fcf4fc928c63e8c3203d0e8fc76441c27f1cbc84743151cb768c9ed1",
+    "components/streaming-transplant/presentation/screens/NetworkDesk/NetworkMap.module.css": "8b497558be01382438af12cb7d75d89f484a37810e1eaeb1a784c236b288d13f",
+    "components/streaming-transplant/presentation/screens/NetworkDesk/PlatformNetwork.module.css": "08d28cf70ec6384868551bcb1bec9604c9287da83d34390ddc4c87477163765b",
+    "components/streaming-transplant/presentation/screens/NetworkDesk/PlatformOffer.module.css": "9348d323a43268d713b72631f8b493f10bddb35cafc57d5fd9cc362253d7c340"
+  }
+}

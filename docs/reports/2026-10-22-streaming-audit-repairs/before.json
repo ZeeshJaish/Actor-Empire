@@ -1,0 +1,14 @@
+[
+  {
+    "name": "audit:streaming-audience-market-phase2",
+    "exit": 1
+  },
+  {
+    "name": "audit:streaming-promotion-phase14",
+    "exit": 1
+  },
+  {
+    "name": "audit:streaming-zip-fidelity",
+    "exit": 1
+  }
+]

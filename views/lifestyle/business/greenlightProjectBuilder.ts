@@ -1,4 +1,5 @@
 import { consumeTalentUses } from '../../../services/talentRoster';
+import { preserveCinemaCastRecognition } from '../../../services/boxOffice/boxOfficeInputs';
 import { commitCinemaAnnouncement, prepareCinemaPackageExposure } from '../../../services/boxOffice/boxOfficeExposureAdapters';
 import { getAbsoluteWeek } from '../../../services/legacyLogic';
 import type {
@@ -621,6 +622,7 @@ export const buildGreenlightProject = ({
         };
 
         if (newCommitment.projectDetails?.type === 'MOVIE') {
+            newCommitment.projectDetails = preserveCinemaCastRecognition(newCommitment.projectDetails, player);
             newCommitment.projectDetails.cinemaExposure = prepareCinemaPackageExposure({ player, project: newCommitment.projectDetails,
                 titleId: newCommitment.id, storyAttention: selectedScript.hype ?? 20, musicAttention: soundtrackPlan?.musicBuzz || 0 });
         }

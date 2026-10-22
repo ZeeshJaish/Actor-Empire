@@ -1,0 +1,104 @@
+[
+  {
+    "name": "audit:world-audience-we2-ui",
+    "exit": 0,
+    "seconds": 0.89,
+    "log": "/tmp/ae-operations-transplant/audit-world-audience-we2-ui.log"
+  },
+  {
+    "name": "audit:world-audience-we3-ui",
+    "exit": 0,
+    "seconds": 0.78,
+    "log": "/tmp/ae-operations-transplant/audit-world-audience-we3-ui.log"
+  },
+  {
+    "name": "audit:world-streaming-we4-ui",
+    "exit": 0,
+    "seconds": 0.88,
+    "log": "/tmp/ae-operations-transplant/audit-world-streaming-we4-ui.log"
+  },
+  {
+    "name": "audit:world-streaming-we5",
+    "exit": 0,
+    "seconds": 27.73,
+    "log": "/tmp/ae-operations-transplant/audit-world-streaming-we5.log"
+  },
+  {
+    "name": "audit:world-streaming-we5-ui",
+    "exit": 0,
+    "seconds": 0.77,
+    "log": "/tmp/ae-operations-transplant/audit-world-streaming-we5-ui.log"
+  },
+  {
+    "name": "audit:streaming-hq-phase4",
+    "exit": 0,
+    "seconds": 0.23,
+    "log": "/tmp/ae-operations-transplant/audit-streaming-hq-phase4.log"
+  },
+  {
+    "name": "audit:streaming-launch-audience-connection",
+    "exit": 0,
+    "seconds": 6.81,
+    "log": "/tmp/ae-operations-transplant/audit-streaming-launch-audience-connection.log"
+  },
+  {
+    "name": "audit:streaming-tap-performance",
+    "exit": 0,
+    "seconds": 1.54,
+    "log": "/tmp/ae-operations-transplant/audit-streaming-tap-performance.log"
+  },
+  {
+    "name": "audit:streaming-rights-marketplace-phase16",
+    "exit": 0,
+    "seconds": 0.23,
+    "log": "/tmp/ae-operations-transplant/audit-streaming-rights-marketplace-phase16.log"
+  },
+  {
+    "name": "audit:streaming-content-desk-consolidation",
+    "exit": 0,
+    "seconds": 0.19,
+    "log": "/tmp/ae-operations-transplant/audit-streaming-content-desk-consolidation.log"
+  },
+  {
+    "name": "audit:streaming-design-system",
+    "exit": 0,
+    "seconds": 0.12,
+    "log": "/tmp/ae-operations-transplant/audit-streaming-design-system.log"
+  },
+  {
+    "name": "audit:streaming-catalogue-read-context",
+    "exit": 0,
+    "seconds": 2.51,
+    "log": "/tmp/ae-operations-transplant/audit-streaming-catalogue-read-context.log"
+  },
+  {
+    "name": "audit:streaming-finance-room",
+    "exit": 0,
+    "seconds": 0.23,
+    "log": "/tmp/ae-operations-transplant/audit-streaming-finance-room.log"
+  },
+  {
+    "name": "audit:streaming-rights-transactions-phase6",
+    "exit": 0,
+    "seconds": 0.99,
+    "log": "/tmp/ae-operations-transplant/audit-streaming-rights-transactions-phase6.log"
+  },
+  {
+    "name": "audit:streaming-infrastructure-phase5",
+    "exit": 0,
+    "seconds": 0.24,
+    "log": "/tmp/ae-operations-transplant/audit-streaming-infrastructure-phase5.log"
+  },
+  {
+    "name": "audit:streaming-launch-draft-continuity",
+    "exit": 0,
+    "seconds": 0.13,
+    "log": "/tmp/ae-operations-transplant/audit-streaming-launch-draft-continuity.log"
+  },
+  {
+    "name": "audit:save-generations",
+    "exit": 0,
+    "seconds": 0.18,
+    "log": "/tmp/ae-operations-transplant/audit-save-generations.log"
+  }
+]

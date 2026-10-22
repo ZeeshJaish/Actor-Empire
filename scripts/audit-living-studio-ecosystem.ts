@@ -71,6 +71,8 @@ assert((marvelAfter.hits || 0) > (marvelBefore.hits || 0), 'Universe hit should 
 
 const playerForStock: Player = {
     ...clone(INITIAL_PLAYER),
+    age: 30,
+    currentWeek: 20,
     stocks: initializeStocks(),
     world: {
         ...clone(INITIAL_PLAYER.world),

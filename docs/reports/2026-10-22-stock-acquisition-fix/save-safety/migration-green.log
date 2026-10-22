@@ -1,0 +1,9 @@
+
+> pr-6.6.3@1.0.25 audit:save-migration
+> esbuild scripts/audit-save-migration.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-save-migration.mjs && node /tmp/audit-save-migration.mjs
+
+
+  ../../../../tmp/audit-save-migration.mjs  6.2mb ⚠️
+
+⚡ Done in 84ms
+Save migration audit passed.

@@ -1,6 +1,6 @@
 import type {Player, WorldStreamingViewingState, WorldStreamingPlatformOffer, StreamingRoyaltyRevenueSource} from '../../types';
 import {allocateStreamingSubscriptionReceipts} from '../streamingEconomyCore';
-import {evaluatePlayerStreamingTitleRoute} from '../streamingContentAvailability';
+import {createStreamingCatalogueReadContext, evaluatePlayerStreamingTitleRoute} from '../streamingContentAvailability';
 import type {StreamingTitleAccessRoute} from '../streamingTitleAccess';
 import {createAiTitleAccessResolver} from './worldStreamingAiCatalogue';
 import {allocateStreamingStoreUnits} from './worldStreamingCommercialEconomy';
@@ -13,12 +13,13 @@ export const attachStreamingRoyaltyReceipts = (
 ): WorldStreamingViewingState => {
     const week = state.lastProcessedAbsoluteWeek;
     const receipts: Receipts = [];
+    const titleFacts=createStreamingCatalogueReadContext(player);
     // Facts are immutable within this close; reuse them across countries/plans.
     const qualityCache = new Map<string, number>();
     const titleQuality = (projectId: string): number => {
         const cached = qualityCache.get(projectId);
         if (cached !== undefined) return cached;
-        const quality = streamingTitleQuality(player, projectId);
+        const quality = streamingTitleQuality(player, projectId, titleFacts);
         qualityCache.set(projectId, quality);
         return quality;
     };

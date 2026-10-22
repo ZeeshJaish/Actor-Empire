@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { frozenStockSchema3 } from './fixtures/stockSaveSchema3';
+import { peekVerifiedPreviousGameData } from '../services/saveGenerations';
 import { INITIAL_PLAYER, type Player } from '../types';
 import { createSaveIntegrityManifest, type SaveIntegrityManifest } from '../services/saveIntegrity';
 import {
@@ -159,6 +161,19 @@ await assert.rejects(() => saveVerifiedGameData(upgraded, slotKey, oldPlayer, cr
 assert.deepEqual(upgraded.records.get(keys.current), nextPlayer,
     'a failed later write must not discard the verified upgraded generation');
 
+const schemaThree = new MemoryGenerationStore();
+const schemaThreePlayer = structuredClone(frozenStockSchema3.player) as unknown as Player;
+const schemaThreeManifest = structuredClone(frozenStockSchema3.manifest) as unknown as SaveIntegrityManifest;
+schemaThree.records.set(keys.current, schemaThreePlayer);
+schemaThree.records.set(keys.integrity, schemaThreeManifest);
+assert.equal((await loadVerifiedGameData(schemaThree, slotKey)).status, 'CURRENT', 'Shipped schema3 must open before migration without re-signing it.');
+const schemaFourPlayer = structuredClone(schemaThreePlayer); schemaFourPlayer.currentWeek++;
+await saveVerifiedGameData(schemaThree, slotKey, schemaFourPlayer, createSaveIntegrityManifest(schemaFourPlayer, 'MIGRATION'));
+assert.deepEqual((schemaThree.records.get(keys.previous) as StoredSaveGeneration).manifest, schemaThreeManifest, 'First schema4 promotion retains its original signed schema3 recovery generation.');
+const tamperedCorporate = structuredClone(schemaFourPlayer);delete tamperedCorporate.portfolio[0].equityFunding;
+schemaThree.records.set(keys.current, tamperedCorporate);
+assert.equal((await loadVerifiedGameData(schemaThree, slotKey)).status, 'RECOVERY_AVAILABLE', 'Lost corporate ownership must select verified recovery instead of trusting a schema4 current generation.');
+
 const successful = new MemoryGenerationStore();
 successful.records.set(keys.current, oldPlayer);
 successful.records.set(keys.integrity, oldManifest);
@@ -201,6 +216,17 @@ unrecoverable.records.set(keys.integrity, nextManifest);
 const unrecoverableLoad = await loadVerifiedGameData(unrecoverable, slotKey);
 assert.equal(unrecoverableLoad.status, 'UNRECOVERABLE');
 
+const peekPrevious = peekVerifiedPreviousGameData;
+const peekStore = new MemoryGenerationStore();
+peekStore.records.set(keys.previous, { kind: 'ACTOR_EMPIRE_SAVE_GENERATION', formatVersion: 1,
+    player: oldPlayer, manifest: oldManifest, needsRecoveryCheckpoint: false } satisfies StoredSaveGeneration);
+const peekBefore = structuredClone(peekStore.records);
+assert.deepEqual(await peekPrevious(peekStore, slotKey), oldPlayer);
+assert.deepEqual(peekStore.records, peekBefore, 'Preview must not promote, quarantine or change the previous generation.');
+(peekStore.records.get(keys.previous) as StoredSaveGeneration).player = { ...oldPlayer, money: oldPlayer.money + 1 };
+assert.equal(await peekPrevious(peekStore, slotKey), null, 'An invalid previous manifest must never become a recovery preview.');
+assert.equal(await peekPrevious(new MemoryGenerationStore(), slotKey), null);
+
 const batch = new MemoryGenerationStore();
 const slotTwoKey = 'actorEmpireSave_2';
 const slotTwoKeys = getSaveGenerationKeys(slotTwoKey);
@@ -242,5 +268,24 @@ assert.equal(
 
 await deleteSaveGenerationFamily(concurrent, slotKey);
 for (const key of Object.values(keys)) assert.equal(concurrent.records.has(key), false, `Delete must remove ${key}.`);
+
+// An atomic promotion can occur between two separate read transactions. Reading
+// the old player and the new manifest must not falsely report save corruption.
+const reading = new MemoryGenerationStore();
+reading.records.set(keys.current, oldPlayer);
+reading.records.set(keys.integrity, oldManifest);
+const originalRead = reading.read.bind(reading);
+reading.read = async key => {
+    const value = await originalRead(key);
+    if (key === keys.current) {
+        reading.records.set(keys.current, nextPlayer);
+        reading.records.set(keys.integrity, nextManifest);
+    }
+    return value;
+};
+Object.assign(reading, { readMany: async (requested: readonly string[]) => requested.map(key => structuredClone(reading.records.get(key) ?? null)) });
+const consistent = await loadVerifiedGameData(reading, slotKey);
+assert.equal(consistent.status, 'CURRENT', 'A generation read must use one atomic player/manifest snapshot when the store supports it.');
+if (consistent.status === 'CURRENT') assert.equal(consistent.player.currentWeek, oldPlayer.currentWeek);
 
 console.log('Save generation audit passed.');

@@ -348,12 +348,14 @@ const reopenedAfterFinalRejection = {
     age: finalWeakResolved.age + Math.floor((finalWeakResolved.currentWeek + 8 - 1) / 52),
 };
 assert(
-    getAcquisitionEligibility({ ...profile, id: 'WEAK_TARGET', acquisitionState: 'NOT_FOR_SALE' }, finalWeakCase, reopenedAfterFinalRejection).canApproach,
-    'The seller should return to the market after the final-rejection cooldown.',
+    getAcquisitionEligibility({ ...profile, id: 'WEAK_TARGET', acquisitionState: 'OPEN_TO_OFFERS' }, finalWeakCase, reopenedAfterFinalRejection).canApproach,
+    'A seller currently open to offers should return after the final-rejection cooldown.',
 );
+assert(!getAcquisitionEligibility({ ...profile, id: 'WEAK_TARGET', acquisitionState: 'NOT_FOR_SALE' }, finalWeakCase, reopenedAfterFinalRejection).canApproach,
+    'A completed cooldown must not override a current private not-for-sale restriction.');
 const freshCycleOffer = submitOpeningOffer({
     player: reopenedAfterFinalRejection,
-    profile: { ...profile, id: 'WEAK_TARGET', name: 'Weak Target', acquisitionState: 'NOT_FOR_SALE' },
+    profile: { ...profile, id: 'WEAK_TARGET', name: 'Weak Target', acquisitionState: 'OPEN_TO_OFFERS' },
     offerType: 'CONSERVATIVE',
     offerAmount: 70_000_000,
     funding: { source: 'PERSONAL' },
@@ -421,9 +423,11 @@ const reopenedPlayer = {
 };
 assert(getAcquisitionReapproachWeeksRemaining(walkedAwayCase, reopenedPlayer) === 0, 'The cooldown should finish after eight in-game weeks.');
 assert(
-    getAcquisitionEligibility({ ...profile, id: 'COUNTER_TARGET', acquisitionState: 'NOT_FOR_SALE' }, walkedAwayCase, reopenedPlayer).canApproach,
-    'A cooled-off studio should return to the acquisition market even if its older public snapshot says not for sale.',
+    getAcquisitionEligibility({ ...profile, id: 'COUNTER_TARGET', acquisitionState: 'OPEN_TO_OFFERS' }, walkedAwayCase, reopenedPlayer).canApproach,
+    'A cooled-off studio currently open to offers should return to the acquisition market.',
 );
+assert(!getAcquisitionEligibility({ ...profile, id: 'COUNTER_TARGET', acquisitionState: 'NOT_FOR_SALE' }, walkedAwayCase, reopenedPlayer).canApproach,
+    'A walked-away company that remains not for sale cannot sell a new acquisition approach.');
 assert(
     walkedAway.player.news.some((item: any) => item.headline.includes('walks away')),
     'Walking away should create a closed-approach news beat.',
@@ -608,6 +612,28 @@ assert(
     studioFundedSigned.player.businesses.some((business: any) => business.id === 'STUDIO_SIGNING_TARGET' && business.type === 'PRODUCTION_HOUSE'),
     'Studio-funded signing should still create the acquired production house.',
 );
+
+for (const [label, offerType, amount, funding] of [
+    ['personal-full', 'FAIR', 115_005_123, { source: 'PERSONAL' }],
+    ['studio-full', 'FAIR', 115_005_123, { source: 'STUDIO', businessId: productionStudio.id }],
+    ['personal-minority', 'MINORITY', 28_751_234, { source: 'PERSONAL' }],
+] as const) {
+    const exactProfile = { ...profile, id: `EXACT_CONTRACT_${label}`, name: `Exact Contract ${label}` };
+    const opening = submitOpeningOffer({ player, profile: exactProfile, offerType, offerAmount: amount, minorityPercent: 25, funding });
+    assert(opening.success, `${label}: exact-dollar offer should file.`);
+    const resolved = resolveStudioAcquisitionResponses(opening.player);
+    assert(getAcquisitionCase(resolved, exactProfile.id)?.status === 'ACCEPTED', `${label}: exact-dollar offer should be accepted.`);
+    const signed = completeAcquisitionTransaction({ player: resolved, profile: exactProfile });
+    assert(signed.success, `${label}: accepted exact-dollar contract should sign.`);
+    assert(signed.acquisitionCase?.closing?.finalPrice === amount, `${label}: signing must retain the exact accepted price.`);
+    const beforeCash = funding.source === 'PERSONAL' ? resolved.money : resolved.businesses.find((business: any) => business.id === productionStudio.id)!.balance;
+    const afterCash = funding.source === 'PERSONAL' ? signed.player.money : signed.player.businesses.find((business: any) => business.id === productionStudio.id)!.balance;
+    assert(beforeCash - afterCash === amount, `${label}: debit must equal the accepted price without estimate rounding.`);
+    if (offerType === 'MINORITY') {
+        assert(getCompanyPosition(signed.player, exactProfile).investedValue === amount, 'Minority basis must retain its exact accepted price.');
+        assert(!signed.player.businesses.some((business: any) => business.id === exactProfile.id), 'Minority settlement must not transfer the whole business.');
+    }
+}
 
 const publicProfile: any = {
     ...profile,

@@ -1,0 +1,40 @@
+{
+  "kind": "PRODUCTION_UI_SYNTHETIC_SAVE_WITH_BROWSER_ONLY_ANNOTATIONS",
+  "sourceBefore": "19f5b2e42aa4670b70317a55067f82be4fd5dd4ddb253e44587894be88c01791",
+  "errors": [],
+  "clips": [
+    {
+      "name": "2 · Gauge needle bounce",
+      "start": 4.714,
+      "end": 6.651
+    },
+    {
+      "name": "3 · Envelope entrance bounce",
+      "start": 6.827,
+      "end": 9.313
+    },
+    {
+      "name": "1 + 4 · Red border and card bounce",
+      "start": 11.006,
+      "end": 14.873
+    },
+    {
+      "name": "5 · Progress width animation",
+      "start": 16.329,
+      "end": 18.828
+    }
+  ],
+  "screenshots": [
+    "/Users/zeesh/Vibe code/Actor empire/output/playwright/ui-warnings/02-gauge-needle.png",
+    "/Users/zeesh/Vibe code/Actor empire/output/playwright/ui-warnings/02-gauge-focus.png",
+    "/Users/zeesh/Vibe code/Actor empire/output/playwright/ui-warnings/03-envelope.png",
+    "/Users/zeesh/Vibe code/Actor empire/output/playwright/ui-warnings/03-envelope-focus.png",
+    "/Users/zeesh/Vibe code/Actor empire/output/playwright/ui-warnings/01-and-04-news-cards.png",
+    "/Users/zeesh/Vibe code/Actor empire/output/playwright/ui-warnings/01-and-04-news-focus.png",
+    "/Users/zeesh/Vibe code/Actor empire/output/playwright/ui-warnings/05-progress-bar.png",
+    "/Users/zeesh/Vibe code/Actor empire/output/playwright/ui-warnings/05-progress-focus.png"
+  ],
+  "status": "PASSED",
+  "sourceAfter": "19f5b2e42aa4670b70317a55067f82be4fd5dd4ddb253e44587894be88c01791",
+  "productionSourceUnchanged": true
+}

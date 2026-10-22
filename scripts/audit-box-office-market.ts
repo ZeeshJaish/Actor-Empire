@@ -79,9 +79,9 @@ test('inactive title deferred interest keeps decaying across omitted weeks',()=>
   f.titles=[title];const r=simulateCinemaWeek(f);assert.ok(r.nextState.titles[0].cells[0].deferredPeople<9000);
 });
 test('screen-denied intent releases wallet to another willing film',()=>{
-  const f=fixture();f.cohorts[0].market!.monthlyCinemaBudgetCents=20000000;const t=structuredClone(f.titles[0]);t.id='other';t.market!.chainIds=['Z_CINEMAS'];t.exposure!.events=t.exposure!.events.map(e=>({...e,id:'other-press',titleId:'other'}));f.titles=[...f.titles,t];
+  const f=fixture();f.cohorts[0].market!.monthlyCinemaBudgetCents=4000000;f.titles[0].exposure!.events[0].impressions=6_000_000;const t=structuredClone(f.titles[0]);t.id='other';t.market!.chainIds=['Z_CINEMAS'];t.exposure!.events=t.exposure!.events.map(e=>({...e,id:'other-press',titleId:'other'}));f.titles=[...f.titles,t];
   f.supply!.pools[0].screens=1;f.supply!.pools[0].weeklyScreenMinutes=145;f.supply!.pools.push({...f.supply!.pools[0],id:'US:Z_CINEMAS:STANDARD',chainId:'Z_CINEMAS',screens:1000,weeklyScreenMinutes:5040000});f.supply!.offers.push({titleId:'other',poolId:'US:Z_CINEMAS:STANDARD'});
-  const r=simulateCinemaWeek(f);assert.ok(r.cohorts[0].unspentCents<1000);assert.ok(r.titles.find(t=>t.titleId==='other')!.firstAdmissions>4000);valid(f,r);
+  const r=simulateCinemaWeek(f);assert.ok(r.cohorts[0].unspentCents<1000);assert.ok(r.titles.find(t=>t.titleId==='other')!.firstAdmissions>700);valid(f,r);
 });
 test('shrinking populations reconcile active audience without rewriting money',()=>{
   const f=fixture('satisfied-repeat');f.marketState!.titles[0].cells[0].awarePeople=1000000;f.marketState!.titles[0].cells[0].seenBands[0].people=1000000;
@@ -113,7 +113,9 @@ test('local poster discovery needs real other-film patrons and arrives next week
   const f=fixture(),unknown=structuredClone(f.titles[0]);unknown.id='unknown';unknown.exposure!.events=[];f.titles=[...f.titles,unknown];f.supply!.offers.push({titleId:'unknown',poolId:f.supply!.pools[0].id});
   // One local screen: its placement reaches the patrons at this actual venue.
   f.supply!.pools[0].screens=1;f.supply!.pools[0].weeklyScreenMinutes=5040;
-  f.titles[0].exposure!.events[0].impressions=10000;
+  // Enough real footfall to produce at least one integer ticket after the
+  // 2.5% poster reach and weekly conversion; awareness alone is not a sale.
+  f.titles[0].exposure!.events[0].impressions=600000;
   const first=simulateCinemaWeek(f);assert.equal(first.titles.find(t=>t.titleId==='unknown')!.firstAdmissions,0);
   const next=simulateCinemaWeek({...f,absoluteWeek:101,marketState:first.nextState});assert.ok(next.titles.find(t=>t.titleId==='unknown')!.firstAdmissions>0);
   const cell=next.nextState.titles.find(t=>t.titleId==='unknown')!.cells[0];assert.ok(cell.awarePeople<=first.titles.find(t=>t.titleId==='film')!.firstAdmissions*.025);

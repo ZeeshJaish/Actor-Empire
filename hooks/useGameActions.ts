@@ -359,6 +359,8 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
 
             const newState: Player = {
                 ...prev,
+                energy: { ...prev.energy },
+                flags: { ...prev.flags },
                 logs: [...prev.logs, { week: prev.currentWeek, year: prev.age, message: logMsg, type: 'positive' as const }].slice(-50),
                 instagram: { ...prev.instagram, posts: newInstaPosts, feed: newInstaFeed },
                 x: { ...prev.x, posts: newXPosts, feed: newXFeed }

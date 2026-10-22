@@ -1020,11 +1020,11 @@ export const validateStreamingInfrastructureDraft = (
             message: `Infrastructure revision ${platform.pendingInfrastructureSetup.revision} is already under construction. Finish it before commissioning another change.`,
         });
     }
-    // Live commercial plans belong to Audience. Their valid custom prices do
+    // Live commercial plans belong to Platform Offer. Their valid custom prices do
     // not have to fit the old three-tier network onboarding ladder.
     if (platform.launchCommit) {
         if (STREAMING_SUBSCRIPTION_TIERS.some(tier => draft.subscriptionPrices[tier.id] !== platform.subscriptionPrices[tier.id])) {
-            issues.push({ step: 3, code: 'PRICING_IN_AUDIENCE', message: 'Change live prices in Audience → Pricing. Network revisions preserve your current offers.' });
+            issues.push({ step: 3, code: 'PRICING_IN_AUDIENCE', message: 'Change live prices in Platform → Offer. Network revisions preserve your current offers.' });
         }
     } else {
         STREAMING_SUBSCRIPTION_TIERS.forEach(tier => {

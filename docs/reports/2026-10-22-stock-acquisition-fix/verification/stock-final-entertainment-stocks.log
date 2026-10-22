@@ -1,0 +1,9 @@
+
+> pr-6.6.3@1.0.25 audit:entertainment-stocks
+> esbuild scripts/audit-entertainment-stocks.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-entertainment-stocks.mjs && node /tmp/audit-entertainment-stocks.mjs
+
+
+  ../../../../tmp/audit-entertainment-stocks.mjs  4.6mb ⚠️
+
+⚡ Done in 513ms
+Entertainment stocks audit passed.

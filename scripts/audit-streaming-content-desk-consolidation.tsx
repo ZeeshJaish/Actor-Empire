@@ -40,7 +40,9 @@ const deskMarkup = renderToStaticMarkup(<ContentDesk
 assert.match(deskMarkup, /Subtitle quality/);
 assert.match(deskMarkup, /Level 2/);
 assert.match(deskMarkup, /India Core Languages/);
-assert.match(deskMarkup, />50<\/strong><h3>catalogue titles covered/);
+/* Entry #4 (live): the tiers are rings (named for screen readers) and the
+   covered-title count sits in the rule beneath them. */
+assert.match(deskMarkup, /50 today/);
 assert.match(deskMarkup, /OPEN RESEARCH CAMPUS/);
 assert.doesNotMatch(deskMarkup, /title by title|Order subtitles|Order dub/,
     'The Content Desk must explain global capability instead of per-title chores.');

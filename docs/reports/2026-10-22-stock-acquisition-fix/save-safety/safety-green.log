@@ -1,0 +1,16 @@
+PASS unheld abnormal quote cannot debit unrelated wallet cash
+PASS normal quote reload preserves high historical cost and corporate rights
+PASS explicit zero average cost and zero invested basis are preserved
+PASS abnormal quote repair retains its original and is idempotent
+PASS unsafe supply never silently rescales shares or rewrites basis
+PASS duplicate holdings and contradictory owner allocations require recoverable review
+PASS new integrity signature rejects disappearing company-funded rights
+PASS new integrity signature rejects altered quote-repair provenance
+PASS finite SX cash survives migration and nonfinite cash requires recovery
+PASS shipped schema3 signature still verifies its exact historical projection
+PASS missing historical cost remains unknown instead of inventing the current quote
+PASS malformed positive register containers request explicit recovery
+PASS nonfinite corporate rights cannot verify as a healthy signed generation
+PASS safe-integer supply still requires recovery when no cent quote fits the company cap
+PASS valid custom registry keeps its explicit supported supply and holding units
+Stock save safety audit passed: 15 checks.

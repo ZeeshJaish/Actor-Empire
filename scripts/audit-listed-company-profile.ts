@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+import {INITIAL_PLAYER} from '../types';
+import {initializeStocks} from '../services/stockLogic';
+import {ensureStudioEcosystem} from '../services/studioEcosystem';
+import {buildForbesStudioProfile} from '../services/forbesStudioProfile';
+import {buildAcquisitionSigningQuote} from '../services/acquisitionSigningQuote';
+import {runDueDiligence,getAcquisitionCase,completeAcquisitionTransaction} from '../services/studioAcquisition';
+const p=structuredClone(INITIAL_PLAYER);p.money=100e9;p.stocks=initializeStocks();p.world=ensureStudioEcosystem(p.world);p.world.studios!.PARAMOUNT={...p.world.studios!.PARAMOUNT,valuation:1e14,cashReserve:1000,ai:{finance:{debtPrincipalMillions:100.001},ledger:[]} as any};
+p.portfolio=[{stockId:'stk_para',shares:331500000,averageCost:13,totalInvested:4309500000}];
+const profile=buildForbesStudioProfile({player:p,studio:p.world.studios!.PARAMOUNT,rank:1,worldProjects:[],universes:{}} as any);
+assert.equal(profile.valuation,8_450_000_000,'public profile must use live listed equity, not SX world appraisal');
+assert.equal(profile.debt,100_001_000,'public debt must come from the actual ledger');
+assert.equal(profile.profitability,0,'unknown operating income is not a guarantee derived from headline');
+const diligent=runDueDiligence({player:p,profile,funding:{source:'PERSONAL'}});assert.equal(diligent.success,true);
+const report=getAcquisitionCase(diligent.player,profile.id)!.diligence!.report;assert.equal(report.adjustedEnterpriseValue,8_450_000_000,'public diligence must not add cash to equity a second time');assert.equal(report.verifiedDebt,100_001_000);assert.equal(report.expectedAnnualIncome,0);assert.equal(report.hiddenLiabilities,0);
+const result=completeAcquisitionTransaction({player:diligent.player,profile});assert.equal(result.success,true);assert.equal(result.player.money,diligent.player.money);assert.equal(result.acquiredBusiness!.stats.valuation,8_450_000_000,'ownership materialization must not revive the SX world headline');assert.equal(result.acquisitionCase!.closing!.verifiedDebt,100_001_000);
+assert.equal(p.world.studios!.PARAMOUNT.valuation,1e14,'legacy source evidence must not be reset');
+console.log('Listed equity, actual ledger liabilities/income, and legacy evidence preservation passed');
+
+const priorQuote=buildAcquisitionSigningQuote({player:diligent.player,profile});const debtChanged=structuredClone(diligent.player);debtChanged.world.studios!.PARAMOUNT.ai!.finance.debtPrincipalMillions=900;const freshProfile=buildForbesStudioProfile({player:debtChanged,studio:debtChanged.world.studios!.PARAMOUNT,rank:1,worldProjects:[],universes:{}});const stale=completeAcquisitionTransaction({player:debtChanged,profile:freshProfile,expectedQuoteKey:priorQuote.quoteKey});assert.equal(stale.success,false,'a world debt change must invalidate a reviewed signing quote');assert.equal(stale.reason,'QUOTE_CHANGED');assert.equal(stale.player,debtChanged);

@@ -1,0 +1,5 @@
+
+> pr-6.6.3@1.0.25 audit:streaming-zip-fidelity
+> node scripts/audit-streaming-zip-fidelity.mjs
+
+EMPIRE+ scoped ZIP fidelity audit passed (17 visual contracts).

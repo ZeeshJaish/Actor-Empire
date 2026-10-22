@@ -1,0 +1,4 @@
+2026-10-22 local inventory check
+Android SDK adb devices -l: List of devices attached (empty)
+iOS xcrun simctl list devices booted: iOS 26.2 runtime; no booted devices
+No installed-build smoke executed. Browser/service results do not verify a native release.

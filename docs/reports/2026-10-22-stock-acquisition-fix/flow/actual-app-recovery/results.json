@@ -1,0 +1,52 @@
+{
+  "kind": "ACTUAL_APP_SIGNED_SCHEMA4_RECOVERY",
+  "cases": [
+    {
+      "bothBad": false,
+      "errors": [],
+      "schema": 4,
+      "before": {
+        "actorEmpireSave_1": "71b5397e5e96731f9652efae41588e189fb5b741737d15ab8d6e10c94a409cfb",
+        "actorEmpireSave_1__integrity": "f418e640ad95224c5dc3ded61a54514506f7be92c8d72972c693cd66a26573db",
+        "actorEmpireSave_1__previous": "2e3499e7f6699463b24146c9c228890557fba2d19ccf08bd73205192334f49dd"
+      },
+      "beforeRecovery": {
+        "actorEmpireSave_1": "71b5397e5e96731f9652efae41588e189fb5b741737d15ab8d6e10c94a409cfb",
+        "actorEmpireSave_1__integrity": "f418e640ad95224c5dc3ded61a54514506f7be92c8d72972c693cd66a26573db",
+        "actorEmpireSave_1__previous": "2e3499e7f6699463b24146c9c228890557fba2d19ccf08bd73205192334f49dd"
+      },
+      "restored": {
+        "status": "CURRENT",
+        "money": 2000000000000,
+        "holdings": [
+          {
+            "stockId": "stk_para",
+            "shares": 100,
+            "averageCost": 13,
+            "totalInvested": 1300
+          }
+        ],
+        "week": 8
+      },
+      "status": "PASSED"
+    },
+    {
+      "bothBad": true,
+      "errors": [],
+      "schema": 4,
+      "before": {
+        "actorEmpireSave_1": "a40fa7dbd73b8eee684cceb0d216dade321d549483ad22a91617213490493687",
+        "actorEmpireSave_1__integrity": "a48b7cd25446571c35a73b461813a7d1334ca756fbc4105b41f503ddce89c541",
+        "actorEmpireSave_1__previous": "857ebd5f4f28dd0f07e391e6281cdc8c329f9c32e010f795ce5bc220667ae619"
+      },
+      "errorText": "Save Could Not Open\nThis career has an inconsistent stock register. Its cash, shares and original save have not been rewritten. Restore a verified previous save or import a verified backup to recover these holdings.\nACTOR\nEMPIRE\nVERSION 1.0.25\nSTART CAREER\nDESIGNED & BUILT BY ZEESH",
+      "after": {
+        "actorEmpireSave_1": "a40fa7dbd73b8eee684cceb0d216dade321d549483ad22a91617213490493687",
+        "actorEmpireSave_1__integrity": "a48b7cd25446571c35a73b461813a7d1334ca756fbc4105b41f503ddce89c541",
+        "actorEmpireSave_1__previous": "857ebd5f4f28dd0f07e391e6281cdc8c329f9c32e010f795ce5bc220667ae619"
+      },
+      "status": "PASSED"
+    }
+  ],
+  "status": "PASSED"
+}

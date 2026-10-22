@@ -968,7 +968,7 @@ export const generateCastList = (player: Player, project: ProjectDetails, player
         ...suggestCharacterIdentity(storyCompass, playerRole, 0, project)
     });
 
-    const completed = completeOfferedCinemaCast({ ...project, castList: cast, castPackageSource: undefined });
+    const completed = completeOfferedCinemaCast({ ...project, castList: cast, castPackageSource: undefined }, player);
     return [...(completed.castList || cast), {
         id: project.directorId || `director:${project.studioId}:${project.title}`,
         name: project.directorName, role: 'Director', isPlayer: project.directorId === 'PLAYER_SELF',

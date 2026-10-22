@@ -1,0 +1,55 @@
+
+> pr-6.6.3@1.0.25 audit:streaming-commercial-c4
+> esbuild scripts/audit-streaming-commercial-c4.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-streaming-commercial-c4.mjs && node /tmp/audit-streaming-commercial-c4.mjs
+
+C4 balance diagnostic {
+  earlyReach: 226172,
+  establishedReach: 1255748,
+  freeViewingAccounts: 506136,
+  hoursViewed: 1006503,
+  adImpressions: 8052024,
+  adStrategy: { minutesPerHour: 4, cpm: 22 },
+  adRevenue: 138253,
+  weeklyAdRevenuePerFreeViewer: 0.2731538558806329
+}
+C4 paid comparison {
+  paidAccounts: 2455,
+  weeklyPaidRevenue: 4280,
+  weeklyPaidRevenuePerAccount: 1.7434420022295074
+}
+C4 pass settlement {
+  oneHourPassTransactions: 6164,
+  oneHourPassRevenue: 12328,
+  dayPassTransactions: 2021,
+  dayPassRevenue: 10105,
+  adFreeCoveredHours: 12227,
+  remainingAdRevenue: 136573
+}
+C4 hybrid diagnostic { paid: 250000, stores: 29989, rentals: 67382 }
+C4 AI balance aggregate {
+  subscription: 1400782396,
+  advertising: 182704502,
+  rental: 382259327,
+  purchase: 62676322,
+  incremental: 760488597,
+  titleTransactions: 364
+}
+C4 AI store diagnostic [
+  { platformId: 'ABEMA', rentalRevenue: 4008323, purchases: 1231481 },
+  {
+    platformId: 'APPLE_TV',
+    rentalRevenue: 30606565,
+    purchases: 4365918
+  },
+  { platformId: 'BINGE', rentalRevenue: 744791, purchases: 91963 },
+  {
+    platformId: 'CANAL_PLUS',
+    rentalRevenue: 1763445,
+    purchases: 217629
+  }
+]
+C4 ad-market invariants passed.
+
+  ../../../../tmp/audit-streaming-commercial-c4.mjs  9.5mb ⚠️
+
+⚡ Done in 89ms

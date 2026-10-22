@@ -1,0 +1,114 @@
+/* ============================================================================
+   ENTER NEW MARKETS — the Audience room's expansion page.
+
+   A full-height layer over the desk, in the room's own dark language: the
+   living map on top, flat panels below, one sticky tray with the pick's
+   real cost. --entry-accent is the platform's brand colour.
+
+   Note: the HQ shell resets every button's font (`.streaming-hq-shell button
+   {font:inherit}`, 0-1-1), so rules that set a font on a button itself are
+   written at 0-2-0 or above.
+   ========================================================================== */
+
+.entry{position:fixed;inset:0;z-index:70;display:flex;flex-direction:column;max-width:520px;margin:0 auto;background:#050609;color:#eef0f5;
+  animation:entryIn .22s cubic-bezier(.22,.8,.3,1) both}
+@keyframes entryIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+/* ── the top bar ── */
+.top{display:grid;grid-template-columns:40px minmax(0,1fr) auto;align-items:center;gap:10px;padding:14px 14px 10px;border-bottom:1px solid rgba(255,255,255,.06)}
+.top.top .back{width:36px;height:36px;border-radius:12px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);font:700 18px/1 'Inter',system-ui,sans-serif;color:#dfe4ec}
+.top small{display:block;font:800 7.5px/1 'Archivo','Inter',sans-serif;letter-spacing:.14em;color:#7d8698}
+.top div>b{display:block;margin-top:4px;font:900 17px/1.1 'Inter',system-ui,sans-serif;letter-spacing:-.01em}
+.purse{display:flex;flex-direction:column;align-items:flex-end;gap:3px}
+.purse b{font:400 16px/1 'Anton','Archivo',sans-serif;letter-spacing:.01em;color:#f3f5f9}
+.purse small{letter-spacing:.06em !important}
+
+/* ── Choose / Clearance ── */
+.tabs{display:grid;grid-template-columns:1fr 1fr;gap:3px;margin:10px 14px 0;padding:3px;border-radius:13px;background:#0b0e14;border:1px solid rgba(255,255,255,.08)}
+.tabs.tabs button{display:flex;align-items:center;justify-content:center;gap:6px;padding:9px 6px;border-radius:10px;font:800 10px/1 'Archivo','Inter',sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#7d8698;transition:background .16s ease,color .16s ease}
+.tabs.tabs button.on{background:color-mix(in srgb,var(--entry-accent) 18%,#0b0e14);color:#fff;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--entry-accent) 55%,transparent)}
+.tabs i{min-width:16px;padding:3px 5px;border-radius:99px;background:var(--entry-accent);font:900 8px/1 'Archivo','Inter',sans-serif;font-style:normal;letter-spacing:0;color:var(--epx-brand-ink,#fff)}
+
+.scroll{flex:1;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:0 14px 40px}
+/* room for the tray (and its warning) so the last card can scroll clear of it */
+.scrollTray{padding-bottom:300px}
+.feedback{margin:12px 0 0;padding:10px 12px;border-radius:12px;font-size:10.5px;line-height:1.45;font-weight:700}
+.feedback.good{background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.25);color:#86efac}
+.feedback.bad{background:rgba(255,107,107,.08);border:1px solid rgba(255,107,107,.25);color:#fca5a5}
+
+/* ── the pick, as removable chips ── */
+.picks{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.picks.picks button{display:flex;align-items:center;gap:6px;padding:5px 8px 5px 5px;border-radius:99px;background:#fff;color:#0b0e14;font:800 10px/1 'Inter',system-ui,sans-serif}
+.picks em{font-style:normal;font-weight:900;opacity:.55}
+.pickFlag{display:block;width:18px;height:12px;border-radius:3px;overflow:hidden;box-shadow:0 0 0 1px rgba(0,0,0,.18)}
+.pickFlag svg{display:block;width:100%;height:100%}
+
+.secHead{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:20px 0 10px}
+.secHead h2{font-size:16px;font-weight:900;letter-spacing:-.01em}
+.secHead span{font-size:9.5px;color:#7d8698}
+.secHead.secHead button{padding:6px 10px;border-radius:99px;border:1px solid color-mix(in srgb,var(--entry-accent) 55%,transparent);font:800 9px/1 'Archivo','Inter',sans-serif;letter-spacing:.1em;text-transform:uppercase;color:color-mix(in srgb,var(--entry-accent) 65%,#fff)}
+
+/* ── a country you could enter ── */
+.cards{display:flex;flex-direction:column;gap:7px}
+.card{padding:10px 11px 11px;border-radius:15px;background:#0c0f15;border:1px solid rgba(255,255,255,.075);transition:border-color .16s ease,background .16s ease}
+.cardOn{border-color:rgba(255,255,255,.55);background:#10141c}
+.cardBody{display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;gap:10px;width:100%;text-align:left}
+.cardFlag{display:block;width:34px;height:23px;border-radius:5px;overflow:hidden;box-shadow:0 0 0 1px rgba(255,255,255,.16)}
+.cardFlag svg{display:block;width:100%;height:100%}
+.cardName{min-width:0}
+.cardName b{display:block;font-size:13px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cardName small{display:block;margin-top:3px;font-size:9px;color:#8b93a5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cardViewers{display:flex;flex-direction:column;align-items:flex-end;gap:3px}
+.cardViewers b{font:400 19px/1 'Anton','Archivo',sans-serif;letter-spacing:.01em;color:#f3f5f9}
+.cardViewers small{font:800 7px/1 'Archivo','Inter',sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#7d8698}
+.cardFacts{display:flex;flex-wrap:wrap;gap:5px;margin:9px 0 9px 44px}
+.cardFacts span{display:flex;align-items:center;gap:5px;padding:4px 7px;border-radius:99px;background:rgba(255,255,255,.045);font-size:9px;font-weight:700;color:#b6bdca}
+.cardFacts span i{width:6px;height:6px;border-radius:50%;background:var(--tone)}
+.card .pick{display:block;width:calc(100% - 44px);margin-left:44px;padding:8px;border-radius:10px;border:1px solid rgba(255,255,255,.12);
+  font:800 9.5px/1 'Archivo','Inter',sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#dfe4ec;transition:background .16s ease}
+.card .pickOn{background:#fff;border-color:#fff;color:#0b0e14}
+.cards .more{padding:11px;border-radius:12px;border:1px dashed rgba(255,255,255,.14);font:800 9px/1 'Archivo','Inter',sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#8b93a5}
+.empty{display:flex;flex-direction:column;gap:5px;margin-top:16px;padding:16px;border-radius:15px;background:#0c0f15;border:1px solid rgba(255,255,255,.075)}
+.empty b{font-size:13px;font-weight:900}
+.empty span{font-size:10px;line-height:1.5;color:#8b93a5}
+
+/* ── clearance files ── */
+.files{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.file{padding:11px;border-radius:15px;background:#0c0f15;border:1px solid rgba(255,255,255,.075)}
+.file header{display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;gap:10px}
+.file header em{padding:4px 7px;border-radius:99px;font:900 7.5px/1 'Archivo','Inter',sans-serif;font-style:normal;letter-spacing:.12em;background:rgba(255,255,255,.06);color:#c9cfda}
+.file_live header em{background:rgba(74,222,128,.12);color:#4ade80}
+.file_alert{border-color:rgba(245,181,68,.45)}
+.file_alert header em{background:rgba(245,181,68,.14);color:#f5b544}
+.file_review header em{color:color-mix(in srgb,var(--entry-accent) 65%,#fff)}
+.progress{height:6px;margin-top:11px;border-radius:4px;background:rgba(255,255,255,.06);overflow:hidden}
+.progress i{display:block;height:100%;border-radius:4px;background:var(--entry-accent);transition:width .5s ease}
+.stages{display:grid;grid-template-columns:repeat(5,1fr);gap:3px;margin-top:5px}
+.stages i{height:3px;border-radius:2px;background:rgba(255,255,255,.08)}
+.stages i.done{background:color-mix(in srgb,var(--entry-accent) 70%,#fff)}
+.fileNote{margin-top:8px;font-size:9.5px;line-height:1.5;color:#8b93a5}
+.file .fileAction{display:block;width:100%;margin-top:10px;padding:10px;border-radius:11px;background:var(--entry-accent);
+  font:800 9.5px/1 'Archivo','Inter',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--epx-brand-ink,#fff)}
+.file .fileAction:disabled,.tray .fileAll:disabled{opacity:.45}
+
+/* ── the tray: the pick's real cost, always in reach ── */
+.tray{position:absolute;left:0;right:0;bottom:0;padding:12px 14px calc(12px + env(safe-area-inset-bottom));background:#090b10;border-top:1px solid rgba(255,255,255,.08);
+  box-shadow:0 -18px 34px rgba(0,0,0,.55)}
+.trayFacts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.trayFacts span{display:flex;flex-direction:column;gap:3px}
+.trayFacts b{font:400 17px/1 'Anton','Archivo',sans-serif;letter-spacing:.01em;color:#f3f5f9;white-space:nowrap}
+.trayFacts small{font:800 7px/1 'Archivo','Inter',sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#7d8698}
+.trayFacts .short b{color:#ff8a8a}
+.tray .fileAll{display:block;width:100%;margin-top:10px;padding:13px;border-radius:13px;background:var(--entry-accent);
+  font:900 10.5px/1 'Archivo','Inter',sans-serif;letter-spacing:.1em;text-transform:uppercase;color:var(--epx-brand-ink,#fff);
+  box-shadow:0 12px 26px -14px var(--entry-accent)}
+.trayNote{display:block;margin-top:7px;font-size:8.5px;line-height:1.4;color:#6f7888;text-align:center}
+
+@media (prefers-reduced-motion:reduce){.entry{animation:none}}
+
+/* ── network reach for a country you could enter ── */
+.cardFacts .cover_SERVED i{background:#4ade80}
+.cardFacts .cover_THIN i{background:#f5b544}
+.cardFacts .cover_DARK{color:#ffb4b4;background:rgba(255,107,107,.1)}
+.cardFacts .cover_DARK i{background:#ff6b6b}
+.trayWarn{margin-top:9px;padding:8px 10px;border-radius:10px;background:rgba(255,107,107,.08);border:1px solid rgba(255,107,107,.22);font-size:9.5px;line-height:1.45;color:#fca5a5}

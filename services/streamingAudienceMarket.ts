@@ -25,6 +25,8 @@ import { getWorldAudiencePersonaShares, normalizeWorldAudienceEconomyState } fro
 import { normalizeWorldAudienceParticipationState } from './worldEconomy/worldAudienceParticipation';
 import { normalizeWorldPopulationState } from './worldEconomy/worldPopulation';
 import { normalizeWorldStreamingCompetitionState } from './worldEconomy/worldStreamingCompetition';
+import { WORLD_COUNTRY_DEFINITIONS } from './worldEconomy/worldCountryRegistry';
+import { projectStreamingCommercialOffers } from './streamingCommercialOffers';
 
 export type StreamingAudiencePlatformId = PlatformId | 'AMAZON_PRIME' | 'REGIONAL' | 'PLAYER';
 export type StreamingAudiencePersonaId = WorldAudiencePersonaId;
@@ -84,6 +86,75 @@ export interface StreamingAudienceCountryView {
     trend: Array<{ label: string; value: number }>;
     audienceReason: string;
     regionalServices: string[];
+}
+
+/** How the player's service makes money, read from its live pricing. The
+    Audience room names "your audience" by the primary model: paid accounts for
+    a subscription service, homes watching free for an ad-supported one, buyers
+    for a rent-or-buy store. A hybrid is labelled by its subscription side. */
+export interface StreamingAudiencePlayerModel {
+    subscription: boolean;
+    ads: boolean;
+    store: boolean;
+    primary: 'ACCOUNTS' | 'AD_HOMES' | 'BUYERS';
+}
+
+/** What your service earned beyond subscriptions in the week that just settled,
+    from the viewing settlement (ads, store, passes). It keeps no history, so it
+    reads zero until a week has settled. */
+export interface StreamingAudiencePlayerCommercialView {
+    available: boolean;
+    adHouseholds: number;
+    adImpressions: number;
+    adRevenueWeekly: number;
+    storeBuyers: number;
+    rentals: number;
+    purchases: number;
+    storeRevenueWeekly: number;
+    /** Passes, metered, patron, sponsorship and premium add-ons. */
+    otherRevenueWeekly: number;
+    totalRevenueWeekly: number;
+    hoursViewed: number;
+}
+
+/** One row for every country in the game world (all of them, not the twenty-four
+    authored markets), read straight from the canonical world simulation. It feeds
+    the Audience map, the region tiles and the country card, so the numbers a player
+    sees on the map are the same numbers the weekly loop works with. */
+export interface StreamingAudienceWorldCountryView {
+    id: string;
+    name: string;
+    regionId: StreamingDayOneRegionId;
+    population: number;
+    /** People watching any service here this week: paid, shared and piracy viewers. */
+    activeViewers: number;
+    /** Homes paying for at least one service (the settled customer ledger once a week has settled). */
+    payingHouseholds: number;
+    reachableHouseholds: number;
+    /** Homes that can stream and pay for no service (settled when available). */
+    unclaimedHouseholds: number;
+    /** Your paid accounts here at the end of the last settled week. */
+    playerAccounts: number;
+    /** Homes that watched your free, ad-supported tier this week. */
+    playerAdHouseholds: number;
+    /** Rentals and purchases from your store this week. */
+    playerStoreBuyers: number;
+    /** Your audience here by your primary model: accounts, ad homes or buyers. */
+    playerAudience: number;
+    /** Homes that would pay you at today's offer (the competition model's target).
+        Paid accounts move toward it a little every week. */
+    playerDemandHouseholds: number;
+    /** Your subscription joins minus cancellations here in the last settled week. */
+    playerNetChange: number;
+    /** Your monthly subscription revenue here. */
+    playerMonthlyRevenue: number;
+    /** All your revenue here as a monthly figure: subscriptions plus a month of
+        ads, store and passes at this week's rate. */
+    playerMonthlyRevenueTotal: number;
+    /** Paying homes by service, largest first. Settled: each home counts under the
+        service it pays first, so the slices add up to the paying homes. Before a
+        week settles: the competition model's homes per service. */
+    platformHouseholds: Array<{ id: string; name: string; color: string; households: number }>;
 }
 
 export interface StreamingAudiencePlatformView {
@@ -202,6 +273,11 @@ export interface StreamingAudienceMarketView {
     globalTrend: StreamingAudienceTrendPoint[];
     globalWatchShare: StreamingAudienceShareEntry[];
     countries: StreamingAudienceCountryView[];
+    worldCountries: StreamingAudienceWorldCountryView[];
+    playerModel: StreamingAudiencePlayerModel;
+    /** The player's paid plans as saved, so a plan with no homes yet still shows. */
+    playerPlans: Array<{ id: string; name: string; monthly: number }>;
+    playerCommercial: StreamingAudiencePlayerCommercialView;
     platforms: StreamingAudiencePlatformView[];
     personas: StreamingAudiencePersonaView[];
     switching: StreamingAudienceSwitchingView;
@@ -550,6 +626,101 @@ const buildPlatformViews = (
     }).sort((left, right) => right.watchSharePercent - left.watchSharePercent);
 };
 
+/* Every country, as the world simulation holds it this week. Nothing here is
+   estimated per country beyond the one fallback the headline already uses: when
+   the customer pass has not run this week, viewers are population × adoption.
+   Ads and store figures come from this week's viewing settlement (they keep no
+   history), so they read zero until a week has settled. */
+const WEEKS_PER_MONTH = 4.33;
+const buildWorldCountries = (
+    worldPopulation: ReturnType<typeof normalizeWorldPopulationState>,
+    worldStreamingCompetition: ReturnType<typeof normalizeWorldStreamingCompetitionState>,
+    worldStreamingCustomers: Player['world']['worldStreamingCustomers'] | null,
+    worldStreamingViewing: Player['world']['worldStreamingViewing'] | null,
+    adoption: number,
+    playerPresentation: AudiencePlatformPresentation,
+    playerModel: StreamingAudiencePlayerModel,
+): StreamingAudienceWorldCountryView[] => WORLD_COUNTRY_DEFINITIONS.map(definition => {
+    const population = worldPopulation.countries[definition.id]?.population ?? definition.baselinePopulation;
+    const competition = worldStreamingCompetition.countries[definition.id];
+    const customers = worldStreamingCustomers?.countries[definition.id];
+    const viewing = worldStreamingViewing?.countries[definition.id]?.platformPerformance?.PLAYER;
+    const playerSummary = customers?.platformSummaries.find(row => row.platformId === 'PLAYER');
+    const playerAllocation = competition?.platformAllocations.find(row => row.platformId === 'PLAYER');
+    const reachable = competition?.streamingReachableHouseholds ?? 0;
+    const payingHouseholds = customers?.payingHouseholds ?? competition?.subscribingHouseholds ?? 0;
+    const holders = customers
+        ? customers.platformSummaries.map(row => ({ platformId: row.platformId, platformName: row.platformName, households: row.payingHouseholds }))
+        : (competition?.platformAllocations || []).map(row => ({ platformId: row.platformId, platformName: row.platformName, households: row.households }));
+    const platformHouseholds = holders
+        .filter(row => row.households > 0)
+        .map(row => {
+            const presentation = row.platformId === 'PLAYER'
+                ? playerPresentation
+                : row.platformId === 'REGIONAL'
+                    ? getAudiencePlatformPresentation('REGIONAL')
+                    : (brand => ({ name: brand.displayName, color: brand.primaryColor }))(resolveStreamingPlatformBrandById(row.platformId, row.platformName));
+            return { id: row.platformId, name: presentation.name, color: presentation.color, households: round(row.households) };
+        })
+        .sort((left, right) => right.households - left.households || left.id.localeCompare(right.id));
+    const playerAccounts = customers ? (playerSummary?.endingPaidAccounts ?? 0) : (playerAllocation?.households ?? 0);
+    const playerAdHouseholds = viewing?.accessMix.freeViewingAccounts ?? 0;
+    const playerStoreBuyers = (viewing?.revenue.rentalTransactions ?? 0) + (viewing?.revenue.purchaseTransactions ?? 0);
+    const playerMonthlyRevenue = customers ? (playerSummary?.monthlySubscriptionRevenue ?? 0) : (playerAllocation?.monthlySubscriptionRevenue ?? 0);
+    return {
+        id: definition.id,
+        name: definition.name,
+        regionId: definition.regionId as StreamingDayOneRegionId,
+        population: round(population),
+        activeViewers: customers
+            ? round(customers.activeViewers + customers.sharedActiveViewers + customers.piracyReach)
+            : round(population * adoption / 100),
+        payingHouseholds: round(payingHouseholds),
+        reachableHouseholds: round(reachable),
+        unclaimedHouseholds: round(customers ? Math.max(0, reachable - payingHouseholds) : competition?.unclaimedHouseholds ?? 0),
+        playerAccounts: round(playerAccounts),
+        playerAdHouseholds: round(playerAdHouseholds),
+        playerStoreBuyers: round(playerStoreBuyers),
+        playerAudience: round(playerModel.primary === 'AD_HOMES' ? playerAdHouseholds : playerModel.primary === 'BUYERS' ? playerStoreBuyers : playerAccounts),
+        playerDemandHouseholds: round(playerAllocation?.households ?? 0),
+        playerNetChange: round((playerSummary?.joins ?? 0) + (playerSummary?.reactivations ?? 0) - (playerSummary?.cancellations ?? 0)),
+        playerMonthlyRevenue: round(playerMonthlyRevenue),
+        playerMonthlyRevenueTotal: round(playerMonthlyRevenue + (viewing?.revenue.totalIncrementalRevenue ?? 0) * WEEKS_PER_MONTH),
+        platformHouseholds,
+    };
+});
+
+const playerCommercialOf = (viewing: Player['world']['worldStreamingViewing'] | null): StreamingAudiencePlayerCommercialView => {
+    const row = viewing?.platforms?.PLAYER;
+    if (!row) {
+        return { available: false, adHouseholds: 0, adImpressions: 0, adRevenueWeekly: 0, storeBuyers: 0, rentals: 0, purchases: 0, storeRevenueWeekly: 0, otherRevenueWeekly: 0, totalRevenueWeekly: 0, hoursViewed: 0 };
+    }
+    const revenue = row.revenue;
+    const store = revenue.rentalRevenue + revenue.purchaseRevenue;
+    return {
+        available: true,
+        adHouseholds: round(row.accessMix.freeViewingAccounts ?? 0),
+        adImpressions: round(revenue.advertisingImpressions),
+        adRevenueWeekly: round(revenue.advertisingRevenue),
+        storeBuyers: round(revenue.rentalTransactions + revenue.purchaseTransactions),
+        rentals: round(revenue.rentalTransactions),
+        purchases: round(revenue.purchaseTransactions),
+        storeRevenueWeekly: round(store),
+        otherRevenueWeekly: round(Math.max(0, revenue.totalIncrementalRevenue - revenue.advertisingRevenue - store)),
+        totalRevenueWeekly: round(revenue.totalIncrementalRevenue),
+        hoursViewed: round(row.totalHoursViewed),
+    };
+};
+
+/** The player's commercial model, from the live pricing the weekly settlement reads. */
+const playerModelOf = (pricing: Parameters<typeof projectStreamingCommercialOffers>[0]): StreamingAudiencePlayerModel => {
+    const offers = projectStreamingCommercialOffers(pricing);
+    const subscription = offers.subscriptions.length > 0;
+    const ads = Boolean(offers.freeAdOffer);
+    const store = Boolean(offers.storeOffer);
+    return { subscription, ads, store, primary: subscription ? 'ACCOUNTS' : ads ? 'AD_HOMES' : store ? 'BUYERS' : 'ACCOUNTS' };
+};
+
 export const getStreamingAudienceMarket = (player: Player): StreamingAudienceMarketView => {
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
@@ -589,6 +760,10 @@ export const getStreamingAudienceMarket = (player: Player): StreamingAudienceMar
     const worldStreamingCustomers = player.world?.worldStreamingCustomers?.lastProcessedAbsoluteWeek === absoluteWeek
         ? player.world.worldStreamingCustomers
         : null;
+    const worldStreamingViewing = player.world?.worldStreamingViewing?.lastProcessedAbsoluteWeek === absoluteWeek
+        ? player.world.worldStreamingViewing
+        : null;
+    const playerModel = playerModelOf(platform.serviceConfiguration.pricing);
     const countries = STREAMING_WORLD_MARKETS.map(market => buildCountry(
         market,
         selectedMarketIds,
@@ -736,6 +911,11 @@ export const getStreamingAudienceMarket = (player: Player): StreamingAudienceMar
         globalTrend: buildGlobalTrend(absoluteWeek, weeksSinceFounding, population, adoption, subscriptionsPerHousehold),
         globalWatchShare,
         countries,
+        worldCountries: buildWorldCountries(worldPopulation, worldStreamingCompetition, worldStreamingCustomers, worldStreamingViewing, adoption, playerPresentation, playerModel),
+        playerModel,
+        playerPlans: projectStreamingCommercialOffers(platform.serviceConfiguration.pricing).subscriptions
+            .map(plan => ({ id: plan.id, name: plan.name, monthly: plan.monthly })),
+        playerCommercial: playerCommercialOf(worldStreamingViewing),
         platforms: buildPlatformViews(player, countries, globalWatchShare, payingHouseholds),
         personas: buildPersonas(activeViewers, worldAudienceEconomy),
         switching: {

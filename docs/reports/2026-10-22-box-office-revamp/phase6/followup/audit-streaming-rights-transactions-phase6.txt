@@ -1,0 +1,10 @@
+
+> pr-6.6.3@1.0.25 audit:streaming-rights-transactions-phase6
+> esbuild scripts/audit-streaming-rights-transactions-phase6.ts --bundle --platform=node --format=cjs --loader:.csv=text --outfile=/tmp/audit-streaming-rights-transactions-phase6.cjs && node /tmp/audit-streaming-rights-transactions-phase6.cjs
+
+Streaming rights transactions Phase A6 schema audit passed.
+
+  ../../../../tmp/audit-streaming-rights-transactions-phase6.cjs    9.2mb ⚠️
+  ../../../../tmp/audit-streaming-rights-transactions-phase6.css  383.2kb
+
+⚡ Done in 122ms

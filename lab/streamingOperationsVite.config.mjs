@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 const root=fileURLToPath(new URL('..',import.meta.url));
 const fixtureKeys={live:'STREAMING_OPERATIONS_LIVE_FIXTURE',prelaunch:'STREAMING_OPERATIONS_PRELAUNCH_FIXTURE','5000':'STREAMING_OPERATIONS_SCALE_FIXTURE'};
-export default defineConfig({root,esbuild:{jsx:'automatic'},plugins:[{
+export default defineConfig({root,optimizeDeps:{entries:['scripts/fixtures/streaming-operations-qa.html']},esbuild:{jsx:'automatic'},plugins:[{
  name:'disposable-streaming-operations-player',
  configureServer(server){server.middlewares.use((request,response,next)=>{
   const url=new URL(request.url||'/','http://localhost');

@@ -1,0 +1,9 @@
+
+> pr-6.6.3@1.0.25 audit:stock-takeovers
+> esbuild scripts/audit-stock-takeovers.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-stock-takeovers.mjs && node /tmp/audit-stock-takeovers.mjs
+
+
+  ../../../../tmp/audit-stock-takeovers.mjs  4.6mb ⚠️
+
+⚡ Done in 146ms
+Stock takeovers audit passed.

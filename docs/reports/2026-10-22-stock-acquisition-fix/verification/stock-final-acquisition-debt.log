@@ -1,0 +1,9 @@
+
+> pr-6.6.3@1.0.25 audit:acquisition-debt
+> esbuild scripts/audit-acquisition-debt.ts --bundle --platform=node --format=esm --outfile=/tmp/audit-acquisition-debt.mjs && node /tmp/audit-acquisition-debt.mjs
+
+
+  ../../../../tmp/audit-acquisition-debt.mjs  3.9mb ⚠️
+
+⚡ Done in 501ms
+Acquisition debt audit passed.

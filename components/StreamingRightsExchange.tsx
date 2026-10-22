@@ -64,9 +64,11 @@ interface Props {
   onClose: () => void;
   onOpenPromotion?: (projectId: string) => void;
   onOpenTitleDossier?: (projectId: string) => void;
+  /** The Content room opens the calendar directly for renewal decisions. */
+  initialTab?: ExchangeTab;
 }
 
-type ExchangeTab = 'MARKET' | 'DEALS' | 'CALENDAR' | 'VAULT';
+export type ExchangeTab = 'MARKET' | 'DEALS' | 'CALENDAR' | 'VAULT';
 
 const formatMoney = (value: number): string => {
   if (value >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(1).replace(/\.0$/, '')}B`;
@@ -111,10 +113,11 @@ export default function StreamingRightsExchange({
   onClose,
   onOpenPromotion,
   onOpenTitleDossier,
+  initialTab = 'MARKET',
 }: Props) {
   const platform = player.ownedStreamingPlatform;
   const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
-  const [tab, setTab] = useState<ExchangeTab>('MARKET');
+  const [tab, setTab] = useState<ExchangeTab>(initialTab);
   const [selectedNegotiationId, setSelectedNegotiationId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState('');
   const opportunities = useMemo(() => getStreamingRightsOpportunities(player), [player]);

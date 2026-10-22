@@ -10,7 +10,7 @@ import { getStudioOwnershipPercent } from '../services/studioOwnership';
 import { getAcquisitionDebtSummary, payDownAcquisitionDebt } from '../services/acquisitionDebt';
 import { migratePlayerSave } from '../services/saveMigration';
 import { processGameWeek } from '../services/gameLoop';
-import { initializeStocks, getCorporateStockDividendReceipts } from '../services/stockLogic';
+import { initializeStocks, getCorporateStockDividendReceipts, getEstimatedAnnualDividend } from '../services/stockLogic';
 
 let checks = 0;
 const check = (name: string, run: () => void) => { run(); checks++; console.log('PASS', name); };
@@ -45,9 +45,11 @@ check('save reload retains balances ownership loan rates and capital classificat
 const dividendFixture=fixture();dividendFixture.currentWeek=12;dividendFixture.stocks=initializeStocks();dividendFixture.portfolio=[{stockId:'stk_apple',shares:100_000,averageCost:100,totalInvested:10_000_000,equityFunding:[{ownerStudioId:'Source',shares:100_000}]}];
 const nextWeek=await processGameWeek(dividendFixture);
 check('actual weekly engine posts corporate public dividends once to company ledger',()=>{
- const next=nextWeek.player;const expected=getCorporateStockDividendReceipts(next,dividendFixture.currentWeek);assert.ok(expected.length,'exercise payout week');
+ const next=nextWeek.player;const stock=next.stocks.find(s=>s.id==='stk_apple')!;
+ const expectedAmount=Math.floor(getEstimatedAnnualDividend(next,stock,100_000)/4);assert.ok(expectedAmount>0,'exercise payout week');
  const entries=next.businesses.find(b=>b.id==='Source')!.studioState!.financeLedger.filter(e=>e.id.startsWith('corporate_stock_DIVIDEND_'));
- assert.equal(entries.length,expected.length);assert.equal(entries.reduce((sum,e)=>sum+e.amount,0),expected.reduce((sum,e)=>sum+e.amount,0));
+ assert.equal(entries.length,1);assert.equal(entries.reduce((sum,e)=>sum+e.amount,0),expectedAmount);
+ assert.deepEqual(getCorporateStockDividendReceipts(next,dividendFixture.currentWeek),[],'a settled source week cannot pay its owners again');
  assert.equal(next.finance.history.filter(e=>e.description==='Stock Dividends').length,0);
 });
 const afterReloadWeek=await processGameWeek(migratePlayerSave(JSON.parse(JSON.stringify(nextWeek.player))));

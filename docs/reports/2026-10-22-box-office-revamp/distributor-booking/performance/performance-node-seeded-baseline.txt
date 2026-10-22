@@ -1,0 +1,40 @@
+BENCH_PROGRESS early -1 686
+BENCH_PROGRESS early 0 459
+BENCH_PROGRESS early 1 451
+BENCH_PROGRESS early 2 441
+BENCH_PROGRESS early 3 438
+BENCH_PROGRESS early 4 538
+BENCH_PROGRESS early 5 469
+BENCH_PROGRESS early 6 459
+BENCH_PROGRESS early 7 457
+BENCH_PROGRESS late -1 6461
+BENCH_PROGRESS late 0 6939
+BENCH_PROGRESS late 1 7324
+BENCH_PROGRESS late 2 7076
+BENCH_PROGRESS late 3 6969
+BENCH_PROGRESS late 4 7521
+BENCH_PROGRESS late 5 7748
+BENCH_PROGRESS late 6 8223
+BENCH_PROGRESS late 7 7851
+[
+  {
+    "name": "early",
+    "total": {
+      "n": 8,
+      "minMs": 438.36850000000004,
+      "p50Ms": 456.9902089999996,
+      "p95Ms": 538.0645829999999,
+      "maxMs": 538.0645829999999
+    }
+  },
+  {
+    "name": "late",
+    "total": {
+      "n": 8,
+      "minMs": 6938.796709,
+      "p50Ms": 7324.466625000001,
+      "p95Ms": 8222.944958,
+      "maxMs": 8222.944958
+    }
+  }
+]

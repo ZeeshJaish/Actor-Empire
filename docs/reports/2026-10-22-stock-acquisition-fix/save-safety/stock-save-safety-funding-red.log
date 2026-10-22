@@ -1,0 +1,27 @@
+PASS unheld abnormal quote cannot debit unrelated wallet cash
+PASS normal quote reload preserves high historical cost and corporate rights
+PASS explicit zero average cost and zero invested basis are preserved
+PASS abnormal quote repair retains its original and is idempotent
+PASS unsafe supply never silently rescales shares or rewrites basis
+PASS duplicate holdings and contradictory owner allocations require recoverable review
+PASS new integrity signature rejects disappearing company-funded rights
+PASS new integrity signature rejects altered quote-repair provenance
+PASS finite SX cash survives migration and nonfinite cash requires recovery
+PASS shipped schema3 signature still verifies its exact historical projection
+PASS missing historical cost remains unknown instead of inventing the current quote
+PASS malformed positive register containers request explicit recovery
+FAIL nonfinite corporate rights cannot verify as a healthy signed generation: Expected values to be strictly equal:
+
+true !== false
+
+file:///private/tmp/audit-stock-save-safety.mjs:99297
+if (failed) throw new Error(`${failed}/${tests.length} stock save safety checks failed`);
+                  ^
+
+Error: 1/13 stock save safety checks failed
+    at file:///private/tmp/audit-stock-save-safety.mjs:99297:19
+    at ModuleJob.run (node:internal/modules/esm/module_job:377:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:671:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+
+Node.js v24.11.1

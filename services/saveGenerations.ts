@@ -36,6 +36,8 @@ export interface PromoteSaveGenerationBatchInput {
 
 export interface SaveGenerationStore {
     read(key: string): Promise<unknown | null>;
+    /** One consistent transaction snapshot, including across other tab writers. */
+    readMany?(keys: readonly string[]): Promise<Array<unknown | null>>;
     write(key: string, value: unknown): Promise<void>;
     remove(key: string): Promise<void>;
     promoteGeneration(input: PromoteSaveGenerationInput): Promise<void>;
@@ -164,8 +166,9 @@ export const loadVerifiedGameData = async (
     currentKey: string,
 ): Promise<VerifiedGameLoad> => {
     const keys = getSaveGenerationKeys(currentKey);
-    const current = await store.read(keys.current);
-    const manifest = await store.read(keys.integrity);
+    const [current, manifest] = store.readMany
+        ? await store.readMany([keys.current, keys.integrity])
+        : [await store.read(keys.current), await store.read(keys.integrity)];
     if (current === null || current === undefined) {
         const previous = verifyGeneration(await store.read(keys.previous));
         return previous.ok
@@ -206,6 +209,15 @@ export const loadVerifiedGameData = async (
         previous: null,
         violations: currentVerification.violations,
     };
+};
+
+/** Read-only recovery preview. A valid current signature can still precede an incompatible migration. */
+export const peekVerifiedPreviousGameData = async (
+    store: SaveGenerationStore,
+    currentKey: string,
+): Promise<Player | null> => {
+    const previous = verifyGeneration(await store.read(getSaveGenerationKeys(currentKey).previous));
+    return previous.ok ? previous.generation.player : null;
 };
 
 export const recoverPreviousGameData = async (

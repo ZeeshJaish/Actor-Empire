@@ -1,136 +1,120 @@
 {
-  "phase": 6,
-  "status": "LOCAL_CHECKPOINT_WITH_OPEN_READINESS_GATES",
-  "baselineHead": "7079d1b8ae8085ac74b266884651bae122afe4d2",
+  "status": "DESKTOP_AND_SOURCE_VERIFIED_NATIVE_UNTESTED",
+  "baseline": "bb029e5 plus exact original69 unrelated dirty paths",
   "schemaVersion": 1,
   "tuningVersion": 2,
-  "rows": [
+  "gates": [
     {
-      "gate": "Conditional balance and hard constraints",
+      "gate": "Conditional fairness and worldwide-access loopholes",
       "status": "PASSED",
-      "evidence": "calibration-after.json",
-      "scope": "832 treatments, 32 seeds, 53,469 title-weeks, 23 tendencies; authored conditional inputs, not global player hit probabilities"
+      "evidence": [
+        "calibration-after.json",
+        "scenario-results.md",
+        "followup/cinema-regressions-final.json"
+      ],
+      "scope": "832 controlled treatments, 53469 title-weeks, 23 tendency checks; no quota or promised player earnings"
     },
     {
-      "gate": "Worldwide access without free intent",
+      "gate": "Fresh earned-cash career progression",
       "status": "PASSED",
-      "evidence": "calibration-after.json; cinema market/placement suites",
-      "scope": "Unused equal-price screens/new-country access cannot create intent; local discovery requires real booked screen footprint and other-film paid footfall"
+      "evidence": [
+        "followup/long-saves-combined.json",
+        "followup/app-results.json"
+      ],
+      "scope": "96 real weeks from $2000 with no starting job or guaranteed casting; actual shortlist/audition/production/organic publicity; alive/funded opening $285303.27; fresh App action checks plus earned-checkpoint continuation, not 96 weeks of manual UI"
     },
     {
-      "gate": "Small, weak, earned/unearned universe outcomes",
+      "gate": "Required existing-save styles and natural handoff",
       "status": "PASSED",
-      "evidence": "calibration-before.json; calibration-after.json",
-      "scope": "Good targeted small films can profit; weak no-awareness wide films lose; strong earned events improve demand, weak payoff can lose; no forced outcome quotas"
+      "evidence": [
+        "followup/long-saves-combined.json"
+      ],
+      "scope": "104 weeks across four required styles plus 26 late-handoff weeks; promotion failure/retry, reloads, paid repeats, actual natural exit and signed handoff; no exit claimed in censored windows"
     },
     {
-      "gate": "No artificial $3B exit",
+      "gate": "Exactly-once player/offered/NPC payments and old paid-save migration",
       "status": "PASSED",
-      "evidence": "calibration-after.json; live integration suite",
-      "scope": "Every extreme-demand seed continues selling beyond old gross ceiling while demand is viable"
+      "evidence": [
+        "followup/audit-integration.txt",
+        "followup/audit-migration.txt",
+        "followup/audit-save-boundary.txt",
+        "followup/audit-finance-contracts.txt",
+        "followup/affected-regressions.json"
+      ],
+      "scope": "Protected cash/history/IDs and already-signed rights remain; source immutable, stale/replay rejected; no durability shortcut"
     },
     {
-      "gate": "Exactly-once player/offered/NPC settlement",
+      "gate": "Production, energy replay, cast portability and small-campaign blockers",
       "status": "PASSED",
-      "evidence": "cinema-audits.json; verified-changes.json",
-      "scope": "Common live receipts, source immutability, stale/replay protection, actual confirmation retry, signed backend, failed promotion and reload"
+      "evidence": [
+        "followup/audit-career-actions.txt",
+        "followup/audit-inputs.txt",
+        "followup/app-results.json"
+      ],
+      "scope": "Null benign crisis; immutable energy/flags; identity-matched actual cast fallback; usable $10K increments for a $100K pool. Missing legacy actor facts are not guessed"
     },
     {
-      "gate": "Known v1 tuning and old paid-save migration",
+      "gate": "Actual App cinema journey, financial detail and 320px IMDb",
       "status": "PASSED",
-      "evidence": "paid-migration.txt",
-      "scope": "20 groups including nonempty settled paid receipt through signed load, upgrade, re-sign and reload; future/partial states reject"
+      "evidence": [
+        "followup/app-results.json",
+        "followup/screenshots/"
+      ],
+      "scope": "Normal App/StrictMode, real navigation and verified IndexedDB; actual owned campaign return once, reload and paid opening; no page errors/horizontal overflow. Prepared owner is explicitly funded; not a newcomer ownership unlock"
     },
     {
-      "gate": "Four existing-save styles for >=104 actual weeks",
+      "gate": "Matched desktop performance <=10% p95 regression",
       "status": "PASSED",
-      "evidence": "existing-saves-verified.json",
-      "scope": "Final selected source run: 26 each of four styles, plus 26 late-handoff weeks (130 total). Prepared fixtures, not fresh rich careers; no exit claimed in censored 26-week active windows"
+      "evidence": [
+        "followup/performance-summary.json",
+        "followup/week-before-trial1.json",
+        "followup/week-after-trial1.json",
+        "followup/week-before-trial2.json",
+        "followup/week-after-trial2.json",
+        "followup/app-week-before.json",
+        "followup/app-week-after.json"
+      ],
+      "scope": "Node early/late 12 warm samples per side in two alternating paired trials; actual App 4 warm weeks per fixture/side plus first week. Node comparable gameplay hash identical; App recorded saved facts identical. Late Node p95 improves41-42%, App45%; small descriptive desktop samples, not production quantiles"
     },
     {
-      "gate": "Actual repeat reload, natural exit and streaming handoff",
+      "gate": "Remaining absolute large-save latency and memory",
+      "status": "KNOWN_LIMIT",
+      "evidence": [
+        "followup/performance-summary.json"
+      ],
+      "scope": "233-240MB stress saves still need7.7-8.3s Node full durable week and6.83s App warm p95; sampled retained Node heap3.52-3.66GB, not cumulative allocation or device peak. No instant-week or mobile-memory claim"
+    },
+    {
+      "gate": "Affected audits, types, build and frozen English",
       "status": "PASSED",
-      "evidence": "existing-saves-verified.json; live integration and rights suites",
-      "scope": "Paid repeats in four styles; old playable title actually exits/signs streaming; no-buyer archive separately tested. Initial adverse starter is not counted as a valid ordinary UI career"
+      "evidence": [
+        "followup/cinema-regressions-final.json",
+        "followup/affected-regressions.json",
+        "followup/lint-final.txt",
+        "followup/build-final.txt",
+        "followup/english-final.txt"
+      ],
+      "scope": "20 cinema suites, 10 affected existing audits, tsc/build and read-only8173-key/14720-reaction-case English guard; no baseline recapture"
     },
     {
-      "gate": "Ordinary earned-cash campaign and paid-release journey",
-      "status": "FAILED_VERIFICATION",
-      "evidence": "starter-work-and-recovery-failed.json; starter-work-break-observation.json",
-      "scope": "156-week work-and-recovery run never reaches production; work-break observation enters deficit by week104 with no paid campaign. No sustainable ordinary career or paid-campaign claim; requires life/choice handling and actual full App validation, without assuming all player routes fail"
-    },
-    {
-      "gate": "Studio receipt retention at verified save boundary",
+      "gate": "Unrelated workspace preservation",
       "status": "PASSED",
-      "evidence": "save-boundary.txt",
-      "scope": "One shared 160-row bound; source money and every retained receipt ID survive verified preparation; source unchanged"
+      "evidence": [
+        "followup/unrelated-preservation.json"
+      ],
+      "scope": "All69 original dirty paths unchanged"
     },
     {
-      "gate": "Streaming route optimization has identical results",
-      "status": "PASSED",
-      "evidence": "viewing-before.json; viewing-after.json; viewing-entitlements-before.json",
-      "scope": "Constructor hashes match including 617,443 royalty rows; next-week prior-purchase output matches, immutable source, same-week idempotence and no permanent-title resale"
-    },
-    {
-      "gate": "Early relative p95 desktop comparison <=10%",
-      "status": "PASSED",
-      "evidence": "performance.json",
-      "scope": "Three paired trials; median trial p95 +1.02% Node total and -3.44% warm browser summary paint; small-sample local lab result"
-    },
-    {
-      "gate": "Late candidate verified Node/IndexedDB pipeline",
-      "status": "PASSED",
-      "evidence": "performance.json",
-      "scope": "One trial each: eight warm Node measurements and eight browser clicks, verified persistence before summary UI"
-    },
-    {
-      "gate": "Global before/after p95 <=10% regression",
-      "status": "INCONCLUSIVE",
-      "evidence": "performance.json; performance/late-baseline-protected-failure.json",
-      "scope": "Same aligned late baseline fails protected studio-ledger compaction and has zero valid timing samples; failure duration is not p95"
-    },
-    {
-      "gate": "Late absolute latency and retained memory",
-      "status": "MEASURED_SLOW",
-      "evidence": "performance.json",
-      "scope": "Node total p95 14.75s, warm browser 12.01s, cold browser 17.57s; Node final UTF-8 save 240,493,790 bytes, retained heap after 3,160,553,648 bytes. Not a device-readiness pass"
-    },
-    {
-      "gate": "Scoped regression suites and TypeScript/build",
-      "status": "PASSED",
-      "evidence": "cinema-audits.json; affected-audits.json; verification.txt",
-      "scope": "18 focused cinema suite types plus 832-treatment calibration and selected 130-week save observations; affected save, rights, playback, C4 and studio audits; isolated/current-workspace lint/build. Ordinary journey remains a separate failed gate; default all-style suite is not green."
-    },
-    {
-      "gate": "Frozen English baseline",
-      "status": "PASSED",
-      "evidence": "english-baseline.txt",
-      "scope": "8,173 frozen keys and 14,720 reaction cases; no recapture"
-    },
-    {
-      "gate": "Full App career UI journey",
+      "gate": "Physical-device/native interaction, memory and GPU",
       "status": "UNTESTED",
-      "scope": "Engine/action functions and a QA summary were tested. Actual full App taps/tutorial and career route are not represented by the QA page"
+      "evidence": [],
+      "scope": "Headless Chromium and web build do not establish iOS/Android/native bridge/device performance"
     },
     {
-      "gate": "Mobile/device/native bridge/GPU interaction",
-      "status": "UNTESTED",
-      "scope": "390x844 headless desktop viewport is not a native or real-device test"
-    },
-    {
-      "gate": "Cumulative allocator volume / native peak memory",
-      "status": "UNTESTED",
-      "scope": "Retained Node heap and logical admission allocation rows were measured; those are not cumulative JavaScript allocations or native peak memory"
-    },
-    {
-      "gate": "Fresh ordinary player studio ownership",
-      "status": "UNTESTED",
-      "scope": "Prepared founder/studio cases have explicit starting resources; actor journey is not proof a $2,000 starter already owns a studio"
-    },
-    {
-      "gate": "Shipping/push/merge/native release",
+      "gate": "Release, merge, push and new git checkpoint",
       "status": "NOT_PERFORMED",
-      "scope": "Local implementation and checkpoint only; normal schema-1 path already existed before this phase"
+      "evidence": [],
+      "scope": "Local source/evidence follow-up only; normal v1 was already active. No rollout toggle, store release or unrelated staging"
     }
   ]
 }

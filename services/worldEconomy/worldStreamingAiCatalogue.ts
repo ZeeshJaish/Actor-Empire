@@ -226,14 +226,24 @@ export const getAiCataloguePositions = (
 
 export const createAiTitleAccessResolver = (
     player: Player, offer: WorldStreamingPlatformOffer, legacy: WorldStreamingAiCatalogueTitle[],
-): ((countryId: string, absoluteWeek: number, route: StreamingTitleAccessRoute) => AiCataloguePosition[]) => {
+): ((countryId: string, absoluteWeek: number, route: StreamingTitleAccessRoute, onlyTitleId?: string) => AiCataloguePosition[]) => {
     const projected = projectStreamingCommercialOffers(offer.commercialConfiguration);
     const positions = getAiCataloguePositions(player, offer.platformId, legacy);
-    return (countryId, absoluteWeek, route) => positions.filter(position => (
+    let byTitle: Map<string, AiCataloguePosition[]> | undefined;
+    return (countryId, absoluteWeek, route, onlyTitleId) => {
+        if (onlyTitleId !== undefined && !byTitle) {
+            byTitle = new Map();
+            for (const position of positions) {
+                const rows = byTitle.get(position.titleId) || [];
+                rows.push(position); byTitle.set(position.titleId, rows);
+            }
+        }
+        return (onlyTitleId === undefined ? positions : byTitle!.get(onlyTitleId) || []).filter(position => (
         evaluateStreamingTitleRoute({ titleId: position.titleId, countryId, absoluteWeek,
             productionReadyAtAbsoluteWeek: position.startsAtAbsoluteWeek,
             generalReleaseAtAbsoluteWeek: position.startsAtAbsoluteWeek,
             marketActive: offer.activeCountryIds.includes(countryId), offer: projected, route,
             position }).allowed
-    ));
+        ));
+    };
 };

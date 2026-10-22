@@ -119,6 +119,20 @@ export interface CinemaWeekInput {
     supply?: CinemaSupplyQuote;
     marketState?: CinemaMarketState;
     history?: readonly CinemaViewingEvidence[];
+    streamingAlternatives?: readonly CinemaStreamingAlternative[];
+}
+/** A conservative reachable overlap from committed home access; no new customers, views or cash. */
+export interface CinemaStreamingAlternative {
+    platformId:string;
+    countryId:string;
+    cohortId:string;
+    accessiblePeople:number;
+    catalogueStrength:number;
+    serviceQuality:number;
+    localization:number;
+    freshness:number;
+    preferredGenres:readonly Genre[];
+    evidenceWeek:number;
 }
 export interface CinemaKnownInputs {
     titles: ReadonlyArray<Omit<CinemaTitleInput, 'delivery'> & { delivery: Omit<CinemaDeliveryInput, 'deliveredQuality'> & { qualityRange: readonly [number, number] } }>;
@@ -240,6 +254,10 @@ export interface CinemaRunState {
     poolId: string;
     quietWeeks: number;
     closed: boolean;
+    /** Optional renewal observations; old saves retain their prior audience and money. */
+    lastBookedWeek?: number;
+    lastShows?: number;
+    lastAdmissions?: number;
 }
 export interface CinemaMarketState {
     schemaVersion: 1;
@@ -282,6 +300,8 @@ export interface CinemaSupplyPool {
     exhibitorBasisPoints: number;
     distributionBasisPoints: number;
     bookingCentsPerShow: number;
+    /** Exhibitor's marginal scheduling estimate only; never charged to the producer. */
+    operatingCentsPerShow?: number;
 }
 export interface CinemaSupplyQuote {
     pools: CinemaSupplyPool[];

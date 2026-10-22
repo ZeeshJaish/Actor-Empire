@@ -1,0 +1,265 @@
+{
+  "suiteCount": 37,
+  "allPassed": true,
+  "suites": [
+    {
+      "kind": "cinema",
+      "name": "inputs",
+      "status": 0,
+      "elapsedMs": 348,
+      "sourceReport": "final-cinema-inputs.txt"
+    },
+    {
+      "kind": "cinema",
+      "name": "delivery",
+      "status": 0,
+      "elapsedMs": 320,
+      "sourceReport": "final-cinema-delivery.txt"
+    },
+    {
+      "kind": "cinema",
+      "name": "finance",
+      "status": 0,
+      "elapsedMs": 259,
+      "sourceReport": "final-cinema-finance.txt"
+    },
+    {
+      "kind": "cinema",
+      "name": "finance-contracts",
+      "status": 0,
+      "elapsedMs": 158,
+      "sourceReport": "final-cinema-finance-contracts.txt"
+    },
+    {
+      "kind": "cinema",
+      "name": "finance-ui",
+      "status": 0,
+      "elapsedMs": 1082,
+      "sourceReport": "final-cinema-finance-ui.txt"
+    },
+    {
+      "kind": "cinema",
+      "name": "phase1-integration",
+      "status": 0,
+      "elapsedMs": 7891,
+      "sourceReport": "final-cinema-phase1-integration.txt"
+    },
+    {
+      "kind": "cinema",
+      "name": "awareness",
+      "status": 0,
+      "elapsedMs": 296,
+      "sourceReport": "final-cinema-awareness.txt"
+    },
+    {
+      "kind": "cinema",
+      "name": "phase2-integration",
+      "status": 0,
+      "elapsedMs": 5251,
+      "sourceReport": "final-cinema-phase2-integration.txt"
+    },
+    {
+      "kind": "cinema",
+      "name": "audience",
+      "status": 0,
+      "elapsedMs": 710,
+      "sourceReport": "final-cinema-audience.txt"
+    },
+    {
+      "kind": "cinema",
+      "name": "market",
+      "status": 0,
+      "elapsedMs": 2198,
+      "sourceReport": "final-cinema-market.txt"
+    },
+    {
+      "kind": "cinema",
+      "name": "migration",
+      "status": 0,
+      "elapsedMs": 6458,
+      "sourceReport": "final-cinema-migration.txt"
+    },
+    {
+      "kind": "cinema",
+      "name": "integration",
+      "status": 0,
+      "elapsedMs": 27755,
+      "sourceReport": "final-cinema-integration.txt"
+    },
+    {
+      "kind": "cinema",
+      "name": "presentation",
+      "status": 0,
+      "elapsedMs": 3632,
+      "sourceReport": "final-cinema-presentation.txt"
+    },
+    {
+      "kind": "cinema",
+      "name": "rights",
+      "status": 0,
+      "elapsedMs": 7612,
+      "sourceReport": "final-cinema-rights.txt"
+    },
+    {
+      "kind": "cinema",
+      "name": "placement",
+      "status": 0,
+      "elapsedMs": 340,
+      "sourceReport": "final-cinema-placement.txt"
+    },
+    {
+      "kind": "cinema",
+      "name": "release-announcement",
+      "status": 0,
+      "elapsedMs": 5055,
+      "sourceReport": "final-cinema-release-announcement.txt"
+    },
+    {
+      "kind": "cinema",
+      "name": "save-boundary",
+      "status": 0,
+      "elapsedMs": 2393,
+      "sourceReport": "final-cinema-save-boundary.txt"
+    },
+    {
+      "kind": "cinema",
+      "name": "viewing-routes",
+      "status": 0,
+      "elapsedMs": 4342,
+      "sourceReport": "final-cinema-viewing-routes.txt"
+    },
+    {
+      "kind": "cinema",
+      "name": "royalty-batch",
+      "status": 0,
+      "elapsedMs": 351,
+      "sourceReport": "final-cinema-royalty-batch.txt"
+    },
+    {
+      "kind": "cinema",
+      "name": "career-actions",
+      "status": 0,
+      "elapsedMs": 763,
+      "sourceReport": "final-cinema-career-actions.txt"
+    },
+    {
+      "kind": "cinema",
+      "name": "booking",
+      "status": 0,
+      "elapsedMs": 320,
+      "sourceReport": "final-cinema-booking.txt"
+    },
+    {
+      "kind": "cinema",
+      "name": "alternatives",
+      "status": 0,
+      "elapsedMs": 370,
+      "sourceReport": "final-cinema-alternatives.txt"
+    },
+    {
+      "kind": "cinema",
+      "name": "alternative-routes",
+      "status": 0,
+      "elapsedMs": 1915,
+      "sourceReport": "final-cinema-alternative-routes.txt"
+    },
+    {
+      "kind": "cinema",
+      "name": "fingerprint",
+      "status": 0,
+      "elapsedMs": 1437,
+      "sourceReport": "final-cinema-fingerprint.txt"
+    },
+    {
+      "kind": "package",
+      "name": "streaming-signed-royalties",
+      "status": 0,
+      "elapsedMs": 6805,
+      "sourceReport": "final-package-streaming-signed-royalties.txt"
+    },
+    {
+      "kind": "package",
+      "name": "streaming-ads-rental-backend",
+      "status": 0,
+      "elapsedMs": 958,
+      "sourceReport": "final-package-streaming-ads-rental-backend.txt"
+    },
+    {
+      "kind": "package",
+      "name": "save-integrity",
+      "status": 0,
+      "elapsedMs": 1395,
+      "sourceReport": "final-package-save-integrity.txt"
+    },
+    {
+      "kind": "package",
+      "name": "save-generations",
+      "status": 0,
+      "elapsedMs": 926,
+      "sourceReport": "final-package-save-generations.txt"
+    },
+    {
+      "kind": "package",
+      "name": "large-save-integrity",
+      "status": 0,
+      "elapsedMs": 4470,
+      "sourceReport": "final-package-large-save-integrity.txt"
+    },
+    {
+      "kind": "package",
+      "name": "streaming-rights-transactions-phase6",
+      "status": 0,
+      "elapsedMs": 2543,
+      "sourceReport": "final-package-streaming-rights-transactions-phase6.txt"
+    },
+    {
+      "kind": "package",
+      "name": "streaming-rights-calendar-phase4",
+      "status": 0,
+      "elapsedMs": 3768,
+      "sourceReport": "final-package-streaming-rights-calendar-phase4.txt"
+    },
+    {
+      "kind": "package",
+      "name": "streaming-original-readiness-repair",
+      "status": 0,
+      "elapsedMs": 298,
+      "sourceReport": "final-package-streaming-original-readiness-repair.txt"
+    },
+    {
+      "kind": "package",
+      "name": "streaming-original-playback-repair",
+      "status": 0,
+      "elapsedMs": 6922,
+      "sourceReport": "final-package-streaming-original-playback-repair.txt"
+    },
+    {
+      "kind": "package",
+      "name": "streaming-commercial-c4",
+      "status": 0,
+      "elapsedMs": 8977,
+      "sourceReport": "final-package-streaming-commercial-c4.txt"
+    },
+    {
+      "kind": "cinema",
+      "name": "alternative-batching",
+      "status": 0,
+      "elapsedMs": 526,
+      "sourceReport": "final-cinema-alternative-batching.txt"
+    },
+    {
+      "kind": "package",
+      "name": "week-processing-save-safety",
+      "status": 0,
+      "elapsedMs": 10025,
+      "sourceReport": "final-package-week-processing-save-safety.txt"
+    },
+    {
+      "kind": "package",
+      "name": "save-transfer",
+      "status": 0,
+      "elapsedMs": 7019,
+      "sourceReport": "final-package-save-transfer.txt"
+    }
+  ]
+}

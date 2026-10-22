@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import { INITIAL_PLAYER } from '../types';
+import { initializeStocks, getStockOutstandingShares } from '../services/stockLogic';
+import { processStockTakeoverEvents } from '../services/stockTakeover';
+import { acknowledgeStockControlNotice } from '../services/stockControlNotices';
+let p=structuredClone(INITIAL_PLAYER);p.age=40;p.currentWeek=52;p.stocks=initializeStocks();p.businesses=[];p.pendingEvents=[];
+const s=p.stocks.find(s=>s.id==='stk_para')!;p.portfolio=[{stockId:s.id,shares:getStockOutstandingShares(s)*.51,averageCost:13,totalInvested:4_309_500_000}];
+p=processStockTakeoverEvents(p);assert.equal(p.pendingEvents!.length,1);
+p=acknowledgeStockControlNotice(p,s.id,'OPEN');assert.equal(p.pendingEvents!.length,0);
+p=processStockTakeoverEvents({...p,age:41,currentWeek:1});assert.equal(p.pendingEvents!.length,0);
+p=processStockTakeoverEvents({...p,currentWeek:12});assert.equal(p.pendingEvents!.length,1);
+p=acknowledgeStockControlNotice(p,s.id,'DEFER');
+p=processStockTakeoverEvents({...p,portfolio:[]});
+p=processStockTakeoverEvents({...p,portfolio:[{stockId:s.id,shares:getStockOutstandingShares(s)*.51}]});assert.equal(p.pendingEvents!.length,1);
+console.log('Stock control acknowledgement, 12-week defer and regain behavior passed');

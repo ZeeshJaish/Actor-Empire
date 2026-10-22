@@ -1,0 +1,27 @@
+✘ [ERROR] No matching export in "services/boxOffice/boxOfficeInputs.ts" for import "preserveCinemaCastRecognition"
+
+    scripts/audit-box-office-inputs.ts:5:58:
+      5 │ ...fferedCinemaCast, preserveCinemaCastRecognition } from '../servi...
+        ╵                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+/Users/zeesh/Vibe code/Actor empire/node_modules/esbuild/lib/main.js:1467
+  let error = new Error(text);
+              ^
+
+Error: Build failed with 1 error:
+scripts/audit-box-office-inputs.ts:5:58: ERROR: No matching export in "services/boxOffice/boxOfficeInputs.ts" for import "preserveCinemaCastRecognition"
+    at failureErrorWithLog (/Users/zeesh/Vibe code/Actor empire/node_modules/esbuild/lib/main.js:1467:15)
+    at /Users/zeesh/Vibe code/Actor empire/node_modules/esbuild/lib/main.js:926:25
+    at /Users/zeesh/Vibe code/Actor empire/node_modules/esbuild/lib/main.js:878:52
+    at buildResponseToResult (/Users/zeesh/Vibe code/Actor empire/node_modules/esbuild/lib/main.js:924:7)
+    at /Users/zeesh/Vibe code/Actor empire/node_modules/esbuild/lib/main.js:951:16
+    at responseCallbacks.<computed> (/Users/zeesh/Vibe code/Actor empire/node_modules/esbuild/lib/main.js:603:9)
+    at handleIncomingPacket (/Users/zeesh/Vibe code/Actor empire/node_modules/esbuild/lib/main.js:658:12)
+    at Socket.readFromStdout (/Users/zeesh/Vibe code/Actor empire/node_modules/esbuild/lib/main.js:581:7)
+    at Socket.emit (node:events:508:28)
+    at addChunk (node:internal/streams/readable:559:12) {
+  errors: [Getter/Setter],
+  warnings: [Getter/Setter]
+}
+
+Node.js v24.11.1

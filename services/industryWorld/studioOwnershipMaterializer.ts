@@ -1,3 +1,4 @@
+import { getListedCompanyValuation } from '../stockValuation';
 import type {
     Business,
     Commitment,
@@ -192,6 +193,9 @@ export const materializeStudioOwnership = (
         };
     }
 
+    const linkedStock = player.stocks.find(stock => stock.relatedStudioId === studioId);
+    const handoffValuation = business.studioState.industryHandoffSnapshot ? business.stats.valuation
+        : linkedStock ? getListedCompanyValuation(player, linkedStock).equityMarketCap : toMoney(studio.valuation * 1_000);
     const activeProductions = Object.values(player.world.industryProductions || {})
         .filter(production => production.producerStudioId === studioId)
         .filter(production => production.source === 'STUDIO_INDEPENDENT' && !TERMINAL.has(production.status))
@@ -200,7 +204,7 @@ export const materializeStudioOwnership = (
     const alreadyExact = business.studioState.industryHandoffSnapshot
         && business.studioState.industryHandoffSnapshot.ai.lastProcessedAbsoluteWeek === studio.ai.lastProcessedAbsoluteWeek
         && business.balance === toMoney(studio.cashReserve)
-        && business.stats.valuation === toMoney(studio.valuation * 1_000)
+        && business.stats.valuation === handoffValuation
         && studio.ai.controller === 'PLAYER'
         && pending.length === 0;
     if (alreadyExact) {
@@ -215,7 +219,7 @@ export const materializeStudioOwnership = (
         balance: toMoney(studio.cashReserve),
         stats: {
             ...business.stats,
-            valuation: toMoney(studio.valuation * 1_000),
+            valuation: handoffValuation,
             brandHealth: clamp(studio.reputation),
             investorConfidence: clamp(studio.reputation - (studio.ai.status === 'DISTRESSED' ? 18 : 0)),
             riskLevel: clamp(studio.ai.finance.debtPrincipalMillions / Math.max(1, studio.cashReserve) * 20, 5, 95),

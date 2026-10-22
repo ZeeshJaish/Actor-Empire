@@ -111,6 +111,11 @@ export interface HqState {
   reachLevel: number;
   subscribers: number;
   subsDelta: number;
+  /** The headline's name when the service is not counted in subscribers
+      (ad-supported: homes watching free; store: buyers). */
+  audienceLabel?: string;
+  /** Under the headline instead of the weekly subscriber change. */
+  audienceNote?: string;
   treasury: number;
   /** pre-launch only */
   readiness?: { done: number; total: number };
@@ -221,13 +226,17 @@ export const PlatformHQ: React.FC<{
 
           <div className={css.hqheroes}>
             <div className={cx(css.hero, css.big)}>
-              <span className={css.hlabel}>{state.live ? 'SUBSCRIBERS' : 'LAUNCH READINESS'}</span>
+              <span className={css.hlabel}>{state.live ? state.audienceLabel ?? 'SUBSCRIBERS' : 'LAUNCH READINESS'}</span>
               {state.live ? (
                 <>
                   <b className={css.hval}>{count(state.subscribers)}</b>
-                  <em className={cx(css.hdelta, (state.subsDelta >= 0 ? '' : css.down))}>
-                    {signed(state.subsDelta)} this week
-                  </em>
+                  {state.audienceNote !== undefined ? (
+                    <em className={css.hdelta}>{state.audienceNote}</em>
+                  ) : (
+                    <em className={cx(css.hdelta, (state.subsDelta >= 0 ? '' : css.down))}>
+                      {signed(state.subsDelta)} this week
+                    </em>
+                  )}
                 </>
               ) : (
                 <>

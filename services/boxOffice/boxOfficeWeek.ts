@@ -7,7 +7,7 @@ import { getCinemaRecognitionShare } from './boxOfficeAwareness';
 import { NPC_DATABASE } from '../npcLogic';
 import { getAbsoluteWeek } from '../legacyLogic';
 import { readCinemaWorldAudience } from './boxOfficeAudienceAdapters';
-import { normalizeCinemaTitle } from './boxOfficeInputs';
+import { normalizeCinemaTitle, preserveCinemaCastRecognition } from './boxOfficeInputs';
 import { simulateCinemaWeek } from './boxOfficeMarket';
 import { migrateCinemaState, CinemaMigrationError } from './boxOfficeMigration';
 import { CINEMA_MARKET_TUNING_VERSION } from './boxOfficeProfiles';
@@ -16,6 +16,7 @@ import type { CinemaTitleInput, CinemaWeekInput, CinemaWeekResult } from './boxO
 export { serializeCinemaFacts } from './boxOfficeIdentity';
 import { serializeCinemaFacts } from './boxOfficeIdentity';
 export const findCinemaBusiness = (player: Player, ownerId: string): Business | undefined => {
+    if(typeof ownerId!=='string'||!ownerId)return undefined;
     const direct = player.businesses.find(b => b.type === 'PRODUCTION_HOUSE' && (b.id === ownerId || b.studioState?.acquisitionPortfolio?.sourceStudioId === ownerId));
     if (direct)
         return direct;
@@ -48,14 +49,15 @@ export const cinemaIndustryProjectDetails = (player: Player, project: IndustryPr
         description: outside?.logline || project.title, subtype: 'STANDALONE', visibleHype: 'LOW', visibleDirectorTier: 'Established', visibleScriptBuzz: 'Delivered', visibleCastStrength: 'Delivered',
         releaseStrategy: project.releaseStrategy || 'THEATRICAL',
         screeningStrategy: production?.studioAiExecution?.selectedReleaseMode === 'LIMITED_THEATRICAL' || outside?.releasePath === 'FESTIVAL' ? 'REGIONAL' : 'INTERNATIONAL',
-        directorId: project.directorId, directorName: project.directorName, castList: cast, universeId: project.universeId,
+        directorId: project.directorId, directorName: project.directorName, castList: project.cinemaCast || cast, universeId: project.universeId,
         originalLanguageId: 'english', cinemaExposure: project.cinemaExposure, talentParticipation: talent?.talentParticipation,
         hiddenStats: { qualityScore: quality, scriptQuality: production?.writerSkill || outside?.scoutReport.scriptQuality || quality,
             directorQuality: outside?.scoutReport.directorQuality || quality, castingStrength: talent?.packageScore || outside?.scoutReport.castQuality || quality,
             rawHype: 0, distributionPower: 0, prestigeBonus: 0 } };
 };
 export const normalizeLiveTitle = (player: Player, id: string, project: ProjectDetails, releaseWeek: number, route: CinemaTitleInput['owner']['route'], world: ReturnType<typeof readCinemaWorldAudience>, release?: ActiveRelease): CinemaTitleInput => {
-    const title = normalizeCinemaTitle({ player, titleId: id, project, owner: { id: project.studioId, route } });
+    const ownerId=project.studioId || player.world.cinemaMarket?.titles[id]?.ownerId || `legacy-owner:${id}`;
+    const title = normalizeCinemaTitle({ player, titleId: id, project, owner: { id: ownerId, route } });
     const regions = getReleaseRegionIdsForProject(project), countries = world.countries!.filter(c => regions.includes(c.regionId));
     const chains = Object.fromEntries(countries.map(c => [c.id, project.releaseChainSelections?.[c.regionId] || getDefaultCinemaChainIdsForRegion(project, c.regionId)]));
     if (title.exposure)
@@ -76,7 +78,9 @@ export const buildCinemaWeekInput = (player: Player, absoluteWeek: number): Cine
     const state = player.world.cinemaMarket;
     if (!state)
         throw new Error('Migrate cinema before building live week');
-    const prepared = prepareCinemaAudienceWorld(player, absoluteWeek), world = readCinemaWorldAudience(prepared);
+    const hasCandidates=player.activeReleases.some(r=>r.type==='MOVIE'&&r.distributionPhase==='THEATRICAL'&&r.status!=='FINISHED'&&!state.titles[r.id]?.closed&&state.titles[r.id]?.basis!=='LEGACY_FULLY_SETTLED')
+        ||player.world.projects.some(p=>p.mediaType!=='SERIES'&&p.releaseStrategy==='THEATRICAL'&&p.cinema?.settlementBasis==='UNSETTLED_WEEKLY'&&!state.titles[p.id]?.closed);
+    const prepared = prepareCinemaAudienceWorld(player, absoluteWeek), world = readCinemaWorldAudience(prepared,{includeStreamingAlternatives:hasCandidates});
     const byId = new Map<string, CinemaTitleInput>();
     for (const release of player.activeReleases || []) {
         if (release.type !== 'MOVIE' || release.distributionPhase !== 'THEATRICAL' || release.status === 'FINISHED')
@@ -127,7 +131,15 @@ export const processCinemaMarketWeek = (player: Player, absoluteWeek: number): {
     const migration = migrateCinemaState(player, absoluteWeek - 1);
     if (migration.status === 'REJECTED')
         throw new CinemaMigrationError(migration.diagnostics.map(d => d.code));
-    const prepared = admitOutsideCinemaTitles(migration.player, absoluteWeek);
+    let prepared = admitOutsideCinemaTitles(migration.player, absoluteWeek);
+    let changed = false;
+    const projects = prepared.world.projects.map(project => {
+        if (project.cinemaCast || project.cinema?.settlementBasis !== 'UNSETTLED_WEEKLY' || prepared.world.cinemaMarket?.titles[project.id]?.closed) return project;
+        const details = preserveCinemaCastRecognition(cinemaIndustryProjectDetails(prepared, project), prepared);
+        changed = true;
+        return { ...project, cinemaCast: details.castList || [] };
+    });
+    if (changed) prepared = { ...prepared, world: { ...prepared.world, projects } };
     const result = simulateCinemaWeek(buildCinemaWeekInput(prepared, absoluteWeek));
     return { player: commitCinemaWeek(prepared, result).player, result };
 };

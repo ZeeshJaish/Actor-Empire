@@ -1,0 +1,22 @@
+PASS ordinary policy resolves persisted choices and keeps actions funded
+PASS visible costs remain visible when translated option keys exist
+PASS updater replay charges one 30E job reservation and one 25E application, source unchanged
+PASS benign cast traits cannot crash a real production week
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Small funded campaign must permit at least one increment: 1
+    at file:///private/var/folders/h0/t4fqx33d23l2fh_9h7n17cqr0000gp/T/actor-box-office-sRlfGU/career-actions.mjs:76637:10
+    at ModuleJob.run (node:internal/modules/esm/module_job:377:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:671:26)
+    at async file:///Users/zeesh/Vibe%20code/Actor%20empire/[eval1]:1:198 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}
+
+Node.js v24.11.1

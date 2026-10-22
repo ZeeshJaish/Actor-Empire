@@ -1,0 +1,2 @@
+PASS 10,000 membership checks use one route evaluation; country/week/plan/mode/new-snapshot isolation and duplicate rights positions preserved
+PASS immutable viewing batch bounds historical archive scans: 69
