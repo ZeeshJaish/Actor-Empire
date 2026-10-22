@@ -108,6 +108,7 @@ interface OfferBuildInput {
 }
 
 const buildOffer = (input: OfferBuildInput): StreamingOfferVersion => {
+    const quoteMoney=input.platformState.cinemaValueBased ? (n:number)=>Math.max(0,Math.floor(n/1000)*1000) : roundMoney;
     const rng = createDeterministicRng(`${input.sessionId}:${input.platform.id}:offer:${input.revision}:${input.variant}`);
     const structureRoll = rng();
     const isSeriesFunding = input.projectType === 'SERIES' && structureRoll > 0.66;
@@ -136,16 +137,16 @@ const buildOffer = (input: OfferBuildInput): StreamingOfferVersion => {
             ? generatedLocalization
             : localizationCap;
     const fundingFraction = isSeriesFunding ? 0.16 + rng() * 0.18 : structureRoll > 0.9 ? 0.08 + rng() * 0.1 : 0;
-    const productionFunding = roundMoney(Math.min(
+    const productionFunding = quoteMoney(Math.min(
         input.platformState.fixedExposureCeiling * 0.25,
         input.guaranteeTarget * fundingFraction,
     ));
     const futureSeasonFunding = isSeriesFunding
-        ? roundMoney(Math.min(input.platformState.fixedExposureCeiling * 0.2, input.guaranteeTarget * (0.1 + rng() * 0.18)))
+        ? quoteMoney(Math.min(input.platformState.fixedExposureCeiling * 0.2, input.guaranteeTarget * (0.1 + rng() * 0.18)))
         : 0;
     const maximumGuarantee = Math.max(0, input.platformState.fixedExposureCeiling - productionFunding - futureSeasonFunding);
-    const minimumGuarantee = roundMoney(Math.min(maximumGuarantee, Math.max(1_000_000, input.guaranteeTarget)));
-    const expectedRoyaltyCost = roundMoney(input.platformState.expectedTitleGross * (input.platform.eligibleBackendRevenueFraction || 0) * (backendPoints / 100));
+    const minimumGuarantee = quoteMoney(Math.min(maximumGuarantee, Math.max(1_000_000, input.guaranteeTarget)));
+    const expectedRoyaltyCost = quoteMoney(input.platformState.expectedTitleGross * (input.platform.eligibleBackendRevenueFraction || 0) * (backendPoints / 100));
     const fixedExposure = minimumGuarantee + productionFunding + futureSeasonFunding;
     const backendCap = null;
     const dealStructure: StreamingRightsDealStructure = productionFunding > 0 || futureSeasonFunding > 0
@@ -186,7 +187,7 @@ const buildOffer = (input: OfferBuildInput): StreamingOfferVersion => {
         fixedExposure,
         expectedRoyaltyCost,
         expectedTotalCost: fixedExposure + expectedRoyaltyCost,
-        expectedPlatformValue: roundMoney(Math.max(0, input.platformState.expectedTitleGross - expectedRoyaltyCost - fixedExposure)),
+        expectedPlatformValue: quoteMoney(Math.max(0, input.platformState.expectedTitleGross - expectedRoyaltyCost - fixedExposure)),
         createdAtActiveSecond: input.activeSecond,
         proposedPremiereAbsoluteWeek: input.requiredPremiereAbsoluteWeek
             ?? input.platform.availablePremiereAbsoluteWeek
@@ -287,18 +288,21 @@ const buildPlatformState = (
         0.42,
         1.7,
     );
-    const expectedTitleGross = roundMoney(Math.max(
+    const expectedTitleGross = platform.cinemaExpectedValue !== undefined ? Math.max(0,Math.floor(platform.cinemaExpectedValue)) : roundMoney(Math.max(
         Math.max(1_000_000, input.projectBudget) * qualityMultiplier * (input.projectType === 'SERIES' ? 1.18 : 1) * rightsLotValueMultiplier,
         theatricalProof * rightsLotValueMultiplier,
         platform.baseBid * 2.5 * rightsLotValueMultiplier,
     ));
-    const fixedExposureCeiling = roundMoney(Math.min(
+    const fixedExposureCeiling = platform.cinemaMaximumBid !== undefined
+        ? Math.floor(Math.max(0,Math.min(platform.cashAvailable,platform.acquisitionCeiling,platform.cinemaMaximumBid))/1000)*1000
+        : roundMoney(Math.min(
         Math.max(0, platform.cashAvailable),
         Math.max(0, platform.acquisitionCeiling) * relationshipMultiplier,
         expectedTitleGross * clamp(0.72 + relationshipMultiplier * 0.28, 0.7, 1.2),
     ));
     const rng = createDeterministicRng(`${sessionId}:${platform.id}:arrival`);
     return {
+        cinemaValueBased:platform.cinemaMaximumBid!==undefined,
         platformId: platform.id,
         platformName: platform.name,
         color: brand.primaryColor,
@@ -362,8 +366,8 @@ export const createStreamingBiddingSession = (input: CreateStreamingBiddingSessi
         .filter(platform => (
             platform.canStartNewBids !== false
             && platform.id
-            && platform.cashAvailable >= 1_000_000
-            && platform.acquisitionCeiling >= 1_000_000
+            && platform.cashAvailable >= (platform.cinemaMaximumBid!==undefined?1000:1_000_000)
+            && platform.acquisitionCeiling >= (platform.cinemaMaximumBid!==undefined?1000:1_000_000)
         ))
         .slice()
         .sort((left, right) => left.id.localeCompare(right.id));

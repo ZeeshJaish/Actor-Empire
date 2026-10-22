@@ -5,6 +5,7 @@ export const rebaseCinemaSavedState = (state:CinemaSavedState,shift:number):Cine
     if(!shift)return state;
     const week=(n:number)=>Math.max(0,n+shift);
     return {...state,clockEpoch:state.clockEpoch+1,activationWeek:week(state.activationWeek),lastProcessedAbsoluteWeek:week(state.lastProcessedAbsoluteWeek),
+        ...(state.streamingSeen ? {streamingSeen:Object.fromEntries(Object.entries(state.streamingSeen).map(([id,v])=>[id,{...v,lastWeek:week(v.lastWeek)}]))} : {}),
         titles:Object.fromEntries(Object.entries(state.titles).map(([id,t])=>[id,{...t,activationWeek:week(t.activationWeek),lastSettledWeek:week(t.lastSettledWeek)}])),
         market:{...state.market,lastProcessedAbsoluteWeek:week(state.market.lastProcessedAbsoluteWeek),
             titles:state.market.titles.map(t=>({...t,releaseWeek:week(t.releaseWeek),cells:t.cells.map(c=>({...c,

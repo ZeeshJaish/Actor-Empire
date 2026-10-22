@@ -125,9 +125,9 @@ export const buildCinemaAudienceSnapshot = (input: CinemaWeekInput): {choices: C
             const utility = clamp(fraction(m.interest)*fit*(.65+.35*fraction(facts.urgency))
                 *(1+Math.min(P.maxFavoriteLift,attachment*P.favoriteLift)+buildup*.5)*fatigue*feedback
                 *(facts.universeId ? .65+.35*fraction(facts.accessibility)+familiarity*.15 : 1));
-            const window = facts.streamingWindow;
-            const knownWait = window?.publiclyKnown && !!window.platformId && window.countryIds.includes(cohort.countryId)
-                && window.absoluteWeek-input.absoluteWeek<=8 ? .6*(1-fraction(facts.urgency)*.65) : 0;
+            const windows=facts.streamingWindows || (facts.streamingWindow ? [facts.streamingWindow] : []);
+            const knownWait = windows.some(window=>window.publiclyKnown && !!window.platformId && window.countryIds.includes(cohort.countryId)
+                && window.absoluteWeek-input.absoluteWeek<=8) ? .6*(1-fraction(facts.urgency)*.65) : 0;
             const interest = people(reachable*utility*P.firstWeeklyIntent);
             const buyShare = clamp(affordability**(.25+fraction(m.priceSensitivity)*.5)*timeFit*(1-knownWait));
             const first = people(interest*buyShare);

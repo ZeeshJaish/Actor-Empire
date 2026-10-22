@@ -36,3 +36,11 @@ export const CINEMA_SUPPLY_PROFILE = {
     /** Twelve monthly envelopes distributed exactly over each 52-week year. */
     monthsPerYear: 12, weeksPerYear: 52,
 } as const;
+
+/** Forecast valuation assumptions, not guaranteed household conversions or producer returns. */
+export const CINEMA_RIGHTS_PROFILE = Object.freeze({
+    titleCashShare:.08, awarenessIntentShare:.22, paidContributionMargin:.35, attributedPaidMonths:2,
+    maximumValueShare:.7, centralValueShare:.55, intentRetentionPerWeek:.97,
+    observedUncertainty:.25, unobservedUncertainty:.5, maximumWaitingPreference:.25,
+    reachableSubscriberMultiple:2,
+});

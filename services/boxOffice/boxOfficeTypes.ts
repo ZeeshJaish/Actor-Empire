@@ -166,6 +166,7 @@ export interface CinemaTitleMarketFacts {
     urgency: number;
     /** Only a publicly known window can cause window-specific waiting. */
     streamingWindow?: { platformId: string; countryIds: readonly string[]; absoluteWeek: number; publiclyKnown: boolean };
+    streamingWindows?:ReadonlyArray<NonNullable<CinemaTitleMarketFacts['streamingWindow']>>;
 }
 export interface CinemaCohortMarketFacts {
     eligiblePeople: number;
@@ -378,6 +379,8 @@ export interface CinemaCommittedWeek {
     titles: CinemaCommittedTitle[];
 }
 export interface CinemaSavedState {
+    /** Maximum observed weekly viewing homes; a conservative overlap lower bound, not cumulative starts. */
+    streamingSeen?:Record<string,{lastWeek:number;countries:Record<string,number>}>;
     /** External investment counterparties have no simulated bank; signed net receivables/payables. */
     externalProducerBalancesCents?:Record<string,number>;
     schemaVersion: 1;

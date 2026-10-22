@@ -1,0 +1,237 @@
+{
+  "date": "2026-10-22",
+  "base_head": "5640278",
+  "verification_snapshot": "/private/tmp/actor-box-office-phase5-20261022-132614/verify-final",
+  "scope": "HEAD plus explicit Task 10 owned files; excludes all 77 original dirty paths",
+  "cinema": [
+    {
+      "suite": "inputs",
+      "exit": 0,
+      "summary": [
+        "PASS duplicate player rows cannot stand in for missing co-stars",
+        "PASS canonical custom actor fame is retained without a global database entry"
+      ],
+      "assertions_or_groups": 9,
+      "command": "node scripts/run-box-office-audit.mjs inputs"
+    },
+    {
+      "suite": "delivery",
+      "exit": 0,
+      "summary": [
+        "PASS blockbuster fallback has the actual offered ensemble and stable credits",
+        "PASS sleeper week-two and later retention do not cliff at $90M"
+      ],
+      "assertions_or_groups": 11,
+      "command": "node scripts/run-box-office-audit.mjs delivery"
+    },
+    {
+      "suite": "finance",
+      "exit": 0,
+      "summary": [
+        "PASS already realized gross is not transformed into demand again",
+        "PASS unavailable cinema selections cannot create unallocated ticket money"
+      ],
+      "assertions_or_groups": 3,
+      "command": "node scripts/run-box-office-audit.mjs finance"
+    },
+    {
+      "suite": "finance-contracts",
+      "exit": 0,
+      "summary": [
+        "PASS funded production does not hide the studios paid marketing exposure",
+        "PASS unknown ledger categories are rejected rather than losing money silently"
+      ],
+      "assertions_or_groups": 12,
+      "command": "node scripts/run-box-office-audit.mjs finance-contracts"
+    },
+    {
+      "suite": "finance-ui",
+      "exit": 0,
+      "summary": [
+        "PASS production-house active and library routes retain actual finance through dashboard render",
+        "PASS archived release detail adapter preserves missing receipt estimates and genuine zero without actor-pay fallback"
+      ],
+      "assertions_or_groups": 3,
+      "command": "node scripts/run-box-office-audit.mjs finance-ui"
+    },
+    {
+      "suite": "phase1-integration",
+      "exit": 0,
+      "summary": [
+        "PASS legacy active receipts retain their provenance through a real new week, reload and completed archive",
+        "PASS actual mixed streaming royalty and soundtrack receipts reconcile investor deductions in studio-sale earnings"
+      ],
+      "assertions_or_groups": 9,
+      "command": "node scripts/run-box-office-audit.mjs phase1-integration"
+    },
+    {
+      "suite": "awareness",
+      "exit": 0,
+      "summary": [
+        "PASS malformed counts and duplicate cohort identities cannot mint people",
+        "PASS forecast projection uses only known quality and creates no history"
+      ],
+      "assertions_or_groups": 18,
+      "command": "node scripts/run-box-office-audit.mjs awareness"
+    },
+    {
+      "suite": "phase2-integration",
+      "exit": 0,
+      "summary": [
+        "PASS studio-owned films use the same actual career-promotion source path",
+        "PASS series keep their existing release and promotion behavior"
+      ],
+      "assertions_or_groups": 10,
+      "command": "node scripts/run-box-office-audit.mjs phase2-integration"
+    },
+    {
+      "suite": "audience",
+      "exit": 0,
+      "summary": [
+        "PASS known streaming remains a waiting option after its public start",
+        "Audience audit: 26 groups passed"
+      ],
+      "assertions_or_groups": 26,
+      "command": "node scripts/run-box-office-audit.mjs audience"
+    },
+    {
+      "suite": "market",
+      "exit": 0,
+      "summary": [
+        "PASS local poster discovery needs real other-film patrons and arrives next week",
+        "Market audit: 36 groups passed"
+      ],
+      "assertions_or_groups": 36,
+      "command": "node scripts/run-box-office-audit.mjs market"
+    },
+    {
+      "suite": "migration",
+      "exit": 0,
+      "summary": [
+        "PASS actual save-generation failure and previous-generation recovery retain cinema money/history",
+        "Migration audit: 19 groups passed"
+      ],
+      "assertions_or_groups": 19,
+      "command": "node scripts/run-box-office-audit.mjs migration"
+    },
+    {
+      "suite": "integration",
+      "exit": 0,
+      "summary": [
+        "PASS actual paid week survives failed promotion and successful retry without duplicate cash",
+        "Integration audit: 30 groups passed"
+      ],
+      "assertions_or_groups": 30,
+      "command": "node scripts/run-box-office-audit.mjs integration"
+    },
+    {
+      "suite": "presentation",
+      "exit": 0,
+      "summary": [
+        "PASS nonzero release preview matches live mid with country-specific chains and paid campaign",
+        "Cinema presentation: 8 groups passed"
+      ],
+      "assertions_or_groups": 8,
+      "command": "node scripts/run-box-office-audit.mjs presentation"
+    },
+    {
+      "suite": "rights",
+      "exit": 0,
+      "summary": [
+        "PASS actual no-buyer studio title archives exactly once",
+        "Cinema rights: 18 groups passed"
+      ],
+      "assertions_or_groups": 18,
+      "command": "node scripts/run-box-office-audit.mjs rights"
+    }
+  ],
+  "cinema_total": 212,
+  "streaming": [
+    {
+      "suite": "streaming-rights-transactions-phase6",
+      "exit": 0,
+      "tail": [
+        "  ../../../../tmp/audit-streaming-rights-transactions-phase6.cjs    9.2mb \u26a0\ufe0f",
+        "  ../../../../tmp/audit-streaming-rights-transactions-phase6.css  383.2kb",
+        "",
+        "\u26a1 Done in 153ms",
+        "Streaming rights transactions Phase A6 schema audit passed."
+      ]
+    },
+    {
+      "suite": "streaming-rights-calendar-phase4",
+      "exit": 0,
+      "tail": [
+        "  ../../../../tmp/audit-streaming-rights-calendar-phase4.cjs  12.1mb \u26a0\ufe0f",
+        "  ../../../../tmp/audit-streaming-rights-calendar-phase4.css  43.1kb",
+        "",
+        "\u26a1 Done in 165ms",
+        "Streaming rights calendar Phase A4 audit passed."
+      ]
+    },
+    {
+      "suite": "streaming-original-readiness-repair",
+      "exit": 0,
+      "tail": [
+        "PASS Original cannot play before localization delivery",
+        "PASS greenlit without canonical completion remains blocked",
+        "PASS Originals modal owns a fixed inset viewport above HQ",
+        "PASS Originals content can shrink and scroll inside viewport",
+        "28/28 Original readiness checks passed"
+      ]
+    },
+    {
+      "suite": "streaming-original-playback-repair",
+      "exit": 0,
+      "tail": [
+        "      \"amortization\": 192307",
+        "    }",
+        "  ]",
+        "}",
+        "Prepared-network Original launch \u2192 actual weekly viewing/receipts \u2192 Finance/replay/reload passed."
+      ]
+    },
+    {
+      "suite": "world-streaming-we6",
+      "exit": 0,
+      "tail": [
+        "\u26a1 Done in 61ms",
+        "WE6 C2 reference-week gross: rights-aware $1326506; permissive reference $1330607; delta -0.308%.",
+        "WE6 C2 title lines (permissive, rights-aware): [{\"projectId\":\"us-window-only\",\"viewingAccounts\":[110649,109518],\"adRevenue\":[19624,19671],\"rentalRevenue\":[181982,181982],\"purchaseRevenue\":[22608,0]},{\"projectId\":\"hindi-heart\",\"viewingAccounts\":[108878,109512],\"adRevenue\":[7011,7006],\"rentalRevenue\":[388745,388745],\"purchaseRevenue\":[44977,57651]},{\"projectId\":\"imported-action\",\"viewingAccounts\":[85127,85419],\"adRevenue\":[11873,11868],\"rentalRevenue\":[142556,142556],\"purchaseRevenue\":[20769,26606]}]",
+        "WE6 seed: 534,084,341 viewing accounts and 1,367,167,499 hours.",
+        "WE6 400-year horizon: 976.7 KiB state; 64818.4ms across 400 annual checkpoints."
+      ]
+    }
+  ],
+  "typescript": {
+    "command": "NODE_OPTIONS=--max-old-space-size=12000 npx tsc --noEmit --pretty false",
+    "exit": 0
+  },
+  "build": {
+    "command": "npm run build",
+    "exit": 0,
+    "warnings": [
+      "existing chunk-size warning",
+      "Browserslist dataset age"
+    ]
+  },
+  "english": {
+    "exit": 0,
+    "keys": 8173,
+    "reaction_cases": 14720,
+    "baseline_regenerated": false
+  },
+  "browser": {
+    "command": "PLAYWRIGHT_MODULE=<bundled playwright> node scripts/audit-box-office-phase5-browser.cjs",
+    "exit": 0,
+    "authored_qa": true,
+    "real_save_access": false,
+    "page_errors": [],
+    "viewport_width": 320,
+    "document_scroll_width": 320,
+    "transcript": "phase5-browser.txt",
+    "natural_theater_exit": "actual-week integration suite; not a browser long-run claim"
+  },
+  "unrelated_paths_hash_verified": 77,
+  "phase6_calibration_and_device_profiling": "pending"
+}

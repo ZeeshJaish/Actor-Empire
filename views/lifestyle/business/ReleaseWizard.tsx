@@ -1,3 +1,4 @@
+import { quoteCinemaRightsForBuyer, applyCinemaRightsQuoteToBidder } from '../../../services/boxOffice/boxOfficeRightsAdapter';
 import React, { useState, useMemo } from 'react';
 import { commitCinemaReleaseExposure } from '../../../services/boxOffice/boxOfficeExposureAdapters';
 import { Player, PendingEvent, ScreeningStrategy, ProjectHiddenStats, NextSeasonFundingTier, CampaignPositioning, CampaignTimeline, MarketingChannelAllocations, MarketingChannelId, BoxOfficeRegionId, CinemaChainId, CinemaChain, CinemaChainRegionalTerms, ReleasePlanningDraft, StreamingBiddingSession, StreamingOfferVersion, PlatformId } from '../../../types';
@@ -634,6 +635,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
             earliestPremiereAbsoluteWeek: biddingRightsStartWeek,
             studioPlatformRelations: studio?.studioState?.platformRelations || {},
         });
+        try {
         const session = createStreamingBiddingSession({
             projectId: project.id,
             title: project.name || project.title || 'Untitled project',
@@ -656,11 +658,13 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                         requestedLevel: 'DUBS_AND_SUBTITLES',
                     })
                     : { localizationLevel: 'NONE' as const, requirements: [] };
+                const valuedPlatform = !isSeries ? applyCinemaRightsQuoteToBidder(platform,
+                    quoteCinemaRightsForBuyer(player,project.projectDetails || project,project.id,platform.id,biddingRightsStartWeek,52,biddingLotBuild.lot.countryIds)) : platform;
                 return {
-                    ...platform,
-                    canStartNewBids: worldPlatform
+                    ...valuedPlatform,
+                    canStartNewBids: valuedPlatform.canStartNewBids !== false && (worldPlatform
                         ? !getPlatformAiSpendingRestrictions(worldPlatform, biddingAbsoluteWeek).blocksNewBids
-                        : platform.canStartNewBids,
+                        : platform.canStartNewBids),
                     localizationLevelCap: worldPlatform ? localizationPromise.localizationLevel : platform.localizationLevelCap,
                     localizationRequirements: worldPlatform ? localizationPromise.requirements : platform.localizationRequirements,
                     strategicCountryIds: worldPlatform?.ai?.capabilities.activeCountryIds || platform.strategicCountryIds,
@@ -668,6 +672,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
             }),
         });
         persistBiddingSession(session);
+        } catch(error) {setBiddingRightsMessage(error instanceof Error ? error.message : 'No eligible buyer can fund this room.');}
     };
 
     const leaveAuction = () => {
@@ -716,6 +721,12 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
             ?? structuredAcceptance?.offer.proposedPremiereAbsoluteWeek
             ?? biddingRightsStartWeek;
         const fundedPremiere = bid.id.startsWith('locked_premiere_');
+        if (structuredAcceptance && !isSeries && !Object.values(player.world.streamingRightsContracts || {}).some((c:import('../../../types').StreamingRightsContract)=>c.sourceOfferId===structuredAcceptance.offer.id)) {
+            const quote=quoteCinemaRightsForBuyer(player,project.projectDetails || project,project.id,bid.platformId,promisedPremiereAbsoluteWeek,structuredAcceptance.offer.durationWeeks,structuredAcceptance.offer.countryIds,structuredAcceptance.offer.exclusivity,structuredAcceptance.offer.windowType);
+            if(!quote.eligible || Math.round(structuredAcceptance.offer.fixedExposure*100)>quote.maximumBidCents){
+                setBiddingRightsMessage('Buyer resources or audience value changed. Reopen the room for an affordable offer.');return;
+            }
+        }
         const preparedSigning = structuredAcceptance
             ? registerProductionStreamingRightsContractFromOffer(player, {
                 session: structuredAcceptance.session,

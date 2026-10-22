@@ -60,11 +60,16 @@ export const normalizeLiveTitle = (player: Player, id: string, project: ProjectD
     const chains = Object.fromEntries(countries.map(c => [c.id, project.releaseChainSelections?.[c.regionId] || getDefaultCinemaChainIdsForRegion(project, c.regionId)]));
     if (title.exposure)
         title.exposure = { ...title.exposure, events: title.exposure.events.map(e => ({ ...e, titleId: id })) };
+    const signed=Object.values(player.world.streamingRightsContracts || {}).filter(c=>c.sourceProjectId===id);
+    const now=player.world.worldPopulation?.lastProcessedAbsoluteWeek ?? getAbsoluteWeek(player.age,player.currentWeek);
+    const windows=signed.filter(c=>c.status==='ACTIVE'&&c.expiresAtAbsoluteWeek>now).map(c=>({platformId:c.buyer.platformId || c.buyerPlatformId,
+        countryIds:c.territory==='GLOBAL'&&!c.countryIds.length ? countries.map(m=>m.id) : [...c.countryIds],absoluteWeek:c.startsAtAbsoluteWeek,publiclyKnown:true}));
+    if(!signed.length&&release?.streaming)windows.push({platformId:release.streaming.platformId,countryIds:countries.map(c=>c.id),absoluteWeek:release.streaming.startWeekAbsolute || releaseWeek,publiclyKnown:true});
     title.market = { releaseWeek, runtimeMinutes: Math.max(45, Math.min(240, Number((project as any).runtimeMinutes) || 120)),
         languages: [project.originalLanguageId || 'english'], countryIds: countries.map(c => c.id), chainIds: [...new Set(Object.values(chains).flat())], chainIdsByCountry: chains, format: 'STANDARD',
         universeId: project.universeId, returningCharacterIds: [...new Set(title.cast.flatMap(c => c.characterIds))],
         payoff: title.delivery.deliveredQuality || 50, accessibility: title.delivery.scriptQuality, urgency: ['ACTION', 'ADVENTURE', 'SCI_FI', 'SUPERHERO', 'FANTASY'].includes(project.genre) ? 65 : 45,
-        ...(release?.streaming ? { streamingWindow: { platformId: release.streaming.platformId, countryIds: countries.map(c => c.id), absoluteWeek: release.streaming.startWeekAbsolute || releaseWeek, publiclyKnown: true } } : {}) };
+        ...(windows.length ? {streamingWindows:windows} : {}) };
     return title;
 };
 export const buildCinemaWeekInput = (player: Player, absoluteWeek: number): CinemaWeekInput => {

@@ -30,6 +30,7 @@ export const inspectCinemaSavedState = (state:unknown):string[] => {
     if(state.market.schemaVersion!==1 || state.market.tuningVersion!==state.tuningVersion)return ['CINEMA_STATE_INCOMPLETE'];
     if(!finiteTree(state)||state.weeks.length>52||state.market.lastProcessedAbsoluteWeek!==state.lastProcessedAbsoluteWeek)return ['CINEMA_STATE_CORRUPT'];
     if(state.externalProducerBalancesCents!==undefined && (!object(state.externalProducerBalancesCents)||Object.values(state.externalProducerBalancesCents).some(v=>!Number.isSafeInteger(v))))return ['CINEMA_EXTERNAL_BALANCE_CORRUPT'];
+    if(state.streamingSeen!==undefined && (!object(state.streamingSeen)||Object.entries(state.streamingSeen).some(([id,v])=>!state.titles[id]||!object(v)||!integer(v.lastWeek)||!object(v.countries)||Object.values(v.countries).some(n=>!integer(n)))))return ['CINEMA_STREAMING_EVIDENCE_CORRUPT'];
     const titleIds=state.market.titles.map((t:any)=>t?.titleId);
     if(titleIds.some((id:unknown)=>typeof id!=='string'||!id)||new Set(titleIds).size!==titleIds.length)return ['CINEMA_AUDIENCE_ID_CORRUPT'];
     for(const title of state.market.titles){
@@ -58,6 +59,11 @@ export const inspectCinemaSavedState = (state:unknown):string[] => {
     for(const [id,value] of Object.entries(state.titles)) {
         if(!object(value)||value.titleId!==id||!['UNSETTLED_WEEKLY','LEGACY_ACTIVE','LEGACY_FULLY_SETTLED'].includes(String(value.basis)))return ['CINEMA_TITLE_STATE_CORRUPT'];
         for(const key of ['legacyGrossCents','grossCents','producerReceiptsCents','exhibitorReceiptsCents','distributionDeductionsCents','bookingCostCents','investorPaidCents','talentPaidCents','actorPaidCents','firstAdmissions','repeatAdmissions'])if(!integer(value[key]))return ['CINEMA_TITLE_MONEY_CORRUPT'];
+        if(value.audienceSignals!==undefined){
+            const a=value.audienceSignals;
+            if(!object(a)||['awarePeople','discoveryPeople','familiarPeople','homeWaitingPeople'].some(k=>!integer(a[k]))||!Array.isArray(a.countries)
+                ||a.countries.some(c=>!object(c)||typeof c.countryId!=='string'||!integer(c.awarePeople)||!integer(c.deferredPeople)||(c.deferredPeople as number)>(c.awarePeople as number)))return ['CINEMA_AUDIENCE_SIGNAL_CORRUPT'];
+        }
         for(const k of ['satisfactionScoreUnits','satisfactionAdmissions'])if(value[k]!==undefined&&!integer(value[k]))return ['CINEMA_TITLE_AUDIENCE_CORRUPT'];
         if(value.legacyProducerReceiptsCents!==null && !integer(value.legacyProducerReceiptsCents))return ['CINEMA_TITLE_MONEY_CORRUPT'];
         if(value.grossCents!==(value.producerReceiptsCents as number)+(value.exhibitorReceiptsCents as number)+(value.distributionDeductionsCents as number))return ['CINEMA_RECEIPT_CONSERVATION'];

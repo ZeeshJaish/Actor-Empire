@@ -5495,6 +5495,9 @@ export interface StreamingBiddingRightsLot {
 }
 
 export interface StreamingBiddingPlatformInput {
+    /** New film quotes from incremental households; absent preserves signed/legacy rooms. Full dollars. */
+    cinemaExpectedValue?:number;
+    cinemaMaximumBid?:number;
     id: string;
     name: string;
     color: string;
@@ -5564,6 +5567,8 @@ export interface StreamingOfferVersion {
 }
 
 export interface StreamingBiddingPlatformState {
+    /** Fixed caps and dollar rounding for new incremental film quotes only. */
+    cinemaValueBased?:boolean;
     platformId: string;
     platformName: string;
     color: string;
@@ -7267,6 +7272,7 @@ export interface Award {
 }
 
 export interface PastProject {
+    originalLanguageId?:string;
     cinema?: CinemaProjectMarker;
     id: string;
     name: string;
@@ -10810,6 +10816,8 @@ export interface WorldStreamingAiStoreTransaction {
 }
 
 export interface WorldStreamingViewingState {
+    /** Funded, rights-valid cinema-title audience allocated within existing AI viewing envelopes. */
+    cinemaAudienceEvidence?:import('./services/boxOffice/boxOfficeStreamingAudience').CinemaStreamingAudienceEvidence[];
     schemaVersion: 2;
     initializedAtAbsoluteWeek: number;
     lastProcessedAbsoluteWeek: number;

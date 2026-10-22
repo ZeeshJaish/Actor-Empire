@@ -1,7 +1,9 @@
+import { recordCinemaStreamingAudience } from './boxOffice/boxOfficeStreamingAudience';
+import { quoteCinemaRightsForBuyer, registerQuotedCinemaStreamingRights, settleQuotedCinemaStreamingSale } from './boxOffice/boxOfficeRightsAdapter';
 import { CINEMA_ROLE_WEIGHTS } from './boxOffice/boxOfficeProfiles';
 import { creditSignedActorBackend } from './talentCareer';
 import { migrateCinemaState, CinemaMigrationError } from './boxOffice/boxOfficeMigration';
-import { processCinemaMarketWeek } from './boxOffice/boxOfficeWeek';
+import { processCinemaMarketWeek, findCinemaBusiness } from './boxOffice/boxOfficeWeek';
 import { getProductionScale } from './studioProductionEconomy';
 import { completeOfferedCinemaCast, normalizeCinemaTitle } from './boxOffice/boxOfficeInputs';
 import { recordStudioSaleEarnings } from './studioSaleHistory';
@@ -1397,6 +1399,7 @@ const createPastProjectArchiveSnapshot = (
     return {
         id: release.id,
         name: release.name,
+        originalLanguageId:projectDetails.originalLanguageId,
         type: 'ACTING_GIG',
         roleType: playerRoleType,
         playerCharacterProfile,
@@ -4579,7 +4582,11 @@ export const processGameWeek = async (
         const upfront = Math.max(0, Number(winningBid.upfront || 0));
         const platformName = PLATFORMS[winningBid.platformId]?.name || 'a streaming platform';
 
-        const registration = registerProductionStreamingRightsContract(nextPlayer, {
+        const cinemaQuote=release.type==='MOVIE' ? quoteCinemaRightsForBuyer(nextPlayer,release.projectDetails,release.id,winningBid.platformId,getAbsoluteWeek(nextPlayer.age,nextPlayer.currentWeek)+1,winningBid.duration) : null;
+        if(cinemaQuote && (!cinemaQuote.eligible || !cinemaQuote.scope?.countryIds.length || upfront*100>cinemaQuote.maximumBidCents))return release;
+        const register=release.type==='MOVIE' ? (p:Player,args:Parameters<typeof registerProductionStreamingRightsContract>[1])=>registerQuotedCinemaStreamingRights(p,release.projectDetails,args) : registerProductionStreamingRightsContract;
+        const registration = register(nextPlayer, {
+            ...(cinemaQuote?.scope ? {territory:'MULTI_REGION' as const,countryIds:cinemaQuote.scope.countryIds} : {}),
             sourceProjectId: release.id,
             title: release.name,
             projectType: release.type === 'SERIES' ? 'SERIES' : 'MOVIE',
@@ -4592,7 +4599,7 @@ export const processGameWeek = async (
             platformRevenueShare: 100 - streamingBackendPercentForBuyer(nextPlayer,winningBid.platformId,getAbsoluteWeek(nextPlayer.age,nextPlayer.currentWeek),Number(winningBid.royalty || 0)),
             productionFunding: winningBid.fundingAmount,
             signedAtAbsoluteWeek: getAbsoluteWeek(nextPlayer.age, nextPlayer.currentWeek),
-            startsAtAbsoluteWeek: getAbsoluteWeek(nextPlayer.age, nextPlayer.currentWeek),
+            startsAtAbsoluteWeek: cinemaQuote?.scope?.startsAtAbsoluteWeek ?? getAbsoluteWeek(nextPlayer.age, nextPlayer.currentWeek),
             durationWeeks: winningBid.duration,
         });
 
@@ -4639,6 +4646,7 @@ export const processGameWeek = async (
                 totalViews: 0,
                 weeklyViews: [],
                 isLeaving: false,
+                ...(cinemaQuote?.scope ? {startWeekAbsolute:cinemaQuote.scope.startsAtAbsoluteWeek} : {}),
             },
             projectDetails: {
                 ...release.projectDetails,
@@ -4815,6 +4823,11 @@ export const processGameWeek = async (
     });
 
     const createTheatricalStreamingBids=(rel:ActiveRelease,newTotal:number,marketDemand:number,bidRiskMultiplier:number)=>{
+        if(rel.type==='MOVIE')return (Object.keys(PLATFORMS) as PlatformId[]).flatMap(platformId=>{
+            const q=quoteCinemaRightsForBuyer(nextPlayer,rel.projectDetails,rel.id,platformId,getAbsoluteWeek(nextPlayer.age,nextPlayer.currentWeek)+1);
+            return q.eligible&&q.maximumBidCents>=100_000&&q.range.mid>0 ? [{platformId,upfront:Math.floor(q.range.mid/100),royalty:0,duration:52}]:[];
+        });
+
                         const bids: { platformId: PlatformId, upfront: number, royalty: number, duration: number }[] = [];
                         const isSeries = rel.type === 'SERIES';
                         const platforms = Object.keys(PLATFORMS) as PlatformId[];
@@ -6647,7 +6660,7 @@ export const processGameWeek = async (
     const cinemaFinalizedReleases:ActiveRelease[]=[];
     for(const rel of nextPlayer.activeReleases){
         if(!exitedCinemaIds.has(rel.id) || rel.distributionPhase!=='THEATRICAL'){cinemaFinalizedReleases.push(rel);continue;}
-        const studio=nextPlayer.businesses.find(b=>b.id===rel.projectDetails.studioId);
+        const studio=findCinemaBusiness(nextPlayer,rel.projectDetails.studioId);
         // Acting consequences reflect delivered experience and actual exposure, not producer ROI.
         const paid=nextPlayer.world.cinemaMarket!.titles[rel.id];
         const credits=rel.projectDetails.castList || [];
@@ -6670,13 +6683,13 @@ export const processGameWeek = async (
         if(rel.streaming){cinemaFinalizedReleases.push({...rel,distributionPhase:'STREAMING',status:'FINISHED'});continue;}
         if(!studio){
             const platformId=determineStreamingAcquisition(rel.projectDetails);
-            const cost=Math.floor(rel.budget*.4*PLATFORMS[platformId].payoutMult);
+            const quote=quoteCinemaRightsForBuyer(nextPlayer,rel.projectDetails,rel.id,platformId,enteredStreamingAbsoluteWeek+1);
+            const cost=quote.eligible ? Math.floor(quote.range.mid/100) : 0;
             if(cost>0 && (nextPlayer.world.platforms?.[platformId]?.cashReserve || 0)*1e6>=cost){
-                const registration=registerProductionStreamingRightsContract(nextPlayer,{sourceProjectId:rel.id,title:rel.name,projectType:'MOVIE',genre:rel.projectDetails.genre,sellerStudioId:rel.projectDetails.studioId,sellerStudioName:rel.projectDetails.studioId,sellerPartyType:'NPC_STUDIO',buyerPlatformId:platformId,minimumGuarantee:cost,platformRevenueShare:100,signedAtAbsoluteWeek:enteredStreamingAbsoluteWeek,startsAtAbsoluteWeek:enteredStreamingAbsoluteWeek,durationWeeks:52});
+                const registration=settleQuotedCinemaStreamingSale(nextPlayer,rel.projectDetails,{sourceProjectId:rel.id,title:rel.name,projectType:'MOVIE',genre:rel.projectDetails.genre,sellerStudioId:rel.projectDetails.studioId,sellerStudioName:rel.projectDetails.studioId,sellerPartyType:'NPC_STUDIO',buyerPlatformId:platformId,territory:'MULTI_REGION',countryIds:quote.scope!.countryIds,minimumGuarantee:cost,platformRevenueShare:100,signedAtAbsoluteWeek:enteredStreamingAbsoluteWeek,startsAtAbsoluteWeek:enteredStreamingAbsoluteWeek+1,durationWeeks:52});
                 nextPlayer=registration.player;
-                if(registration.contract){
-                    const platform=nextPlayer.world.platforms![platformId];platform.cashReserve-=cost/1e6;
-                    cinemaFinalizedReleases.push({...rel,status:'FINISHED',distributionPhase:'STREAMING',streamingRevenue:(rel.streamingRevenue || 0)+cost,streamingUpfrontFee:(rel.streamingUpfrontFee || 0)+cost,streamingContractId:registration.contract.id,streaming:{platformId,contractId:registration.contract.id,weekOnPlatform:0,totalViews:0,weeklyViews:[],isLeaving:false,startWeekAbsolute:enteredStreamingAbsoluteWeek}});continue;
+                if(registration.contract && registration.changed){
+                    cinemaFinalizedReleases.push({...rel,status:'FINISHED',distributionPhase:'STREAMING',streamingRevenue:(rel.streamingRevenue || 0)+cost,streamingUpfrontFee:(rel.streamingUpfrontFee || 0)+cost,streamingContractId:registration.contract.id,streaming:{platformId,contractId:registration.contract.id,weekOnPlatform:0,totalViews:0,weeklyViews:[],isLeaving:false,startWeekAbsolute:enteredStreamingAbsoluteWeek+1}});continue;
                 }
             }
             if(!nextPlayer.pastProjects.some(p=>p.id===rel.id))nextPlayer.pastProjects.push(createPastProjectArchiveSnapshot({...rel,status:'FINISHED'},{player:nextPlayer}));
@@ -6684,6 +6697,11 @@ export const processGameWeek = async (
         }
         const risk=calculateProductionRiskProfile(rel.projectDetails,{budget:rel.budget,imdbRating:rel.imdbRating,productionPerformance:rel.productionPerformance});
         const bids=createTheatricalStreamingBids(rel,rel.totalGross,getProjectMarketDemand(rel.projectDetails,nextPlayer.currentWeek,studio?.studioState?.marketTrends),risk.platformBidMultiplier);
+        if(!bids.length){
+            if(!nextPlayer.pastProjects.some(p=>p.id===rel.id))nextPlayer.pastProjects.push(createPastProjectArchiveSnapshot({...rel,status:'FINISHED'},{player:nextPlayer}));
+            logsToAdd.push({msg:`No affordable streaming buyer for "${rel.name}"; theatrical results archived.`,type:'neutral'});
+            continue;
+        }
         // Existing downstream contract authority accepts these bids; creating bids pays nothing.
         const biddingRelease:ActiveRelease={...rel,distributionPhase:'STREAMING_BIDDING',status:'FINISHED',bids};
         cinemaFinalizedReleases.push(studio.studioState?.operatingModel==='INDEPENDENT_LABEL' ? closeIndependentSubsidiaryStreamingDeal(biddingRelease,studio,bids) : biddingRelease);
@@ -6767,6 +6785,7 @@ export const processGameWeek = async (
             onStage: stage => emitLoopStage(`world_streaming_viewing_${stage}`),
         },
     );
+    nextPlayer=recordCinemaStreamingAudience(nextPlayer);
     nextPlayer = settleWorldStreamingAudienceEntitlements(nextPlayer, enteredStreamingAbsoluteWeek);
     emitLoopStage('world_streaming_viewing_done', {
         absolute_week: enteredStreamingAbsoluteWeek,

@@ -140,6 +140,7 @@ export const projectCinemaForecastInput = (input: CinemaWeekInput, known: Cinema
                 chainIdsByCountry:structuredClone(title.market.chainIdsByCountry),countryIds:[...title.market.countryIds],chainIds:[...title.market.chainIds],format:title.market.format,
                 universeId:title.market.universeId,returningCharacterIds:title.market.returningCharacterIds ? [...title.market.returningCharacterIds] : undefined,
                 payoff:title.market.payoff,accessibility:title.market.accessibility,urgency:title.market.urgency,
+                ...(title.market.streamingWindows ? {streamingWindows:structuredClone(title.market.streamingWindows)} : {}),
                 ...(title.market.streamingWindow ? {streamingWindow:structuredClone(title.market.streamingWindow)} : {})}} : {}),
             ...(title.exposure ? { exposure: readCinemaExposureRecord({ cinemaExposure: title.exposure }) } : {}),
             delivery: { estimatedQuality: clamp(title.delivery.estimatedQuality ?? (low + high) / 2, low, high), qualityRange: [low, high],

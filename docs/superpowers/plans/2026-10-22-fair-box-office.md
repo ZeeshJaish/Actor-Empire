@@ -314,7 +314,7 @@ assert.deepEqual(twice.player, once.player);
 
 **Interfaces:** produce `forecastCinemaWeek(input: CinemaWeekInput, known: CinemaKnownInputs): CinemaForecast` and `toCinemaPresentation(result: CinemaWeekResult, titleId: string): CinemaPresentation`. Forecast returns explicit low/mid/high scenarios and driver/cost/attendance ranges, not a promised payout. Presentation returns gross, receipts, costs, unique/repeat counts, evidence confidence and audience tags from committed facts.
 
-- [ ] Write forecast purity and finance consistency assertions:
+- [x] Write forecast purity and finance consistency assertions:
 
 ~~~ts
 const f = makeCinemaFixture('targeted-indie', 17);
@@ -328,12 +328,12 @@ const card = toCinemaPresentation(live, live.titles[0].titleId);
 assert.equal(card.grossCents, live.titles[0].grossCents);
 ~~~
 
-- [ ] Run `node scripts/run-box-office-audit.mjs presentation`; call forecast-safe projection plus the same kernel for bounded uncertainty scenarios. Greenlight uses visible estimated delivery and rough future competition uncertainty; release preview uses current footprint, campaign, costs and country prices. Complete identical inputs must produce identical kernel allocations.
-- [ ] Remove independent budget × screen/region/distribution demand math from `distributionDealSummary` and inherited raw-hype/fame preview shortcuts. Show attention potential, awareness by market and intent ranges. Show credible capacity constraints, booking/marketing costs and break-even admissions before commitments.
-- [ ] Use one finance presenter for theater gross, receipts, cost recovery/profit and actor pay. Sum legitimate hybrid media income while preserving separate categories. Historical estimated unique counts must carry a clear label; observed repeat labels require settled evidence.
-- [ ] Add IMDb audience insights: strong theater interest, paid repeat interest, growing word of mouth, franchise appeal, home-viewing appeal/waiting. Apply minimum evidence/confidence rules. Never equate home preference with bad quality; tags summarize behavior and are not extra demand multipliers. Leave numerical IMDb/series redesign outside scope.
-- [ ] Verify normal taps: Greenlight → production → campaign → region/chain selection → confirm → week advancement → weekly box office → detail/IMDb → theater exit. Check narrow mobile layout and English/localization behavior; do not replace the frozen baseline.
-- [ ] Checkpoint as `feat: show consistent cinema forecasts and audience facts`.
+- [x] Run `node scripts/run-box-office-audit.mjs presentation`; call forecast-safe projection plus the same kernel for bounded uncertainty scenarios. Greenlight uses visible estimated delivery and rough future competition uncertainty; release preview uses current footprint, campaign, costs and country prices. Complete identical inputs must produce identical kernel allocations.
+- [x] Remove independent budget × screen/region/distribution demand math from `distributionDealSummary` and inherited raw-hype/fame preview shortcuts. Show attention potential, awareness by market and intent ranges. Show credible capacity constraints, booking/marketing costs and break-even admissions before commitments.
+- [x] Use one finance presenter for theater gross, receipts, cost recovery/profit and actor pay. Sum legitimate hybrid media income while preserving separate categories. Historical estimated unique counts must carry a clear label; observed repeat labels require settled evidence.
+- [x] Add IMDb audience insights: strong theater interest, paid repeat interest, growing word of mouth, franchise appeal, home-viewing appeal/waiting. Apply minimum evidence/confidence rules. Never equate home preference with bad quality; tags summarize behavior and are not extra demand multipliers. Leave numerical IMDb/series redesign outside scope.
+- [x] Verify normal taps: Greenlight → production → campaign → region/chain selection → confirm → week advancement → weekly box office → detail/IMDb → theater exit. Check narrow mobile layout and English/localization behavior; do not replace the frozen baseline.
+- [x] Checkpoint as `feat: show consistent cinema forecasts and audience facts`.
 
 ### Task 10: Rights-aware streaming handoff and buyer economics
 
@@ -341,8 +341,8 @@ assert.equal(card.grossCents, live.titles[0].grossCents);
 
 **Interfaces:** produce `valueCinemaStreamingRights(input: CinemaRightsValueInput): CinemaRightsQuote`. Inputs include country/window rights, reachable incremental households/viewing, overlap, signed obligations, buyer resources and scenario uncertainty. Output is an affordable buyer-specific bid range with value drivers; it creates no cash or entitlement itself.
 
-- [ ] Add expensive low-demand title, strong local sleeper, exhausted/overlapping audience, no streaming rights, already-signed deal, deferred interest and low-resource buyer cases.
-- [ ] Write the offer eligibility/affordability assertions:
+- [x] Add expensive low-demand title, strong local sleeper, exhausted/overlapping audience, no streaming rights, already-signed deal, deferred interest and low-resource buyer cases.
+- [x] Write the offer eligibility/affordability assertions:
 
 ~~~ts
 const f = makeCinemaFixture('no-streaming-rights', 29);
@@ -351,9 +351,11 @@ assert.equal(quote.eligible, false);
 assert.equal(quote.maximumBidCents, 0);
 ~~~
 
-- [ ] Run `node scripts/run-box-office-audit.mjs rights`; replace automatic budget floors/theater-success multiples with buyer-specific incremental value and risk. Demand evidence may support a high bid, but cannot guarantee an oversized second reward. Keep signed deals unchanged.
-- [ ] Route deferred/catch-up interest through actual readiness, premiere, country, language, entitlement and viewing rules. A waiting audience is not an instant subscription, guaranteed stream or cinema-equivalent payment. Subscription repeat starts do not become extra ticket cash.
-- [ ] Prove signed settlement happens once and availability begins at the real date. When those adapters change, run `npm run audit:streaming-rights-transactions-phase6`, `npm run audit:streaming-rights-calendar-phase4`, `npm run audit:streaming-original-readiness-repair` and `npm run audit:streaming-original-playback-repair`. Checkpoint as `feat: value film streaming rights from incremental demand`.
+- [x] Run `node scripts/run-box-office-audit.mjs rights`; replace automatic budget floors/theater-success multiples with buyer-specific incremental value and risk. Demand evidence may support a high bid, but cannot guarantee an oversized second reward. Keep signed deals unchanged.
+- [x] Route deferred/catch-up interest through actual readiness, premiere, country, language, entitlement and viewing rules. A waiting audience is not an instant subscription, guaranteed stream or cinema-equivalent payment. Subscription repeat starts do not become extra ticket cash.
+- [x] Prove signed settlement happens once and availability begins at the real date. When those adapters change, run `npm run audit:streaming-rights-transactions-phase6`, `npm run audit:streaming-rights-calendar-phase4`, `npm run audit:streaming-original-readiness-repair` and `npm run audit:streaming-original-playback-repair`. Checkpoint as `feat: value film streaming rights from incremental demand`.
+
+**Phase 5 verification:** See `docs/reports/2026-10-22-box-office-phase5/README.md`. Browser proof covers Greenlight through IMDb at 320px; natural theater exit is verified by actual-week integration audits.
 
 **Phase 5 gate:** normal player choices and reports use the same source as money. Theater balancing is not undone by guaranteed post-theater bids.
 

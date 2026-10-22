@@ -44,5 +44,26 @@ export const readCinemaWorldAudience = (player: Player): Pick<CinemaWeekInput,'c
                 source:'STREAMING_ESTIMATE'});
         }
     }
+    // New cinema-linked rival playback carries observed, conservative catch-up evidence too.
+    // Maximum weekly homes are a lower bound; repeated starts and overlapping platforms are never summed as unique people.
+    for(const [titleId,seen] of Object.entries(player.world.cinemaMarket?.streamingSeen||{})){
+        const archived=player.pastProjects.find(p=>p.id===titleId),active=player.activeReleases.find(p=>p.id===titleId);
+        const npc=player.world.projects.find(p=>p.id===titleId),details=active?.projectDetails;
+        if(!archived&&!active&&!npc)continue;
+        const cast: CinemaCreditedPerson[]=(details?.castList||archived?.castList||[]).filter(p=>p.type!=='DIRECTOR').map(p=>({personId:p.isPlayer?'PLAYER_SELF':p.actorId||p.npcId||p.id,
+            name:p.name,roleType:p.roleType||'SUPPORTING',roleWeight:CINEMA_ROLE_WEIGHTS[p.roleType||'SUPPORTING'],fame:0,isPlayer:!!p.isPlayer,characterIds:p.characterId?[p.characterId]:[]}));
+        if(!cast.length&&npc?.leadActorId)cast.push({personId:npc.leadActorId,name:npc.leadActorName,roleType:'LEAD',roleWeight:1,fame:0,isPlayer:false,characterIds:[]});
+        for(const [countryId,accounts] of Object.entries(seen.countries)){
+            const local=cohorts.filter(c=>c.countryId===countryId),population=local.reduce((n,c)=>n+c.people,0);
+            for(const cohort of local){
+                const count=Math.min(cohort.people,Math.floor(accounts*.5*cohort.people/Math.max(1,population)));if(!count)continue;
+                const old=history.find(h=>h.titleId===titleId&&h.cohortId===cohort.id);
+                if(old){old.people=Math.max(old.people,count);continue}
+                history.push({id:`cinema-streaming:${titleId}:${cohort.id}`,titleId,ownerId:details?.studioId||archived?.studioId||npc!.studioId,cohortId:cohort.id,
+                    people:count,satisfaction:Math.max(0,Math.min(100,(active?.imdbRating||archived?.rating||npc?.rating||6)*10)),absoluteWeek:seen.lastWeek,
+                    cast,universeId:details?.universeId||archived?.universeId||npc?.universeId,source:'STREAMING_ESTIMATE'});
+            }
+        }
+    }
     return {cohorts,countries,history:history.sort((a,b)=>a.id.localeCompare(b.id))};
 };

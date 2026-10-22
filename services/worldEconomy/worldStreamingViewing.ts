@@ -1,3 +1,5 @@
+import { resolveStreamingProductionReadiness } from '../streamingProductionReadiness';
+import { allocateCinemaStreamingEvidence, cinemaStreamingInterestWeight, cinemaStreamingLanguageReady, type CinemaStreamingAudienceEvidence } from '../boxOffice/boxOfficeStreamingAudience';
 import type {
     OwnedStreamingSlateEntry,
     Player,
@@ -112,6 +114,9 @@ const isValidViewingState = (input: WorldStreamingViewingState | undefined, abso
         || (input.aiCatalogue !== undefined && (!Array.isArray(input.aiCatalogue)
             || input.aiCatalogue.some(title => !title.platformId || !title.titleId || !title.contractId
                 || !Array.isArray(title.countryIds) || !title.accessGrant)))
+        || (input.cinemaAudienceEvidence !== undefined && (!Array.isArray(input.cinemaAudienceEvidence)
+            || input.cinemaAudienceEvidence.some(row=>!row || !row.titleId || !row.countryId || !row.platformId
+                || row.absoluteWeek!==absoluteWeek || !Number.isSafeInteger(row.viewingAccounts) || row.viewingAccounts<=0)))
         || (input.aiCatalogueSeededPlatformIds !== undefined && !Array.isArray(input.aiCatalogueSeededPlatformIds))
         || (input.aiStoreEntitlements !== undefined && (!Array.isArray(input.aiStoreEntitlements)
             || input.aiStoreEntitlements.some(row => !row.platformId || !row.countryId || !row.titleId
@@ -233,6 +238,7 @@ const emptyGlobal = (): WorldStreamingViewingGlobalSummary => ({
 });
 
 interface RivalViewingProjection {
+    cinemaAudienceEvidence:CinemaStreamingAudienceEvidence[];
     platforms: Record<string, WorldStreamingViewingPlatformSummary>;
     countries: Record<string, Record<string, WorldStreamingViewingCountryPlatformSummary>>;
     adEligibleHours: Record<string, Record<string, number>>;
@@ -327,6 +333,7 @@ const projectRivalViewing = (
     priorEntitlements: WorldStreamingAiStoreEntitlement[],
     offerRegistry: WorldStreamingOfferRegistry,
 ): RivalViewingProjection => {
+    const cinemaAudienceEvidence:CinemaStreamingAudienceEvidence[]=[];
     const offers = new Map(offerRegistry.offers.map(offer => [offer.platformId, offer]));
     const countries: RivalViewingProjection['countries'] = {};
     const adEligibleHours: RivalViewingProjection['adEligibleHours'] = {};
@@ -348,7 +355,11 @@ const projectRivalViewing = (
                 .find(row => row.platformId === offer.platformId);
             const choice = choices[country.countryId]?.platforms[offer.platformId] || choiceZero();
             if (!customer && !choice.freeAd && !choice.store && !choice.secondaryStore) return;
-            const playable = titleResolvers.get(offer.platformId)!;
+            const resolver=titleResolvers.get(offer.platformId)!;
+            const playable=(countryId:string,week:number,route:StreamingTitleAccessRoute)=>resolver(countryId,week,route).filter(title=>
+                !player.world.cinemaMarket?.titles[title.titleId] || (resolveStreamingProductionReadiness(player,title.titleId).ready
+                    && cinemaStreamingLanguageReady(player,title.titleId,countryId,offer.platformId,week)));
+
             const paidPlanId = offer.plans.find(plan => plan.monthlyPrice > 0)?.id;
             const subscriptionTitles = paidPlanId
                 ? playable(country.countryId, absoluteWeek, { kind: 'SUBSCRIPTION', planId: paidPlanId }) : [];
@@ -370,6 +381,13 @@ const projectRivalViewing = (
                 ? Math.min(customer?.sharedActiveViewers || 0, Math.round((customer?.sharedActiveViewers || 0) * clamp(engagementRate * 1.04, 0, .9))) : 0;
             const piracyViewingAccounts = Math.min(customer?.piracyReach || 0, Math.round((customer?.piracyReach || 0) * clamp(.18 + offer.catalogueStrengthIndex / 250, .15, .58)));
             const totalViewingAccounts = paidViewingAccounts + freeViewingAccounts + sharedViewingAccounts;
+            // Resolver plus the cinema delivery/language filter above enforce the real date, country, production and route access.
+            const paidEvidence=allocateCinemaStreamingEvidence(player,country.countryId,offer.platformId,absoluteWeek,subscriptionTitles.map(t=>t.titleId),paidViewingAccounts);
+            const freeEvidence=allocateCinemaStreamingEvidence(player,country.countryId,offer.platformId,absoluteWeek,freeTitles.map(t=>t.titleId),freeViewingAccounts);
+            const merged=new Map(paidEvidence.map(r=>[r.titleId,r]));
+            for(const row of freeEvidence){const old=merged.get(row.titleId);if(!old||row.viewingAccounts>old.viewingAccounts)merged.set(row.titleId,row)}
+            cinemaAudienceEvidence.push(...merged.values());
+
             const totalStarts = Math.round(totalViewingAccounts * (1.08 + offer.catalogueStrengthIndex / 300));
             const totalHoursViewed = Math.round(totalStarts * (1.2 + offer.catalogueStrengthIndex / 125));
             const estimatedViewers = Math.max(totalViewingAccounts, Math.round(totalViewingAccounts * 1.42));
@@ -527,7 +545,7 @@ const projectRivalViewing = (
             };
             return [platformId, summary];
         }));
-    return { platforms, countries, adEligibleHours, royaltySourceReceipts, aiStoreTransactions: aiStoreTransactions.sort((left, right) =>
+    return { cinemaAudienceEvidence, platforms, countries, adEligibleHours, royaltySourceReceipts, aiStoreTransactions: aiStoreTransactions.sort((left, right) =>
         left.transactionId.localeCompare(right.transactionId)), aiStoreEntitlements: [...entitlementMap.values()]
         .sort((left, right) => `${left.platformId}:${left.countryId}:${left.titleId}:${left.kind}`
             .localeCompare(`${right.platformId}:${right.countryId}:${right.titleId}:${right.kind}`)) };
@@ -717,7 +735,8 @@ const scoreCandidate = (
     const variance = .94 + rng() * .12;
     return {
         score: Math.max(.01, qualityFit * genreFit * languageFit * prestigeFit * fandomFit * marketingFit
-            * freshness * weeklyLift * recommendationFit * growthFit * reliability * variance),
+            * freshness * weeklyLift * recommendationFit * growthFit * reliability * variance
+            * cinemaStreamingInterestWeight(player,candidate.entry.projectId,countryId,absoluteWeek)),
         languageFit,
     };
 };
@@ -823,6 +842,7 @@ const buildViewingState = (
             lastProcessedAbsoluteWeek: absoluteWeek,
             sourceFingerprint: createDeterministicId('world-streaming-viewing', absoluteWeek, customers.sourceFingerprint, 'AI_PLATFORM_FIELD'),
             countries, platforms, global,
+            ...(rivalViewing.cinemaAudienceEvidence.length ? {cinemaAudienceEvidence:rivalViewing.cinemaAudienceEvidence} : {}),
             aiCatalogue: aiCatalogue.titles,
             aiCatalogueSeededPlatformIds: aiCatalogue.seededPlatformIds,
             aiStoreEntitlements: rivalViewing.aiStoreEntitlements,
@@ -1524,6 +1544,7 @@ const buildViewingState = (
         countries: countryStates,
         platforms,
         global,
+        ...(rivalViewing.cinemaAudienceEvidence.length ? {cinemaAudienceEvidence:rivalViewing.cinemaAudienceEvidence} : {}),
         aiCatalogue: aiCatalogue.titles,
         aiCatalogueSeededPlatformIds: aiCatalogue.seededPlatformIds,
         aiStoreEntitlements: rivalViewing.aiStoreEntitlements,

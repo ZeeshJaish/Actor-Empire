@@ -9,6 +9,8 @@ export const CinemaForecastPanel=({player,project,titleId,releaseWeek,onForecast
     const signature=JSON.stringify({titleId,releaseWeek,week:player.currentWeek,age:player.age,fame:player.stats.fame,
         marketWeek:player.world.cinemaMarket?.lastProcessedAbsoluteWeek,
         slate:player.activeReleases.map(r=>[r.id,r.distributionPhase,r.totalGross]),
+        streamingWindows:Object.values(player.world.streamingRightsContracts||{}).map(c=>
+            [c.id,c.sourceProjectId,c.status,c.countryIds,c.startsAtAbsoluteWeek,c.expiresAtAbsoluteWeek,c.buyer.platformId]),
         populationWeek:player.world.worldPopulation?.lastProcessedAbsoluteWeek,
         project:{studioId:project.studioId,genre:project.genre,budget:project.estimatedBudget,cast:project.castList,
             quality:project.hiddenStats?.estimatedQualityScore,exposure:project.cinemaExposure,regions:project.releaseRegionIds,

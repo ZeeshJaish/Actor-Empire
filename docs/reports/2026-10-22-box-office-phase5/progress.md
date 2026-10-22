@@ -5,6 +5,8 @@ Baseline: 61b9633 on codex/streaming-tap-lag. Fresh dirty-work backup and isolat
 Approved scope: Task 9 shared forecasts, financial presentation and audience facts; Task 10 incremental streaming rights valuation. Inline execution, scoped local checkpoints; no push. Save-generation durability and numerical IMDb behavior remain outside this change.
 
 - Discovery: release previews still have independent budget/screen/hype formulas. Live finance already has a common cents-based presenter; extend rather than duplicate it.
-- In progress: failing behavioral forecast/presentation assertions, then shared kernel and UI consumers.
+- Implemented: shared forecasts/presenters and incremental rights value with actual playback evidence.
 
-Task 9 verified: 8 presentation, 30 live integration, 36 market, 19 migration groups; finance UI, frozen English, isolated TypeScript/build and normal Greenlight-to-IMDb browser flow passed. 320px document width conserved. Read-only review fixes included. Task 10 remains in progress and is excluded from this checkpoint.
+Task 9 verified: 8 presentation, 30 live integration, 36 market, 19 migration groups; finance UI, frozen English, isolated TypeScript/build and normal Greenlight-to-IMDb browser flow passed. 320px document width conserved. Read-only review fixes included. Task 10 was excluded from that checkpoint.
+
+Task 10 verified: 18 rights groups, all 212 assertions across 14 cinema suites, the four required rights/readiness/playback audits, WE6, TypeScript/build and unchanged frozen English passed in the final isolated snapshot. Final browser rerun passed through IMDb with no errors and 320px scroll width. All 77 unrelated baseline hashes match. Read-only targeted review found no remaining actionable issues. Phase 6 calibration/device work remains pending.
