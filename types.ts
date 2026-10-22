@@ -1215,6 +1215,7 @@ export interface TheatricalRegionReceipt {
 }
 
 export interface TheatricalDistributionBreakdown {
+    distributionDeductions?:number;
     week: number;
     gross: number;
     studioReceipts: number;
@@ -2156,7 +2157,7 @@ export interface StudioFinanceEntry {
     week: number;
     year: number;
     amount: number;
-    type: 'INVESTMENT_RETURN' | 'THEATRICAL' | 'STREAMING_DEAL' | 'STREAMING_ROYALTY' | 'SOUNDTRACK' | 'TALENT_BACKEND' | 'UNIVERSE' | 'CAPITAL_INJECTION' | 'CAPITAL_WITHDRAWAL' | 'PRODUCTION_SPEND' | 'FUNDING_SURPLUS' | 'INVESTOR_FUNDING' | 'INVESTOR_PAYOUT' | 'ACQUISITION_MERGER' | 'IP_ACQUISITION' | 'STUDIO_SALE' | 'REBRAND' | 'LEGAL';
+    type: 'INVESTMENT_RETURN' | 'THEATRICAL' | 'STREAMING_DEAL' | 'STREAMING_ROYALTY' | 'SOUNDTRACK' | 'TALENT_BACKEND' | 'UNIVERSE' | 'CAPITAL_INJECTION' | 'CAPITAL_WITHDRAWAL' | 'PRODUCTION_SPEND' | 'FUNDING_SURPLUS' | 'INVESTOR_FUNDING' | 'INVESTOR_PAYOUT' | 'ACQUISITION_MERGER' | 'IP_ACQUISITION' | 'STUDIO_SALE' | 'REBRAND' | 'LEGAL' | 'CINEMA_BOOKING';
     label: string;
     projectId?: string;
 }
@@ -2682,6 +2683,7 @@ export interface OutsideProducerInvestmentOffer {
 }
 
 export interface OutsideProductionInvestment {
+    cinema?: CinemaProjectMarker;
     id: string;
     offerId: string;
     projectId: string;
@@ -7206,6 +7208,8 @@ export interface ActiveRelease {
     weeklyExhibitorReceipts?: number[];
     totalExhibitorReceipts?: number;
     weeklyDistributionBreakdowns?: TheatricalDistributionBreakdown[];
+    bookingCostPaid?:number;
+    talentBackendPaid?:number;
     budget: number;
     status: 'RUNNING' | 'BLOCKBUSTER_TRACK' | 'FLOP_WARNING' | 'FINISHED';
     imdbRating?: number;
@@ -7243,6 +7247,7 @@ export interface ActiveRelease {
     futurePotential?: FuturePotential;
     promotionalBuzz?: number;
     royaltyPercentage?: number;
+    actorRoyaltyPayeeId?:string;
     previousBestBidValue?: number;
     generatedNewsKeys?: string[];
     releaseWeek?: number;
@@ -7325,6 +7330,8 @@ export interface PastProject {
     weeklyExhibitorReceipts?: number[];
     totalExhibitorReceipts?: number;
     weeklyDistributionBreakdowns?: TheatricalDistributionBreakdown[];
+    bookingCostPaid?:number;
+    talentBackendPaid?:number;
     releaseRegionIds?: BoxOfficeRegionId[];
     releaseChainSelections?: Partial<Record<BoxOfficeRegionId, CinemaChainId[]>>;
     boxOfficeArchiveVersion?: number;
@@ -7339,6 +7346,7 @@ export interface PastProject {
     description?: string;
     projectType: ProjectType;
     royaltyPercentage?: number;
+    actorRoyaltyPayeeId?:string;
     awards?: Award[];
     franchiseId?: string;
     universeId?: UniverseId;
@@ -7389,6 +7397,7 @@ export interface Commitment {
     directorGains?: Partial<DirectorStats>;
     agentCommission?: number;
     royaltyPercentage?: number;
+    actorRoyaltyPayeeId?:string;
     durationLeft?: number;
     previousBestBidValue?: number;
 }
@@ -7419,6 +7428,7 @@ export interface AuditionOpportunity {
     estimatedIncome: number;
     source: 'CASTING_APP' | 'AGENT' | 'DIRECTOR' | 'DIRECT';
     royaltyPercentage?: number;
+    actorRoyaltyPayeeId?:string;
     universeContract?: UniverseContract;
     /** The authored character offer, separate from billing size such as LEAD. */
     characterProfile?: CharacterIdentityProfile;
@@ -7452,6 +7462,7 @@ export interface NegotiationData {
     studioPatience: number;
     hasRoyaltyOption: boolean;
     royaltyPercentage?: number;
+    actorRoyaltyPayeeId?:string;
 }
 
 export interface SponsorshipOffer {
@@ -8320,6 +8331,7 @@ export interface IndustryProject {
     streamingWindows?: PlatformAiProjectStreamingWindow[];
     /** Latest explicit performance observation; settlement remains the weekly economy's responsibility. */
     streamingPerformance?: PlatformAiStreamingPerformance;
+    cinemaExposure?: CinemaExposureRecord;
 }
 
 export interface UniverseCharacter {
@@ -8608,6 +8620,7 @@ export interface StudioAiFinalQuality {
 }
 
 export interface StudioAiCommercialResult {
+    cinemaSettlement?: 'WEEKLY_PENDING' | 'WEEKLY_CLOSED';
     releasedAtAbsoluteWeek: number;
     theatricalGrossMillions: number;
     streamingValueMillions: number;

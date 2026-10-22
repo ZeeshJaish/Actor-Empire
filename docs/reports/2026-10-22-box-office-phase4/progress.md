@@ -1,6 +1,6 @@
 # Phase 4 live cinema integration
 
-Task 7 complete; Task 8 in progress. Current owner: root agent.
+Tasks 7 and 8 complete. Current owner: root agent.
 
 - Recovery snapshot: `/private/tmp/actor-box-office-phase4-20261022-111827`.
 - Current checkout retained by approved execution choice. Unrelated streaming work excluded from staging.
@@ -12,3 +12,5 @@ Task 7 complete; Task 8 in progress. Current owner: root agent.
 - Complete Phase 4 requires real weekly integration and save/retry tests, not only pure market tests.
 
 Task 7 evidence: migration audit 18 groups, issued v1/v2 save integrity audit and TypeScript passed. Read-only review fixes cover raw corrupt finance, parent cast identity, display retirement, and malformed receipt/affinity/run records.
+
+Task 8 evidence: 30 integration groups; total focused Phase 1–4 groups186; related world/save/NPC checks, production-only soak, isolated TypeScript and build pass. Read-only review findings resolved. Full rights/UI redesign and balance/device verification remain Phases 5–6.

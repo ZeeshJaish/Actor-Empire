@@ -411,6 +411,7 @@ const compactWorldProjects = (player: any): any[] => {
   const projects = Array.isArray(player.world?.projects) ? player.world.projects : [];
   const absoluteWeek = getApproxAbsoluteWeek(Number(player?.age), Number(player?.currentWeek));
   const referencedIds = getReferencedWorldProjectIds(player, absoluteWeek);
+  Object.values(player.world?.cinemaMarket?.titles || {}).forEach((title:any)=>{if(!title.closed)referencedIds.add(title.titleId)});
   const seenProjectIds = new Set<string>();
   const canonicalProjects = projects.filter((project: any) => {
     const projectId = getUsableWorldProjectId(project?.id);

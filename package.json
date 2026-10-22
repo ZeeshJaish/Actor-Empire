@@ -4,6 +4,8 @@
   "version": "1.0.25",
   "type": "module",
   "scripts": {
+    "audit:box-office-migration": "node scripts/run-box-office-audit.mjs migration",
+    "audit:box-office-integration": "node scripts/run-box-office-audit.mjs integration",
     "audit:box-office-awareness": "node scripts/run-box-office-audit.mjs awareness",
     "audit:box-office-phase2-integration": "node scripts/run-box-office-audit.mjs phase2-integration",
     "audit:box-office-finance": "node scripts/run-box-office-audit.mjs finance",

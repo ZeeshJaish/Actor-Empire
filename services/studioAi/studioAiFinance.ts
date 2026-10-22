@@ -1,3 +1,4 @@
+import { moveCinemaNpcCash } from '../boxOffice/boxOfficeSettlement';
 import type {
     NPCStudioState,
     StudioAiCompanyStatus,
@@ -82,11 +83,11 @@ export const processStudioAiFinanceWeek = (
     const revenue = money(Math.max(0, safe(input.operatingRevenueMillions, defaultRevenue)));
     const projectOutcome = money(safe(input.projectOutcomeMillions));
     const debtService = money(Math.max(0, runtime.finance.debtPrincipalMillions) * 0.08 / 52);
-    let balance = money(Math.max(0, normalized.cashReserve));
+    let balance = Math.max(0, normalized.cashReserve);
     const entries: StudioAiLedgerEntry[] = [];
     const addEntry = (category: StudioAiLedgerEntry['category'], amount: number, description: string) => {
         if (amount === 0) return;
-        balance = money(balance + amount);
+        balance = moveCinemaNpcCash(balance,amount);
         entries.push({
             id: createDeterministicId('studio_ai_ledger', normalized.id, absoluteWeek, category),
             absoluteWeek,
@@ -104,7 +105,7 @@ export const processStudioAiFinanceWeek = (
     addEntry('SHORTFALL_BORROWING', shortfallBorrowing, 'Shortfall borrowing added to company debt');
 
     const net = money(revenue + projectOutcome - operatingCost - debtService);
-    const cash = money(Math.max(0, balance));
+    const cash = Math.max(0, balance);
     const consecutiveLossWeeks = net < 0 ? runtime.finance.consecutiveLossWeeks + 1 : 0;
     const runwayWeeks = weeks(cash / Math.max(0.01, operatingCost + debtService));
     const latestStatusChangeWeek = runtime.events

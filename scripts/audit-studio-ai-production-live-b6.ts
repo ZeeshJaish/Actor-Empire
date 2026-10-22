@@ -1,4 +1,6 @@
 // @ts-nocheck - executable audit fixture.
+import { migrateCinemaState } from '../services/boxOffice/boxOfficeMigration';
+import { processCinemaMarketWeek } from '../services/boxOffice/boxOfficeWeek';
 import assert from 'node:assert/strict';
 import { INITIAL_PLAYER } from '../types';
 import type { IndustryContentFingerprint, IndustryProductionCommitment, NPCStudioState, StudioAiSlateCommitment, WorldState } from '../types';
@@ -17,10 +19,12 @@ studio.ai.intelligence!.content.selectedFingerprints = [fingerprint];
 const production = { id: 'live_prod', canonicalProjectId: 'live_project', title: 'Friday Deadline', projectType: 'MOVIE', genre: 'COMEDY', producerStudioId: studio.id, source: 'STUDIO_INDEPENDENT', status: 'PLANNED', productionCalendar: { preProductionWeeks: 1, productionWeeks: 1, postProductionWeeks: 1, totalWeeks: 3, focusWindowWeeks: 2, elapsedWeeks: 0, startedAbsoluteWeek: START }, budgetMillions: 20, paidMillions: 0, talentBookingIds: [], writerSource: 'IN_HOUSE_TEAM', writerId: null, writerName: 'Writers', writerSkill: 78, studioAiSlateCommitmentId: slate.id, industryContentFingerprintId: fingerprint.id, createdAtAbsoluteWeek: START, updatedAtAbsoluteWeek: START, studioAiExecution: { schemaVersion: 1, source: 'STUDIO_INDEPENDENT', slateCommitmentId: slate.id, fingerprintId: fingerprint.id, controllerAtLastProgression: 'AI', selectedReleaseMode: null, publicReleaseStrategy: null, talentSelected: false, talent: null, finalQuality: null, result: null, problems: [], paidMilestoneIds: [], processedKeys: [], nextReviewAbsoluteWeek: START + 1, lastProgressedAbsoluteWeek: START } } as IndustryProductionCommitment;
 let world = { ...INITIAL_PLAYER.world, projects: [], studios: { [studio.id]: studio }, industryProductions: { [production.id]: production }, talentBookings: [] } as WorldState;
 let player = { ...structuredClone(INITIAL_PLAYER), id: 'b6_live_player', world };
+player=migrateCinemaState(player,START).player;world=player.world;
 for (let week = START + 1; week <= START + 12; week += 1) {
     const result = executeStudioAiProductionWeek({ player: { ...player, world }, world, absoluteWeek: week });
     world = result.world;
-    player = { ...player, world };
+    player=processCinemaMarketWeek({...player,world},week).player;
+    world=player.world;
 }
 assert.equal(world.industryProductions![production.id].status, 'RELEASED');
 assert.equal(world.projects.filter(project => project.id === production.canonicalProjectId).length, 1);
@@ -34,8 +38,9 @@ const releaseTalent = releasedProduction.studioAiExecution!.talent!;
 assert.ok((releaseTalent.talentParticipation?.contracts || []).some(contract =>
     (getTalentCareerProfile(world, contract.talentId)?.backendIncome || 0) > 0),
     'A released production must settle eligible backend only from collected receipts.');
-assert.equal(world.studios![studio.id].ai!.ledger.filter(row => row.category === 'TALENT_BACKEND' && row.description.includes(production.title)).length, 1,
-    'A release must post one backend expense.');
+const paidBackendCents=player.world.cinemaMarket!.weeks.reduce((n,w)=>n+w.titles.filter(t=>t.titleId===production.canonicalProjectId).reduce((m,t)=>m+t.talentPaidCents,0),0);
+assert.ok(paidBackendCents>0,'Actual weekly receipts pay signed talent backend.');
+assert.equal(paidBackendCents,releaseTalent.talentParticipation!.contracts.reduce((n,c)=>n+Math.round((getTalentCareerProfile(world,c.talentId)?.backendIncome || 0)*100),0),'Saved weekly backend expenses match talent career cash exactly.');
 assert.equal(world.talentBookings?.filter(row => row.projectId === production.canonicalProjectId && row.status === 'RELEASED').length, 3);
 assert.equal(world.studios![studio.id].ai!.intelligence!.content.selectedFingerprints[0].lifecycle, 'MATERIALIZED');
 assert.equal(world.studios![studio.id].ai!.intelligence!.content.selectedFingerprints[0].canonicalProjectId, production.canonicalProjectId);

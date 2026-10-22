@@ -29,6 +29,7 @@ export const inspectCinemaSavedState = (state:unknown):string[] => {
         ||!Array.isArray(state.market.titles)||!Array.isArray(state.market.affinities)||!Array.isArray(state.market.runs))return ['CINEMA_STATE_INCOMPLETE'];
     if(state.market.schemaVersion!==1 || state.market.tuningVersion!==state.tuningVersion)return ['CINEMA_STATE_INCOMPLETE'];
     if(!finiteTree(state)||state.weeks.length>52||state.market.lastProcessedAbsoluteWeek!==state.lastProcessedAbsoluteWeek)return ['CINEMA_STATE_CORRUPT'];
+    if(state.externalProducerBalancesCents!==undefined && (!object(state.externalProducerBalancesCents)||Object.values(state.externalProducerBalancesCents).some(v=>!Number.isSafeInteger(v))))return ['CINEMA_EXTERNAL_BALANCE_CORRUPT'];
     const titleIds=state.market.titles.map((t:any)=>t?.titleId);
     if(titleIds.some((id:unknown)=>typeof id!=='string'||!id)||new Set(titleIds).size!==titleIds.length)return ['CINEMA_AUDIENCE_ID_CORRUPT'];
     for(const title of state.market.titles){
@@ -57,6 +58,7 @@ export const inspectCinemaSavedState = (state:unknown):string[] => {
     for(const [id,value] of Object.entries(state.titles)) {
         if(!object(value)||value.titleId!==id||!['UNSETTLED_WEEKLY','LEGACY_ACTIVE','LEGACY_FULLY_SETTLED'].includes(String(value.basis)))return ['CINEMA_TITLE_STATE_CORRUPT'];
         for(const key of ['legacyGrossCents','grossCents','producerReceiptsCents','exhibitorReceiptsCents','distributionDeductionsCents','bookingCostCents','investorPaidCents','talentPaidCents','actorPaidCents','firstAdmissions','repeatAdmissions'])if(!integer(value[key]))return ['CINEMA_TITLE_MONEY_CORRUPT'];
+        for(const k of ['satisfactionScoreUnits','satisfactionAdmissions'])if(value[k]!==undefined&&!integer(value[k]))return ['CINEMA_TITLE_AUDIENCE_CORRUPT'];
         if(value.legacyProducerReceiptsCents!==null && !integer(value.legacyProducerReceiptsCents))return ['CINEMA_TITLE_MONEY_CORRUPT'];
         if(value.grossCents!==(value.producerReceiptsCents as number)+(value.exhibitorReceiptsCents as number)+(value.distributionDeductionsCents as number))return ['CINEMA_RECEIPT_CONSERVATION'];
     }
@@ -76,8 +78,8 @@ export const migrateCinemaState = (player:Player,absoluteWeek:number):CinemaMigr
     if(!Number.isFinite(player.money))return rejected('CINEMA_PROTECTED_MONEY_CORRUPT');
     for(const r of player.activeReleases || [])if(r.type==='MOVIE' && (!Number.isFinite(r.totalGross)||r.totalGross<0||!Number.isFinite(r.budget)||r.budget<0
         ||(r.totalStudioReceipts!==undefined && (!Number.isFinite(r.totalStudioReceipts)||r.totalStudioReceipts<0))))return rejected('CINEMA_LEGACY_FINANCE_CORRUPT');
-    for(const p of player.world.projects || [])if(!Number.isFinite(p.boxOffice)||p.boxOffice<0)return rejected('CINEMA_LEGACY_FINANCE_CORRUPT');
-    try{for(const r of player.activeReleases || []){cents(r.totalGross);cents(r.budget);if(r.totalStudioReceipts!==undefined)cents(r.totalStudioReceipts)}for(const p of player.world.projects)cents(p.boxOffice)}catch{return rejected('CINEMA_LEGACY_FINANCE_CORRUPT')}
+    for(const p of player.world.projects || [])if(p.boxOffice!==undefined && (!Number.isFinite(p.boxOffice)||p.boxOffice<0))return rejected('CINEMA_LEGACY_FINANCE_CORRUPT');
+    try{for(const r of player.activeReleases || []){cents(r.totalGross);cents(r.budget);if(r.totalStudioReceipts!==undefined)cents(r.totalStudioReceipts)}for(const p of player.world.projects)if(p.boxOffice!==undefined)cents(p.boxOffice)}catch{return rejected('CINEMA_LEGACY_FINANCE_CORRUPT')}
     const activationWeek=absoluteWeek+1;
     const state:CinemaSavedState={schemaVersion:1,tuningVersion:CINEMA_MARKET_TUNING_VERSION,clockEpoch:0,activationWeek,lastProcessedAbsoluteWeek:absoluteWeek,
         market:{schemaVersion:1,tuningVersion:CINEMA_MARKET_TUNING_VERSION,lastProcessedAbsoluteWeek:absoluteWeek,titles:[],affinities:[],runs:[]},titles:{},weeks:[]};
@@ -119,7 +121,7 @@ export const migrateCinemaState = (player:Player,absoluteWeek:number):CinemaMigr
     const projects=player.world.projects.map(project=>{
         if(state.titles[project.id])return project;
         const basis=project.cinema?.settlementBasis || 'LEGACY_FULLY_SETTLED';
-        state.titles[project.id]=makeCinemaSettledTitle(project.id,project.studioId,basis,activationWeek,project.boxOffice);
+        state.titles[project.id]={...makeCinemaSettledTitle(project.id,project.studioId || `legacy-owner:${project.id}`,basis,activationWeek,project.boxOffice),legacyGrossKnown:project.boxOffice!==undefined};
         return {...project,cinema:project.cinema || {schemaVersion:1 as const,settlementBasis:basis,activationWeek,audienceBasis:'LEGACY_ESTIMATE' as const}};
     });
     return {player:{...player,activeReleases,world:{...player.world,projects,cinemaMarket:state}},status:'MIGRATED',diagnostics};

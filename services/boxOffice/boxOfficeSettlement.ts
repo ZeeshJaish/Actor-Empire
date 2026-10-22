@@ -112,3 +112,10 @@ export const getCinemaProjectFinance = (source: CinemaFinanceSource): CinemaFina
     return { ...summary, receiptsEstimated, costsEstimated,
         studioReturnPercent: riskCents > 0 ? (summary.netStudioReceiptsCents - riskCents) / riskCents * 100 : null };
 };
+
+/** NPC treasuries use millions; cash moves retain ticket cents across coarse budget quotes. */
+export const moveCinemaNpcCash=(balanceMillions:number,deltaMillions:number):number=>{
+    const base=Math.round(balanceMillions*100_000_000),delta=Math.round(deltaMillions*100_000_000),next=base+delta;
+    if(!Number.isSafeInteger(base)||!Number.isSafeInteger(delta)||!Number.isSafeInteger(next))throw new RangeError('NPC cinema cash overflow');
+    return next/100_000_000;
+};

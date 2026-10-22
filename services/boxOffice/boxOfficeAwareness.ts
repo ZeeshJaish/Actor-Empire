@@ -137,7 +137,7 @@ export const projectCinemaForecastInput = (input: CinemaWeekInput, known: Cinema
                 fame: person.fame, stature: person.stature, isPlayer: person.isPlayer, characterIds: [...person.characterIds] })),
             directorId: title.directorId, playerCredited: title.playerCredited,
             ...(title.market ? {market:{releaseWeek:title.market.releaseWeek,runtimeMinutes:title.market.runtimeMinutes,languages:[...title.market.languages],
-                countryIds:[...title.market.countryIds],chainIds:[...title.market.chainIds],format:title.market.format,
+                chainIdsByCountry:structuredClone(title.market.chainIdsByCountry),countryIds:[...title.market.countryIds],chainIds:[...title.market.chainIds],format:title.market.format,
                 universeId:title.market.universeId,returningCharacterIds:title.market.returningCharacterIds ? [...title.market.returningCharacterIds] : undefined,
                 payoff:title.market.payoff,accessibility:title.market.accessibility,urgency:title.market.urgency,
                 ...(title.market.streamingWindow ? {streamingWindow:structuredClone(title.market.streamingWindow)} : {})}} : {}),

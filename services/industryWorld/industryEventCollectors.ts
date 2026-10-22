@@ -214,7 +214,10 @@ const collectProductionFacts = (before: WorldState, after: WorldState, absoluteW
                 headline: `${production.title} is released`,
                 detail: `${studioName} completed the saved release plan for ${production.title}.`,
             }));
-            const outcome = production.studioAiExecution?.result?.outcome;
+        }
+        const result=production.studioAiExecution?.result;
+        if(result?.cinemaSettlement==='WEEKLY_CLOSED' && previous?.studioAiExecution?.result?.cinemaSettlement!=='WEEKLY_CLOSED' || production.status==='RELEASED' && previous?.status!=='RELEASED' && !result?.cinemaSettlement){
+            const outcome = result?.outcome;
             if (outcome === 'HIT' || outcome === 'FLOP') facts.push(createIndustryEventFact({
                 ...common,
                 idempotencyKey: `production-result:${production.id}:${outcome}`,

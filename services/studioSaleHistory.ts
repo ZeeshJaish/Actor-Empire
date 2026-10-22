@@ -68,7 +68,7 @@ const getLegacyRows = (player: Pick<Player, 'age' | 'currentWeek'>, studio: Busi
     return normalizeRows([...byWeek.values()], now);
 };
 
-const PAYOUT_TYPES = new Set<StudioFinanceEntry['type']>(['INVESTOR_PAYOUT', 'TALENT_BACKEND']);
+const PAYOUT_TYPES = new Set<StudioFinanceEntry['type']>(['INVESTOR_PAYOUT', 'TALENT_BACKEND', 'CINEMA_BOOKING']);
 const isEarningsEntry = (entry: StudioFinanceEntry): boolean => !!entry && typeof entry.id === 'string' && !!entry.id
     && finite(entry.amount) && validYear(entry.year) && validWeek(entry.week)
     && ((RECEIPT_TYPES.has(entry.type) && entry.amount > 0) || (PAYOUT_TYPES.has(entry.type) && entry.amount < 0));

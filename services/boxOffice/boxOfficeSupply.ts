@@ -39,7 +39,7 @@ export const quoteCinemaSupply = (input: CinemaWeekInput): CinemaSupplyQuote => 
         const m=title.market;
         if(!m || m.releaseWeek>input.absoluteWeek) continue;
         for(const pool of pools) {
-            if(!m.countryIds.includes(pool.countryId) || !m.chainIds.includes(pool.chainId) || m.format!==pool.format) continue;
+            if(!m.countryIds.includes(pool.countryId) || !(m.chainIdsByCountry?.[pool.countryId] || m.chainIds).includes(pool.chainId) || m.format!==pool.format) continue;
             if(input.marketState?.runs.some(r=>r.titleId===title.id && r.poolId===pool.id && r.closed)) continue;
             offers.push({titleId:title.id,poolId:pool.id});
         }

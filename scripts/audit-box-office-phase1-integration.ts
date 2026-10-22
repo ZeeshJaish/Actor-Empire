@@ -42,23 +42,27 @@ capFixture.player.activeReleases=[{id:'cap-ledger',name:capFixture.project.title
  productionPerformance:95,distributionPhase:'THEATRICAL',baseTheatricalWeeks:20,maxTheatricalWeeks:20,sequelDecisionMade:true,
  releaseWeek:18,releaseYear:30} as typeof capFixture.player.activeReleases[number]];
 const tick=await processGameWeek(capFixture.player);
+// Load/recovery exercises the persisted JSON payload, including generated event metadata.
+tick.player=JSON.parse(JSON.stringify(tick.player));
 const capped=tick.player.activeReleases.find(r=>r.id==='cap-ledger')!;
 assert.ok(capped,'Owned title remains available for streaming after its theatrical exit');
 const gross=capped.weeklyGross.at(-1)!;
-assert.ok(gross>0,'Fixture must reach the cap with a positive final ticket week');
-assert.equal(capped.weeklyStudioReceipts!.at(-1)!+capped.weeklyExhibitorReceipts!.at(-1)!,gross,
- 'Actual saved cap-week studio and cinema receipts must equal actual ticket gross');
+assert.ok(gross>0,'Legacy near-cap fixture earns a real new ticket week');
+assert.ok(capped.totalGross>cap,'Old lifetime ceiling cannot stop paid audience demand');
+const committedCap=tick.player.world.cinemaMarket!.weeks.at(-1)!.titles.find(t=>t.titleId==='cap-ledger')!;
+assert.equal(Math.round(capped.weeklyStudioReceipts!.at(-1)!*100)+Math.round(capped.weeklyExhibitorReceipts!.at(-1)!*100)+committedCap.distributionDeductionsCents,Math.round(gross*100),
+ 'Actual saved receipt shares and explicit distribution deductions conserve every ticket cent');
 const projectLedger=tick.player.businesses.find(b=>b.id===studio.id)!.studioState!.financeLedger.filter(row=>row.projectId==='cap-ledger');
 const receipts=capped.weeklyStudioReceipts!.at(-1)!;
 const soundtrack=capped.weeklySoundtrackRevenue?.at(-1) || 0;
 const net=receipts+soundtrack-Math.round(receipts*.1)-Math.round(soundtrack*.1);
-assert.equal(projectLedger.filter(row=>row.type==='THEATRICAL'||row.type==='SOUNDTRACK'||row.type==='INVESTOR_PAYOUT').reduce((n,row)=>n+row.amount,0),net,
+assert.equal(Math.round(projectLedger.filter(row=>row.type==='THEATRICAL'||row.type==='SOUNDTRACK'||row.type==='INVESTOR_PAYOUT').reduce((n,row)=>n+row.amount,0)*100),Math.round(net*100),
  'The finance ledger must not subtract an investor split twice');
 const { getStudioSaleEarnings } = await import('../services/studioSaleHistory');
 const savedStudio=tick.player.businesses.find(b=>b.id===studio.id)!;
 const titleOnlyStudio={...savedStudio,history:[],studioState:{...savedStudio.studioState!,saleEarningsHistory:[],financeLedger:projectLedger}};
 const saleEarnings=getStudioSaleEarnings(tick.player,titleOnlyStudio);
-assert.equal(saleEarnings.profit,net,'Studio sale earnings must honor new gross receipt rows and their real investor deductions');
+assert.equal(Math.round(saleEarnings.profit*100),Math.round(net*100)-committedCap.costsCents,'Studio sale earnings include actual booking costs and deduct investors once');
 console.log('PASS actual cap-week shares and investor ledger reconciliation');
 
 const directed=makeCinemaFixture(71);

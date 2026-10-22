@@ -139,3 +139,11 @@ export const settleTalentReceipt = (
         totalPaid,
     };
 };
+
+/** A saved legacy actor royalty can belong to an inherited parent, independent of studio ownership. */
+export const creditSignedActorBackend=(world:WorldState,talentId:string,talentName:string,sourceId:string,amount:number,absoluteWeek:number):WorldState=>{
+    const state=careerState(world),key=`actor-backend:${sourceId}`;
+    if(amount<=0 || !canRecord(state,key,absoluteWeek))return world;
+    const profiles=withProfile(state.profiles,{talentId,talentName,role:'ACTOR'},profile=>({...profile,income:profile.income+amount,backendIncome:profile.backendIncome+amount}));
+    return {...world,talentCareer:withEvent(state,key,absoluteWeek,profiles)};
+};

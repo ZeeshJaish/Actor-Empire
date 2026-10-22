@@ -112,6 +112,7 @@ export interface CinemaWeekInput {
     seed: number;
     tuningVersion: number;
     knowledge: 'OBSERVED' | 'FORECAST';
+    live?: { clockEpoch:number; sourceSignature:string };
     titles: readonly CinemaTitleInput[];
     cohorts: readonly CinemaExposureCohort[];
     countries?: readonly CinemaCountryFacts[];
@@ -156,6 +157,7 @@ export interface CinemaTitleMarketFacts {
     languages: readonly string[];
     countryIds: readonly string[];
     chainIds: readonly CinemaChainId[];
+    chainIdsByCountry?: Readonly<Record<string,readonly CinemaChainId[]>>;
     format: 'STANDARD' | 'PREMIUM';
     universeId?: string;
     returningCharacterIds?: readonly string[];
@@ -302,13 +304,15 @@ export interface CinemaCountryResult extends CinemaGrossSplit {
 export interface CinemaWeekResult {
     absoluteWeek: number;
     tuningVersion: number;
-    mode: 'SHADOW';
+    mode: 'SHADOW' | 'LIVE';
+    live?: { clockEpoch:number; sourceSignature:string };
     /** Diagnostic identity, not an authorization or settlement receipt. */
     inputFingerprint: string;
-    titles: Array<CinemaGrossSplit & { titleId: string; firstAdmissions: number; repeatAdmissions: number; deferredPeople: number; satisfactionScore: number | null; countries: CinemaCountryResult[] }>;
+    titles: Array<CinemaGrossSplit & { titleId: string; screens?:number; firstAdmissions: number; repeatAdmissions: number; deferredPeople: number; satisfactionScore: number | null; countries: CinemaCountryResult[] }>;
     cohorts: Array<{ cohortId: string; walletCents: number; spentCents: number; unspentCents: number; leisureMinutes: number; usedMinutes: number }>;
     supply: Array<{ poolId: string; shows: number; usedScreenMinutes: number; availableScreenMinutes: number; seats: number; admissions: number }>;
     allocations: CinemaAdmissionAllocation[];
+    exhibition?:Array<{titleId:string;poolId:string;shows:number;screens:number}>;
     costEvents: Array<{ id: string; titleId: string; poolId: string; category: 'BOOKING_COST'; amountCents: number }>;
     nextState: CinemaMarketState;
 }
@@ -327,6 +331,7 @@ export interface CinemaSettledTitle {
     basis: CinemaSettlementBasis;
     activationWeek: number;
     legacyGrossCents: number;
+    legacyGrossKnown?:boolean;
     legacyProducerReceiptsCents: number | null;
     grossCents: number;
     producerReceiptsCents: number;
@@ -338,10 +343,13 @@ export interface CinemaSettledTitle {
     actorPaidCents: number;
     firstAdmissions: number;
     repeatAdmissions: number;
+    satisfactionScoreUnits?:number;
+    satisfactionAdmissions?:number;
     lastSettledWeek: number;
     closed: boolean;
 }
 export interface CinemaCommittedTitle extends CinemaGrossSplit {
+    soundtrackReceiptsCents?:number;
     titleId: string;
     ownerId: string;
     ownerRoute: CinemaOwnerRef['route'];
@@ -365,6 +373,8 @@ export interface CinemaCommittedWeek {
     titles: CinemaCommittedTitle[];
 }
 export interface CinemaSavedState {
+    /** External investment counterparties have no simulated bank; signed net receivables/payables. */
+    externalProducerBalancesCents?:Record<string,number>;
     schemaVersion: 1;
     tuningVersion: number;
     clockEpoch: number;

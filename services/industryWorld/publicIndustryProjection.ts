@@ -74,7 +74,7 @@ export const getCanonicalReleasedMarketProjects = (
     currentAbsoluteWeek: number,
     chartRunWeeks = 8,
 ): IndustryProject[] => (world.projects || [])
-    .filter(project => project.releaseStrategy !== 'STREAMING_ONLY' && project.boxOffice > 0)
+    .filter(project => project.cinema?.settlementBasis==='UNSETTLED_WEEKLY' ? project.releaseStrategy==='THEATRICAL' && !world.cinemaMarket?.titles[project.id]?.closed : project.releaseStrategy!=='STREAMING_ONLY' && project.boxOffice>0)
     .filter(project => {
         const releasedAt = toAbsoluteWeek(project.year, project.weekReleased);
         return releasedAt <= currentAbsoluteWeek && releasedAt >= currentAbsoluteWeek - Math.max(1, chartRunWeeks) + 1;

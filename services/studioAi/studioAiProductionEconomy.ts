@@ -1,3 +1,4 @@
+import { moveCinemaNpcCash } from '../boxOffice/boxOfficeSettlement';
 import type { IndustryProductionCommitment, NPCStudioState, StudioAiProductionMilestone } from '../../types';
 import { createDeterministicId } from '../deterministicRandom';
 import { appendStudioAiProductionKey, STUDIO_AI_PRODUCTION_PROBLEM_LIMIT } from './studioAiProductionState';
@@ -62,7 +63,7 @@ export const applyStudioAiProductionMilestone = (input: ApplyStudioAiProductionM
             },
         };
     }
-    const nextCash = money(input.studio.cashReserve - milestone.amountMillions);
+    const nextCash = moveCinemaNpcCash(input.studio.cashReserve,-milestone.amountMillions);
     const ledgerId = createDeterministicId('studio_ai_production_ledger', input.production.id, input.milestone);
     const paidMilestoneIds = [...(execution.paidMilestoneIds || []), input.milestone];
     const status = input.milestone === 'PRODUCTION_START' ? 'PRODUCTION'

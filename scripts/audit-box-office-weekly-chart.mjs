@@ -9,8 +9,7 @@ const packageJson = fs.readFileSync('package.json', 'utf8');
 
 [
   'WeeklyChartEntry',
-  'SIMULATED_WEEKLY_MARKET',
-  'getSimulatedMarketEntries',
+  'getCommittedCinemaChartRows',
   'getRankMovementLabel',
   'getWeeklyStatusTag',
   "tr('box.top10Gross')",
@@ -33,8 +32,8 @@ assert(
 );
 
 assert(
-  source.includes("source: 'PLAYER'") && source.includes("source: 'MARKET'"),
-  'Weekly market chart should mix player releases with simulated market releases.'
+  source.includes('committed.rows') && source.includes('committed.previousRanks'),
+  'Weekly chart uses committed owner rows and the entire previous committed slate.'
 );
 
 assert(
@@ -42,4 +41,5 @@ assert(
   'package.json should expose the weekly chart audit.'
 );
 
-console.log('Box Office weekly chart audit passed.');
+assert(!source.includes('getSimulatedMarketEntries') && !source.includes('getOutsideProducerWeeklyEntries'),'Invented NPC or investment ticket curves cannot return.');
+console.log('Box Office committed weekly chart audit passed.');

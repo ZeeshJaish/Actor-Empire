@@ -1,0 +1,417 @@
+{
+  "phase": 4,
+  "status": "IMPLEMENTED_AND_VERIFIED_LOCAL",
+  "base": "d3b9e271c3072be9c7b08b4d024062bb986bf7e6",
+  "migrationCheckpoint": "17b44d5",
+  "localOnly": true,
+  "remotePush": false,
+  "focusedGroups": 186,
+  "migrationGroups": 19,
+  "integrationGroups": 30,
+  "focusedAndSeamChecks": [
+    {
+      "name": "inputs",
+      "exit": 0,
+      "seconds": 0.16,
+      "command": [
+        "node",
+        "scripts/run-box-office-audit.mjs",
+        "inputs"
+      ]
+    },
+    {
+      "name": "delivery",
+      "exit": 0,
+      "seconds": 0.15,
+      "command": [
+        "node",
+        "scripts/run-box-office-audit.mjs",
+        "delivery"
+      ]
+    },
+    {
+      "name": "finance",
+      "exit": 0,
+      "seconds": 0.11,
+      "command": [
+        "node",
+        "scripts/run-box-office-audit.mjs",
+        "finance"
+      ]
+    },
+    {
+      "name": "finance-contracts",
+      "exit": 0,
+      "seconds": 0.06,
+      "command": [
+        "node",
+        "scripts/run-box-office-audit.mjs",
+        "finance-contracts"
+      ]
+    },
+    {
+      "name": "finance-ui",
+      "exit": 0,
+      "seconds": 0.43,
+      "command": [
+        "node",
+        "scripts/run-box-office-audit.mjs",
+        "finance-ui"
+      ]
+    },
+    {
+      "name": "phase1-integration",
+      "exit": 0,
+      "seconds": 4.71,
+      "command": [
+        "node",
+        "scripts/run-box-office-audit.mjs",
+        "phase1-integration"
+      ]
+    },
+    {
+      "name": "awareness",
+      "exit": 0,
+      "seconds": 0.13,
+      "command": [
+        "node",
+        "scripts/run-box-office-audit.mjs",
+        "awareness"
+      ]
+    },
+    {
+      "name": "phase2-integration",
+      "exit": 0,
+      "seconds": 3.61,
+      "command": [
+        "node",
+        "scripts/run-box-office-audit.mjs",
+        "phase2-integration"
+      ]
+    },
+    {
+      "name": "audience",
+      "exit": 0,
+      "seconds": 0.35,
+      "command": [
+        "node",
+        "scripts/run-box-office-audit.mjs",
+        "audience"
+      ]
+    },
+    {
+      "name": "market",
+      "exit": 0,
+      "seconds": 1.22,
+      "command": [
+        "node",
+        "scripts/run-box-office-audit.mjs",
+        "market"
+      ]
+    },
+    {
+      "name": "migration",
+      "exit": 0,
+      "seconds": 1.1,
+      "command": [
+        "node",
+        "scripts/run-box-office-audit.mjs",
+        "migration"
+      ]
+    },
+    {
+      "name": "integration",
+      "exit": 0,
+      "seconds": 10.36,
+      "command": [
+        "npm",
+        "run",
+        "audit:box-office-integration"
+      ],
+      "groups": 30,
+      "verificationLog": "integration-final.log"
+    },
+    {
+      "name": "audit:box-office-weekly-chart",
+      "exit": 0,
+      "seconds": 0.12,
+      "command": [
+        "npm",
+        "run",
+        "audit:box-office-weekly-chart"
+      ]
+    },
+    {
+      "name": "audit:world-streaming-we4",
+      "exit": 0,
+      "seconds": 0.91,
+      "command": [
+        "npm",
+        "run",
+        "audit:world-streaming-we4"
+      ]
+    },
+    {
+      "name": "audit:studio-ai-production-live-b6",
+      "exit": 0,
+      "seconds": 2.14,
+      "command": [
+        "npm",
+        "run",
+        "audit:studio-ai-production-live-b6"
+      ]
+    },
+    {
+      "name": "audit:studio-ai-commercial-result-b6",
+      "exit": 0,
+      "seconds": 0.18,
+      "command": [
+        "npm",
+        "run",
+        "audit:studio-ai-commercial-result-b6"
+      ]
+    },
+    {
+      "name": "audit:save-integrity",
+      "exit": 0,
+      "seconds": 0.17,
+      "command": [
+        "npm",
+        "run",
+        "audit:save-integrity"
+      ]
+    },
+    {
+      "name": "audit:save-generations",
+      "exit": 0,
+      "seconds": 0.17,
+      "command": [
+        "npm",
+        "run",
+        "audit:save-generations"
+      ]
+    }
+  ],
+  "relatedChecks": [
+    {
+      "name": "audit:save-integrity",
+      "exit": 0,
+      "seconds": 0.17,
+      "command": [
+        "npm",
+        "run",
+        "audit:save-integrity"
+      ]
+    },
+    {
+      "name": "audit:save-generations",
+      "exit": 0,
+      "seconds": 0.17,
+      "command": [
+        "npm",
+        "run",
+        "audit:save-generations"
+      ]
+    },
+    {
+      "name": "audit:world-audience-we2",
+      "exit": 0,
+      "seconds": 3.28,
+      "command": [
+        "npm",
+        "run",
+        "audit:world-audience-we2"
+      ]
+    },
+    {
+      "name": "audit:world-audience-we3",
+      "exit": 0,
+      "seconds": 3.1,
+      "command": [
+        "npm",
+        "run",
+        "audit:world-audience-we3"
+      ]
+    },
+    {
+      "name": "audit:world-streaming-we4",
+      "exit": 0,
+      "seconds": 0.91,
+      "command": [
+        "npm",
+        "run",
+        "audit:world-streaming-we4"
+      ]
+    },
+    {
+      "name": "audit:world-streaming-we6",
+      "exit": 0,
+      "seconds": 63.76,
+      "command": [
+        "npm",
+        "run",
+        "audit:world-streaming-we6"
+      ]
+    },
+    {
+      "name": "audit:world-economy-we8-integrity",
+      "exit": 0,
+      "seconds": 1.01,
+      "command": [
+        "npm",
+        "run",
+        "audit:world-economy-we8-integrity"
+      ]
+    },
+    {
+      "name": "audit:studio-ai-finance-b1",
+      "exit": 0,
+      "seconds": 0.19,
+      "command": [
+        "npm",
+        "run",
+        "audit:studio-ai-finance-b1"
+      ]
+    },
+    {
+      "name": "audit:studio-ai-production-economy-b6",
+      "exit": 0,
+      "seconds": 0.17,
+      "command": [
+        "npm",
+        "run",
+        "audit:studio-ai-production-economy-b6"
+      ]
+    },
+    {
+      "name": "audit:studio-ai-commercial-result-b6",
+      "exit": 0,
+      "seconds": 0.18,
+      "command": [
+        "npm",
+        "run",
+        "audit:studio-ai-commercial-result-b6"
+      ]
+    },
+    {
+      "name": "audit:studio-ai-production-live-b6",
+      "exit": 0,
+      "seconds": 2.14,
+      "command": [
+        "npm",
+        "run",
+        "audit:studio-ai-production-live-b6"
+      ]
+    },
+    {
+      "name": "audit:industry-media-fandom-week-c5",
+      "exit": 0,
+      "seconds": 0.22,
+      "command": [
+        "npm",
+        "run",
+        "audit:industry-media-fandom-week-c5"
+      ]
+    },
+    {
+      "name": "audit:industry-ownership-handoff-b7",
+      "exit": 0,
+      "seconds": 0.2,
+      "command": [
+        "npm",
+        "run",
+        "audit:industry-ownership-handoff-b7"
+      ]
+    }
+  ],
+  "build": {
+    "command": "npm run build",
+    "exit": 0,
+    "isolated": true,
+    "warning": "Existing large JavaScript chunk warning",
+    "verificationLog": "build-final.log"
+  },
+  "types": {
+    "command": "npm run lint",
+    "exit": 0,
+    "isolated": true,
+    "verificationLog": "types-committable.log"
+  },
+  "productionOnlySoak": {
+    "years": 400,
+    "releases": 520,
+    "pendingCinemaResults": 520,
+    "delayed": 173,
+    "duplicateIds": 0,
+    "retainedBytes": 3200812,
+    "isLiveBalanceProof": false
+  },
+  "liveDiagnostic": {
+    "firstGameWeekMs": 627,
+    "journeyMs": 3445,
+    "titles": 4,
+    "cinemaBytes": 2818080,
+    "saveBytes": 9410988
+  },
+  "durabilityAuthoritiesUnchanged": {
+    "services/saveGenerations.ts": true,
+    "App.tsx": true
+  },
+  "unrelatedBaselineHashesUnchanged": true,
+  "preservedUnrelatedFiles": 76,
+  "sourceHashesSha256": {
+    "types.ts": "538a57ff7a67c8038f5e0407bdb389c3ce11cb5e655e7c348e2d5e069a8d0ff7",
+    "services/boxOffice/boxOfficeTypes.ts": "c8fc1ce6b51815acc73faf16495e7bc38c0f7d07830669f599aa5979c5ff8202",
+    "services/boxOffice/boxOfficeMigration.ts": "99bb544268381151ce47a33b1cf45ffd0a01a52d84bbe1a04ba9f7cb1d8712df",
+    "services/boxOffice/boxOfficeClock.ts": "7975a435290989ddd4bcab161dcc2fcd0437da035987760b6ad8daca32f3f42d",
+    "services/boxOffice/boxOfficeHistory.ts": "9692edae0e5fb5e2dd9317f8ce08d6bbaa1f8e640b56c4fd325da359cb7e0821",
+    "services/boxOffice/boxOfficeMarket.ts": "226bd895d4c7bee3092dadb7a736332deb7f9a2cb94d7e59d669f3f8f19cc8c4",
+    "services/legacyLogic.ts": "4eb5cd5dd50f4dc1ae857c4a6ce08523b4fc198980efd3c54890d0cedadd6d3c",
+    "services/saveMigration.ts": "54704d277f99dbdcd7684c8477a2128e76178b411b5f97f4d8efceaae69a78c1",
+    "services/saveIntegrity.ts": "588ac638f2d578e623eb25e53e5c4450ed1787400965b639ed83ef12743c820a",
+    "services/worldEconomy/worldEconomyIntegrity.ts": "b5a21bd021d41481568895110c70559fc8449914e4a16f9435895e3f197e8e28",
+    "scripts/audit-box-office-migration.ts": "8548cf7cc81cd3f631cea8f6bf93c4ce8f1ba79e40268af3f96554ada56c9952",
+    "scripts/fixtures/cinemaSaveStore.ts": "b9a98cad7fda543e5d66f495118f6ec6a2adbf130015dae7237e72cdace41577",
+    "scripts/run-box-office-audit.mjs": "172f0d5a8b0df6dbf38f017e97eb052d2c1560564f0715d1c3546ceec0eac843",
+    "scripts/audit-save-integrity.ts": "fc97d9079678efb0357dc8e1e2e7ccc0419d86eaf3c36d18b375b4a526e91cf0",
+    "docs/reports/2026-10-22-box-office-phase4/progress.md": "b211c6a39ee9a32869d55995873888bec1bd38ab5ef65ba41e46472238e3e8d6",
+    "docs/superpowers/plans/2026-10-22-fair-box-office.md": "d69f5a0e6e62adff2d1e8a5c318d28cd6562f6581387d9642cfa54578dc1cbcc",
+    "services/boxOffice/boxOfficeWeek.ts": "5e52fa8413ef71248ca48c3aefdb0727ed213bac2c41e480611a440f147ca269",
+    "services/boxOffice/boxOfficeLiveSettlement.ts": "a732126231521b742a508d72f2ece47097ff221aa8abad9281bc8c66ab2962e5",
+    "services/boxOffice/boxOfficeLiveReports.ts": "e6160627a6baab4b01de880bd72522d5dc80219481a8da3edf2b4ed016601421",
+    "services/boxOffice/boxOfficeIdentity.ts": "848fe0da6156458823467609a0ef3ec9874ba38ff3f808dc74bd7ec6635271b2",
+    "services/boxOffice/boxOfficeCharts.ts": "44a18856d3892c58bdf20e85a66ea08dfc08ffe03488b88602bccf2e559bc4ae",
+    "services/boxOffice/boxOfficeAwareness.ts": "db21a30517bfc8522ac08bcd00a199b0978137a344fa6a030defcdb1cd02ff6d",
+    "services/boxOffice/boxOfficeSettlement.ts": "b42ebb6f455dd3b0ffd76bebe297a541531ef21ebc80802bb3731d480d0ee385",
+    "services/boxOffice/boxOfficeSupply.ts": "e0e72e5c27b308be12f46f9b3ad6c9b455da4d20fc1576806b3b09f4d20499f6",
+    "scripts/audit-box-office-integration.ts": "38cb180ffc2340771800fe9bc221fa48e87f18bc2980e7672b7afc43da158d16",
+    "scripts/fixtures/cinemaLiveNpc.ts": "df95a75bc45f579f3dcb842b21230fb7bd1dee1d12f043fbb0ae33f0e262b9e5",
+    "scripts/audit-box-office-phase1-integration.ts": "557295b6281522464527ab486fd4eee4d1b11fa9d13ac3d9ef3d0ea84d5828e2",
+    "scripts/audit-studio-ai-commercial-result-b6.ts": "37cfa3e2d04de781bfca95527c86c19f190daea2f98132d979392e277918f2fa",
+    "scripts/audit-studio-ai-production-live-b6.ts": "72d9d14ed344d3b0b017ddac1f53272023e0d12a2a252ba1550c1cbaa7d90224",
+    "services/gameLoop.ts": "85f6b7a5866e16b4eb6dbbbd1c75d0e6b39c8a85889f08302e712cc4f2c9db85",
+    "services/outsideProductions.ts": "7f9c0feb4fa1c19c2cc50bfd879cc1ef71d0265db95d6c0781a683981c0c7b57",
+    "services/studioEcosystem.ts": "ebca8bf64dea62b836050143ba914584e70e71287a0050db3918ef0267927daf",
+    "services/studioSaleHistory.ts": "321323585bc146892afe49337b0aae1a5d910a0a6538711cb8475179dca4a09b",
+    "services/talentCareer.ts": "5753b94ea0821b7f581b9bf3772798822c31982280eb1495e25aca9d483ba8d7",
+    "services/saveCompaction.ts": "51de11b5b7689abccc277e71462e97f4f08a483264f562c020657ce9d52b6618",
+    "services/industryWorld/industryEventCollectors.ts": "f210edb6af1d7ff30cec62dff03b9d3625581bf932eca0d23ff31de9274943d8",
+    "services/industryWorld/publicIndustryProjection.ts": "b94f91e371cca87f2105b11f8de7dbb60901714e3a956358047ad1e18d1fb737",
+    "views/mobile/BoxOfficeApp.tsx": "716a35cc3a5716891e7e7488631f23b3485396788fd86606262863d08159f780",
+    "services/studioAi/studioAiCommercialResult.ts": "62e6824d76abdf48e8cf409e067a1c501c25d0a21dc0afc385f94f39f68a34b2",
+    "services/studioAi/studioAiFinance.ts": "f340d0eb861a1ecef60cd06d63c1e2699f5783f8a30b340d14ce48c63e621358",
+    "services/studioAi/studioAiProductionEconomy.ts": "3bb0f713ec32b53d903dc1ff532d61e368ffc30c260ccd3e6b43ae518a42e692",
+    "services/studioAi/studioAiProductionState.ts": "7558680a4c5a2786d659166e9a88fa1758d29cd2bc66862f6e7833c497cabe64",
+    "services/studioAi/studioAiProductionTurnaround.ts": "bbd1224945687bae9698d186300866b98e75b2769b87efc626581cab54bbd70e",
+    "services/studioAi/studioAiSlateAdmission.ts": "eba0aa1ce914bd46e383604463f93856e7ae5c8201ff08be6bd363a24cbc0c81",
+    "scripts/audit-studio-ai-production-long-run-b6.ts": "22098e97b047b09c463f455090cec51e32dc760f1d142a559edc0402df603283",
+    "scripts/audit-box-office-weekly-chart.mjs": "a45df88adc30713880ecdf2b95d7452f3cebab8762d8cc06dcad3f7e8bc53784",
+    "package.json": "fc8a67a74cb80b8c54e9465cf77e1577a20dacc7e0cb37bfeab11c84b21bad69",
+    "docs/reports/2026-10-22-box-office-phase4/README.md": "64e4767157faec172beb98fa904623c6735bac19b855867501949fdc74d0e255"
+  },
+  "review": "Read-only review findings fixed; final changes preserve signed payees, cumulative audience/role visibility and producer backend costs.",
+  "nextPhases": [
+    "Complete forecast/financial/IMDb-insight surfaces and rights bids",
+    "Final balance, actual UI/device journeys, long live careers and large-slate performance"
+  ]
+}

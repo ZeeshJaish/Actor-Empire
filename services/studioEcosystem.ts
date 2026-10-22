@@ -1,3 +1,4 @@
+import { moveCinemaNpcCash } from './boxOffice/boxOfficeSettlement';
 import type { IndustryProject, NPCStudioState, Player, Stock, StudioId, WorldState } from '../types';
 import { getEstimatedBudget } from './roleLogic';
 import { STUDIO_CATALOG } from './studioLogic';
@@ -177,7 +178,7 @@ export const applyStudioProjectOutcome = (
     nextWorld.studios![project.studioId] = normalizeStudioState({
         ...studio,
         valuation: Math.max(valuationFloor, roundThree(studio.valuation * valuationMultiplier)),
-        cashReserve: roundOne(Math.max(studio.isNpcVenture ? -30 : 0, nextCash)),
+        cashReserve: exactSettlement?.cashAlreadySettled ? studio.cashReserve : moveCinemaNpcCash(studio.cashReserve,Math.max(studio.isNpcVenture ? -30 : 0, nextCash)-studio.cashReserve),
         reputation: clamp(studio.reputation + reputationDelta + qualitySignal * 4, 5, 100),
         recentHits: outcome.outcome === 'HIT'
             ? (studio.recentHits || 0) + 1
@@ -219,7 +220,7 @@ export const applyPassiveStudioEcosystemTurn = (
         nextWorld.studios![normalized.id] = normalizeStudioState({
             ...normalized,
             valuation: Math.max(valuationFloor, roundThree(normalized.valuation * passiveMultiplier)),
-            cashReserve: roundOne(normalized.cashReserve + cashFlow),
+            cashReserve: moveCinemaNpcCash(normalized.cashReserve,roundOne(cashFlow)),
             recentHits: Math.random() < 0.08 ? Math.max(0, (normalized.recentHits || 0) - 1) : normalized.recentHits,
             slateMomentum: clamp(momentum + (momentum > 50 ? -0.45 : 0.2), 0, 100),
         });

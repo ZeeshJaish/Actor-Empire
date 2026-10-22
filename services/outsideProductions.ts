@@ -1,3 +1,4 @@
+import { getAbsoluteWeek as canonicalCinemaWeek } from './legacyLogic';
 import {
     GameLanguage,
     Genre,
@@ -756,6 +757,7 @@ export const processOutsideProductionsWeek = (player: Player): { player: Player;
                 eventLog: [...(item.eventLog || []), t(language, 'services.outsideProducer.fraud.event.legit')]
             };
         }
+        if(item.cinema)return item; // Actual cinema receipts now own this signed stake.
         const finishAbsolute = releaseAbsolute + Math.max(1, Math.round((item.budget / 15_000_000) % 5) + 3);
         if (currentAbsolute < finishAbsolute) {
             if (currentAbsolute >= releaseAbsolute && item.status === 'FUNDED') {
@@ -765,6 +767,7 @@ export const processOutsideProductionsWeek = (player: Player): { player: Player;
             return item;
         }
         const resolved = resolveOutsideProduction(player, item);
+        if(item.releasePath!=='STREAMING' && resolved.status!=='CANCELLED')return {...item,status:'RELEASED' as const,cinema:{schemaVersion:1 as const,settlementBasis:'UNSETTLED_WEEKLY' as const,activationWeek:canonicalCinemaWeek(player.age,player.currentWeek)+1,audienceBasis:'TRACKED' as const}};
         payouts += Math.max(0, resolved.playerPayout || 0);
         reputationImpact += resolved.reputationImpact || 0;
         resultMessages.push(buildOutsideProductionResultMessage(resolved, player));
@@ -780,7 +783,7 @@ export const processOutsideProductionsWeek = (player: Player): { player: Player;
         return { ...resolved, finishWeek: finish.week, finishYear: finish.year };
     });
 
-    if (!payouts && !legalFees && !logs.length) return { player, logs: logs.map(entry => entry.message), payouts };
+    if (!payouts && !legalFees && !logs.length && nextItems.every((item,index)=>item===player.outsideProductions?.[index])) return { player, logs: logs.map(entry => entry.message), payouts };
     let nextPlayer: Player = {
             ...player,
             money: player.money + payouts - legalFees,

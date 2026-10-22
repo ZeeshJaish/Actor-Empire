@@ -1,3 +1,4 @@
+import { moveCinemaNpcCash } from '../boxOffice/boxOfficeSettlement';
 import type {
     IndustryContentFingerprint,
     IndustryIntelligenceProposal,
@@ -148,7 +149,7 @@ export const applyStudioAiDevelopmentTransaction = (
     if (ai.ledger.some(item => item.id === transaction.id)) return studio;
     const amount = money(Math.min(studio.cashReserve, transaction.amountMillions));
     if (amount <= 0) return studio;
-    const cashReserve = money(studio.cashReserve - amount);
+    const cashReserve = moveCinemaNpcCash(studio.cashReserve,-amount);
     return {
         ...studio,
         cashReserve,

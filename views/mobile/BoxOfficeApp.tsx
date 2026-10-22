@@ -1,3 +1,4 @@
+import { getCommittedCinemaChartRows } from '../../services/boxOffice/boxOfficeCharts';
 import { createArchivedCinemaReleaseRecord } from '../../services/boxOffice/boxOfficePresentation';
 import { getCinemaProjectFinance } from '../../services/boxOffice/boxOfficeSettlement';
 import React, { useState } from 'react';
@@ -351,73 +352,6 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
       return Math.round(((latest - previous) / previous) * 100);
   };
 
-  const getSimulatedMarketEntries = (): WeeklyChartEntry[] => {
-      const currentAbsolute = getAbsoluteWeek(player.age, player.currentWeek);
-      return getCanonicalReleasedMarketProjects(player.world, currentAbsolute, 8).map(project => {
-          const releasedAbsolute = getAbsoluteWeek(project.year, project.weekReleased);
-          const runWeek = Math.max(1, currentAbsolute - releasedAbsolute + 1);
-          const rating = project.rating || Math.max(1, Math.min(10, project.quality / 10));
-          const opening = Math.max(250_000, project.boxOffice * (0.3 + Math.min(0.1, Math.max(0, rating - 6.5) * 0.02)));
-          const hold = 0.54 + Math.min(0.18, Math.max(0, rating - 6) * 0.04);
-          const weeklyGross = Math.round(opening * Math.pow(hold, runWeek - 1));
-          const previousGross = runWeek <= 1 ? undefined : Math.round(opening * Math.pow(hold, runWeek - 2));
-          const budget = project.budgetTier === 'BLOCKBUSTER' ? 220_000_000 : project.budgetTier === 'HIGH' ? 130_000_000 : project.budgetTier === 'MID' ? 60_000_000 : 18_000_000;
-          const screens = project.budgetTier === 'BLOCKBUSTER' ? 18_000 : project.budgetTier === 'HIGH' ? 11_000 : project.budgetTier === 'MID' ? 5_500 : 2_000;
-          return {
-              id: project.id,
-              title: project.title,
-              source: 'MARKET',
-              weeklyGross,
-              previousGross,
-              studioReceipts: Math.round(weeklyGross * 0.52),
-              screens,
-              runWeek,
-              budget,
-              imdbRating: rating,
-          };
-      });
-  };
-
-  const getOutsideProducerWeeklyEntries = (): WeeklyChartEntry[] => {
-      const currentAbsolute = absoluteWeek(player.age, player.currentWeek);
-      return (player.outsideProductions || [])
-          .filter((item: OutsideProductionInvestment) => item.status === 'RELEASED')
-          .filter((item: OutsideProductionInvestment) => currentAbsolute >= absoluteWeek(item.releaseYear, item.releaseWeek))
-          .map((item: OutsideProductionInvestment) => {
-              const releaseAbsolute = absoluteWeek(item.releaseYear, item.releaseWeek);
-              const runWeek = Math.max(1, currentAbsolute - releaseAbsolute + 1);
-              const seed = hashString(`${item.projectId}:${item.projectTitle}:weekly-market`);
-              const quality = item.scoutReport.scriptQuality * 0.24
-                  + item.scoutReport.directorQuality * 0.16
-                  + item.scoutReport.castQuality * 0.2
-                  + item.scoutReport.marketFit * 0.25
-                  + item.scoutReport.buzz * 0.15
-                  - item.scoutReport.risk * 0.18;
-              const pathLift = item.releasePath === 'THEATRICAL' ? 0.32 : item.releasePath === 'FESTIVAL' ? 0.16 : 0.2;
-              const baseOpening = Math.max(750_000, item.budget * (pathLift + Math.max(0, quality) / 420));
-              const hold = Math.pow(0.55 + Math.max(0, item.scoutReport.marketFit - 45) / 260, Math.max(0, runWeek - 1));
-              const pulse = 0.88 + ((seed + runWeek * 13) % 24) / 100;
-              const weeklyGross = Math.round(baseOpening * hold * pulse);
-              const previousGross = runWeek <= 1
-                  ? undefined
-                  : Math.round(baseOpening * Math.pow(0.55 + Math.max(0, item.scoutReport.marketFit - 45) / 260, Math.max(0, runWeek - 2)) * (0.9 + ((seed + runWeek * 7) % 18) / 100));
-              const receiptsRate = item.releasePath === 'STREAMING' ? 0.72 : item.releasePath === 'FESTIVAL' ? 0.38 : 0.46;
-
-              return {
-                  id: `outside_${item.projectId}`,
-                  title: item.projectTitle,
-                  source: 'OUTSIDE',
-                  weeklyGross,
-                  previousGross,
-                  studioReceipts: Math.round(weeklyGross * receiptsRate),
-                  screens: Math.round(Math.max(120, Math.min(8500, item.budget / 18_000))),
-                  runWeek,
-                  budget: item.budget,
-                  imdbRating: Math.round((5.2 + Math.max(0, quality) / 34) * 10) / 10
-              };
-          });
-  };
-
   const getRankMovementLabel = (currentRank: number, previousRank?: number) => {
       if (!previousRank) return 'NEW';
       const movement = previousRank - currentRank;
@@ -462,12 +396,14 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
               imdbRating: rel.imdbRating
           };
       });
-      const entries = [...playerEntries, ...getOutsideProducerWeeklyEntries(), ...getSimulatedMarketEntries()].filter(entry => entry.weeklyGross > 0);
-      const currentRanked = [...entries].sort((a, b) => b.weeklyGross - a.weeklyGross);
+      const committed=getCommittedCinemaChartRows(player);
+      const entries:WeeklyChartEntry[] = player.world.cinemaMarket ? [...committed.rows,...playerEntries.filter(e=>e.rel?.type==='SERIES')] : playerEntries;
+      const positiveEntries=entries.filter(e=>e.weeklyGross>0);
+      const currentRanked = [...positiveEntries].sort((a, b) => b.weeklyGross - a.weeklyGross);
       const previousRanked = [...entries]
           .filter(entry => entry.previousGross !== undefined)
           .sort((a, b) => (b.previousGross || 0) - (a.previousGross || 0));
-      const previousRanks = new Map(previousRanked.map((entry, index) => [entry.id, index + 1]));
+      const previousRanks = player.world.cinemaMarket ? committed.previousRanks : new Map(previousRanked.map((entry, index) => [entry.id, index + 1]));
 
       return currentRanked.slice(0, 10).map((entry, index) => ({
           ...entry,

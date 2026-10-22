@@ -402,8 +402,8 @@ const createProtectedState = (player: Player): SaveProtectedState => {
         ownedStreamingTreasury: treasury,
         worldEconomy: worldEconomyState(player),
         ...(player.world?.cinemaMarket ? {cinemaState:stableHash({market:player.world.cinemaMarket,
-            active:(player.activeReleases || []).filter(r=>r.cinema && r.cinema.settlementBasis!=='LEGACY_FULLY_SETTLED').map(r=>({id:r.id,cinema:r.cinema,gross:r.totalGross,receipts:r.totalStudioReceipts})),
-            projects:(player.world.projects || []).filter(r=>r.cinema && r.cinema.settlementBasis!=='LEGACY_FULLY_SETTLED').map(r=>({id:r.id,cinema:r.cinema,gross:r.boxOffice}))})} : {}),
+            active:(player.activeReleases || []).filter(r=>r.cinema && r.cinema.settlementBasis!=='LEGACY_FULLY_SETTLED' && !player.world.cinemaMarket!.titles[r.id]?.closed).map(r=>({id:r.id,cinema:r.cinema,gross:r.totalGross,receipts:r.totalStudioReceipts})),
+            projects:(player.world.projects || []).filter(r=>r.cinema && r.cinema.settlementBasis!=='LEGACY_FULLY_SETTLED' && !player.world.cinemaMarket!.titles[r.id]?.closed).map(r=>({id:r.id,cinema:r.cinema,gross:r.boxOffice}))})} : {}),
     };
 };
 

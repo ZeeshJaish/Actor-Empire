@@ -38,8 +38,9 @@ const run = () => {
     return {
         digest: releases.map(project => `${project.id}:${project.rating}:${project.boxOffice}`).join('|'),
         releases: releases.length,
-        hits: results.filter(result => result.outcome === 'HIT').length,
-        flops: results.filter(result => result.outcome === 'FLOP').length,
+        pending:results.filter(result=>result.cinemaSettlement==='WEEKLY_PENDING').length,
+        hits: results.filter(result => !result.cinemaSettlement && result.outcome === 'HIT').length,
+        flops: results.filter(result => !result.cinemaSettlement && result.outcome === 'FLOP').length,
         delayed: Object.values(world.industryProductions).filter(production => (production.studioAiExecution?.problems || []).some(problem => problem.delayWeeks > 0)).length,
         duplicateIds: releases.length - new Set(releases.map(project => project.id)).size,
         retainedBytes: JSON.stringify(compacted).length,
@@ -50,7 +51,8 @@ const first = run();
 const replay = run();
 assert.deepEqual(replay, first);
 assert.ok(first.releases >= 500);
-assert.ok(first.hits > 0 && first.flops > 0);
+assert.ok(first.pending>0,'Production-only soak admits releases without inventing commercial outcomes.');
+assert.equal(first.hits+first.flops,0,'Actual hit/flop balance belongs to the shared weekly cinema engine.');
 assert.ok(first.delayed > 0);
 assert.equal(first.duplicateIds, 0);
 assert.ok(first.retainedBytes < 3_500_000);

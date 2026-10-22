@@ -57,6 +57,7 @@ export const getStreamingWeeksUntilStart = (
 /** Source identities remain stable; only the live inherited copy changes age-clock basis. */
 const rebaseInheritedCinemaExposure = (source: any, clockShift: number) => {
     const exposure = source?.cinemaExposure;
+    source={...source,...(source?.talentParticipation && typeof source.talentParticipation.lastSettledAbsoluteWeek==='number'?{talentParticipation:{...source.talentParticipation,lastSettledAbsoluteWeek:Math.max(-1,source.talentParticipation.lastSettledAbsoluteWeek+clockShift)}}:{})};
     if (!exposure || !Array.isArray(exposure.events)) return { ...source };
     return { ...source, cinemaExposure: { ...exposure, events: exposure.events.map((event: any) => ({ ...event,
         absoluteWeek: typeof event.absoluteWeek === 'number' && Number.isFinite(event.absoluteWeek)
@@ -190,7 +191,9 @@ const PLAYER_SELF_REFERENCE_KEYS = new Set([
     'npcId',
     'leadActorId',
     'performerId',
-    'personId'
+    'personId',
+    'talentId',
+    'actorRoyaltyPayeeId'
 ]);
 
 export const rewritePlayerSelfReferencesForLegacyParent = <T,>(value: T, parentActor: NPCActor): T => {
@@ -278,6 +281,16 @@ export const buildLegacyStudioInheritance = (
     const inheritedStudio = player.studio ? rewritePlayerSelfReferencesForLegacyParent(player.studio, parentActor) : undefined;
     const inheritedWorld = player.world ? rewritePlayerSelfReferencesForLegacyParent(player.world, parentActor) : undefined;
     if(inheritedWorld?.cinemaMarket)inheritedWorld.cinemaMarket=rebaseCinemaSavedState(inheritedWorld.cinemaMarket,targetAbsoluteWeek-sourceAbsoluteWeek);
+    const cinemaClockShift=targetAbsoluteWeek-sourceAbsoluteWeek;
+    if(inheritedWorld && cinemaClockShift){
+        if(inheritedWorld.talentCareer){
+            inheritedWorld.talentCareer={...inheritedWorld.talentCareer,lastProcessedAbsoluteWeek:Math.max(-1,inheritedWorld.talentCareer.lastProcessedAbsoluteWeek+cinemaClockShift)};
+            const profiles=inheritedWorld.talentCareer.profiles;
+            if(profiles.PLAYER_SELF){profiles[parentActor.id]=profiles.PLAYER_SELF;delete profiles.PLAYER_SELF;}
+        }
+        inheritedWorld.industryProductions=Object.fromEntries(Object.entries(inheritedWorld.industryProductions || {}).map(([id,production])=>[id,production.studioAiExecution?.talent ? {...production,studioAiExecution:{...production.studioAiExecution,talent:rebaseInheritedCinemaExposure(production.studioAiExecution.talent,cinemaClockShift)}}:production]));
+        inheritedWorld.projects=inheritedWorld.projects.map(project=>project.cinema?.settlementBasis==='UNSETTLED_WEEKLY' && !inheritedWorld.cinemaMarket?.titles[project.id]?.closed ? {...rebaseInheritedCinemaExposure(project,cinemaClockShift),cinema:{...project.cinema,activationWeek:Math.max(0,project.cinema.activationWeek+cinemaClockShift)}}:project);
+    }
     const studioIds = inheritedBusinesses
         .filter((business: any) => business?.type === 'PRODUCTION_HOUSE' && business?.id)
         .map((business: any) => String(business.id));
@@ -292,6 +305,7 @@ export const buildLegacyStudioInheritance = (
     const legacyCareerActiveReleases = (player.activeReleases || [])
         .map(release => ({
             ...rewritePlayerSelfReferencesForLegacyParent(release, parentActor),
+            ...(release.royaltyPercentage && !release.actorRoyaltyPayeeId?{actorRoyaltyPayeeId:parentActor.id}:{}),
             isLegacyCareerProject: true,
             legacyParentActorId: parentActor.id,
             legacyParentName: parentActor.name,

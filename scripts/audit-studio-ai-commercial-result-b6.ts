@@ -14,9 +14,12 @@ const first = releaseStudioAiProduction({ world, studio, production, absoluteWee
 assert.equal(first.changed, true);
 assert.equal(first.production.status, 'RELEASED');
 assert.equal(first.world.projects.filter(row => row.id === production.canonicalProjectId).length, 1);
-assert.ok((first.project?.boxOffice || 0) > 0);
+assert.equal(first.project?.boxOffice,0);
+assert.equal(first.production.studioAiExecution?.result?.cinemaSettlement,'WEEKLY_PENDING');
+assert.equal(first.production.studioAiExecution?.result?.studioReceiptsMillions,0);
+assert.equal(first.studio.cashReserve,studio.cashReserve-60*.18);
 assert.equal(first.production.studioAiExecution?.result?.productionSpendMillions, 60);
-assert.equal(first.studio.ai!.ledger.filter(row => ['RELEASE_MARKETING', 'RIGHTS_INCOME'].includes(row.category)).length, 2);
+assert.equal(first.studio.ai!.ledger.filter(row => ['RELEASE_MARKETING', 'RIGHTS_INCOME'].includes(row.category)).length, 1);
 const replay = releaseStudioAiProduction({ world: first.world, studio: first.studio, production: first.production, absoluteWeek: WEEK });
 assert.equal(replay.changed, false);
 assert.equal(replay.world.projects.filter(row => row.id === production.canonicalProjectId).length, 1);

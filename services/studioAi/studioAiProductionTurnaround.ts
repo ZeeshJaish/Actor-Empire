@@ -1,3 +1,4 @@
+import { moveCinemaNpcCash } from '../boxOffice/boxOfficeSettlement';
 import type { IndustryProductionCommitment, NPCStudioState, WorldState } from '../../types';
 import { createDeterministicId } from '../deterministicRandom';
 import { upsertCanonicalIndustryProduction } from '../industryProductions';
@@ -36,8 +37,8 @@ export const settleStudioAiProductionTurnaround = (input: SettleStudioAiProducti
         || input.buyer.cashReserve < price || input.buyer.id === input.seller.id) {
         return { world: input.world, production: input.production, seller: input.seller, buyer: input.buyer, changed: false };
     }
-    const sellerCash = money(input.seller.cashReserve + price);
-    const buyerCash = money(input.buyer.cashReserve - price);
+    const sellerCash = moveCinemaNpcCash(input.seller.cashReserve,price);
+    const buyerCash = moveCinemaNpcCash(input.buyer.cashReserve,-price);
     const ledger = (studio: NPCStudioState, amount: number, balance: number, side: 'sale' | 'purchase') => [...studio.ai!.ledger, {
         id: createDeterministicId('studio_ai_turnaround_ledger', input.production.id, studio.id, side),
         absoluteWeek: input.absoluteWeek, category: 'TURNAROUND' as const, amountMillions: amount,

@@ -1,3 +1,4 @@
+import { moveCinemaNpcCash } from '../boxOffice/boxOfficeSettlement';
 import type { BudgetTier, IndustryProductionCommitment, IndustryProject, NPCStudioState, PlatformAiProjectStreamingWindow, WorldState } from '../../types';
 import { createDeterministicId, createDeterministicRng } from '../deterministicRandom';
 import { upsertCanonicalIndustryProduction } from '../industryProductions';
@@ -29,9 +30,10 @@ export const releaseStudioAiProduction = (input: ReleaseStudioAiProductionInput)
     if ((mode === 'STREAMING_ONLY' || mode === 'THEATRICAL_THEN_STREAMING') && !streamingContract) return { world: input.world, studio: input.studio, production: input.production, project: null, changed: false };
     const quality = execution.finalQuality;
     const rng = createDeterministicRng(`${input.studio.ai.seed}:b6-commercial:${input.production.id}`);
+    const weeklyCinema = input.production.projectType === 'MOVIE' && execution.publicReleaseStrategy !== 'STREAMING_ONLY';
     const modeMultiplier = mode === 'EVENT_THEATRICAL' ? 1.35 : mode === 'WIDE_THEATRICAL' ? 1.18 : mode === 'PRESTIGE_THEATRICAL' ? 0.82 : mode === 'LIMITED_THEATRICAL' ? 0.58 : mode === 'THEATRICAL_THEN_STREAMING' ? 1.05 : 0;
-    const theatricalGrossMillions = execution.publicReleaseStrategy === 'STREAMING_ONLY' ? 0 : money(input.production.budgetMillions * modeMultiplier * (0.60 + quality.commercialPotential / 45) * (0.55 + rng() * 1.30));
-    const streamingValueMillions = streamingContract ? money(input.production.budgetMillions * (0.35 + quality.commercialPotential / 100) * (0.65 + rng() * 0.35)) : 0;
+    const theatricalGrossMillions = execution.publicReleaseStrategy === 'STREAMING_ONLY' || weeklyCinema ? 0 : money(input.production.budgetMillions * modeMultiplier * (0.60 + quality.commercialPotential / 45) * (0.55 + rng() * 1.30));
+    const streamingValueMillions = 0; // Signed rights settlement is the streaming cash authority.
     const marketingRate = mode === 'EVENT_THEATRICAL' ? 0.25 : mode === 'WIDE_THEATRICAL' ? 0.18 : mode === 'THEATRICAL_THEN_STREAMING' ? 0.16 : mode === 'PRESTIGE_THEATRICAL' ? 0.12 : 0.08;
     const marketingSpendMillions = money(input.production.budgetMillions * marketingRate);
     if (input.studio.cashReserve < marketingSpendMillions) return { world: input.world, studio: input.studio, production: input.production, project: null, changed: false };
@@ -41,7 +43,7 @@ export const releaseStudioAiProduction = (input: ReleaseStudioAiProductionInput)
         Math.round(studioReceiptsMillions * 1_000_000), input.absoluteWeek);
     const backendMillions = money(talentSettlement.totalPaid / 1_000_000);
     const netResultMillions = money(studioReceiptsMillions - backendMillions - input.production.budgetMillions - marketingSpendMillions);
-    const outcome = netResultMillions >= input.production.budgetMillions * 0.6 ? 'HIT' as const : netResultMillions < 0 ? 'FLOP' as const : 'SOLID' as const;
+    const outcome = weeklyCinema ? 'SOLID' as const : netResultMillions >= input.production.budgetMillions * 0.6 ? 'HIT' as const : netResultMillions < 0 ? 'FLOP' as const : 'SOLID' as const;
     const rating = Math.round(clamp(4.2 + quality.creativeQuality * 0.058 + (rng() - 0.5) * 0.5, 1, 10) * 10) / 10;
     const { year, week } = yearWeek(input.absoluteWeek);
     const streamingWindows: PlatformAiProjectStreamingWindow[] = streamingContract ? [{
@@ -71,7 +73,7 @@ export const releaseStudioAiProduction = (input: ReleaseStudioAiProductionInput)
         boxOffice: Math.round(theatricalGrossMillions * 1_000_000), year, weekReleased: week,
         leadActorId: talent.leadActorId, leadActorName: talent.leadActorName, directorId: talent.directorId, directorName: talent.directorName,
         ...(input.production.writerId ? { writerId: input.production.writerId } : {}), writerName: input.production.writerName,
-        reviews: outcome === 'HIT' ? 'A major audience and critical success' : outcome === 'FLOP' ? 'A disappointing commercial response' : 'A solid industry performance',
+        reviews: weeklyCinema ? 'In theaters: awaiting paid audience results' : outcome === 'HIT' ? 'A major audience and critical success' : outcome === 'FLOP' ? 'A disappointing commercial response' : 'A solid industry performance',
         awardProfile: {
             leadPerformance: clamp(Math.round(quality.creativeQuality * 0.72 + talent.packageScore * 0.22)), directing: clamp(Math.round(quality.executionQuality * 0.72 + talent.packageScore * 0.22)),
             screenplay: clamp(Math.round(quality.creativeQuality * 0.75 + input.production.writerSkill * 0.2)), cinematography: clamp(Math.round(quality.executionQuality * 0.9)),
@@ -79,18 +81,22 @@ export const releaseStudioAiProduction = (input: ReleaseStudioAiProductionInput)
             originalSong: input.production.genre === 'MUSICAL' ? clamp(Math.round(quality.creativeQuality * 0.9)) : clamp(Math.round(quality.creativeQuality * 0.48)), campaign: clamp(Math.round(input.studio.ai.competence.marketing * 0.7 + marketingRate * 100)),
         },
         ...(input.production.universeId ? { universeId: input.production.universeId } : {}), releaseStrategy: execution.publicReleaseStrategy,
+        ...(weeklyCinema ? {cinema:{schemaVersion:1 as const,settlementBasis:'UNSETTLED_WEEKLY' as const,activationWeek:input.absoluteWeek,audienceBasis:'TRACKED' as const},
+            cinemaExposure:{version:1 as const,attentionBasis:'PACKAGE' as const,attentionPotential:quality.commercialPotential,events:[
+                {id:`npc-announcement:${input.production.id}`,titleId:input.production.canonicalProjectId,absoluteWeek:input.absoluteWeek,kind:'ANNOUNCEMENT' as const,channel:'STUDIO_RELEASE',impressions:0},
+                {id:`npc-paid:${input.production.id}`,titleId:input.production.canonicalProjectId,absoluteWeek:input.absoluteWeek,kind:'PAID_CAMPAIGN' as const,channel:'RELEASE_CAMPAIGN',paidCostCents:Math.round(marketingSpendMillions*1e8),impressions:Math.floor(marketingSpendMillions*1e6*30)}]}} : {}),
         streamingWindows, studioAiSlateCommitmentId: execution.slateCommitmentId, industryContentFingerprintId: execution.fingerprintId,
     };
-    const releaseCash = money(input.studio.cashReserve - marketingSpendMillions + studioReceiptsMillions - backendMillions);
+    const releaseCash = moveCinemaNpcCash(input.studio.cashReserve,-marketingSpendMillions+studioReceiptsMillions-backendMillions);
     const settledStudio: NPCStudioState = { ...input.studio, cashReserve: releaseCash, ai: { ...input.studio.ai, ledger: [...input.studio.ai.ledger,
-        { id: createDeterministicId('studio_ai_release_ledger', input.production.id, 'marketing'), absoluteWeek: input.absoluteWeek, category: 'RELEASE_MARKETING' as const, amountMillions: -marketingSpendMillions, balanceAfterMillions: money(input.studio.cashReserve - marketingSpendMillions), description: `${project.title}: release campaign` },
-        { id: createDeterministicId('studio_ai_release_ledger', input.production.id, 'income'), absoluteWeek: input.absoluteWeek, category: 'RIGHTS_INCOME' as const, amountMillions: studioReceiptsMillions, balanceAfterMillions: money(releaseCash + backendMillions), description: `${project.title}: studio receipts` },
+        { id: createDeterministicId('studio_ai_release_ledger', input.production.id, 'marketing'), absoluteWeek: input.absoluteWeek, category: 'RELEASE_MARKETING' as const, amountMillions: -marketingSpendMillions, balanceAfterMillions: moveCinemaNpcCash(input.studio.cashReserve,-marketingSpendMillions), description: `${project.title}: release campaign` },
+        ...(studioReceiptsMillions>0 ? [{ id: createDeterministicId('studio_ai_release_ledger', input.production.id, 'income'), absoluteWeek: input.absoluteWeek, category: 'RIGHTS_INCOME' as const, amountMillions: studioReceiptsMillions, balanceAfterMillions: money(releaseCash + backendMillions), description: `${project.title}: studio receipts` }] : []),
         ...(backendMillions > 0 ? [{ id: createDeterministicId('studio_ai_release_ledger', input.production.id, 'backend'), absoluteWeek: input.absoluteWeek, category: 'TALENT_BACKEND' as const, amountMillions: -backendMillions, balanceAfterMillions: releaseCash, description: `${project.title}: contracted talent backend` }] : []),
     ].slice(-STUDIO_AI_LEDGER_LIMIT) } };
-    const result = { releasedAtAbsoluteWeek: input.absoluteWeek, theatricalGrossMillions, streamingValueMillions, studioReceiptsMillions, productionSpendMillions: input.production.budgetMillions, marketingSpendMillions, netResultMillions, rating, outcome };
+    const result = { ...(weeklyCinema ? {cinemaSettlement:'WEEKLY_PENDING' as const} : {}), releasedAtAbsoluteWeek: input.absoluteWeek, theatricalGrossMillions, streamingValueMillions, studioReceiptsMillions, productionSpendMillions: input.production.budgetMillions, marketingSpendMillions, netResultMillions, rating, outcome };
     const production: IndustryProductionCommitment = { ...input.production, status: 'RELEASED', updatedAtAbsoluteWeek: input.absoluteWeek, studioAiExecution: { ...execution, talent: { ...talent, talentParticipation: talentSettlement.participation }, result, lastProgressedAbsoluteWeek: input.absoluteWeek, processedKeys: appendStudioAiProductionKey(execution.processedKeys, `b6-release:${input.production.id}`) } };
     let world: WorldState = { ...talentSettlement.world, projects: [...input.world.projects, project], studios: { ...(input.world.studios || {}), [settledStudio.id]: settledStudio }, talentBookings: releaseProjectTalentBookings(input.world.talentBookings, project.id, input.absoluteWeek), industryProductions: upsertCanonicalIndustryProduction(input.world.industryProductions, production) };
-    world = applyStudioProjectOutcome(world, project, { productionSpendMillions: input.production.budgetMillions, marketingSpendMillions, studioReceiptsMillions, netResultMillions, cashAlreadySettled: true, outcome }).world;
+    if(!weeklyCinema)world = applyStudioProjectOutcome(world, project, { productionSpendMillions: input.production.budgetMillions, marketingSpendMillions, studioReceiptsMillions, netResultMillions, cashAlreadySettled: true, outcome }).world;
     world = {
         ...world,
         studios: Object.fromEntries(Object.entries(world.studios || {}).map(([studioId, candidate]) => {

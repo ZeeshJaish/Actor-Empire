@@ -1,3 +1,7 @@
+import { CINEMA_ROLE_WEIGHTS } from './boxOffice/boxOfficeProfiles';
+import { creditSignedActorBackend } from './talentCareer';
+import { migrateCinemaState, CinemaMigrationError } from './boxOffice/boxOfficeMigration';
+import { processCinemaMarketWeek } from './boxOffice/boxOfficeWeek';
 import { getProductionScale } from './studioProductionEconomy';
 import { completeOfferedCinemaCast, normalizeCinemaTitle } from './boxOffice/boxOfficeInputs';
 import { recordStudioSaleEarnings } from './studioSaleHistory';
@@ -1472,6 +1476,10 @@ const createPastProjectArchiveSnapshot = (
         weeklyExhibitorReceipts,
         totalExhibitorReceipts,
         weeklyDistributionBreakdowns,
+        cinema:release.cinema,
+        actorRoyaltyPayeeId:release.actorRoyaltyPayeeId,
+        bookingCostPaid:release.bookingCostPaid,
+        talentBackendPaid:release.talentBackendPaid,
         releaseRegionIds: Array.isArray(projectDetails.releaseRegionIds) ? projectDetails.releaseRegionIds : [],
         releaseChainSelections: projectDetails.releaseChainSelections && typeof projectDetails.releaseChainSelections === 'object'
             ? projectDetails.releaseChainSelections
@@ -1547,6 +1555,7 @@ const buildFriendFavorRequest = (player: Player, absoluteWeek: number): Message 
 };
 
 export type ProcessGameWeekDiagnostics = {
+    onCinemaResult?:(result:import('./boxOffice/boxOfficeTypes').CinemaWeekResult)=>void;
     onStage?: (stage: string, context?: Record<string, unknown>) => void;
     validateWorldEconomy?: (candidate: Player, expectedAbsoluteWeek: number) => WorldEconomyValidationResult;
     repairWorldEconomy?: (candidate: Player, absoluteWeek: number) => Player;
@@ -1570,6 +1579,9 @@ export const processGameWeek = async (
     let nextPlayer = clonePlayerForWeekProcessing(player);
     let triggerAd = false;
     const targetAbsoluteWeek = getAbsoluteWeek(player.age, player.currentWeek) + 1;
+    const cinemaMigration=migrateCinemaState(nextPlayer,targetAbsoluteWeek-1);
+    if(cinemaMigration.status==='REJECTED')throw new CinemaMigrationError(cinemaMigration.diagnostics.map(d=>d.code));
+    nextPlayer=cinemaMigration.player;
     const simulationSeed = createWeekSimulationSeed(player, targetAbsoluteWeek);
     const emitLoopStage = (stage: string, context: Record<string, unknown> = {}) => {
         const stageContext = {
@@ -4802,6 +4814,165 @@ export const processGameWeek = async (
         });
     });
 
+    const createTheatricalStreamingBids=(rel:ActiveRelease,newTotal:number,marketDemand:number,bidRiskMultiplier:number)=>{
+                        const bids: { platformId: PlatformId, upfront: number, royalty: number, duration: number }[] = [];
+                        const isSeries = rel.type === 'SERIES';
+                        const platforms = Object.keys(PLATFORMS) as PlatformId[];
+
+                        platforms.forEach(pId => {
+                            const platformProfile = PLATFORMS[pId];
+                            const platformState = nextPlayer.world.platforms?.[pId];
+
+                            if (!platformState) return;
+
+                            // Base interest on quality, genre match, and platform's desperation (recentHits)
+                            const normalizePlatformGenre = (value: string) => {
+                                const normalized = value.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+                                if (normalized === 'ROMCOM') return 'ROMANCE';
+                                if (normalized === 'INDIE') return 'DRAMA';
+                                return normalized;
+                            };
+                            const isGenreMatch = platformProfile.genreBias.some(g => normalizePlatformGenre(g) === rel.projectDetails.genre) ? 1.15 : 0.95;
+                            const desperation = Math.max(0.5, 1.5 - (platformState.recentHits * 0.1));
+                            const qualityScore = rel.projectDetails.hiddenStats.qualityScore || 50;
+                            const scriptQuality = rel.projectDetails.hiddenStats.scriptQuality || 50;
+                            const directorQuality = rel.projectDetails.hiddenStats.directorQuality || 50;
+                            const castingStrength = rel.projectDetails.hiddenStats.castingStrength || 50;
+	                            const packageStrength = (qualityScore * 0.45) + (scriptQuality * 0.2) + (directorQuality * 0.15) + (castingStrength * 0.2);
+	                            const runStrength = Math.max(0.5, Math.min(3, newTotal / Math.max(rel.budget, 1)));
+	                            const hasProvenIp = Boolean(rel.projectDetails.franchiseId || rel.projectDetails.universeId || rel.projectDetails.subtype === 'SEQUEL' || rel.projectDetails.subtype === 'SPINOFF' || rel.projectDetails.subtype === 'UNIVERSE_EVENT');
+	                            const campaignReach = Math.max(0.38, Math.min(1.28, rel.projectDetails.hiddenStats.campaignReachMultiplier ?? 1));
+		                            const interest = (
+	                                (packageStrength * isGenreMatch * desperation * marketDemand)
+	                                + ((rel.promotionalBuzz ?? 0) * 0.15)
+	                                + (runStrength * 12)
+	                            ) * (0.82 + (campaignReach * 0.18));
+
+                            if (interest > 60 || Math.random() > 0.7) {
+                                const bidProfile = getStreamingBidProfile(packageStrength, isSeries, runStrength);
+                                const qualityFactor = Math.max(0.85, 0.95 + ((packageStrength - 55) / 105));
+                                const baseFloorOffer = rel.budget * bidProfile.floor;
+                                const topPlatformCash = Math.max(...platforms.map(id => nextPlayer.world.platforms?.[id]?.cashReserve || 0), 1);
+                                const platformMuscle = Math.max(0.25, Math.min(1, (platformState.cashReserve || 0) / topPlatformCash));
+                                const safeMinimum = Math.max(baseFloorOffer, packageStrength < 45 ? rel.budget * 0.8 : 0);
+                                const riskAdjustedSafeMinimum = packageStrength < 45
+                                    ? Math.max(rel.budget * 0.45, safeMinimum * bidRiskMultiplier)
+                                    : safeMinimum * Math.min(1.05, bidRiskMultiplier);
+                                const floorOffer = Math.floor(Math.max(riskAdjustedSafeMinimum, baseFloorOffer * (0.96 + Math.random() * 0.1 + platformMuscle * 0.05) * bidRiskMultiplier));
+                                const qualityRange = rel.budget * (
+                                    bidProfile.floor + ((bidProfile.ceiling - bidProfile.floor) * (0.18 + Math.random() * 0.5))
+                                ) * bidRiskMultiplier;
+                                const theatricalProofOffer = newTotal
+                                    * (0.42 + Math.min(0.34, packageStrength / 290) + Math.random() * 0.12)
+	                                    * platformProfile.payoutMult
+	                                    * isGenreMatch
+	                                    * marketDemand
+	                                    * Math.max(0.82, desperation)
+	                                    * bidRiskMultiplier;
+	                                const marketOffer = rel.budget
+	                                    * (0.65 + (runStrength * 0.24))
+                                    * qualityFactor
+	                                    * platformProfile.payoutMult
+	                                    * desperation
+	                                    * isGenreMatch
+	                                    * marketDemand
+	                                    * bidRiskMultiplier;
+                                let baseOffer = Math.max(
+                                    floorOffer * (1.02 + Math.random() * 0.12),
+                                    qualityRange,
+                                    marketOffer,
+                                    theatricalProofOffer
+                                );
+
+                                // Streaming is meant to be the safest lane, so don't let platform cash quirks undercut viable projects.
+                                const platformCashCap = Math.max(
+                                    floorOffer,
+                                    platformState.cashReserve * (isSeries ? 0.78 : 0.68),
+                                    rel.budget * Math.min(
+                                        bidProfile.ceiling,
+                                        packageStrength >= 92 ? 16 : packageStrength >= 84 ? 12 : packageStrength >= 72 ? 7 : packageStrength >= 60 ? 3.5 : 1.4
+                                    ) * Math.max(0.55, bidRiskMultiplier),
+                                    newTotal * (packageStrength >= 84 ? 0.92 : packageStrength >= 72 ? 0.72 : 0.55) * Math.max(0.62, bidRiskMultiplier)
+                                );
+                                const marketProofCap = getStreamingMarketProofCap(rel.budget, packageStrength, rel.projectDetails.hiddenStats || {}, isSeries, newTotal, hasProvenIp) * Math.max(0.55, Math.min(1.05, bidRiskMultiplier));
+                                const maxOffer = Math.min(platformCashCap, rel.budget * bidProfile.ceiling, marketProofCap);
+                                baseOffer = Math.min(baseOffer, Math.max(floorOffer, maxOffer));
+
+                                const upfront = Math.floor(Math.max(floorOffer, baseOffer * (0.96 + Math.random() * 0.28)));
+                                const royalty = Math.floor(Math.random() * (isSeries ? 6 : 8)) + (isSeries ? 6 : 5); // series get slightly safer backend terms
+
+                                if (upfront > 0) {
+                                    bids.push({ platformId: pId, upfront, royalty, duration: 52 }); // 1 year contract
+                                }
+                            }
+                        });
+
+                        const minimumCompetitiveBids = Math.min(3, platforms.length);
+                        if (bids.length < minimumCompetitiveBids) {
+                            const hiddenStats = (rel.projectDetails.hiddenStats || {}) as Record<string, number>;
+                            const qualityScore = hiddenStats.qualityScore || 50;
+                            const scriptQuality = hiddenStats.scriptQuality || 50;
+                            const directorQuality = hiddenStats.directorQuality || 50;
+                            const castingStrength = hiddenStats.castingStrength || 50;
+                            const packageStrength = (qualityScore * 0.45) + (scriptQuality * 0.2) + (directorQuality * 0.15) + (castingStrength * 0.2);
+                            const runStrength = Math.max(0.5, Math.min(3, newTotal / Math.max(rel.budget, 1)));
+                            const bidProfile = getStreamingBidProfile(packageStrength, isSeries, runStrength);
+                            const hasProvenIp = Boolean(rel.projectDetails.franchiseId || rel.projectDetails.universeId || rel.projectDetails.subtype === 'SEQUEL' || rel.projectDetails.subtype === 'SPINOFF' || rel.projectDetails.subtype === 'UNIVERSE_EVENT');
+                            const marketProofCap = getStreamingMarketProofCap(rel.budget, packageStrength, rel.projectDetails.hiddenStats || {}, isSeries, newTotal, hasProvenIp);
+                            const bestExistingBid = bids.reduce((max, bid) => Math.max(max, bid.upfront), 0);
+                            const missingPlatforms = platforms.filter(pId => !bids.some(bid => bid.platformId === pId));
+
+                            missingPlatforms.some((pId, index) => {
+                                if (bids.length >= minimumCompetitiveBids) return true;
+
+                                const platformProfile = PLATFORMS[pId];
+                                const platformState = nextPlayer.world.platforms?.[pId];
+                                if (!platformState) return false;
+
+                                const floorOffer = Math.max(1_000_000, rel.budget * bidProfile.floor * Math.max(0.55, bidRiskMultiplier));
+                                const competitiveAnchor = bestExistingBid > 0
+                                    ? bestExistingBid * (0.52 + Math.random() * 0.36)
+                                    : floorOffer * (1.08 + Math.random() * 0.42);
+                                const platformCap = Math.max(
+                                    floorOffer,
+                                    platformState.cashReserve * (isSeries ? 0.72 : 0.62),
+                                    rel.budget * bidProfile.ceiling * Math.max(0.55, bidRiskMultiplier),
+                                    newTotal * (packageStrength >= 84 ? 0.82 : packageStrength >= 72 ? 0.65 : 0.48) * Math.max(0.62, bidRiskMultiplier)
+                                );
+                                const cap = Math.max(floorOffer, Math.min(platformCap, marketProofCap * Math.max(0.55, Math.min(1.05, bidRiskMultiplier))));
+                                const upfront = Math.floor(Math.max(floorOffer, Math.min(cap, competitiveAnchor * platformProfile.payoutMult)));
+
+                                bids.push({
+                                    platformId: pId,
+                                    upfront,
+                                    royalty: Math.floor(Math.random() * (isSeries ? 5 : 7)) + (isSeries ? 5 : 4),
+                                    duration: 52,
+                                });
+
+                                return false;
+                            });
+                        }
+
+                        if (bids.length === 0) {
+                            const hiddenStats = (rel.projectDetails.hiddenStats || {}) as Record<string, number>;
+                            const packageStrength = ((hiddenStats.qualityScore || 50) * 0.45)
+                                + ((hiddenStats.scriptQuality || 50) * 0.2)
+                                + ((hiddenStats.directorQuality || 50) * 0.15)
+                                + ((hiddenStats.castingStrength || 50) * 0.2);
+                            const runStrength = Math.max(0.5, Math.min(3, newTotal / Math.max(rel.budget, 1)));
+                            const bidProfile = getStreamingBidProfile(packageStrength, isSeries, runStrength);
+                            // Fallback bid should still preserve streaming as a safer release lane.
+                            bids.push({
+                                platformId: 'NETFLIX',
+                                upfront: Math.floor(rel.budget * bidProfile.floor * Math.max(0.55, bidRiskMultiplier)),
+                                royalty: isSeries ? 6 : 5,
+                                duration: 52
+                            });
+                        }
+
+        return bids;
+    };
+
     allRunning.forEach(initialRelease => {
         // Owned-platform Originals settle viewing through the platform loop,
         // rather than an external streaming state. Keep their real release
@@ -5204,6 +5375,7 @@ export const processGameWeek = async (
 	            }
         }
 
+        if(rel.type==='MOVIE' && rel.distributionPhase==='THEATRICAL'){processedReleases.push(rel);return;}
 	        if (rel.distributionPhase === 'THEATRICAL') {
 	            const prevGross = rel.weeklyGross.length > 0 ? rel.weeklyGross[rel.weeklyGross.length - 1] : 0;
 	            const releaseStudio = nextPlayer.businesses?.find(b => b.id === rel.projectDetails.studioId && b.type === 'PRODUCTION_HOUSE');
@@ -5499,161 +5671,7 @@ export const processGameWeek = async (
                         // Already has a streaming deal (accepted while in theaters)
                         processedReleases.push({ ...rel, ...theatricalDistributionState, distributionPhase: 'STREAMING', status: 'FINISHED' });
                     } else {
-                        const bids: { platformId: PlatformId, upfront: number, royalty: number, duration: number }[] = [];
-                        const isSeries = rel.type === 'SERIES';
-                        const platforms = Object.keys(PLATFORMS) as PlatformId[];
-                        const bidRiskMultiplier = productionRisk.platformBidMultiplier;
-                        platforms.forEach(pId => {
-                            const platformProfile = PLATFORMS[pId];
-                            const platformState = nextPlayer.world.platforms?.[pId];
-
-                            if (!platformState) return;
-
-                            // Base interest on quality, genre match, and platform's desperation (recentHits)
-                            const normalizePlatformGenre = (value: string) => {
-                                const normalized = value.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
-                                if (normalized === 'ROMCOM') return 'ROMANCE';
-                                if (normalized === 'INDIE') return 'DRAMA';
-                                return normalized;
-                            };
-                            const isGenreMatch = platformProfile.genreBias.some(g => normalizePlatformGenre(g) === rel.projectDetails.genre) ? 1.15 : 0.95;
-                            const desperation = Math.max(0.5, 1.5 - (platformState.recentHits * 0.1));
-                            const qualityScore = rel.projectDetails.hiddenStats.qualityScore || 50;
-                            const scriptQuality = rel.projectDetails.hiddenStats.scriptQuality || 50;
-                            const directorQuality = rel.projectDetails.hiddenStats.directorQuality || 50;
-                            const castingStrength = rel.projectDetails.hiddenStats.castingStrength || 50;
-	                            const packageStrength = (qualityScore * 0.45) + (scriptQuality * 0.2) + (directorQuality * 0.15) + (castingStrength * 0.2);
-	                            const runStrength = Math.max(0.5, Math.min(3, newTotal / Math.max(rel.budget, 1)));
-	                            const hasProvenIp = Boolean(rel.projectDetails.franchiseId || rel.projectDetails.universeId || rel.projectDetails.subtype === 'SEQUEL' || rel.projectDetails.subtype === 'SPINOFF' || rel.projectDetails.subtype === 'UNIVERSE_EVENT');
-	                            const campaignReach = Math.max(0.38, Math.min(1.28, rel.projectDetails.hiddenStats.campaignReachMultiplier ?? 1));
-		                            const interest = (
-	                                (packageStrength * isGenreMatch * desperation * marketDemand)
-	                                + ((rel.promotionalBuzz ?? 0) * 0.15)
-	                                + (runStrength * 12)
-	                            ) * (0.82 + (campaignReach * 0.18));
-
-                            if (interest > 60 || Math.random() > 0.7) {
-                                const bidProfile = getStreamingBidProfile(packageStrength, isSeries, runStrength);
-                                const qualityFactor = Math.max(0.85, 0.95 + ((packageStrength - 55) / 105));
-                                const baseFloorOffer = rel.budget * bidProfile.floor;
-                                const topPlatformCash = Math.max(...platforms.map(id => nextPlayer.world.platforms?.[id]?.cashReserve || 0), 1);
-                                const platformMuscle = Math.max(0.25, Math.min(1, (platformState.cashReserve || 0) / topPlatformCash));
-                                const safeMinimum = Math.max(baseFloorOffer, packageStrength < 45 ? rel.budget * 0.8 : 0);
-                                const riskAdjustedSafeMinimum = packageStrength < 45
-                                    ? Math.max(rel.budget * 0.45, safeMinimum * bidRiskMultiplier)
-                                    : safeMinimum * Math.min(1.05, bidRiskMultiplier);
-                                const floorOffer = Math.floor(Math.max(riskAdjustedSafeMinimum, baseFloorOffer * (0.96 + Math.random() * 0.1 + platformMuscle * 0.05) * bidRiskMultiplier));
-                                const qualityRange = rel.budget * (
-                                    bidProfile.floor + ((bidProfile.ceiling - bidProfile.floor) * (0.18 + Math.random() * 0.5))
-                                ) * bidRiskMultiplier;
-                                const theatricalProofOffer = newTotal
-                                    * (0.42 + Math.min(0.34, packageStrength / 290) + Math.random() * 0.12)
-	                                    * platformProfile.payoutMult
-	                                    * isGenreMatch
-	                                    * marketDemand
-	                                    * Math.max(0.82, desperation)
-	                                    * bidRiskMultiplier;
-	                                const marketOffer = rel.budget
-	                                    * (0.65 + (runStrength * 0.24))
-                                    * qualityFactor
-	                                    * platformProfile.payoutMult
-	                                    * desperation
-	                                    * isGenreMatch
-	                                    * marketDemand
-	                                    * bidRiskMultiplier;
-                                let baseOffer = Math.max(
-                                    floorOffer * (1.02 + Math.random() * 0.12),
-                                    qualityRange,
-                                    marketOffer,
-                                    theatricalProofOffer
-                                );
-
-                                // Streaming is meant to be the safest lane, so don't let platform cash quirks undercut viable projects.
-                                const platformCashCap = Math.max(
-                                    floorOffer,
-                                    platformState.cashReserve * (isSeries ? 0.78 : 0.68),
-                                    rel.budget * Math.min(
-                                        bidProfile.ceiling,
-                                        packageStrength >= 92 ? 16 : packageStrength >= 84 ? 12 : packageStrength >= 72 ? 7 : packageStrength >= 60 ? 3.5 : 1.4
-                                    ) * Math.max(0.55, bidRiskMultiplier),
-                                    newTotal * (packageStrength >= 84 ? 0.92 : packageStrength >= 72 ? 0.72 : 0.55) * Math.max(0.62, bidRiskMultiplier)
-                                );
-                                const marketProofCap = getStreamingMarketProofCap(rel.budget, packageStrength, rel.projectDetails.hiddenStats || {}, isSeries, newTotal, hasProvenIp) * Math.max(0.55, Math.min(1.05, bidRiskMultiplier));
-                                const maxOffer = Math.min(platformCashCap, rel.budget * bidProfile.ceiling, marketProofCap);
-                                baseOffer = Math.min(baseOffer, Math.max(floorOffer, maxOffer));
-
-                                const upfront = Math.floor(Math.max(floorOffer, baseOffer * (0.96 + Math.random() * 0.28)));
-                                const royalty = Math.floor(Math.random() * (isSeries ? 6 : 8)) + (isSeries ? 6 : 5); // series get slightly safer backend terms
-
-                                if (upfront > 0) {
-                                    bids.push({ platformId: pId, upfront, royalty, duration: 52 }); // 1 year contract
-                                }
-                            }
-                        });
-
-                        const minimumCompetitiveBids = Math.min(3, platforms.length);
-                        if (bids.length < minimumCompetitiveBids) {
-                            const hiddenStats = (rel.projectDetails.hiddenStats || {}) as Record<string, number>;
-                            const qualityScore = hiddenStats.qualityScore || 50;
-                            const scriptQuality = hiddenStats.scriptQuality || 50;
-                            const directorQuality = hiddenStats.directorQuality || 50;
-                            const castingStrength = hiddenStats.castingStrength || 50;
-                            const packageStrength = (qualityScore * 0.45) + (scriptQuality * 0.2) + (directorQuality * 0.15) + (castingStrength * 0.2);
-                            const runStrength = Math.max(0.5, Math.min(3, newTotal / Math.max(rel.budget, 1)));
-                            const bidProfile = getStreamingBidProfile(packageStrength, isSeries, runStrength);
-                            const hasProvenIp = Boolean(rel.projectDetails.franchiseId || rel.projectDetails.universeId || rel.projectDetails.subtype === 'SEQUEL' || rel.projectDetails.subtype === 'SPINOFF' || rel.projectDetails.subtype === 'UNIVERSE_EVENT');
-                            const marketProofCap = getStreamingMarketProofCap(rel.budget, packageStrength, rel.projectDetails.hiddenStats || {}, isSeries, newTotal, hasProvenIp);
-                            const bestExistingBid = bids.reduce((max, bid) => Math.max(max, bid.upfront), 0);
-                            const missingPlatforms = platforms.filter(pId => !bids.some(bid => bid.platformId === pId));
-
-                            missingPlatforms.some((pId, index) => {
-                                if (bids.length >= minimumCompetitiveBids) return true;
-
-                                const platformProfile = PLATFORMS[pId];
-                                const platformState = nextPlayer.world.platforms?.[pId];
-                                if (!platformState) return false;
-
-                                const floorOffer = Math.max(1_000_000, rel.budget * bidProfile.floor * Math.max(0.55, bidRiskMultiplier));
-                                const competitiveAnchor = bestExistingBid > 0
-                                    ? bestExistingBid * (0.52 + Math.random() * 0.36)
-                                    : floorOffer * (1.08 + Math.random() * 0.42);
-                                const platformCap = Math.max(
-                                    floorOffer,
-                                    platformState.cashReserve * (isSeries ? 0.72 : 0.62),
-                                    rel.budget * bidProfile.ceiling * Math.max(0.55, bidRiskMultiplier),
-                                    newTotal * (packageStrength >= 84 ? 0.82 : packageStrength >= 72 ? 0.65 : 0.48) * Math.max(0.62, bidRiskMultiplier)
-                                );
-                                const cap = Math.max(floorOffer, Math.min(platformCap, marketProofCap * Math.max(0.55, Math.min(1.05, bidRiskMultiplier))));
-                                const upfront = Math.floor(Math.max(floorOffer, Math.min(cap, competitiveAnchor * platformProfile.payoutMult)));
-
-                                bids.push({
-                                    platformId: pId,
-                                    upfront,
-                                    royalty: Math.floor(Math.random() * (isSeries ? 5 : 7)) + (isSeries ? 5 : 4),
-                                    duration: 52,
-                                });
-
-                                return false;
-                            });
-                        }
-
-                        if (bids.length === 0) {
-                            const hiddenStats = (rel.projectDetails.hiddenStats || {}) as Record<string, number>;
-                            const packageStrength = ((hiddenStats.qualityScore || 50) * 0.45)
-                                + ((hiddenStats.scriptQuality || 50) * 0.2)
-                                + ((hiddenStats.directorQuality || 50) * 0.15)
-                                + ((hiddenStats.castingStrength || 50) * 0.2);
-                            const runStrength = Math.max(0.5, Math.min(3, newTotal / Math.max(rel.budget, 1)));
-                            const bidProfile = getStreamingBidProfile(packageStrength, isSeries, runStrength);
-                            // Fallback bid should still preserve streaming as a safer release lane.
-                            bids.push({
-                                platformId: 'NETFLIX',
-                                upfront: Math.floor(rel.budget * bidProfile.floor * Math.max(0.55, bidRiskMultiplier)),
-                                royalty: isSeries ? 6 : 5,
-                                duration: 52
-                            });
-                        }
-
+                        const bids=createTheatricalStreamingBids(rel,newTotal,marketDemand,productionRisk.platformBidMultiplier);
                         const biddingRelease: ActiveRelease = {
                             ...rel,
                             ...theatricalDistributionState,
@@ -6076,9 +6094,10 @@ export const processGameWeek = async (
                     const studioCut = rel.budget * 2;
                     const netProfit = rel.totalGross - studioCut;
                     if (netProfit > 0) {
-                        const royaltyAmount = Math.floor(netProfit * (rel.royaltyPercentage / 100));
+                        const royaltyAmount = Math.max(0,Math.floor(netProfit * (rel.royaltyPercentage / 100))-(nextPlayer.world.cinemaMarket?.titles[rel.id]?.actorPaidCents || 0)/100);
                         if (royaltyAmount > 0) {
-                            addTransaction(royaltyAmount, 'ROYALTY', `Royalties: ${rel.name}`);
+                            if(!rel.actorRoyaltyPayeeId || rel.actorRoyaltyPayeeId==='PLAYER_SELF')addTransaction(royaltyAmount,'ROYALTY',`Royalties: ${rel.name}`);
+                            else nextPlayer.world=creditSignedActorBackend(nextPlayer.world,rel.actorRoyaltyPayeeId,rel.actorRoyaltyPayeeId,`final:${rel.id}:${nextPlayer.world.cinemaMarket?.clockEpoch || 0}`,royaltyAmount,getAbsoluteWeek(nextPlayer.age,nextPlayer.currentWeek));
                             logsToAdd.push({ msg: `👑 ROYALTY PAYOUT: $${royaltyAmount.toLocaleString()}`, type: 'positive' });
                         }
                     }
@@ -6621,6 +6640,55 @@ export const processGameWeek = async (
     );
     nextPlayer = streamingIndustryResult.player;
     nextPlayer.world = streamingIndustryResult.world;
+    const cinemaWeek=processCinemaMarketWeek(nextPlayer,enteredStreamingAbsoluteWeek);
+    nextPlayer=cinemaWeek.player;
+    diagnostics.onCinemaResult?.(cinemaWeek.result);
+    const exitedCinemaIds=new Set(nextPlayer.world.cinemaMarket!.weeks.at(-1)!.titles.filter(t=>t.closed).map(t=>t.titleId));
+    const cinemaFinalizedReleases:ActiveRelease[]=[];
+    for(const rel of nextPlayer.activeReleases){
+        if(!exitedCinemaIds.has(rel.id) || rel.distributionPhase!=='THEATRICAL'){cinemaFinalizedReleases.push(rel);continue;}
+        const studio=nextPlayer.businesses.find(b=>b.id===rel.projectDetails.studioId);
+        // Acting consequences reflect delivered experience and actual exposure, not producer ROI.
+        const paid=nextPlayer.world.cinemaMarket!.titles[rel.id];
+        const credits=rel.projectDetails.castList || [];
+        const playerCredits=credits.filter(c=>c.isPlayer||c.actorId==='PLAYER_SELF'||c.npcId==='PLAYER_SELF');
+        const playerActs=playerCredits.length>0;
+        const visibility=Math.max(0,...playerCredits.map(c=>CINEMA_ROLE_WEIGHTS[c.roleType || rel.roleType || 'MINOR'] || 0));
+        if(playerActs){
+            const satisfaction=paid.satisfactionAdmissions ? (paid.satisfactionScoreUnits || 0)/paid.satisfactionAdmissions/100 : null;
+            const craft=rel.productionPerformance;
+            const reach=Math.min(1,Math.log10(1+paid.firstAdmissions)/7);
+            nextPlayer.stats.fame=Math.max(0,Math.min(100,nextPlayer.stats.fame+reach*visibility*Math.max(-1,Math.min(2,(craft-55)/20))));
+            nextPlayer.stats.reputation=Math.max(0,Math.min(100,nextPlayer.stats.reputation+visibility*Math.max(-2,Math.min(2,(craft-60)/20))));
+            if(satisfaction!==null && satisfaction!==undefined && satisfaction>65)nextPlayer.stats.followers+=Math.floor(paid.firstAdmissions*.0005*reach*visibility);
+        }
+        const cinemaNewsBefore=new Set(newNews.map(n=>n.id));
+        applyStudioMarketOutcome(studio,rel,rel.totalGross+(rel.soundtrackRevenue || 0));
+        const cinemaOutcomeNews=newNews.filter(n=>!cinemaNewsBefore.has(n.id));
+        if(cinemaOutcomeNews.length)nextPlayer.news=[...cinemaOutcomeNews,...nextPlayer.news].slice(0,50);
+        logsToAdd.push({msg:`🎟️ "${rel.name}" completed its paid cinema run.`,type:'neutral'});
+        if(rel.streaming){cinemaFinalizedReleases.push({...rel,distributionPhase:'STREAMING',status:'FINISHED'});continue;}
+        if(!studio){
+            const platformId=determineStreamingAcquisition(rel.projectDetails);
+            const cost=Math.floor(rel.budget*.4*PLATFORMS[platformId].payoutMult);
+            if(cost>0 && (nextPlayer.world.platforms?.[platformId]?.cashReserve || 0)*1e6>=cost){
+                const registration=registerProductionStreamingRightsContract(nextPlayer,{sourceProjectId:rel.id,title:rel.name,projectType:'MOVIE',genre:rel.projectDetails.genre,sellerStudioId:rel.projectDetails.studioId,sellerStudioName:rel.projectDetails.studioId,sellerPartyType:'NPC_STUDIO',buyerPlatformId:platformId,minimumGuarantee:cost,platformRevenueShare:100,signedAtAbsoluteWeek:enteredStreamingAbsoluteWeek,startsAtAbsoluteWeek:enteredStreamingAbsoluteWeek,durationWeeks:52});
+                nextPlayer=registration.player;
+                if(registration.contract){
+                    const platform=nextPlayer.world.platforms![platformId];platform.cashReserve-=cost/1e6;
+                    cinemaFinalizedReleases.push({...rel,status:'FINISHED',distributionPhase:'STREAMING',streamingRevenue:(rel.streamingRevenue || 0)+cost,streamingUpfrontFee:(rel.streamingUpfrontFee || 0)+cost,streamingContractId:registration.contract.id,streaming:{platformId,contractId:registration.contract.id,weekOnPlatform:0,totalViews:0,weeklyViews:[],isLeaving:false,startWeekAbsolute:enteredStreamingAbsoluteWeek}});continue;
+                }
+            }
+            if(!nextPlayer.pastProjects.some(p=>p.id===rel.id))nextPlayer.pastProjects.push(createPastProjectArchiveSnapshot({...rel,status:'FINISHED'},{player:nextPlayer}));
+            continue;
+        }
+        const risk=calculateProductionRiskProfile(rel.projectDetails,{budget:rel.budget,imdbRating:rel.imdbRating,productionPerformance:rel.productionPerformance});
+        const bids=createTheatricalStreamingBids(rel,rel.totalGross,getProjectMarketDemand(rel.projectDetails,nextPlayer.currentWeek,studio?.studioState?.marketTrends),risk.platformBidMultiplier);
+        // Existing downstream contract authority accepts these bids; creating bids pays nothing.
+        const biddingRelease:ActiveRelease={...rel,distributionPhase:'STREAMING_BIDDING',status:'FINISHED',bids};
+        cinemaFinalizedReleases.push(studio.studioState?.operatingModel==='INDEPENDENT_LABEL' ? closeIndependentSubsidiaryStreamingDeal(biddingRelease,studio,bids) : biddingRelease);
+    }
+    nextPlayer.activeReleases=cinemaFinalizedReleases;
     nextPlayer=collectStreamingStudioRoyaltyReceipts(nextPlayer,enteredStreamingAbsoluteWeek);
     streamingIndustryResult.logs.forEach(message => logsToAdd.push({ msg: `🏢 ${message}`, type: 'neutral' }));
     const dynastyCareerResult = processDynastyCareerWeek(nextPlayer, enteredStreamingAbsoluteWeek);

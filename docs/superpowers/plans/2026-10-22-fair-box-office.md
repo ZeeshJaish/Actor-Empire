@@ -285,8 +285,8 @@ assert.deepEqual(migrateCinemaState(migrated.player, f.input.absoluteWeek).playe
 
 **Interfaces:** produce `buildCinemaWeekInput(player: Player, absoluteWeek: number): CinemaWeekInput`, `commitCinemaWeek(player: Player, result: CinemaWeekResult): CinemaCommitResult` and `processCinemaMarketWeek(player: Player, absoluteWeek: number): { player: Player; result: CinemaWeekResult }`. The commit result includes `applied: boolean`; replay returns `false`, same week/different fingerprint refuses a second settlement.
 
-- [ ] Trace order: theater currently executes before world normalization. Prepare one target-week world snapshot before any owner cinema allocation; avoid an unrelated full week-loop reorder. Collect the entire eligible slate before simulating once.
-- [ ] Write exactly-once assertions:
+- [x] Trace order: theater currently executes before world normalization. Prepare one target-week world snapshot before any owner cinema allocation; avoid an unrelated full week-loop reorder. Collect the entire eligible slate before simulating once.
+- [x] Write exactly-once assertions:
 
 ~~~ts
 const f = makeCinemaFixture('mixed-owner-slate', 23);
@@ -298,11 +298,11 @@ assert.equal(twice.applied, false);
 assert.deepEqual(twice.player, once.player);
 ~~~
 
-- [ ] Run `node scripts/run-box-office-audit.mjs integration`; route accepted roles, player studios and unsettled NPC studios through the same input/kernel/result. Retire the NPC one-shot lifetime payout for new weekly titles and synthetic competing revenue calculation. Charts consume committed results.
-- [ ] Settle ticket shares, actual due cost events, contract/actor/investor amounts, cash and summaries once in the candidate state. Preserve processed-week/save persistence order and crash recovery. No display component computes cash. Owner changes use canonical rights and the existing signed contract, not a copied second title.
-- [ ] Feed career outcomes/media/awards/rewards from the same committed facts; distinguish financial return from actor performance and audience fit. An offered-role actor cannot inherit the entire producer loss as an unexplained career penalty.
-- [ ] Test real `processGameWeek` using the mixed-owner fixture, release confirmation retries, title exit, same-week replay, reload, changed project ordering and ownership transfer. Inspect saved receipts/costs, not only formula results. Then rerun Phase 1 suites and current shared world-budget audits.
-- [ ] Checkpoint as `feat: settle cinema market once per world week`.
+- [x] Run `node scripts/run-box-office-audit.mjs integration`; route accepted roles, player studios and unsettled NPC studios through the same input/kernel/result. Retire the NPC one-shot lifetime payout for new weekly titles and synthetic competing revenue calculation. Charts consume committed results.
+- [x] Settle ticket shares, actual due cost events, contract/actor/investor amounts, cash and summaries once in the candidate state. Preserve processed-week/save persistence order and crash recovery. No display component computes cash. Owner changes use canonical rights and the existing signed contract, not a copied second title.
+- [x] Feed career outcomes/media/awards/rewards from the same committed facts; distinguish financial return from actor performance and audience fit. An offered-role actor cannot inherit the entire producer loss as an unexplained career penalty.
+- [x] Test real `processGameWeek` using the mixed-owner fixture, release confirmation retries, title exit, same-week replay, reload, changed project ordering and ownership transfer. Inspect saved receipts/costs, not only formula results. Then rerun Phase 1 suites and current shared world-budget audits.
+- [x] Checkpoint as `feat: settle cinema market once per world week`.
 
 **Phase 4 gate:** actual week-loop and persistence paths prove one result/payment. Historical NPC curves are not represented as newly paid v1 attendance.
 

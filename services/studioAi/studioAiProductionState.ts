@@ -76,15 +76,17 @@ const normalizeQuality = (value: unknown): StudioAiFinalQuality | null => {
 const normalizeResult = (value: unknown, maxAbsoluteWeek: number): StudioAiCommercialResult | null => {
     if (!value || typeof value !== 'object') return null;
     const raw = value as Partial<StudioAiCommercialResult>;
+    const settledMoney=(v:unknown)=>raw.cinemaSettlement ? Math.round(finite(v)*1e8)/1e8 : money(v);
     const outcome = raw.outcome === 'HIT' || raw.outcome === 'FLOP' ? raw.outcome : 'SOLID';
     return {
+        ...(raw.cinemaSettlement==='WEEKLY_PENDING'||raw.cinemaSettlement==='WEEKLY_CLOSED'?{cinemaSettlement:raw.cinemaSettlement}:{}),
         releasedAtAbsoluteWeek: Math.min(maxAbsoluteWeek, whole(raw.releasedAtAbsoluteWeek)),
-        theatricalGrossMillions: money(raw.theatricalGrossMillions),
+        theatricalGrossMillions: settledMoney(raw.theatricalGrossMillions),
         streamingValueMillions: money(raw.streamingValueMillions),
-        studioReceiptsMillions: money(raw.studioReceiptsMillions),
+        studioReceiptsMillions: settledMoney(raw.studioReceiptsMillions),
         productionSpendMillions: money(raw.productionSpendMillions),
         marketingSpendMillions: money(raw.marketingSpendMillions),
-        netResultMillions: Math.round(finite(raw.netResultMillions) * 1000) / 1000,
+        netResultMillions: raw.cinemaSettlement ? Math.round(finite(raw.netResultMillions)*1e8)/1e8 : Math.round(finite(raw.netResultMillions)*1000)/1000,
         rating: Math.max(1, Math.min(10, finite(raw.rating, 5))),
         outcome,
     };

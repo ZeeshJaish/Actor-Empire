@@ -1,3 +1,4 @@
+import { issueCinemaResult } from './boxOfficeIdentity';
 import { compactCinemaMarketState } from './boxOfficeHistory';
 import { buildCinemaAudienceSnapshot } from './boxOfficeAudience';
 import { allocateCinemaResources, apportionCinemaIntegers, cinemaCount, cinemaKey, cinemaSum, cinemaWeeklyWallet } from './boxOfficeMath';
@@ -108,13 +109,15 @@ export const simulateCinemaWeek = (input:CinemaWeekInput):CinemaWeekResult => {
         if(!p.seatsPerShow || !p.ticketPriceCents || p.weeklyScreenMinutes>p.screens*P.daysPerWeek*P.openingMinutesPerDay)throw new RangeError('Invalid cinema physical/price supply');
         splitRealizedCinemaGross({grossCents:0,exhibitorBasisPoints:p.exhibitorBasisPoints,distributionBasisPoints:p.distributionBasisPoints});
     }
+    const titleScreens=new Map<string,number>();
+    const exhibition:NonNullable<CinemaWeekResult['exhibition']>=[];
     const titleIndex=new Map(input.titles.map(t=>[t.id,t])),poolIndex=new Map(supply.pools.map(p=>[p.id,p]));
     const inputCohortIndex=new Map(input.cohorts.map(c=>[c.id,c]));
     for(const o of supply.offers)if(!titleIndex.has(o.titleId)||!poolIndex.has(o.poolId))throw new Error('Unknown cinema offer identity');
     supply.offers=supply.offers.filter(o=>{
         const t=titleIndex.get(o.titleId)!,pool=poolIndex.get(o.poolId)!;
         return t.market && t.market.releaseWeek<=input.absoluteWeek && t.market.countryIds.includes(pool.countryId)
-            && t.market.chainIds.includes(pool.chainId) && t.market.format===pool.format
+            && (t.market.chainIdsByCountry?.[pool.countryId] || t.market.chainIds).includes(pool.chainId) && t.market.format===pool.format
             && !input.marketState?.runs.some(r=>r.titleId===t.id && r.poolId===pool.id && r.closed);
     });
     const snapshot=buildCinemaAudienceSnapshot({...input,supply});
@@ -162,6 +165,9 @@ export const simulateCinemaWeek = (input:CinemaWeekInput):CinemaWeekResult => {
                 sold+=admissions;poolAdmissions+=admissions;r.remaining-=admissions;
                 allocations.push({titleId,cohortId:r.cohortId,poolId:pool.id,kind:r.kind as 'FIRST'|'REPEAT',admissions,priceCents:pool.ticketPriceCents,minutesPerVisit:r.minutesPerVisit,satisfaction:r.satisfaction});
             }
+            const scheduledScreens=Math.min(pool.screens,Math.ceil(showCount*(titleIndex.get(titleId)!.market!.runtimeMinutes+P.turnaroundMinutes)/(P.openingMinutesPerDay*P.daysPerWeek)));
+            titleScreens.set(titleId,(titleScreens.get(titleId)||0)+scheduledScreens);
+            exhibition.push({titleId,poolId:pool.id,shows:showCount,screens:scheduledScreens});
             const prior=runs.find(r=>r.titleId===titleId && r.poolId===pool.id);
             const releaseAge=input.absoluteWeek-titleIndex.get(titleId)!.market!.releaseWeek;
             const hadDemand=rows.some(r=>(wanted.get(r.id)||0)>0);
@@ -192,7 +198,7 @@ export const simulateCinemaWeek = (input:CinemaWeekInput):CinemaWeekResult => {
                 exhibitorReceiptsCents:cinemaSum(localSplits.map(s=>s.exhibitorReceiptsCents)),distributionDeductionsCents:cinemaSum(localSplits.map(s=>s.distributionDeductionsCents))};
         });
         const admissions=cinemaSum(rows.map(r=>r.admissions));
-        return {titleId:t.id,countries,satisfactionScore:admissions ? rows.reduce((n,r)=>n+r.admissions*r.satisfaction,0)/admissions : null,
+        return {titleId:t.id,screens:titleScreens.get(t.id)||0,countries,satisfactionScore:admissions ? rows.reduce((n,r)=>n+r.admissions*r.satisfaction,0)/admissions : null,
             firstAdmissions:cinemaSum(rows.filter(r=>r.kind==='FIRST').map(r=>r.admissions)),repeatAdmissions:cinemaSum(rows.filter(r=>r.kind==='REPEAT').map(r=>r.admissions)),
             deferredPeople:cinemaSum(snapshot.choices.filter(r=>r.titleId===t.id && r.kind==='DEFER').map(r=>r.interestedPeople)),
             grossCents:cinemaSum(splits.map(s=>s.grossCents)),producerReceiptsCents:cinemaSum(splits.map(s=>s.producerReceiptsCents)),
@@ -232,8 +238,8 @@ export const simulateCinemaWeek = (input:CinemaWeekInput):CinemaWeekResult => {
         affinities:input.marketState?.affinities || [],runs},new Set([...snapshot.titles,...retained].map(t=>t.titleId)));
     cohorts.forEach(c=>{c.unspentCents=c.walletCents-c.spentCents;if(c.unspentCents<0||c.usedMinutes>c.leisureMinutes)throw new Error('Cinema resource conservation failed')});
     for(const s of supplyRows)if(s.admissions>s.seats||s.usedScreenMinutes>s.availableScreenMinutes)throw new Error('Cinema physical conservation failed');
-    return {absoluteWeek:input.absoluteWeek,tuningVersion:input.tuningVersion,mode:'SHADOW',inputFingerprint:fingerprint(input),titles,cohorts,supply:supplyRows.sort((a,b)=>a.poolId.localeCompare(b.poolId)),
+    return issueCinemaResult({absoluteWeek:input.absoluteWeek,tuningVersion:input.tuningVersion,mode:input.live?'LIVE':'SHADOW',...(input.live?{live:{...input.live}}:{}),inputFingerprint:fingerprint(input),titles,cohorts,supply:supplyRows.sort((a,b)=>a.poolId.localeCompare(b.poolId)),
         allocations:allocations.sort((a,b)=>a.titleId.localeCompare(b.titleId)||a.cohortId.localeCompare(b.cohortId)||a.poolId.localeCompare(b.poolId)||a.kind.localeCompare(b.kind)),
-        costEvents:costEvents.sort((a,b)=>a.id.localeCompare(b.id)),nextState:{...compact,titles:[...compact.titles].sort((a,b)=>a.titleId.localeCompare(b.titleId)),
-            runs:[...compact.runs].sort((a,b)=>a.titleId.localeCompare(b.titleId)||a.poolId.localeCompare(b.poolId))}};
+        exhibition, costEvents:costEvents.sort((a,b)=>a.id.localeCompare(b.id)),nextState:{...compact,titles:[...compact.titles].sort((a,b)=>a.titleId.localeCompare(b.titleId)),
+            runs:[...compact.runs].sort((a,b)=>a.titleId.localeCompare(b.titleId)||a.poolId.localeCompare(b.poolId))}});
 };
