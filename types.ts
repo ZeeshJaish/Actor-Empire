@@ -1,5 +1,7 @@
 
 
+import type { CinemaExposureRecord } from './services/boxOffice/boxOfficeTypes';
+
 // Enums & Basic Types
 export enum Page {
   HOME = 'HOME',
@@ -2805,6 +2807,8 @@ export interface ProjectDetails {
     castList?: CastMember[];
     /** Protect authored casting from the legacy offered-package repair. */
     castPackageSource?: 'AUTHORED' | 'OFFER_GENERATED';
+    /** Dated public exposure only; private package previews contain no events. */
+    cinemaExposure?: CinemaExposureRecord;
     backgroundCastingPlan?: BackgroundCastingPlan;
     crewList?: CrewMember[]; // NEW: Crew roster
     location?: LocationDetails; // NEW: Filming location
@@ -7322,6 +7326,7 @@ export interface PastProject {
     releaseRegionIds?: BoxOfficeRegionId[];
     releaseChainSelections?: Partial<Record<BoxOfficeRegionId, CinemaChainId[]>>;
     boxOfficeArchiveVersion?: number;
+    cinemaExposure?: CinemaExposureRecord;
     baseTheatricalWeeks?: number;
     theatricalExtensionWeeks?: number;
     theatricalExtensionHistory?: TheatricalExtensionDecision[];

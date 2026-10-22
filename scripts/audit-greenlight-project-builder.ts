@@ -156,6 +156,11 @@ const projectInput: BuildGreenlightProjectInput = {
 };
 const project = buildGreenlightProject(projectInput);
 
+assert.ok(project.newCommitment.projectDetails?.cinemaExposure, 'Greenlight must distinguish attention potential from actual public exposure');
+assert.equal(project.newCommitment.projectDetails.cinemaExposure.events.length, 0, 'A private package build must not announce itself');
+assert.deepEqual(buildGreenlightProject({...projectInput,currentEstimatedBuzz:100,random:()=>0.99}).newCommitment.projectDetails!.cinemaExposure,
+    project.newCommitment.projectDetails.cinemaExposure,'Legacy buzz and hidden quality variance cannot leak into package attention or exposure');
+
 assert.equal(project.newCommitment.id, 'proj_1234');
 assert.equal(project.newCommitment.projectPhase, 'PRE_PRODUCTION');
 assert.equal(project.newCommitment.phaseWeeksLeft, 7);
@@ -212,6 +217,7 @@ assert.equal(funding.fundingResult.studioSpend, 1_000_000);
 assert.equal(funding.newProductionFund, 0);
 assert.equal(funding.newStudioBalance, 19_000_000);
 assert.equal(funding.fundedCommitment.projectDetails?.hiddenStats?.studioCashAtRisk, 1_000_000);
+assert.equal(funding.fundedCommitment.projectDetails?.cinemaExposure?.events.length,1,'Actual public Greenlight creates one identified announcement');
 
 const buzz = buildGreenlightBuzz({
     player,

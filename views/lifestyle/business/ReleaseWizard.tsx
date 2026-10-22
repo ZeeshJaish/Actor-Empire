@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { commitCinemaReleaseExposure } from '../../../services/boxOffice/boxOfficeExposureAdapters';
 import { Player, PendingEvent, ScreeningStrategy, ProjectHiddenStats, NextSeasonFundingTier, CampaignPositioning, CampaignTimeline, MarketingChannelAllocations, MarketingChannelId, BoxOfficeRegionId, CinemaChainId, CinemaChain, CinemaChainRegionalTerms, ReleasePlanningDraft, StreamingBiddingSession, StreamingOfferVersion, PlatformId } from '../../../types';
 import { FESTIVALS, CALENDAR_EVENTS } from '../../../services/worldLogic';
 import { mergeUniverseRosterWithProject, normalizeUniverseMap } from '../../../services/universeLogic';
@@ -1536,6 +1537,14 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                     }
                 } : undefined
             };
+        }
+
+        const savedRelease = updatedPlayer.commitments[commitmentIndex];
+        if (releaseType === 'THEATRICAL' && savedRelease?.projectDetails) {
+            updatedPlayer.commitments[commitmentIndex] = { ...savedRelease, projectDetails: commitCinemaReleaseExposure({
+                player: updatedPlayer, project: savedRelease.projectDetails, titleId: savedRelease.id,
+                absoluteWeek: currentAbsoluteWeek, allocations: normalizedChannelMix.allocations,
+            }) };
         }
 
         // Update Universe Stats if applicable

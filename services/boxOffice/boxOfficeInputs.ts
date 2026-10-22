@@ -3,6 +3,7 @@ import { NPC_DATABASE, isCastableActor } from '../npcLogic';
 import { createDeterministicRng } from '../deterministicRandom';
 import { buildCinemaDeliveryInput } from './boxOfficeDelivery';
 import { CINEMA_ROLE_WEIGHTS } from './boxOfficeProfiles';
+import { readCinemaExposureRecord } from './boxOfficeAwareness';
 import type { CinemaOwnerRef, CinemaTitleInput } from './boxOfficeTypes';
 
 const score = (value: unknown, fallback = 0): number => (
@@ -32,6 +33,7 @@ export const normalizeCinemaTitle = ({ titleId, owner, project, player }: {
         if (!existing || roleWeight > existing.roleWeight) {
             people.set(canonicalId, { personId: canonicalId, name: member.actorName || member.name,
                 roleType, roleWeight, fame: anonymous ? 0 : isPlayer ? score(player.stats.fame) : score(actors.get(personId)?.stats?.fame),
+                stature: anonymous || isPlayer ? 0 : ({ ICON:100,A_LIST:85,ESTABLISHED:60,RISING:30,INDIE:15,UNKNOWN:0 }[actors.get(personId)?.tier || 'UNKNOWN']),
                 isPlayer, characterIds });
         } else existing.characterIds = characterIds;
     }
@@ -42,7 +44,8 @@ export const normalizeCinemaTitle = ({ titleId, owner, project, player }: {
     const playerDirected = directorId === 'PLAYER_SELF' || project.crewList?.some(c => c.role === 'DIRECTOR' && c.isPlayer);
     return { id: titleId, owner: { ...owner }, projectType: project.type, genre: project.genre, budgetCents,
         cast: [...people.values()].sort((a, b) => a.personId.localeCompare(b.personId)), directorId,
-        playerCredited: Boolean(playerDirected || people.has('PLAYER_SELF')), delivery: buildCinemaDeliveryInput(project) };
+        playerCredited: Boolean(playerDirected || people.has('PLAYER_SELF')), delivery: buildCinemaDeliveryInput(project),
+        ...(project.cinemaExposure ? { exposure: readCinemaExposureRecord(project) } : {}) };
 };
 
 /** Only offered packages with an absent/legacy player-only ensemble are reconstructed.

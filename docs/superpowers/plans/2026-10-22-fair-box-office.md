@@ -173,8 +173,8 @@ assert.ok(Object.values(split).every(Number.isSafeInteger));
 
 **Interfaces:** produce `buildCinemaExposure(input: CinemaExposureInput): CinemaExposureResult` and `projectCinemaForecastInput(input: CinemaWeekInput, known: CinemaKnownInputs): CinemaWeekInput`. Exposure input carries bounded cohort recognition/history and dated, identified paid/organic/local source events; output carries attention potential, aware counts and source attribution. `CinemaKnownInputs` carries visible package data and quality ranges, excluding hidden final quality.
 
-- [ ] Add fixtures `wide-unknown`, `narrow-unknown`, `two-stars-weak`, `healthy-new-studio`, repeated campaign source IDs and overlapping fans. Keep cohort awareness/interest identical in wide/narrow fixtures; their capacity is non-binding.
-- [ ] Write the leakage and exposure assertions:
+- [x] Add fixtures `wide-unknown`, `narrow-unknown`, `two-stars-weak`, `healthy-new-studio`, repeated campaign source IDs and overlapping fans. Keep audience inputs identical in wide/narrow fixtures; supply is absent from exposure and its later non-binding-capacity admission invariant remains a Task 6 gate.
+- [x] Write the leakage and exposure assertions:
 
 ~~~ts
 const f = makeCinemaFixture('wide-unknown', 8);
@@ -186,12 +186,14 @@ assert.deepEqual(a, b);
 assert.equal(a.knowledge, 'FORECAST');
 ~~~
 
-- [ ] Run `node scripts/run-box-office-audit.mjs awareness`; confirm missing separation fails, then add fame/tier recognition, role-weighted deduplication and earned favorite/studio trust. New-studio brand health cannot seed established global recognition. Streaming brand is a channel/access signal, not ticket buyers.
-- [ ] Implement the qualified-impression saturation rule in the shared contracts. Actor recognition can produce organic exposure with zero paid spend. Local cinema discovery uses bounded real footfall; screen count is never direct worldwide awareness. Keep paid/organic channel overlap and one event/one application.
-- [ ] Persist exposure events only on real announcements/promotions/spend commitments. Greenlight private previews are read-only. Replace raw buzz inputs with attention potential, current country awareness and forecast intent fields; retain a migration reader for old raw hype, with estimated-source labeling rather than 100% awareness.
-- [ ] Verify no-budget marketing, marketing saturation, duplicate sources, cameo versus lead and misleading expectations. Run `npm run audit:streaming-launch-marketing-forecast` and `npm run audit:streaming-launch-marketing-lifecycle` to ensure reuse did not alter platform economics. Checkpoint as `feat: model film awareness from actual exposure`.
+- [x] Run `node scripts/run-box-office-audit.mjs awareness`; reproduce missing separation in actual Greenlight construction, then add fame/tier recognition, role-weighted deduplication and experience-gated favorite/studio-trust inputs. Formation of earned affinity belongs to Task 5. New-studio health cannot seed global recognition. Streaming brand is a channel/access signal, not ticket buyers.
+- [x] Implement qualified-impression saturation. A real public announcement can create bounded organic exposure with zero paid spend, frozen from recognition at that announcement. Local discovery requires actual footfall in the contract; live emission waits for Task 6's real supply facts. Screen count is never awareness. Keep channel overlap and one source/one application.
+- [x] Persist source events at public Greenlight, paid theatrical release confirmation and actual career publications. Private builders/previews are read-only. Add distinct package-attention, country/cohort exposure and quality-safe forecast inputs, plus a labeled legacy-hype reader. Existing buzz/money UI compatibility remains until Tasks 8/9; intent numbers are not invented before the shared price/choice kernel exists.
+- [x] Verify zero-paid-spend announcements, saturation, replay/JSON/compaction, cameo/lead, hidden-quality exclusion, inherited reputation and actual succession clock rebasing. Run both streaming launch-marketing parity audits. Checkpoint as `feat: model film awareness from actual exposure` after the final type/build and review gates pass.
 
 **Phase 2 gate:** worldwide footprint does not mint awareness; all three readings have distinct units and source truth. No hidden-quality leakage or repeated fame payout.
+
+**Phase 2 execution boundary:** attention is an index; awareness is a population-bounded modeled people estimate reconstructed from dated sources; forecast quality is an explicit visible range. Theater-intent/admission forecasts wait for Tasks 5/6/9. No live tickets, customer money, earned affinity formation or audience-market state is activated here. Tasks 7/8 must persist per-cohort awareness/applied-source history before live use: the Phase 2 read-only estimate must not replay old recognition against population growth as new committed viewers. See [Phase 2 evidence](../../reports/2026-10-22-box-office-phase2/README.md).
 
 ## Phase 3 — Build the market in shadow
 

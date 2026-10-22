@@ -1,0 +1,247 @@
+{
+  "date": "2026-10-22",
+  "baselineCommit": "849cf7d",
+  "phase2Cases": 28,
+  "phase1RegressionCases": 47,
+  "results": [
+    {
+      "suite": "awareness",
+      "command": "node scripts/run-box-office-audit.mjs awareness",
+      "exitCode": 0,
+      "output": "PASS private unknown packages have no audience and footprint alone changes nothing\nPASS a public star announcement creates bounded organic awareness with no paid campaign\nPASS healthy new-studio scores cannot create established recognition\nPASS paid reach saturates the existing audience with declining marginal growth\nPASS duplicate events apply once and conflicting duplicate identities are rejected\nPASS source order is stable and new sources only reach the still-unaware population\nPASS many duplicate actor credits never create extra fans\nPASS cameo recognition is smaller than a meaningful lead credit\nPASS favorites and studio trust require actual experience evidence\nPASS repeat announcements do not pay out the same actor recognition again\nPASS a real announcement can reach a new country once without re-paying recognition elsewhere\nPASS committed announcement recognition is frozen rather than re-valued from later fame\nPASS local discovery requires real local footfall, independent of screens\nPASS future events, unpaid campaigns and legacy hype do not become actual exposure\nPASS streaming promotion is bounded by actual accessible reach, not subscribers\nPASS exposure event commits are immutable, idempotent and survive JSON reload\nPASS malformed counts and duplicate cohort identities cannot mint people\nPASS forecast projection uses only known quality and creates no history",
+      "warnings": "",
+      "durationMs": 272,
+      "groupedCases": 18
+    },
+    {
+      "suite": "phase2-integration",
+      "command": "node scripts/run-box-office-audit.mjs phase2-integration",
+      "exitCode": 0,
+      "output": "PASS private package and world-aware forecast create no public exposure or save mutation\nPASS actual Greenlight funding emits one dated announcement with frozen recognition\nPASS inherited studio careers retain conservative recognition without duplicating archived titles\nPASS actual succession rebases public-source dates for live commitments and releases without reannouncing\nPASS paid campaign exposure requires recorded committed marketing cost\nPASS release campaign records exact spend once and selected countries limit its paid reach\nPASS real career publication records exposure once without paying again or leaking to another title\nPASS real release, persistence and completed archive preserve public-source identities\nPASS studio-owned films use the same actual career-promotion source path\nPASS series keep their existing release and promotion behavior",
+      "warnings": "",
+      "durationMs": 3761,
+      "groupedCases": 10
+    },
+    {
+      "suite": "inputs",
+      "command": "node scripts/run-box-office-audit.mjs inputs",
+      "exitCode": 0,
+      "output": "PASS accepted offer contains the package ensemble, not only the player\nPASS old singleton is repaired deterministically without mutating the offer\nPASS duplicate actor IDs do not add fame\nPASS an uncredited player contributes neither fame nor acting talent\nPASS universe offer keeps its template studio\nPASS authored casting is not padded and canonical people keep their characters\nPASS custom actor IDs resolve through relationships without inventing fame\nPASS duplicate player rows cannot stand in for missing co-stars\nPASS canonical custom actor fame is retained without a global database entry",
+      "warnings": "",
+      "durationMs": 264,
+      "groupedCases": 9
+    },
+    {
+      "suite": "delivery",
+      "command": "node scripts/run-box-office-audit.mjs delivery",
+      "exitCode": 0,
+      "output": "PASS max equipment cannot turn ordinary craft into a perfect film\nPASS equipment has diminishing returns\nPASS zero craft is not silently replaced with average craft\nPASS fame does not substitute for acting craft\nPASS generated cash budgets match every declared tier including blockbuster\nPASS identical cash/package cannot change risk when only a tier label changes\nPASS one dollar across $120M does not create a ticket-earnings cliff\nPASS legacy dynamic ceiling uses continuous cash inputs instead of labels\nPASS event and sleeper opening bonuses remain continuous across $35M and $90M\nPASS blockbuster fallback has the actual offered ensemble and stable credits\nPASS sleeper week-two and later retention do not cliff at $90M",
+      "warnings": "",
+      "durationMs": 264,
+      "groupedCases": 11
+    },
+    {
+      "suite": "finance",
+      "command": "node scripts/run-box-office-audit.mjs finance",
+      "exitCode": 0,
+      "output": "PASS final ticket gross is capped before shares are allocated\nPASS already realized gross is not transformed into demand again\nPASS unavailable cinema selections cannot create unallocated ticket money",
+      "warnings": "",
+      "durationMs": 204,
+      "groupedCases": 3
+    },
+    {
+      "suite": "finance-contracts",
+      "command": "node scripts/run-box-office-audit.mjs finance-contracts",
+      "exitCode": 0,
+      "output": "PASS integer cents split odd amounts exactly\nPASS safe-integer large gross does not overflow share multiplication\nPASS invalid money/shares cannot enter the ledger\nPASS player dollars and NPC millions have distinct exact adapters\nPASS ledger deduplicates actual cost events and separates gross from profit\nPASS conflicting duplicate events are rejected instead of overwritten\nPASS hybrid producer receipts add media without counting actor earnings\nPASS a recorded zero receipt remains zero, with later streaming added\nPASS legacy receipts are explicitly estimated and quotes are not paid costs\nPASS combined signed profit cannot overflow safe integer cents\nPASS funded production does not hide the studios paid marketing exposure\nPASS unknown ledger categories are rejected rather than losing money silently",
+      "warnings": "",
+      "durationMs": 91,
+      "groupedCases": 12
+    },
+    {
+      "suite": "phase1-integration",
+      "command": "node scripts/run-box-office-audit.mjs phase1-integration",
+      "exitCode": 0,
+      "output": "PASS actual release reads both cast ID formats and preserves source save\nPASS actual cap-week shares and investor ledger reconciliation\nPASS actual self-director credit does not invent a player acting performance\nPASS actual custom actor fame survives release normalization\nPASS actual Greenlight funding and returned reserve reconcile studio ROI\nPASS actual investor and production-fund package financing is charged once after reserve refund\nPASS actual save migration preserves missing receipts, explicit zero and repeat-load provenance\nPASS legacy active receipts retain their provenance through a real new week, reload and completed archive\nPASS actual mixed streaming royalty and soundtrack receipts reconcile investor deductions in studio-sale earnings",
+      "warnings": "",
+      "durationMs": 4181,
+      "groupedCases": 9
+    },
+    {
+      "suite": "finance-ui",
+      "command": "node scripts/run-box-office-audit.mjs finance-ui",
+      "exitCode": 0,
+      "output": "PASS actual finance card render, collected-receipt ROI, legacy estimate label and save immutability\nPASS production-house active and library routes retain actual finance through dashboard render\nPASS archived release detail adapter preserves missing receipt estimates and genuine zero without actor-pay fallback",
+      "warnings": "The width(-1) and height(-1) of chart should be greater than 0,\n       please check the style of container, or the props width(100%) and height(100%),\n       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the\n       height and width.\nThe width(-1) and height(-1) of chart should be greater than 0,\n       please check the style of container, or the props width(100%) and height(100%),\n       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the\n       height and width.\nThe width(-1) and height(-1) of chart should be greater than 0,\n       please check the style of container, or the props width(100%) and height(100%),\n       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the\n       height and width.\nThe width(-1) and height(-1) of chart should be greater than 0,\n       please check the style of container, or the props width(100%) and height(100%),\n       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the\n       height and width.",
+      "durationMs": 520,
+      "groupedCases": 3
+    },
+    {
+      "suite": "audit:greenlight-project-builder",
+      "command": "npm run audit:greenlight-project-builder",
+      "exitCode": 0,
+      "output": "> pr-6.6.3@1.0.25 audit:greenlight-project-builder\n> esbuild scripts/audit-greenlight-project-builder.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-greenlight-project-builder.mjs && node /tmp/audit-greenlight-project-builder.mjs\n\nGreenlight project builder audit passed: package, funding, and launch buzz preserve their core outputs.\nGreenlight contract lifecycle passed: one use per project, zero extra salary, last use retains unpaid EMI.\nFull talent flow passed: immutable signing -> zero cast salary -> funded Greenlight -> last use -> verified save preparation -> EMI after exhaustion -> migration/reload.",
+      "warnings": "../../../tmp/audit-greenlight-project-builder.mjs  10.2mb \u26a0\ufe0f\n\n\u26a1 Done in 96ms",
+      "durationMs": 3021
+    },
+    {
+      "suite": "audit:greenlight-calculations",
+      "command": "npm run audit:greenlight-calculations",
+      "exitCode": 0,
+      "output": "> pr-6.6.3@1.0.25 audit:greenlight-calculations\n> esbuild scripts/audit-greenlight-calculations.ts --bundle --platform=node --format=esm --outfile=/tmp/audit-greenlight-calculations.mjs && node /tmp/audit-greenlight-calculations.mjs\n\nGreenlight calculation audit passed.",
+      "warnings": "../../../tmp/audit-greenlight-calculations.mjs  11.1kb\n\n\u26a1 Done in 4ms",
+      "durationMs": 123
+    },
+    {
+      "suite": "audit:streaming-launch-marketing-forecast",
+      "command": "npm run audit:streaming-launch-marketing-forecast",
+      "exitCode": 0,
+      "output": "> pr-6.6.3@1.0.25 audit:streaming-launch-marketing-forecast\n> esbuild scripts/audit-streaming-launch-marketing-forecast.ts --bundle --platform=node --format=esm --outfile=/tmp/audit-streaming-launch-marketing-forecast.mjs && node /tmp/audit-streaming-launch-marketing-forecast.mjs\n\nStreaming launch marketing forecast audit passed.",
+      "warnings": "../../../tmp/audit-streaming-launch-marketing-forecast.mjs  20.6kb\n\n\u26a1 Done in 5ms",
+      "durationMs": 139
+    },
+    {
+      "suite": "audit:streaming-launch-marketing-lifecycle",
+      "command": "npm run audit:streaming-launch-marketing-lifecycle",
+      "exitCode": 0,
+      "output": "> pr-6.6.3@1.0.25 audit:streaming-launch-marketing-lifecycle\n> esbuild scripts/audit-streaming-launch-marketing-lifecycle.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-streaming-launch-marketing-lifecycle.mjs && node /tmp/audit-streaming-launch-marketing-lifecycle.mjs\n\nStreaming launch marketing lifecycle audit passed.",
+      "warnings": "../../../tmp/audit-streaming-launch-marketing-lifecycle.mjs  433.7kb\n\n\u26a1 Done in 41ms",
+      "durationMs": 250
+    },
+    {
+      "suite": "audit:project-promotion-attribution-c7",
+      "command": "npm run audit:project-promotion-attribution-c7",
+      "exitCode": 0,
+      "output": "> pr-6.6.3@1.0.25 audit:project-promotion-attribution-c7\n> esbuild scripts/audit-project-promotion-attribution-c7.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-project-promotion-attribution-c7.mjs && node /tmp/audit-project-promotion-attribution-c7.mjs\n\nC7 project promotion attribution audit passed.",
+      "warnings": "../../../tmp/audit-project-promotion-attribution-c7.mjs  4.7mb \u26a0\ufe0f\n\n\u26a1 Done in 53ms",
+      "durationMs": 268
+    },
+    {
+      "suite": "audit:project-promotion-integration-c7",
+      "command": "npm run audit:project-promotion-integration-c7",
+      "exitCode": 0,
+      "output": "> pr-6.6.3@1.0.25 audit:project-promotion-integration-c7\n> esbuild scripts/audit-project-promotion-integration-c7.tsx --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-project-promotion-integration-c7.mjs && node /tmp/audit-project-promotion-integration-c7.mjs\n\nC7 project promotion integration audit passed.",
+      "warnings": "../../../tmp/audit-project-promotion-integration-c7.mjs  916b \n\n\u26a1 Done in 2ms",
+      "durationMs": 128
+    },
+    {
+      "suite": "audit:legacy-inheritance",
+      "command": "npm run audit:legacy-inheritance",
+      "exitCode": 0,
+      "output": "> pr-6.6.3@1.0.25 audit:legacy-inheritance\n> esbuild scripts/audit-legacy-inheritance.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-legacy-inheritance.mjs && node /tmp/audit-legacy-inheritance.mjs\n\nLegacy inheritance audit passed.",
+      "warnings": "../../../tmp/audit-legacy-inheritance.mjs  6.1mb \u26a0\ufe0f\n\n\u26a1 Done in 75ms",
+      "durationMs": 745
+    },
+    {
+      "suite": "audit:save-migration",
+      "command": "npm run audit:save-migration",
+      "exitCode": 0,
+      "output": "> pr-6.6.3@1.0.25 audit:save-migration\n> esbuild scripts/audit-save-migration.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-save-migration.mjs && node /tmp/audit-save-migration.mjs\n\nSave migration audit passed.",
+      "warnings": "../../../tmp/audit-save-migration.mjs  6.1mb \u26a0\ufe0f\n\n\u26a1 Done in 68ms",
+      "durationMs": 3964
+    },
+    {
+      "suite": "audit:save-generations",
+      "command": "npm run audit:save-generations",
+      "exitCode": 0,
+      "output": "> pr-6.6.3@1.0.25 audit:save-generations\n> esbuild scripts/audit-save-generations.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-save-generations.mjs && node /tmp/audit-save-generations.mjs\n\nSave generation audit passed.",
+      "warnings": "../../../tmp/audit-save-generations.mjs  383.4kb\n\n\u26a1 Done in 33ms",
+      "durationMs": 206
+    }
+  ],
+  "sourceSha256": {
+    "package.json": "fa4c6522abbd04b16b3c9e6944024844f9ed8c1d3e009903910e54baf833085e",
+    "scripts/audit-greenlight-project-builder.ts": "6642c2eab21cff3d4c4fef731a57ed6cab49f1da1dd3f718ce6f3965035d39c5",
+    "scripts/fixtures/boxOfficeScenarios.ts": "d5349e43f455cfb65cadcb91fd49878d23ed58c30667a3991c0ba81bc42c587e",
+    "scripts/run-box-office-audit.mjs": "72ef3a6b54dd9c861362ccab889c96f6d3247d51fb7e6e474d0d676f5174c30c",
+    "scripts/audit-box-office-awareness.ts": "270d65a5739a4ec278941d3828593c3b1a7c7e10092afece1ae6c12bc404f6db",
+    "scripts/audit-box-office-phase2-integration.ts": "2e5d49804b78b719f6162a3227914503b87ce89bb06795382bfd25a16ad95f47",
+    "services/boxOffice/boxOfficeInputs.ts": "0bdeb1c1b126f2e203f7e00c1e357aa37f642a724b6aed05de45ecb0136207cf",
+    "services/boxOffice/boxOfficeProfiles.ts": "2303697e986c98b5a0a72a4ae082b20beab0476e68a0545ec7a9dd2be6250f0c",
+    "services/boxOffice/boxOfficeTypes.ts": "62dcc5ca79ada717e4d4781e3a4d48cfdec415dc4f4197c2d186e2675d04689b",
+    "services/boxOffice/boxOfficeAwareness.ts": "fa716254061b8ca63430ef2ec6e360aa3d38d99e3696087388a78289d34876a8",
+    "services/boxOffice/boxOfficeExposureAdapters.ts": "1636bdfe8179ad9f159dffa9c8d6ef3d557063bbd57889f87d214689426e9c94",
+    "services/gameLoop.ts": "253d80bb7fe89c2116cc7ed18c78c6c99c86c0e76e85cda07f19901c97e4e014",
+    "services/legacyLogic.ts": "113725ca6254b58191fa9a33df48c9e5a9e5220f44e0741219338a5c43b63a8e",
+    "services/projectPromotionAttribution.ts": "14a468d55d6ca1378517dc72bfabf3a99c1fe4196ab64cefb118cb4bbcd61014",
+    "types.ts": "5a2510c96002d59b480ce0dee60297c88103c608de7d4012d068c7af3bf16355",
+    "views/lifestyle/business/ReleaseWizard.tsx": "16f87b84adfd5b6777df570a8de516fb0d4c1a482560bd32e1f1420c6495399e",
+    "views/lifestyle/business/greenlightProjectBuilder.ts": "aa8fad9b7e7c3da7b9052741fa74190e28b266975d4080202e92c341407a4429"
+  },
+  "validation": {
+    "typescript": {
+      "command": "npm run lint",
+      "exitCode": 0
+    },
+    "build": {
+      "command": "npm run build",
+      "exitCode": 0,
+      "seconds": 18.07,
+      "notices": [
+        "Existing large-bundle warning",
+        "Browserslist database age notice"
+      ]
+    },
+    "whitespace": {
+      "command": "git diff --cached --check (Phase 2 owned paths only)",
+      "exitCode": 0
+    },
+    "frozenEnglish": {
+      "exitCode": 0,
+      "frozenKeys": 8173,
+      "deterministicReactionCases": 14720,
+      "baselineRecaptured": false
+    }
+  },
+  "preservation": {
+    "phase1EvidenceUnchanged": [
+      "docs/reports/2026-10-22-box-office-phase1/README.md",
+      "docs/reports/2026-10-22-box-office-phase1/baseline-audit-failures.json",
+      "docs/reports/2026-10-22-box-office-phase1/task1-verification.json",
+      "docs/reports/2026-10-22-box-office-phase1/task2-verification.json",
+      "docs/reports/2026-10-22-box-office-phase1/verification.json"
+    ],
+    "frozenEnglishBaselineUnchanged": true,
+    "phase2CommitDoesNotModifyStreamingCustomerAuthorities": true
+  },
+  "review": {
+    "mode": "Independent read-only source/probe review",
+    "verdict": "No remaining Critical or Important issues within Phase 2 scope",
+    "repairs": [
+      "Inherited studio career recognition includes deduplicated inherited library",
+      "Live inherited exposure dates rebased with age-clock shift while identities and parent archive remain intact"
+    ]
+  },
+  "redEvidence": {
+    "actualGreenlightPrivatePackage": "Missing attention/exposure separation assertion failed before adapter integration",
+    "awareness": [
+      "Regional announcement incorrectly blocked a new country",
+      "Previously committed recognition revalued from later fame"
+    ],
+    "integration": [
+      "Unpaid proposed campaign could generate paid exposure",
+      "Publication had no exposure/replay bridge",
+      "Studio-owned movie excluded from publication path",
+      "Inherited studio recognition reset to zero",
+      "Actual succession retained event week1527 instead of903",
+      "Modeled paid impressions lacked estimated provenance"
+    ]
+  },
+  "scope": {
+    "phase": 2,
+    "newTicketMarketActive": false,
+    "newStreamingCustomerEconomicsActive": false,
+    "awarenessBasis": "Recomputed modeled estimate from dated source history and current cohorts; not a committed unique-viewer ledger",
+    "liveActivationPrerequisite": "Tasks7/8 must persist per-cohort awareness and applied-source history before ticket settlement",
+    "fullIntentAndUIReplacement": "Tasks5/6/9",
+    "physicalDevicePerformanceCertified": false,
+    "browserInteractionsVerified": false
+  },
+  "concurrentWork": "Unrelated streaming edits are preserved and excluded from Phase 2 staging. Final audits/type/build/English checks passed on the isolated Phase 2 snapshot.",
+  "verificationBasis": {
+    "baselineCommit": "849cf7d",
+    "method": "Isolated git archive plus only Phase 2 owned files",
+    "dependencyRuntime": "Existing workspace node_modules; package dependencies unchanged",
+    "sharedCheckoutCertified": false
+  }
+}

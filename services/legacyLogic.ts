@@ -53,6 +53,16 @@ export const getStreamingWeeksUntilStart = (
     return typeof streaming.startWeekAbsolute === 'number' ? 1 : 0;
 };
 
+/** Source identities remain stable; only the live inherited copy changes age-clock basis. */
+const rebaseInheritedCinemaExposure = (source: any, clockShift: number) => {
+    const exposure = source?.cinemaExposure;
+    if (!exposure || !Array.isArray(exposure.events)) return { ...source };
+    return { ...source, cinemaExposure: { ...exposure, events: exposure.events.map((event: any) => ({ ...event,
+        absoluteWeek: typeof event.absoluteWeek === 'number' && Number.isFinite(event.absoluteWeek)
+            ? Math.max(0, Math.round(event.absoluteWeek + clockShift)) : event.absoluteWeek,
+    })) } };
+};
+
 const rebaseInheritedActiveReleaseTiming = (
     release: any,
     parentAge: number,
@@ -70,16 +80,16 @@ const rebaseInheritedActiveReleaseTiming = (
             : undefined;
     };
 
-    const next = { ...release };
+    const next = rebaseInheritedCinemaExposure(release, clockShift);
     const releasedAtAbsoluteWeek = shiftAbsoluteWeek(release?.releasedAtAbsoluteWeek);
     if (releasedAtAbsoluteWeek !== undefined) next.releasedAtAbsoluteWeek = releasedAtAbsoluteWeek;
 
     if (release?.projectDetails && typeof release.projectDetails === 'object') {
         const projectReleasedAtAbsoluteWeek = shiftAbsoluteWeek(release.projectDetails.releasedAtAbsoluteWeek);
-        next.projectDetails = {
+        next.projectDetails = rebaseInheritedCinemaExposure({
             ...release.projectDetails,
             ...(projectReleasedAtAbsoluteWeek !== undefined ? { releasedAtAbsoluteWeek: projectReleasedAtAbsoluteWeek } : {}),
-        };
+        }, clockShift);
     }
 
     if (release?.streaming && typeof release.streaming === 'object') {
@@ -298,7 +308,12 @@ export const buildLegacyStudioInheritance = (
         ));
     const inheritedStudioCommitments = (player.commitments || [])
         .filter((commitment: any) => commitment?.projectDetails?.studioId && studioIdSet.has(String(commitment.projectDetails.studioId)))
-        .map(commitment => rewritePlayerSelfReferencesForLegacyParent(commitment, parentActor));
+        .map(commitment => {
+            const inherited = rewritePlayerSelfReferencesForLegacyParent(commitment, parentActor);
+            return typeof options.heirAge === 'number' && inherited.projectDetails
+                ? { ...inherited, projectDetails: rebaseInheritedCinemaExposure(inherited.projectDetails, targetAbsoluteWeek - sourceAbsoluteWeek) }
+                : inherited;
+        });
     const legacyPastProjects = (player.pastProjects || [])
         .filter((project: any) => project?.studioId && studioIdSet.has(String(project.studioId)))
         .map(project => toLegacyStudioProject(project, parentActor, 'PAST'));

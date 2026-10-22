@@ -1,4 +1,6 @@
 import { consumeTalentUses } from '../../../services/talentRoster';
+import { commitCinemaAnnouncement, prepareCinemaPackageExposure } from '../../../services/boxOffice/boxOfficeExposureAdapters';
+import { getAbsoluteWeek } from '../../../services/legacyLogic';
 import type {
     BackgroundCastingPlan,
     Business,
@@ -618,6 +620,11 @@ export const buildGreenlightProject = ({
             }
         };
 
+        if (newCommitment.projectDetails?.type === 'MOVIE') {
+            newCommitment.projectDetails.cinemaExposure = prepareCinemaPackageExposure({ player, project: newCommitment.projectDetails,
+                titleId: newCommitment.id, storyAttention: selectedScript.hype ?? 20, musicAttention: soundtrackPlan?.musicBuzz || 0 });
+        }
+
         const updatedScripts = studio.studioState!.scripts.map(s =>
             s.id === selectedScriptId ? { ...s, status: 'PRODUCED' as const, producedAtWeek: player.currentWeek } : s
         );
@@ -702,10 +709,12 @@ export const prepareGreenlightFunding = ({
     });
     const lockedFundApplied = fundingResult.lockedFundApplied;
     const unusedFundingReturned = fundingResult.unusedFundingReturned;
+    const announcedDetails = newCommitment.projectDetails ? commitCinemaAnnouncement(player, newCommitment.projectDetails,
+        newCommitment.id, getAbsoluteWeek(player.age, player.currentWeek)) : undefined;
     const fundedCommitment: Commitment = {
         ...newCommitment,
-        projectDetails: newCommitment.projectDetails ? {
-            ...newCommitment.projectDetails,
+        projectDetails: announcedDetails ? {
+            ...announcedDetails,
             hiddenStats: {
                 ...newCommitment.projectDetails.hiddenStats,
                 platformProductionFundingApplied: lockedFundApplied,

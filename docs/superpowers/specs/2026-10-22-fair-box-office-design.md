@@ -13,6 +13,8 @@ Confirmed decisions:
 
 **Implementation status:** Phase 1 foundations are implemented; [verification and remaining integration boundaries](../../reports/2026-10-22-box-office-phase1/README.md). The shared audience market is not yet active.
 
+Phase 2 adds bounded exposure, actual source-event adapters and forecast-safe knowledge; [scope and evidence](../../reports/2026-10-22-box-office-phase2/README.md). Its awareness reading is a recomputed modeled estimate, pending committed cohort history and the later shared market/UI activation.
+
 ## Global constraints
 
 - Automatic country/chain ticket prices; no manual ticket-price slider.

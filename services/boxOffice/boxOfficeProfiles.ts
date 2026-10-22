@@ -6,3 +6,15 @@ export const CINEMA_ROLE_WEIGHTS = {
 
 /** Normalized craft shares; fame/marketing/distribution have no craft weight. */
 export const CINEMA_CRAFT_WEIGHTS = { script: 0.35, direction: 0.25, cast: 0.2, crew: 0.2 } as const;
+
+/** Candidate exposure parameters, not calibrated ticket conversion or revenue multipliers. */
+export const CINEMA_EXPOSURE_TUNING_VERSION = 1;
+export const CINEMA_EXPOSURE_PROFILE = {
+    legacyRecognitionCeiling: 0.22,
+    incrementalCastOverlap: 0.25,
+    announcementRecognitionReach: 0.45,
+    localFootfallDiscovery: 0.025,
+    qualifiedImpressionsPerDollar: 30,
+    favoriteRecognitionLift: 0.2,
+    studioTrustReach: 0.2,
+} as const;

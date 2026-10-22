@@ -7,6 +7,7 @@ import type {
 } from '../types';
 import { createDeterministicId } from './deterministicRandom';
 import { applyPublicistMediaModifier, normalizeIndustryMediaWorld } from './industryWorld';
+import { appendCinemaExposureEvent } from './boxOffice/boxOfficeAwareness';
 
 const ELIGIBLE_PHASES = new Set<Commitment['projectPhase']>([
     'PLANNING', 'PRE_PRODUCTION', 'PRODUCTION', 'POST_PRODUCTION', 'SCHEDULED', 'AWAITING_RELEASE',
@@ -25,7 +26,7 @@ const clamp = (value: number, minimum: number, maximum: number): number => (
 );
 
 export const getEligiblePromotionProjects = (player: Player): Commitment[] => (
-    player.commitments.filter(item => ELIGIBLE_TYPES.has(item.type) && ELIGIBLE_PHASES.has(item.projectPhase))
+    player.commitments.filter(item => (ELIGIBLE_TYPES.has(item.type) || (item.type === 'JOB' && item.projectDetails?.type === 'MOVIE')) && ELIGIBLE_PHASES.has(item.projectPhase))
 );
 
 export interface ApplyProjectPromotionAttributionInput {
@@ -54,6 +55,8 @@ export const applyProjectPromotionAttribution = (
     const project = getEligiblePromotionProjects(player).find(item => item.id === input.projectId);
     const publicationId = input.publicationId.trim();
     if (!project || !publicationId) return { player, appliedBuzzDelta: 0 };
+    const cinemaEventId = `cinema-promotion:${publicationId}`;
+    if (project.projectDetails?.cinemaExposure?.events.some(event => event.id === cinemaEventId)) return { player, appliedBuzzDelta: 0 };
     const media = normalizeIndustryMediaWorld(player.world.industryMedia);
     const attributionKey = `promotion:${publicationId}`;
     const existing = media.promotionAttributions.find(item => item.attributionKey === attributionKey);
@@ -85,9 +88,14 @@ export const applyProjectPromotionAttribution = (
         rawEffects: { projectBuzz: fatiguedBuzz },
     });
     const appliedBuzzDelta = clamp(pr.appliedEffects.projectBuzz, -10, 10);
+    const qualifiedReach = Number.isFinite(input.reach) ? Math.max(0, Math.floor(input.reach! * Math.min(1, fitMultiplier) * fatigueMultiplier)) : 0;
     const nextCommitments = pr.player.commitments.map(item => item.id === project.id ? {
         ...item,
         promotionalBuzz: clamp((item.promotionalBuzz || 0) + appliedBuzzDelta, -50, 50),
+        ...(item.projectDetails?.type === 'MOVIE' ? { projectDetails: { ...item.projectDetails,
+            cinemaExposure: appendCinemaExposureEvent(item.projectDetails, { id: cinemaEventId, titleId: item.id,
+                kind: 'PROMOTION', channel: input.channel, absoluteWeek: Math.max(0, Math.round(input.absoluteWeek)),
+                impressions: qualifiedReach, sentiment: Math.sign(appliedBuzzDelta) }) } } : {}),
     } : item);
     const prIntervention = pr.intervention;
     const attribution: ProjectPromotionAttribution = {

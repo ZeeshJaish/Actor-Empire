@@ -1477,6 +1477,7 @@ const createPastProjectArchiveSnapshot = (
             ? projectDetails.releaseChainSelections
             : {},
         boxOfficeArchiveVersion: 1,
+        cinemaExposure: projectDetails.cinemaExposure,
         baseTheatricalWeeks: release.baseTheatricalWeeks,
         theatricalExtensionWeeks: release.theatricalExtensionWeeks,
         theatricalExtensionHistory: ensureObjectArray(release.theatricalExtensionHistory),
