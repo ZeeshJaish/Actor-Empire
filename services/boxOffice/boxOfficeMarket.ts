@@ -230,6 +230,20 @@ export const simulateCinemaWeek = (input:CinemaWeekInput):CinemaWeekResult => {
         cell.deferredPeople=Math.min(cell.deferredPeople+Math.max(0,firstIntent-first),Math.max(0,cell.awarePeople-seen));
     }
     for(const title of titles)title.deferredPeople=cinemaSum(snapshot.titles.find(t=>t.titleId===title.titleId)!.cells.map(c=>c.deferredPeople));
+    for(const title of titles){
+        const cells=snapshot.titles.find(t=>t.titleId===title.titleId)!.cells;
+        const choices=snapshot.choices.filter(c=>c.titleId===title.titleId&&c.kind==='FIRST');
+        const countries=[...new Set(input.cohorts.map(c=>c.countryId))].sort().map(countryId=>{
+            const ids=new Set(input.cohorts.filter(c=>c.countryId===countryId).map(c=>c.id));
+            const local=cells.filter(c=>ids.has(c.cohortId));
+            return {countryId,awarePeople:cinemaSum(local.map(c=>c.awarePeople)),deferredPeople:cinemaSum(local.map(c=>c.deferredPeople))};
+        }).filter(c=>c.awarePeople>0||c.deferredPeople>0);
+        Object.assign(title,{audienceSignals:{awarePeople:cinemaSum(cells.map(c=>c.awarePeople)),
+            homeWaitingPeople:cinemaSum(snapshot.choices.filter(c=>c.titleId===title.titleId&&c.kind==='DEFER'&&c.reasons.includes('KNOWN_STREAMING_WINDOW')).map(c=>c.interestedPeople)),
+            discoveryPeople:cinemaSum(choices.map(c=>c.discoveryPeople)),
+            familiarPeople:cinemaSum(choices.map(c=>Math.floor(c.awarePeople*c.universeFamiliarity))),countries}});
+    }
+
     const activeIds=new Set(snapshot.titles.map(t=>t.titleId));
     const retained=(input.marketState?.titles || []).filter(t=>!activeIds.has(t.titleId) && input.absoluteWeek-t.releaseWeek<=CINEMA_AUDIENCE_PROFILE.activeTitleHistoryWeeks).map(t=>({...structuredClone(t),cells:t.cells.map(c=>({...structuredClone(c),lastChoiceWeek:c.lastChoiceWeek ?? input.marketState!.lastProcessedAbsoluteWeek}))}));
     const archived=(input.marketState?.titles || []).filter(t=>!activeIds.has(t.titleId) && !retained.some(r=>r.titleId===t.titleId));

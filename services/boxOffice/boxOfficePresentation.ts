@@ -99,3 +99,37 @@ export const createArchivedCinemaReleaseRecord = (project: any, untitledLabel: s
         releasedAtAbsoluteWeek: project.releasedAtAbsoluteWeek,
     };
 };
+
+
+import type { Player } from '../../types';
+import type { CinemaWeekResult } from './boxOfficeTypes';
+export interface CinemaAudienceInsights {
+    evidence:'TRACKED'|'PARTIAL_HISTORY'|'UNAVAILABLE'; firstAdmissions:number|null; repeatAdmissions:number|null;
+    deferredPeople:number; tags:string[]; note:string;
+}
+/** Descriptive evidence only. These labels are never read by the demand engine. */
+export const getCinemaAudienceInsights=(player:Player,titleId:string):CinemaAudienceInsights=>{
+    const root=player.world.cinemaMarket,paid=root?.titles[titleId];
+    if(!paid||paid.basis==='LEGACY_FULLY_SETTLED')return {evidence:'UNAVAILABLE',firstAdmissions:null,repeatAdmissions:null,deferredPeople:0,tags:[],note:'Historical audience counts were not tracked.'};
+    const state=root!.market.titles.find(t=>t.titleId===titleId);
+    const deferredPeople=paid.audienceSignals?.countries.reduce((n,c)=>n+c.deferredPeople,0)??state?.cells.reduce((n,c)=>n+c.deferredPeople,0)??0;
+    const total=paid.firstAdmissions+paid.repeatAdmissions,tags:string[]=[];
+
+    if(total>=1000){
+        if(paid.repeatAdmissions>=100&&paid.repeatAdmissions/total>=.08)tags.push('Paid repeat interest');
+        if((paid.audienceSignals?.discoveryPeople||0)>=1000)tags.push('Growing word of mouth');
+        if((paid.audienceSignals?.familiarPeople||0)>=1000)tags.push('Earned franchise familiarity');
+        if(paid.firstAdmissions>=10000)tags.push('Proven theater attendance');
+    }
+    if((paid.audienceSignals?.homeWaitingPeople||0)>=1000)tags.push('Audience waiting for home viewing');
+    else if(deferredPeople>=1000)tags.push('Unconverted audience interest');
+    return {evidence:paid.basis==='UNSETTLED_WEEKLY'?'TRACKED':'PARTIAL_HISTORY',firstAdmissions:paid.firstAdmissions,
+        repeatAdmissions:paid.repeatAdmissions,deferredPeople,tags,note:paid.basis==='UNSETTLED_WEEKLY'
+        ?'Modeled paid visits; waiting interest is not a guaranteed stream.'
+        :'Visits since tracking began; earlier unique viewers and repeats are unknown.'};
+};
+export const toCinemaPresentation=(result:CinemaWeekResult,titleId:string)=>{
+    const row=result.titles.find(t=>t.titleId===titleId);if(!row)throw new Error('Unknown cinema presentation title');
+    return {...row,evidence:result.mode==='LIVE'?'PROPOSED_LIVE' as const:'FORECAST' as const,
+        costsCents:result.costEvents.filter(e=>e.titleId===titleId).reduce((n,e)=>n+e.amountCents,0)};
+};

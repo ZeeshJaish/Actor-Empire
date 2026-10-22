@@ -14,6 +14,7 @@ const join = (...names: Array<string | false | undefined>) => names.filter(Boole
 const millions = (value: number) => `$${(Math.max(0, value) / 1_000_000).toFixed(1)}M`;
 
 export const CampaignStep: React.FC<{
+  cinema?: boolean;
   film: ReleaseFilmArt;
   positions: CampaignPositionModel[];
   selectedPositionId: string;
@@ -30,7 +31,7 @@ export const CampaignStep: React.FC<{
   onChangeChannel: (id: string, delta: number) => void;
   onContinue: () => void;
   onBack: () => void;
-}> = ({ film, positions, selectedPositionId, timelines, selectedTimelineId, forecast, soundtrack, channels, budget, spent, allocationStep, onSelectPosition, onSelectTimeline, onChangeChannel, onContinue, onBack }) => {
+}> = ({ cinema, film, positions, selectedPositionId, timelines, selectedTimelineId, forecast, soundtrack, channels, budget, spent, allocationStep, onSelectPosition, onSelectTimeline, onChangeChannel, onContinue, onBack }) => {
   const position = positions.find(item => item.id === selectedPositionId) || positions[0];
   const timeline = timelines.find(item => item.id === selectedTimelineId) || timelines[0];
   const remaining = Math.max(0, budget - spent);
@@ -68,17 +69,18 @@ export const CampaignStep: React.FC<{
     <section className={css.sec}>
       <div className={css.sechead}><span className={css.seclabel}>STUDIO FORECAST</span><em className={css.step}>03 / 05</em></div>
       <div className={css.fcast}>
-        <div className={css.readrow}><div className={css.dial}><svg viewBox="0 0 80 48"><path d="M8 42A32 32 0 0 1 72 42" fill="none" stroke="rgba(255,255,255,.1)" strokeWidth="7" /><path d="M8 42A32 32 0 0 1 72 42" fill="none" stroke="currentColor" strokeWidth="7" pathLength="100" strokeDasharray={`${forecast.score} 100`} /></svg><b>{forecast.score}</b><em>{forecast.label.toUpperCase()}</em></div><div className={css.readside}><em>OPENING RANGE</em><b>{forecast.openingRange}</b><span>MODELLED FROM CURRENT GAME STATE</span></div></div>
-        <div className={css.bigtwo}><div><em>BREAK-EVEN</em><b>{forecast.breakEvenChance}%</b></div><div><em>WEEK-TWO DROP</em><b>{forecast.weekTwoDropRisk}%</b></div></div>
+        {!cinema && <div className={css.readrow}><div className={css.dial}><svg viewBox="0 0 80 48"><path d="M8 42A32 32 0 0 1 72 42" fill="none" stroke="rgba(255,255,255,.1)" strokeWidth="7" /><path d="M8 42A32 32 0 0 1 72 42" fill="none" stroke="currentColor" strokeWidth="7" pathLength="100" strokeDasharray={`${forecast.score} 100`} /></svg><b>{forecast.score}</b><em>{forecast.label.toUpperCase()}</em></div><div className={css.readside}><em>OPENING RANGE</em><b>{forecast.openingRange}</b><span>MODELLED FROM CURRENT GAME STATE</span></div></div>}
+        {!cinema && <><div className={css.bigtwo}><div><em>BREAK-EVEN</em><b>{forecast.breakEvenChance}%</b></div><div><em>WEEK-TWO DROP</em><b>{forecast.weekTwoDropRisk}%</b></div></div>
         <div className={css.bigtwo}><div><em>STREAMING BID</em><b>+{forecast.streamingBidBoost}%</b></div><div><em>AWARDS VISIBILITY</em><b>+{forecast.awardsVisibility}%</b></div></div>
-        <p className={css.fnote}>{forecast.note}</p>
+        </>}
+        <p className={css.fnote}>{cinema ? 'Use the cinema forecast above for receipts and cost recovery. Campaign fit is a creative estimate, not a bid or profit guarantee.' : forecast.note}</p>
       </div>
     </section>
 
     <section className={join(css.sec, css.sound)}>
       <div className={css.sechead}><span className={css.seclabel}>SOUNDTRACK IMPACT</span><em className={css.step}>04 / 05</em></div>
       <div className={css.soundtop}><div className={css.sleeve}><i className={css.disc} /><span className={css.sleevemark}><Glyph id="signal" /></span></div><div className={css.soundmeta}><b className={css.soundlabel}>{soundtrack.label}</b><em className={css.score}>FIT {soundtrack.score}</em></div></div>
-      <div className={css.srow}><span className={css.good}><b>+{soundtrack.openingLift}%</b><em>OPENING</em></span><span className={css.cool}><b>+{soundtrack.trailerLift}</b><em>TRAILER</em></span><span className={css.quiet}><b>{soundtrack.mismatchRisk}%</b><em>MISMATCH</em></span></div>
+      {!cinema && <div className={css.srow}><span className={css.good}><b>+{soundtrack.openingLift}%</b><em>OPENING</em></span><span className={css.cool}><b>+{soundtrack.trailerLift}</b><em>TRAILER</em></span><span className={css.quiet}><b>{soundtrack.mismatchRisk}%</b><em>MISMATCH</em></span></div>}
     </section>
 
     <section className={css.sec}>

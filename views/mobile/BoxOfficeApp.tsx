@@ -1,3 +1,5 @@
+import { CinemaFinancePanel } from '../../components/CinemaFinancePanel';
+import { CinemaAudiencePanel } from '../../components/CinemaAudiencePanel';
 import { getCommittedCinemaChartRows } from '../../services/boxOffice/boxOfficeCharts';
 import { createArchivedCinemaReleaseRecord } from '../../services/boxOffice/boxOfficePresentation';
 import { getCinemaProjectFinance } from '../../services/boxOffice/boxOfficeSettlement';
@@ -866,6 +868,7 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
                           <>
 	                              {renderMetric(tr('box.worldwideGross'), formatMoney(rel.totalGross))}
 	                              {renderMetric(`${tr('box.metric.studioReceipts')}${cinemaFinance.receiptsEstimated ? ' · Estimated' : ''}`, formatMoney(totalStudioReceipts), 'text-emerald-300')}
+                                  <div className="col-span-full"><CinemaFinancePanel player={player} source={rel} /><CinemaAudiencePanel player={player} titleId={rel.id} /></div>
 	                              {soundtrackRevenue > 0 && renderMetric(tr('box.soundtrackRevenue'), formatMoney(soundtrackRevenue), 'text-cyan-300')}
 	                              {renderMetric(tr('box.openingWeekend'), formatMoney(getOpeningWeekend(rel)))}
 	                              {renderMetric(tr('box.weeklyDrop'), latestDrop === null ? '-' : `${latestDrop}%`, latestDrop !== null && latestDrop < 0 ? 'text-emerald-300' : 'text-amber-300')}

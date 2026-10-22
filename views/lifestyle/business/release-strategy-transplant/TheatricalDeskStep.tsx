@@ -28,6 +28,7 @@ export interface TheatricalDeskModel {
   regions: TheatricalRegionModel[];
   selectedRegionCount: number;
   totalScreens: number;
+  forecastReady?: boolean;
   bookingCost: number;
   studioShare: number;
   expectedFootfall: number;
@@ -44,7 +45,7 @@ export const TheatricalDeskStep: React.FC<TheatricalDeskModel & {
   onAutoBuild: () => void;
   onContinue: () => void;
   onBack: () => void;
-}> = ({ regions, selectedRegionCount, totalScreens, bookingCost, studioShare, expectedFootfall, openingRange, onToggleRegion, onToggleChain, onAutoBuild, onContinue, onBack }) => {
+}> = ({ regions, selectedRegionCount, totalScreens, forecastReady, bookingCost, studioShare, expectedFootfall, openingRange, onToggleRegion, onToggleChain, onAutoBuild, onContinue, onBack }) => {
   const exhibitorShare = Math.max(0, 1 - studioShare);
   const [mapView, setMapView] = useState<RegionMapView>(WORLD_VIEW);
   const mapModel = useMemo(() => createTheatricalRegionMapModel(regions, mapView), [mapView, regions]);
@@ -107,14 +108,14 @@ export const TheatricalDeskStep: React.FC<TheatricalDeskModel & {
       {selectedRegionCount === 0 && <p className={css.empty}>Select at least one region to open its partner desk.</p>}
     </section>
 
-    <section className={css.split}>
+    {forecastReady ? <section className={css.split}>
       <div className={css.splitbar}>
         <span className={css.splitmine} style={{ width: `${studioShare * 100}%` }}><i>{Math.round(studioShare * 100)}%</i></span>
         <span className={css.splittheirs} style={{ width: `${exhibitorShare * 100}%` }}><i>{Math.round(exhibitorShare * 100)}%</i></span>
       </div>
       <div className={css.splitkey}><em className={css.keymine}>YOUR STUDIO</em><em className={css.keytheirs}>EXHIBITORS</em></div>
-      <p><b>{totalScreens.toLocaleString()} screens</b> · {count(expectedFootfall)} expected visits · {money(bookingCost)} booking cost · opening read {money(openingRange[0])}–{money(openingRange[1])}</p>
-    </section>
+      <p>Calculate or refresh the cinema forecast above after changing this desk. <b>{totalScreens.toLocaleString()} accessible screens</b> · {count(expectedFootfall)} forecast visits · {money(bookingCost)} opening booking estimate · producer receipt scenarios {money(openingRange[0])}–{money(openingRange[1])}</p>
+    </section> : <p className={css.empty}>Opening visits, receipts and booking costs are not calculated. Use the cinema forecast above.</p>}
     <div className={css.foot}>
       <button type="button" className={css.backText} onClick={onBack}>BACK</button>
       <button type="button" className={join(css.next, totalScreens <= 0 && css.dead)} disabled={totalScreens <= 0} onClick={onContinue}>CONTINUE</button>

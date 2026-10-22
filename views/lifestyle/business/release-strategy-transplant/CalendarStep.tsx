@@ -9,6 +9,7 @@ const join = (...names: Array<string | false | undefined>) => names.filter(Boole
 const rivalRoom = { TENTPOLE: 60, MID: 31, SMALL: 13 };
 
 export const CalendarStep: React.FC<{
+  cinema?: boolean;
   film: ReleaseFilmArt;
   slots: ReleaseCalendarSlotModel[];
   selectedWeek: number;
@@ -16,7 +17,7 @@ export const CalendarStep: React.FC<{
   onContinue: () => void;
   onBack: () => void;
   locked?: boolean;
-}> = ({ film, slots, selectedWeek, onSelectWeek, onContinue, onBack, locked = false }) => {
+}> = ({ cinema, film, slots, selectedWeek, onSelectWeek, onContinue, onBack, locked = false }) => {
   const [previewWeek, setPreviewWeek] = React.useState(selectedWeek);
   const dragging = React.useRef(false);
   const startWeek = slots[0]?.week || 1;
@@ -58,8 +59,9 @@ export const CalendarStep: React.FC<{
     </div>
     {shown && <div className={join(css.faceoff, shown.week === selectedWeek && css.on)}>
       <div className={css.fohead}><span className={css.fowk}><i>WEEK</i><b>{shown.weekOfYear}</b></span><em className={css.foseason}>{shown.season}{shown.weekOfYear < slots[0].weekOfYear ? ' · NEXT YEAR' : ''}</em>{shown.week === selectedWeek && <span className={css.fomine}>YOUR DATE</span>}</div>
-      <div className={css.ring}><div className={join(css.corner, rank === 1 && css.wins)}>{rank === 1 && <span className={css.crown}>★</span>}<div className={css.mysheet}><FilmSheet film={film} size="sm" /></div><b className={css.pct}>{Math.round(yours)}%</b><em>YOURS</em></div><span className={css.vs}>VS</span><div className={css.corner}>{shown.rivals.length === 0 ? <span className={css.alone}><i /><em>NOBODY ELSE<br />OPENS</em></span> : <div className={css.rivalsheets}>{shown.rivals.map(rival => <span className={css.rivalsheet} key={rival.id} style={{ '--st': String(rivalRoom[rival.scale] / 60) } as React.CSSProperties}><b>{rival.title}</b><em>{rival.scale}</em></span>)}</div>}</div></div>
-      <div className={join(css.verdict, css[`r-${rank}`])}><b>{rank}</b><div><em>YOU OPEN {rank === 1 ? 'FIRST' : rank === 2 ? 'SECOND' : 'THIRD'}</em><p>{shown.event || (shown.rivals.length ? 'A contested weekend. The campaign must work.' : 'A clear path for the opening.')}</p></div></div>
+      {!cinema && <div className={css.ring}><div className={join(css.corner, rank === 1 && css.wins)}>{rank === 1 && <span className={css.crown}>★</span>}<div className={css.mysheet}><FilmSheet film={film} size="sm" /></div><b className={css.pct}>{Math.round(yours)}%</b><em>YOURS</em></div><span className={css.vs}>VS</span><div className={css.corner}>{shown.rivals.length === 0 ? <span className={css.alone}><i /><em>NOBODY ELSE<br />OPENS</em></span> : <div className={css.rivalsheets}>{shown.rivals.map(rival => <span className={css.rivalsheet} key={rival.id} style={{ '--st': String(rivalRoom[rival.scale] / 60) } as React.CSSProperties}><b>{rival.title}</b><em>{rival.scale}</em></span>)}</div>}</div></div>}
+      {!cinema && <div className={join(css.verdict, css[`r-${rank}`])}><b>{rank}</b><div><em>YOU OPEN {rank === 1 ? 'FIRST' : rank === 2 ? 'SECOND' : 'THIRD'}</em><p>{shown.event || (shown.rivals.length ? 'A contested weekend. The campaign must work.' : 'A clear path for the opening.')}</p></div></div>}
+    {cinema && <p>Scheduled competing releases: {shown.rivals.map(r=>r.title).join(', ') || 'None announced'}. Paid attendance is allocated by the shared cinema market.</p>}
     </div>}
     <div className={css.foot}><button type="button" className={css.backText} onClick={onBack}>BACK</button><button type="button" className={join(css.next, !selectedWeek && css.dead)} disabled={!selectedWeek} onClick={onContinue}>REVIEW</button></div>
   </>;

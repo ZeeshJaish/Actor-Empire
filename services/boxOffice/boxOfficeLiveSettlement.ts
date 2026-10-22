@@ -172,7 +172,7 @@ export const commitCinemaWeek = (player: Player, result: CinemaWeekResult): Cine
                 outside.resultSummary = 'Settled from actual paid cinema admissions and the signed producer-receipt stake.';
             }
         }
-        state.titles[row.titleId] = { ...prior, ownerId: title.owner.id, grossCents: prior.grossCents + row.grossCents, producerReceiptsCents: prior.producerReceiptsCents + receipts,
+        state.titles[row.titleId] = { ...prior, audienceSignals:row.audienceSignals, ownerId: title.owner.id, grossCents: prior.grossCents + row.grossCents, producerReceiptsCents: prior.producerReceiptsCents + receipts,
             exhibitorReceiptsCents: prior.exhibitorReceiptsCents + row.exhibitorReceiptsCents, distributionDeductionsCents: prior.distributionDeductionsCents + row.distributionDeductionsCents,
             bookingCostCents: prior.bookingCostCents + cost, investorPaidCents: prior.investorPaidCents + investor, talentPaidCents: prior.talentPaidCents + talent, actorPaidCents: prior.actorPaidCents + actor,
             satisfactionScoreUnits: (prior.satisfactionScoreUnits || 0) + Math.round((row.satisfactionScore || 0) * 100) * (row.firstAdmissions + row.repeatAdmissions), satisfactionAdmissions: (prior.satisfactionAdmissions || 0) + row.firstAdmissions + row.repeatAdmissions,

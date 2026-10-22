@@ -8,7 +8,8 @@ import { calculateBalancedNextSeasonFundingCap, getPlatformFundingRelationshipMu
 import { CAMPAIGN_POSITIONING_OPTIONS, CAMPAIGN_TIMELINE_OPTIONS, MARKETING_CHANNEL_OPTIONS, calculateCampaignFit, calculateCampaignForecast, normalizeMarketingChannelAllocations } from '../../../services/marketingStrategy';
 import { BOX_OFFICE_REGIONS, getBoxOfficeRegionLabel, getBoxOfficeRegionShortLabel, getCinemaChainById, getCinemaChainTerms, getCinemaChainsForRegion } from '../../../services/cinemaChains';
 import { getDefaultReleaseRegionIds, getRegionMapSummary, normalizeReleaseRegionIds } from '../../../services/regionMap';
-import { getBoxOfficeCaps } from '../../../services/roleLogic';
+import { CinemaForecastPanel } from '../../../components/CinemaForecastPanel';
+import type { CinemaForecast } from '../../../services/boxOffice/boxOfficeForecast';
 import { applyMusicImpactToHiddenStats, calculateProjectMusicImpact } from '../../../services/musicIndustry';
 import { applyInvestorPayoutMemory, calculateInvestorPayout } from '../../../services/projectInvestors';
 import { getPlayerLanguage, t } from '../../../services/i18n';
@@ -1271,7 +1272,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
             const footfallPower = totalScreens > 0
                 ? termsList.reduce((sum, terms) => sum + (terms.footfallPower * terms.screens), 0) / totalScreens
                 : 0;
-            const expectedFootfall = Math.round(totalScreens * footfallPower * region.marketWeight * 680);
+            const expectedFootfall = 0; // Attendance is provided by the shared market forecast, never by screen count.
             return {
                 regionId,
                 region,
@@ -1287,73 +1288,23 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
             };
         }).filter(Boolean)
     ), [boxOfficeRegionById, language, normalizedDistributionChainSelections, normalizedSelectedRegionIds, project.projectDetails, effectiveScreeningStrategy]);
-    const distributionDealSummary = useMemo(() => {
-        const rows = selectedDistributionRows as Array<NonNullable<typeof selectedDistributionRows[number]>>;
-        const releaseReach = rows.reduce((sum, row) => sum + row.region.marketWeight, 0);
-        const totalScreens = rows.reduce((sum, row) => sum + row.terms.screens, 0);
-        const bookingCost = rows.reduce((sum, row) => sum + row.terms.bookingCost, 0);
-        const expectedFootfall = rows.reduce((sum, row) => sum + row.expectedFootfall, 0);
-        const weightedCut = releaseReach > 0
-            ? rows.reduce((sum, row) => sum + (row.terms.exhibitorCut * row.region.marketWeight), 0) / releaseReach
-            : 0;
-        const studioShare = Math.max(0, 1 - weightedCut);
-        const budget = Math.max(1_000_000, Number(project.projectDetails?.estimatedBudget || project.budget || 0) || 1_000_000);
-        const hiddenStats = project.projectDetails?.hiddenStats || {};
-        const quality = Number(hiddenStats.qualityScore || 50);
-        const scriptQuality = Number(hiddenStats.scriptQuality || quality);
-        const directorQuality = Number(hiddenStats.directorQuality || quality);
-        const castingStrength = Number(hiddenStats.castingStrength || 50);
-        const rawHype = Number(hiddenStats.rawHype || 50);
-        const fameMultiplier = Number(hiddenStats.fameMultiplier || 1);
-        const packageScore = (scriptQuality * 0.32) + (directorQuality * 0.24) + (castingStrength * 0.26) + (quality * 0.18);
-        const genreEventMultiplier = ['SUPERHERO', 'SCI_FI', 'ADVENTURE', 'ACTION', 'FANTASY', 'ANIMATION'].includes(project.projectDetails?.genre)
-            ? 1.12
-            : ['DRAMA', 'BIOPIC', 'DOCUMENTARY', 'ROMANCE'].includes(project.projectDetails?.genre)
-                ? 0.72
-                : 0.92;
-        const screenReach = 1 - Math.exp(-totalScreens / 14500);
-        const regionReach = 1 - Math.exp(-releaseReach / 2.75);
-        const footfallSignal = Math.min(1.28, expectedFootfall / 18_000_000);
-        const distributionPower = Math.max(35, Math.min(98, 42 + (screenReach * 34) + (releaseReach * 4) + (footfallSignal * 7)));
-        const campaignLift = Math.min(0.38, totalCampaignCost / Math.max(1, budget * 2.4));
-        const qualityLift = 0.72 + (packageScore / 100) * 0.64;
-        const hypeLift = 0.78 + (rawHype / 100) * 0.55;
-        const fameLift = 0.92 + Math.min(0.32, Math.max(0, fameMultiplier - 1) * 0.28);
-        const distributionLift = Math.pow(distributionPower / 50, 0.72);
-        const musicOpeningMod = Math.max(0.9, Math.min(1.32, 1 + (musicImpact.openingWeekendLiftPct / 100) + (musicImpact.trailerStrengthLift / 260) - (musicImpact.mismatchBacklashRisk / 1000)));
-        const grossDemand = budget * (0.28 + screenReach * 0.34 + regionReach * 0.26 + footfallSignal * 0.14 + campaignLift) * qualityLift * hypeLift * fameLift * genreEventMultiplier * distributionLift * musicOpeningMod;
-        const caps = getBoxOfficeCaps(project.projectDetails?.budgetTier || 'MID', budget);
-        const openingCap = caps.opening * (quality >= 88 && rawHype >= 82 ? 1.08 : 0.92);
-        const midpoint = Math.min(openingCap, grossDemand);
-        const uncertainty = quality < 55
-            ? 0.34
-            : quality >= 82
-                ? 0.18
-                : 0.25;
-        const openingLow = Math.round(midpoint * (1 - uncertainty));
-        const openingHigh = Math.round(Math.max(openingLow + 1, midpoint * (1 + uncertainty)));
-        const studioOpeningLow = Math.round(openingLow * studioShare);
-        const studioOpeningHigh = Math.round(openingHigh * studioShare);
-        const partnerExampleShare = Math.round(100 * weightedCut);
-        const studioExampleShare = Math.round(100 * studioShare);
-
-        return {
-            regionCount: rows.length,
-            releaseReach,
-            totalScreens,
-            bookingCost,
-            expectedFootfall,
-            weightedCut,
-            studioShare,
-            openingLow,
-            openingHigh,
-            studioOpeningLow,
-            studioOpeningHigh,
-            partnerExampleShare,
-            studioExampleShare,
-            distributionPower
-        };
-    }, [project.budget, project.projectDetails, selectedDistributionRows, totalCampaignCost, musicImpact]);
+    const [cinemaForecast, setCinemaForecast] = useState<CinemaForecast|null>(null);
+    const cinemaPreviewProject = useMemo(() => ({
+        ...(project.projectDetails || project), releaseStrategy:'THEATRICAL', screeningStrategy:effectiveScreeningStrategy,
+        releaseRegionIds:normalizedSelectedRegionIds, releaseChainSelections:normalizedDistributionChainSelections,
+        marketingChannelAllocations:normalizedChannelMix.allocations, marketingBudgetSpent:totalCampaignCost,
+        totalCampaignSpend:totalCampaignCost,
+    }), [project, effectiveScreeningStrategy, normalizedSelectedRegionIds, normalizedDistributionChainSelections, normalizedChannelMix.allocations, totalCampaignCost]);
+    const cinemaPreviewWeek = getAbsoluteWeek(player.age, player.currentWeek) + ((releaseWeek - player.currentWeek + 52) % 52);
+    const cinemaRead = cinemaForecast?.titles.find(t => t.titleId === project.id);
+    const distributionDealSummary = {
+        totalScreens: normalizedSelectedRegionIds.length===0 ? 0 : cinemaRead?.availableScreens || selectedDistributionRows.reduce((n,r)=>n+(r?.terms.screens||0),0),
+        bookingCost: (cinemaRead?.bookingCostCents.mid || 0)/100,
+        expectedFootfall: cinemaRead?.admissions.mid || 0,
+        studioShare: cinemaRead?.grossCents.mid ? cinemaRead.producerReceiptsCents.mid/cinemaRead.grossCents.mid : 0,
+        studioOpeningLow:(cinemaRead?.producerReceiptsCents.low||0)/100,
+        studioOpeningHigh:(cinemaRead?.producerReceiptsCents.high||0)/100,
+    };
     const toggleDistributionChain = (regionId: BoxOfficeRegionId, chainId: CinemaChainId) => {
         setDistributionChainSelections(currentSelections => {
             const currentChainIds = currentSelections[regionId] || [];
@@ -1742,6 +1693,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
             hue={positionPresentation[campaignPositioning].hue}
             onBack={step <= 1 ? handleBack : prevStep}
         >
+            {releaseType === 'THEATRICAL' && step >= 2 && <CinemaForecastPanel player={player} project={cinemaPreviewProject} titleId={project.id} releaseWeek={cinemaPreviewWeek} onForecast={setCinemaForecast} />}
             {step === 1 && (
                 <DistributionStep
                     film={releaseFilm}
@@ -1765,6 +1717,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                     totalScreens={distributionDealSummary.totalScreens}
                     bookingCost={distributionDealSummary.bookingCost}
                     studioShare={distributionDealSummary.studioShare}
+                    forecastReady={Boolean(cinemaRead)}
                     expectedFootfall={distributionDealSummary.expectedFootfall}
                     openingRange={[distributionDealSummary.studioOpeningLow, distributionDealSummary.studioOpeningHigh]}
                     onToggleRegion={regionId => toggleSelectedRegion(regionId as BoxOfficeRegionId)}
@@ -1802,6 +1755,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
 
             {step === 3 && (
                 <CampaignStep
+                    cinema={releaseType === 'THEATRICAL'}
                     film={releaseFilm}
                     positions={campaignPositions}
                     selectedPositionId={campaignPositioning}
@@ -1810,7 +1764,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                     forecast={{
                         score: forecastGaugeScore,
                         label: forecastGaugeLabel,
-                        openingRange: '$' + formatCampaignMillions(campaignForecast.openingWeekendLow) + 'M–$' + formatCampaignMillions(campaignForecast.openingWeekendHigh) + 'M',
+                        openingRange: releaseType === 'THEATRICAL' ? (cinemaRead ? `${formatDealMoney(cinemaRead.grossCents.low/100)}–${formatDealMoney(cinemaRead.grossCents.high/100)}` : 'Calculate cinema forecast') : 'Streaming contract market',
                         breakEvenChance: campaignForecast.breakEvenChance,
                         weekTwoDropRisk: campaignForecast.weekTwoDropRisk,
                         streamingBidBoost: campaignForecast.streamingBidBoost,
@@ -1849,6 +1803,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
 
             {step === 5 && (
                 <CalendarStep
+                    cinema={releaseType === 'THEATRICAL'}
                     film={releaseFilm}
                     slots={calendarSlots}
                     selectedWeek={displayReleaseWeek}
@@ -1879,7 +1834,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                     partnerNames={partnerNames}
                     bookingCost={distributionDealSummary.bookingCost}
                     studioShare={distributionDealSummary.studioShare}
-                    valueRange={[distributionDealSummary.studioOpeningLow, distributionDealSummary.studioOpeningHigh]}
+                    valueRange={cinemaRead ? [distributionDealSummary.studioOpeningLow, distributionDealSummary.studioOpeningHigh] : undefined}
                     buyerName={streamingMarketPlatforms.find(platform => platform.id === selectedPlatform)?.name || selectedPlatform}
                     buyerNames={Array.from(new Set([
                         ...((biddingSession?.offers || [])

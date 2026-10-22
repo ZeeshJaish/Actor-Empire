@@ -54,7 +54,7 @@ export const cinemaIndustryProjectDetails = (player: Player, project: IndustryPr
             directorQuality: outside?.scoutReport.directorQuality || quality, castingStrength: talent?.packageScore || outside?.scoutReport.castQuality || quality,
             rawHype: 0, distributionPower: 0, prestigeBonus: 0 } };
 };
-const normalizeLiveTitle = (player: Player, id: string, project: ProjectDetails, releaseWeek: number, route: CinemaTitleInput['owner']['route'], world: ReturnType<typeof readCinemaWorldAudience>, release?: ActiveRelease): CinemaTitleInput => {
+export const normalizeLiveTitle = (player: Player, id: string, project: ProjectDetails, releaseWeek: number, route: CinemaTitleInput['owner']['route'], world: ReturnType<typeof readCinemaWorldAudience>, release?: ActiveRelease): CinemaTitleInput => {
     const title = normalizeCinemaTitle({ player, titleId: id, project, owner: { id: project.studioId, route } });
     const regions = getReleaseRegionIdsForProject(project), countries = world.countries!.filter(c => regions.includes(c.regionId));
     const chains = Object.fromEntries(countries.map(c => [c.id, project.releaseChainSelections?.[c.regionId] || getDefaultCinemaChainIdsForRegion(project, c.regionId)]));

@@ -301,6 +301,10 @@ export interface CinemaCountryResult extends CinemaGrossSplit {
     firstAdmissions: number;
     repeatAdmissions: number;
 }
+export interface CinemaAudienceSignals {
+    awarePeople:number; discoveryPeople:number; familiarPeople:number; homeWaitingPeople:number;
+    countries:Array<{countryId:string;awarePeople:number;deferredPeople:number}>;
+}
 export interface CinemaWeekResult {
     absoluteWeek: number;
     tuningVersion: number;
@@ -308,7 +312,7 @@ export interface CinemaWeekResult {
     live?: { clockEpoch:number; sourceSignature:string };
     /** Diagnostic identity, not an authorization or settlement receipt. */
     inputFingerprint: string;
-    titles: Array<CinemaGrossSplit & { titleId: string; screens?:number; firstAdmissions: number; repeatAdmissions: number; deferredPeople: number; satisfactionScore: number | null; countries: CinemaCountryResult[] }>;
+    titles: Array<CinemaGrossSplit & { titleId: string; audienceSignals?:CinemaAudienceSignals; screens?:number; firstAdmissions: number; repeatAdmissions: number; deferredPeople: number; satisfactionScore: number | null; countries: CinemaCountryResult[] }>;
     cohorts: Array<{ cohortId: string; walletCents: number; spentCents: number; unspentCents: number; leisureMinutes: number; usedMinutes: number }>;
     supply: Array<{ poolId: string; shows: number; usedScreenMinutes: number; availableScreenMinutes: number; seats: number; admissions: number }>;
     allocations: CinemaAdmissionAllocation[];
@@ -326,6 +330,7 @@ export interface CinemaProjectMarker {
     audienceBasis: 'TRACKED' | 'LEGACY_ESTIMATE';
 }
 export interface CinemaSettledTitle {
+    audienceSignals?:CinemaAudienceSignals;
     titleId: string;
     ownerId: string;
     basis: CinemaSettlementBasis;

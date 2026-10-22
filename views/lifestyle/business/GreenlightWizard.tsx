@@ -1,3 +1,5 @@
+import { CinemaForecastPanel } from '../../../components/CinemaForecastPanel';
+import { prepareCinemaPackageExposure } from '../../../services/boxOffice/boxOfficeExposureAdapters';
 import { calculateActorRoleSalary } from '../../../services/talentService';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
@@ -2906,6 +2908,14 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
     const currentEstimatedBudget = budgetBreakdown.total + musicBudget;
 
     const currentEstimatedBuzz = useMemo(() => {
+        if (resolveProjectType(selectedScript?.projectType,selectedScript?.type) === 'MOVIE') {
+            const project = {type:'MOVIE',studioId:studio.id,genre:selectedScript?.genres?.[0] || 'DRAMA',hiddenStats:{},
+                castList:castList.filter(c=>c.actorId).map(c=>({id:c.actorId,actorId:c.actorId,name:c.actorId,type:'ACTOR',
+                    roleType:c.roleType,isPlayer:c.actorId==='PLAYER_SELF',image:''})),
+            } as ProjectDetails;
+            return prepareCinemaPackageExposure({player,project,titleId:'greenlight-preview',storyAttention:selectedScript?.hype ?? 20,
+                musicAttention:selectedMusicPlan?.musicBuzz || 0}).attentionPotential;
+        }
         let buzz = 0;
         if (selectedScript) {
             buzz += selectedScript.hype || 20;
@@ -2932,7 +2942,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         buzz += musicBuzzBonus;
 
         return Math.min(100, Math.max(0, Math.floor(buzz || 0)));
-    }, [selectedScript, selectedCrew, castList, player, availableActors, musicBuzzBonus]);
+    }, [selectedScript, selectedCrew, castList, player, availableActors, musicBuzzBonus, selectedMusicPlan, studio.id]);
 
     const currentCastingStrength = useMemo(() => {
         const cast = castList
@@ -3130,6 +3140,17 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             backgroundSetCare: backgroundCastingPlan.setCare,
         });
     }, [selectedScript, selectedCrew, selectedLocations, availableDirectors, productionLocations, crewModes, equipmentChoices, studio, crewMarket, currentCastingStrength, liveCharacterStoryFit, backgroundCastingPlan]);
+    const cinemaGreenlightPreview = useMemo(() => {
+        const details = {title:selectedScript?.title || 'Private package', type:resolveProjectType(selectedScript?.projectType,selectedScript?.type), studioId:studio.id,
+            genre:selectedScript?.genres?.[0] || 'DRAMA', estimatedBudget:budgetBreakdown.total,
+            subtype:'STANDALONE', screeningStrategy:'NATIONAL', originalLanguageId:'english',
+            universeId:activeUniverseId, directorName:getCrewData('director').name,
+            castList:castList.filter(c=>c.actorId).map(c=>({id:c.actorId,actorId:c.actorId,name:c.actorName||c.actorId,roleType:c.roleType,
+                role:c.characterName||'Cast',isPlayer:c.actorId==='PLAYER_SELF',image:''})),
+            hiddenStats:{estimatedQualityScore:currentEstimatedQuality},
+        } as ProjectDetails;
+        return {...details,cinemaExposure:prepareCinemaPackageExposure({player,project:details,titleId:'greenlight-preview',storyAttention:selectedScript?.hype ?? 20,musicAttention:selectedMusicPlan?.musicBuzz || 0})};
+    }, [selectedScript,studio.id,budgetBreakdown.total,activeUniverseId,castList,currentEstimatedQuality,selectedMusicPlan,player]);
     if (!selectedScript && step !== 'SELECT_SCRIPT' && step !== 'BUZZ') {
         return (
             <div className="fixed inset-0 z-[70] bg-[#020a05] text-white flex flex-col items-center justify-center p-8 text-center font-sans">
@@ -3491,6 +3512,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 {/* CONFIRM STEP */}
                 {step === 'CONFIRM' && selectedScript && (
                     <GreenlightConfirmationStep
+                        cinemaForecast={resolveProjectType(selectedScript.projectType, selectedScript.type) === 'MOVIE' ? <CinemaForecastPanel player={player} project={cinemaGreenlightPreview} titleId="greenlight-preview" /> : undefined}
                         projectTitle={selectedScript.title}
                         scriptStatus={selectedScript.status}
                         effectiveConnectedIntent={effectiveConnectedIntent}

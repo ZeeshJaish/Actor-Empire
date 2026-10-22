@@ -1,3 +1,5 @@
+import { CinemaFinancePanel } from '../../../../components/CinemaFinancePanel';
+import { CinemaAudiencePanel } from '../../../../components/CinemaAudiencePanel';
 import { getCinemaProjectFinance } from '../../../../services/boxOffice/boxOfficeSettlement';
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -961,6 +963,7 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                                     </div>
                                                 </div>
                                             </div>
+                                            <div className="col-span-full"><CinemaFinancePanel player={player} source={project} /><CinemaAudiencePanel player={player} titleId={project.id} /></div>
                                             <div className="p-5 sm:p-6 bg-blue-500/5 rounded-3xl border border-blue-500/10 backdrop-blur-sm flex flex-col justify-center h-[120px]">
                                                 <div className="text-[10px] font-black uppercase tracking-widest text-blue-400/70 mb-2">{tr('projectDashboard.revenue.studioReceipts')}{cinemaFinance.receiptsEstimated ? ' · Estimated' : ''}</div>
                                                 <div className="text-2xl sm:text-3xl font-bold tracking-tight text-blue-300">

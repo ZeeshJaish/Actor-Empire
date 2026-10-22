@@ -1,0 +1,140 @@
+GREENLIGHT Cinema audience forecast
+Refresh forecast
+
+Current audience, country prices and competing films. Before Greenlight, campaign spend is only a plan. Future competition and delivery may change.
+
+Attention potential
+9/100
+Market awareness
+179,093,334
+Theater intent
+2,480,036–3,355,626
+Opening paid visits
+2,480,036–3,355,626
+Opening public gross
+$29.5M–$39.9M
+Producer receipts
+$14.4M–$19.5M
+Opening booking costs
+$1.1M–$1.4M
+Automatic ticket prices
+$8–$16
+Cost recovery visits
+4,167,964
+
+Available screens do not guarantee visits. Cost recovery uses estimated receipts per visit, production, planned campaign and opening booking; later costs can increase it. This is not a lifetime payout.
+
+Awareness by country
+AFTER GREENLIGHT [ { id: 'proj_1792657202679', phase: 'PRE_PRODUCTION' } ]
+AFTER PRODUCTION [ { id: 'proj_1792657202679', phase: 'POST_PRODUCTION' } ]
+AUTO BUILT
+FORECAST READY
+FINAL ←
+Release Strategy
+THE LAST LANTERN (RELEASE READY)
+Finalize
+
+Read the complete release before you lock it.
+
+Cinema audience forecast
+Refresh forecast
+
+Current audience, country prices and competing films. Before Greenlight, campaign spend is only a plan. Future competition and delivery may change.
+
+Attention potential
+9/100
+Market awareness
+186,445,119
+Theater intent
+2,629,945–3,558,455
+Opening paid visits
+2,629,945–3,558,455
+Opening public gross
+$29.7M–$40.2M
+Producer receipts
+$14.1M–$19.0M
+Opening booking costs
+$1.1M–$1.4M
+Automatic ticket prices
+$8–$14
+Cost recovery visits
+4,580,938
+
+Available screens do not guarantee visits. Cost recovery uses estimated receipts per visit, production, planned campaign and opening booking; later costs can increase it. This is not a lifetime payout.
+
+Awareness by country
+THE LAST
+LANTERN
+RELEASE READY
+THIS SUMMER
+IN CINEMAS
+IN CINEMAS ON 5,202 SCREENS
+WEEK 42
+THE STRATEGY
+DISTRIBUTION
+Theatrical
+FOOTPRINT
+5,202 screens
+3 regions
+WHO CARRIES IT
+1 chains
+Nova Circuit
+CAMPAIGN POSITION
+Mass Event
+Spectacle
+TIMELINE
+Balanced
+MARKETING
+1 channels
+$1.8M returns
+FESTIVAL
+Skipped
+RELEASE DATE
+Week 42
+CAMPAIGN SPEND
+leaves the wallet on lock
+$250k
+OPENING PRODUCER RECEIPT SCENARIOS
+$14.1M – $19.0M
+47%
+studio receipts
+$1.2M
+opening booking estimate
+BACK
+LOCK STRATEGY
+15E
+PAID { grossCents: 12612859633, first: 11136883, repeats: 55177 }
+DETAIL Project financial report
+Public theatrical gross
+$126.1M
+Theatrical producer receipts
+$59.7M
+Collected producer receipts, all media
+$59.8M
+Production and paid release costs
+$27.7M
+Investor payouts
+$0
+Talent backend paid
+$0
+Net studio receipts
+$59.8M
+Project profit after costs
+$32.1M
+
+Signed actor backend paid since tracking began: $0
+
+Total actor earnings are not recorded on this release.
+
+Public gross includes the cinema share. Actor pay is reported separately; upfront pay is already in production cost.
+IMDB Cinema audience insights
+
+11,136,883 first visits · 55,177 paid repeat visits
+
+Modeled paid visits; waiting interest is not a guaranteed stream.
+
+Growing word of mouth
+Proven theater attendance
+Unconverted audience interest
+OVERFLOW { width: 320, scroll: 320 }
+ERRORS []

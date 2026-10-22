@@ -48,6 +48,7 @@ interface GreenlightReturningTalentReviewItem {
 }
 
 interface GreenlightConfirmationStepProps {
+    cinemaForecast?: React.ReactNode;
     projectTitle: string;
     scriptStatus?: string;
     effectiveConnectedIntent: ConnectedProjectIntent;
@@ -90,6 +91,7 @@ interface GreenlightConfirmationStepProps {
 }
 
 export const GreenlightConfirmationStep: React.FC<GreenlightConfirmationStepProps> = ({
+    cinemaForecast,
     projectTitle,
     scriptStatus,
     effectiveConnectedIntent,
@@ -136,6 +138,7 @@ export const GreenlightConfirmationStep: React.FC<GreenlightConfirmationStepProp
 
     return (
         <div className="max-w-2xl mx-auto px-4 pt-10 pb-nav-safe-lg animate-in slide-in-from-bottom-4 duration-500 space-y-8">
+            {cinemaForecast}
             <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-2xl">
                 <div className="bg-zinc-950 p-6 border-b border-zinc-800 flex justify-between items-center">
                     <div>

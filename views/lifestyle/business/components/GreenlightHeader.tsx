@@ -85,7 +85,7 @@ export const GreenlightHeader: React.FC<GreenlightHeaderProps> = ({
 
                     <div className="flex w-full min-w-0 items-center justify-between gap-2 sm:w-auto sm:shrink-0" data-greenlight-metrics>
                         <div className="bg-black/60 px-3 py-2 sm:px-4 sm:py-3 rounded-2xl border border-amber-500/20 backdrop-blur-xl flex flex-col items-center justify-center shadow-2xl h-full">
-                            <span className="text-[7px] sm:text-[8px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-1">Buzz</span>
+                            <span className="text-[7px] sm:text-[8px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-1">Attention</span>
                             <div className="flex items-center gap-1">
                                 <div className="relative inline-block w-[14px] h-[14px]">
                                     <Star size={14} className="absolute inset-0 text-zinc-700" />

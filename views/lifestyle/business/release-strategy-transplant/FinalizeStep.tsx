@@ -48,7 +48,8 @@ export const FinalizeStep: React.FC<FinalizeStepModel & { energyCost: number; di
   </div>
   <div className={css.tolls}>
     <div className={css.toll}><span>CAMPAIGN SPEND<em>leaves the wallet on lock</em></span><b>{money(campaignSpend)}</b></div>
-    {route === 'THEATRICAL' && valueRange && <div className={`${css.toll} ${css.tollworth}`}><span>WHAT THE RUN IS WORTH</span><b>{money(valueRange[0])} – {money(valueRange[1])}</b><div className={css.dealsplit}><em><i>{Math.round(studioShare * 100)}%</i>studio receipts</em><em><i>{money(bookingCost)}</i>booking cost</em></div></div>}
+    {route === 'THEATRICAL' && !valueRange && <p className={css.empty}>Opening receipts and booking costs have not been calculated. Use the cinema forecast above.</p>}
+    {route === 'THEATRICAL' && valueRange && <div className={`${css.toll} ${css.tollworth}`}><span>OPENING PRODUCER RECEIPT SCENARIOS</span><b>{money(valueRange[0])} – {money(valueRange[1])}</b><div className={css.dealsplit}><em><i>{Math.round(studioShare * 100)}%</i>studio receipts</em><em><i>{money(bookingCost)}</i>opening booking estimate</em></div></div>}
   </div>
   {disabled && disabledReason && <p className={css.lockReason}>{disabledReason}</p>}
   <div className={css.foot}><button type="button" className={css.backText} onClick={onBack}>BACK</button><button type="button" className={`${css.lock} ${disabled ? css.dead : ''}`} disabled={disabled} onClick={onLock}><Glyph id="bolt" size={15} /> LOCK STRATEGY <i>{energyCost}E</i></button></div>

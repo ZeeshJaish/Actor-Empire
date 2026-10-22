@@ -1,3 +1,4 @@
+import { CinemaAudiencePanel } from '../../components/CinemaAudiencePanel';
 
 // ... existing imports
 import React, { useState } from 'react';
@@ -1315,6 +1316,7 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
 	                    </p>
 	                </div>
 
+                {selectedProject.mediaType === 'MOVIE' && <CinemaAudiencePanel player={player} titleId={selectedProject.id} />}
                 {selectedAudienceReception && (
                     <div className="px-3 py-2 border-b border-zinc-800 bg-gradient-to-br from-yellow-950/10 via-zinc-950 to-zinc-950">
                         <div className="rounded-2xl border border-yellow-400/20 bg-black/35 p-3">
