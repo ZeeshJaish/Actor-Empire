@@ -18,3 +18,21 @@ export const CINEMA_EXPOSURE_PROFILE = {
     favoriteRecognitionLift: 0.2,
     studioTrustReach: 0.2,
 } as const;
+
+/** Candidate behavior/supply coefficients. Phase 6 calibrates these against full careers. */
+export const CINEMA_MARKET_TUNING_VERSION = 1;
+export const CINEMA_AUDIENCE_PROFILE = {
+    contactRatePerSatisfiedViewer: 1.8, contactOverlap: 0.35,
+    favoriteLift: 0.28, maxFavoriteLift: 0.35,
+    firstWeeklyIntent: 0.32, repeatWeeklyIntent: 0.12,
+    deferredRetentionPerWeek: 0.8, recentRepeatHalfLifeWeeks: 3,
+    activeTitleHistoryWeeks: 104, maxAffinityEntriesPerCohort: 48,
+} as const;
+export const CINEMA_SUPPLY_PROFILE = {
+    seatsPerShow: 180, openingMinutesPerDay: 720, daysPerWeek: 7,
+    turnaroundMinutes: 25, standardBasePriceCents: 1200,
+    premiumPriceMultiplier: 1.4, premiumScreenShare: 0.2,
+    quietWeeksBeforeExit: 3, discoveryGraceWeeks: 4,
+    /** Twelve monthly envelopes distributed exactly over each 52-week year. */
+    monthsPerYear: 12, weeksPerYear: 52,
+} as const;

@@ -1,4 +1,4 @@
-import type { Genre, ProjectType, RoleType } from '../../types';
+import type { BoxOfficeRegionId, CinemaChainId, Genre, ProjectType, RoleType, WorldAudiencePersonaId } from '../../types';
 
 export interface CinemaOwnerRef {
     id: string;
@@ -28,6 +28,7 @@ export interface CinemaTitleInput {
     playerCredited: boolean;
     delivery: CinemaDeliveryInput;
     exposure?: CinemaExposureRecord;
+    market?: CinemaTitleMarketFacts;
 }
 
 export interface CinemaDeliveryInput {
@@ -77,6 +78,7 @@ export interface CinemaExposureCohort {
     priorAwarePeople?: number;
     actors?: Readonly<Record<string, CinemaRecognitionEvidence>>;
     studioTrust?: { strength: number; experiencedPeople: number };
+    market?: CinemaCohortMarketFacts;
 }
 export interface CinemaStudioRecognition {
     releasedTitleCount: number;
@@ -112,6 +114,10 @@ export interface CinemaWeekInput {
     knowledge: 'OBSERVED' | 'FORECAST';
     titles: readonly CinemaTitleInput[];
     cohorts: readonly CinemaExposureCohort[];
+    countries?: readonly CinemaCountryFacts[];
+    supply?: CinemaSupplyQuote;
+    marketState?: CinemaMarketState;
+    history?: readonly CinemaViewingEvidence[];
 }
 export interface CinemaKnownInputs {
     titles: ReadonlyArray<Omit<CinemaTitleInput, 'delivery'> & { delivery: Omit<CinemaDeliveryInput, 'deliveredQuality'> & { qualityRange: readonly [number, number] } }>;
@@ -141,4 +147,156 @@ export interface CinemaFinanceSummary {
     talentBackendCents: number;
     netProfitCents: number;
     actorEarningsCents: number;
+}
+
+/** Phase 3 contracts. Counts are aggregate segments, never individual simulated people. */
+export interface CinemaTitleMarketFacts {
+    releaseWeek: number;
+    runtimeMinutes: number;
+    languages: readonly string[];
+    countryIds: readonly string[];
+    chainIds: readonly CinemaChainId[];
+    format: 'STANDARD' | 'PREMIUM';
+    universeId?: string;
+    returningCharacterIds?: readonly string[];
+    payoff: number;
+    accessibility: number;
+    urgency: number;
+    /** Only a publicly known window can cause window-specific waiting. */
+    streamingWindow?: { platformId: string; countryIds: readonly string[]; absoluteWeek: number; publiclyKnown: boolean };
+}
+export interface CinemaCohortMarketFacts {
+    eligiblePeople: number;
+    /** Participation's cinema-only monthly allocation, integer cents. */
+    monthlyCinemaBudgetCents: number;
+    weeklyLeisureMinutes: number;
+    interest: number;
+    priceSensitivity: number;
+    persona: WorldAudiencePersonaId;
+    languages: readonly string[];
+    travelMinutes: number;
+}
+export interface CinemaCountryFacts {
+    id: string;
+    regionId: BoxOfficeRegionId;
+    population: number;
+    cinemaAccess: number;
+    purchasingPower: number;
+    inflation: number;
+    languages: readonly string[];
+}
+export interface CinemaSeenBand {
+    people: number;
+    satisfaction: number;
+    repeatAdmissions: number;
+    lastViewedWeek: number;
+}
+export interface CinemaAudienceCell {
+    cohortId: string;
+    awarePeople: number;
+    seenBands: CinemaSeenBand[];
+    deferredPeople: number;
+    lastDiscoveryWeek: number;
+    /** Qualified lifetime contacts already spent by this title/cohort's seen audience. */
+    discoveryContactsUsed?: number;
+}
+export interface CinemaTitleAudienceState {
+    titleId: string;
+    ownerId: string;
+    cast: CinemaCreditedPerson[];
+    universeId?: string;
+    releaseWeek: number;
+    appliedExposureIds: string[];
+    cells: CinemaAudienceCell[];
+}
+export interface CinemaViewingEvidence {
+    id: string;
+    titleId: string;
+    ownerId: string;
+    cohortId: string;
+    people: number;
+    satisfaction: number;
+    absoluteWeek: number;
+    cast: readonly CinemaCreditedPerson[];
+    universeId?: string;
+    source: 'THEATER' | 'STREAMING_ESTIMATE';
+}
+export interface CinemaAffinity {
+    cohortId: string;
+    kind: 'ACTOR' | 'STUDIO' | 'UNIVERSE';
+    id: string;
+    people: number;
+    strength: number;
+    lastWeek: number;
+}
+export interface CinemaRunState {
+    titleId: string;
+    poolId: string;
+    quietWeeks: number;
+    closed: boolean;
+}
+export interface CinemaMarketState {
+    schemaVersion: 1;
+    tuningVersion: number;
+    lastProcessedAbsoluteWeek: number;
+    titles: CinemaTitleAudienceState[];
+    affinities: CinemaAffinity[];
+    runs: CinemaRunState[];
+}
+export interface CinemaChoiceRequest {
+    kind: 'FIRST' | 'REPEAT' | 'DEFER';
+    cohortId: string;
+    titleId: string;
+    requestedAdmissions: number;
+    interestedPeople: number;
+    utility: number;
+    priceCents: number;
+    minutesPerVisit: number;
+    awarePeople: number;
+    reachableUnseenPeople: number;
+    repeatEligiblePeople: number;
+    satisfaction: number;
+    attachment: number;
+    universeFamiliarity: number;
+    discoveryPeople: number;
+    reasons: string[];
+}
+export interface CinemaSupplyPool {
+    id: string;
+    countryId: string;
+    chainId: CinemaChainId;
+    format: 'STANDARD' | 'PREMIUM';
+    locationId?: string;
+    screens: number;
+    seatsPerShow: number;
+    weeklyScreenMinutes: number;
+    ticketPriceCents: number;
+    exhibitorBasisPoints: number;
+    distributionBasisPoints: number;
+    bookingCentsPerShow: number;
+}
+export interface CinemaSupplyQuote {
+    pools: CinemaSupplyPool[];
+    offers: Array<{ titleId: string; poolId: string }>;
+}
+export interface CinemaAdmissionAllocation {
+    titleId: string;
+    cohortId: string;
+    poolId: string;
+    kind: 'FIRST' | 'REPEAT';
+    admissions: number;
+    priceCents: number;
+    minutesPerVisit: number;
+    satisfaction: number;
+}
+export interface CinemaWeekResult {
+    absoluteWeek: number;
+    tuningVersion: number;
+    mode: 'SHADOW';
+    titles: Array<CinemaGrossSplit & { titleId: string; firstAdmissions: number; repeatAdmissions: number; deferredPeople: number }>;
+    cohorts: Array<{ cohortId: string; walletCents: number; spentCents: number; unspentCents: number; leisureMinutes: number; usedMinutes: number }>;
+    supply: Array<{ poolId: string; shows: number; usedScreenMinutes: number; availableScreenMinutes: number; seats: number; admissions: number }>;
+    allocations: CinemaAdmissionAllocation[];
+    costEvents: Array<{ id: string; titleId: string; poolId: string; category: 'BOOKING_COST'; amountCents: number }>;
+    nextState: CinemaMarketState;
 }

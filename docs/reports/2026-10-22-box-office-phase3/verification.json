@@ -1,0 +1,71 @@
+{
+  "phase": 3,
+  "status": "TASK_5_VERIFIED_TASK_6_IN_PROGRESS",
+  "baseline": "a75893a",
+  "verificationScope": "HEAD archive plus owned overlay; unrelated concurrent streaming changes excluded",
+  "task5": {
+    "audienceGroups": 24,
+    "priorGroups": 75,
+    "typecheckExitCode": 0,
+    "suites": [
+      {
+        "suite": "inputs",
+        "exitCode": 0
+      },
+      {
+        "suite": "delivery",
+        "exitCode": 0
+      },
+      {
+        "suite": "finance",
+        "exitCode": 0
+      },
+      {
+        "suite": "finance-contracts",
+        "exitCode": 0
+      },
+      {
+        "suite": "finance-ui",
+        "exitCode": 0
+      },
+      {
+        "suite": "phase1-integration",
+        "exitCode": 0
+      },
+      {
+        "suite": "awareness",
+        "exitCode": 0
+      },
+      {
+        "suite": "phase2-integration",
+        "exitCode": 0
+      },
+      {
+        "suite": "audience",
+        "exitCode": 0
+      }
+    ],
+    "review": "No remaining Critical or Important Task5 findings after substantive regressions repaired",
+    "redEvidence": [
+      "Empty choice builder failed positive exposed first intent",
+      "Empty adapter failed canonical participation audience",
+      "Old forecast projector lost market access",
+      "Historical cameo matched lead; compact universe history lost; finite WOM regression"
+    ],
+    "sourceHashes": {
+      "services/boxOffice/boxOfficeTypes.ts": "e12ff106e4d2ffc46ca5eefcf10397a3ea1bc509271222884da40acbf85634c6",
+      "services/boxOffice/boxOfficeProfiles.ts": "cab21183f99658fff9fb2669372ad3ae2586f96f8c4aa07a111beb8c47b4ad01",
+      "services/boxOffice/boxOfficeAwareness.ts": "c6dc4c335495c194d5372e69d6bcdf1b790a9b2c6eae00da668b6c669733644f",
+      "services/boxOffice/boxOfficeAudience.ts": "8468a802be58d18ed97803d97ebe9aa0d05229921ec172f09fcaa2b1a97b3c4b",
+      "services/boxOffice/boxOfficeAudienceAdapters.ts": "00e465aac2d38989d8e8f4b691f5e9454ea945695a7cfff19329b16912e84cec",
+      "scripts/audit-box-office-audience.ts": "3f7b722e2dfa1527d6f2370a42f68b9459215a4e4d10dfbc03437897e7f01134",
+      "scripts/fixtures/boxOfficeScenarios.ts": "ff7e91f0c9b00eac8612cb4728f4769925a61b860fd2871763e4c4ca797fcfad",
+      "scripts/run-box-office-audit.mjs": "7d02e20ca6ba9944c741fb539003c5102ed8173981eb93ab9e043471d4cf2347"
+    }
+  },
+  "recoveryManifest": "/private/tmp/actor-box-office-phase3-20261022-103404/manifest.json",
+  "limits": [
+    "Shadow only. No Player/world save schema, audience persistence, live settlement or UI activation.",
+    "Coefficients are candidate game tuning; full balance and device verification remain Phase6."
+  ]
+}

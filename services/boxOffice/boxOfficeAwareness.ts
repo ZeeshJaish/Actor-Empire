@@ -127,6 +127,8 @@ export const appendCinemaExposureEvent = (source: Parameters<typeof readCinemaEx
 export const projectCinemaForecastInput = (input: CinemaWeekInput, known: CinemaKnownInputs): CinemaWeekInput => ({
     absoluteWeek: count(input.absoluteWeek, 'forecast week'), seed: input.seed, tuningVersion: input.tuningVersion, knowledge: 'FORECAST',
     cohorts: structuredClone(known.cohorts),
+    countries: structuredClone(input.countries), supply: structuredClone(input.supply),
+    marketState: structuredClone(input.marketState), history: structuredClone(input.history),
     titles: known.titles.map(title => {
         const [low, high] = title.delivery.qualityRange;
         if (!Number.isFinite(low) || !Number.isFinite(high) || low < 0 || high > 100 || low > high) throw new RangeError('Invalid visible cinema quality range');
@@ -134,6 +136,11 @@ export const projectCinemaForecastInput = (input: CinemaWeekInput, known: Cinema
             cast: uniqueCast(title.cast).map(person => ({ personId: person.personId, name: person.name, roleType: person.roleType, roleWeight: person.roleWeight,
                 fame: person.fame, stature: person.stature, isPlayer: person.isPlayer, characterIds: [...person.characterIds] })),
             directorId: title.directorId, playerCredited: title.playerCredited,
+            ...(title.market ? {market:{releaseWeek:title.market.releaseWeek,runtimeMinutes:title.market.runtimeMinutes,languages:[...title.market.languages],
+                countryIds:[...title.market.countryIds],chainIds:[...title.market.chainIds],format:title.market.format,
+                universeId:title.market.universeId,returningCharacterIds:title.market.returningCharacterIds ? [...title.market.returningCharacterIds] : undefined,
+                payoff:title.market.payoff,accessibility:title.market.accessibility,urgency:title.market.urgency,
+                ...(title.market.streamingWindow ? {streamingWindow:structuredClone(title.market.streamingWindow)} : {})}} : {}),
             ...(title.exposure ? { exposure: readCinemaExposureRecord({ cinemaExposure: title.exposure }) } : {}),
             delivery: { estimatedQuality: clamp(title.delivery.estimatedQuality ?? (low + high) / 2, low, high), qualityRange: [low, high],
                 scriptQuality: clamp(title.delivery.scriptQuality, 0, 100), directorQuality: clamp(title.delivery.directorQuality, 0, 100),

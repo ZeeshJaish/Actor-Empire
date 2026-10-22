@@ -203,8 +203,8 @@ assert.equal(a.knowledge, 'FORECAST');
 
 **Interfaces:** produce `buildCinemaChoices(input: CinemaWeekInput): CinemaChoiceRequest[]`. Requests have `kind: FIRST | REPEAT | DEFER`, `cohortId`, `titleId`, `requestedAdmissions`, utility, price/time requirements and experience signals. Deferred requests carry interest counts and never request a paid admission. They are requests before shared allocation, not paid admissions. Define bounded seen bands and compact affinity updates in `CinemaMarketState`.
 
-- [ ] Add `earned-event`, `unearned-event`, `streaming-wait`, `no-streaming-deal`, `satisfied-repeat`, `weak-repeat`, `indie-discovery`, `no-exposure` and `overlapping-favorites` fixtures.
-- [ ] Write and run first/repeat/defer cases with actual code:
+- [x] Add `earned-event`, `unearned-event`, `streaming-wait`, `no-streaming-deal`, `satisfied-repeat`, `weak-repeat`, `indie-discovery`, `no-exposure` and `overlapping-favorites` fixtures.
+- [x] Write and run first/repeat/defer cases with actual code:
 
 ~~~ts
 const f = makeCinemaFixture('satisfied-repeat', 13);
@@ -216,12 +216,12 @@ assert.equal(buildCinemaChoices(unknown.input)
   .filter(r => r.kind === 'FIRST').reduce((n, r) => n + r.requestedAdmissions, 0), 0);
 ~~~
 
-- [ ] Run `node scripts/run-box-office-audit.mjs audience`; implement awareness-gated first intent and satisfaction/attachment-based repeat intent with declining recent-repeat propensity. Every paid repeat later requires a fresh seat, money and time. Repeat requests never increase the unique-viewer pool.
-- [ ] Build favorites from delivered experience and relevant roles; use bounded overlapping cohort segments for actor/studio/franchise attachment. Apply fatigue once. Seed recognition conservatively when old histories are absent.
-- [ ] Connect universe familiarity to actual earlier theater/streaming exposure and satisfaction, meaningful returning roles/payoff, accessibility and cadence. The blueprint helper is not currently proven wired; explicitly connect canonical player/NPC history rather than treating existing tests as integration proof. Do not impose a universal precursor-film count.
-- [ ] Add waiting/skip alternatives based on affordability, urgency, travel/time and known streaming windows. Deferred intent decays, reserves no money and cannot bypass future country rights, entitlement, readiness or platform capacity. Catch-up uses actual viewing, not catalogue presence.
-- [ ] Implement word of mouth from satisfied exposed people to bounded net-new reachable contacts, with overlap/language/local fit and timing. High quality with no exposure cannot recruit an informed worldwide audience immediately.
-- [ ] Run audience and existing universe-blueprint, fandom state/formation, novelty and WE6 viewing audits if those shared files changed. Checkpoint as `feat: model cinema audience history and choices`.
+- [x] Run `node scripts/run-box-office-audit.mjs audience`; implement awareness-gated first intent and satisfaction/attachment-based repeat intent with declining recent-repeat propensity. Every paid repeat later requires a fresh seat, money and time. Repeat requests never increase the unique-viewer pool.
+- [x] Build favorites from delivered experience and relevant roles; use bounded overlapping cohort segments for actor/studio/franchise attachment. Apply fatigue once. Seed recognition conservatively when old histories are absent.
+- [x] Connect universe familiarity to actual earlier theater/streaming exposure and satisfaction, meaningful returning roles/payoff, accessibility and cadence. The blueprint helper is not currently proven wired; explicitly connect canonical player/NPC history rather than treating existing tests as integration proof. Do not impose a universal precursor-film count.
+- [x] Add waiting/skip alternatives based on affordability, urgency, travel/time and known streaming windows. Deferred intent decays, reserves no money and cannot bypass future country rights, entitlement, readiness or platform capacity. Catch-up uses actual viewing, not catalogue presence.
+- [x] Implement word of mouth from satisfied exposed people to bounded net-new reachable contacts, with overlap/language/local fit and timing. High quality with no exposure cannot recruit an informed worldwide audience immediately.
+- [x] Run audience and existing universe-blueprint, fandom state/formation, novelty and WE6 viewing audits if those shared files changed. Checkpoint as `feat: model cinema audience history and choices`.
 
 ### Task 6: Country pricing, shared shows and bounded allocation
 
