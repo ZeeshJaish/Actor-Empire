@@ -38,7 +38,7 @@
     {
       "gate": "Known v1 tuning and old paid-save migration",
       "status": "PASSED",
-      "evidence": "paid-migration.log",
+      "evidence": "paid-migration.txt",
       "scope": "20 groups including nonempty settled paid receipt through signed load, upgrade, re-sign and reload; future/partial states reject"
     },
     {
@@ -62,7 +62,7 @@
     {
       "gate": "Studio receipt retention at verified save boundary",
       "status": "PASSED",
-      "evidence": "save-boundary.log",
+      "evidence": "save-boundary.txt",
       "scope": "One shared 160-row bound; source money and every retained receipt ID survive verified preparation; source unchanged"
     },
     {
@@ -98,13 +98,13 @@
     {
       "gate": "Scoped regression suites and TypeScript/build",
       "status": "PASSED",
-      "evidence": "cinema-audits.json; affected-audits.json; verification.log",
+      "evidence": "cinema-audits.json; affected-audits.json; verification.txt",
       "scope": "18 focused cinema suite types plus 832-treatment calibration and selected 130-week save observations; affected save, rights, playback, C4 and studio audits; isolated/current-workspace lint/build. Ordinary journey remains a separate failed gate; default all-style suite is not green."
     },
     {
       "gate": "Frozen English baseline",
       "status": "PASSED",
-      "evidence": "english-baseline.log",
+      "evidence": "english-baseline.txt",
       "scope": "8,173 frozen keys and 14,720 reaction cases; no recapture"
     },
     {

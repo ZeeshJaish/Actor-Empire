@@ -1,0 +1,12 @@
+PASS tuning 1 migration preserves money/history and future tuning is rejected
+START ordinary-starter
+PROGRESS ordinary-starter 0/208 {"cash":1575,"energy":60,"phases":[],"campaignPaid":0}
+PROGRESS ordinary-starter 13/208 {"cash":1550,"energy":45,"phases":[],"campaignPaid":0}
+PROGRESS ordinary-starter 26/208 {"cash":1550,"energy":45,"phases":[],"campaignPaid":0}
+PROGRESS ordinary-starter 39/208 {"cash":1550,"energy":45,"phases":[],"campaignPaid":0}
+PROGRESS ordinary-starter 52/208 {"cash":1575,"energy":85,"phases":[],"campaignPaid":0}
+PROGRESS ordinary-starter 65/208 {"cash":5475,"energy":85,"phases":[],"campaignPaid":0}
+PROGRESS ordinary-starter 78/208 {"cash":6880,"energy":30,"phases":["AUDITION"],"campaignPaid":0}
+PROGRESS ordinary-starter 91/208 {"cash":5035,"energy":65,"phases":[],"campaignPaid":0}
+PROGRESS ordinary-starter 104/208 {"cash":-23595,"energy":65,"phases":[],"campaignPaid":0}
+PROGRESS ordinary-starter 117/208 {"cash":-59655,"energy":65,"phases":[],"campaignPaid":0}

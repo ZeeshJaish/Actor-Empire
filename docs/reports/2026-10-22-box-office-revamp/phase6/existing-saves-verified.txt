@@ -1,0 +1,21 @@
+PASS tuning 1 migration preserves money/history and future tuning is rejected
+START founder-small
+PROGRESS founder-small 0/26 {"cash":2000,"energy":100,"phases":["PRE_PRODUCTION"],"campaignPaid":0}
+PROGRESS founder-small 13/26 {"cash":2000,"energy":100,"phases":[],"campaignPaid":0}
+PASS long save founder-small: {"weeks":26,"sawProduction":true,"sawOpening":true,"sawRepeat":true,"sawExit":false,"sawStreaming":false,"reloads":3}
+START established-studio
+PROGRESS established-studio 0/26 {"cash":2000,"energy":100,"phases":["PRE_PRODUCTION"],"campaignPaid":0}
+PROGRESS established-studio 13/26 {"cash":2000,"energy":100,"phases":[],"campaignPaid":0}
+PASS long save established-studio: {"weeks":26,"sawProduction":true,"sawOpening":true,"sawRepeat":true,"sawExit":false,"sawStreaming":false,"reloads":4}
+START offered-universe
+PROGRESS offered-universe 0/26 {"cash":2000,"energy":100,"phases":[],"campaignPaid":0}
+PROGRESS offered-universe 13/26 {"cash":560810,"energy":100,"phases":[],"campaignPaid":0}
+PASS long save offered-universe: {"weeks":26,"sawProduction":false,"sawOpening":true,"sawRepeat":true,"sawExit":false,"sawStreaming":false,"reloads":3}
+START legacy-active
+PROGRESS legacy-active 0/26 {"cash":2000,"energy":100,"phases":[],"campaignPaid":0}
+PROGRESS legacy-active 13/26 {"cash":51609,"energy":100,"phases":[],"campaignPaid":0}
+PASS long save legacy-active: {"weeks":26,"sawProduction":false,"sawOpening":true,"sawRepeat":true,"sawExit":false,"sawStreaming":false,"reloads":2}
+START late-handoff
+PROGRESS late-handoff 0/26 {"cash":2000,"energy":100,"phases":[],"campaignPaid":0}
+PROGRESS late-handoff 13/26 {"cash":2000,"energy":100,"phases":[],"campaignPaid":0}
+PASS long save late-handoff: {"weeks":26,"sawProduction":false,"sawOpening":false,"sawRepeat":false,"sawExit":true,"sawStreaming":true,"reloads":3}

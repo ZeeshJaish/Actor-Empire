@@ -1,0 +1,37 @@
+PASS tuning 1 migration preserves money/history and future tuning is rejected
+START founder-small
+PROGRESS founder-small 0/26
+PROGRESS founder-small 13/26
+PASS long save founder-small: {"weeks":26,"sawProduction":true,"sawOpening":true,"sawRepeat":true,"sawExit":false,"sawStreaming":false,"reloads":3}
+START established-studio
+PROGRESS established-studio 0/26
+PROGRESS established-studio 13/26
+PASS long save established-studio: {"weeks":26,"sawProduction":true,"sawOpening":true,"sawRepeat":true,"sawExit":false,"sawStreaming":false,"reloads":4}
+START offered-universe
+PROGRESS offered-universe 0/26
+PROGRESS offered-universe 13/26
+PASS long save offered-universe: {"weeks":26,"sawProduction":false,"sawOpening":true,"sawRepeat":true,"sawExit":false,"sawStreaming":false,"reloads":3}
+START legacy-active
+PROGRESS legacy-active 0/26
+PROGRESS legacy-active 13/26
+PASS long save legacy-active: {"weeks":26,"sawProduction":false,"sawOpening":true,"sawRepeat":true,"sawExit":false,"sawStreaming":false,"reloads":2}
+START ordinary-starter
+PROGRESS ordinary-starter 0/156
+PROGRESS ordinary-starter 13/156
+PROGRESS ordinary-starter 26/156
+PROGRESS ordinary-starter 39/156
+PROGRESS ordinary-starter 52/156
+PROGRESS ordinary-starter 65/156
+PROGRESS ordinary-starter 78/156
+PROGRESS ordinary-starter 91/156
+PROGRESS ordinary-starter 104/156
+PROGRESS ordinary-starter 117/156
+PROGRESS ordinary-starter 130/156
+Starting inspector on 127.0.0.1:9229 failed: operation not permitted
+Starting inspector on 127.0.0.1:9229 failed: operation not permitted
+PROGRESS ordinary-starter 143/156
+PASS long save ordinary-starter: {"weeks":156,"sawProduction":true,"sawOpening":true,"sawRepeat":false,"sawExit":true,"sawStreaming":true,"reloads":14}
+START late-handoff
+PROGRESS late-handoff 0/26
+PROGRESS late-handoff 13/26
+PASS long save late-handoff: {"weeks":26,"sawProduction":false,"sawOpening":false,"sawRepeat":false,"sawExit":true,"sawStreaming":true,"reloads":3}

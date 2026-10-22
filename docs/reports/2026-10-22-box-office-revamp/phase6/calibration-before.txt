@@ -1,0 +1,42 @@
+FAIL old finite exposure loses opening urgency
+PASS no free worldwide tickets
+PASS worldwide checkbox cannot create a new audience
+PASS targeted campaign finds more paid viewers
+PASS strong two-star delivery outlasts weak delivery
+PASS earned buildup improves crossover demand
+FAIL earned universe with weak payoff can lose money
+PASS cameo cannot equal meaningful returning lead
+PASS duplicate fan evidence makes no extra people
+PASS actual precursor streaming catch-up earns familiarity
+FAIL cadence fatigue has consequences
+PASS new studio health is not free awareness
+PASS small film can recover its real costs
+PASS wide weak no-awareness film can lose money
+PASS high-price low-income constrains paid visits
+PASS recession reduces affordable paid visits
+FAIL rivals compete for the same audience resources
+PASS local language improves otherwise identical local reach
+PASS limited seats constrain opening
+PASS campaign exposure saturates before spending
+PASS short announced streaming window reduces theater visits
+PASS late word of mouth can grow
+PASS viable demand continues beyond old $3B cap
+Calibration: 832 measured treatments; 77024 title-weeks
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Conditional balance tendencies failed; inspect distributions before tuning
+    at file:///private/var/folders/h0/t4fqx33d23l2fh_9h7n17cqr0000gp/T/actor-box-office-QIqwNy/calibration.mjs:2765:8
+    at ModuleJob.run (node:internal/modules/esm/module_job:377:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:671:26)
+    at async file:///private/tmp/actor-box-office-phase6-20261022-143859/baseline/[eval1]:1:198 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}
+
+Node.js v24.11.1

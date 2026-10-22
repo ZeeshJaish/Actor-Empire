@@ -1,0 +1,29 @@
+PASS tuning 1 migration preserves money/history and future tuning is rejected
+START ordinary-starter
+PROGRESS ordinary-starter 0/156
+PROGRESS ordinary-starter 13/156
+PROGRESS ordinary-starter 26/156
+PROGRESS ordinary-starter 39/156
+PROGRESS ordinary-starter 52/156
+PROGRESS ordinary-starter 65/156
+PROGRESS ordinary-starter 78/156
+PROGRESS ordinary-starter 91/156
+PROGRESS ordinary-starter 104/156
+PROGRESS ordinary-starter 117/156
+PROGRESS ordinary-starter 130/156
+PROGRESS ordinary-starter 143/156
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Starter must actually complete production and paid release
+    at file:///private/var/folders/h0/t4fqx33d23l2fh_9h7n17cqr0000gp/T/actor-box-office-HA7i7J/long-save.mjs:165131:12 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}
+
+Node.js v24.11.1

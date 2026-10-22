@@ -1,0 +1,129 @@
+Current workspace lint
+
+> pr-6.6.3@1.0.25 lint
+> node --max-old-space-size=8192 ./node_modules/typescript/bin/tsc --noEmit
+
+
+
+Current workspace production build
+
+> pr-6.6.3@1.0.25 build
+> vite build
+
+vite v6.4.1 building for production...
+transforming...
+Browserslist: browsers data (caniuse-lite) is 8 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+✓ 3752 modules transformed.
+rendering chunks...
+[plugin vite:reporter] 
+(!) /Users/zeesh/Vibe code/Actor empire/services/crisisGenerator.ts is dynamically imported by /Users/zeesh/Vibe code/Actor empire/views/home/homeProductionQaActions.ts but also statically imported by /Users/zeesh/Vibe code/Actor empire/services/productionService.ts, dynamic import will not move module into another chunk.
+
+[plugin vite:reporter] 
+(!) /Users/zeesh/Vibe code/Actor empire/services/directorGenerator.ts is dynamically imported by /Users/zeesh/Vibe code/Actor empire/views/home/homeProductionQaActions.ts but also statically imported by /Users/zeesh/Vibe code/Actor empire/services/productionService.ts, dynamic import will not move module into another chunk.
+
+[plugin vite:reporter] 
+(!) /Users/zeesh/Vibe code/Actor empire/services/productionService.ts is dynamically imported by /Users/zeesh/Vibe code/Actor empire/views/home/homeProductionQaActions.ts but also statically imported by /Users/zeesh/Vibe code/Actor empire/App.tsx, /Users/zeesh/Vibe code/Actor empire/services/gameLoop.ts, dynamic import will not move module into another chunk.
+
+computing gzip size...
+dist/index.html                                        6.91 kB │ gzip:     1.92 kB
+dist/assets/boxOfficeForecast.worker-DzYh4oAy.js   4,490.07 kB
+dist/assets/index-BVMmbM-I.css                     4,233.94 kB │ gzip: 1,635.89 kB
+dist/assets/web-CEafVBXE.js                            0.84 kB │ gzip:     0.25 kB
+dist/assets/web-DKY_S3gW.js                            1.56 kB │ gzip:     0.53 kB
+dist/assets/streamingLaunchQa-DFdyCRqD.js             10.95 kB │ gzip:     4.55 kB
+dist/assets/web-Dr_ww6Zc.js                           16.37 kB │ gzip:     4.79 kB
+dist/assets/web-CX-8hlQf.js                           28.44 kB │ gzip:     5.51 kB
+dist/assets/web-DuiJztz6.js                           40.11 kB │ gzip:    10.39 kB
+dist/assets/index.esm-H2zVK-Yc.js                     54.48 kB │ gzip:    11.21 kB
+dist/assets/index-DuvimOM0.js                     14,569.97 kB │ gzip: 4,093.36 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 19.95s
+
+
+Isolated candidate TypeScript
+
+
+Isolated candidate production build
+
+> pr-6.6.3@1.0.25 build
+> vite build
+
+vite v6.4.1 building for production...
+transforming...
+Browserslist: browsers data (caniuse-lite) is 8 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+✓ 3733 modules transformed.
+rendering chunks...
+[plugin vite:reporter] 
+(!) /private/tmp/actor-box-office-phase6-20261022-143859/candidate/services/crisisGenerator.ts is dynamically imported by /private/tmp/actor-box-office-phase6-20261022-143859/candidate/views/home/homeProductionQaActions.ts but also statically imported by /private/tmp/actor-box-office-phase6-20261022-143859/candidate/services/productionService.ts, dynamic import will not move module into another chunk.
+
+[plugin vite:reporter] 
+(!) /private/tmp/actor-box-office-phase6-20261022-143859/candidate/services/directorGenerator.ts is dynamically imported by /private/tmp/actor-box-office-phase6-20261022-143859/candidate/views/home/homeProductionQaActions.ts but also statically imported by /private/tmp/actor-box-office-phase6-20261022-143859/candidate/services/productionService.ts, dynamic import will not move module into another chunk.
+
+[plugin vite:reporter] 
+(!) /private/tmp/actor-box-office-phase6-20261022-143859/candidate/services/productionService.ts is dynamically imported by /private/tmp/actor-box-office-phase6-20261022-143859/candidate/views/home/homeProductionQaActions.ts but also statically imported by /private/tmp/actor-box-office-phase6-20261022-143859/candidate/App.tsx, /private/tmp/actor-box-office-phase6-20261022-143859/candidate/services/gameLoop.ts, dynamic import will not move module into another chunk.
+
+computing gzip size...
+dist/index.html                                        6.91 kB │ gzip:     1.92 kB
+dist/assets/boxOfficeForecast.worker-DzYh4oAy.js   4,490.07 kB
+dist/assets/index-DIbgDSIx.css                     4,140.86 kB │ gzip: 1,619.15 kB
+dist/assets/web-DkvwAL6L.js                            0.84 kB │ gzip:     0.25 kB
+dist/assets/web-C_0fR685.js                            1.56 kB │ gzip:     0.53 kB
+dist/assets/streamingLaunchQa-D63WKfR5.js             10.95 kB │ gzip:     4.55 kB
+dist/assets/web-CjPiUs4J.js                           16.37 kB │ gzip:     4.79 kB
+dist/assets/web-CKSx8A7u.js                           28.44 kB │ gzip:     5.51 kB
+dist/assets/web-D6cNk64d.js                           40.11 kB │ gzip:    10.39 kB
+dist/assets/index.esm-H2zVK-Yc.js                     54.48 kB │ gzip:    11.21 kB
+dist/assets/index--st8DyGU.js                     14,344.31 kB │ gzip: 4,014.13 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 18.22s
+
+
+Save integrity and generation recovery
+
+> pr-6.6.3@1.0.25 audit:save-generations
+> esbuild scripts/audit-save-generations.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-save-generations.mjs && node /tmp/audit-save-generations.mjs
+
+
+  ../../../../tmp/audit-save-generations.mjs  974.9kb
+
+⚡ Done in 36ms
+Save generation audit passed.
+
+
+Corrected large-save guard
+
+> pr-6.6.3@1.0.25 audit:large-save-integrity
+> esbuild scripts/audit-large-save-integrity.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-large-save-integrity.mjs && node /tmp/audit-large-save-integrity.mjs
+
+
+  ../../../../tmp/audit-large-save-integrity.mjs  6.2mb ⚠️
+
+⚡ Done in 52ms
+Large save integrity audit passed: 50MB=52428963 bytes, 100MB=104857913 bytes, 400MB=419431613 bytes
+
+
+World streaming annual checkpoints
+
+> pr-6.6.3@1.0.25 audit:world-streaming-we6
+> esbuild scripts/audit-world-streaming-we6.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-world-streaming-we6.mjs && node /tmp/audit-world-streaming-we6.mjs
+
+
+  ../../../../tmp/audit-world-streaming-we6.mjs  6.7mb ⚠️
+
+⚡ Done in 63ms
+WE6 C2 reference-week gross: rights-aware $1326506; permissive reference $1330607; delta -0.308%.
+WE6 C2 title lines (permissive, rights-aware): [{"projectId":"us-window-only","viewingAccounts":[110649,109518],"adRevenue":[19624,19671],"rentalRevenue":[181982,181982],"purchaseRevenue":[22608,0]},{"projectId":"hindi-heart","viewingAccounts":[108878,109512],"adRevenue":[7011,7006],"rentalRevenue":[388745,388745],"purchaseRevenue":[44977,57651]},{"projectId":"imported-action","viewingAccounts":[85127,85419],"adRevenue":[11873,11868],"rentalRevenue":[142556,142556],"purchaseRevenue":[20769,26606]}]
+WE6 seed: 534,084,341 viewing accounts and 1,367,167,499 hours.
+WE6 400-year horizon: 976.7 KiB state; 61839.2ms across 400 annual checkpoints.
