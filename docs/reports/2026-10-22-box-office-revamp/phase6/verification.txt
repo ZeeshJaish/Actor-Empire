@@ -17,13 +17,13 @@ Browserslist: browsers data (caniuse-lite) is 8 months old. Please run:
   Why you should do it regularly: https://github.com/browserslist/update-db#readme
 ✓ 3752 modules transformed.
 rendering chunks...
-[plugin vite:reporter] 
+[plugin vite:reporter]
 (!) /Users/zeesh/Vibe code/Actor empire/services/crisisGenerator.ts is dynamically imported by /Users/zeesh/Vibe code/Actor empire/views/home/homeProductionQaActions.ts but also statically imported by /Users/zeesh/Vibe code/Actor empire/services/productionService.ts, dynamic import will not move module into another chunk.
 
-[plugin vite:reporter] 
+[plugin vite:reporter]
 (!) /Users/zeesh/Vibe code/Actor empire/services/directorGenerator.ts is dynamically imported by /Users/zeesh/Vibe code/Actor empire/views/home/homeProductionQaActions.ts but also statically imported by /Users/zeesh/Vibe code/Actor empire/services/productionService.ts, dynamic import will not move module into another chunk.
 
-[plugin vite:reporter] 
+[plugin vite:reporter]
 (!) /Users/zeesh/Vibe code/Actor empire/services/productionService.ts is dynamically imported by /Users/zeesh/Vibe code/Actor empire/views/home/homeProductionQaActions.ts but also statically imported by /Users/zeesh/Vibe code/Actor empire/App.tsx, /Users/zeesh/Vibe code/Actor empire/services/gameLoop.ts, dynamic import will not move module into another chunk.
 
 computing gzip size...
@@ -61,13 +61,13 @@ Browserslist: browsers data (caniuse-lite) is 8 months old. Please run:
   Why you should do it regularly: https://github.com/browserslist/update-db#readme
 ✓ 3733 modules transformed.
 rendering chunks...
-[plugin vite:reporter] 
+[plugin vite:reporter]
 (!) /private/tmp/actor-box-office-phase6-20261022-143859/candidate/services/crisisGenerator.ts is dynamically imported by /private/tmp/actor-box-office-phase6-20261022-143859/candidate/views/home/homeProductionQaActions.ts but also statically imported by /private/tmp/actor-box-office-phase6-20261022-143859/candidate/services/productionService.ts, dynamic import will not move module into another chunk.
 
-[plugin vite:reporter] 
+[plugin vite:reporter]
 (!) /private/tmp/actor-box-office-phase6-20261022-143859/candidate/services/directorGenerator.ts is dynamically imported by /private/tmp/actor-box-office-phase6-20261022-143859/candidate/views/home/homeProductionQaActions.ts but also statically imported by /private/tmp/actor-box-office-phase6-20261022-143859/candidate/services/productionService.ts, dynamic import will not move module into another chunk.
 
-[plugin vite:reporter] 
+[plugin vite:reporter]
 (!) /private/tmp/actor-box-office-phase6-20261022-143859/candidate/services/productionService.ts is dynamically imported by /private/tmp/actor-box-office-phase6-20261022-143859/candidate/views/home/homeProductionQaActions.ts but also statically imported by /private/tmp/actor-box-office-phase6-20261022-143859/candidate/App.tsx, /private/tmp/actor-box-office-phase6-20261022-143859/candidate/services/gameLoop.ts, dynamic import will not move module into another chunk.
 
 computing gzip size...

@@ -22,7 +22,7 @@
     "docs/reports/2026-10-22-box-office-revamp/phase6/english-baseline.txt": "e10fff7ee743f27da35790d61ba0914aeb688f437edce916ca15c5a48e5d893e",
     "docs/reports/2026-10-22-box-office-revamp/phase6/existing-saves-verified.json": "24742a187076a5313d862c23e7a7c01af874cae88fd647ed789c5491309a650c",
     "docs/reports/2026-10-22-box-office-revamp/phase6/existing-saves-verified.txt": "b9ccde2355fda5cbeaee2767bbff56fc9cb548d6909ff271460b3379ecf2b744",
-    "docs/reports/2026-10-22-box-office-revamp/phase6/final-lint.txt": "4d009f7343606e5c16aaefe77ed90fd2f20baf198e0cbb04d3a9e90a035f322a",
+    "docs/reports/2026-10-22-box-office-revamp/phase6/final-lint.txt": "65da3a5d65329fe6c861f526ec6d67b1348c7d1de7600099330b1a77463e509a",
     "docs/reports/2026-10-22-box-office-revamp/phase6/iterations.md": "6f115e0cae623c41cdc34c01cc7e5c02c772e3abf62eb7b5dd36916394c347f7",
     "docs/reports/2026-10-22-box-office-revamp/phase6/long-saves-first-pass.json": "0968fce3b8ee3042de7e8e7f5742f3bb563b75cb4e060acf193f909c6c4bb98b",
     "docs/reports/2026-10-22-box-office-revamp/phase6/long-saves-first-pass.txt": "68c4248331a99981ad331617a65253b8ebe3c5a01fdda44c983b13a2a857124b",
@@ -50,7 +50,7 @@
     "docs/reports/2026-10-22-box-office-revamp/phase6/starter-work-break-observation.json": "96277257ba3661486c44085f2988d4b7db796d899c7ba97454dc2f02a82fd3ff",
     "docs/reports/2026-10-22-box-office-revamp/phase6/starter-work-break-observation.txt": "ea94a9d9242b03933626937c7bb51c235a62e305805d9d3d938c02b43f85b71b",
     "docs/reports/2026-10-22-box-office-revamp/phase6/verification-matrix.json": "deb2ade1808d9876df8aea18acf4b675eddd8ffa261b45adc95d66333813a64a",
-    "docs/reports/2026-10-22-box-office-revamp/phase6/verification.txt": "8502f1b6dc8c4ce6f8a3f82b210141505771cf8004f28b7db2ff8a6fe157782d",
+    "docs/reports/2026-10-22-box-office-revamp/phase6/verification.txt": "ffbd874e270513ba449fd97db6c9ff78003ee108eb236c274ec5ee838fcac650",
     "docs/reports/2026-10-22-box-office-revamp/phase6/verified-changes.json": "a555cc71c10ba76b3cd489968ebfec1dd557ba29d491c12c72ae5ed29f7871ad",
     "docs/reports/2026-10-22-box-office-revamp/phase6/viewing-after.json": "7e3a6c540d2cd2afe0b2b58fdb87ab75fcb3851421b108fd1c765d79e634fb46",
     "docs/reports/2026-10-22-box-office-revamp/phase6/viewing-before.json": "83a954401ffae11435d8febddfe4dce640a19855df5f95b50fb1d175499673e2",
@@ -95,5 +95,6 @@
     "globalP95Gate": "INCONCLUSIVE",
     "deviceAndFullApp": "UNTESTED"
   },
-  "implementationCheckpoint": "54807f1"
+  "implementationCheckpoint": "54807f1",
+  "transcriptNormalization": "Trailing line whitespace and excess blank EOF normalized for version control; values and verdict text unchanged. Original raw logs remain in the local evidence directory."
 }
