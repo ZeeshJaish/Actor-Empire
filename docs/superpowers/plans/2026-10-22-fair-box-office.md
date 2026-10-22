@@ -229,8 +229,8 @@ assert.equal(buildCinemaChoices(unknown.input)
 
 **Interfaces:** produce `quoteCinemaSupply(input: CinemaWeekInput): CinemaSupplyQuote` and `simulateCinemaWeek(input: CinemaWeekInput): CinemaWeekResult`. Supply quote gives per-country/chain/format automatic price and feasible shared capacity/cost terms. The result includes compact next-state and complete audit totals; simulation never mutates Player, world, wallets or real ledgers.
 
-- [ ] Add scarce-seat, scarce-wallet, low-access/language, runtime, saturated-market, costly-wide-release and non-binding-capacity fixtures. Map current region/chain inputs to country supply with explicit weights; optional location IDs support future cities.
-- [ ] Write the key loophole and determinism tests:
+- [x] Add scarce-seat, scarce-wallet, low-access/language, runtime, saturated-market, costly-wide-release and non-binding-capacity fixtures. Map current region/chain inputs to country supply with explicit weights; optional location IDs support future cities.
+- [x] Write the key loophole and determinism tests:
 
 ~~~ts
 const narrow = makeCinemaFixture('narrow-unknown', 41);
@@ -244,11 +244,11 @@ assert.deepEqual(simulateCinemaWeek(reordered), b);
 assert.deepEqual(wide.input, makeCinemaFixture('wide-unknown', 41).input);
 ~~~
 
-- [ ] Run `node scripts/run-box-office-audit.mjs market`; implement automatic prices from country economy/calendar + chain/format terms. Derive seats from shared screens, runtime/turnaround, opening time and days, without granting every title a chain's full footprint. Candidate supply constants have explicit units in the profile.
-- [ ] Allocate all title/cohort first and repeat requests jointly. Stable ordering and keyed draws prevent player/NPC iteration preference. Respect participation's cinema budget, leisure time and seat capacities. Retain unspent budgets/outside choice; do not silently transfer the streaming allocation.
-- [ ] Use exact integer remainders and `splitRealizedCinemaGross`. Assert first views <= reachable unseen population, paid repeats <= eligible seen demand, total spending <= cohort wallet, no negative time, booked seats <= supply, and all gross splits exact.
-- [ ] Implement natural country/chain holds, reallocation and ends with bounded discovery grace for credible local/sleeper runs. New local exposure has its own bounded source; access by itself never mints intent. Remove new-model fixed opening/lifetime dollar caps and prior-final-gross multiplier recurrence.
-- [ ] Expose a test-only shadow invocation that records diagnostics without cash, career consequences or persisted audience changes. Run market plus WE1/WE2/WE3 and shared streaming-budget audits. Checkpoint as `feat: simulate shared cinema market in shadow`.
+- [x] Run `node scripts/run-box-office-audit.mjs market`; implement automatic prices from country economy/calendar + chain/format terms. Derive seats from shared screens, runtime/turnaround, opening time and days, without granting every title a chain's full footprint. Candidate supply constants have explicit units in the profile.
+- [x] Allocate all title/cohort first and repeat requests jointly. Stable ordering and keyed draws prevent player/NPC iteration preference. Respect participation's cinema budget, leisure time and seat capacities. Retain unspent budgets/outside choice; do not silently transfer the streaming allocation.
+- [x] Use exact integer remainders and `splitRealizedCinemaGross`. Assert first views <= reachable unseen population, paid repeats <= eligible seen demand, total spending <= cohort wallet, no negative time, booked seats <= supply, and all gross splits exact.
+- [x] Implement natural country/chain holds, reallocation and ends with bounded discovery grace for credible local/sleeper runs. New local exposure has its own bounded source; access by itself never mints intent. Remove new-model fixed opening/lifetime dollar caps and prior-final-gross multiplier recurrence.
+- [x] Expose a test-only shadow invocation that records diagnostics without cash, career consequences or persisted audience changes. Run market plus WE1/WE2/WE3 and shared streaming-budget audits. Checkpoint as `feat: simulate shared cinema market in shadow`.
 
 **Phase 3 gate:** physical, population, money and time invariants pass across owner routes; no shadow payouts. A $50M film may legitimately reach $500M but cannot get it merely by selecting worldwide chains.
 

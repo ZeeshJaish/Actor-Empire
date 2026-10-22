@@ -197,6 +197,9 @@ export interface CinemaAudienceCell {
     seenBands: CinemaSeenBand[];
     deferredPeople: number;
     lastDiscoveryWeek: number;
+    lastChoiceWeek?: number;
+    pendingLocalFootfall?: { absoluteWeek: number; otherFilmAdmissions: number };
+    lastAppliedLocalFootfallWeek?: number;
     /** Qualified lifetime contacts already spent by this title/cohort's seen audience. */
     discoveryContactsUsed?: number;
 }
@@ -239,6 +242,7 @@ export interface CinemaMarketState {
     schemaVersion: 1;
     tuningVersion: number;
     lastProcessedAbsoluteWeek: number;
+    cohortPopulations?: Readonly<Record<string, number>>;
     titles: CinemaTitleAudienceState[];
     affinities: CinemaAffinity[];
     runs: CinemaRunState[];
@@ -259,6 +263,7 @@ export interface CinemaChoiceRequest {
     attachment: number;
     universeFamiliarity: number;
     discoveryPeople: number;
+    localDiscoveryPeople: number;
     reasons: string[];
 }
 export interface CinemaSupplyPool {
@@ -289,11 +294,18 @@ export interface CinemaAdmissionAllocation {
     minutesPerVisit: number;
     satisfaction: number;
 }
+export interface CinemaCountryResult extends CinemaGrossSplit {
+    countryId: string;
+    firstAdmissions: number;
+    repeatAdmissions: number;
+}
 export interface CinemaWeekResult {
     absoluteWeek: number;
     tuningVersion: number;
     mode: 'SHADOW';
-    titles: Array<CinemaGrossSplit & { titleId: string; firstAdmissions: number; repeatAdmissions: number; deferredPeople: number }>;
+    /** Diagnostic identity, not an authorization or settlement receipt. */
+    inputFingerprint: string;
+    titles: Array<CinemaGrossSplit & { titleId: string; firstAdmissions: number; repeatAdmissions: number; deferredPeople: number; satisfactionScore: number | null; countries: CinemaCountryResult[] }>;
     cohorts: Array<{ cohortId: string; walletCents: number; spentCents: number; unspentCents: number; leisureMinutes: number; usedMinutes: number }>;
     supply: Array<{ poolId: string; shows: number; usedScreenMinutes: number; availableScreenMinutes: number; seats: number; admissions: number }>;
     allocations: CinemaAdmissionAllocation[];

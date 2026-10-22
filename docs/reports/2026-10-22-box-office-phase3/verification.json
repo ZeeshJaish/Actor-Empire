@@ -1,6 +1,6 @@
 {
   "phase": 3,
-  "status": "TASK_5_VERIFIED_TASK_6_IN_PROGRESS",
+  "status": "PHASE_3_VERIFIED_SHADOW_ONLY",
   "baseline": "a75893a",
   "verificationScope": "HEAD archive plus owned overlay; unrelated concurrent streaming changes excluded",
   "task5": {
@@ -61,11 +61,263 @@
       "scripts/audit-box-office-audience.ts": "3f7b722e2dfa1527d6f2370a42f68b9459215a4e4d10dfbc03437897e7f01134",
       "scripts/fixtures/boxOfficeScenarios.ts": "ff7e91f0c9b00eac8612cb4728f4769925a61b860fd2871763e4c4ca797fcfad",
       "scripts/run-box-office-audit.mjs": "7d02e20ca6ba9944c741fb539003c5102ed8173981eb93ab9e043471d4cf2347"
-    }
+    },
+    "checkpoint": "a25cdaf",
+    "hashBasis": "Task 5 checkpoint, retained as historical evidence; final Phase3 hashes below"
   },
   "recoveryManifest": "/private/tmp/actor-box-office-phase3-20261022-103404/manifest.json",
   "limits": [
-    "Shadow only. No Player/world save schema, audience persistence, live settlement or UI activation.",
-    "Coefficients are candidate game tuning; full balance and device verification remain Phase6."
-  ]
+    "Shadow calculation only; Player/world state, wallet, live theater/streaming payments and career effects remain unchanged.",
+    "Diagnostic 32-bit input fingerprint is not a settlement receipt; Phase4 must use canonical source IDs/exactly-once commit and migration safeguards.",
+    "No numerical IMDb redesign, series fixes or cinema-chain ownership UI.",
+    "Country/chain exposure, cohort language/persona and household viewing history are aggregate estimates; no invented individual or city precision.",
+    "Cinema leisure and all supply/behavior coefficients remain candidate tuning; Phase6 must calibrate careers, long sessions, UI journeys and physical-device performance.",
+    "Full shared-market live activation, existing-save and inheritance migration remain Phase4."
+  ],
+  "task6": {
+    "audienceGroups": 26,
+    "marketGroups": 36,
+    "priorGroups": 75,
+    "totalFocusedGroups": 137,
+    "focusedCommands": [
+      {
+        "command": [
+          "node",
+          "scripts/run-box-office-audit.mjs",
+          "inputs"
+        ],
+        "exitCode": 0,
+        "elapsedSeconds": 0.18
+      },
+      {
+        "command": [
+          "node",
+          "scripts/run-box-office-audit.mjs",
+          "delivery"
+        ],
+        "exitCode": 0,
+        "elapsedSeconds": 0.19
+      },
+      {
+        "command": [
+          "node",
+          "scripts/run-box-office-audit.mjs",
+          "finance"
+        ],
+        "exitCode": 0,
+        "elapsedSeconds": 0.14
+      },
+      {
+        "command": [
+          "node",
+          "scripts/run-box-office-audit.mjs",
+          "finance-contracts"
+        ],
+        "exitCode": 0,
+        "elapsedSeconds": 0.09
+      },
+      {
+        "command": [
+          "node",
+          "scripts/run-box-office-audit.mjs",
+          "finance-ui"
+        ],
+        "exitCode": 0,
+        "elapsedSeconds": 0.6
+      },
+      {
+        "command": [
+          "node",
+          "scripts/run-box-office-audit.mjs",
+          "phase1-integration"
+        ],
+        "exitCode": 0,
+        "elapsedSeconds": 3.93
+      },
+      {
+        "command": [
+          "node",
+          "scripts/run-box-office-audit.mjs",
+          "awareness"
+        ],
+        "exitCode": 0,
+        "elapsedSeconds": 0.18
+      },
+      {
+        "command": [
+          "node",
+          "scripts/run-box-office-audit.mjs",
+          "phase2-integration"
+        ],
+        "exitCode": 0,
+        "elapsedSeconds": 3.27
+      },
+      {
+        "command": [
+          "node",
+          "scripts/run-box-office-audit.mjs",
+          "audience"
+        ],
+        "exitCode": 0,
+        "elapsedSeconds": 0.41
+      },
+      {
+        "command": [
+          "node",
+          "scripts/run-box-office-audit.mjs",
+          "market"
+        ],
+        "exitCode": 0,
+        "elapsedSeconds": 1.33
+      }
+    ],
+    "relatedEconomyAndIndustryCommands": [
+      {
+        "command": [
+          "npm",
+          "run",
+          "audit:world-population-we1"
+        ],
+        "exitCode": 0,
+        "elapsedSeconds": 2.96
+      },
+      {
+        "command": [
+          "npm",
+          "run",
+          "audit:world-audience-we2"
+        ],
+        "exitCode": 0,
+        "elapsedSeconds": 3.0
+      },
+      {
+        "command": [
+          "npm",
+          "run",
+          "audit:world-audience-we3"
+        ],
+        "exitCode": 0,
+        "elapsedSeconds": 2.94
+      },
+      {
+        "command": [
+          "npm",
+          "run",
+          "audit:streaming-shared-budget"
+        ],
+        "exitCode": 0,
+        "elapsedSeconds": 4.94
+      },
+      {
+        "command": [
+          "npm",
+          "run",
+          "audit:industry-universe-blueprint-b3"
+        ],
+        "exitCode": 0,
+        "elapsedSeconds": 0.13
+      },
+      {
+        "command": [
+          "npm",
+          "run",
+          "audit:industry-media-fandom-state-c5"
+        ],
+        "exitCode": 0,
+        "elapsedSeconds": 0.2
+      },
+      {
+        "command": [
+          "npm",
+          "run",
+          "audit:industry-media-fandom-formation-c5"
+        ],
+        "exitCode": 0,
+        "elapsedSeconds": 0.19
+      },
+      {
+        "command": [
+          "npm",
+          "run",
+          "audit:industry-content-novelty-b3"
+        ],
+        "exitCode": 0,
+        "elapsedSeconds": 0.12
+      },
+      {
+        "command": [
+          "npm",
+          "run",
+          "audit:world-streaming-we6"
+        ],
+        "exitCode": 0,
+        "elapsedSeconds": 62.82
+      }
+    ],
+    "lintExitCode": 0,
+    "buildExitCode": 0,
+    "buildWarning": "Existing Vite chunks exceed 500 kB; no chunk warning suppression added.",
+    "review": "Independent read-only review reports no remaining Critical or Important findings; all substantive findings have failing-first regressions.",
+    "worldShadow": {
+      "countries": 197,
+      "cohorts": 2363,
+      "titleCount": 3,
+      "poolCount": 1729,
+      "admissions": 63561609,
+      "grossCents": 72918792713,
+      "elapsedMs": 308.09
+    },
+    "performance": {
+      "beforeIndexingMs": 49685.6,
+      "afterIndexingSameInputsMs": 205.17,
+      "sameInputsSameAdmissions": 16543144,
+      "sameInputsSameGrossCents": 18732160551,
+      "finalCanonicalLanguageAndLocalSourceSnapshotMs": 308.09,
+      "scope": "One local pure-kernel invocation after fresh world preparation; excludes module initialization, UI, persistence and physical-device cost."
+    },
+    "stateRegressionCoverage": [
+      "Finite WOM contact budget",
+      "Old and new credited role relevance",
+      "Favorite erosion and retained compact universe familiarity",
+      "Exact weekly wallet remainder",
+      "Joint first/repeat wallet, time and seats",
+      "Feasible demand reallocation after unaffordable/seat-blocked requests",
+      "Physical denial is not audience rejection",
+      "Omitted-title defer decay",
+      "Deterministic archive ordering and actual-viewing recency",
+      "Shrinking population reconciliation and legacy title permutation",
+      "Country receipt conservation",
+      "Delayed local discovery from actual other-film footfall only"
+    ]
+  },
+  "finalSourceHashes": {
+    "services/boxOffice/boxOfficeTypes.ts": "7f3860f0cd24b918b550c18053e9ee7637818e522bb789ffbfc4d6f87fa79d64",
+    "services/boxOffice/boxOfficeProfiles.ts": "cab21183f99658fff9fb2669372ad3ae2586f96f8c4aa07a111beb8c47b4ad01",
+    "services/boxOffice/boxOfficeAwareness.ts": "c6dc4c335495c194d5372e69d6bcdf1b790a9b2c6eae00da668b6c669733644f",
+    "services/boxOffice/boxOfficeAudience.ts": "8499d692db4fd4e622fb0e05506eff866502ea78e949b0fa95500e1059fec781",
+    "services/boxOffice/boxOfficeAudienceAdapters.ts": "00e465aac2d38989d8e8f4b691f5e9454ea945695a7cfff19329b16912e84cec",
+    "services/boxOffice/boxOfficeSupply.ts": "28c7b01c09eb3bfc6bd731ea6276b617843a8ffceb4ac1455edb8fb18e62783b",
+    "services/boxOffice/boxOfficeMarket.ts": "ee7cca736a2abaf1a143d575f757e61d1a76e2a838add0357e0c9a4d702b6b7b",
+    "scripts/audit-box-office-audience.ts": "4a956f69e6589b1994afaf922f4cb088d2ad2c8fbdf9aaa623812559c578b00f",
+    "scripts/audit-box-office-market.ts": "db5bf860d1a065fa70bfb9123b4d44db9dec420ecd2d4be03a9fdd5db3a73993",
+    "scripts/fixtures/boxOfficeScenarios.ts": "b703935c56ad68de5f0fbd0f948cd9f9091094c04a1d63131a4b6355b500ae99",
+    "scripts/run-box-office-audit.mjs": "7d02e20ca6ba9944c741fb539003c5102ed8173981eb93ab9e043471d4cf2347",
+    "services/boxOffice/boxOfficeMath.ts": "007c70236494039f231e50555ca002890e6ca5f1dd65ab2fb582d03bbbfa768b",
+    "scripts/fixtures/boxOfficeWorldShadow.ts": "43841fa1d39ddd29058aa66509165f677ff487cb6ce1b5dd6e26eef5a6adb323"
+  },
+  "frozenEnglishBaseline": {
+    "path": "scripts/fixtures/localization-english-baseline.json",
+    "sha256": "cdb6faae6aa68876b47ea92a20b1877f0f8d5ebdaaf1eeab236ae25131bd5190",
+    "unchangedFromBaseline": true
+  },
+  "unrelatedWork": {
+    "baselineFileCount": 48,
+    "unchangedHashCount": 46,
+    "concurrentlyChangedPaths": [
+      "components/streaming-transplant/createCanonicalStreamingPresentation.ts",
+      "scripts/audit-streaming-operations-ui.tsx"
+    ],
+    "scope": "Preexisting files preserved and excluded from commits. Two paths evolved in concurrent streaming work; baseline copies/hashes retained in recovery manifest.",
+    "isolatedVerificationRoot": "/private/tmp/actor-box-office-phase3-20261022-103404/verification"
+  }
 }

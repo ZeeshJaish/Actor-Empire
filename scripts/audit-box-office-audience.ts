@@ -82,4 +82,10 @@ test('duplicate character credits union independently of order',()=>{
   const a=buildCinemaAudienceSnapshot(f);f.titles[0].cast.reverse();assert.deepEqual(buildCinemaAudienceSnapshot(f),a);
   assert.deepEqual(a.titles[0].cast[0].characterIds,['hero','other-hero']);
 });
+test('canonical language labels match normalized language IDs',()=>{
+  const f=fixture();f.titles[0].market!.languages=['english'];f.cohorts[0].market!.languages=['english'];const before=count(f);f.cohorts[0].market!.languages=['English'];assert.equal(count(f),before);
+});
+test('known streaming remains a waiting option after its public start',()=>{
+  const f=fixture('streaming-wait');f.titles[0].market!.streamingWindow!.absoluteWeek=99;assert.ok(count(f)<count(fixture('no-streaming-deal')));
+});
 console.log(`Audience audit: ${passed} groups passed`);
