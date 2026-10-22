@@ -260,8 +260,8 @@ assert.deepEqual(wide.input, makeCinemaFixture('wide-unknown', 41).input);
 
 **Interfaces:** produce `migrateCinemaState(player: Player, absoluteWeek: number): CinemaMigrationResult`, returning a candidate player and structured diagnostics. Use schema version 1 plus an independent tuning version. Missing/old known schema migrates once; unsupported future schema is recoverably rejected without overwriting the save.
 
-- [ ] Add absent, partial, old active release, fully settled NPC, negative/NaN-corrupt input, reload and future-schema fixtures. Distinguish `UNSETTLED_WEEKLY`, `LEGACY_ACTIVE` and `LEGACY_FULLY_SETTLED` settlement bases.
-- [ ] Write and run the preservation test:
+- [x] Add absent, partial, old active release, fully settled NPC, negative/NaN-corrupt input, reload and future-schema fixtures. Distinguish `UNSETTLED_WEEKLY`, `LEGACY_ACTIVE` and `LEGACY_FULLY_SETTLED` settlement bases.
+- [x] Write and run the preservation test:
 
 ~~~ts
 const f = makeCinemaFixture('legacy-active-save', 3);
@@ -274,10 +274,10 @@ assert.deepEqual(migrateCinemaState(migrated.player, f.input.absoluteWeek).playe
   migrated.player);
 ~~~
 
-- [ ] Run `node scripts/run-box-office-audit.mjs migration`; implement the spec's next-unprocessed-week transition. Estimate old active seen history conservatively from known gross/footprint/prices, cap it to population, mark `LEGACY_ESTIMATE` and pay none of it. Begin tracked v1 attendance at activation.
-- [ ] Preserve historical costs, receipts and signed deals. Exclude fully settled legacy NPC lifetime results from new ticket/cash settlement; keep any old synthetic chart history identified as legacy. NPC projects not yet settled enter the weekly engine.
-- [ ] Bound active histories, retire closed title/cohort detail into summaries and retain compact affinity/universe aggregates. Persist exact committed result versions/fingerprint and the last week. Do not store every cohort/title/week matrix indefinitely.
-- [ ] Test JSON roundtrip, double migration, unsupported schema diagnostic, old signed streaming deal and save fallback/recovery. Expected: no historic money/gross change, no duplicate title or payout, explicit estimated audience labels. Checkpoint as `feat: migrate cinema market state safely`.
+- [x] Run `node scripts/run-box-office-audit.mjs migration`; implement the spec's next-unprocessed-week transition. Estimate old active seen history conservatively from known gross/footprint/prices, cap it to population, mark `LEGACY_ESTIMATE` and pay none of it. Begin tracked v1 attendance at activation.
+- [x] Preserve historical costs, receipts and signed deals. Exclude fully settled legacy NPC lifetime results from new ticket/cash settlement; keep any old synthetic chart history identified as legacy. NPC projects not yet settled enter the weekly engine.
+- [x] Bound active histories, retire closed title/cohort detail into summaries and retain compact affinity/universe aggregates. Persist exact committed result versions/fingerprint and the last week. Do not store every cohort/title/week matrix indefinitely.
+- [x] Test JSON roundtrip, double migration, unsupported schema diagnostic, old signed streaming deal and save fallback/recovery. Expected: no historic money/gross change, no duplicate title or payout, explicit estimated audience labels. Checkpoint as `feat: migrate cinema market state safely`.
 
 ### Task 8: One week, all owners, one settlement
 

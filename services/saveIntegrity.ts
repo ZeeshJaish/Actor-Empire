@@ -1,3 +1,4 @@
+import { inspectCinemaSavedState } from './boxOffice/boxOfficeMigration';
 import type { Player } from '../types';
 import { compactIndustryIntelligenceState } from './industryIntelligence/industryIntelligenceState';
 import { getAbsoluteWeek } from './legacyLogic';
@@ -8,7 +9,7 @@ export const SAVE_INTEGRITY_FORMAT_VERSION = 1;
 // This versions the digest projection, not the IndexedDB generation envelope.
 // Never change an issued projection in place: add a new schema and retain its
 // exact verifier so careers can skip any number of app releases safely.
-export const SAVE_INTEGRITY_DIGEST_SCHEMA_VERSION = 2;
+export const SAVE_INTEGRITY_DIGEST_SCHEMA_VERSION = 3;
 
 export type SaveIntegrityReason = 'AUTOSAVE' | 'PROCESS_WEEK' | 'LIFE_EVENT_RESOLUTION' | 'MIGRATION' | 'IMPORT' | 'MANUAL';
 
@@ -49,6 +50,7 @@ export interface SaveProtectedState {
     ownedStreamingIdentity: string;
     ownedStreamingTreasury: number;
     worldEconomy: string;
+    cinemaState?: string;
 }
 
 export interface SaveIntegrityManifest {
@@ -399,6 +401,9 @@ const createProtectedState = (player: Player): SaveProtectedState => {
         }),
         ownedStreamingTreasury: treasury,
         worldEconomy: worldEconomyState(player),
+        ...(player.world?.cinemaMarket ? {cinemaState:stableHash({market:player.world.cinemaMarket,
+            active:(player.activeReleases || []).filter(r=>r.cinema && r.cinema.settlementBasis!=='LEGACY_FULLY_SETTLED').map(r=>({id:r.id,cinema:r.cinema,gross:r.totalGross,receipts:r.totalStudioReceipts})),
+            projects:(player.world.projects || []).filter(r=>r.cinema && r.cinema.settlementBasis!=='LEGACY_FULLY_SETTLED').map(r=>({id:r.id,cinema:r.cinema,gross:r.boxOffice}))})} : {}),
     };
 };
 
@@ -485,6 +490,7 @@ export const compareProtectedSaveState = (before: Player, after: Player): Protec
     if (left.ownedStreamingIdentity !== right.ownedStreamingIdentity) violations.push('owned streaming identity changed');
     if (!Number.isFinite(right.ownedStreamingTreasury)) violations.push('owned streaming treasury is not finite');
     else if (left.ownedStreamingTreasury !== right.ownedStreamingTreasury) violations.push('owned streaming treasury changed');
+    if (left.cinemaState !== right.cinemaState) violations.push('cinema market canonical state changed');
     if (left.worldEconomy !== right.worldEconomy) violations.push('world economy canonical state changed');
     return violations.length ? { ok: false, violations } : { ok: true };
 };
@@ -501,15 +507,22 @@ export const verifySaveIntegrity = (
     nonFiniteCanonicalMoneyPaths(player)
         .filter(path => path !== 'money')
         .forEach(path => violations.push(`${path} is not finite`));
+    inspectCinemaSavedState(player.world?.cinemaMarket).forEach(code=>violations.push(code));
     if (manifest.formatVersion !== SAVE_INTEGRITY_FORMAT_VERSION) violations.push('integrity format is unsupported');
     const rebuilt = createSaveIntegrityManifest(player, manifest.reason, manifest.createdAt, manifest.needsRecoveryCheckpoint === true);
     if (manifest.digestSchemaVersion === SAVE_INTEGRITY_DIGEST_SCHEMA_VERSION) {
         if (rebuilt.digest !== manifest.digest) violations.push('integrity digest does not match save payload');
+    } else if (manifest.digestSchemaVersion === 2) {
+        // Issued v2 protected projection remains exact; cinema did not exist in it.
+        const protectedV2={...rebuilt.protected};delete protectedV2.cinemaState;
+        const {digest:_digest,createdAt:_createdAt,...core}=rebuilt;
+        if(stableHash(manifestDigestSource({...core,digestSchemaVersion:2,protected:protectedV2}))!==manifest.digest)violations.push('integrity digest does not match save payload');
     } else if (manifest.digestSchemaVersion === undefined) {
         // Unversioned v1 was shipped with several protected-field projections.
         // Only the three known optional additions may be absent; derive every
         // protected value from the player, never from the stored manifest.
         const legacyProtected = { ...rebuilt.protected } as Partial<SaveProtectedState>;
+        delete legacyProtected.cinemaState;
         const storedProtected = manifest.protected && typeof manifest.protected === 'object'
             ? manifest.protected as Partial<SaveProtectedState>
             : {};

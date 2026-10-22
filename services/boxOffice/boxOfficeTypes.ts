@@ -312,3 +312,75 @@ export interface CinemaWeekResult {
     costEvents: Array<{ id: string; titleId: string; poolId: string; category: 'BOOKING_COST'; amountCents: number }>;
     nextState: CinemaMarketState;
 }
+
+/** Versioned live settlement facts. Audience matrices are separate from paid money summaries. */
+export type CinemaSettlementBasis = 'UNSETTLED_WEEKLY' | 'LEGACY_ACTIVE' | 'LEGACY_FULLY_SETTLED';
+export interface CinemaProjectMarker {
+    schemaVersion: 1;
+    settlementBasis: CinemaSettlementBasis;
+    activationWeek: number;
+    audienceBasis: 'TRACKED' | 'LEGACY_ESTIMATE';
+}
+export interface CinemaSettledTitle {
+    titleId: string;
+    ownerId: string;
+    basis: CinemaSettlementBasis;
+    activationWeek: number;
+    legacyGrossCents: number;
+    legacyProducerReceiptsCents: number | null;
+    grossCents: number;
+    producerReceiptsCents: number;
+    exhibitorReceiptsCents: number;
+    distributionDeductionsCents: number;
+    bookingCostCents: number;
+    investorPaidCents: number;
+    talentPaidCents: number;
+    actorPaidCents: number;
+    firstAdmissions: number;
+    repeatAdmissions: number;
+    lastSettledWeek: number;
+    closed: boolean;
+}
+export interface CinemaCommittedTitle extends CinemaGrossSplit {
+    titleId: string;
+    ownerId: string;
+    ownerRoute: CinemaOwnerRef['route'];
+    firstAdmissions: number;
+    repeatAdmissions: number;
+    costsCents: number;
+    investorPaidCents: number;
+    talentPaidCents: number;
+    actorPaidCents: number;
+    satisfactionScore: number | null;
+    closed: boolean;
+    screens: number;
+}
+export interface CinemaCommittedWeek {
+    id: string;
+    absoluteWeek: number;
+    clockEpoch: number;
+    inputFingerprint: string;
+    /** Exact compact receipt equality, independently of the kernel's diagnostic hash. */
+    receiptSignature: string;
+    titles: CinemaCommittedTitle[];
+}
+export interface CinemaSavedState {
+    schemaVersion: 1;
+    tuningVersion: number;
+    clockEpoch: number;
+    activationWeek: number;
+    lastProcessedAbsoluteWeek: number;
+    market: CinemaMarketState;
+    titles: Record<string,CinemaSettledTitle>;
+    weeks: CinemaCommittedWeek[];
+}
+export interface CinemaMigrationResult {
+    player: import('../../types').Player;
+    status: 'MIGRATED' | 'UNCHANGED' | 'REJECTED';
+    diagnostics: Array<{code:string;titleId?:string;estimated?:boolean}>;
+}
+export interface CinemaCommitResult {
+    player: import('../../types').Player;
+    applied: boolean;
+    receipt?: CinemaCommittedWeek;
+}

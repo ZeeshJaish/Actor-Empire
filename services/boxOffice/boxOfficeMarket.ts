@@ -1,9 +1,10 @@
+import { compactCinemaMarketState } from './boxOfficeHistory';
 import { buildCinemaAudienceSnapshot } from './boxOfficeAudience';
 import { allocateCinemaResources, apportionCinemaIntegers, cinemaCount, cinemaKey, cinemaSum, cinemaWeeklyWallet } from './boxOfficeMath';
 import { CINEMA_AUDIENCE_PROFILE, CINEMA_MARKET_TUNING_VERSION, CINEMA_SUPPLY_PROFILE as P } from './boxOfficeProfiles';
 import { splitRealizedCinemaGross } from './boxOfficeSettlement';
 import { quoteCinemaSupply } from './boxOfficeSupply';
-import type { CinemaAdmissionAllocation, CinemaAffinity, CinemaSupplyPool, CinemaWeekInput, CinemaWeekResult } from './boxOfficeTypes';
+import type { CinemaAdmissionAllocation, CinemaSupplyPool, CinemaWeekInput, CinemaWeekResult } from './boxOfficeTypes';
 
 const group = <T>(rows:readonly T[],key:(r:T)=>string):Map<string,T[]> => {
     const result=new Map<string,T[]>();for(const row of rows){const id=key(row);const list=result.get(id)||[];list.push(row);result.set(id,list)}return result;
@@ -226,23 +227,13 @@ export const simulateCinemaWeek = (input:CinemaWeekInput):CinemaWeekResult => {
     const activeIds=new Set(snapshot.titles.map(t=>t.titleId));
     const retained=(input.marketState?.titles || []).filter(t=>!activeIds.has(t.titleId) && input.absoluteWeek-t.releaseWeek<=CINEMA_AUDIENCE_PROFILE.activeTitleHistoryWeeks).map(t=>({...structuredClone(t),cells:t.cells.map(c=>({...structuredClone(c),lastChoiceWeek:c.lastChoiceWeek ?? input.marketState!.lastProcessedAbsoluteWeek}))}));
     const archived=(input.marketState?.titles || []).filter(t=>!activeIds.has(t.titleId) && !retained.some(r=>r.titleId===t.titleId));
-    const affinities:CinemaAffinity[]=structuredClone(input.marketState?.affinities || []);
-    for(const t of [...archived].sort((a,b)=>a.releaseWeek-b.releaseWeek||a.titleId.localeCompare(b.titleId)))for(const c of t.cells) {
-        const total=c.seenBands.reduce((n,b)=>n+b.people,0);if(!total)continue;
-        const quality=c.seenBands.reduce((n,b)=>n+b.people*b.satisfaction,0)/total;
-        for(const person of [...t.cast.map(p=>({kind:'ACTOR' as const,id:p.personId,weight:p.roleWeight})),{kind:'STUDIO' as const,id:t.ownerId,weight:1},...(t.universeId?[{kind:'UNIVERSE' as const,id:t.universeId,weight:1}]:[])]) {
-            const existing=affinities.find(a=>a.cohortId===c.cohortId && a.kind===person.kind && a.id===person.id);
-            const people=Math.floor(total*person.weight);
-            if(existing){existing.strength=(existing.strength+quality)/2;existing.people=Math.max(existing.people,people);existing.lastWeek=Math.max(existing.lastWeek,...c.seenBands.map(b=>b.lastViewedWeek))}
-            else affinities.push({cohortId:c.cohortId,kind:person.kind,id:person.id,people,strength:quality,lastWeek:Math.max(...c.seenBands.map(b=>b.lastViewedWeek))});
-        }
-    }
-    const compactAffinities=cohorts.flatMap(c=>affinities.filter(a=>a.cohortId===c.cohortId).sort((a,b)=>b.lastWeek-a.lastWeek||b.people-a.people||a.id.localeCompare(b.id)).slice(0,CINEMA_AUDIENCE_PROFILE.maxAffinityEntriesPerCohort));
+    const compact=compactCinemaMarketState({schemaVersion:1,tuningVersion:input.tuningVersion,lastProcessedAbsoluteWeek:input.absoluteWeek,
+        cohortPopulations:Object.fromEntries(input.cohorts.map(c=>[c.id,c.people])),titles:[...snapshot.titles,...retained,...archived],
+        affinities:input.marketState?.affinities || [],runs},new Set([...snapshot.titles,...retained].map(t=>t.titleId)));
     cohorts.forEach(c=>{c.unspentCents=c.walletCents-c.spentCents;if(c.unspentCents<0||c.usedMinutes>c.leisureMinutes)throw new Error('Cinema resource conservation failed')});
     for(const s of supplyRows)if(s.admissions>s.seats||s.usedScreenMinutes>s.availableScreenMinutes)throw new Error('Cinema physical conservation failed');
     return {absoluteWeek:input.absoluteWeek,tuningVersion:input.tuningVersion,mode:'SHADOW',inputFingerprint:fingerprint(input),titles,cohorts,supply:supplyRows.sort((a,b)=>a.poolId.localeCompare(b.poolId)),
         allocations:allocations.sort((a,b)=>a.titleId.localeCompare(b.titleId)||a.cohortId.localeCompare(b.cohortId)||a.poolId.localeCompare(b.poolId)||a.kind.localeCompare(b.kind)),
-        costEvents:costEvents.sort((a,b)=>a.id.localeCompare(b.id)),nextState:{schemaVersion:1,tuningVersion:input.tuningVersion,lastProcessedAbsoluteWeek:input.absoluteWeek,cohortPopulations:Object.fromEntries(input.cohorts.map(c=>[c.id,c.people])),
-            titles:[...snapshot.titles,...retained].sort((a,b)=>a.titleId.localeCompare(b.titleId)),affinities:compactAffinities.sort((a,b)=>a.cohortId.localeCompare(b.cohortId)||a.kind.localeCompare(b.kind)||a.id.localeCompare(b.id)),
-            runs:runs.filter(r=>activeIds.has(r.titleId)||retained.some(t=>t.titleId===r.titleId)).sort((a,b)=>a.titleId.localeCompare(b.titleId)||a.poolId.localeCompare(b.poolId))}};
+        costEvents:costEvents.sort((a,b)=>a.id.localeCompare(b.id)),nextState:{...compact,titles:[...compact.titles].sort((a,b)=>a.titleId.localeCompare(b.titleId)),
+            runs:[...compact.runs].sort((a,b)=>a.titleId.localeCompare(b.titleId)||a.poolId.localeCompare(b.poolId))}};
 };

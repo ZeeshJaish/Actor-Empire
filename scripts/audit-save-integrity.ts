@@ -149,7 +149,7 @@ const tamperedRollout = structuredClone(preExpansionPlayer) as Player;
 assert.equal(verifySaveIntegrity(tamperedRollout, rolloutV1Manifest).ok, false,
     'current-rollout v1 must still protect its historical catalogue');
 
-assert.equal(expandedManifest.digestSchemaVersion, 2,
+assert.equal(expandedManifest.digestSchemaVersion, 3,
     'new signatures must identify their projection so future fields cannot silently change it');
 const wrongSchema = { ...expandedManifest, digestSchemaVersion: 99 };
 assert.equal(verifySaveIntegrity(preExpansionPlayer, wrongSchema).ok, false,
@@ -169,7 +169,11 @@ const pinnedV2Player = {
     },
     ownedStreamingPlatform: { id: 'stream-one', name: 'Empire+', lifecycle: 'ACTIVE', treasuryCash: 500, catalogLicenses: [] },
 } as unknown as Player;
-const pinnedV2Manifest = createSaveIntegrityManifest(pinnedV2Player, 'AUTOSAVE', 456);
+const pinnedCurrentManifest = createSaveIntegrityManifest(pinnedV2Player, 'AUTOSAVE', 456);
+const {digest:_currentPinnedDigest,createdAt:_currentPinnedAt,...pinnedCurrentCore}=pinnedCurrentManifest;
+const pinnedV2Core={...pinnedCurrentCore,digestSchemaVersion:2};
+const pinnedV2Manifest={...pinnedV2Core,createdAt:456,digest:legacyHash(pinnedV2Core)};
+assert.equal(verifySaveIntegrity(pinnedV2Player,pinnedV2Manifest).ok,true);
 assert.equal(pinnedV2Manifest.digest, 'a9c2c9234e13ad16',
     'schema 2 signature must stay stable for saves already issued under this schema');
 const {

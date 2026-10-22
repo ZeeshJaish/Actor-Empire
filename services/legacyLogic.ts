@@ -1,3 +1,4 @@
+import { rebaseCinemaSavedState } from './boxOffice/boxOfficeClock';
 import { rebaseStudioSaleHistoryForInheritance } from './studioSaleHistory';
 import { ActorSkills, BloodlineMember, NPCActor, Player, PortfolioItem, Relationship, StreamingState, UniverseId, ProjectType } from '../types';
 import { buildDynastySuccessionState } from './dynastyCareer';
@@ -81,6 +82,7 @@ const rebaseInheritedActiveReleaseTiming = (
     };
 
     const next = rebaseInheritedCinemaExposure(release, clockShift);
+    if(next.cinema)next.cinema={...next.cinema,activationWeek:Math.max(0,next.cinema.activationWeek+clockShift)};
     const releasedAtAbsoluteWeek = shiftAbsoluteWeek(release?.releasedAtAbsoluteWeek);
     if (releasedAtAbsoluteWeek !== undefined) next.releasedAtAbsoluteWeek = releasedAtAbsoluteWeek;
 
@@ -187,7 +189,8 @@ const PLAYER_SELF_REFERENCE_KEYS = new Set([
     'directorId',
     'npcId',
     'leadActorId',
-    'performerId'
+    'performerId',
+    'personId'
 ]);
 
 export const rewritePlayerSelfReferencesForLegacyParent = <T,>(value: T, parentActor: NPCActor): T => {
@@ -274,6 +277,7 @@ export const buildLegacyStudioInheritance = (
     );
     const inheritedStudio = player.studio ? rewritePlayerSelfReferencesForLegacyParent(player.studio, parentActor) : undefined;
     const inheritedWorld = player.world ? rewritePlayerSelfReferencesForLegacyParent(player.world, parentActor) : undefined;
+    if(inheritedWorld?.cinemaMarket)inheritedWorld.cinemaMarket=rebaseCinemaSavedState(inheritedWorld.cinemaMarket,targetAbsoluteWeek-sourceAbsoluteWeek);
     const studioIds = inheritedBusinesses
         .filter((business: any) => business?.type === 'PRODUCTION_HOUSE' && business?.id)
         .map((business: any) => String(business.id));

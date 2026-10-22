@@ -1,6 +1,6 @@
 
 
-import type { CinemaExposureRecord } from './services/boxOffice/boxOfficeTypes';
+import type { CinemaExposureRecord, CinemaProjectMarker, CinemaSavedState } from './services/boxOffice/boxOfficeTypes';
 
 // Enums & Basic Types
 export enum Page {
@@ -7189,6 +7189,7 @@ export interface TheatricalExtensionDecision {
 }
 
 export interface ActiveRelease {
+    cinema?: CinemaProjectMarker;
     id: string;
     name: string;
     type: ProjectType;
@@ -7261,6 +7262,7 @@ export interface Award {
 }
 
 export interface PastProject {
+    cinema?: CinemaProjectMarker;
     id: string;
     name: string;
     type: 'ACTING_GIG';
@@ -8265,6 +8267,7 @@ export interface YearlyFinance {
 }
 
 export interface IndustryProject {
+    cinema?: CinemaProjectMarker;
     id: string;
     title: string;
     genre: Genre;
@@ -10952,6 +10955,7 @@ export interface WorldEconomyHealthSummary {
 }
 
 export interface WorldState {
+    cinemaMarket?: CinemaSavedState;
     projects: IndustryProject[];
     streamingOpportunityMarket?: StreamingOpportunityMarketState;
     talentCareer?: TalentCareerState;

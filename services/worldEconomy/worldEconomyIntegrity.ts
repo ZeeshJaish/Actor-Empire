@@ -1,3 +1,4 @@
+import { inspectCinemaSavedState } from '../boxOffice/boxOfficeMigration';
 import type {
     Player,
     WorldEconomyIntegritySeverity,
@@ -62,6 +63,7 @@ export const validateWorldEconomyCandidate = (
 ): WorldEconomyValidationResult => {
     const week = Math.max(0, Math.round(Number(absoluteWeek) || 0));
     const issues: WorldEconomyIntegrityViolation[] = [];
+    inspectCinemaSavedState(player.world?.cinemaMarket).forEach(code=>issues.push(violation(code,'WEEK','PROTECTED')));
 
     if (!Number.isFinite(player.money)) {
         issues.push(violation('PLAYER_MONEY_NON_FINITE', 'WEEK', 'PROTECTED'));

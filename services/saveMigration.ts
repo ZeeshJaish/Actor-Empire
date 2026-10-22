@@ -1,3 +1,4 @@
+import { CinemaMigrationError, inspectCinemaSavedState, migrateCinemaState } from './boxOffice/boxOfficeMigration';
 import { repairTalentNegotiations } from './talentNegotiation';
 import { normalizeCinemaReceiptHistory } from './boxOffice/boxOfficeReceiptHistory';
 import { INITIAL_PLAYER, type Business, type Message, type NewsItem, type Player, type PortfolioItem, type Relationship, type ScheduledEvent, type Stock, type StockTakeoverCase } from '../types';
@@ -68,7 +69,7 @@ import { normalizeWorldStreamingViewingState } from './worldEconomy/worldStreami
 import { normalizeWorldStreamingPlatformEconomyState } from './worldEconomy/worldStreamingPlatformEconomy';
 import { createWorldEconomyHealthSummary } from './worldEconomy/worldEconomyIntegrity';
 
-export const SAVE_MIGRATION_VERSION = 51;
+export const SAVE_MIGRATION_VERSION = 52;
 const RUNAWAY_STOCK_CASH_CEILING = 10_000_000_000_000;
 const ACQUISITION_RIVAL_BID_MAX_ROUNDS = 3;
 
@@ -1079,7 +1080,18 @@ const reverseLegacyImportedAcquisitionDebtCharge = (player: Player): Player => {
     };
 };
 
+const withCinemaMigration = (player: Player): Player => {
+    const result=migrateCinemaState(player,getAbsoluteWeek(player.age,player.currentWeek));
+    if(result.status==='REJECTED')throw new CinemaMigrationError(result.diagnostics.map(d=>d.code));
+    return result.player;
+};
 export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
+    const cinemaErrors=inspectCinemaSavedState(input.world?.cinemaMarket);
+    // Validate present raw financial facts before legacy defaults can erase corruption.
+    const badMoney=(v:unknown)=>v!==undefined && (typeof v!=='number'||!Number.isFinite(v)||v<0);
+    for(const release of input.activeReleases || [])if(badMoney(release.totalGross)||badMoney(release.totalStudioReceipts)||badMoney(release.budget))cinemaErrors.push('CINEMA_LEGACY_FINANCE_CORRUPT');
+    for(const project of input.world?.projects || [])if(badMoney(project.boxOffice))cinemaErrors.push('CINEMA_LEGACY_FINANCE_CORRUPT');
+    if(cinemaErrors.length)throw new CinemaMigrationError(cinemaErrors);
     const base: Player = mergeDefaults(INITIAL_PLAYER, input);
     const protectedPlatformAiExternalMoveIds = new Set<string>();
     Object.values(base.world?.platforms || {}).forEach(platform => {
@@ -1375,7 +1387,7 @@ export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
         && business.config?.productionType !== 'Acquired Studio'
     )) || productionHouses[0];
 
-    if (!parentStudio) return advanceStreamingOpportunityMarket(initializeHistoricalMarketPacing(initializeHistoricalCatalogue(repairedPlayer, input)));
+    if (!parentStudio) return withCinemaMigration(advanceStreamingOpportunityMarket(initializeHistoricalMarketPacing(initializeHistoricalCatalogue(repairedPlayer, input))));
 
     const reconciledRoster = mergeParentStudioTalentRosters(
         parentStudio.id,
@@ -1383,7 +1395,7 @@ export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
         parentStudio.studioState?.talentRoster as any,
     );
 
-    return advanceStreamingOpportunityMarket(initializeHistoricalMarketPacing(initializeHistoricalCatalogue({
+    return withCinemaMigration(advanceStreamingOpportunityMarket(initializeHistoricalMarketPacing(initializeHistoricalCatalogue({
         ...repairedPlayer,
         studio: {
             ...repairedPlayer.studio,
@@ -1399,5 +1411,5 @@ export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
                 }
                 : business
         )),
-    }, input)));
+    }, input))));
 };
