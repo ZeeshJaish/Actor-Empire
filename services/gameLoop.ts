@@ -2,6 +2,7 @@ import { ensureActorCareerBalance, getCareerLearningGain, getCareerPassivePrepar
 import { createSeriesStreamingBids, quoteSeriesStreamingRights } from './seriesStreamingValue';
 import { settleStockCash } from './stockSettlement';
 import { syncLinkedNpcRelationships } from './relationshipBond';
+import { createProjectTitleReservations, getCurrentPlayerProjectTitles, rememberProjectTitles } from './projectTitleGeneration';
 import { markStockDividendsSettled } from './stockLogic';
 import { recordCinemaStreamingAudience } from './boxOffice/boxOfficeStreamingAudience';
 import { commitCinemaAnnouncement } from './boxOffice/boxOfficeExposureAdapters';
@@ -7010,14 +7011,7 @@ export const processGameWeek = async (
     }
 
     try {
-        const usedTitles = [
-            ...nextPlayer.commitments.map(commitment => commitment.name),
-            ...nextPlayer.activeReleases.map(release => release.name),
-            ...nextPlayer.pastProjects.map(project => project.name),
-            ...nextPlayer.inbox
-                .map(message => (message.data as AuditionOpportunity | undefined)?.projectName)
-                .filter((title): title is string => typeof title === 'string')
-        ];
+        const usedTitles = [...createProjectTitleReservations(nextPlayer)];
         const breakthroughInvite = generateBreakthroughAuditionInvite(nextPlayer, usedTitles, language);
         if (breakthroughInvite) {
             nextPlayer.inbox.unshift({
@@ -7100,15 +7094,7 @@ export const processGameWeek = async (
 
     if (nextPlayer.currentWeek % 3 === 0) {
         // Updated: usedTitles now includes past projects to prevent repeating famous titles
-        const usedTitles = [
-            ...nextPlayer.commitments.map(c => c.name),
-            ...nextPlayer.activeReleases.map(r => r.name),
-            ...nextPlayer.pastProjects.map(p => p.name),
-            ...nextPlayer.inbox
-                .map(message => (message.data as AuditionOpportunity | undefined)?.projectName)
-                .filter((title): title is string => typeof title === 'string')
-        ];
-        nextPlayer.weeklyOpportunities = { auditions: generateAuditions(nextPlayer, usedTitles), jobs: generatePartTimeJobs() };
+        nextPlayer.weeklyOpportunities = { auditions: generateAuditions(nextPlayer, []), jobs: generatePartTimeJobs() };
         logsToAdd.push({ msg: "🔄 CastLink updated.", type: 'neutral' });
     }
     emitLoopStage('weekly_offers_done', { inbox_messages: nextPlayer.inbox?.length || 0 });
@@ -7346,5 +7332,7 @@ export const processGameWeek = async (
         logs_added: logsToAdd.length,
         inbox_count: nextPlayer.inbox?.length || 0,
     });
+    const titleWorld = rememberProjectTitles(nextPlayer.world, getCurrentPlayerProjectTitles(nextPlayer), targetAbsoluteWeek);
+    if (titleWorld !== nextPlayer.world) nextPlayer = { ...nextPlayer, world: titleWorld };
     return { player: syncLinkedNpcRelationships(nextPlayer), triggerAd };
 };

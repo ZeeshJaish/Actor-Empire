@@ -342,13 +342,7 @@ export const generateNpcVentureRoleOffer = (player: Player): { opportunity: Audi
     const budgetTier = getVentureBudgetTier(venture);
     const type: ProjectType = Math.random() < 0.28 ? 'SERIES' : 'MOVIE';
     const roleType: RoleType = player.stats.fame >= 65 || Math.random() < 0.35 ? 'LEAD' : player.stats.fame >= 30 ? 'SUPPORTING' : 'ENSEMBLE';
-    const usedTitles = [
-        ...player.commitments.map(c => c.name),
-        ...player.activeReleases.map(r => r.name),
-        ...player.pastProjects.map(p => p.name),
-        ...venture.history.map(h => h.title),
-    ];
-    const project = generateProjectDetails(budgetTier, type, usedTitles, player);
+    const project = generateProjectDetails(budgetTier, type, [], player);
     project.studioId = venture.id;
     project.description = t(language, 'services.npcVenture.project.description', {
         ventureName: venture.name,

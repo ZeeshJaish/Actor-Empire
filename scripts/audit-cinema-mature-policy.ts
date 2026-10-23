@@ -10,6 +10,40 @@ assert.ok(origin?.player,'Use the actual earned origin for these adapter checks'
 const fresh=()=>structuredClone(origin.player) as Player;
 let passed=0;
 {
+ const p=fresh(),hire=(matureCareerUi(p) as any).hireAgent;
+ assert.equal(typeof hire,'function','Mature verification must use the actual paid team action');
+ const agent=p.team.availableAgents[0];assert.ok(agent);
+ // Controlled wallet cases only. These never enter the normal career.
+ p.money=agent.annualFee+1000;
+ const next=matureCareerUi(p).hireAgent(agent.id);assert.equal(next.money,1000);assert.equal(next.team.agent?.id,agent.id);assert.equal(next.team.agent?.commission,agent.commission);passed++;
+ const poor=fresh();poor.money=0;assert.equal(matureCareerUi(poor).hireAgent(agent.id).money,0);assert.equal(poor.team.agent,null);passed++;
+ const press=(matureCareerUi(p) as any).press;
+ assert.equal(typeof press,'function','Press rewards must be resolved from real generated questions');
+ assert.throws(()=>press('absent-project'),/current post.production/);passed++;
+}
+{
+ const p=fresh(),role=p.commitments.find(c=>c.type==='ACTING_GIG')!;assert.ok(role);
+ // Controlled UI-phase case only; not a completed film in career evidence.
+ role.projectPhase='POST_PRODUCTION';p.energy.current=p.energy.max;
+ const cash=p.money,energy=p.energy.current,fame=p.stats.fame,rep=p.stats.reputation;
+ const tour=matureCareerUi(p).press(role.id);
+ assert.equal(tour.answers.length,3);assert.equal(tour.player.money,cash);assert.equal(tour.player.energy.current,energy-25);
+ assert.equal(tour.result.statsDelta.fame,tour.answers.reduce((n:number,a:any)=>n+(a.consequences.fame||0),0));
+ assert.equal(tour.player.stats.fame,Math.max(0,fame+tour.result.statsDelta.fame));assert.equal(tour.player.stats.reputation,Math.max(0,Math.min(100,rep+tour.result.statsDelta.reputation)));passed++;
+ const managed={pressedProjectIds:[role.id]},actions:any[]=[];
+ createMatureAppCareerPolicy(0,actions,new Map(),new Set(),managed)(tour.player,156);
+ assert.ok(!actions.some(a=>a.type==='actual-press-tour'),'A resumed policy cannot repeat this project tour');passed++;
+}
+{
+ const p=fresh();p.energy.current=p.energy.max;const energy=p.energy.current;
+ // Controlled sponsor terms exercise the real acceptance/fulfilment callbacks.
+ const offer={id:'unit-sponsor',brandName:'Adapter case',category:'LIFESTYLE',weeklyPay:100,durationWeeks:1,requirements:{type:'POST',energyCost:10,totalRequired:1,progress:0},isExclusive:false,penalty:400,description:'Controlled case'};
+ const message={id:'unit-sponsor-message',type:'OFFER_SPONSORSHIP',data:offer,isExpired:false} as Message;p.inbox=[message];
+ const signed=matureCareerUi(p).accept(message);assert.equal(signed.money,p.money);assert.equal(signed.energy.current,energy-10);assert.equal(signed.activeSponsorships.at(-1)?.weeklyPay,100);passed++;
+ const completed=matureCareerUi(signed).perform(offer.id);assert.equal(completed.money,p.money);assert.equal(completed.energy.current,energy-20);assert.equal(completed.activeSponsorships.at(-1)?.requirements.progress,1);
+ assert.throws(()=>matureCareerUi(completed).perform(offer.id),/payable current deliverable/);passed++;
+}
+{
  const choose=(maturePolicy as any).selectMatureCareerOpportunity;
  assert.equal(typeof choose,'function','The mature policy needs one comparison across inbox and Casting App choices');
  const p=fresh(),base=structuredClone(p.weeklyOpportunities.auditions[0]);

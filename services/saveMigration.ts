@@ -1,5 +1,6 @@
 import { ensureActorCareerBalance } from './actorCareerBalance';
 import { syncLinkedNpcRelationships } from './relationshipBond';
+import { initializeRecentProjectTitles } from './projectTitleGeneration';
 import { inspectStockSaveContainers, inspectStockSaveCompatibility, migrateStockPortfolio, recordStockQuoteRepairs, StockSaveRecoveryError } from './stockSaveCompatibility';
 import { CinemaMigrationError, inspectCinemaSavedState, migrateCinemaState } from './boxOffice/boxOfficeMigration';
 import { preserveCinemaCastRecognition } from './boxOffice/boxOfficeInputs';
@@ -1042,7 +1043,9 @@ const reverseLegacyImportedAcquisitionDebtCharge = (player: Player): Player => {
 const withCinemaMigration = (player: Player): Player => {
     const result=migrateCinemaState(player,getAbsoluteWeek(player.age,player.currentWeek));
     if(result.status==='REJECTED')throw new CinemaMigrationError(result.diagnostics.map(d=>d.code));
-    const migrated = result.player;
+    const migrated = { ...result.player, world: { ...result.player.world,
+        recentProjectTitles: initializeRecentProjectTitles(result.player, getAbsoluteWeek(result.player.age, result.player.currentWeek)),
+    } };
     // Capture resolvable legacy cast without touching any prior settlement or guessing lost identities.
     const commitments = migrated.commitments.map(c => {
         const projectDetails = c.projectDetails?.type === 'MOVIE' ? preserveCinemaCastRecognition(c.projectDetails, migrated) : c.projectDetails;

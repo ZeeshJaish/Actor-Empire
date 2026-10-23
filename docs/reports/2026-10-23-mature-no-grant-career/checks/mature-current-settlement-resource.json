@@ -1,0 +1,14 @@
+{
+  "label": "mature-current-settlement",
+  "heapMiB": 1024,
+  "peakOwnedTreeRssMiB": 805.515625,
+  "stopReason": null,
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 11423,
+  "script": "/private/tmp/actor-cinema-mature-no-grants-07fdfff-20261023/tooling/run-current-safety.mjs",
+  "args": [
+    "scripts/audit-box-office-integration.ts",
+    "current-settlement"
+  ]
+}

@@ -3,6 +3,7 @@ import { GameLanguage, Genre, Player, ProjectDetails, AuditionOpportunity, RoleT
 import { ROLE_DEFINITIONS } from './roleLogic';
 import { getPlayerLanguage, t } from './i18n';
 import { quoteActorBackend } from './actorOfferTerms';
+import { createProjectTitleReservations, projectTitleKey } from './projectTitleGeneration';
 
 interface FamousProjectDef {
     title: string;
@@ -203,16 +204,18 @@ export const getFamousProjectDescription = (language: GameLanguage, def: FamousP
     })()
 );
 
-export const getNextFamousMovie = (player: Player): FamousProjectDef | null => {
+export const getNextFamousMovie = (player: Player, reserved = createProjectTitleReservations(player)): FamousProjectDef | null => {
     // Filter out movies already released in this world run
-    const available = FAMOUS_MOVIE_DB.filter(m => !player.world.famousMoviesReleased?.includes(m.title));
-    return pick(available.length > 0 ? available : FAMOUS_MOVIE_DB);
+    const released = new Set((player.world.famousMoviesReleased || []).map(projectTitleKey));
+    const available = FAMOUS_MOVIE_DB.filter(m => !released.has(projectTitleKey(m.title)) && !reserved.has(projectTitleKey(m.title)));
+    return available.length ? pick(available) : null;
 };
 
-export const getNextFamousSeries = (player: Player): FamousProjectDef | null => {
+export const getNextFamousSeries = (player: Player, reserved = createProjectTitleReservations(player)): FamousProjectDef | null => {
     // Filter out series already released
-    const available = FAMOUS_SERIES_DB.filter(m => !player.world.famousMoviesReleased?.includes(m.title));
-    return pick(available.length > 0 ? available : FAMOUS_SERIES_DB);
+    const released = new Set((player.world.famousMoviesReleased || []).map(projectTitleKey));
+    const available = FAMOUS_SERIES_DB.filter(m => !released.has(projectTitleKey(m.title)) && !reserved.has(projectTitleKey(m.title)));
+    return available.length ? pick(available) : null;
 };
 
 export const createFamousOpportunity = (def: FamousProjectDef, roleType: RoleType, source: 'CASTING_APP' | 'AGENT' | 'DIRECT', language: GameLanguage = 'en', player?: Player): AuditionOpportunity => {
@@ -278,8 +281,8 @@ export const createFamousOpportunity = (def: FamousProjectDef, roleType: RoleTyp
 // --- GENERATORS ---
 
 // 1. Hard Audition Path (Standard appearance in CastLink)
-export const generateFamousMovieOpportunity = (player: Player): AuditionOpportunity | null => {
-    const movie = getNextFamousMovie(player);
+export const generateFamousMovieOpportunity = (player: Player, reserved?: Set<string>): AuditionOpportunity | null => {
+    const movie = getNextFamousMovie(player, reserved);
     if (!movie) return null;
 
     // Famous movies usually audition for Supporting or Lead
@@ -289,8 +292,8 @@ export const generateFamousMovieOpportunity = (player: Player): AuditionOpportun
 };
 
 // 2. TV Series Path
-export const generateFamousSeriesOpportunity = (player: Player): AuditionOpportunity | null => {
-    const series = getNextFamousSeries(player);
+export const generateFamousSeriesOpportunity = (player: Player, reserved?: Set<string>): AuditionOpportunity | null => {
+    const series = getNextFamousSeries(player, reserved);
     if (!series) return null;
 
     // Series usually audition for Lead or Ensemble

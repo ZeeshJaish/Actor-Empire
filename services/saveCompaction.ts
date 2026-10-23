@@ -1,5 +1,6 @@
 import { retainReferencedNpcProfiles } from './npcRetention';
 import { syncLinkedNpcRelationships } from './relationshipBond';
+import { initializeRecentProjectTitles } from './projectTitleGeneration';
 import { STUDIO_AI_LEDGER_LIMIT } from './studioAi/studioAiState';
 import { PLATFORM_AI_RUNTIME_SCHEMA_VERSION, type Player } from '../types';
 import { getAbsoluteWeek } from './legacyLogic';
@@ -974,6 +975,7 @@ const compactWorld = (player: any) => {
   };
   return {
     ...compactedWorld,
+    recentProjectTitles: initializeRecentProjectTitles(player, getAbsoluteWeek(player.age, player.currentWeek)),
     projects: compactWorldProjects({ ...player, world: compactedWorld }),
   };
 };

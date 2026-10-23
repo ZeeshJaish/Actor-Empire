@@ -10,7 +10,7 @@ import type {
 import { createDeterministicId, createDeterministicRng } from '../deterministicRandom';
 import { upsertCanonicalIndustryProduction } from '../industryProductions';
 import { createProductionCalendar } from '../productionCalendar';
-import { generateProjectTitle } from '../roleLogic';
+import { allocateProjectTitle, createProjectTitleReservations, rememberProjectTitles } from '../projectTitleGeneration';
 import { appendStudioAiProductionKey } from './studioAiProductionState';
 import { attachNormalizedStudioAiState } from './studioAiState';
 
@@ -94,6 +94,7 @@ export const handoffStudioAiGreenlights = (
     }
     let world = input.world;
     let createdCount = 0;
+    let reservedTitles: Set<string> | undefined;
     const greenlights = studio.ai!.slate!.commitments
         .filter(item => item.source === 'INDEPENDENT' && item.status === 'GREENLIT')
         .sort((left, right) => (left.greenlitAtAbsoluteWeek || left.updatedAtAbsoluteWeek) - (right.greenlitAtAbsoluteWeek || right.updatedAtAbsoluteWeek)
@@ -116,11 +117,8 @@ export const handoffStudioAiGreenlights = (
         const canonicalProjectId = createDeterministicId('studio_ai_project', studio.id, commitment.id);
         const handoffKey = `b6-handoff:${commitment.id}`;
         const rng = createDeterministicRng(`${studio.ai!.seed}:${handoffKey}:title`);
-        const existingTitles = [
-            ...(world.projects || []).map(project => project.title),
-            ...Object.values(world.industryProductions || {}).map(production => production.title),
-        ];
-        const title = generateProjectTitle(existingTitles, rng);
+        reservedTitles ||= createProjectTitleReservations(input.player, world, input.absoluteWeek);
+        const title = allocateProjectTitle(reservedTitles, rng, fingerprint.primaryGenre);
         const calendar = buildCalendar(fingerprint, budgetMillions, studio.ai!.competence.production, input.absoluteWeek);
         const production: IndustryProductionCommitment = {
             id: productionId,
@@ -169,6 +167,7 @@ export const handoffStudioAiGreenlights = (
             ...world,
             industryProductions: upsertCanonicalIndustryProduction(world.industryProductions, production),
         };
+        world = rememberProjectTitles(world, [title], input.absoluteWeek);
         studio = updateCommitment(studio, commitment.id, productionId, input.absoluteWeek);
         createdCount += 1;
     }

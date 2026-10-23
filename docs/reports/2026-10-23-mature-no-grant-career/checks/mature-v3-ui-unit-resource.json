@@ -1,0 +1,11 @@
+{
+  "label": "mature-v3-ui-unit",
+  "heapMiB": 768,
+  "peakOwnedTreeRssMiB": 1357.765625,
+  "stopReason": null,
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 2332,
+  "script": "/private/tmp/actor-cinema-mature-no-grants-07fdfff-20261023/tooling/run-policy-unit.mjs",
+  "args": []
+}

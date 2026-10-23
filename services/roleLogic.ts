@@ -21,6 +21,7 @@ import { getPlayerLanguage, t } from './i18n';
 import { enrichAuditionOpportunity, inferStoryCompass, suggestCharacterIdentity } from './characterIdentityLogic';
 import { getRoleMasteryLanes } from './actorRoleIdentity';
 import { getRoleOfferMessageLine } from './roleMarketDemand';
+import { allocateProjectTitle, createProjectTitleReservations, projectTitleKey } from './projectTitleGeneration';
 
 // --- CONSTANTS ---
 
@@ -330,7 +331,7 @@ export const generateBreakthroughAuditionInvite = (
 
     if (random() < profile.blockbusterExtraChance) {
         const famousProject = getNextFamousMovie(player);
-        if (famousProject && !usedTitles.includes(famousProject.title)) {
+        if (famousProject && !new Set(usedTitles.map(projectTitleKey)).has(projectTitleKey(famousProject.title))) {
             const roleType: RoleType = random() < 0.65 ? 'SUPPORTING' : 'ENSEMBLE';
             const roleLabel = getWeeklyOfferRoleLabel(language, roleType);
             const opportunity = createFamousOpportunity(famousProject, roleType, 'DIRECT', language, player);
@@ -699,51 +700,9 @@ export const getEstimatedBudget = (tier: BudgetTier, rng: () => number = Math.ra
 export const getBudgetDisplay = (tier: BudgetTier): string => ({ LOW: '$', MID: '$$', HIGH: '$$$', BLOCKBUSTER: '$$$$' }[tier]);
 
 // --- TITLE GENERATION ---
-const TITLES_FIRST = [
-    'The', 'A', 'My', 'Our', 'Last', 'First', 'Dark', 'Light', 'Red', 'Blue', 'Golden', 'Silent', 'Loud', 
-    'Beyond', 'After', 'Before', 'Under', 'Over', 'Within', 'Without', 'Endless', 'Finite', 'Broken', 'Hidden',
-    'Secret', 'Lost', 'Found', 'Eternal', 'Fleeting', 'Wild', 'Quiet', 'Brave', 'Fierce', 'Savage', 'Gentle',
-    'Crimson', 'Azure', 'Violet', 'Black', 'White', 'Grey', 'Silver', 'Neon', 'Digital', 'Analog', 'Final',
-    'Infinite', 'Zero', 'Alpha', 'Omega', 'Prime', 'Neo', 'Cyber', 'Solar', 'Lunar', 'Stellar', 'Void'
-];
-
-const TITLES_ADJ = [
-    'Broken', 'Hidden', 'Secret', 'Lost', 'Found', 'Eternal', 'Fleeting', 'Wild', 'Quiet', 'Brave', 'Fierce',
-    'Savage', 'Gentle', 'Crimson', 'Azure', 'Violet', 'Black', 'White', 'Grey', 'Silver', 'Neon', 'Digital',
-    'Analog', 'Final', 'Infinite', 'Zero', 'Alpha', 'Omega', 'Prime', 'Neo', 'Cyber', 'Solar', 'Lunar',
-    'Stellar', 'Void', 'Electric', 'Velvet', 'Crystal', 'Iron', 'Steel', 'Glass', 'Stone', 'Wood', 'Fire',
-    'Ice', 'Storm', 'Thunder', 'Rain', 'Wind', 'Cloud', 'Sky', 'Sea', 'Ocean', 'River', 'Mountain', 'Valley'
-];
-
-const TITLES_NOUN = [
-    'Dream', 'Heart', 'Soul', 'City', 'World', 'Life', 'Death', 'Love', 'Night', 'Day', 'Star', 'Moon', 'Sun',
-    'Sky', 'Sea', 'Ocean', 'River', 'Mountain', 'Valley', 'Forest', 'Desert', 'Garden', 'Machine', 'Ghost',
-    'Spirit', 'Shadow', 'Light', 'Flame', 'Spark', 'Ember', 'Ash', 'Dust', 'Bone', 'Blood', 'Tear', 'Smile',
-    'Laugh', 'Cry', 'Scream', 'Whisper', 'Song', 'Dance', 'Walk', 'Run', 'Jump', 'Fall', 'Rise', 'Fly',
-    'Horizon', 'Frontier', 'Empire', 'Kingdom', 'Republic', 'Union', 'Federation', 'Alliance', 'Syndicate'
-];
-
-const TITLES_VERB = [
-    'Rising', 'Falling', 'Burning', 'Freezing', 'Breaking', 'Healing', 'Living', 'Dying', 'Loving', 'Hating',
-    'Fighting', 'Surviving', 'Winning', 'Losing', 'Searching', 'Finding', 'Hiding', 'Seeking', 'Chasing',
-    'Running', 'Walking', 'Sleeping', 'Dreaming', 'Waking', 'Calling', 'Answering', 'Asking', 'Knowing'
-];
-
-export const generateProjectTitle = (existingTitles: string[], rng: () => number = Math.random): string => {
-    let title = "";
-    let attempts = 0;
-    do {
-        const structure = Math.floor(rng() * 5); // Increased variations
-        if (structure === 0) title = `${pick(TITLES_FIRST, rng)} ${pick(TITLES_NOUN, rng)}`;
-        else if (structure === 1) title = `${pick(TITLES_FIRST, rng)} ${pick(TITLES_ADJ, rng)} ${pick(TITLES_NOUN, rng)}`;
-        else if (structure === 2) title = `${pick(TITLES_ADJ, rng)} ${pick(TITLES_NOUN, rng)}`;
-        else if (structure === 3) title = `The ${pick(TITLES_NOUN, rng)} of ${pick(TITLES_NOUN, rng)}`;
-        else title = `${pick(TITLES_NOUN, rng)} ${pick(TITLES_VERB, rng)}`;
-        
-        attempts++;
-    } while (existingTitles.includes(title) && attempts < 20);
-    return title;
-};
+export const generateProjectTitle = (existingTitles: string[], rng: () => number = Math.random, genre?: Genre): string => (
+    allocateProjectTitle(new Set(existingTitles.map(projectTitleKey)), rng, genre)
+);
 
 export const generateHiddenStats = (tier: BudgetTier): ProjectHiddenStats => {
     const base = tier === 'LOW' ? 30 : tier === 'MID' ? 50 : 70;
@@ -780,11 +739,11 @@ export const generateHiddenStats = (tier: BudgetTier): ProjectHiddenStats => {
     };
 };
 
-export const generateProjectDetails = (tier: BudgetTier, type: ProjectType, usedTitles: string[], player: Player): ProjectDetails => {
+export const generateProjectDetails = (tier: BudgetTier, type: ProjectType, usedTitles: string[], player: Player, reservations?: Set<string>): ProjectDetails => {
     const genre = pick(GENRES);
     const studio = selectStudioForProject(tier, player);
     const hidden = generateHiddenStats(tier);
-    const title = generateProjectTitle(usedTitles);
+    const title = allocateProjectTitle(reservations || createProjectTitleReservations(player, player.world, getAbsoluteWeek(player.age, player.currentWeek), usedTitles), Math.random, genre);
     
     const dirFirst = ['Christopher', 'Greta', 'Steven', 'Martin', 'Quentin', 'Sofia', 'Wes', 'James', 'Denis', 'Chloe'];
     const dirLast = ['Nolan', 'Gerwig', 'Spielberg', 'Scorsese', 'Tarantino', 'Coppola', 'Anderson', 'Cameron', 'Villeneuve', 'Zhao'];
@@ -827,10 +786,11 @@ export const generateAudition = (
     usedTitles: string[], 
     player: Player, 
     source: 'CASTING_APP' | 'AGENT' | 'DIRECTOR' | 'DIRECT',
-    forcedType?: ProjectType
+    forcedType?: ProjectType,
+    reservations?: Set<string>
 ): AuditionOpportunity => {
     const type: ProjectType = forcedType || (Math.random() > 0.4 ? 'MOVIE' : 'SERIES');
-    const project = generateProjectDetails(tier, type, usedTitles, player);
+    const project = generateProjectDetails(tier, type, usedTitles, player, reservations);
     if (source === 'AGENT' || source === 'DIRECT') roleType = resolveCareerOfferRole(player, roleType, project.genre);
     const income = calculateProjectPay(roleType, tier, type, project.estimatedBudget);
     
@@ -859,6 +819,7 @@ export const generateAuditions = (player: Player, usedTitles: string[]): Auditio
     const count = 3 + Math.floor(Math.random() * 3);
     const opps: AuditionOpportunity[] = [];
     const access = getCastingOpportunityAccess(player);
+    const reservations = createProjectTitleReservations(player, player.world, getAbsoluteWeek(player.age, player.currentWeek), usedTitles);
     const addOpportunity = (candidate: AuditionOpportunity) => {
         let opportunity = enrichAuditionOpportunity(candidate, player);
         const sameMarketRoleOffers = opps.filter(existing => (
@@ -874,6 +835,7 @@ export const generateAuditions = (player: Player, usedTitles: string[]): Auditio
             }, player, { forceRange: true });
         }
         opps.push(opportunity);
+        reservations.add(projectTitleKey(opportunity.project.title));
     };
     
     for(let i=0; i<count; i++) {
@@ -884,8 +846,7 @@ export const generateAuditions = (player: Player, usedTitles: string[]): Auditio
             const npc = NPC_DATABASE.find(n => n.id === friend.npcId);
             if (npc) {
                 const role: RoleType = Math.random() > 0.7 ? 'LEAD' : 'SUPPORTING';
-                const opp = generateAudition(role, 'MID', usedTitles, player, 'DIRECT');
-                opp.projectName = `${npc.name}'s Next Project`;
+                const opp = generateAudition(role, 'MID', [], player, 'DIRECT', undefined, reservations);
                 opp.source = 'DIRECT';
                 opp.estimatedIncome = Math.floor(opp.estimatedIncome * 1.2); // Better pay from friends
                 addOpportunity(opp);
@@ -896,8 +857,8 @@ export const generateAuditions = (player: Player, usedTitles: string[]): Auditio
         const famousRoll = Math.random();
         if (famousRoll < access.famousProjectChance) {
             const famousOpp = Math.random() > 0.5 
-                ? generateFamousMovieOpportunity(player) 
-                : generateFamousSeriesOpportunity(player);
+                ? generateFamousMovieOpportunity(player, reservations)
+                : generateFamousSeriesOpportunity(player, reservations);
             
             if (famousOpp) {
                 addOpportunity(famousOpp);
@@ -916,7 +877,7 @@ export const generateAuditions = (player: Player, usedTitles: string[]): Auditio
         else if (r < access.leadRoleChance + access.supportingRoleChance) role = 'SUPPORTING';
         else if (r < access.leadRoleChance + access.supportingRoleChance + 0.28) role = 'CAMEO';
 
-        addOpportunity(generateAudition(role, tier, usedTitles, player, 'CASTING_APP'));
+        addOpportunity(generateAudition(role, tier, [], player, 'CASTING_APP', undefined, reservations));
     }
     return opps;
 };

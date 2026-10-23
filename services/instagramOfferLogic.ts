@@ -1,5 +1,6 @@
 import { AuditionOpportunity, BudgetTier, Player } from '../types';
 import { generateAudition } from './roleLogic';
+import { createProjectTitleReservations } from './projectTitleGeneration';
 
 export type InstagramReferralDeliveryType = 'AUDITION' | 'DIRECT_ROLE';
 
@@ -8,10 +9,7 @@ export interface InstagramReferralOutcome {
     opportunity: AuditionOpportunity;
 }
 
-const getUsedProjectTitles = (player: Player): string[] => [
-    ...(player.commitments || []).map(commitment => commitment.name),
-    ...(player.pastProjects || []).map(project => project.name),
-].filter(Boolean);
+const getUsedProjectTitles = (player: Player): string[] => [...createProjectTitleReservations(player)];
 
 export const createInstagramReferralAudition = (player: Player): AuditionOpportunity => {
     const fame = Number(player.stats?.fame) || 0;

@@ -11,7 +11,8 @@
     "/Users/zeesh/Vibe code/Actor empire/services/adLogic.ts",
     "/Users/zeesh/Vibe code/Actor empire/scripts/audit-cinema-mature-career.ts",
     "/Users/zeesh/Vibe code/Actor empire/scripts/audit-cinema-mature-policy.ts",
-    "/Users/zeesh/Vibe code/Actor empire/scripts/fixtures/cinemaMatureAppPolicy.ts"
+    "/Users/zeesh/Vibe code/Actor empire/scripts/fixtures/cinemaMatureAppPolicy.ts",
+    "/Users/zeesh/Vibe code/Actor empire/scripts/audit-cinema-file-save-store.ts"
   ],
   "include": [],
   "exclude": []

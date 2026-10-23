@@ -30,7 +30,7 @@ try{
    const contents=override&&existsSync(override)?readFileSync(override,'utf8'):frozenPath&&existsSync(frozenPath)?readFileSync(frozenPath,'utf8'):
     sourceRef&&tracked.has(p)?execFileSync('git',['show',`${sourceRef}:${p}`],{encoding:'utf8',maxBuffer:16e6}):readFileSync(p,'utf8');cache.set(p,contents);return contents;
   };
-  const frozen=new Map(['hooks/useGameActions.ts','App.tsx','scripts/audit-actor-career-flow.ts',...(kind==='mature'?['views/mobile/MobilePage.tsx']:[])].map(p=>[p,readSource(p)]));
+  const frozen=new Map(['hooks/useGameActions.ts','App.tsx','scripts/audit-actor-career-flow.ts',...(kind==='mature'?['views/mobile/MobilePage.tsx','views/mobile/TeamApp.tsx','views/PressConferenceEvent.tsx','views/AwardNightFlow.tsx']:[])].map(p=>[p,readSource(p)]));
   const entry=kind==='mature'?'scripts/audit-cinema-mature-career.ts':kind==='normal'?'scripts/audit-cinema-normal-cohort.ts':'scripts/audit-cinema-phenomenon.ts';
   const built=await build({entryPoints:[entry],bundle:true,platform:'node',format:'esm',loader:{'.csv':'text','.css':'empty'},outfile:bundle,metafile:true,logLevel:'error',plugins:[{
    name:'freeze-audit-ui-sources',setup(api){api.onLoad({filter:/\.(tsx?|json|csv)$/},args=>{

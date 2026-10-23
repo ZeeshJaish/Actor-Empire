@@ -11006,7 +11006,14 @@ export interface WorldEconomyHealthSummary {
     lastSuccessfulMigrationVersion: number;
 }
 
+/** Bounded naming hints, independent of the actual film/rights/finance archives. */
+export interface RecentProjectTitleMemory {
+    schemaVersion: 1;
+    entries: { title: string; week: number }[];
+}
+
 export interface WorldState {
+    recentProjectTitles?: RecentProjectTitleMemory;
     cinemaMarket?: CinemaSavedState;
     projects: IndustryProject[];
     streamingOpportunityMarket?: StreamingOpportunityMarketState;

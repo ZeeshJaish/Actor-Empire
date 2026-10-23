@@ -1,4 +1,5 @@
 import {streamingBackendPercentForBuyer} from '../streamingBackendPolicy';
+import { allocateProjectTitle, createProjectTitleReservations, rememberProjectTitles, projectTitleKey } from '../projectTitleGeneration';
 import type {
     Genre,
     IndustryProject,
@@ -344,10 +345,11 @@ const buildPlatformContentCandidatesInternal = (
                 : roundMillions(35 + profile.competence.production * 7.5);
             const depositMillions = roundMillions(productionBudgetMillions * 0.05);
             if (hasRunway(platform.cashReserve, runwayFloor, productionBudgetMillions)) {
+                const candidateId = createDeterministicId('platform_ai_candidate', input.player.id, input.platformId, input.absoluteWeek, ai.strategyCycle, 'ORIGINAL', intent?.contentFingerprintId || genre, producerStudioId);
                 candidates.push({
-                    id: createDeterministicId('platform_ai_candidate', input.player.id, input.platformId, input.absoluteWeek, ai.strategyCycle, 'ORIGINAL', intent?.contentFingerprintId || genre, producerStudioId),
+                    id: candidateId,
                     source: 'COMMISSIONED_ORIGINAL',
-                    title: `${platform.name} ${genre.replaceAll('_', ' ')} Original`,
+                    title: allocateProjectTitle(createProjectTitleReservations(input.player, input.world, input.absoluteWeek), createDeterministicRng(`${candidateId}:title`), genre),
                     projectType: intent?.projectType || (ai.strategyCycle % 3 === 0 ? 'SERIES' : 'MOVIE'),
                     genre,
                     targetAudience: intent?.targetAudience || (genre === 'CRIME' || genre === 'HORROR' ? 'R' : 'PG-13'),
@@ -624,7 +626,15 @@ export const commitPlatformContentCandidate = (
     const cataloguePackageId = input.candidate.source === 'CATALOGUE_ACQUISITION'
         ? createDeterministicId('platform_ai_catalogue_package', input.platformId, ...input.candidate.sourceProjectIds.slice().sort())
         : null;
-    const plan = buildPlan(input, platform, planId, cataloguePackageId);
+    let candidate = input.candidate;
+    if (candidate.source === 'COMMISSIONED_ORIGINAL') {
+        const reserved = createProjectTitleReservations(input.player, input.world, input.absoluteWeek);
+        if (reserved.has(projectTitleKey(candidate.title))) candidate = {
+            ...candidate,
+            title: allocateProjectTitle(reserved, createDeterministicRng(`${candidate.id}:commit-title`), candidate.genre),
+        };
+    }
+    const plan = buildPlan({ ...input, candidate }, platform, planId, cataloguePackageId);
     const requestedCountryIds = normalizeStreamingDayOneMarketIds(
         input.candidate.countryIds?.length
             ? input.candidate.countryIds
@@ -832,7 +842,7 @@ export const commitPlatformContentCandidate = (
         id: createDeterministicId('platform_ai_decision', input.platformId, planId, 'CONTENT_COMMITMENT'),
         absoluteWeek: input.absoluteWeek,
         type: 'CONTENT_COMMITMENT',
-        summary: `${platform.name} committed to ${input.candidate.title}.`,
+        summary: `${platform.name} committed to ${committedPlan.title}.`,
         reason: `${input.candidate.source} ranked among the platform's strongest current options.`,
         cashImpactMillions: -input.candidate.depositMillions,
     };
@@ -849,6 +859,9 @@ export const commitPlatformContentCandidate = (
     return {
         world: {
             ...input.world,
+            recentProjectTitles: candidate.source === 'COMMISSIONED_ORIGINAL'
+                ? rememberProjectTitles(input.world, [committedPlan.title], input.absoluteWeek).recentProjectTitles
+                : input.world.recentProjectTitles,
             streamingRightsContracts,
             streamingCataloguePackages: cataloguePackage ? {
                 ...normalizeStreamingCataloguePackageRegistry(input.world.streamingCataloguePackages),
