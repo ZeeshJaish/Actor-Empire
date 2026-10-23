@@ -1,0 +1,35 @@
+PASS real exposure creates bounded first intent
+PASS quality without exposure produces no first admissions
+PASS satisfied seen audience can request a paid repeat
+PASS weak delivered experience suppresses repeats
+PASS recent repeated visits reduce repeat requests
+PASS real satisfied exposure enables bounded local discovery
+PASS discovery source cannot replay in the same week
+PASS known nearby streaming window increases zero-admission defer
+PASS private or foreign streaming window cannot invent local waiting
+PASS actual precursor experience earns event interest
+PASS a reached loyal audience can plan an opening instead of inheriting the casual weekly attendance rate
+PASS loyalty cannot create awareness or tickets for an unannounced unknown title
+PASS duplicate prior viewing rows cannot multiply loyal audience intent
+PASS catalogue-only missing history earns no universe familiarity
+PASS duplicate cast and overlapping favorite credits cannot add people
+PASS expensive travel and language friction reduce reachable demand
+PASS foreign-language preference reduces conversion once without removing aware people who have cinema access
+PASS missing participation does not fabricate paying audience
+PASS future release has no current tickets
+PASS choices are pure and order independent
+PASS canonical population and participation supply cinema-only wallets
+PASS canonical player and NPC history require actual viewing evidence
+PASS forecast retains access and visible intent without hidden delivery
+PASS historical cameo earns less attachment than historical lead
+PASS repeated disappointing experience can erode favorites
+PASS the same satisfied people cannot regenerate an unlimited WOM contact budget
+PASS compacted earned universe history retains bounded familiarity
+PASS duplicate character credits union independently of order
+PASS canonical language labels match normalized language IDs
+PASS an observed weak response informs the reached audience before a large country has all attended
+PASS a reliable excellent paid response can sustain later intent beyond an ordinary response
+PASS unseen final quality cannot buy longer legs, and a tiny observed sample cannot renew a whole market
+PASS later awareness cannot erase staying power earned from the same paid review sample
+PASS known streaming remains a waiting option after its public start
+Audience audit: 34 groups passed

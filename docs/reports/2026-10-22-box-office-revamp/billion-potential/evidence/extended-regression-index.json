@@ -1,0 +1,26 @@
+[
+  {
+    "suite": "audit:greenlight-project-builder",
+    "exit": 0
+  },
+  {
+    "suite": "audit:greenlight-calculations",
+    "exit": 0
+  },
+  {
+    "suite": "audit:platform-funding-balance",
+    "exit": 0
+  },
+  {
+    "suite": "audit:save-integrity",
+    "exit": 0
+  },
+  {
+    "suite": "audit:save-generations",
+    "exit": 0
+  },
+  {
+    "suite": "audit:save-migration",
+    "exit": 0
+  }
+]

@@ -1,0 +1,13 @@
+
+> pr-6.6.3@1.0.25 audit:script-variation-flow
+> esbuild scripts/audit-script-variation-flow.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-script-variation-flow.mjs && node /tmp/ae-script-variation-flow.mjs
+
+
+  ../../../../tmp/ae-script-variation-flow.mjs  6.6mb ⚠️
+
+⚡ Done in 118ms
+PASS normal writer development retains selected answers and story intent.
+PASS pirate script → real greenlight project preserves its story and canonical quality.
+PASS series greenlight shares the same story and retains the streaming delivery gate.
+PASS verified save/reload preserves old script stats/costs, new choices, cash and studio ownership.
+PASS canonical cinema settlement → verified reload → three weeks retains receipts without duplicate payment.

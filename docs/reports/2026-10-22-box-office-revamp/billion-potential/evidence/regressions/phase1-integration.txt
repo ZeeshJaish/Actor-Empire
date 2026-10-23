@@ -1,0 +1,9 @@
+PASS actual release reads both cast ID formats and preserves source save
+PASS actual cap-week shares and investor ledger reconciliation
+PASS actual self-director credit does not invent a player acting performance
+PASS actual custom actor fame survives release normalization
+PASS actual Greenlight funding and returned reserve reconcile studio ROI
+PASS actual investor and production-fund package financing is charged once after reserve refund
+PASS actual save migration preserves missing receipts, explicit zero and repeat-load provenance
+PASS legacy active receipts retain their provenance through a real new week, reload and completed archive
+PASS actual mixed streaming royalty and soundtrack receipts reconcile investor deductions in studio-sale earnings

@@ -1,0 +1,23 @@
+{
+  "newAnswers": 68,
+  "genres": 17,
+  "legacyScoringCases": 894,
+  "questionsAdded": 0,
+  "screensAdded": 0,
+  "unrelatedDirtyFilesPreserved": 33,
+  "checks": {
+    "unit": "PASS",
+    "uiPayloadThroughWriterGreenlightSaveCinema": "PASS",
+    "cinemaIntegrationGroups": 32,
+    "typescript": "PASS",
+    "productionBuild": "PASS",
+    "browserReload": "PASS",
+    "rewrite": "PASS",
+    "canon": "PASS",
+    "sequel": "PASS"
+  },
+  "knownBaselineFailure": "character identity migration audit expects 23; current schema is 53; identical with original inference code",
+  "nativeManualCareerTested": false,
+  "committed": false,
+  "pushed": false
+}

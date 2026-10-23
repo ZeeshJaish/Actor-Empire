@@ -85,7 +85,7 @@ export const simulateCinemaWeek = (input:CinemaWeekInput):CinemaWeekResult => {
     const supply=input.supply ? structuredClone(input.supply) : quoteCinemaSupply(input);
     unique(supply.pools.map(p=>p.id),'supply pool');unique(supply.offers.map(o=>`${o.titleId}:${o.poolId}`),'supply offer');
     for(const p of supply.pools) {
-        [p.screens,p.seatsPerShow,p.weeklyScreenMinutes,p.ticketPriceCents,p.bookingCentsPerShow,...(p.operatingCentsPerShow===undefined?[]:[p.operatingCentsPerShow])].forEach(n=>cinemaCount(n,'supply resource'));
+        [p.screens,p.seatsPerShow,p.weeklyScreenMinutes,p.ticketPriceCents,p.bookingCentsPerShow,...(p.legacyBookingCentsPerShow===undefined?[]:[p.legacyBookingCentsPerShow]),...(p.operatingCentsPerShow===undefined?[]:[p.operatingCentsPerShow])].forEach(n=>cinemaCount(n,'supply resource'));
         if(!p.seatsPerShow || !p.ticketPriceCents || p.weeklyScreenMinutes>p.screens*P.daysPerWeek*P.openingMinutesPerDay)throw new RangeError('Invalid cinema physical/price supply');
         splitRealizedCinemaGross({grossCents:0,exhibitorBasisPoints:p.exhibitorBasisPoints,distributionBasisPoints:p.distributionBasisPoints});
     }
@@ -150,16 +150,20 @@ export const simulateCinemaWeek = (input:CinemaWeekInput):CinemaWeekResult => {
             titleScreens.set(titleId,(titleScreens.get(titleId)||0)+scheduledScreens);
             exhibition.push({titleId,poolId:pool.id,shows:showCount,screens:scheduledScreens});
             const prior=runs.find(r=>r.titleId===titleId && r.poolId===pool.id);
+            const contract=titleIndex.get(titleId)!.market!.bookingContract;
+            const bookingCentsPerShow=prior?.bookingCentsPerShow ?? (contract==='REVENUE_SHARE'?0:
+                contract==='LEGACY_SHOW_FEES'?pool.legacyBookingCentsPerShow ?? pool.bookingCentsPerShow:pool.bookingCentsPerShow);
             const releaseAge=input.absoluteWeek-titleIndex.get(titleId)!.market!.releaseWeek;
             const hadDemand=rows.some(r=>(wanted.get(r.id)||0)>0);
             const capacityDenied=showCount===0&&hadDemand&&(booking.requested.get(titleId)||0)>0;
             const contribution=sold*pool.ticketPriceCents*pool.exhibitorBasisPoints/10_000-showCount*cinemaOperatingCostPerShow(pool);
             const viable=showCount>0&&contribution>0&&sold/(showCount*pool.seatsPerShow)>=P.minimumOccupancy;
             const quietWeeks=capacityDenied ? prior?.quietWeeks || 0 : viable?0:(prior?.quietWeeks || 0)+1;
-            const run={titleId,poolId:pool.id,quietWeeks,lastBookedWeek:input.absoluteWeek,lastShows:showCount,lastAdmissions:sold,closed:!capacityDenied && releaseAge>=P.discoveryGraceWeeks && quietWeeks>=P.quietWeeksBeforeExit};
+            const run={titleId,poolId:pool.id,quietWeeks,bookingCentsPerShow,lastBookedWeek:input.absoluteWeek,lastShows:showCount,lastAdmissions:sold,closed:!capacityDenied && releaseAge>=P.discoveryGraceWeeks && quietWeeks>=P.quietWeeksBeforeExit};
             if(prior)Object.assign(prior,run);else runs.push(run);
-            // A selected new market pays a launch booking even when nobody buys; subsequent costs follow actual shows.
-            const cost=cinemaCount((showCount+(!prior?1:0))*pool.bookingCentsPerShow,'booking cost');
+            // Standard exhibition is paid through the exhibitor share. An existing
+            // fixed-show agreement retains its actual launch and renewal charges.
+            const cost=cinemaCount((showCount+(!prior?1:0))*bookingCentsPerShow,'booking cost');
             if(cost)costEvents.push({id:`cinema-booking:${input.absoluteWeek}:${titleId}:${pool.id}`,titleId,poolId:pool.id,category:'BOOKING_COST',amountCents:cost});
         }
         const totalShows=cinemaSum([...shows.values()]);

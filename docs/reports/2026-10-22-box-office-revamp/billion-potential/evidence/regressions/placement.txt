@@ -1,0 +1,1 @@
+PASS local discovery needs paid physical placement and is bounded by its actual screen footprint

@@ -3,6 +3,12 @@ import { createIndustryBudgetSuitability, evaluateIndustryBudgetSuitability } fr
 
 const smallMovie = createIndustryBudgetSuitability({ format: 'MOVIE', primaryGenre: 'DRAMA', creativeRisk: 35, starPowerTarget: 30, commercialIntent: 45, affordabilityCeilingMillions: 100 });
 const largeSeries = createIndustryBudgetSuitability({ format: 'SERIES', primaryGenre: 'SCI_FI', creativeRisk: 70, starPowerTarget: 85, commercialIntent: 85, affordabilityCeilingMillions: 300 });
+const plannedMovie=(genre:string,stars:number)=>createIndustryBudgetSuitability({format:'MOVIE',primaryGenre:genre,
+ creativeRisk:35,starPowerTarget:stars,commercialIntent:65,affordabilityCeilingMillions:500,theatricalPlanning:true} as any);
+const modestDrama=plannedMovie('DRAMA',30),starDrama=plannedMovie('DRAMA',90),effectsFilm=plannedMovie('SCI_FI',90);
+assert.ok(modestDrama.idealHighMillions<15,'A modest movie is not budgeted like a tentpole');
+assert.ok(starDrama.idealHighMillions<65,'One strong star target does not automatically make every drama a $100M production');
+assert.ok(effectsFilm.idealHighMillions>starDrama.idealHighMillions*1.5,'Effects scope retains real production cost');
 
 for (const curve of [smallMovie, largeSeries]) {
     assert.ok(Number.isFinite(curve.minimumMillions) && curve.minimumMillions > 0);

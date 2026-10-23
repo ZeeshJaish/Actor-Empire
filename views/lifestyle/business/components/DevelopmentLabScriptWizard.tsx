@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { BookOpen, ChevronRight, Film, Info, PenTool, Sparkles, Star, Tv } from 'lucide-react';
-import { Genre, ProjectFormat, ProjectType, Script, ScriptAttributes, ScriptSubjectType, TargetAudience } from '../../../../types';
+import { Genre, ProjectFormat, ProjectType, Script, ScriptSubjectType, TargetAudience } from '../../../../types';
 import { generateProceduralLogline } from '../../../../src/data/generators';
 import { SCRIPT_TEMPLATES, ScriptQuestion } from '../../../../src/data/scriptTemplates';
 import { resolveProjectType } from '../../../../services/businessLogic';
@@ -8,8 +8,8 @@ import { ALL_GENRES, PROJECT_FORMATS, formatGenreLabel, formatProjectFormatLabel
 import { getPlayerLanguage, t } from '../../../../services/i18n';
 import { inferStoryCompass } from '../../../../services/characterIdentityLogic';
 import { StoryCompassStrip } from './StoryCompassStrip';
+import { calculateConceptAttributes, calculateConceptQuality, suggestScriptPremise } from '../../../../services/scriptConcept';
 
-const clampScriptStat = (value: number) => Math.max(10, Math.min(100, Math.round(value)));
 const CUSTOM_PREMISE_MAX_LENGTH = 180;
 
 const sanitizeCustomPremise = (value: string) => value.replace(/\s+/g, ' ').trimStart().slice(0, CUSTOM_PREMISE_MAX_LENGTH);
@@ -72,83 +72,6 @@ const getScriptQuestions = (genre: Genre, format: ProjectFormat, subjectName: st
     ...getSubjectQuestions(genre, subjectName, subjectType),
     ...(SCRIPT_TEMPLATES[genre] || []),
 ];
-
-const calculateConceptAttributes = (
-    genre: Genre,
-    format: ProjectFormat,
-    subjectType: ScriptSubjectType,
-    selectedOptions: { questionId: string; choiceId: string }[],
-    hasSecondaryGenre: boolean
-): ScriptAttributes => {
-    const attrs: ScriptAttributes = { plot: 50, characters: 50, pacing: 50, dialogue: 50, action: 50, originality: 50 };
-    const boost = (stat: keyof ScriptAttributes, amount: number) => {
-        attrs[stat] = clampScriptStat((attrs[stat] || 50) + amount);
-    };
-
-    if (hasSecondaryGenre) boost('originality', 4);
-    if (format === 'ANIMATED') {
-        boost('originality', 8);
-        boost('characters', 5);
-        if (genre === 'ANIMATION' || genre === 'FANTASY') boost('action', 5);
-    }
-    if (format === 'ANIME') {
-        boost('originality', 10);
-        boost('action', 7);
-        boost('pacing', 4);
-    }
-    if (genre === 'BIOPIC') {
-        boost('characters', 10);
-        boost('dialogue', 4);
-        boost('originality', subjectType === 'ATHLETE' || subjectType === 'MUSICIAN' ? 5 : 2);
-    }
-    if (genre === 'DOCUMENTARY') {
-        boost('originality', 12);
-        boost('plot', 6);
-        boost('dialogue', 3);
-        boost('action', -8);
-    }
-    if (genre === 'MUSICAL') {
-        boost('originality', 8);
-        boost('dialogue', 5);
-        boost('pacing', 5);
-    }
-    if (genre === 'SPORTS') {
-        boost('action', 8);
-        boost('pacing', 6);
-        boost('characters', 4);
-    }
-    if (genre === 'CRIME') {
-        boost('plot', 8);
-        boost('pacing', 5);
-    }
-    if (genre === 'MYSTERY') {
-        boost('plot', 10);
-        boost('originality', 4);
-        boost('pacing', 3);
-        boost('dialogue', 2);
-    }
-    if (genre === 'FANTASY') {
-        boost('plot', 8);
-        boost('originality', 7);
-    }
-
-    selectedOptions.forEach(option => {
-        const id = option.choiceId;
-        if (/archive|exclusive|original|forbidden|lost-heir|world|mature|stylized|messy/.test(id)) boost('originality', 5);
-        if (/authorized|private|intimate|character|slice|family|community|mob/.test(id)) boost('characters', 5);
-        if (/investigative|detective|mystery|case|truth|open-question/.test(id)) boost('plot', 5);
-        if (/shonen|rivalry|final|breakneck|sports|action|monster/.test(id)) boost('action', 5);
-        if (/jukebox|voice|comedy|dialogue|interviews|witnesses/.test(id)) boost('dialogue', 5);
-        if (/comeback|underdog|cultural|backstage|fame|dark-fantasy/.test(id)) boost('pacing', 4);
-    });
-
-    return attrs;
-};
-
-const calculateConceptQuality = (attrs: ScriptAttributes) => {
-    const weighted = ((attrs.plot || 50) * 1.2) + ((attrs.characters || 50) * 1.1) + (attrs.pacing || 50) + (attrs.dialogue || 50) + ((attrs.action || 50) * 0.85) + ((attrs.originality || 50) * 1.1);
-    return clampScriptStat(weighted / 6.25);
-};
 
 type ScriptBuilderStep = 'IDEA' | 'IDENTITY' | 'STORY' | 'DRAFT';
 
@@ -322,11 +245,18 @@ export const DevelopmentLabScriptWizard: React.FC<DevelopmentLabScriptWizardProp
     const selectedOptionLabels = questions
         .map(q => q.options.find(opt => opt.id === (options[q.id] || q.options[0].id))?.text)
         .filter(Boolean);
-    const suggestedPremise = needsSubject && subjectName.trim()
-        ? `${primaryGenre === 'BIOPIC' ? 'A dramatic portrait' : 'A documentary investigation'} of ${subjectName.trim()}, built around the public story and private cost behind the headlines.`
-        : seedLogline;
+    const suggestedPremise = suggestScriptPremise(
+        primaryGenre ? secondaryGenre ? [primaryGenre, secondaryGenre] : [primaryGenre] : [],
+        selectedScriptOptions, seedLogline, needsSubject ? subjectName : undefined,
+    );
     const displayedPremise = premiseEdited ? draftPremise : suggestedPremise;
     const finalPremise = (displayedPremise.trim() || suggestedPremise).slice(0, CUSTOM_PREMISE_MAX_LENGTH);
+    const storyChanged = Boolean(initialScript && (
+        initialScript.genres[0] !== primaryGenre || (initialScript.genres[1] || '') !== secondaryGenre
+        || (initialScript.logline || '') !== finalPremise
+        || selectedScriptOptions.some(option => !initialScript.options?.some(saved => saved.questionId === option.questionId && saved.choiceId === option.choiceId))
+    ));
+    const protectedCompass = initialScript?.storyCompass?.source === 'CANON' || initialScript?.storyCompass?.source === 'AUTHOR_INTENT';
     const previewStoryCompass = inferStoryCompass({
         genres: primaryGenre
             ? secondaryGenre
@@ -336,7 +266,7 @@ export const DevelopmentLabScriptWizard: React.FC<DevelopmentLabScriptWizardProp
         logline: finalPremise,
         options: selectedScriptOptions,
         isOriginal: initialScript?.isOriginal ?? true,
-        storyCompass: initialScript?.storyCompass,
+        storyCompass: !storyChanged || protectedCompass ? initialScript?.storyCompass : undefined,
         sourceMaterial: needsSubject ? 'ADAPTATION' : initialScript?.sourceMaterial,
     }, initialScript?.isOriginal === false ? 'MARKET_INFERENCE' : 'SCRIPT_DNA');
     const builderSteps: ScriptBuilderStepItem[] = [
@@ -385,7 +315,7 @@ export const DevelopmentLabScriptWizard: React.FC<DevelopmentLabScriptWizardProp
         weeksInDevelopment: 0,
         totalDevelopmentWeeks: 0,
         isOriginal: initialScript ? initialScript.isOriginal : true,
-        // Script DNA still drives gameplay calculations; this premise is player-facing flavor.
+        // Script DNA still drives gameplay calculations; the premise also guides story/casting inference.
         logline: finalPremise,
         storyCompass: previewStoryCompass,
         subjectName: needsSubject ? subjectName.trim() : undefined,
@@ -738,7 +668,7 @@ export const DevelopmentLabScriptWizard: React.FC<DevelopmentLabScriptWizardProp
                                 <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4">
                                     <div className="text-sm font-black text-white">How these stats are calculated</div>
                                     <p className="mt-2 text-xs leading-relaxed text-zinc-400">
-                                        Every concept starts at 50. Format, genre, subject type, secondary genre, and your story choices add small boosts. Final quality weighs Plot, Characters, and Originality slightly more than Action.
+                                        Every concept starts at 50. Format, genre, and subject affect its strengths. New story variations trade strengths between stats; no variation guarantees a hit. Final quality weighs Plot, Characters, and Originality slightly more than Action.
                                     </p>
                                     <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                                         {statInfo.map(([label, description]) => (

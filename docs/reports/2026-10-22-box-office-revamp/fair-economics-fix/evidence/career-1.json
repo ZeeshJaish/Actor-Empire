@@ -1,0 +1,3188 @@
+{
+  "kind": "NORMAL_INITIAL_PLAYER_CAREER_CURRENT_ACTION_POLICY",
+  "seed": 1,
+  "horizon": 208,
+  "status": "RUNNING",
+  "executedWeeks": 105,
+  "saves": 12,
+  "reloads": 11,
+  "replays": 105,
+  "failedPromotionChecked": true,
+  "startingMoney": 2000,
+  "endingMoney": 33845,
+  "alive": true,
+  "health": 76.04999999999913,
+  "age": 17,
+  "week": 2,
+  "ownTitleIds": [
+    "aud_active_1800000000880_0.16833423590287566",
+    "aud_active_1800000001335_0.8529868626501411"
+  ],
+  "ownPaidFilms": [
+    {
+      "id": "aud_active_1800000000880_0.16833423590287566",
+      "name": "The Bone of Smile",
+      "genre": "DRAMA",
+      "budgetCents": 322299400,
+      "campaignCents": 0,
+      "quality": 31,
+      "source": "PLAYER_CREDIT",
+      "activationWeek": 815,
+      "ownCredit": true,
+      "owner": "ARTISAN_PICTURES",
+      "closed": true,
+      "grossCents": 15709650,
+      "receiptsCents": 8326309,
+      "bookingCents": 0,
+      "investorPaidCents": 0,
+      "talentPaidCents": 0,
+      "actorPaidCents": 0,
+      "first": 9842,
+      "repeats": 0,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": -313973091,
+      "producerNetAfterSignedSharesCents": 8326309,
+      "weekly": [
+        {
+          "absoluteWeek": 815,
+          "grossCents": 5344887,
+          "closed": false
+        },
+        {
+          "absoluteWeek": 816,
+          "grossCents": 2971888,
+          "closed": false
+        },
+        {
+          "absoluteWeek": 817,
+          "grossCents": 2004604,
+          "closed": false
+        },
+        {
+          "absoluteWeek": 818,
+          "grossCents": 1357915,
+          "closed": false
+        },
+        {
+          "absoluteWeek": 819,
+          "grossCents": 1063834,
+          "closed": false
+        },
+        {
+          "absoluteWeek": 820,
+          "grossCents": 832426,
+          "closed": false
+        },
+        {
+          "absoluteWeek": 821,
+          "grossCents": 655656,
+          "closed": false
+        },
+        {
+          "absoluteWeek": 822,
+          "grossCents": 514240,
+          "closed": false
+        },
+        {
+          "absoluteWeek": 823,
+          "grossCents": 403357,
+          "closed": false
+        },
+        {
+          "absoluteWeek": 824,
+          "grossCents": 314972,
+          "closed": false
+        },
+        {
+          "absoluteWeek": 825,
+          "grossCents": 245871,
+          "closed": true
+        }
+      ]
+    }
+  ],
+  "films": [
+    {
+      "id": "studio_ai_project_0wcpt4p",
+      "name": "My Kingdom",
+      "genre": "BIOPIC",
+      "budgetCents": 3641900000,
+      "campaignCents": 291400000,
+      "quality": 68,
+      "source": "WORLD_NPC",
+      "activationWeek": 756,
+      "ownCredit": false,
+      "owner": "DREAMWORKS",
+      "closed": true,
+      "grossCents": 11107312029,
+      "receiptsCents": 5886708703,
+      "bookingCents": 0,
+      "investorPaidCents": 0,
+      "talentPaidCents": 176601600,
+      "actorPaidCents": 0,
+      "first": 7240586,
+      "repeats": 62693,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": 1776807103,
+      "producerNetAfterSignedSharesCents": 5710107103
+    },
+    {
+      "id": "studio_ai_project_0gnux3r",
+      "name": "The Ash of Life",
+      "genre": "SPORTS",
+      "budgetCents": 4468400000,
+      "campaignCents": 804300000,
+      "quality": 75,
+      "source": "WORLD_NPC",
+      "activationWeek": 757,
+      "ownCredit": false,
+      "owner": "UNIVERSAL",
+      "closed": true,
+      "grossCents": 11911062883,
+      "receiptsCents": 5749923353,
+      "bookingCents": 0,
+      "investorPaidCents": 0,
+      "talentPaidCents": 172497300,
+      "actorPaidCents": 0,
+      "first": 10111025,
+      "repeats": 34654,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": 304726053,
+      "producerNetAfterSignedSharesCents": 5577426053
+    },
+    {
+      "id": "studio_ai_project_0l4b7om",
+      "name": "The Alliance of Fly",
+      "genre": "COMEDY",
+      "budgetCents": 4523000000,
+      "campaignCents": 361800000,
+      "quality": 69,
+      "source": "WORLD_NPC",
+      "activationWeek": 757,
+      "ownCredit": false,
+      "owner": "YOUTUBE",
+      "closed": true,
+      "grossCents": 1747854577,
+      "receiptsCents": 943849659,
+      "bookingCents": 0,
+      "investorPaidCents": 0,
+      "talentPaidCents": 28315700,
+      "actorPaidCents": 0,
+      "first": 1911945,
+      "repeats": 1931,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": -3969266041,
+      "producerNetAfterSignedSharesCents": 915533959
+    },
+    {
+      "id": "studio_ai_project_05rjelo",
+      "name": "Endless Moon",
+      "genre": "ANIMATION",
+      "budgetCents": 10488300000,
+      "campaignCents": 1887900000,
+      "quality": 77,
+      "source": "WORLD_NPC",
+      "activationWeek": 762,
+      "ownCredit": false,
+      "owner": "DISNEY_PLUS",
+      "closed": true,
+      "grossCents": 18800322470,
+      "receiptsCents": 9236012229,
+      "bookingCents": 0,
+      "investorPaidCents": 0,
+      "talentPaidCents": 369440800,
+      "actorPaidCents": 0,
+      "first": 15821563,
+      "repeats": 57406,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": -3509628571,
+      "producerNetAfterSignedSharesCents": 8866571429
+    },
+    {
+      "id": "studio_ai_project_0izo7yk",
+      "name": "The Alliance of Frontier",
+      "genre": "MYSTERY",
+      "budgetCents": 3427800000,
+      "campaignCents": 274200000,
+      "quality": 54,
+      "source": "WORLD_NPC",
+      "activationWeek": 763,
+      "ownCredit": false,
+      "owner": "PARAMOUNT",
+      "closed": true,
+      "grossCents": 3116491689,
+      "receiptsCents": 1714073072,
+      "bookingCents": 0,
+      "investorPaidCents": 0,
+      "talentPaidCents": 34281200,
+      "actorPaidCents": 0,
+      "first": 2749886,
+      "repeats": 2633,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": -2022208128,
+      "producerNetAfterSignedSharesCents": 1679791872
+    },
+    {
+      "id": "studio_ai_project_0zi1zpn",
+      "name": "Fleeting Jump",
+      "genre": "COMEDY",
+      "budgetCents": 4448700000,
+      "campaignCents": 355900000,
+      "quality": 74,
+      "source": "WORLD_NPC",
+      "activationWeek": 764,
+      "ownCredit": false,
+      "owner": "HULU",
+      "closed": true,
+      "grossCents": 11228031153,
+      "receiptsCents": 5501738996,
+      "bookingCents": 0,
+      "investorPaidCents": 0,
+      "talentPaidCents": 110035000,
+      "actorPaidCents": 0,
+      "first": 7887505,
+      "repeats": 77169,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": 587103996,
+      "producerNetAfterSignedSharesCents": 5391703996
+    },
+    {
+      "id": "studio_ai_project_1ex4iy0",
+      "name": "The Empire of Star",
+      "genre": "CRIME",
+      "budgetCents": 3152900000,
+      "campaignCents": 252200000,
+      "quality": 71,
+      "source": "WORLD_NPC",
+      "activationWeek": 769,
+      "ownCredit": false,
+      "owner": "SONY_PICTURES",
+      "closed": true,
+      "grossCents": 6050546976,
+      "receiptsCents": 2843765618,
+      "bookingCents": 0,
+      "investorPaidCents": 0,
+      "talentPaidCents": 113750500,
+      "actorPaidCents": 0,
+      "first": 5230212,
+      "repeats": 17951,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": -675084882,
+      "producerNetAfterSignedSharesCents": 2730015118
+    },
+    {
+      "id": "studio_ai_project_1omo64n",
+      "name": "Star Freezing",
+      "genre": "FANTASY",
+      "budgetCents": 7093600000,
+      "campaignCents": 1276800000,
+      "quality": 79,
+      "source": "WORLD_NPC",
+      "activationWeek": 770,
+      "ownCredit": false,
+      "owner": "SONY_PICTURES",
+      "closed": true,
+      "grossCents": 20461894281,
+      "receiptsCents": 9916276814,
+      "bookingCents": 0,
+      "investorPaidCents": 0,
+      "talentPaidCents": 396650500,
+      "actorPaidCents": 0,
+      "first": 16110423,
+      "repeats": 64073,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": 1149226314,
+      "producerNetAfterSignedSharesCents": 9519626314
+    },
+    {
+      "id": "studio_ai_project_1qrvodk",
+      "name": "Savage Black Dance",
+      "genre": "SPORTS",
+      "budgetCents": 2170900000,
+      "campaignCents": 173700000,
+      "quality": 62,
+      "source": "WORLD_NPC",
+      "activationWeek": 775,
+      "ownCredit": false,
+      "owner": "MGM",
+      "closed": true,
+      "grossCents": 5025318231,
+      "receiptsCents": 2361906535,
+      "bookingCents": 0,
+      "investorPaidCents": 0,
+      "talentPaidCents": 23618900,
+      "actorPaidCents": 0,
+      "first": 4206537,
+      "repeats": 3268,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": -6312365,
+      "producerNetAfterSignedSharesCents": 2338287635
+    },
+    {
+      "id": "studio_ai_project_02e4or3",
+      "name": "Red Forest",
+      "genre": "HORROR",
+      "budgetCents": 5477100000,
+      "campaignCents": 985900000,
+      "quality": 91,
+      "source": "WORLD_NPC",
+      "activationWeek": 776,
+      "ownCredit": false,
+      "owner": "MARVEL_STUDIOS",
+      "closed": true,
+      "grossCents": 19804468210,
+      "receiptsCents": 9463169672,
+      "bookingCents": 0,
+      "investorPaidCents": 0,
+      "talentPaidCents": 378527400,
+      "actorPaidCents": 0,
+      "first": 17337249,
+      "repeats": 73973,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": 2621642272,
+      "producerNetAfterSignedSharesCents": 9084642272
+    },
+    {
+      "id": "studio_ai_project_0bmreik",
+      "name": "Alpha Smile",
+      "genre": "ACTION",
+      "budgetCents": 7909300000,
+      "campaignCents": 949100000,
+      "quality": 84,
+      "source": "WORLD_NPC",
+      "activationWeek": 778,
+      "ownCredit": false,
+      "owner": "HBO",
+      "closed": true,
+      "grossCents": 8427054266,
+      "receiptsCents": 3960719205,
+      "bookingCents": 0,
+      "investorPaidCents": 0,
+      "talentPaidCents": 79214400,
+      "actorPaidCents": 0,
+      "first": 5392222,
+      "repeats": 23885,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": -4976895195,
+      "producerNetAfterSignedSharesCents": 3881504805
+    },
+    {
+      "id": "studio_ai_project_12xz1wc",
+      "name": "Death Falling",
+      "genre": "HORROR",
+      "budgetCents": 3588300000,
+      "campaignCents": 645900000,
+      "quality": 75,
+      "source": "WORLD_NPC",
+      "activationWeek": 778,
+      "ownCredit": false,
+      "owner": "NETFLIX",
+      "closed": true,
+      "grossCents": 13727983002,
+      "receiptsCents": 6569669390,
+      "bookingCents": 0,
+      "investorPaidCents": 0,
+      "talentPaidCents": 262786700,
+      "actorPaidCents": 0,
+      "first": 11995622,
+      "repeats": 53963,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": 2072682690,
+      "producerNetAfterSignedSharesCents": 6306882690
+    },
+    {
+      "id": "studio_ai_project_1m3v2s9",
+      "name": "Desert Living",
+      "genre": "SUPERHERO",
+      "budgetCents": 5794100000,
+      "campaignCents": 1042900000,
+      "quality": 58,
+      "source": "WORLD_NPC",
+      "activationWeek": 778,
+      "ownCredit": false,
+      "owner": "LIONSGATE",
+      "closed": true,
+      "grossCents": 15074672549,
+      "receiptsCents": 7263931642,
+      "bookingCents": 0,
+      "investorPaidCents": 0,
+      "talentPaidCents": 72639600,
+      "actorPaidCents": 0,
+      "first": 11943149,
+      "repeats": 3828,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": 354292042,
+      "producerNetAfterSignedSharesCents": 7191292042
+    },
+    {
+      "id": "studio_ai_project_1f2hnca",
+      "name": "Fleeting Horizon",
+      "genre": "CRIME",
+      "budgetCents": 3079400000,
+      "campaignCents": 246400000,
+      "quality": 90,
+      "source": "WORLD_NPC",
+      "activationWeek": 779,
+      "ownCredit": false,
+      "owner": "LUCASFILM",
+      "closed": false,
+      "grossCents": 11212556756,
+      "receiptsCents": 5269911234,
+      "bookingCents": 0,
+      "investorPaidCents": 0,
+      "talentPaidCents": 210796400,
+      "actorPaidCents": 0,
+      "first": 10569586,
+      "repeats": 49309,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": 1733314834,
+      "producerNetAfterSignedSharesCents": 5059114834
+    },
+    {
+      "id": "studio_ai_project_1pfxvmw",
+      "name": "Solar Valley",
+      "genre": "ANIMATION",
+      "budgetCents": 10107900000,
+      "campaignCents": 808600000,
+      "quality": 78,
+      "source": "WORLD_NPC",
+      "activationWeek": 780,
+      "ownCredit": false,
+      "owner": "NETFLIX",
+      "closed": true,
+      "grossCents": 9776544608,
+      "receiptsCents": 4594985897,
+      "bookingCents": 0,
+      "investorPaidCents": 0,
+      "talentPaidCents": 183799700,
+      "actorPaidCents": 0,
+      "first": 8363721,
+      "repeats": 34111,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": -6505313803,
+      "producerNetAfterSignedSharesCents": 4411186197
+    },
+    {
+      "id": "studio_ai_project_18o95xt",
+      "name": "Garden Asking",
+      "genre": "ANIMATION",
+      "budgetCents": 9640900000,
+      "campaignCents": 1735400000,
+      "quality": 82,
+      "source": "WORLD_NPC",
+      "activationWeek": 781,
+      "ownCredit": false,
+      "owner": "APPLE_TV",
+      "closed": true,
+      "grossCents": 19396069470,
+      "receiptsCents": 9529198821,
+      "bookingCents": 0,
+      "investorPaidCents": 0,
+      "talentPaidCents": 381167100,
+      "actorPaidCents": 0,
+      "first": 16269741,
+      "repeats": 61794,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": -2228268279,
+      "producerNetAfterSignedSharesCents": 9148031721
+    },
+    {
+      "id": "studio_ai_project_1t3zadh",
+      "name": "Golden Ice Sun",
+      "genre": "HORROR",
+      "budgetCents": 3433700000,
+      "campaignCents": 618100000,
+      "quality": 90,
+      "source": "WORLD_NPC",
+      "activationWeek": 784,
+      "ownCredit": false,
+      "owner": "DISNEY_PLUS",
+      "closed": true,
+      "grossCents": 13931198700,
+      "receiptsCents": 6838680731,
+      "bookingCents": 0,
+      "investorPaidCents": 0,
+      "talentPaidCents": 273547200,
+      "actorPaidCents": 0,
+      "first": 11739913,
+      "repeats": 51420,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": 2513333531,
+      "producerNetAfterSignedSharesCents": 6565133531
+    },
+    {
+      "id": "studio_ai_project_1rtmgay",
+      "name": "Gentle Blood",
+      "genre": "ANIMATION",
+      "budgetCents": 9290200000,
+      "campaignCents": 1114800000,
+      "quality": 74,
+      "source": "WORLD_NPC",
+      "activationWeek": 788,
+      "ownCredit": false,
+      "owner": "HBO",
+      "closed": true,
+      "grossCents": 11380717987,
+      "receiptsCents": 5804176316,
+      "bookingCents": 0,
+      "investorPaidCents": 0,
+      "talentPaidCents": 174125700,
+      "actorPaidCents": 0,
+      "first": 8179368,
+      "repeats": 56360,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": -4774949384,
+      "producerNetAfterSignedSharesCents": 5630050616
+    },
+    {
+      "id": "studio_ai_project_1wygj3c",
+      "name": "The Dream of Bone",
+      "genre": "ACTION",
+      "budgetCents": 8616900000,
+      "campaignCents": 1551000000,
+      "quality": 54,
+      "source": "WORLD_NPC",
+      "activationWeek": 792,
+      "ownCredit": false,
+      "owner": "PARAMOUNT",
+      "closed": true,
+      "grossCents": 18479574886,
+      "receiptsCents": 8843186095,
+      "bookingCents": 0,
+      "investorPaidCents": 0,
+      "talentPaidCents": 176863200,
+      "actorPaidCents": 0,
+      "first": 15768428,
+      "repeats": 1682,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": -1501577105,
+      "producerNetAfterSignedSharesCents": 8666322895
+    },
+    {
+      "id": "studio_ai_project_1ljp9jg",
+      "name": "The Sun of Rise",
+      "genre": "ANIMATION",
+      "budgetCents": 9425100000,
+      "campaignCents": 754000000,
+      "quality": 73,
+      "source": "WORLD_NPC",
+      "activationWeek": 793,
+      "ownCredit": false,
+      "owner": "UNIVERSAL",
+      "closed": true,
+      "grossCents": 8764171937,
+      "receiptsCents": 4469747080,
+      "bookingCents": 0,
+      "investorPaidCents": 0,
+      "talentPaidCents": 178789100,
+      "actorPaidCents": 0,
+      "first": 6299792,
+      "repeats": 41429,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": -5888142020,
+      "producerNetAfterSignedSharesCents": 4290957980
+    },
+    {
+      "id": "studio_ai_project_0aduz9o",
+      "name": "Endless Wood Ghost",
+      "genre": "SPORTS",
+      "budgetCents": 470000000,
+      "campaignCents": 37600000,
+      "quality": 65,
+      "source": "WORLD_NPC",
+      "activationWeek": 797,
+      "ownCredit": false,
+      "owner": "npc_venture_0tpn7a5",
+      "closed": true,
+      "grossCents": 1491321955,
+      "receiptsCents": 760579235,
+      "bookingCents": 0,
+      "investorPaidCents": 0,
+      "talentPaidCents": 7605800,
+      "actorPaidCents": 0,
+      "first": 1095241,
+      "repeats": 1168,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": 245373435,
+      "producerNetAfterSignedSharesCents": 752973435
+    },
+    {
+      "id": "studio_ai_project_1a27mt8",
+      "name": "Cyber Desert",
+      "genre": "ROMANCE",
+      "budgetCents": 3423500000,
+      "campaignCents": 273900000,
+      "quality": 60,
+      "source": "WORLD_NPC",
+      "activationWeek": 798,
+      "ownCredit": false,
+      "owner": "DC_STUDIOS",
+      "closed": true,
+      "grossCents": 1202379929,
+      "receiptsCents": 649291721,
+      "bookingCents": 0,
+      "investorPaidCents": 0,
+      "talentPaidCents": 12985600,
+      "actorPaidCents": 0,
+      "first": 1302038,
+      "repeats": 0,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": -3061093879,
+      "producerNetAfterSignedSharesCents": 636306121
+    },
+    {
+      "id": "studio_ai_project_0o4leid",
+      "name": "First Zero Union",
+      "genre": "SPORTS",
+      "budgetCents": 4111900000,
+      "campaignCents": 740100000,
+      "quality": 65,
+      "source": "WORLD_NPC",
+      "activationWeek": 804,
+      "ownCredit": false,
+      "owner": "SONY_PICTURES",
+      "closed": false,
+      "grossCents": 14186904430,
+      "receiptsCents": 6922943039,
+      "bookingCents": 0,
+      "investorPaidCents": 0,
+      "talentPaidCents": 207688200,
+      "actorPaidCents": 0,
+      "first": 11686258,
+      "repeats": 22518,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": 1863254839,
+      "producerNetAfterSignedSharesCents": 6715254839
+    },
+    {
+      "id": "studio_ai_project_0oawa23",
+      "name": "Crimson Song",
+      "genre": "ROMANCE",
+      "budgetCents": 4257000000,
+      "campaignCents": 766300000,
+      "quality": 82,
+      "source": "WORLD_NPC",
+      "activationWeek": 804,
+      "ownCredit": false,
+      "owner": "LUCASFILM",
+      "closed": false,
+      "grossCents": 12910767331,
+      "receiptsCents": 6231972978,
+      "bookingCents": 0,
+      "investorPaidCents": 0,
+      "talentPaidCents": 186959400,
+      "actorPaidCents": 0,
+      "first": 10890234,
+      "repeats": 38472,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": 1021713578,
+      "producerNetAfterSignedSharesCents": 6045013578
+    },
+    {
+      "id": "studio_ai_project_1oi4yr5",
+      "name": "Gentle Mountain Dream",
+      "genre": "SCI_FI",
+      "budgetCents": 9125700000,
+      "campaignCents": 730100000,
+      "quality": 69,
+      "source": "WORLD_NPC",
+      "activationWeek": 807,
+      "ownCredit": false,
+      "owner": "PARAMOUNT",
+      "closed": false,
+      "grossCents": 2572654344,
+      "receiptsCents": 1389242644,
+      "bookingCents": 0,
+      "investorPaidCents": 0,
+      "talentPaidCents": 27785400,
+      "actorPaidCents": 0,
+      "first": 2732699,
+      "repeats": 5019,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": -8494342756,
+      "producerNetAfterSignedSharesCents": 1361457244
+    },
+    {
+      "id": "studio_ai_project_1irwtgc",
+      "name": "Omega Death",
+      "genre": "CRIME",
+      "budgetCents": 3864300000,
+      "campaignCents": 309100000,
+      "quality": 44,
+      "source": "WORLD_NPC",
+      "activationWeek": 808,
+      "ownCredit": false,
+      "owner": "HULU",
+      "closed": false,
+      "grossCents": 4747951116,
+      "receiptsCents": 2231543585,
+      "bookingCents": 0,
+      "investorPaidCents": 0,
+      "talentPaidCents": 66947100,
+      "actorPaidCents": 0,
+      "first": 4216239,
+      "repeats": 0,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": -2008803515,
+      "producerNetAfterSignedSharesCents": 2164596485
+    },
+    {
+      "id": "studio_ai_project_032mk34",
+      "name": "Flame Living",
+      "genre": "FANTASY",
+      "budgetCents": 9374900000,
+      "campaignCents": 1687500000,
+      "quality": 73,
+      "source": "WORLD_NPC",
+      "activationWeek": 809,
+      "ownCredit": false,
+      "owner": "AMAZON_STUDIOS",
+      "closed": false,
+      "grossCents": 22216246704,
+      "receiptsCents": 10761461589,
+      "bookingCents": 0,
+      "investorPaidCents": 0,
+      "talentPaidCents": 430459000,
+      "actorPaidCents": 0,
+      "first": 17761352,
+      "repeats": 65889,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": -731397411,
+      "producerNetAfterSignedSharesCents": 10331002589
+    },
+    {
+      "id": "studio_ai_project_0ojm13a",
+      "name": "Jump Searching",
+      "genre": "COMEDY",
+      "budgetCents": 3790900000,
+      "campaignCents": 303300000,
+      "quality": 59,
+      "source": "WORLD_NPC",
+      "activationWeek": 810,
+      "ownCredit": false,
+      "owner": "PIXAR",
+      "closed": false,
+      "grossCents": 3096813915,
+      "receiptsCents": 1517441222,
+      "bookingCents": 0,
+      "investorPaidCents": 0,
+      "talentPaidCents": 30348800,
+      "actorPaidCents": 0,
+      "first": 2268739,
+      "repeats": 0,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": -2607107578,
+      "producerNetAfterSignedSharesCents": 1487092422
+    },
+    {
+      "id": "studio_ai_project_0no7kgh",
+      "name": "The Heart of Fall",
+      "genre": "ANIMATION",
+      "budgetCents": 11051500000,
+      "campaignCents": 884100000,
+      "quality": 56,
+      "source": "WORLD_NPC",
+      "activationWeek": 811,
+      "ownCredit": false,
+      "owner": "AMAZON_STUDIOS",
+      "closed": false,
+      "grossCents": 7394120139,
+      "receiptsCents": 3771008106,
+      "bookingCents": 0,
+      "investorPaidCents": 0,
+      "talentPaidCents": 150840300,
+      "actorPaidCents": 0,
+      "first": 5358321,
+      "repeats": 265,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": -8315432194,
+      "producerNetAfterSignedSharesCents": 3620167806
+    },
+    {
+      "id": "studio_ai_project_1ezz9ja",
+      "name": "Solar Savage World",
+      "genre": "HORROR",
+      "budgetCents": 3507600000,
+      "campaignCents": 420900000,
+      "quality": 80,
+      "source": "WORLD_NPC",
+      "activationWeek": 811,
+      "ownCredit": false,
+      "owner": "HBO",
+      "closed": false,
+      "grossCents": 13194396860,
+      "receiptsCents": 6465260618,
+      "bookingCents": 0,
+      "investorPaidCents": 0,
+      "talentPaidCents": 193957800,
+      "actorPaidCents": 0,
+      "first": 9512373,
+      "repeats": 129627,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": 2342802818,
+      "producerNetAfterSignedSharesCents": 6271302818
+    },
+    {
+      "id": "studio_ai_project_0fr5ppd",
+      "name": "Day Chasing",
+      "genre": "FANTASY",
+      "budgetCents": 8080500000,
+      "campaignCents": 1454500000,
+      "quality": 89,
+      "source": "WORLD_NPC",
+      "activationWeek": 814,
+      "ownCredit": false,
+      "owner": "DISNEY_PLUS",
+      "closed": false,
+      "grossCents": 29660368069,
+      "receiptsCents": 14172602958,
+      "bookingCents": 0,
+      "investorPaidCents": 0,
+      "talentPaidCents": 566903800,
+      "actorPaidCents": 0,
+      "first": 25561807,
+      "repeats": 106487,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": 4070699158,
+      "producerNetAfterSignedSharesCents": 13605699158
+    },
+    {
+      "id": "aud_active_1800000000880_0.16833423590287566",
+      "name": "The Bone of Smile",
+      "genre": "DRAMA",
+      "budgetCents": 322299400,
+      "campaignCents": 0,
+      "quality": 31,
+      "source": "PLAYER_CREDIT",
+      "activationWeek": 815,
+      "ownCredit": true,
+      "owner": "ARTISAN_PICTURES",
+      "closed": true,
+      "grossCents": 15709650,
+      "receiptsCents": 8326309,
+      "bookingCents": 0,
+      "investorPaidCents": 0,
+      "talentPaidCents": 0,
+      "actorPaidCents": 0,
+      "first": 9842,
+      "repeats": 0,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": -313973091,
+      "producerNetAfterSignedSharesCents": 8326309,
+      "weekly": [
+        {
+          "absoluteWeek": 815,
+          "grossCents": 5344887,
+          "closed": false
+        },
+        {
+          "absoluteWeek": 816,
+          "grossCents": 2971888,
+          "closed": false
+        },
+        {
+          "absoluteWeek": 817,
+          "grossCents": 2004604,
+          "closed": false
+        },
+        {
+          "absoluteWeek": 818,
+          "grossCents": 1357915,
+          "closed": false
+        },
+        {
+          "absoluteWeek": 819,
+          "grossCents": 1063834,
+          "closed": false
+        },
+        {
+          "absoluteWeek": 820,
+          "grossCents": 832426,
+          "closed": false
+        },
+        {
+          "absoluteWeek": 821,
+          "grossCents": 655656,
+          "closed": false
+        },
+        {
+          "absoluteWeek": 822,
+          "grossCents": 514240,
+          "closed": false
+        },
+        {
+          "absoluteWeek": 823,
+          "grossCents": 403357,
+          "closed": false
+        },
+        {
+          "absoluteWeek": 824,
+          "grossCents": 314972,
+          "closed": false
+        },
+        {
+          "absoluteWeek": 825,
+          "grossCents": 245871,
+          "closed": true
+        }
+      ]
+    },
+    {
+      "id": "studio_ai_project_0vn3715",
+      "name": "Endless Cry",
+      "genre": "SPORTS",
+      "budgetCents": 4538400000,
+      "campaignCents": 816900000,
+      "quality": 87,
+      "source": "WORLD_NPC",
+      "activationWeek": 816,
+      "ownCredit": false,
+      "owner": "MARVEL_STUDIOS",
+      "closed": false,
+      "grossCents": 14293791548,
+      "receiptsCents": 6884662400,
+      "bookingCents": 0,
+      "investorPaidCents": 0,
+      "talentPaidCents": 206539800,
+      "actorPaidCents": 0,
+      "first": 11842379,
+      "repeats": 51371,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": 1322822600,
+      "producerNetAfterSignedSharesCents": 6678122600
+    },
+    {
+      "id": "studio_ai_project_0btglq0",
+      "name": "Tear Fighting",
+      "genre": "SPORTS",
+      "budgetCents": 3146000000,
+      "campaignCents": 251700000,
+      "quality": 82,
+      "source": "WORLD_NPC",
+      "activationWeek": 822,
+      "ownCredit": false,
+      "owner": "WARNER_BROS",
+      "closed": false,
+      "grossCents": 1606957986,
+      "receiptsCents": 883828313,
+      "bookingCents": 0,
+      "investorPaidCents": 0,
+      "talentPaidCents": 26514800,
+      "actorPaidCents": 0,
+      "first": 1329083,
+      "repeats": 4595,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": -2540386487,
+      "producerNetAfterSignedSharesCents": 857313513
+    },
+    {
+      "id": "studio_ai_project_0z2yjhe",
+      "name": "Black Sun",
+      "genre": "COMEDY",
+      "budgetCents": 2700100000,
+      "campaignCents": 216000000,
+      "quality": 88,
+      "source": "WORLD_NPC",
+      "activationWeek": 822,
+      "ownCredit": false,
+      "owner": "SONY_PICTURES",
+      "closed": false,
+      "grossCents": 11327147865,
+      "receiptsCents": 5323765840,
+      "bookingCents": 0,
+      "investorPaidCents": 0,
+      "talentPaidCents": 159712900,
+      "actorPaidCents": 0,
+      "first": 10452646,
+      "repeats": 53712,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": 2247952940,
+      "producerNetAfterSignedSharesCents": 5164052940
+    },
+    {
+      "id": "studio_ai_project_0pcr33u",
+      "name": "Alpha Fleeting Light",
+      "genre": "SPORTS",
+      "budgetCents": 2170900000,
+      "campaignCents": 173700000,
+      "quality": 81,
+      "source": "WORLD_NPC",
+      "activationWeek": 824,
+      "ownCredit": false,
+      "owner": "SEARCHLIGHT",
+      "closed": false,
+      "grossCents": 1075256699,
+      "receiptsCents": 580643781,
+      "bookingCents": 0,
+      "investorPaidCents": 0,
+      "talentPaidCents": 11613000,
+      "actorPaidCents": 0,
+      "first": 1120709,
+      "repeats": 1630,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": -1775569219,
+      "producerNetAfterSignedSharesCents": 569030781
+    },
+    {
+      "id": "studio_ai_project_1n6fay5",
+      "name": "The Rise of Shadow",
+      "genre": "SUPERHERO",
+      "budgetCents": 9764400000,
+      "campaignCents": 1757600000,
+      "quality": 62,
+      "source": "WORLD_NPC",
+      "activationWeek": 828,
+      "ownCredit": false,
+      "owner": "DISNEY_PLUS",
+      "closed": false,
+      "grossCents": 13992677008,
+      "receiptsCents": 6715445762,
+      "bookingCents": 0,
+      "investorPaidCents": 0,
+      "talentPaidCents": 201463500,
+      "actorPaidCents": 0,
+      "first": 10711560,
+      "repeats": 2910,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": -5008017738,
+      "producerNetAfterSignedSharesCents": 6513982262
+    },
+    {
+      "id": "studio_ai_project_0kekksi",
+      "name": "The Ocean of Dance",
+      "genre": "FANTASY",
+      "budgetCents": 4189800000,
+      "campaignCents": 754200000,
+      "quality": 71,
+      "source": "WORLD_NPC",
+      "activationWeek": 829,
+      "ownCredit": false,
+      "owner": "SEARCHLIGHT",
+      "closed": false,
+      "grossCents": 11366019931,
+      "receiptsCents": 5506406475,
+      "bookingCents": 0,
+      "investorPaidCents": 0,
+      "talentPaidCents": 165192000,
+      "actorPaidCents": 0,
+      "first": 8779733,
+      "repeats": 26338,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": 397214475,
+      "producerNetAfterSignedSharesCents": 5341214475
+    },
+    {
+      "id": "studio_ai_project_05shu3t",
+      "name": "Star Searching",
+      "genre": "ADVENTURE",
+      "budgetCents": 7521300000,
+      "campaignCents": 601700000,
+      "quality": 92,
+      "source": "WORLD_NPC",
+      "activationWeek": 832,
+      "ownCredit": false,
+      "owner": "HBO",
+      "closed": false,
+      "grossCents": 2804699017,
+      "receiptsCents": 1318209587,
+      "bookingCents": 0,
+      "investorPaidCents": 0,
+      "talentPaidCents": 26364200,
+      "actorPaidCents": 0,
+      "first": 2476558,
+      "repeats": 1840,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": -6831154613,
+      "producerNetAfterSignedSharesCents": 1291845387
+    }
+  ],
+  "actions": 283,
+  "actionLog": [
+    {
+      "week": 728,
+      "action": "Train DRAMA",
+      "cashBefore": 2000,
+      "cashAfter": 1975,
+      "energy": 10
+    },
+    {
+      "week": 728,
+      "action": "Train DRAMA",
+      "cashBefore": 1975,
+      "cashAfter": 1950,
+      "energy": 10
+    },
+    {
+      "week": 728,
+      "action": "Train DRAMA",
+      "cashBefore": 1950,
+      "cashAfter": 1925,
+      "energy": 10
+    },
+    {
+      "week": 728,
+      "action": "Train DRAMA",
+      "cashBefore": 1925,
+      "cashAfter": 1900,
+      "energy": 10
+    },
+    {
+      "week": 728,
+      "action": "Train DRAMA",
+      "cashBefore": 1900,
+      "cashAfter": 1875,
+      "energy": 10
+    },
+    {
+      "week": 728,
+      "action": "Train DRAMA",
+      "cashBefore": 1875,
+      "cashAfter": 1850,
+      "energy": 10
+    },
+    {
+      "week": 728,
+      "action": "Train DRAMA",
+      "cashBefore": 1850,
+      "cashAfter": 1825,
+      "energy": 10
+    },
+    {
+      "week": 728,
+      "action": "Train DRAMA",
+      "cashBefore": 1825,
+      "cashAfter": 1800,
+      "energy": 10
+    },
+    {
+      "week": 728,
+      "action": "Train DRAMA",
+      "cashBefore": 1800,
+      "cashAfter": 1775,
+      "energy": 10
+    },
+    {
+      "week": 728,
+      "action": "Train DRAMA",
+      "cashBefore": 1775,
+      "cashAfter": 1750,
+      "energy": 10
+    },
+    {
+      "week": 729,
+      "action": "Train DRAMA",
+      "cashBefore": 1750,
+      "cashAfter": 1725,
+      "energy": 10
+    },
+    {
+      "week": 729,
+      "action": "Train DRAMA",
+      "cashBefore": 1725,
+      "cashAfter": 1700,
+      "energy": 10
+    },
+    {
+      "week": 729,
+      "action": "Train DRAMA",
+      "cashBefore": 1700,
+      "cashAfter": 1675,
+      "energy": 10
+    },
+    {
+      "week": 729,
+      "action": "Train DRAMA",
+      "cashBefore": 1675,
+      "cashAfter": 1650,
+      "energy": 10
+    },
+    {
+      "week": 729,
+      "action": "Train DRAMA",
+      "cashBefore": 1650,
+      "cashAfter": 1625,
+      "energy": 10
+    },
+    {
+      "week": 729,
+      "action": "Train DRAMA",
+      "cashBefore": 1625,
+      "cashAfter": 1600,
+      "energy": 10
+    },
+    {
+      "week": 729,
+      "action": "Train DRAMA",
+      "cashBefore": 1600,
+      "cashAfter": 1575,
+      "energy": 10
+    },
+    {
+      "week": 729,
+      "action": "Train DRAMA",
+      "cashBefore": 1575,
+      "cashAfter": 1550,
+      "energy": 10
+    },
+    {
+      "week": 729,
+      "action": "Train DRAMA",
+      "cashBefore": 1550,
+      "cashAfter": 1525,
+      "energy": 10
+    },
+    {
+      "week": 729,
+      "action": "Train DRAMA",
+      "cashBefore": 1525,
+      "cashAfter": 1500,
+      "energy": 10
+    },
+    {
+      "week": 730,
+      "action": "Accept current job: Ride Share Driver",
+      "cashBefore": 1500,
+      "cashAfter": 1500,
+      "energy": 15
+    },
+    {
+      "week": 730,
+      "action": "Train DRAMA",
+      "cashBefore": 1500,
+      "cashAfter": 1475,
+      "energy": 10
+    },
+    {
+      "week": 730,
+      "action": "Train DRAMA",
+      "cashBefore": 1475,
+      "cashAfter": 1450,
+      "energy": 10
+    },
+    {
+      "week": 730,
+      "action": "Train DRAMA",
+      "cashBefore": 1450,
+      "cashAfter": 1425,
+      "energy": 10
+    },
+    {
+      "week": 730,
+      "action": "Train DRAMA",
+      "cashBefore": 1425,
+      "cashAfter": 1400,
+      "energy": 10
+    },
+    {
+      "week": 730,
+      "action": "Train DRAMA",
+      "cashBefore": 1400,
+      "cashAfter": 1375,
+      "energy": 10
+    },
+    {
+      "week": 730,
+      "action": "Train DRAMA",
+      "cashBefore": 1375,
+      "cashAfter": 1350,
+      "energy": 10
+    },
+    {
+      "week": 730,
+      "action": "Train DRAMA",
+      "cashBefore": 1350,
+      "cashAfter": 1325,
+      "energy": 10
+    },
+    {
+      "week": 730,
+      "action": "Train DRAMA",
+      "cashBefore": 1325,
+      "cashAfter": 1300,
+      "energy": 10
+    },
+    {
+      "week": 731,
+      "action": "Train DRAMA",
+      "cashBefore": 1600,
+      "cashAfter": 1575,
+      "energy": 10
+    },
+    {
+      "week": 731,
+      "action": "Train DRAMA",
+      "cashBefore": 1575,
+      "cashAfter": 1550,
+      "energy": 10
+    },
+    {
+      "week": 731,
+      "action": "Train DRAMA",
+      "cashBefore": 1550,
+      "cashAfter": 1525,
+      "energy": 10
+    },
+    {
+      "week": 731,
+      "action": "Train DRAMA",
+      "cashBefore": 1525,
+      "cashAfter": 1500,
+      "energy": 10
+    },
+    {
+      "week": 731,
+      "action": "Train DRAMA",
+      "cashBefore": 1500,
+      "cashAfter": 1475,
+      "energy": 10
+    },
+    {
+      "week": 731,
+      "action": "Train DRAMA",
+      "cashBefore": 1475,
+      "cashAfter": 1450,
+      "energy": 10
+    },
+    {
+      "week": 731,
+      "action": "Train DRAMA",
+      "cashBefore": 1450,
+      "cashAfter": 1425,
+      "energy": 10
+    },
+    {
+      "week": 731,
+      "action": "Train DRAMA",
+      "cashBefore": 1425,
+      "cashAfter": 1400,
+      "energy": 10
+    },
+    {
+      "week": 732,
+      "action": "Train DRAMA",
+      "cashBefore": 1700,
+      "cashAfter": 1675,
+      "energy": 10
+    },
+    {
+      "week": 732,
+      "action": "Train DRAMA",
+      "cashBefore": 1675,
+      "cashAfter": 1650,
+      "energy": 10
+    },
+    {
+      "week": 732,
+      "action": "Train DRAMA",
+      "cashBefore": 1650,
+      "cashAfter": 1625,
+      "energy": 10
+    },
+    {
+      "week": 732,
+      "action": "Train DRAMA",
+      "cashBefore": 1625,
+      "cashAfter": 1600,
+      "energy": 10
+    },
+    {
+      "week": 732,
+      "action": "Train DRAMA",
+      "cashBefore": 1600,
+      "cashAfter": 1575,
+      "energy": 10
+    },
+    {
+      "week": 732,
+      "action": "Train DRAMA",
+      "cashBefore": 1575,
+      "cashAfter": 1550,
+      "energy": 10
+    },
+    {
+      "week": 732,
+      "action": "Train DRAMA",
+      "cashBefore": 1550,
+      "cashAfter": 1525,
+      "energy": 10
+    },
+    {
+      "week": 732,
+      "action": "Train DRAMA",
+      "cashBefore": 1525,
+      "cashAfter": 1500,
+      "energy": 10
+    },
+    {
+      "week": 733,
+      "action": "Train DRAMA",
+      "cashBefore": 1800,
+      "cashAfter": 1775,
+      "energy": 10
+    },
+    {
+      "week": 733,
+      "action": "Train DRAMA",
+      "cashBefore": 1775,
+      "cashAfter": 1750,
+      "energy": 10
+    },
+    {
+      "week": 733,
+      "action": "Train DRAMA",
+      "cashBefore": 1750,
+      "cashAfter": 1725,
+      "energy": 10
+    },
+    {
+      "week": 733,
+      "action": "Train DRAMA",
+      "cashBefore": 1725,
+      "cashAfter": 1700,
+      "energy": 10
+    },
+    {
+      "week": 733,
+      "action": "Train DRAMA",
+      "cashBefore": 1700,
+      "cashAfter": 1675,
+      "energy": 10
+    },
+    {
+      "week": 733,
+      "action": "Train DRAMA",
+      "cashBefore": 1675,
+      "cashAfter": 1650,
+      "energy": 10
+    },
+    {
+      "week": 733,
+      "action": "Train DRAMA",
+      "cashBefore": 1650,
+      "cashAfter": 1625,
+      "energy": 10
+    },
+    {
+      "week": 733,
+      "action": "Train DRAMA",
+      "cashBefore": 1625,
+      "cashAfter": 1600,
+      "energy": 10
+    },
+    {
+      "week": 734,
+      "action": "Train DRAMA",
+      "cashBefore": 1900,
+      "cashAfter": 1875,
+      "energy": 10
+    },
+    {
+      "week": 734,
+      "action": "Train DRAMA",
+      "cashBefore": 1875,
+      "cashAfter": 1850,
+      "energy": 10
+    },
+    {
+      "week": 734,
+      "action": "Train DRAMA",
+      "cashBefore": 1850,
+      "cashAfter": 1825,
+      "energy": 10
+    },
+    {
+      "week": 734,
+      "action": "Train DRAMA",
+      "cashBefore": 1825,
+      "cashAfter": 1800,
+      "energy": 10
+    },
+    {
+      "week": 734,
+      "action": "Train DRAMA",
+      "cashBefore": 1800,
+      "cashAfter": 1775,
+      "energy": 10
+    },
+    {
+      "week": 734,
+      "action": "Train DRAMA",
+      "cashBefore": 1775,
+      "cashAfter": 1750,
+      "energy": 10
+    },
+    {
+      "week": 734,
+      "action": "Train DRAMA",
+      "cashBefore": 1750,
+      "cashAfter": 1725,
+      "energy": 10
+    },
+    {
+      "week": 734,
+      "action": "Train DRAMA",
+      "cashBefore": 1725,
+      "cashAfter": 1700,
+      "energy": 10
+    },
+    {
+      "week": 735,
+      "action": "Train DRAMA",
+      "cashBefore": 2000,
+      "cashAfter": 1975,
+      "energy": 10
+    },
+    {
+      "week": 735,
+      "action": "Train DRAMA",
+      "cashBefore": 1975,
+      "cashAfter": 1950,
+      "energy": 10
+    },
+    {
+      "week": 735,
+      "action": "Train DRAMA",
+      "cashBefore": 1950,
+      "cashAfter": 1925,
+      "energy": 10
+    },
+    {
+      "week": 735,
+      "action": "Train DRAMA",
+      "cashBefore": 1925,
+      "cashAfter": 1900,
+      "energy": 10
+    },
+    {
+      "week": 735,
+      "action": "Train DRAMA",
+      "cashBefore": 1900,
+      "cashAfter": 1875,
+      "energy": 10
+    },
+    {
+      "week": 735,
+      "action": "Train DRAMA",
+      "cashBefore": 1875,
+      "cashAfter": 1850,
+      "energy": 10
+    },
+    {
+      "week": 735,
+      "action": "Train DRAMA",
+      "cashBefore": 1850,
+      "cashAfter": 1825,
+      "energy": 10
+    },
+    {
+      "week": 735,
+      "action": "Train DRAMA",
+      "cashBefore": 1825,
+      "cashAfter": 1800,
+      "energy": 10
+    },
+    {
+      "week": 736,
+      "action": "Life choice: life.event.early.sideHustle.auditions.label",
+      "cashBefore": 2100,
+      "cashAfter": 2100,
+      "energy": 0
+    },
+    {
+      "week": 736,
+      "action": "Train DRAMA",
+      "cashBefore": 2100,
+      "cashAfter": 2075,
+      "energy": 10
+    },
+    {
+      "week": 736,
+      "action": "Train DRAMA",
+      "cashBefore": 2075,
+      "cashAfter": 2050,
+      "energy": 10
+    },
+    {
+      "week": 736,
+      "action": "Train DRAMA",
+      "cashBefore": 2050,
+      "cashAfter": 2025,
+      "energy": 10
+    },
+    {
+      "week": 736,
+      "action": "Train DRAMA",
+      "cashBefore": 2025,
+      "cashAfter": 2000,
+      "energy": 10
+    },
+    {
+      "week": 736,
+      "action": "Train DRAMA",
+      "cashBefore": 2000,
+      "cashAfter": 1975,
+      "energy": 10
+    },
+    {
+      "week": 736,
+      "action": "Train DRAMA",
+      "cashBefore": 1975,
+      "cashAfter": 1950,
+      "energy": 10
+    },
+    {
+      "week": 736,
+      "action": "Train DRAMA",
+      "cashBefore": 1950,
+      "cashAfter": 1925,
+      "energy": 10
+    },
+    {
+      "week": 736,
+      "action": "Train DRAMA",
+      "cashBefore": 1925,
+      "cashAfter": 1900,
+      "energy": 10
+    },
+    {
+      "week": 737,
+      "action": "Train DRAMA",
+      "cashBefore": 2200,
+      "cashAfter": 2175,
+      "energy": 10
+    },
+    {
+      "week": 737,
+      "action": "Train DRAMA",
+      "cashBefore": 2175,
+      "cashAfter": 2150,
+      "energy": 10
+    },
+    {
+      "week": 737,
+      "action": "Train DRAMA",
+      "cashBefore": 2150,
+      "cashAfter": 2125,
+      "energy": 10
+    },
+    {
+      "week": 737,
+      "action": "Train DRAMA",
+      "cashBefore": 2125,
+      "cashAfter": 2100,
+      "energy": 10
+    },
+    {
+      "week": 737,
+      "action": "Train DRAMA",
+      "cashBefore": 2100,
+      "cashAfter": 2075,
+      "energy": 10
+    },
+    {
+      "week": 737,
+      "action": "Train DRAMA",
+      "cashBefore": 2075,
+      "cashAfter": 2050,
+      "energy": 10
+    },
+    {
+      "week": 737,
+      "action": "Train DRAMA",
+      "cashBefore": 2050,
+      "cashAfter": 2025,
+      "energy": 10
+    },
+    {
+      "week": 737,
+      "action": "Train DRAMA",
+      "cashBefore": 2025,
+      "cashAfter": 2000,
+      "energy": 10
+    },
+    {
+      "week": 738,
+      "action": "Train DRAMA",
+      "cashBefore": 2300,
+      "cashAfter": 2275,
+      "energy": 10
+    },
+    {
+      "week": 738,
+      "action": "Train DRAMA",
+      "cashBefore": 2275,
+      "cashAfter": 2250,
+      "energy": 10
+    },
+    {
+      "week": 738,
+      "action": "Train DRAMA",
+      "cashBefore": 2250,
+      "cashAfter": 2225,
+      "energy": 10
+    },
+    {
+      "week": 738,
+      "action": "Train DRAMA",
+      "cashBefore": 2225,
+      "cashAfter": 2200,
+      "energy": 10
+    },
+    {
+      "week": 738,
+      "action": "Train DRAMA",
+      "cashBefore": 2200,
+      "cashAfter": 2175,
+      "energy": 10
+    },
+    {
+      "week": 738,
+      "action": "Train DRAMA",
+      "cashBefore": 2175,
+      "cashAfter": 2150,
+      "energy": 10
+    },
+    {
+      "week": 738,
+      "action": "Train DRAMA",
+      "cashBefore": 2150,
+      "cashAfter": 2125,
+      "energy": 10
+    },
+    {
+      "week": 738,
+      "action": "Train DRAMA",
+      "cashBefore": 2125,
+      "cashAfter": 2100,
+      "energy": 10
+    },
+    {
+      "week": 739,
+      "action": "Train DRAMA",
+      "cashBefore": 2400,
+      "cashAfter": 2375,
+      "energy": 10
+    },
+    {
+      "week": 739,
+      "action": "Train DRAMA",
+      "cashBefore": 2375,
+      "cashAfter": 2350,
+      "energy": 10
+    },
+    {
+      "week": 739,
+      "action": "Train DRAMA",
+      "cashBefore": 2350,
+      "cashAfter": 2325,
+      "energy": 10
+    },
+    {
+      "week": 739,
+      "action": "Train DRAMA",
+      "cashBefore": 2325,
+      "cashAfter": 2300,
+      "energy": 10
+    },
+    {
+      "week": 739,
+      "action": "Train DRAMA",
+      "cashBefore": 2300,
+      "cashAfter": 2275,
+      "energy": 10
+    },
+    {
+      "week": 739,
+      "action": "Train DRAMA",
+      "cashBefore": 2275,
+      "cashAfter": 2250,
+      "energy": 10
+    },
+    {
+      "week": 739,
+      "action": "Train DRAMA",
+      "cashBefore": 2250,
+      "cashAfter": 2225,
+      "energy": 10
+    },
+    {
+      "week": 739,
+      "action": "Train DRAMA",
+      "cashBefore": 2225,
+      "cashAfter": 2200,
+      "energy": 10
+    },
+    {
+      "week": 740,
+      "action": "Train DRAMA",
+      "cashBefore": 2500,
+      "cashAfter": 2475,
+      "energy": 10
+    },
+    {
+      "week": 740,
+      "action": "Train DRAMA",
+      "cashBefore": 2475,
+      "cashAfter": 2450,
+      "energy": 10
+    },
+    {
+      "week": 740,
+      "action": "Train DRAMA",
+      "cashBefore": 2450,
+      "cashAfter": 2425,
+      "energy": 10
+    },
+    {
+      "week": 740,
+      "action": "Train DRAMA",
+      "cashBefore": 2425,
+      "cashAfter": 2400,
+      "energy": 10
+    },
+    {
+      "week": 740,
+      "action": "Train DRAMA",
+      "cashBefore": 2400,
+      "cashAfter": 2375,
+      "energy": 10
+    },
+    {
+      "week": 740,
+      "action": "Train DRAMA",
+      "cashBefore": 2375,
+      "cashAfter": 2350,
+      "energy": 10
+    },
+    {
+      "week": 740,
+      "action": "Train DRAMA",
+      "cashBefore": 2350,
+      "cashAfter": 2325,
+      "energy": 10
+    },
+    {
+      "week": 740,
+      "action": "Train DRAMA",
+      "cashBefore": 2325,
+      "cashAfter": 2300,
+      "energy": 10
+    },
+    {
+      "week": 741,
+      "action": "Train DRAMA",
+      "cashBefore": 2600,
+      "cashAfter": 2575,
+      "energy": 10
+    },
+    {
+      "week": 741,
+      "action": "Train DRAMA",
+      "cashBefore": 2575,
+      "cashAfter": 2550,
+      "energy": 10
+    },
+    {
+      "week": 741,
+      "action": "Train DRAMA",
+      "cashBefore": 2550,
+      "cashAfter": 2525,
+      "energy": 10
+    },
+    {
+      "week": 741,
+      "action": "Train DRAMA",
+      "cashBefore": 2525,
+      "cashAfter": 2500,
+      "energy": 10
+    },
+    {
+      "week": 741,
+      "action": "Train DRAMA",
+      "cashBefore": 2500,
+      "cashAfter": 2475,
+      "energy": 10
+    },
+    {
+      "week": 741,
+      "action": "Train DRAMA",
+      "cashBefore": 2475,
+      "cashAfter": 2450,
+      "energy": 10
+    },
+    {
+      "week": 741,
+      "action": "Train DRAMA",
+      "cashBefore": 2450,
+      "cashAfter": 2425,
+      "energy": 10
+    },
+    {
+      "week": 741,
+      "action": "Train DRAMA",
+      "cashBefore": 2425,
+      "cashAfter": 2400,
+      "energy": 10
+    },
+    {
+      "week": 742,
+      "action": "Train DRAMA",
+      "cashBefore": 2700,
+      "cashAfter": 2675,
+      "energy": 10
+    },
+    {
+      "week": 742,
+      "action": "Train DRAMA",
+      "cashBefore": 2675,
+      "cashAfter": 2650,
+      "energy": 10
+    },
+    {
+      "week": 742,
+      "action": "Train DRAMA",
+      "cashBefore": 2650,
+      "cashAfter": 2625,
+      "energy": 10
+    },
+    {
+      "week": 762,
+      "action": "Life choice: life.event.early.sideHustle.auditions.label",
+      "cashBefore": 8625,
+      "cashAfter": 8625,
+      "energy": 0
+    },
+    {
+      "week": 762,
+      "action": "Morning Jog",
+      "cashBefore": 8625,
+      "cashAfter": 8625,
+      "energy": 10
+    },
+    {
+      "week": 763,
+      "action": "Morning Jog",
+      "cashBefore": 8925,
+      "cashAfter": 8925,
+      "energy": 10
+    },
+    {
+      "week": 764,
+      "action": "Morning Jog",
+      "cashBefore": 9225,
+      "cashAfter": 9225,
+      "energy": 10
+    },
+    {
+      "week": 765,
+      "action": "Morning Jog",
+      "cashBefore": 9525,
+      "cashAfter": 9525,
+      "energy": 10
+    },
+    {
+      "week": 766,
+      "action": "Morning Jog",
+      "cashBefore": 9825,
+      "cashAfter": 9825,
+      "energy": 10
+    },
+    {
+      "week": 767,
+      "action": "Morning Jog",
+      "cashBefore": 10125,
+      "cashAfter": 10125,
+      "energy": 10
+    },
+    {
+      "week": 769,
+      "action": "Life choice: life.event.early.workshop.attend.label",
+      "cashBefore": 10725,
+      "cashAfter": 10725,
+      "energy": 0
+    },
+    {
+      "week": 771,
+      "action": "Morning Jog",
+      "cashBefore": 11325,
+      "cashAfter": 11325,
+      "energy": 10
+    },
+    {
+      "week": 772,
+      "action": "Morning Jog",
+      "cashBefore": 11625,
+      "cashAfter": 11625,
+      "energy": 10
+    },
+    {
+      "week": 773,
+      "action": "Morning Jog",
+      "cashBefore": 11925,
+      "cashAfter": 11925,
+      "energy": 10
+    },
+    {
+      "week": 778,
+      "action": "Morning Jog",
+      "cashBefore": 13425,
+      "cashAfter": 13425,
+      "energy": 10
+    },
+    {
+      "week": 779,
+      "action": "Morning Jog",
+      "cashBefore": 13725,
+      "cashAfter": 13725,
+      "energy": 10
+    },
+    {
+      "week": 780,
+      "action": "Life choice: life.event.early.sideHustle.auditions.label",
+      "cashBefore": 14025,
+      "cashAfter": 14025,
+      "energy": 0
+    },
+    {
+      "week": 783,
+      "action": "Morning Jog",
+      "cashBefore": 14925,
+      "cashAfter": 14925,
+      "energy": 10
+    },
+    {
+      "week": 784,
+      "action": "Morning Jog",
+      "cashBefore": 15225,
+      "cashAfter": 15225,
+      "energy": 10
+    },
+    {
+      "week": 785,
+      "action": "Morning Jog",
+      "cashBefore": 15525,
+      "cashAfter": 15525,
+      "energy": 10
+    },
+    {
+      "week": 786,
+      "action": "Morning Jog",
+      "cashBefore": 15825,
+      "cashAfter": 15825,
+      "energy": 10
+    },
+    {
+      "week": 787,
+      "action": "Morning Jog",
+      "cashBefore": 16125,
+      "cashAfter": 16125,
+      "energy": 10
+    },
+    {
+      "week": 788,
+      "action": "Apply current audition: The Bone of Smile",
+      "cashBefore": 16425,
+      "cashAfter": 16425,
+      "energy": 25
+    },
+    {
+      "week": 789,
+      "action": "Audition rehearsal",
+      "cashBefore": 16725,
+      "cashAfter": 16725,
+      "energy": 20,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 789,
+      "action": "Audition rehearsal",
+      "cashBefore": 16725,
+      "cashAfter": 16725,
+      "energy": 20,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 789,
+      "action": "Audition rehearsal",
+      "cashBefore": 16725,
+      "cashAfter": 16725,
+      "energy": 20,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 789,
+      "action": "Audition rehearsal",
+      "cashBefore": 16725,
+      "cashAfter": 16725,
+      "energy": 20,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 789,
+      "action": "Audition rehearsal",
+      "cashBefore": 16725,
+      "cashAfter": 16725,
+      "energy": 20,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 790,
+      "action": "Audition rehearsal",
+      "cashBefore": 16725,
+      "cashAfter": 16725,
+      "energy": 20,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 790,
+      "action": "Audition rehearsal",
+      "cashBefore": 16725,
+      "cashAfter": 16725,
+      "energy": 20,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 790,
+      "action": "Audition rehearsal",
+      "cashBefore": 16725,
+      "cashAfter": 16725,
+      "energy": 20,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 790,
+      "action": "Audition rehearsal",
+      "cashBefore": 16725,
+      "cashAfter": 16725,
+      "energy": 20,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 790,
+      "action": "Audition rehearsal",
+      "cashBefore": 16725,
+      "cashAfter": 16725,
+      "energy": 20,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 791,
+      "action": "Morning Jog",
+      "cashBefore": 16725,
+      "cashAfter": 16725,
+      "energy": 10
+    },
+    {
+      "week": 791,
+      "action": "Audition rehearsal",
+      "cashBefore": 16725,
+      "cashAfter": 16725,
+      "energy": 20,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 791,
+      "action": "Audition rehearsal",
+      "cashBefore": 16725,
+      "cashAfter": 16725,
+      "energy": 20,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 791,
+      "action": "Audition rehearsal",
+      "cashBefore": 16725,
+      "cashAfter": 16725,
+      "energy": 20,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 791,
+      "action": "Audition rehearsal",
+      "cashBefore": 16725,
+      "cashAfter": 16725,
+      "energy": 20,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 792,
+      "action": "Morning Jog",
+      "cashBefore": 16725,
+      "cashAfter": 16725,
+      "energy": 10
+    },
+    {
+      "week": 792,
+      "action": "Accept current job: Tutor",
+      "cashBefore": 16725,
+      "cashAfter": 16725,
+      "energy": 25
+    },
+    {
+      "week": 792,
+      "action": "Production rehearsal",
+      "cashBefore": 16725,
+      "cashAfter": 16725,
+      "energy": 20,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 792,
+      "action": "Production rehearsal",
+      "cashBefore": 16725,
+      "cashAfter": 16725,
+      "energy": 20,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 792,
+      "action": "Production rehearsal",
+      "cashBefore": 16725,
+      "cashAfter": 16725,
+      "energy": 20,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 793,
+      "action": "Production rehearsal",
+      "cashBefore": 17225,
+      "cashAfter": 17225,
+      "energy": 20,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 793,
+      "action": "Production rehearsal",
+      "cashBefore": 17225,
+      "cashAfter": 17225,
+      "energy": 20,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 793,
+      "action": "Production rehearsal",
+      "cashBefore": 17225,
+      "cashAfter": 17225,
+      "energy": 20,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 794,
+      "action": "Production rehearsal",
+      "cashBefore": 17725,
+      "cashAfter": 17725,
+      "energy": 20,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 794,
+      "action": "Production rehearsal",
+      "cashBefore": 17725,
+      "cashAfter": 17725,
+      "energy": 20,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 794,
+      "action": "Production rehearsal",
+      "cashBefore": 17725,
+      "cashAfter": 17725,
+      "energy": 20,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 795,
+      "action": "Production rehearsal",
+      "cashBefore": 18225,
+      "cashAfter": 18225,
+      "energy": 20,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 795,
+      "action": "Production rehearsal",
+      "cashBefore": 18225,
+      "cashAfter": 18225,
+      "energy": 20,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 795,
+      "action": "Production rehearsal",
+      "cashBefore": 18225,
+      "cashAfter": 18225,
+      "energy": 20,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 796,
+      "action": "Production rehearsal",
+      "cashBefore": 18725,
+      "cashAfter": 18725,
+      "energy": 20,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 796,
+      "action": "Production rehearsal",
+      "cashBefore": 18725,
+      "cashAfter": 18725,
+      "energy": 20,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 796,
+      "action": "Production rehearsal",
+      "cashBefore": 18725,
+      "cashAfter": 18725,
+      "energy": 20,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 797,
+      "action": "Morning Jog",
+      "cashBefore": 19225,
+      "cashAfter": 19225,
+      "energy": 10
+    },
+    {
+      "week": 797,
+      "action": "Production rehearsal",
+      "cashBefore": 19225,
+      "cashAfter": 19225,
+      "energy": 20,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 797,
+      "action": "Production rehearsal",
+      "cashBefore": 19225,
+      "cashAfter": 19225,
+      "energy": 20,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 797,
+      "action": "Production rehearsal",
+      "cashBefore": 19225,
+      "cashAfter": 19225,
+      "energy": 20,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 798,
+      "action": "Production choice: production.crisis.generated.push.label",
+      "cashBefore": 19725,
+      "cashAfter": 19725,
+      "energy": 0
+    },
+    {
+      "week": 798,
+      "action": "Morning Jog",
+      "cashBefore": 19725,
+      "cashAfter": 19725,
+      "energy": 10
+    },
+    {
+      "week": 798,
+      "action": "Production rehearsal",
+      "cashBefore": 19725,
+      "cashAfter": 19725,
+      "energy": 20,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 798,
+      "action": "Production rehearsal",
+      "cashBefore": 19725,
+      "cashAfter": 19725,
+      "energy": 20,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 798,
+      "action": "Production rehearsal",
+      "cashBefore": 19725,
+      "cashAfter": 19725,
+      "energy": 20,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 799,
+      "action": "Production choice: production.event.trailerEnvy.swap.label",
+      "cashBefore": 20225,
+      "cashAfter": 20225,
+      "energy": 0
+    },
+    {
+      "week": 799,
+      "action": "Morning Jog",
+      "cashBefore": 20225,
+      "cashAfter": 20225,
+      "energy": 10
+    },
+    {
+      "week": 799,
+      "action": "Meditation",
+      "cashBefore": 20225,
+      "cashAfter": 20225,
+      "energy": 5
+    },
+    {
+      "week": 799,
+      "action": "Production rehearsal",
+      "cashBefore": 20225,
+      "cashAfter": 20225,
+      "energy": 20,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 799,
+      "action": "Production rehearsal",
+      "cashBefore": 20225,
+      "cashAfter": 20225,
+      "energy": 20,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 799,
+      "action": "Production rehearsal",
+      "cashBefore": 20225,
+      "cashAfter": 20225,
+      "energy": 20,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 800,
+      "action": "Life choice: life.event.family.pressure.time.label",
+      "cashBefore": 20725,
+      "cashAfter": 20725,
+      "energy": 0
+    },
+    {
+      "week": 800,
+      "action": "Morning Jog",
+      "cashBefore": 20725,
+      "cashAfter": 20725,
+      "energy": 10
+    },
+    {
+      "week": 800,
+      "action": "Meditation",
+      "cashBefore": 20725,
+      "cashAfter": 20725,
+      "energy": 5
+    },
+    {
+      "week": 800,
+      "action": "Production rehearsal",
+      "cashBefore": 20725,
+      "cashAfter": 20725,
+      "energy": 20,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 800,
+      "action": "Production rehearsal",
+      "cashBefore": 20725,
+      "cashAfter": 20725,
+      "energy": 20,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 800,
+      "action": "Production rehearsal",
+      "cashBefore": 20725,
+      "cashAfter": 20725,
+      "energy": 20,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 801,
+      "action": "Morning Jog",
+      "cashBefore": 21225,
+      "cashAfter": 21225,
+      "energy": 10
+    },
+    {
+      "week": 801,
+      "action": "Production rehearsal",
+      "cashBefore": 21225,
+      "cashAfter": 21225,
+      "energy": 20,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 801,
+      "action": "Production rehearsal",
+      "cashBefore": 21225,
+      "cashAfter": 21225,
+      "energy": 20,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 801,
+      "action": "Production rehearsal",
+      "cashBefore": 21225,
+      "cashAfter": 21225,
+      "energy": 20,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 802,
+      "action": "Life choice: life.event.early.workshop.attend.label",
+      "cashBefore": 21725,
+      "cashAfter": 21725,
+      "energy": 0
+    },
+    {
+      "week": 802,
+      "action": "Production choice: production.crisis.equipmentFailure.rent.label",
+      "cashBefore": 21725,
+      "cashAfter": 21725,
+      "energy": 0
+    },
+    {
+      "week": 802,
+      "action": "Morning Jog",
+      "cashBefore": 21725,
+      "cashAfter": 21725,
+      "energy": 10
+    },
+    {
+      "week": 802,
+      "action": "Career Instagram promotion",
+      "cashBefore": 21725,
+      "cashAfter": 21725,
+      "energy": 10,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 803,
+      "action": "Morning Jog",
+      "cashBefore": 22225,
+      "cashAfter": 22225,
+      "energy": 10
+    },
+    {
+      "week": 803,
+      "action": "Career Instagram promotion",
+      "cashBefore": 22225,
+      "cashAfter": 22225,
+      "energy": 10,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 804,
+      "action": "Morning Jog",
+      "cashBefore": 22725,
+      "cashAfter": 22725,
+      "energy": 10
+    },
+    {
+      "week": 804,
+      "action": "Career Instagram promotion",
+      "cashBefore": 22725,
+      "cashAfter": 22725,
+      "energy": 10,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 805,
+      "action": "Morning Jog",
+      "cashBefore": 23225,
+      "cashAfter": 23225,
+      "energy": 10
+    },
+    {
+      "week": 805,
+      "action": "Career Instagram promotion",
+      "cashBefore": 23225,
+      "cashAfter": 23225,
+      "energy": 10,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 806,
+      "action": "Morning Jog",
+      "cashBefore": 23725,
+      "cashAfter": 23725,
+      "energy": 10
+    },
+    {
+      "week": 806,
+      "action": "Career Instagram promotion",
+      "cashBefore": 23725,
+      "cashAfter": 23725,
+      "energy": 10,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 807,
+      "action": "Morning Jog",
+      "cashBefore": 24225,
+      "cashAfter": 24225,
+      "energy": 10
+    },
+    {
+      "week": 807,
+      "action": "Career Instagram promotion",
+      "cashBefore": 24225,
+      "cashAfter": 24225,
+      "energy": 10,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 808,
+      "action": "Career Instagram promotion",
+      "cashBefore": 24725,
+      "cashAfter": 24725,
+      "energy": 10,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 809,
+      "action": "Career Instagram promotion",
+      "cashBefore": 25225,
+      "cashAfter": 25225,
+      "energy": 10,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 810,
+      "action": "Career Instagram promotion",
+      "cashBefore": 25725,
+      "cashAfter": 25725,
+      "energy": 10,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 811,
+      "action": "Morning Jog",
+      "cashBefore": 26225,
+      "cashAfter": 26225,
+      "energy": 10
+    },
+    {
+      "week": 811,
+      "action": "Career Instagram promotion",
+      "cashBefore": 26225,
+      "cashAfter": 26225,
+      "energy": 10,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 812,
+      "action": "Morning Jog",
+      "cashBefore": 26725,
+      "cashAfter": 26725,
+      "energy": 10
+    },
+    {
+      "week": 812,
+      "action": "Career Instagram promotion",
+      "cashBefore": 26725,
+      "cashAfter": 26725,
+      "energy": 10,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 813,
+      "action": "Career Instagram promotion",
+      "cashBefore": 27225,
+      "cashAfter": 27225,
+      "energy": 10,
+      "projectId": "aud_active_1800000000880_0.16833423590287566"
+    },
+    {
+      "week": 814,
+      "action": "Life choice: life.event.family.pressure.time.label",
+      "cashBefore": 27725,
+      "cashAfter": 27725,
+      "energy": 0
+    },
+    {
+      "week": 816,
+      "action": "Morning Jog",
+      "cashBefore": 29245,
+      "cashAfter": 29245,
+      "energy": 10
+    },
+    {
+      "week": 817,
+      "action": "Morning Jog",
+      "cashBefore": 29745,
+      "cashAfter": 29745,
+      "energy": 10
+    },
+    {
+      "week": 817,
+      "action": "Meditation",
+      "cashBefore": 29745,
+      "cashAfter": 29745,
+      "energy": 5
+    },
+    {
+      "week": 818,
+      "action": "Morning Jog",
+      "cashBefore": 30245,
+      "cashAfter": 30245,
+      "energy": 10
+    },
+    {
+      "week": 819,
+      "action": "Morning Jog",
+      "cashBefore": 30745,
+      "cashAfter": 30745,
+      "energy": 10
+    },
+    {
+      "week": 820,
+      "action": "Morning Jog",
+      "cashBefore": 31245,
+      "cashAfter": 31245,
+      "energy": 10
+    },
+    {
+      "week": 821,
+      "action": "Morning Jog",
+      "cashBefore": 31745,
+      "cashAfter": 31745,
+      "energy": 10
+    },
+    {
+      "week": 821,
+      "action": "Apply current audition: Ash Winning",
+      "cashBefore": 31745,
+      "cashAfter": 31745,
+      "energy": 25
+    },
+    {
+      "week": 822,
+      "action": "Morning Jog",
+      "cashBefore": 32245,
+      "cashAfter": 32245,
+      "energy": 10
+    },
+    {
+      "week": 822,
+      "action": "Audition rehearsal",
+      "cashBefore": 32245,
+      "cashAfter": 32245,
+      "energy": 20,
+      "projectId": "aud_active_1800000001335_0.8529868626501411"
+    },
+    {
+      "week": 822,
+      "action": "Audition rehearsal",
+      "cashBefore": 32245,
+      "cashAfter": 32245,
+      "energy": 20,
+      "projectId": "aud_active_1800000001335_0.8529868626501411"
+    },
+    {
+      "week": 822,
+      "action": "Audition rehearsal",
+      "cashBefore": 32245,
+      "cashAfter": 32245,
+      "energy": 20,
+      "projectId": "aud_active_1800000001335_0.8529868626501411"
+    },
+    {
+      "week": 822,
+      "action": "Audition rehearsal",
+      "cashBefore": 32245,
+      "cashAfter": 32245,
+      "energy": 20,
+      "projectId": "aud_active_1800000001335_0.8529868626501411"
+    },
+    {
+      "week": 823,
+      "action": "Morning Jog",
+      "cashBefore": 32245,
+      "cashAfter": 32245,
+      "energy": 10
+    },
+    {
+      "week": 823,
+      "action": "Audition rehearsal",
+      "cashBefore": 32245,
+      "cashAfter": 32245,
+      "energy": 20,
+      "projectId": "aud_active_1800000001335_0.8529868626501411"
+    },
+    {
+      "week": 823,
+      "action": "Audition rehearsal",
+      "cashBefore": 32245,
+      "cashAfter": 32245,
+      "energy": 20,
+      "projectId": "aud_active_1800000001335_0.8529868626501411"
+    },
+    {
+      "week": 823,
+      "action": "Audition rehearsal",
+      "cashBefore": 32245,
+      "cashAfter": 32245,
+      "energy": 20,
+      "projectId": "aud_active_1800000001335_0.8529868626501411"
+    },
+    {
+      "week": 823,
+      "action": "Audition rehearsal",
+      "cashBefore": 32245,
+      "cashAfter": 32245,
+      "energy": 20,
+      "projectId": "aud_active_1800000001335_0.8529868626501411"
+    },
+    {
+      "week": 824,
+      "action": "Morning Jog",
+      "cashBefore": 32245,
+      "cashAfter": 32245,
+      "energy": 10
+    },
+    {
+      "week": 824,
+      "action": "Audition rehearsal",
+      "cashBefore": 32245,
+      "cashAfter": 32245,
+      "energy": 20,
+      "projectId": "aud_active_1800000001335_0.8529868626501411"
+    },
+    {
+      "week": 824,
+      "action": "Audition rehearsal",
+      "cashBefore": 32245,
+      "cashAfter": 32245,
+      "energy": 20,
+      "projectId": "aud_active_1800000001335_0.8529868626501411"
+    },
+    {
+      "week": 824,
+      "action": "Audition rehearsal",
+      "cashBefore": 32245,
+      "cashAfter": 32245,
+      "energy": 20,
+      "projectId": "aud_active_1800000001335_0.8529868626501411"
+    },
+    {
+      "week": 824,
+      "action": "Audition rehearsal",
+      "cashBefore": 32245,
+      "cashAfter": 32245,
+      "energy": 20,
+      "projectId": "aud_active_1800000001335_0.8529868626501411"
+    },
+    {
+      "week": 825,
+      "action": "Morning Jog",
+      "cashBefore": 32245,
+      "cashAfter": 32245,
+      "energy": 10
+    },
+    {
+      "week": 825,
+      "action": "Audition rehearsal",
+      "cashBefore": 32245,
+      "cashAfter": 32245,
+      "energy": 20,
+      "projectId": "aud_active_1800000001335_0.8529868626501411"
+    },
+    {
+      "week": 825,
+      "action": "Audition rehearsal",
+      "cashBefore": 32245,
+      "cashAfter": 32245,
+      "energy": 20,
+      "projectId": "aud_active_1800000001335_0.8529868626501411"
+    },
+    {
+      "week": 825,
+      "action": "Audition rehearsal",
+      "cashBefore": 32245,
+      "cashAfter": 32245,
+      "energy": 20,
+      "projectId": "aud_active_1800000001335_0.8529868626501411"
+    },
+    {
+      "week": 825,
+      "action": "Audition rehearsal",
+      "cashBefore": 32245,
+      "cashAfter": 32245,
+      "energy": 20,
+      "projectId": "aud_active_1800000001335_0.8529868626501411"
+    },
+    {
+      "week": 826,
+      "action": "Morning Jog",
+      "cashBefore": 32245,
+      "cashAfter": 32245,
+      "energy": 10
+    },
+    {
+      "week": 826,
+      "action": "Audition rehearsal",
+      "cashBefore": 32245,
+      "cashAfter": 32245,
+      "energy": 20,
+      "projectId": "aud_active_1800000001335_0.8529868626501411"
+    },
+    {
+      "week": 826,
+      "action": "Audition rehearsal",
+      "cashBefore": 32245,
+      "cashAfter": 32245,
+      "energy": 20,
+      "projectId": "aud_active_1800000001335_0.8529868626501411"
+    },
+    {
+      "week": 826,
+      "action": "Audition rehearsal",
+      "cashBefore": 32245,
+      "cashAfter": 32245,
+      "energy": 20,
+      "projectId": "aud_active_1800000001335_0.8529868626501411"
+    },
+    {
+      "week": 826,
+      "action": "Audition rehearsal",
+      "cashBefore": 32245,
+      "cashAfter": 32245,
+      "energy": 20,
+      "projectId": "aud_active_1800000001335_0.8529868626501411"
+    },
+    {
+      "week": 827,
+      "action": "Morning Jog",
+      "cashBefore": 32245,
+      "cashAfter": 32245,
+      "energy": 10
+    },
+    {
+      "week": 827,
+      "action": "Meditation",
+      "cashBefore": 32245,
+      "cashAfter": 32245,
+      "energy": 5
+    },
+    {
+      "week": 827,
+      "action": "Audition rehearsal",
+      "cashBefore": 32245,
+      "cashAfter": 32245,
+      "energy": 20,
+      "projectId": "aud_active_1800000001335_0.8529868626501411"
+    },
+    {
+      "week": 827,
+      "action": "Audition rehearsal",
+      "cashBefore": 32245,
+      "cashAfter": 32245,
+      "energy": 20,
+      "projectId": "aud_active_1800000001335_0.8529868626501411"
+    },
+    {
+      "week": 827,
+      "action": "Audition rehearsal",
+      "cashBefore": 32245,
+      "cashAfter": 32245,
+      "energy": 20,
+      "projectId": "aud_active_1800000001335_0.8529868626501411"
+    },
+    {
+      "week": 827,
+      "action": "Audition rehearsal",
+      "cashBefore": 32245,
+      "cashAfter": 32245,
+      "energy": 20,
+      "projectId": "aud_active_1800000001335_0.8529868626501411"
+    },
+    {
+      "week": 828,
+      "action": "Life choice: life.event.early.sideHustle.auditions.label",
+      "cashBefore": 32245,
+      "cashAfter": 32245,
+      "energy": 0
+    },
+    {
+      "week": 828,
+      "action": "Morning Jog",
+      "cashBefore": 32245,
+      "cashAfter": 32245,
+      "energy": 10
+    },
+    {
+      "week": 828,
+      "action": "Audition rehearsal",
+      "cashBefore": 32245,
+      "cashAfter": 32245,
+      "energy": 20,
+      "projectId": "aud_active_1800000001335_0.8529868626501411"
+    },
+    {
+      "week": 828,
+      "action": "Audition rehearsal",
+      "cashBefore": 32245,
+      "cashAfter": 32245,
+      "energy": 20,
+      "projectId": "aud_active_1800000001335_0.8529868626501411"
+    },
+    {
+      "week": 828,
+      "action": "Audition rehearsal",
+      "cashBefore": 32245,
+      "cashAfter": 32245,
+      "energy": 20,
+      "projectId": "aud_active_1800000001335_0.8529868626501411"
+    },
+    {
+      "week": 828,
+      "action": "Audition rehearsal",
+      "cashBefore": 32245,
+      "cashAfter": 32245,
+      "energy": 20,
+      "projectId": "aud_active_1800000001335_0.8529868626501411"
+    },
+    {
+      "week": 829,
+      "action": "Morning Jog",
+      "cashBefore": 32245,
+      "cashAfter": 32245,
+      "energy": 10
+    },
+    {
+      "week": 829,
+      "action": "Accept current job: Social Media Assistant",
+      "cashBefore": 32245,
+      "cashAfter": 32245,
+      "energy": 20
+    },
+    {
+      "week": 829,
+      "action": "Production rehearsal",
+      "cashBefore": 32245,
+      "cashAfter": 32245,
+      "energy": 20,
+      "projectId": "aud_active_1800000001335_0.8529868626501411"
+    },
+    {
+      "week": 829,
+      "action": "Production rehearsal",
+      "cashBefore": 32245,
+      "cashAfter": 32245,
+      "energy": 20,
+      "projectId": "aud_active_1800000001335_0.8529868626501411"
+    },
+    {
+      "week": 829,
+      "action": "Production rehearsal",
+      "cashBefore": 32245,
+      "cashAfter": 32245,
+      "energy": 20,
+      "projectId": "aud_active_1800000001335_0.8529868626501411"
+    },
+    {
+      "week": 830,
+      "action": "Morning Jog",
+      "cashBefore": 32645,
+      "cashAfter": 32645,
+      "energy": 10
+    },
+    {
+      "week": 830,
+      "action": "Production rehearsal",
+      "cashBefore": 32645,
+      "cashAfter": 32645,
+      "energy": 20,
+      "projectId": "aud_active_1800000001335_0.8529868626501411"
+    },
+    {
+      "week": 830,
+      "action": "Production rehearsal",
+      "cashBefore": 32645,
+      "cashAfter": 32645,
+      "energy": 20,
+      "projectId": "aud_active_1800000001335_0.8529868626501411"
+    },
+    {
+      "week": 830,
+      "action": "Production rehearsal",
+      "cashBefore": 32645,
+      "cashAfter": 32645,
+      "energy": 20,
+      "projectId": "aud_active_1800000001335_0.8529868626501411"
+    },
+    {
+      "week": 831,
+      "action": "Morning Jog",
+      "cashBefore": 33045,
+      "cashAfter": 33045,
+      "energy": 10
+    },
+    {
+      "week": 831,
+      "action": "Production rehearsal",
+      "cashBefore": 33045,
+      "cashAfter": 33045,
+      "energy": 20,
+      "projectId": "aud_active_1800000001335_0.8529868626501411"
+    },
+    {
+      "week": 831,
+      "action": "Production rehearsal",
+      "cashBefore": 33045,
+      "cashAfter": 33045,
+      "energy": 20,
+      "projectId": "aud_active_1800000001335_0.8529868626501411"
+    },
+    {
+      "week": 831,
+      "action": "Production rehearsal",
+      "cashBefore": 33045,
+      "cashAfter": 33045,
+      "energy": 20,
+      "projectId": "aud_active_1800000001335_0.8529868626501411"
+    },
+    {
+      "week": 832,
+      "action": "Morning Jog",
+      "cashBefore": 33445,
+      "cashAfter": 33445,
+      "energy": 10
+    },
+    {
+      "week": 832,
+      "action": "Production rehearsal",
+      "cashBefore": 33445,
+      "cashAfter": 33445,
+      "energy": 20,
+      "projectId": "aud_active_1800000001335_0.8529868626501411"
+    },
+    {
+      "week": 832,
+      "action": "Production rehearsal",
+      "cashBefore": 33445,
+      "cashAfter": 33445,
+      "energy": 20,
+      "projectId": "aud_active_1800000001335_0.8529868626501411"
+    },
+    {
+      "week": 832,
+      "action": "Production rehearsal",
+      "cashBefore": 33445,
+      "cashAfter": 33445,
+      "energy": 20,
+      "projectId": "aud_active_1800000001335_0.8529868626501411"
+    }
+  ],
+  "elapsedMs": 433194,
+  "saveBytes": 52229571,
+  "limits": [
+    "One existing sustainable DRAMA/minor-role action policy; not all player strategies",
+    "No authored cash, skill, cast, delivered craft or audience grants",
+    "Actual game loop each week, verified persistence at paid opening/closure or every 13 weeks; not full UI per week",
+    "Open runs are censored and excluded from lifetime hit/flop denominators",
+    "Project theatrical result excludes future streaming/home media and investor ownership distributions"
+  ]
+}

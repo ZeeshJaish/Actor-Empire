@@ -42,7 +42,8 @@ export const quoteCinemaSupply = (input: CinemaWeekInput): CinemaSupplyQuote => 
                     seatsPerShow:P.seatsPerShow,weeklyScreenMinutes:count*P.openingMinutesPerDay*P.daysPerWeek,ticketPriceCents,
                     exhibitorBasisPoints:Math.round(terms.exhibitorCut*10_000),distributionBasisPoints:500,
                     operatingCentsPerShow:Math.max(1,Math.round(P.standardOperatingCentsPerShow*economy*inflation*chainPremium*(format==='PREMIUM'?1.2:1))),
-                    bookingCentsPerShow:Math.max(1,Math.round(terms.bookingCost*100/(terms.screens*P.daysPerWeek*4)))});
+                    bookingCentsPerShow:0,
+                    legacyBookingCentsPerShow:Math.max(1,Math.round(terms.bookingCost*100/(terms.screens*P.daysPerWeek*4)))});
             }
         }
     }

@@ -180,6 +180,7 @@ export const commitCinemaWeek = (player: Player, result: CinemaWeekResult): Cine
             bookingCostCents: prior.bookingCostCents + cost, investorPaidCents: prior.investorPaidCents + investor, talentPaidCents: prior.talentPaidCents + talent, actorPaidCents: prior.actorPaidCents + actor,
             satisfactionScoreUnits: (prior.satisfactionScoreUnits || 0) + Math.round((row.satisfactionScore || 0) * 100) * (row.firstAdmissions + row.repeatAdmissions), satisfactionAdmissions: (prior.satisfactionAdmissions || 0) + row.firstAdmissions + row.repeatAdmissions,
             firstAdmissions: prior.firstAdmissions + row.firstAdmissions, repeatAdmissions: prior.repeatAdmissions + row.repeatAdmissions, lastSettledWeek: result.absoluteWeek, closed };
+        state.bookingContracts={...state.bookingContracts,[row.titleId]:title.market!.bookingContract || 'REVENUE_SHARE'};
         if (release) {
             release.weeklyDistributionBreakdowns = [...(release.weeklyDistributionBreakdowns || []), cinemaDistributionReport(input, result, physicalSupply, row.titleId, release.weekNum - 1)].slice(-104);
             release.audienceReception = cinemaAudienceReport(state.titles[row.titleId], release.audienceReception, week, year);

@@ -1,0 +1,544 @@
+{
+  "kind": "FIRST_YEAR_NORMAL_CAREER_RELEASE_DIAGNOSTIC_NOT_AN_ADDITIONAL_INDEPENDENT_SEED",
+  "seed": 0,
+  "weeks": 52,
+  "status": "HORIZON_COMPLETE",
+  "films": [
+    {
+      "id": "studio_ai_project_0wcpt4p",
+      "name": "My Kingdom",
+      "genre": "BIOPIC",
+      "mode": "LIMITED_THEATRICAL",
+      "publicStrategy": "THEATRICAL",
+      "studioId": "DREAMWORKS",
+      "cast": [
+        {
+          "id": "celeb_act_1",
+          "name": "Leonardo DiCaprio",
+          "role": "LEAD"
+        }
+      ],
+      "campaignEvents": [
+        {
+          "id": "npc-announcement:studio_ai_production_1emq4hx",
+          "titleId": "studio_ai_project_0wcpt4p",
+          "absoluteWeek": 759,
+          "kind": "ANNOUNCEMENT",
+          "channel": "STUDIO_RELEASE",
+          "impressions": 0
+        },
+        {
+          "id": "npc-paid:studio_ai_production_1emq4hx",
+          "titleId": "studio_ai_project_0wcpt4p",
+          "absoluteWeek": 759,
+          "kind": "PAID_CAMPAIGN",
+          "channel": "RELEASE_CAMPAIGN",
+          "paidCostCents": 764400000,
+          "impressions": 229320000
+        }
+      ],
+      "budgetCents": 9555200000,
+      "campaignCents": 764400000,
+      "quality": 68,
+      "source": "WORLD_NPC",
+      "activationWeek": 759,
+      "ownCredit": false,
+      "owner": "DREAMWORKS",
+      "closed": false,
+      "grossCents": 5237888588,
+      "receiptsCents": 2775938644,
+      "bookingCents": 354495297,
+      "investorPaidCents": 0,
+      "talentPaidCents": 83277900,
+      "actorPaidCents": 0,
+      "first": 3298203,
+      "repeats": 28585,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": -7981434553,
+      "producerNetAfterSignedSharesCents": 2338165447
+    },
+    {
+      "id": "studio_ai_project_0gnux3r",
+      "name": "The Ash of Life",
+      "genre": "SPORTS",
+      "mode": "LIMITED_THEATRICAL",
+      "publicStrategy": "THEATRICAL",
+      "studioId": "UNIVERSAL",
+      "cast": [
+        {
+          "id": "celeb_act_2",
+          "name": "Tom Cruise",
+          "role": "LEAD"
+        }
+      ],
+      "campaignEvents": [
+        {
+          "id": "npc-announcement:studio_ai_production_0bdarh7",
+          "titleId": "studio_ai_project_0gnux3r",
+          "absoluteWeek": 760,
+          "kind": "ANNOUNCEMENT",
+          "channel": "STUDIO_RELEASE",
+          "impressions": 0
+        },
+        {
+          "id": "npc-paid:studio_ai_production_0bdarh7",
+          "titleId": "studio_ai_project_0gnux3r",
+          "absoluteWeek": 760,
+          "kind": "PAID_CAMPAIGN",
+          "channel": "RELEASE_CAMPAIGN",
+          "paidCostCents": 961900000,
+          "impressions": 288570000
+        }
+      ],
+      "budgetCents": 12024300000,
+      "campaignCents": 961900000,
+      "quality": 75,
+      "source": "WORLD_NPC",
+      "activationWeek": 760,
+      "ownCredit": false,
+      "owner": "UNIVERSAL",
+      "closed": false,
+      "grossCents": 4704515663,
+      "receiptsCents": 2305215354,
+      "bookingCents": 306411660,
+      "investorPaidCents": 0,
+      "talentPaidCents": 69156600,
+      "actorPaidCents": 0,
+      "first": 3313452,
+      "repeats": 32972,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": -11056552906,
+      "producerNetAfterSignedSharesCents": 1929647094
+    },
+    {
+      "id": "studio_ai_project_0l4b7om",
+      "name": "The Alliance of Fly",
+      "genre": "COMEDY",
+      "mode": "LIMITED_THEATRICAL",
+      "publicStrategy": "THEATRICAL",
+      "studioId": "YOUTUBE",
+      "cast": [
+        {
+          "id": "celeb_act_0",
+          "name": "Dwayne Johnson",
+          "role": "LEAD"
+        }
+      ],
+      "campaignEvents": [
+        {
+          "id": "npc-announcement:studio_ai_production_0w6jvgy",
+          "titleId": "studio_ai_project_0l4b7om",
+          "absoluteWeek": 760,
+          "kind": "ANNOUNCEMENT",
+          "channel": "STUDIO_RELEASE",
+          "impressions": 0
+        },
+        {
+          "id": "npc-paid:studio_ai_production_0w6jvgy",
+          "titleId": "studio_ai_project_0l4b7om",
+          "absoluteWeek": 760,
+          "kind": "PAID_CAMPAIGN",
+          "channel": "RELEASE_CAMPAIGN",
+          "paidCostCents": 999700000,
+          "impressions": 299910000
+        }
+      ],
+      "budgetCents": 12495700000,
+      "campaignCents": 999700000,
+      "quality": 69,
+      "source": "WORLD_NPC",
+      "activationWeek": 760,
+      "ownCredit": false,
+      "owner": "YOUTUBE",
+      "closed": false,
+      "grossCents": 5504329424,
+      "receiptsCents": 2697124223,
+      "bookingCents": 358755042,
+      "investorPaidCents": 0,
+      "talentPaidCents": 80913900,
+      "actorPaidCents": 0,
+      "first": 3891122,
+      "repeats": 27394,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": -11237944719,
+      "producerNetAfterSignedSharesCents": 2257455281
+    },
+    {
+      "id": "studio_ai_project_05rjelo",
+      "name": "Endless Moon",
+      "genre": "ANIMATION",
+      "mode": "WIDE_THEATRICAL",
+      "publicStrategy": "THEATRICAL",
+      "studioId": "DISNEY_PLUS",
+      "cast": [
+        {
+          "id": "celeb_act_0",
+          "name": "Dwayne Johnson",
+          "role": "LEAD"
+        }
+      ],
+      "campaignEvents": [
+        {
+          "id": "npc-announcement:studio_ai_production_0uxgi3s",
+          "titleId": "studio_ai_project_05rjelo",
+          "absoluteWeek": 766,
+          "kind": "ANNOUNCEMENT",
+          "channel": "STUDIO_RELEASE",
+          "impressions": 0
+        },
+        {
+          "id": "npc-paid:studio_ai_production_0uxgi3s",
+          "titleId": "studio_ai_project_05rjelo",
+          "absoluteWeek": 766,
+          "kind": "PAID_CAMPAIGN",
+          "channel": "RELEASE_CAMPAIGN",
+          "paidCostCents": 2871900000,
+          "impressions": 861570000
+        }
+      ],
+      "budgetCents": 15954900000,
+      "campaignCents": 2871900000,
+      "quality": 77,
+      "source": "WORLD_NPC",
+      "activationWeek": 766,
+      "ownCredit": false,
+      "owner": "DISNEY_PLUS",
+      "closed": false,
+      "grossCents": 39426082468,
+      "receiptsCents": 19316506279,
+      "bookingCents": 2755110727,
+      "investorPaidCents": 0,
+      "talentPaidCents": 772659900,
+      "actorPaidCents": 0,
+      "first": 33964999,
+      "repeats": 219737,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": -3038064348,
+      "producerNetAfterSignedSharesCents": 15788735652
+    },
+    {
+      "id": "studio_ai_project_0izo7yk",
+      "name": "The Alliance of Frontier",
+      "genre": "MYSTERY",
+      "mode": "LIMITED_THEATRICAL",
+      "publicStrategy": "THEATRICAL",
+      "studioId": "PARAMOUNT",
+      "cast": [
+        {
+          "id": "celeb_act_0",
+          "name": "Dwayne Johnson",
+          "role": "LEAD"
+        }
+      ],
+      "campaignEvents": [
+        {
+          "id": "npc-announcement:studio_ai_production_0smim3k",
+          "titleId": "studio_ai_project_0izo7yk",
+          "absoluteWeek": 766,
+          "kind": "ANNOUNCEMENT",
+          "channel": "STUDIO_RELEASE",
+          "impressions": 0
+        },
+        {
+          "id": "npc-paid:studio_ai_production_0smim3k",
+          "titleId": "studio_ai_project_0izo7yk",
+          "absoluteWeek": 766,
+          "kind": "PAID_CAMPAIGN",
+          "channel": "RELEASE_CAMPAIGN",
+          "paidCostCents": 770300000,
+          "impressions": 231090000
+        }
+      ],
+      "budgetCents": 9629300000,
+      "campaignCents": 770300000,
+      "quality": 54,
+      "source": "WORLD_NPC",
+      "activationWeek": 766,
+      "ownCredit": false,
+      "owner": "PARAMOUNT",
+      "closed": false,
+      "grossCents": 4468332577,
+      "receiptsCents": 2189484985,
+      "bookingCents": 291829512,
+      "investorPaidCents": 0,
+      "talentPaidCents": 43789600,
+      "actorPaidCents": 0,
+      "first": 3155069,
+      "repeats": 5920,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": -8545734127,
+      "producerNetAfterSignedSharesCents": 1853865873
+    },
+    {
+      "id": "studio_ai_project_0zi1zpn",
+      "name": "Fleeting Jump",
+      "genre": "COMEDY",
+      "mode": "LIMITED_THEATRICAL",
+      "publicStrategy": "THEATRICAL",
+      "studioId": "HULU",
+      "cast": [
+        {
+          "id": "celeb_act_5",
+          "name": "Ryan Reynolds",
+          "role": "LEAD"
+        }
+      ],
+      "campaignEvents": [
+        {
+          "id": "npc-announcement:studio_ai_production_1n2x9wf",
+          "titleId": "studio_ai_project_0zi1zpn",
+          "absoluteWeek": 767,
+          "kind": "ANNOUNCEMENT",
+          "channel": "STUDIO_RELEASE",
+          "impressions": 0
+        },
+        {
+          "id": "npc-paid:studio_ai_production_1n2x9wf",
+          "titleId": "studio_ai_project_0zi1zpn",
+          "absoluteWeek": 767,
+          "kind": "PAID_CAMPAIGN",
+          "channel": "RELEASE_CAMPAIGN",
+          "paidCostCents": 900900000,
+          "impressions": 270270000
+        }
+      ],
+      "budgetCents": 11261500000,
+      "campaignCents": 900900000,
+      "quality": 74,
+      "source": "WORLD_NPC",
+      "activationWeek": 767,
+      "ownCredit": false,
+      "owner": "HULU",
+      "closed": false,
+      "grossCents": 5071297359,
+      "receiptsCents": 2484938076,
+      "bookingCents": 326108442,
+      "investorPaidCents": 0,
+      "talentPaidCents": 49698800,
+      "actorPaidCents": 0,
+      "first": 3542815,
+      "repeats": 34829,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": -10053269166,
+      "producerNetAfterSignedSharesCents": 2109130834
+    },
+    {
+      "id": "studio_ai_project_1ex4iy0",
+      "name": "The Empire of Star",
+      "genre": "CRIME",
+      "mode": "LIMITED_THEATRICAL",
+      "publicStrategy": "THEATRICAL",
+      "studioId": "SONY_PICTURES",
+      "cast": [
+        {
+          "id": "celeb_act_5",
+          "name": "Ryan Reynolds",
+          "role": "LEAD"
+        }
+      ],
+      "campaignEvents": [
+        {
+          "id": "npc-announcement:studio_ai_production_1vs3eho",
+          "titleId": "studio_ai_project_1ex4iy0",
+          "absoluteWeek": 772,
+          "kind": "ANNOUNCEMENT",
+          "channel": "STUDIO_RELEASE",
+          "impressions": 0
+        },
+        {
+          "id": "npc-paid:studio_ai_production_1vs3eho",
+          "titleId": "studio_ai_project_1ex4iy0",
+          "absoluteWeek": 772,
+          "kind": "PAID_CAMPAIGN",
+          "channel": "RELEASE_CAMPAIGN",
+          "paidCostCents": 740600000,
+          "impressions": 222180000
+        }
+      ],
+      "budgetCents": 9257600000,
+      "campaignCents": 740600000,
+      "quality": 71,
+      "source": "WORLD_NPC",
+      "activationWeek": 772,
+      "ownCredit": false,
+      "owner": "SONY_PICTURES",
+      "closed": false,
+      "grossCents": 4004909209,
+      "receiptsCents": 1962407233,
+      "bookingCents": 252327126,
+      "investorPaidCents": 0,
+      "talentPaidCents": 78496300,
+      "actorPaidCents": 0,
+      "first": 2742360,
+      "repeats": 26290,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": -8366616193,
+      "producerNetAfterSignedSharesCents": 1631583807
+    },
+    {
+      "id": "studio_ai_project_1omo64n",
+      "name": "Star Freezing",
+      "genre": "FANTASY",
+      "mode": "LIMITED_THEATRICAL",
+      "publicStrategy": "THEATRICAL",
+      "studioId": "SONY_PICTURES",
+      "cast": [
+        {
+          "id": "celeb_act_5",
+          "name": "Ryan Reynolds",
+          "role": "LEAD"
+        }
+      ],
+      "campaignEvents": [
+        {
+          "id": "npc-announcement:studio_ai_production_1ipczt7",
+          "titleId": "studio_ai_project_1omo64n",
+          "absoluteWeek": 773,
+          "kind": "ANNOUNCEMENT",
+          "channel": "STUDIO_RELEASE",
+          "impressions": 0
+        },
+        {
+          "id": "npc-paid:studio_ai_production_1ipczt7",
+          "titleId": "studio_ai_project_1omo64n",
+          "absoluteWeek": 773,
+          "kind": "PAID_CAMPAIGN",
+          "channel": "RELEASE_CAMPAIGN",
+          "paidCostCents": 988100000,
+          "impressions": 296430000
+        }
+      ],
+      "budgetCents": 12350700000,
+      "campaignCents": 988100000,
+      "quality": 79,
+      "source": "WORLD_NPC",
+      "activationWeek": 773,
+      "ownCredit": false,
+      "owner": "SONY_PICTURES",
+      "closed": false,
+      "grossCents": 5575083950,
+      "receiptsCents": 2731792743,
+      "bookingCents": 343302318,
+      "investorPaidCents": 0,
+      "talentPaidCents": 109271700,
+      "actorPaidCents": 0,
+      "first": 3771741,
+      "repeats": 45815,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": -11059581275,
+      "producerNetAfterSignedSharesCents": 2279218725
+    },
+    {
+      "id": "studio_ai_project_02e4or3",
+      "name": "Red Forest",
+      "genre": "HORROR",
+      "mode": "WIDE_THEATRICAL",
+      "publicStrategy": "THEATRICAL",
+      "studioId": "MARVEL_STUDIOS",
+      "cast": [
+        {
+          "id": "celeb_act_2",
+          "name": "Tom Cruise",
+          "role": "LEAD"
+        }
+      ],
+      "campaignEvents": [
+        {
+          "id": "npc-announcement:studio_ai_production_08im4yz",
+          "titleId": "studio_ai_project_02e4or3",
+          "absoluteWeek": 779,
+          "kind": "ANNOUNCEMENT",
+          "channel": "STUDIO_RELEASE",
+          "impressions": 0
+        },
+        {
+          "id": "npc-paid:studio_ai_production_08im4yz",
+          "titleId": "studio_ai_project_02e4or3",
+          "absoluteWeek": 779,
+          "kind": "PAID_CAMPAIGN",
+          "channel": "RELEASE_CAMPAIGN",
+          "paidCostCents": 2530400000,
+          "impressions": 759120000
+        }
+      ],
+      "budgetCents": 14057500000,
+      "campaignCents": 2530400000,
+      "quality": 91,
+      "source": "WORLD_NPC",
+      "activationWeek": 779,
+      "ownCredit": false,
+      "owner": "MARVEL_STUDIOS",
+      "closed": false,
+      "grossCents": 11221085546,
+      "receiptsCents": 5441540066,
+      "bookingCents": 737627605,
+      "investorPaidCents": 0,
+      "talentPaidCents": 217661600,
+      "actorPaidCents": 0,
+      "first": 9470886,
+      "repeats": 19171,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": -12101649139,
+      "producerNetAfterSignedSharesCents": 4486250861
+    },
+    {
+      "id": "studio_ai_project_1qrvodk",
+      "name": "Savage Black Dance",
+      "genre": "SPORTS",
+      "mode": "LIMITED_THEATRICAL",
+      "publicStrategy": "THEATRICAL",
+      "studioId": "MGM",
+      "cast": [
+        {
+          "id": "celeb_act_5",
+          "name": "Ryan Reynolds",
+          "role": "LEAD"
+        }
+      ],
+      "campaignEvents": [
+        {
+          "id": "npc-announcement:studio_ai_production_1aolano",
+          "titleId": "studio_ai_project_1qrvodk",
+          "absoluteWeek": 779,
+          "kind": "ANNOUNCEMENT",
+          "channel": "STUDIO_RELEASE",
+          "impressions": 0
+        },
+        {
+          "id": "npc-paid:studio_ai_production_1aolano",
+          "titleId": "studio_ai_project_1qrvodk",
+          "absoluteWeek": 779,
+          "kind": "PAID_CAMPAIGN",
+          "channel": "RELEASE_CAMPAIGN",
+          "paidCostCents": 607700000,
+          "impressions": 182310000
+        }
+      ],
+      "budgetCents": 7596500000,
+      "campaignCents": 607700000,
+      "quality": 62,
+      "source": "WORLD_NPC",
+      "activationWeek": 779,
+      "ownCredit": false,
+      "owner": "MGM",
+      "closed": false,
+      "grossCents": 1234748754,
+      "receiptsCents": 605027240,
+      "bookingCents": 76688418,
+      "investorPaidCents": 0,
+      "talentPaidCents": 6050200,
+      "actorPaidCents": 0,
+      "first": 853632,
+      "repeats": 1051,
+      "productionCampaignBookingKnown": true,
+      "theatricalProjectProfitBeforeFinancingCents": -7681911378,
+      "producerNetAfterSignedSharesCents": 522288622
+    }
+  ],
+  "sourceFindings": {
+    "limitedRegionalMapping": "boxOfficeWeek.ts cinemaIndustryProjectDetails -> REGIONAL -> regionMap.ts NORTH_AMERICA",
+    "unscopedNpcCampaign": "studioAiCommercialResult.ts PAID_CAMPAIGN omits countryIds, so exposure allocates across all input country cohorts",
+    "playerCampaign": "boxOfficeExposureAdapters.ts commitCinemaReleaseExposure scopes campaign to explicit releaseRegionIds when supplied"
+  },
+  "interpretation": "Observed budget/release mismatch and unscoped campaign are concerns to test; this diagnostic is not a proven counterfactual fix or an independent probability sample."
+}

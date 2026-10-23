@@ -166,6 +166,8 @@ export interface CinemaFinanceSummary {
 
 /** Phase 3 contracts. Counts are aggregate segments, never individual simulated people. */
 export interface CinemaTitleMarketFacts {
+    /** Committed active titles retain their pre-upgrade exhibition agreement. */
+    bookingContract?: 'REVENUE_SHARE' | 'LEGACY_SHOW_FEES';
     releaseWeek: number;
     runtimeMinutes: number;
     languages: readonly string[];
@@ -258,6 +260,8 @@ export interface CinemaRunState {
     lastBookedWeek?: number;
     lastShows?: number;
     lastAdmissions?: number;
+    /** Agreed producer fee, frozen at the first local booking; zero for standard revenue sharing. */
+    bookingCentsPerShow?: number;
 }
 export interface CinemaMarketState {
     schemaVersion: 1;
@@ -300,6 +304,8 @@ export interface CinemaSupplyPool {
     exhibitorBasisPoints: number;
     distributionBasisPoints: number;
     bookingCentsPerShow: number;
+    /** Prior fixed-show agreement quote, available only to already committed legacy titles. */
+    legacyBookingCentsPerShow?: number;
     /** Exhibitor's marginal scheduling estimate only; never charged to the producer. */
     operatingCentsPerShow?: number;
 }
@@ -399,6 +405,7 @@ export interface CinemaCommittedWeek {
     titles: CinemaCommittedTitle[];
 }
 export interface CinemaSavedState {
+    bookingContracts?:Record<string,'REVENUE_SHARE'|'LEGACY_SHOW_FEES'>;
     /** Maximum observed weekly viewing homes; a conservative overlap lower bound, not cumulative starts. */
     streamingSeen?:Record<string,{lastWeek:number;countries:Record<string,number>}>;
     /** External investment counterparties have no simulated bank; signed net receivables/payables. */

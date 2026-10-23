@@ -1,0 +1,9 @@
+{"seed":2,"week":1,"cash":1750,"health":79.85,"films":0,"ownPaid":[]}
+{"seed":2,"week":14,"cash":3960,"health":77.89999999999992,"films":0,"ownPaid":[]}
+{"seed":2,"week":27,"cash":8525,"health":75.94999999999985,"films":0,"ownPaid":[]}
+{"seed":2,"week":40,"cash":13465,"health":74.59999999999974,"films":6,"ownPaid":[]}
+{"seed":2,"week":53,"cash":18405,"health":73.94999999999959,"films":16,"ownPaid":[]}
+{"seed":2,"week":66,"cash":23345,"health":74.29999999999944,"films":20,"ownPaid":[]}
+{"seed":2,"week":79,"cash":28285,"health":73.6499999999993,"films":25,"ownPaid":[]}
+{"seed":2,"week":92,"cash":33225,"health":73.99999999999915,"films":32,"ownPaid":[]}
+{"seed":2,"week":105,"cash":38165,"health":74.349999999999,"films":38,"ownPaid":[]}

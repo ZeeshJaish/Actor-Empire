@@ -84,6 +84,15 @@
         ],
         "createdAt": "2026-10-22T17:38:59.918Z",
         "reason": "Codex review: pre-existing .sa-waxseal uses sa-slamseal to animate a literal physical seal strike with impact/recoil; domain-appropriate motion, verified unchanged from HEAD."
+      },
+      {
+        "rule": "gray-on-color",
+        "value": "*",
+        "files": [
+          "views/lifestyle/business/components/DevelopmentLabScriptWizard.tsx"
+        ],
+        "createdAt": "2026-10-23T07:08:15.861Z",
+        "reason": "Agent verified computed styles in browser: enabled button is black text on amber; gray text applies only when disabled, together with a gray background. The detector combines mutually exclusive states. Existing styling preserved."
       }
     ]
   }

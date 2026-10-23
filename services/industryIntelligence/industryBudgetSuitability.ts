@@ -7,6 +7,8 @@ export interface CreateIndustryBudgetSuitabilityInput {
     starPowerTarget: number;
     commercialIntent: number;
     affordabilityCeilingMillions: number;
+    /** New production-studio movie proposals only; persisted fingerprints retain their curve. */
+    theatricalPlanning?: boolean;
 }
 
 export interface IndustryBudgetSuitabilityEvaluation {
@@ -28,7 +30,13 @@ export const createIndustryBudgetSuitability = (
     const risk = bounded(input.creativeRisk);
     const stars = bounded(input.starPowerTarget);
     const commercial = bounded(input.commercialIntent);
-    const naturalIdeal = (6 + stars * 0.72 + risk * 0.18 + commercial * 0.12) * formatScale * genreScale;
+    // Casting attention is not the full production cost. A modest story can be
+    // made cheaply; heavy effects still require a substantially larger package.
+    // Existing fingerprints and episodic/commissioned proposals keep their curve.
+    const moviePlan=input.theatricalPlanning&&input.format==='MOVIE';
+    const naturalIdeal = moviePlan
+        ? (3 + Math.pow(stars/100,2)*32 + risk*.07 + commercial*.04) * (genreScale>1?2.3:1)
+        : (6 + stars * 0.72 + risk * 0.18 + commercial * 0.12) * formatScale * genreScale;
     const ceiling = Math.max(5, finite(input.affordabilityCeilingMillions, naturalIdeal));
     const idealHighMillions = money(Math.max(3.1, Math.min(naturalIdeal * 1.18, ceiling)));
     const idealLowMillions = money(Math.max(2.1, Math.min(idealHighMillions - 0.1, idealHighMillions * 0.68)));

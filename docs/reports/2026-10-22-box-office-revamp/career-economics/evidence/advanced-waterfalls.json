@@ -1,0 +1,61 @@
+{
+  "kind": "RECALCULATED_ACCOUNTING_FROM_PREVIOUS_COMPLETED_ACTUAL_ROUTES_NOT_NEW_NORMAL_CAREERS",
+  "rows": [
+    {
+      "id": "final-phenomenon",
+      "grossCents": 233029896436,
+      "producerReceiptsCents": 113331484467,
+      "productionCents": 30000000000,
+      "campaignCents": 20000000000,
+      "bookingCents": 13883601275,
+      "theatricalProfitCents": 49447883192,
+      "frozenGrossProfitWithoutBookingCents": 63331484467,
+      "producerSharePercent": 48.63388183246508
+    },
+    {
+      "id": "final-earned",
+      "grossCents": 158112552269,
+      "producerReceiptsCents": 76833190008,
+      "productionCents": 30000000000,
+      "campaignCents": 10000000000,
+      "bookingCents": 9725697325,
+      "theatricalProfitCents": 27107492683,
+      "frozenGrossProfitWithoutBookingCents": 36833190008,
+      "producerSharePercent": 48.5939850476148
+    },
+    {
+      "id": "final-weak",
+      "grossCents": 42328359981,
+      "producerReceiptsCents": 20538198284,
+      "productionCents": 30000000000,
+      "campaignCents": 10000000000,
+      "bookingCents": 2922373377,
+      "theatricalProfitCents": -22384175093,
+      "frozenGrossProfitWithoutBookingCents": -19461801716,
+      "producerSharePercent": 48.521129316654395
+    },
+    {
+      "id": "final-small",
+      "grossCents": 2491445396,
+      "producerReceiptsCents": 1220810641,
+      "productionCents": 200000000,
+      "campaignCents": 50000000,
+      "bookingCents": 165291630,
+      "theatricalProfitCents": 805519011,
+      "frozenGrossProfitWithoutBookingCents": 970810641,
+      "producerSharePercent": 49.00009620760719
+    },
+    {
+      "id": "final-wide-small",
+      "grossCents": 803398726,
+      "producerReceiptsCents": 386990483,
+      "productionCents": 200000000,
+      "campaignCents": 50000000,
+      "bookingCents": 83225163,
+      "theatricalProfitCents": 53765320,
+      "frozenGrossProfitWithoutBookingCents": 136990483,
+      "producerSharePercent": 48.16916811989069
+    }
+  ],
+  "limit": "No-booking values hold historical admissions/gross fixed. They are not implemented payouts or a forecast after changing studio cash and future decisions."
+}

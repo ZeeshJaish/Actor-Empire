@@ -1,0 +1,47 @@
+{
+  "accessed": "2026-10-23",
+  "sources": [
+    {
+      "title": "Avatar: The Way of Water — Deadline profit study, 19 April 2023",
+      "url": "https://web.archive.org/web/20230419172938/https://deadline.com/2023/04/avatar-the-way-of-water-box-office-profits-1235328725/",
+      "kind": "Archived original trade estimate",
+      "facts": "About $2.3B gross; $531.7M estimated film profit including home entertainment and streaming/TV; $1.26B film rentals. Not audited theatrical-only profit."
+    },
+    {
+      "title": "The Super Mario Bros Movie — Deadline profit study, 6 May 2024",
+      "url": "https://web.archive.org/web/20250206165223/https://deadline.com/2024/05/the-super-mario-bros-movie-profits-1235902894/",
+      "kind": "Archived original trade estimate",
+      "facts": "$1.36B gross; $559M estimated film profit; $100M production. Different costs and downstream revenue from Avatar."
+    },
+    {
+      "title": "Film distribution and cinema operators — UK Cinema Association",
+      "url": "https://www.cinemauk.org.uk/the-industry/about-the-uk-cinema-sector/film-distribution-and-cinema-operators/",
+      "kind": "Industry association primary guidance",
+      "facts": "Exhibitor/distributor rental terms usually percentage of box office; vary by film and run timing. Cinema uses retained income to operate."
+    },
+    {
+      "title": "Working in distribution — Independent Cinema Office",
+      "url": "https://www.independentcinemaoffice.org.uk/advice-support/working-in-film-exhibition/working-in-distribution/",
+      "kind": "Practitioner primary guidance",
+      "facts": "Film booking agreement sets flat fee or percentage, often combination for independent cinema; terms and duration reflect audience expectations. Not a universal producer-per-show rental rule."
+    },
+    {
+      "title": "The economics of the operation — Independent Cinema Office",
+      "url": "https://www.independentcinemaoffice.org.uk/advice-support/how-to-start-a-cinema/the-economics-of-the-operation/",
+      "kind": "Practitioner primary guidance",
+      "facts": "Cinema pays film hire; may owe distributor a minimum guarantee. Cinema has its own staffing and premises costs. Do not invert the guarantee direction."
+    },
+    {
+      "title": "Cinemark full-year 2025 results — SEC Exhibit 99.1",
+      "url": "https://www.sec.gov/Archives/edgar/data/1385280/000119312526056010/cnk-ex99_1.htm",
+      "kind": "Company filing",
+      "facts": "Admissions $1544.7M; film rentals and advertising combined $877M; own staffing/lease costs separately reported. Combined expense is not a pure studio take-rate."
+    },
+    {
+      "title": "Disney FY2025 annual report",
+      "url": "https://investors.thewaltdisneycompany.com/files/doc_financials/2025/ar/2025-Annual-Report.pdf",
+      "kind": "Company filing",
+      "facts": "Theatrical revenue is rentals from films licensed to theaters; TV/VOD and home entertainment revenue are separately described."
+    }
+  ]
+}

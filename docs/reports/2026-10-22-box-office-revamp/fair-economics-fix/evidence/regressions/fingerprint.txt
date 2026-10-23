@@ -1,0 +1,2 @@
+{"calls":22326,"cohorts":2363,"hash":"6e5fabe3ed044959bfc6242a64cd3fb783e94ae331eb6121f8c0a35426b9d408"}
+PASS full-world fingerprint serialization stays bounded and result deterministic

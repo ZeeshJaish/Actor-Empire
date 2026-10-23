@@ -1,0 +1,25 @@
+{
+  "windows": [
+    {
+      "report": "career-0.json",
+      "observationStatus": "INTERRUPTED_OBSERVATION_WINDOW"
+    },
+    {
+      "report": "career-1.json",
+      "observationStatus": "INTERRUPTED_OBSERVATION_WINDOW"
+    },
+    {
+      "report": "career-2.json",
+      "observationStatus": "INTERRUPTED_OBSERVATION_WINDOW"
+    },
+    {
+      "report": "career-3.json",
+      "observationStatus": "INTERRUPTED_OBSERVATION_WINDOW"
+    },
+    {
+      "report": "career-4.json",
+      "observationStatus": "HORIZON_COMPLETE"
+    }
+  ],
+  "legacyExecutableSha256": "2e1a061f6ec3b16d6034cb1cc87083d247aa3999f40cb0a7639857b132222def"
+}

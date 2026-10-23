@@ -1,0 +1,34 @@
+{
+  "kind": "CURRENT_FINANCE_PRESENTATION_DIAGNOSTIC",
+  "source": {
+    "id": "funded",
+    "budget": 100000000,
+    "totalStudioReceipts": 100000000,
+    "studioCashAtRisk": 50000000,
+    "investorPlan": {
+      "totalRaised": 50000000
+    },
+    "investorPayouts": {
+      "lifetimeInvestorPayout": 50000000,
+      "weeklyInvestorPayouts": [
+        50000000
+      ]
+    }
+  },
+  "actual": {
+    "publicGrossCents": 0,
+    "theatricalProducerReceiptsCents": 10000000000,
+    "producerReceiptsCents": 10000000000,
+    "netStudioReceiptsCents": 5000000000,
+    "totalPaidCostsCents": 10000000000,
+    "investorPayoutCents": 5000000000,
+    "talentBackendCents": 0,
+    "netProfitCents": -5000000000,
+    "actorEarningsCents": 0,
+    "receiptsEstimated": false,
+    "costsEstimated": false,
+    "studioReturnPercent": 0
+  },
+  "projectResultBeforeFinancing": 0,
+  "studioResultAfterFinancing": 0
+}

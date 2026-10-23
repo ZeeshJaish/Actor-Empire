@@ -80,7 +80,7 @@ export const executeStudioAiProductionWeek = (input: ExecuteStudioAiProductionWe
 
         if (production.status === 'ON_HOLD') {
             if ((execution.nextReviewAbsoluteWeek ?? Number.MAX_SAFE_INTEGER) > input.absoluteWeek) continue;
-            if (execution.releaseBlockedReason === 'MISSING_STREAMING_RIGHTS') {
+            if (execution.releaseBlockedReason === 'MISSING_STREAMING_RIGHTS'||execution.releaseBlockedReason==='INSUFFICIENT_MARKETING') {
                 production = { ...production, status: 'AWAITING_RELEASE', studioAiExecution: { ...execution, selectedReleaseMode: null, releaseBlockedReason: 'NONE', nextReviewAbsoluteWeek: input.absoluteWeek } };
             } else {
                 const holdAge = input.absoluteWeek - (execution.holdStartedAtAbsoluteWeek ?? input.absoluteWeek);
@@ -127,7 +127,8 @@ export const executeStudioAiProductionWeek = (input: ExecuteStudioAiProductionWe
             }
             const released = releaseStudioAiProduction({ world, studio, production, absoluteWeek: input.absoluteWeek });
             world = released.world; production = released.production; studio = released.studio;
-            if (released.changed) { releasedCount += 1; logs.push(`${production.title} was released.`); }
+            if (released.changed&&production.status==='RELEASED') { releasedCount += 1; logs.push(`${production.title} was released.`); }
+            else if(production.status==='ON_HOLD'){heldCount+=1;}
             else if (production.studioAiExecution) {
                 production = { ...production, studioAiExecution: { ...production.studioAiExecution, lastProgressedAbsoluteWeek: input.absoluteWeek } };
                 world = { ...world, industryProductions: upsertCanonicalIndustryProduction(world.industryProductions, production) };

@@ -2006,7 +2006,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             type: previewProjectType,
             format: selectedScript.format || 'LIVE_ACTION',
             episodes: selectedScript.episodes,
-            description: `A ${selectedScript.genres.join('/')} ${previewProjectType === 'SERIES' ? 'series' : 'film'} produced by ${studio.name}.`,
+            description: selectedScript.logline?.trim() || `A ${selectedScript.genres.join('/')} ${previewProjectType === 'SERIES' ? 'series' : 'film'} produced by ${studio.name}.`,
             studioId: studio.id as any,
             subtype: 'STANDALONE',
             genre: selectedScript.genres[0],

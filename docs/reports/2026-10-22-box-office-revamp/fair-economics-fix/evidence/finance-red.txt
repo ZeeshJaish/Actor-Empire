@@ -1,0 +1,48 @@
+PASS integer cents split odd amounts exactly
+PASS safe-integer large gross does not overflow share multiplication
+PASS invalid money/shares cannot enter the ledger
+PASS player dollars and NPC millions have distinct exact adapters
+FAIL ledger deduplicates actual cost events and separates gross from profit Project profit excludes investor ownership distributions
+
+-1200 !== -1000
+
+PASS conflicting duplicate events are rejected instead of overwritten
+PASS hybrid producer receipts add media without counting actor earnings
+PASS a recorded zero receipt remains zero, with later streaming added
+PASS legacy receipts are explicitly estimated and quotes are not paid costs
+PASS combined signed profit cannot overflow safe integer cents
+PASS funded production does not hide the studios paid marketing exposure
+PASS unknown ledger categories are rejected rather than losing money silently
+FAIL a half-investor financed break-even film reports zero project and studio profit Expected values to be strictly equal:
+
+-5000000000 !== 0
+
+FAIL project and studio profit remain different when investors finance a profitable film Expected values to be strictly equal:
+
+0 !== 10000000000
+
+FAIL applied platform production cover is recognized once without inventing spendable studio receipts Expected values to be strictly equal:
+
+-11000 !== -1000
+
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: 4 finance contract regressions
+
+4 !== 0
+
+    at file:///private/var/folders/h0/t4fqx33d23l2fh_9h7n17cqr0000gp/T/actor-box-office-jhofa5/finance-contracts.mjs:301:8
+    at ModuleJob.run (node:internal/modules/esm/module_job:377:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:671:26)
+    at async file:///Users/zeesh/Vibe%20code/Actor%20empire/[eval1]:1:198 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 4,
+  expected: 0,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.11.1

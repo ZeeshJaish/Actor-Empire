@@ -15,6 +15,19 @@ console.log('PASS ordinary policy resolves persisted choices and keeps actions f
 const poor=structuredClone(INITIAL_PLAYER);poor.stats.genreXP.DRAMA=85;poor.flags.extraNPCs=[{id:'policy-diva',name:'Policy Diva'} as any];poor.commitments=[{id:'policy-film',name:'Policy Film',type:'ACTING_GIG',projectPhase:'PRODUCTION',roleType:'MINOR',energyCost:0,income:0,projectDetails:{hiddenStats:{},genre:'DRAMA'}} as any];poor.pendingEvents=[{id:'policy-crisis',week:1,type:'PRODUCTION_CRISIS',title:'Diva Demands',data:{projectId:'policy-film',crisisId:'policy-crisis',trait:'DIVA',npcId:'policy-diva',options:[{label:'Give In ($50k)',labelKey:'production.crisis.diva.giveIn.label',index:0},{label:'Refuse (Delay)',labelKey:'production.crisis.diva.refuse.label',index:1}]}} as any];
 const choices:CareerAction[]=[];const funded=prepareOrdinaryCinemaWeek(poor,choices);assert.ok(funded.money>=0,'A translation key cannot hide the visible $50k expense from an ordinary action policy');assert.ok(choices.some(a=>a.action==='Production choice: production.crisis.diva.refuse.label'));console.log('PASS visible costs remain visible when translated option keys exist');
 
+{
+ const source=structuredClone(poor);source.money=2000;source.energy.current=0;source.commitments[0].productionPerformance=80;
+ source.pendingEvents=[{id:'generated-crisis',week:1,type:'PRODUCTION_CRISIS',title:'Generated crisis',data:{projectId:'policy-film',isGenerative:true,options:[
+  {label:'',labelKey:'production.crisis.generated.money.label',index:0},
+  {label:'',labelKey:'production.crisis.generated.push.label',index:1}
+ ]}} as any];
+ const decisions:CareerAction[]=[];const result=prepareOrdinaryCinemaWeek(source,decisions);
+ assert.ok(result.money>=0,'An untranslated generated choice cannot hide an unaffordable $25k charge');
+ assert.ok(decisions.some(a=>a.action==='Production choice: production.crisis.generated.push.label'));
+ assert.equal(result.commitments[0].productionPerformance,76,'The free production choice pays its real quality consequence');
+ console.log('PASS key-only generated crisis chooses funded option and retains its quality consequence');
+}
+
 // Model StrictMode replay against the same immutable React source.
 {
  const initial=structuredClone(INITIAL_PLAYER),before=structuredClone(initial);

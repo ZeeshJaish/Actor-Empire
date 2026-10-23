@@ -34,7 +34,7 @@ test('ledger deduplicates actual cost events and separates gross from profit',()
  ]});
  assert.equal(result.publicGrossCents,23000);assert.equal(result.totalPaidCostsCents,13500);
  assert.equal(result.producerReceiptsCents,12600);assert.equal(result.netStudioReceiptsCents,12300);
- assert.equal(result.netProfitCents,-1200);assert.equal(result.actorEarningsCents,2000);
+ assert.equal(result.netProfitCents,-1000,'Project profit excludes investor ownership distributions');assert.equal(result.actorEarningsCents,2000);
 });
 test('conflicting duplicate events are rejected instead of overwritten',()=>{
  assert.throws(()=>summarizeCinemaFinance({titleId:'film',entries:[
@@ -59,7 +59,7 @@ test('legacy receipts are explicitly estimated and quotes are not paid costs',()
 test('combined signed profit cannot overflow safe integer cents',()=>{
  assert.throws(()=>summarizeCinemaFinance({titleId:'unsafe',entries:[
  {id:'production',category:'PRODUCTION_COST',amountCents:Number.MAX_SAFE_INTEGER},
- {id:'investor',category:'INVESTOR_PAYOUT',amountCents:Number.MAX_SAFE_INTEGER},
+ {id:'backend',category:'TALENT_BACKEND',amountCents:Number.MAX_SAFE_INTEGER},
  ]}));
 });
 test('funded production does not hide the studios paid marketing exposure',()=>{
@@ -70,6 +70,25 @@ test('funded production does not hide the studios paid marketing exposure',()=>{
 });
 test('unknown ledger categories are rejected rather than losing money silently',()=>{
  assert.throws(()=>summarizeCinemaFinance({titleId:'bad',entries:[{id:'bad',category:'UNKNOWN' as never,amountCents:100}]}));
+});
+test('a half-investor financed break-even film reports zero project and studio profit',()=>{
+ const source={id:'financed',budget:100e6,totalStudioReceipts:100e6,studioCashAtRisk:50e6,
+  investorPlan:{totalRaised:50e6},investorPayouts:{lifetimeInvestorPayout:50e6,weeklyInvestorPayouts:[50e6]}};
+ const before=JSON.stringify(source),f=getCinemaProjectFinance(source as Parameters<typeof getCinemaProjectFinance>[0]);
+ assert.equal(f.netProfitCents,0);assert.equal((f as any).studioProfitCents,0);
+ assert.equal((f as any).studioCashAtRiskCents,50e8);assert.equal(f.studioReturnPercent,0);
+ assert.equal(JSON.stringify(source),before,'Presenting financing never settles cash');
+});
+test('project and studio profit remain different when investors finance a profitable film',()=>{
+ const f=getCinemaProjectFinance({budget:100e6,totalStudioReceipts:200e6,studioCashAtRisk:50e6,
+  investorPayouts:{lifetimeInvestorPayout:100e6,weeklyInvestorPayouts:[100e6]}});
+ assert.equal(f.netProfitCents,100e8);assert.equal((f as any).studioProfitCents,50e8);
+ assert.equal(f.studioReturnPercent,100);
+});
+test('applied platform production cover is recognized once without inventing spendable studio receipts',()=>{
+ const f=getCinemaProjectFinance({budget:100,platformProductionFunding:100,studioCashAtRisk:0,marketingBudgetSpent:10});
+ assert.equal(f.netProfitCents,-1000);assert.equal((f as any).studioProfitCents,-1000);
+ assert.equal(f.producerReceiptsCents,0);assert.equal(f.studioReturnPercent,-100);
 });
 let failures=0;for(const[name,run]of tests){try{run();console.log('PASS',name)}catch(error){failures++;console.error('FAIL',name,error instanceof Error?error.message:error)}}
 assert.equal(failures,0,`${failures} finance contract regressions`);

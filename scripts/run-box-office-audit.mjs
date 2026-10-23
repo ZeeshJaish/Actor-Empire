@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
-const suites = new Set(['inputs', 'delivery', 'finance', 'finance-contracts', 'finance-ui', 'phase1-integration', 'awareness', 'phase2-integration', 'audience', 'market', 'migration', 'integration', 'presentation', 'rights', 'calibration', 'long-save', 'placement', 'release-announcement', 'save-boundary', 'viewing-routes', 'royalty-batch', 'career-actions', 'booking', 'alternatives', 'alternative-routes', 'alternative-batching', 'fingerprint', 'full-world', 'billion-career', 'affinity-index']);
+const suites = new Set(['inputs', 'delivery', 'finance', 'finance-contracts', 'finance-ui', 'phase1-integration', 'awareness', 'phase2-integration', 'audience', 'market', 'migration', 'integration', 'presentation', 'rights', 'calibration', 'long-save', 'placement', 'release-announcement', 'save-boundary', 'viewing-routes', 'royalty-batch', 'career-actions', 'booking', 'alternatives', 'alternative-routes', 'alternative-batching', 'fingerprint', 'full-world', 'billion-career', 'billion-app-fixture', 'affinity-index']);
 const suite = process.argv[2];
 if (!suites.has(suite)) throw new Error(`Choose an implemented cinema audit: ${[...suites].join(', ')}`);
 const folder = await mkdtemp(join(tmpdir(), 'actor-box-office-'));

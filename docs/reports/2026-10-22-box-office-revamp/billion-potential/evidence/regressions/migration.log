@@ -1,0 +1,24 @@
+PASS absent state activates the next unprocessed week without changing cash or historical gross
+PASS active legacy audience is bounded estimated history without historical payout
+PASS a sparse legacy release retains an explicitly unknown owner without corrupting its migrated audience
+PASS migration is idempotent and survives JSON reload
+PASS fully settled NPC gross is preserved and cannot enter new payouts
+PASS unsupported future schema is rejected without overwriting input
+PASS ambiguous partial paid state is recoverably rejected instead of reset
+PASS corrupt money and historical gross are never silently normalized into a migration
+PASS actual loader refuses corrupt raw legacy money before defaults
+PASS actual inheritance remaps parent cinema identity
+PASS settled legacy display history can compact while financial truth stays protected
+PASS partial receipts and malformed audience memory require recovery before signing
+PASS legacy catalogue with missing theatrical facts stays unknown and already settled
+PASS signed streaming agreements survive unchanged
+PASS load migration rejects future cinema state before generic defaults can overwrite it
+PASS cinema audience and receipt checkpoints are protected by save integrity
+PASS issued digest schema 2 still verifies its exact pre-cinema projection
+PASS closed audience matrices retire into compact earned universe/actor memory
+PASS inheritance changes the cinema clock without changing paid source identities
+PASS actual save-generation failure and previous-generation recovery retain cinema money/history
+PASS signed tuning 1 generation verifies before migration and current re-sign/reload preserves paid facts
+PASS tuning 2 active runs preserve paid facts and do not restart discovery or awareness
+PASS signed tuning 3 load/upgrade/reload retains every old payment, cash balance and local booking
+Migration audit: 23 groups passed

@@ -19,6 +19,7 @@ import {
 } from '../types';
 import { completeOfferedCinemaCast, isCinemaPlayerCredit } from './boxOffice/boxOfficeInputs';
 import { getRoleOfferMarketDecision } from './roleMarketDemand';
+import { getScriptChoiceCompass, getScriptChoiceTokens } from './scriptConcept';
 import {
     evaluateCharacterProfileFit,
     getCharacterIdentityOption,
@@ -47,18 +48,18 @@ const normalizedText = (source: StorySource): string => [
     source.logline,
     source.description,
     ...(source.tags || []),
-    ...(source.options || []).flatMap(option => [option.questionId, option.choiceId]),
+    ...getScriptChoiceTokens(source.genre || source.genres?.[0], source.options || []),
 ].filter(Boolean).join(' ').toLowerCase();
 
 const hasAny = (text: string, values: string[]) => values.some(value => text.includes(value));
 const primaryGenre = (source: StorySource): Genre | undefined => source.genre || source.genres?.[0];
 
 const inferWorldRule = (source: StorySource, text: string): StoryWorldRule => {
-    const genre = primaryGenre(source);
-    const hasMagic = genre === 'FANTASY' || hasAny(text, ['magic', 'myth', 'wizard', 'witch', 'spell', 'arcane']);
-    const hasTechnology = genre === 'SCI_FI' || hasAny(text, ['robot', 'android', 'technology', 'cyber', 'machine', 'alien tech']);
-    const hasSupernatural = genre === 'HORROR' || hasAny(text, ['ghost', 'vampire', 'demon', 'supernatural', 'spirit']);
-    const hasSuperpowers = genre === 'SUPERHERO' || hasAny(text, ['superpower', 'superhero', 'mutant', 'power origin']);
+    const genres = new Set([source.genre, ...(source.genres || [])]);
+    const hasMagic = genres.has('FANTASY') || hasAny(text, ['magic', 'myth', 'wizard', 'witch', 'spell', 'arcane']);
+    const hasTechnology = genres.has('SCI_FI') || hasAny(text, ['robot', 'android', 'technology', 'cyber', 'machine', 'alien tech']);
+    const hasSupernatural = genres.has('HORROR') || hasAny(text, ['ghost', 'vampire', 'demon', 'supernatural', 'spirit']);
+    const hasSuperpowers = genres.has('SUPERHERO') || hasAny(text, ['superpower', 'superhero', 'mutant', 'power origin']);
     const lanes = [hasMagic, hasTechnology, hasSupernatural, hasSuperpowers].filter(Boolean).length;
     if (lanes > 1) return 'MIXED';
     if (hasSuperpowers) return 'SUPERPOWERED';
@@ -106,7 +107,8 @@ export const inferStoryCompass = (
     const text = normalizedText(source);
     const genre = primaryGenre(source);
     const inferredPerspective = inferPerspective(text);
-    const perspective = isOneOf(existing?.perspective, STORY_PERSPECTIVES) ? existing.perspective : inferredPerspective;
+    const choiceCompass = genre ? getScriptChoiceCompass(genre, source.options || []) : {};
+    const perspective = isOneOf(existing?.perspective, STORY_PERSPECTIVES) ? existing.perspective : choiceCompass.perspective || inferredPerspective;
     const inferredSource = sourceHint
         || (source.universeId ? 'CANON' : source.isOriginal === false ? 'MARKET_INFERENCE' : 'SCRIPT_DNA');
     const confidenceSignals = [
@@ -121,14 +123,14 @@ export const inferStoryCompass = (
         perspective,
         conflictSource: isOneOf(existing?.conflictSource, STORY_CONFLICT_SOURCES)
             ? existing.conflictSource
-            : inferConflict(text, genre),
+            : choiceCompass.conflictSource || inferConflict(text, genre),
         worldRule: isOneOf(existing?.worldRule, STORY_WORLD_RULES)
             ? existing.worldRule
-            : inferWorldRule(source, text),
-        tone: isOneOf(existing?.tone, STORY_TONES) ? existing.tone : inferTone(text, genre),
+            : choiceCompass.worldRule || inferWorldRule(source, text),
+        tone: isOneOf(existing?.tone, STORY_TONES) ? existing.tone : choiceCompass.tone || inferTone(text, genre),
         castShape: isOneOf(existing?.castShape, STORY_CAST_SHAPES)
             ? existing.castShape
-            : inferCastShape(text, perspective),
+            : choiceCompass.castShape || inferCastShape(text, perspective),
         flexibility: isOneOf(existing?.flexibility, STORY_FLEXIBILITY)
             ? existing.flexibility
             : source.universeId ? 'PROTECTED' : source.isOriginal === false ? 'ADAPTABLE' : 'OPEN',

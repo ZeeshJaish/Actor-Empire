@@ -1,0 +1,38 @@
+[
+  {
+    "suite": "finance-ui",
+    "exit": 0
+  },
+  {
+    "suite": "presentation",
+    "exit": 0
+  },
+  {
+    "suite": "save-boundary",
+    "exit": 0
+  },
+  {
+    "suite": "rights",
+    "exit": 0
+  },
+  {
+    "suite": "finance-contracts",
+    "exit": 0
+  },
+  {
+    "suite": "career-actions",
+    "exit": 0
+  },
+  {
+    "suite": "migration",
+    "exit": 0
+  },
+  {
+    "suite": "integration",
+    "exit": 0
+  },
+  {
+    "suite": "actual-app-fresh-billion",
+    "exit": 0
+  }
+]

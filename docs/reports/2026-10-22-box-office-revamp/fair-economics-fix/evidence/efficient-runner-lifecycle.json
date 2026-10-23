@@ -1,0 +1,8 @@
+{
+  "completedDeathRetainedWithoutCheckpoint": true,
+  "kernelParentLockBlocksDuplicateController": true,
+  "orphanWorkerBlocksNewHeavyImport": true,
+  "kernelWorkerLockRecoversAfterSigkill": true,
+  "pinnedCompletedResultRetained": true,
+  "failedResultPreserved": true
+}

@@ -1,0 +1,11 @@
+PASS accepted offer contains the package ensemble, not only the player
+PASS old singleton is repaired deterministically without mutating the offer
+PASS duplicate actor IDs do not add fame
+PASS an uncredited player contributes neither fame nor acting talent
+PASS universe offer keeps its template studio
+PASS authored casting is not padded and canonical people keep their characters
+PASS custom actor IDs resolve through relationships without inventing fame
+PASS duplicate player rows cannot stand in for missing co-stars
+PASS canonical custom actor fame is retained without a global database entry
+PASS saved cast recognition survives a missing procedural catalogue actor without inventing a replacement
+PASS offered ensemble captures actual catalogue recognition at casting

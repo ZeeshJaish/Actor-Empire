@@ -1,0 +1,9 @@
+PASS forecast is pure, ordered, deterministic and creates no live receipt
+PASS hidden final delivery and unknown observed fields cannot alter preview
+PASS mid scenario equals the same known-input market kernel
+PASS presentation preserves every cent and labels shadow results
+PASS no attendance-derived tags without settled evidence; legacy repeats are never invented
+PASS real release forecast is pure and hides final quality including payoff
+PASS generic unconverted demand is never called a known streaming wait
+PASS nonzero release preview matches live mid with country-specific chains and paid campaign
+Cinema presentation: 8 groups passed

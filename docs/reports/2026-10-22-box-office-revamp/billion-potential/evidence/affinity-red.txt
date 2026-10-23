@@ -1,0 +1,18 @@
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Bounded per-cohort work required: inspected 5760000 affinity identities for 9,600 rows
+    at file:///private/var/folders/h0/t4fqx33d23l2fh_9h7n17cqr0000gp/T/actor-box-office-6q98Pb/affinity-index.mjs:1697:8
+    at ModuleJob.run (node:internal/modules/esm/module_job:377:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:671:26)
+    at async file:///Users/zeesh/Vibe%20code/Actor%20empire/[eval1]:1:198 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}
+
+Node.js v24.11.1

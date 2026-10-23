@@ -512,7 +512,7 @@ export const buildGreenlightProject = ({
                 type: resolveProjectType(selectedScript.projectType, (selectedScript as any).type, (selectedScript as any).projectDetails?.type),
                 format: selectedScript.format || 'LIVE_ACTION',
                 episodes: selectedScript.episodes,
-                description: `A ${selectedScript.genres.join('/')} ${formatProjectFormatLabel(selectedScript.format)} ${resolveProjectType(selectedScript.projectType, (selectedScript as any).type, (selectedScript as any).projectDetails?.type) === 'SERIES' ? 'series' : 'film'} produced by ${studio.name}${selectedScript.subjectName ? ` about ${selectedScript.subjectName}` : ''}.`,
+                description: selectedScript.logline?.trim() || `A ${selectedScript.genres.join('/')} ${formatProjectFormatLabel(selectedScript.format)} ${resolveProjectType(selectedScript.projectType, (selectedScript as any).type, (selectedScript as any).projectDetails?.type) === 'SERIES' ? 'series' : 'film'} produced by ${studio.name}${selectedScript.subjectName ? ` about ${selectedScript.subjectName}` : ''}.`,
                 studioId: studio.id as any,
                 subtype: projectSubtype,
                 universeId: finalUniverseId,

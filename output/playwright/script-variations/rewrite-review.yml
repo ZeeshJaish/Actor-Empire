@@ -1,0 +1,110 @@
+- main [ref=f8e3]:
+  - generic [ref=f8e6]:
+    - generic [ref=f8e7]:
+      - generic [ref=f8e8]:
+        - generic [ref=f8e9]:
+          - generic [ref=f8e10]: Script Concept
+          - heading "Final Review" [level=2] [ref=f8e151]
+        - generic [ref=f8e17]:
+          - generic [ref=f8e18]: Quality
+          - generic [ref=f8e19]: "51"
+      - generic [ref=f8e20]:
+        - button "1 Basics" [ref=f8e21] [cursor=pointer]:
+          - generic [ref=f8e22]: "1"
+          - generic [ref=f8e23]: Basics
+        - button "2 Genre" [ref=f8e24] [cursor=pointer]:
+          - generic [ref=f8e25]: "2"
+          - generic [ref=f8e26]: Genre
+        - button "3 Story" [ref=f8e27] [cursor=pointer]:
+          - generic [ref=f8e28]: "3"
+          - generic [ref=f8e29]: Story
+        - button "4 Review" [ref=f8e30] [cursor=pointer]:
+          - generic [ref=f8e31]: "4"
+          - generic [ref=f8e32]: Review
+    - generic [ref=f8e33]:
+      - generic [ref=f8e34]:
+        - generic [ref=f8e35]: Concept
+        - generic [ref=f8e36]: Curse of the Open Sea
+      - generic [ref=f8e37]:
+        - generic [ref=f8e38]: MOVIE
+        - generic [ref=f8e39]: Live Action
+        - generic [ref=f8e40]: Adventure
+        - generic [ref=f8e41]: Fantasy
+    - generic [ref=f8e152]:
+      - generic [ref=f8e153]:
+        - generic [ref=f8e154]: Final Draft Review
+        - heading "Curse of the Open Sea" [level=2] [ref=f8e155]
+        - generic [ref=f8e156]:
+          - generic [ref=f8e157]: MOVIE
+          - generic [ref=f8e158]: Live Action
+          - generic [ref=f8e159]: Adventure
+          - generic [ref=f8e160]: Fantasy
+      - generic [ref=f8e161]:
+        - generic [ref=f8e162]:
+          - generic [ref=f8e163]:
+            - generic [ref=f8e164]:
+              - generic [ref=f8e165]: Player Premise
+              - generic [ref=f8e166]: The one-line pitch the town repeats.
+            - generic [ref=f8e167]: 76/180
+          - textbox "A sharp one-line pitch for this project..." [ref=f8e168]: A pirate captain and a loyal crew race a ghost admiral to a cursed treasure.
+          - button "Use DNA Suggestion" [ref=f8e169] [cursor=pointer]
+        - region "Story Compass" [ref=f8e170]:
+          - generic [ref=f8e172]:
+            - generic [ref=f8e173]:
+              - paragraph [ref=f8e177]: Story Compass
+              - paragraph [ref=f8e178]: The script suggests a clear main-character focus, a mystery at its centre, a supernatural world, and a balanced cast.
+              - paragraph [ref=f8e179]: Guides automatic character suggestions. You can still rewrite every role during casting.
+            - button "Explain the Story Compass" [ref=f8e180] [cursor=pointer]
+          - generic [ref=f8e183]:
+            - generic [ref=f8e184]:
+              - paragraph [ref=f8e185]: Focus
+              - paragraph [ref=f8e186]: Protagonist Led
+            - generic [ref=f8e187]:
+              - paragraph [ref=f8e188]: Conflict
+              - paragraph [ref=f8e189]: Mystery
+            - generic [ref=f8e190]:
+              - paragraph [ref=f8e191]: World
+              - paragraph [ref=f8e192]: Supernatural
+            - generic [ref=f8e193]:
+              - paragraph [ref=f8e194]: Cast
+              - paragraph [ref=f8e195]: Balanced
+            - generic [ref=f8e196]:
+              - paragraph [ref=f8e197]: Tone
+              - paragraph [ref=f8e198]: Heroic
+          - generic [ref=f8e199]: "Creative flexibility: Open"
+        - generic [ref=f8e200]:
+          - generic [ref=f8e201]: Script DNA
+          - button "Explain script DNA stats" [ref=f8e202] [cursor=pointer]
+        - generic [ref=f8e205]:
+          - generic [ref=f8e206]:
+            - generic [ref=f8e207]: Plot
+            - generic [ref=f8e208]: "50"
+          - generic [ref=f8e209]:
+            - generic [ref=f8e210]: Characters
+            - generic [ref=f8e211]: "45"
+          - generic [ref=f8e212]:
+            - generic [ref=f8e213]: Pacing
+            - generic [ref=f8e214]: "45"
+          - generic [ref=f8e215]:
+            - generic [ref=f8e216]: Dialogue
+            - generic [ref=f8e217]: "50"
+          - generic [ref=f8e218]:
+            - generic [ref=f8e219]: Action
+            - generic [ref=f8e220]: "55"
+          - generic [ref=f8e221]:
+            - generic [ref=f8e222]: Originality
+            - generic [ref=f8e223]: "59"
+        - generic [ref=f8e224]:
+          - generic [ref=f8e225]: Chosen Angles
+          - generic [ref=f8e226]:
+            - generic [ref=f8e227]: Break a Sea Curse
+            - generic [ref=f8e228]: High Seas & Pirate Ports
+        - generic [ref=f8e229]:
+          - generic [ref=f8e230]:
+            - generic [ref=f8e231]: Draft Quality
+            - generic [ref=f8e232]: Ready for the vault
+          - generic [ref=f8e233]: "51"
+    - generic [ref=f8e104]:
+      - button "Back" [ref=f8e105] [cursor=pointer]
+      - button "Add To Vault" [active] [ref=f8e234] [cursor=pointer]
+  - generic [ref=f8e107]: "{\"id\":\"script_1792739536447\",\"title\":\"Curse of the Open Sea\",\"projectType\":\"MOVIE\",\"format\":\"LIVE_ACTION\",\"targetAudience\":\"PG-13\",\"genres\":[\"ADVENTURE\",\"FANTASY\"],\"status\":\"CONCEPT\",\"quality\":51,\"options\":[{\"questionId\":\"goal\",\"choiceId\":\"cursed-treasure\"},{\"questionId\":\"location\",\"choiceId\":\"high-seas\"}],\"writerId\":null,\"weeksInDevelopment\":0,\"totalDevelopmentWeeks\":0,\"isOriginal\":true,\"logline\":\"A pirate captain and a loyal crew race a ghost admiral to a cursed treasure.\",\"storyCompass\":{\"perspective\":\"ENSEMBLE\",\"conflictSource\":\"ANTAGONIST\",\"worldRule\":\"SUPERNATURAL\",\"tone\":\"HEROIC\",\"castShape\":\"ENSEMBLE\",\"flexibility\":\"OPEN\",\"source\":\"SCRIPT_DNA\",\"confidence\":75},\"attributes\":{\"plot\":55,\"characters\":45,\"pacing\":50,\"dialogue\":45,\"action\":55,\"originality\":54},\"baseQuality\":51,\"developmentCost\":0}"

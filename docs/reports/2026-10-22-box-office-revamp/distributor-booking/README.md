@@ -1,5 +1,7 @@
 # Existing distributor booking: implemented and desktop-verified
 
+**Historical tuning-3 measurements.** The [tuning-4 billion-dollar follow-up](../billion-potential/README.md) supersedes the numerical balance results below. It adds fresh-release App proof, earned exceptional-event staying power and a paid-metadata hydration repair; the original distributor evidence is preserved here.
+
 Tuning 3 uses the existing distributors, country audience/economy and rival platforms. There is no hard gross ceiling, budget-return guarantee, hit quota or forced maximum theatrical age. Worldwide access does not create awareness or paid intent.
 
 Existing chain screens are partitioned consistently across the complete country registry. Local openings use public demand; renewals use actual attendance, contribution and occupancy. Real screen-days and audience funding are shared across films. Reachable home alternatives use prior committed customers/viewing and canonical country/plan/title permissions, without creating customers, views or money.

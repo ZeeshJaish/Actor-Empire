@@ -1,0 +1,11 @@
+--- matrix-tested-bundle
++++ final-bundle
+@@ -1850,7 +1850,7 @@
+   unique(supply.pools.map((p) => p.id), "supply pool");
+   unique(supply.offers.map((o) => `${o.titleId}:${o.poolId}`), "supply offer");
+   for (const p of supply.pools) {
+-    [p.screens, p.seatsPerShow, p.weeklyScreenMinutes, p.ticketPriceCents, p.bookingCentsPerShow, ...p.operatingCentsPerShow === void 0 ? [] : [p.operatingCentsPerShow]].forEach((n) => cinemaCount(n, "supply resource"));
++    [p.screens, p.seatsPerShow, p.weeklyScreenMinutes, p.ticketPriceCents, p.bookingCentsPerShow, ...p.legacyBookingCentsPerShow === void 0 ? [] : [p.legacyBookingCentsPerShow], ...p.operatingCentsPerShow === void 0 ? [] : [p.operatingCentsPerShow]].forEach((n) => cinemaCount(n, "supply resource"));
+     if (!p.seatsPerShow || !p.ticketPriceCents || p.weeklyScreenMinutes > p.screens * CINEMA_SUPPLY_PROFILE.daysPerWeek * CINEMA_SUPPLY_PROFILE.openingMinutesPerDay) throw new RangeError("Invalid cinema physical/price supply");
+     splitRealizedCinemaGross({ grossCents: 0, exhibitorBasisPoints: p.exhibitorBasisPoints, distributionBasisPoints: p.distributionBasisPoints });
+   }

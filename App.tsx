@@ -308,6 +308,9 @@ const normalizeActiveRelease = (release: Partial<ActiveRelease>, playerAge: numb
     const distributionPhase = release.distributionPhase || 'THEATRICAL';
 
     return {
+        // Hydration must retain paid receipts, costs, signed beneficiaries and
+        // settlement metadata added after this legacy defaults list was written.
+        ...release,
         id: release.id || `release_${Date.now()}`,
         name: release.name || projectDetails.title,
         type: release.type || projectDetails.type,

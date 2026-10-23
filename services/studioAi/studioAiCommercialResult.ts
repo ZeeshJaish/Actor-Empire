@@ -7,6 +7,10 @@ import { releaseProjectTalentBookings } from '../talentBookings';
 import { appendStudioAiProductionKey } from './studioAiProductionState';
 import { STUDIO_AI_LEDGER_LIMIT } from './studioAiState';
 import { settleTalentReceipt } from '../talentCareer';
+import { studioAiCinemaRegions, studioAiMarketingRate } from './studioAiCinemaRelease';
+import { WORLD_COUNTRY_DEFINITIONS } from '../worldEconomy/worldCountryRegistry';
+import { normalizeStreamingLanguageId } from '../streamingLocalizationCapabilities';
+import { CINEMA_EXPOSURE_PROFILE } from '../boxOffice/boxOfficeProfiles';
 
 const money = (value: number) => Math.round((value + Number.EPSILON * 100) * 1000) / 1000;
 const clamp = (value: number, min = 0, max = 100) => Math.max(min, Math.min(max, value));
@@ -34,9 +38,18 @@ export const releaseStudioAiProduction = (input: ReleaseStudioAiProductionInput)
     const modeMultiplier = mode === 'EVENT_THEATRICAL' ? 1.35 : mode === 'WIDE_THEATRICAL' ? 1.18 : mode === 'PRESTIGE_THEATRICAL' ? 0.82 : mode === 'LIMITED_THEATRICAL' ? 0.58 : mode === 'THEATRICAL_THEN_STREAMING' ? 1.05 : 0;
     const theatricalGrossMillions = execution.publicReleaseStrategy === 'STREAMING_ONLY' || weeklyCinema ? 0 : money(input.production.budgetMillions * modeMultiplier * (0.60 + quality.commercialPotential / 45) * (0.55 + rng() * 1.30));
     const streamingValueMillions = 0; // Signed rights settlement is the streaming cash authority.
-    const marketingRate = mode === 'EVENT_THEATRICAL' ? 0.25 : mode === 'WIDE_THEATRICAL' ? 0.18 : mode === 'THEATRICAL_THEN_STREAMING' ? 0.16 : mode === 'PRESTIGE_THEATRICAL' ? 0.12 : 0.08;
+    const marketingRate = studioAiMarketingRate(mode);
     const marketingSpendMillions = money(input.production.budgetMillions * marketingRate);
-    if (input.studio.cashReserve < marketingSpendMillions) return { world: input.world, studio: input.studio, production: input.production, project: null, changed: false };
+    if (input.studio.cashReserve < marketingSpendMillions) {
+        // Cash can change after planning. Re-enter the existing review path
+        // instead of leaving a preselected release permanently stuck at launch.
+        const production:IndustryProductionCommitment={...input.production,status:'ON_HOLD',updatedAtAbsoluteWeek:input.absoluteWeek,
+            studioAiExecution:{...execution,selectedReleaseMode:'HOLD',releaseBlockedReason:'INSUFFICIENT_MARKETING',
+                holdStartedAtAbsoluteWeek:execution.holdStartedAtAbsoluteWeek ?? input.absoluteWeek,
+                nextReviewAbsoluteWeek:input.absoluteWeek+4,lastProgressedAbsoluteWeek:input.absoluteWeek}};
+        return {world:{...input.world,industryProductions:upsertCanonicalIndustryProduction(input.world.industryProductions,production)},
+            studio:input.studio,production,project:null,changed:true};
+    }
     const studioReceiptsMillions = money(theatricalGrossMillions * 0.48 + streamingValueMillions);
     const talentSettlement = settleTalentReceipt(input.world, input.production.canonicalProjectId,
         execution.talent.talentParticipation, `studio_ai_release:${input.production.id}`,
@@ -66,8 +79,13 @@ export const releaseStudioAiProduction = (input: ReleaseStudioAiProductionInput)
         },
     }] : [];
     const talent = execution.talent;
+    const fingerprint=execution.fingerprintSnapshot || input.studio.ai.intelligence?.content.selectedFingerprints.find(f=>f.id===execution.fingerprintId);
+    const releaseRegionIds=studioAiCinemaRegions(mode,fingerprint);
+    const campaignCountryIds=WORLD_COUNTRY_DEFINITIONS.filter(c=>releaseRegionIds.includes(c.regionId)).map(c=>c.id);
     const project: IndustryProject = {
         id: input.production.canonicalProjectId, title: input.production.title, genre: input.production.genre, mediaType: input.production.projectType,
+        ...(weeklyCinema?{releaseRegionIds}:{}),
+        originalLanguageId:normalizeStreamingLanguageId(fingerprint?.originalLanguage || 'english'),
         studioId: input.production.producerStudioId, physicalProducerStudioId: input.production.producerStudioId,
         budgetTier: budgetTier(input.production.budgetMillions), quality: Math.round(quality.creativeQuality), rating,
         boxOffice: Math.round(theatricalGrossMillions * 1_000_000), year, weekReleased: week,
@@ -83,8 +101,8 @@ export const releaseStudioAiProduction = (input: ReleaseStudioAiProductionInput)
         ...(input.production.universeId ? { universeId: input.production.universeId } : {}), releaseStrategy: execution.publicReleaseStrategy,
         ...(weeklyCinema ? {cinema:{schemaVersion:1 as const,settlementBasis:'UNSETTLED_WEEKLY' as const,activationWeek:input.absoluteWeek,audienceBasis:'TRACKED' as const},
             cinemaExposure:{version:1 as const,attentionBasis:'PACKAGE' as const,attentionPotential:quality.commercialPotential,events:[
-                {id:`npc-announcement:${input.production.id}`,titleId:input.production.canonicalProjectId,absoluteWeek:input.absoluteWeek,kind:'ANNOUNCEMENT' as const,channel:'STUDIO_RELEASE',impressions:0},
-                {id:`npc-paid:${input.production.id}`,titleId:input.production.canonicalProjectId,absoluteWeek:input.absoluteWeek,kind:'PAID_CAMPAIGN' as const,channel:'RELEASE_CAMPAIGN',paidCostCents:Math.round(marketingSpendMillions*1e8),impressions:Math.floor(marketingSpendMillions*1e6*30)}]}} : {}),
+                {id:`npc-announcement:${input.production.id}`,titleId:input.production.canonicalProjectId,absoluteWeek:input.absoluteWeek,kind:'ANNOUNCEMENT' as const,channel:'STUDIO_RELEASE',impressions:0,countryIds:campaignCountryIds},
+                {id:`npc-paid:${input.production.id}`,titleId:input.production.canonicalProjectId,absoluteWeek:input.absoluteWeek,kind:'PAID_CAMPAIGN' as const,channel:'RELEASE_CAMPAIGN',countryIds:campaignCountryIds,paidCostCents:Math.round(marketingSpendMillions*1e8),impressions:Math.floor(marketingSpendMillions*1e6*CINEMA_EXPOSURE_PROFILE.qualifiedImpressionsPerDollar)}]}} : {}),
         streamingWindows, studioAiSlateCommitmentId: execution.slateCommitmentId, industryContentFingerprintId: execution.fingerprintId,
     };
     const releaseCash = moveCinemaNpcCash(input.studio.cashReserve,-marketingSpendMillions+studioReceiptsMillions-backendMillions);

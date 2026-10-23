@@ -1,0 +1,7 @@
+{
+  "status": "PASS",
+  "economicStateSha256": "f92c7a4e3eff2b4817338a822d4075c6128c9ca25c04cb281cfd812ed6adc7cb",
+  "finalGrossCents": 0,
+  "controls": "Authored healthy owner; unresolved life/award prompts cleared. Financial state untouched.",
+  "output": "/private/tmp/actor-billion-potential-20261022/app-opening.json"
+}

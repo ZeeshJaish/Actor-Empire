@@ -1,0 +1,3 @@
+PASS final ticket gross is capped before shares are allocated
+PASS already realized gross is not transformed into demand again
+PASS unavailable cinema selections cannot create unallocated ticket money

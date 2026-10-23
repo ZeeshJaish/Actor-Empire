@@ -19,4 +19,19 @@ assert.equal(streaming.mode, 'HOLD');
 assert.equal(streaming.blockedReason, 'MISSING_STREAMING_RIGHTS');
 assert.deepEqual(planStudioAiProductionRelease({ world, studio, production: theatrical.production, fingerprint: baseFingerprint, absoluteWeek: 1501 }).production, theatrical.production);
 
+const fallbackProduction=structuredClone(production);
+fallbackProduction.budgetMillions=120;fallbackProduction.studioAiExecution!.holdStartedAtAbsoluteWeek=1480;
+fallbackProduction.studioAiExecution!.finalQuality={creativeQuality:72,executionQuality:75,commercialPotential:68,prestigePotential:60,downsideRisk:35};
+const fallback=planStudioAiProductionRelease({world,studio,production:fallbackProduction,
+ fingerprint:{...baseFingerprint,releasePath:'STREAMING_FIRST'},absoluteWeek:1500});
+assert.equal(fallback.mode,'WIDE_THEATRICAL','A rights-market timeout cannot force a viable large movie into a tiny release');
+assert.equal(Object.keys(world.streamingRightsContracts||{}).length,0,'A fallback does not invent streaming rights');
+const weak=structuredClone(fallbackProduction);weak.budgetMillions=8;weak.studioAiExecution!.finalQuality!.commercialPotential=35;
+assert.equal(planStudioAiProductionRelease({world,studio,production:weak,fingerprint:baseFingerprint,absoluteWeek:1500}).mode,'LIMITED_THEATRICAL');
+const underfunded=planStudioAiProductionRelease({world,studio:{...studio,cashReserve:1},production:fallbackProduction,
+ fingerprint:{...baseFingerprint,releasePath:'STREAMING_FIRST'},absoluteWeek:1500});
+assert.equal(underfunded.mode,'HOLD');assert.equal(underfunded.production.studioAiExecution?.releaseBlockedReason,'INSUFFICIENT_MARKETING');
+assert.equal(planStudioAiProductionRelease({world,studio,production:fallbackProduction,
+ fingerprint:{...baseFingerprint,releasePath:'LIMITED_EVENT'},absoluteWeek:1500}).mode,'LIMITED_THEATRICAL','Explicit limited-event intent is retained');
+
 console.log('Studio AI B6 release planning audit passed.');

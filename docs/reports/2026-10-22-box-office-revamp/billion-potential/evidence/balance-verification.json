@@ -1,0 +1,47 @@
+{
+  "status": "PASS",
+  "pairedTendencies": 19,
+  "controlledRuns": 20,
+  "actual": [
+    {
+      "name": "earned",
+      "titleId": "final-phenomenon",
+      "grossM": 2330.29896436,
+      "profitM": 494.47883192,
+      "weeks": 122,
+      "week95": 30
+    },
+    {
+      "name": "earned",
+      "titleId": "final-earned",
+      "grossM": 1581.12552269,
+      "profitM": 271.07492683,
+      "weeks": 95,
+      "week95": 24
+    },
+    {
+      "name": "weak",
+      "titleId": "final-weak",
+      "grossM": 423.28359981,
+      "profitM": -223.84175093,
+      "weeks": 40,
+      "week95": 12
+    },
+    {
+      "name": "small",
+      "titleId": "final-small",
+      "grossM": 24.91445396,
+      "profitM": 8.05519011,
+      "weeks": 60,
+      "week95": 27
+    },
+    {
+      "name": "wide-small",
+      "titleId": "final-wide-small",
+      "grossM": 8.03398726,
+      "profitM": 0.5376532,
+      "weeks": 45,
+      "week95": 22
+    }
+  ]
+}

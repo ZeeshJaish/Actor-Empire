@@ -1,0 +1,929 @@
+{
+  "kind": "ACTUAL_GAME_WEEK_FUNDED_EXISTING_OWNER",
+  "executionCodeSha256": "2a44a6b2dce625ca5acb9f8d4fcbeb8a2bff30615aa88bced8424c558d5cd0a7",
+  "tuningVersion": 4,
+  "audienceProfile": {
+    "contactRatePerSatisfiedViewer": 1.8,
+    "contactOverlap": 0.35,
+    "favoriteLift": 0.28,
+    "maxFavoriteLift": 0.35,
+    "firstWeeklyIntent": 0.08,
+    "repeatWeeklyIntent": 0.05,
+    "loyalWeeklyIntent": 0.32,
+    "loyalAttentionOpportunities": 4,
+    "openingInterestGraceWeeks": 2,
+    "firstInterestHalfLifeWeeks": 3,
+    "repeatInterestHalfLifeWeeks": 2,
+    "excellentResponseHold": 3,
+    "deferredRetentionPerWeek": 0.8,
+    "recentRepeatHalfLifeWeeks": 3,
+    "activeTitleHistoryWeeks": 104,
+    "maxAffinityEntriesPerCohort": 48
+  },
+  "seed": 0,
+  "saveEvery": 13,
+  "rows": [
+    {
+      "name": "small",
+      "film": {
+        "id": "final-small",
+        "budget": 2000000,
+        "campaign": 500000,
+        "quality": 96,
+        "estimatedQuality": 90,
+        "castIndices": [],
+        "universe": false,
+        "wide": false
+      },
+      "precursors": [],
+      "totalWeeks": 60,
+      "runWeeks": 60,
+      "week95": 27,
+      "grossCents": 2491445396,
+      "receiptsCents": 1220810641,
+      "profitCents": 805519011,
+      "first": 1793719,
+      "repeats": 13870,
+      "weekly": [
+        {
+          "week": 1,
+          "grossCents": 211127737,
+          "first": 154373,
+          "repeats": 0,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 2,
+          "grossCents": 243986891,
+          "first": 176800,
+          "repeats": 1251,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 3,
+          "grossCents": 217407217,
+          "first": 156515,
+          "repeats": 1930,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 4,
+          "grossCents": 193802151,
+          "first": 139048,
+          "repeats": 2019,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 5,
+          "grossCents": 173332544,
+          "first": 124175,
+          "repeats": 1844,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 6,
+          "grossCents": 154919057,
+          "first": 110810,
+          "repeats": 1564,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 7,
+          "grossCents": 138196646,
+          "first": 99232,
+          "repeats": 1278,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 8,
+          "grossCents": 123706521,
+          "first": 88843,
+          "repeats": 1008,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 9,
+          "grossCents": 110759802,
+          "first": 79545,
+          "repeats": 783,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 10,
+          "grossCents": 98981789,
+          "first": 71100,
+          "repeats": 591,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 11,
+          "grossCents": 88755164,
+          "first": 63812,
+          "repeats": 446,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 12,
+          "grossCents": 79409980,
+          "first": 57100,
+          "repeats": 333,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 13,
+          "grossCents": 71125631,
+          "first": 51185,
+          "repeats": 242,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 14,
+          "grossCents": 63665542,
+          "first": 45846,
+          "repeats": 175,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 15,
+          "grossCents": 56958502,
+          "first": 41038,
+          "repeats": 125,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 16,
+          "grossCents": 50934849,
+          "first": 36711,
+          "repeats": 91,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 17,
+          "grossCents": 45509065,
+          "first": 32812,
+          "repeats": 63,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 18,
+          "grossCents": 40659419,
+          "first": 29320,
+          "repeats": 46,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 19,
+          "grossCents": 36293247,
+          "first": 26177,
+          "repeats": 31,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 20,
+          "grossCents": 32243564,
+          "first": 23361,
+          "repeats": 20,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 21,
+          "grossCents": 28761743,
+          "first": 20840,
+          "repeats": 13,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 22,
+          "grossCents": 25650966,
+          "first": 18587,
+          "repeats": 8,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 23,
+          "grossCents": 22871478,
+          "first": 16573,
+          "repeats": 5,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 24,
+          "grossCents": 20386604,
+          "first": 14772,
+          "repeats": 3,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 25,
+          "grossCents": 18175294,
+          "first": 13170,
+          "repeats": 1,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 26,
+          "grossCents": 16028545,
+          "first": 11599,
+          "repeats": 0,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 27,
+          "grossCents": 14726536,
+          "first": 10150,
+          "repeats": 0,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 28,
+          "grossCents": 13121851,
+          "first": 9044,
+          "repeats": 0,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 29,
+          "grossCents": 11688374,
+          "first": 8056,
+          "repeats": 0,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 30,
+          "grossCents": 10413041,
+          "first": 7177,
+          "repeats": 0,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 31,
+          "grossCents": 9275543,
+          "first": 6393,
+          "repeats": 0,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 32,
+          "grossCents": 8261371,
+          "first": 5694,
+          "repeats": 0,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 33,
+          "grossCents": 7105099,
+          "first": 5164,
+          "repeats": 0,
+          "closed": false,
+          "slate": 2
+        },
+        {
+          "week": 34,
+          "grossCents": 6331849,
+          "first": 4602,
+          "repeats": 0,
+          "closed": false,
+          "slate": 3
+        },
+        {
+          "week": 35,
+          "grossCents": 5639776,
+          "first": 4099,
+          "repeats": 0,
+          "closed": false,
+          "slate": 4
+        },
+        {
+          "week": 36,
+          "grossCents": 5023378,
+          "first": 3651,
+          "repeats": 0,
+          "closed": false,
+          "slate": 4
+        },
+        {
+          "week": 37,
+          "grossCents": 4471646,
+          "first": 3250,
+          "repeats": 0,
+          "closed": false,
+          "slate": 5
+        },
+        {
+          "week": 38,
+          "grossCents": 3987331,
+          "first": 2898,
+          "repeats": 0,
+          "closed": false,
+          "slate": 6
+        },
+        {
+          "week": 39,
+          "grossCents": 3548423,
+          "first": 2579,
+          "repeats": 0,
+          "closed": false,
+          "slate": 8
+        },
+        {
+          "week": 40,
+          "grossCents": 3152169,
+          "first": 2291,
+          "repeats": 0,
+          "closed": false,
+          "slate": 8
+        },
+        {
+          "week": 41,
+          "grossCents": 2809572,
+          "first": 2042,
+          "repeats": 0,
+          "closed": false,
+          "slate": 8
+        },
+        {
+          "week": 42,
+          "grossCents": 2501371,
+          "first": 1818,
+          "repeats": 0,
+          "closed": false,
+          "slate": 9
+        },
+        {
+          "week": 43,
+          "grossCents": 1986944,
+          "first": 1444,
+          "repeats": 0,
+          "closed": false,
+          "slate": 9
+        },
+        {
+          "week": 44,
+          "grossCents": 1765408,
+          "first": 1283,
+          "repeats": 0,
+          "closed": false,
+          "slate": 9
+        },
+        {
+          "week": 45,
+          "grossCents": 1571392,
+          "first": 1142,
+          "repeats": 0,
+          "closed": false,
+          "slate": 11
+        },
+        {
+          "week": 46,
+          "grossCents": 1391565,
+          "first": 1015,
+          "repeats": 0,
+          "closed": false,
+          "slate": 11
+        },
+        {
+          "week": 47,
+          "grossCents": 1236642,
+          "first": 902,
+          "repeats": 0,
+          "closed": false,
+          "slate": 12
+        },
+        {
+          "week": 48,
+          "grossCents": 1102284,
+          "first": 804,
+          "repeats": 0,
+          "closed": false,
+          "slate": 12
+        },
+        {
+          "week": 49,
+          "grossCents": 981636,
+          "first": 716,
+          "repeats": 0,
+          "closed": false,
+          "slate": 13
+        },
+        {
+          "week": 50,
+          "grossCents": 873327,
+          "first": 637,
+          "repeats": 0,
+          "closed": false,
+          "slate": 13
+        },
+        {
+          "week": 51,
+          "grossCents": 780099,
+          "first": 569,
+          "repeats": 0,
+          "closed": false,
+          "slate": 13
+        },
+        {
+          "week": 52,
+          "grossCents": 688242,
+          "first": 502,
+          "repeats": 0,
+          "closed": false,
+          "slate": 14
+        },
+        {
+          "week": 53,
+          "grossCents": 612837,
+          "first": 447,
+          "repeats": 0,
+          "closed": false,
+          "slate": 14
+        },
+        {
+          "week": 54,
+          "grossCents": 547029,
+          "first": 399,
+          "repeats": 0,
+          "closed": false,
+          "slate": 14
+        },
+        {
+          "week": 55,
+          "grossCents": 486705,
+          "first": 355,
+          "repeats": 0,
+          "closed": false,
+          "slate": 14
+        },
+        {
+          "week": 56,
+          "grossCents": 430494,
+          "first": 314,
+          "repeats": 0,
+          "closed": false,
+          "slate": 15
+        },
+        {
+          "week": 57,
+          "grossCents": 381138,
+          "first": 278,
+          "repeats": 0,
+          "closed": false,
+          "slate": 15
+        },
+        {
+          "week": 58,
+          "grossCents": 337266,
+          "first": 246,
+          "repeats": 0,
+          "closed": false,
+          "slate": 16
+        },
+        {
+          "week": 59,
+          "grossCents": 298935,
+          "first": 219,
+          "repeats": 0,
+          "closed": false,
+          "slate": 18
+        },
+        {
+          "week": 60,
+          "grossCents": 266175,
+          "first": 195,
+          "repeats": 0,
+          "closed": true,
+          "slate": 19
+        }
+      ],
+      "allClosed": true,
+      "runMs": 71584,
+      "countries": 197,
+      "platforms": 5
+    },
+    {
+      "name": "wide-small",
+      "film": {
+        "id": "final-wide-small",
+        "budget": 2000000,
+        "campaign": 500000,
+        "quality": 96,
+        "estimatedQuality": 90,
+        "castIndices": [],
+        "universe": false,
+        "wide": true
+      },
+      "precursors": [],
+      "totalWeeks": 45,
+      "runWeeks": 45,
+      "week95": 22,
+      "grossCents": 803398726,
+      "receiptsCents": 386990483,
+      "profitCents": 53765320,
+      "first": 708284,
+      "repeats": 2705,
+      "weekly": [
+        {
+          "week": 1,
+          "grossCents": 90130598,
+          "first": 79481,
+          "repeats": 0,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 2,
+          "grossCents": 96011553,
+          "first": 84095,
+          "repeats": 255,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 3,
+          "grossCents": 79756008,
+          "first": 69718,
+          "repeats": 418,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 4,
+          "grossCents": 69314297,
+          "first": 60611,
+          "repeats": 430,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 5,
+          "grossCents": 60001999,
+          "first": 52460,
+          "repeats": 390,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 6,
+          "grossCents": 52171630,
+          "first": 45607,
+          "repeats": 319,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 7,
+          "grossCents": 45102291,
+          "first": 39697,
+          "repeats": 253,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 8,
+          "grossCents": 39016631,
+          "first": 34334,
+          "repeats": 199,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 9,
+          "grossCents": 34006518,
+          "first": 30001,
+          "repeats": 142,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 10,
+          "grossCents": 29812254,
+          "first": 26359,
+          "repeats": 104,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 11,
+          "grossCents": 26446348,
+          "first": 23417,
+          "repeats": 70,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 12,
+          "grossCents": 22924466,
+          "first": 20393,
+          "repeats": 47,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 13,
+          "grossCents": 20248386,
+          "first": 18012,
+          "repeats": 29,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 14,
+          "grossCents": 17860413,
+          "first": 15866,
+          "repeats": 20,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 15,
+          "grossCents": 15707909,
+          "first": 13979,
+          "repeats": 12,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 16,
+          "grossCents": 13814075,
+          "first": 12278,
+          "repeats": 9,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 17,
+          "grossCents": 11854649,
+          "first": 10601,
+          "repeats": 6,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 18,
+          "grossCents": 10531527,
+          "first": 9424,
+          "repeats": 2,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 19,
+          "grossCents": 9366127,
+          "first": 8385,
+          "repeats": 0,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 20,
+          "grossCents": 8281989,
+          "first": 7452,
+          "repeats": 0,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 21,
+          "grossCents": 7136031,
+          "first": 6463,
+          "repeats": 0,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 22,
+          "grossCents": 6168998,
+          "first": 5572,
+          "repeats": 0,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 23,
+          "grossCents": 5271474,
+          "first": 4779,
+          "repeats": 0,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 24,
+          "grossCents": 4685139,
+          "first": 4249,
+          "repeats": 0,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 25,
+          "grossCents": 3748661,
+          "first": 3459,
+          "repeats": 0,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 26,
+          "grossCents": 3342421,
+          "first": 3083,
+          "repeats": 0,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 27,
+          "grossCents": 3066917,
+          "first": 2695,
+          "repeats": 0,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 28,
+          "grossCents": 2727858,
+          "first": 2397,
+          "repeats": 0,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 29,
+          "grossCents": 2423439,
+          "first": 2130,
+          "repeats": 0,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 30,
+          "grossCents": 1804744,
+          "first": 1554,
+          "repeats": 0,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 31,
+          "grossCents": 1607158,
+          "first": 1385,
+          "repeats": 0,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 32,
+          "grossCents": 1428138,
+          "first": 1230,
+          "repeats": 0,
+          "closed": false,
+          "slate": 1
+        },
+        {
+          "week": 33,
+          "grossCents": 1228736,
+          "first": 1117,
+          "repeats": 0,
+          "closed": false,
+          "slate": 2
+        },
+        {
+          "week": 34,
+          "grossCents": 1089888,
+          "first": 991,
+          "repeats": 0,
+          "closed": false,
+          "slate": 3
+        },
+        {
+          "week": 35,
+          "grossCents": 969312,
+          "first": 881,
+          "repeats": 0,
+          "closed": false,
+          "slate": 4
+        },
+        {
+          "week": 36,
+          "grossCents": 864466,
+          "first": 785,
+          "repeats": 0,
+          "closed": false,
+          "slate": 4
+        },
+        {
+          "week": 37,
+          "grossCents": 765466,
+          "first": 695,
+          "repeats": 0,
+          "closed": false,
+          "slate": 5
+        },
+        {
+          "week": 38,
+          "grossCents": 682138,
+          "first": 620,
+          "repeats": 0,
+          "closed": false,
+          "slate": 6
+        },
+        {
+          "week": 39,
+          "grossCents": 606238,
+          "first": 551,
+          "repeats": 0,
+          "closed": false,
+          "slate": 8
+        },
+        {
+          "week": 40,
+          "grossCents": 313612,
+          "first": 326,
+          "repeats": 0,
+          "closed": false,
+          "slate": 8
+        },
+        {
+          "week": 41,
+          "grossCents": 278018,
+          "first": 289,
+          "repeats": 0,
+          "closed": false,
+          "slate": 8
+        },
+        {
+          "week": 42,
+          "grossCents": 246272,
+          "first": 256,
+          "repeats": 0,
+          "closed": false,
+          "slate": 9
+        },
+        {
+          "week": 43,
+          "grossCents": 218374,
+          "first": 227,
+          "repeats": 0,
+          "closed": false,
+          "slate": 9
+        },
+        {
+          "week": 44,
+          "grossCents": 194324,
+          "first": 202,
+          "repeats": 0,
+          "closed": false,
+          "slate": 9
+        },
+        {
+          "week": 45,
+          "grossCents": 171236,
+          "first": 178,
+          "repeats": 0,
+          "closed": true,
+          "slate": 11
+        }
+      ],
+      "allClosed": true,
+      "runMs": 39457,
+      "countries": 197,
+      "platforms": 5
+    }
+  ],
+  "limitations": [
+    "Authored established owner starts with $3B studio cash and $1M personal cash, not an ordinary new career",
+    "Completed craft packages are authored; real Greenlight funding, release confirmation exposure, game-loop premiere, full-world rivals, settlement and verified saves run unchanged",
+    "No pre-existing box-office gross, paid viewers, universe familiarity or affinity is granted; precursor attendance is earned during these weeks",
+    "Conditional scenarios demonstrate attainability and contrasts, not the frequency of exceptional films across all careers"
+  ]
+}

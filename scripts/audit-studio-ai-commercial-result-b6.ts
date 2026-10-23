@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import type { IndustryProductionCommitment, NPCStudioState, WorldState } from '../types';
 import { normalizeStudioAiState } from '../services/studioAi';
 import { releaseStudioAiProduction } from '../services/studioAi/studioAiCommercialResult';
+import { cinemaIndustryProjectDetails } from '../services/boxOffice/boxOfficeWeek';
 
 const WEEK = 1600;
 const studio = { id: 'commercial', name: 'Commercial House', valuation: 20, reputation: 78, cashReserve: 200, recentHits: 2, archetype: 'COMMERCIAL' } as NPCStudioState;
@@ -33,5 +34,32 @@ const streamWorld = { ...world, industryProductions: { [streamingProduction.id]:
 const streaming = releaseStudioAiProduction({ world: streamWorld, studio, production: streamingProduction, absoluteWeek: WEEK });
 assert.equal(streaming.project?.boxOffice, 0);
 assert.ok((streaming.project?.streamingWindows?.length || 0) > 0);
+
+const regionalProduction=structuredClone(production);
+regionalProduction.id='regional-prod';regionalProduction.canonicalProjectId='regional-project';
+regionalProduction.studioAiExecution!.selectedReleaseMode='LIMITED_THEATRICAL';
+regionalProduction.studioAiExecution!.fingerprintSnapshot={originalLanguage:'HINDI',priorityMarket:'INDIA'} as any;
+const regional=releaseStudioAiProduction({world,studio,production:regionalProduction,absoluteWeek:WEEK});
+const campaign=regional.project!.cinemaExposure!.events.find(e=>e.kind==='PAID_CAMPAIGN')!;
+assert.ok(campaign.countryIds?.includes('IN'),'A regional campaign reaches its selected market');
+assert.ok(!campaign.countryIds?.includes('US'),'A regional campaign is not diluted across unreachable world markets');
+assert.equal(regional.project!.originalLanguageId,'hindi','A new film retains its actual language');
+const details=cinemaIndustryProjectDetails({world:regional.world,outsideProductions:[]} as any,regional.project!);
+assert.equal(details.originalLanguageId,'hindi');assert.deepEqual(details.releaseRegionIds,['ASIA']);
+assert.equal(regional.studio.cashReserve,200-60*.08,'Campaign funding is still charged once');
+const middleEastProduction=structuredClone(regionalProduction);
+middleEastProduction.studioAiExecution!.fingerprintSnapshot={originalLanguage:'ENGLISH',priorityMarket:'MIDDLE_EAST'} as any;
+const middleEast=releaseStudioAiProduction({world,studio,production:middleEastProduction,absoluteWeek:WEEK});
+assert.deepEqual(middleEast.project!.releaseRegionIds,['ASIA'],'The existing cinema map places Middle Eastern markets in ASIA');
+assert.ok(middleEast.project!.cinemaExposure!.events.find(e=>e.kind==='PAID_CAMPAIGN')!.countryIds?.includes('SA'),'A Middle East campaign must actually reach Saudi Arabia');
+const legacyRegional=structuredClone(regionalProduction);delete legacyRegional.studioAiExecution!.fingerprintSnapshot;
+const knownStudio=structuredClone(studio);knownStudio.ai!.intelligence={content:{selectedFingerprints:[{id:'fp',originalLanguage:'HINDI',priorityMarket:'INDIA'}]}} as any;
+const legacyRelease=releaseStudioAiProduction({world,studio:knownStudio,production:legacyRegional,absoluteWeek:WEEK});
+assert.equal(legacyRelease.project!.originalLanguageId,'hindi','A missing snapshot retains still-known saved source language');
+assert.deepEqual(legacyRelease.project!.releaseRegionIds,['ASIA']);
+const lostCampaignCash=releaseStudioAiProduction({world,studio:{...studio,cashReserve:1},production,absoluteWeek:WEEK});
+assert.equal(lostCampaignCash.production.status,'ON_HOLD','A due release must re-check actual campaign cash');
+assert.equal(lostCampaignCash.production.studioAiExecution!.releaseBlockedReason,'INSUFFICIENT_MARKETING');
+assert.equal(lostCampaignCash.studio.cashReserve,1);assert.equal(lostCampaignCash.project,null);
 
 console.log('Studio AI B6 commercial result audit passed.');

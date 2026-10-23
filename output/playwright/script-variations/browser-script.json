@@ -1,0 +1,48 @@
+{
+  "id": "script_1792739536447",
+  "title": "Curse of the Open Sea",
+  "projectType": "MOVIE",
+  "format": "LIVE_ACTION",
+  "targetAudience": "PG-13",
+  "genres": [
+    "ADVENTURE",
+    "FANTASY"
+  ],
+  "status": "CONCEPT",
+  "quality": 51,
+  "options": [
+    {
+      "questionId": "goal",
+      "choiceId": "cursed-treasure"
+    },
+    {
+      "questionId": "location",
+      "choiceId": "high-seas"
+    }
+  ],
+  "writerId": null,
+  "weeksInDevelopment": 0,
+  "totalDevelopmentWeeks": 0,
+  "isOriginal": true,
+  "logline": "A pirate captain and a loyal crew race a ghost admiral to a cursed treasure.",
+  "storyCompass": {
+    "perspective": "ENSEMBLE",
+    "conflictSource": "ANTAGONIST",
+    "worldRule": "SUPERNATURAL",
+    "tone": "HEROIC",
+    "castShape": "ENSEMBLE",
+    "flexibility": "OPEN",
+    "source": "SCRIPT_DNA",
+    "confidence": 75
+  },
+  "attributes": {
+    "plot": 55,
+    "characters": 45,
+    "pacing": 50,
+    "dialogue": 45,
+    "action": 55,
+    "originality": 54
+  },
+  "baseQuality": 51,
+  "developmentCost": 0
+}

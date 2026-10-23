@@ -1,0 +1,50 @@
+PASS real exposure creates bounded first intent
+PASS quality without exposure produces no first admissions
+PASS satisfied seen audience can request a paid repeat
+PASS weak delivered experience suppresses repeats
+PASS recent repeated visits reduce repeat requests
+PASS real satisfied exposure enables bounded local discovery
+PASS discovery source cannot replay in the same week
+PASS known nearby streaming window increases zero-admission defer
+PASS private or foreign streaming window cannot invent local waiting
+PASS actual precursor experience earns event interest
+PASS a reached loyal audience can plan an opening instead of inheriting the casual weekly attendance rate
+PASS loyalty cannot create awareness or tickets for an unannounced unknown title
+PASS duplicate prior viewing rows cannot multiply loyal audience intent
+PASS catalogue-only missing history earns no universe familiarity
+PASS duplicate cast and overlapping favorite credits cannot add people
+PASS expensive travel and language friction reduce reachable demand
+PASS foreign-language preference reduces conversion once without removing aware people who have cinema access
+PASS missing participation does not fabricate paying audience
+PASS future release has no current tickets
+PASS choices are pure and order independent
+PASS canonical population and participation supply cinema-only wallets
+PASS canonical player and NPC history require actual viewing evidence
+PASS forecast retains access and visible intent without hidden delivery
+PASS historical cameo earns less attachment than historical lead
+PASS repeated disappointing experience can erode favorites
+PASS the same satisfied people cannot regenerate an unlimited WOM contact budget
+PASS compacted earned universe history retains bounded familiarity
+PASS duplicate character credits union independently of order
+PASS canonical language labels match normalized language IDs
+PASS an observed weak response informs the reached audience before a large country has all attended
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Excellent observed response must sustain interest, not just inherit the same fixed decay
+    at file:///private/var/folders/h0/t4fqx33d23l2fh_9h7n17cqr0000gp/T/actor-box-office-mnC1JN/audience.mjs:16715:10
+    at test (file:///private/var/folders/h0/t4fqx33d23l2fh_9h7n17cqr0000gp/T/actor-box-office-mnC1JN/audience.mjs:16478:3)
+    at file:///private/var/folders/h0/t4fqx33d23l2fh_9h7n17cqr0000gp/T/actor-box-office-mnC1JN/audience.mjs:16705:1
+    at ModuleJob.run (node:internal/modules/esm/module_job:377:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:671:26)
+    at async file:///Users/zeesh/Vibe%20code/Actor%20empire/[eval1]:1:198 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}
+
+Node.js v24.11.1

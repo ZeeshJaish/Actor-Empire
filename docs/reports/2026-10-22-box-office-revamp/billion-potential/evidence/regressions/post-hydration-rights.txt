@@ -1,0 +1,19 @@
+PASS buyer-specific quote is pure, ordered and affordable
+PASS no rights or an already signed position creates no new bid
+PASS exhausted and overlapping households reduce value
+PASS low resources and unpaid obligations constrain all fixed exposure
+PASS deferred demand is bounded by reachable unique households, never added twice
+PASS no production budget floor or theatrical gross multiplier exists
+PASS later windows decay current intentions and short licences have less value
+PASS automatic signing retains exact unblocked countries and never rewrites old deals
+PASS exact shared rights remain eligible after a legitimate first shared licence
+PASS a future restriction cannot be priced into a room that excludes that country
+PASS new film bidding keeps fixed obligations within incremental value through revisions and reload
+PASS funded playback waits for actual date, country and route, then only competes within its envelope
+PASS automatic streaming settlement pays both parties exactly once after save reload
+PASS malformed streaming evidence is rejected by derived-state normalization
+PASS local audience can justify a small film bid while an unseen expensive package has no floor
+PASS actual shared streaming close gates cinema catch-up by delivery, date, rights and language
+PASS live and forecast cinema waiting use signed country windows rather than a worldwide summary
+PASS actual no-buyer studio title archives exactly once
+Cinema rights: 18 groups passed

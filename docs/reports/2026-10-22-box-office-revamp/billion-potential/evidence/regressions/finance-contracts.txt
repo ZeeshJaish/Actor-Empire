@@ -1,0 +1,12 @@
+PASS integer cents split odd amounts exactly
+PASS safe-integer large gross does not overflow share multiplication
+PASS invalid money/shares cannot enter the ledger
+PASS player dollars and NPC millions have distinct exact adapters
+PASS ledger deduplicates actual cost events and separates gross from profit
+PASS conflicting duplicate events are rejected instead of overwritten
+PASS hybrid producer receipts add media without counting actor earnings
+PASS a recorded zero receipt remains zero, with later streaming added
+PASS legacy receipts are explicitly estimated and quotes are not paid costs
+PASS combined signed profit cannot overflow safe integer cents
+PASS funded production does not hide the studios paid marketing exposure
+PASS unknown ledger categories are rejected rather than losing money silently

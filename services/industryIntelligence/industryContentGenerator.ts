@@ -52,7 +52,8 @@ export const generateIndustryContentCandidates = (
     const prestigeIntent = bounded(context.identity.prestigeIntent * 0.7 + rng() * 30);
     const creativeRisk = bounded(context.identity.riskTolerance * 0.65 + rng() * 35);
     const starPowerTarget = bounded(context.identity.scale * 0.55 + commercialIntent * 0.25 + rng() * 20);
-    const budgetSuitability = createIndustryBudgetSuitability({ format, primaryGenre, creativeRisk, starPowerTarget, commercialIntent, affordabilityCeilingMillions: input.affordabilityCeilingMillions });
+    const budgetSuitability = createIndustryBudgetSuitability({ format, primaryGenre, creativeRisk, starPowerTarget, commercialIntent, affordabilityCeilingMillions: input.affordabilityCeilingMillions,
+        theatricalPlanning:context.companyKind==='PRODUCTION_STUDIO'&&format==='MOVIE' });
     const noveltySignature = [format, primaryGenre, secondaryGenre, subgenre, tone, theme, setting, period, targetAudience, originalLanguage, relationship].join('|');
     return {
         id: createDeterministicId('industry_content_fingerprint', seed), seed,

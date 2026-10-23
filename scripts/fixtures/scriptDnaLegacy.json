@@ -1,0 +1,458 @@
+{
+  "ACTION": {
+    "questions": [
+      {
+        "id": "protagonist",
+        "choices": [
+          "ex-special-forces",
+          "ordinary-guy",
+          "rogue-cop",
+          "retired-assassin",
+          "undercover-agent"
+        ]
+      },
+      {
+        "id": "inciting-incident",
+        "choices": [
+          "kidnapped-family",
+          "stolen-secrets",
+          "framed",
+          "bank-heist"
+        ]
+      },
+      {
+        "id": "sidekick",
+        "choices": [
+          "comic-hacker",
+          "gritty-mentor",
+          "rival-agent"
+        ]
+      },
+      {
+        "id": "set-piece",
+        "choices": [
+          "mid-air-hijack",
+          "highway-chase",
+          "skyscraper-assault",
+          "boat-chase"
+        ]
+      },
+      {
+        "id": "villain-motivation",
+        "choices": [
+          "pure-greed",
+          "twisted-justice",
+          "revenge"
+        ]
+      },
+      {
+        "id": "climax-location",
+        "choices": [
+          "abandoned-warehouse",
+          "rainy-rooftop",
+          "moving-train"
+        ]
+      },
+      {
+        "id": "ending",
+        "choices": [
+          "hero-sacrifice",
+          "ride-into-sunset",
+          "cliffhanger"
+        ]
+      }
+    ],
+    "profileCount": 150,
+    "profileHash": "1589ca22f4c7ed4d06a10b0e8931ca835ef058bcb783997dca0aab03ce3a516b"
+  },
+  "HORROR": {
+    "questions": [
+      {
+        "id": "threat",
+        "choices": [
+          "supernatural-entity",
+          "masked-killer",
+          "psychological",
+          "cosmic-horror",
+          "techno-horror"
+        ]
+      },
+      {
+        "id": "setting",
+        "choices": [
+          "isolated-cabin",
+          "suburban-home",
+          "abandoned-asylum",
+          "underwater-base",
+          "space-station"
+        ]
+      },
+      {
+        "id": "victim-type",
+        "choices": [
+          "teen-group",
+          "investigative-team",
+          "lone-survivor"
+        ]
+      },
+      {
+        "id": "twist",
+        "choices": [
+          "all-in-head",
+          "trusted-friend",
+          "never-left",
+          "cycle-continues"
+        ]
+      }
+    ],
+    "profileCount": 102,
+    "profileHash": "162b9371bfac156022cd9ed70fa8c76f5b704e1e0d4a4ced639cf7f83df15ab1"
+  },
+  "SCI_FI": {
+    "questions": [
+      {
+        "id": "concept",
+        "choices": [
+          "ai-uprising",
+          "alien-contact",
+          "time-travel",
+          "multiverse",
+          "genetic-engineering"
+        ]
+      },
+      {
+        "id": "setting",
+        "choices": [
+          "dystopian-earth",
+          "deep-space",
+          "cyberpunk-city",
+          "alien-planet"
+        ]
+      },
+      {
+        "id": "tech-level",
+        "choices": [
+          "near-future",
+          "high-tech",
+          "low-tech"
+        ]
+      }
+    ],
+    "profileCount": 72,
+    "profileHash": "c0df507222a6d37538f31a833f1a0ededbcfe2e41db7101878284c0829d63adc"
+  },
+  "COMEDY": {
+    "questions": [
+      {
+        "id": "premise",
+        "choices": [
+          "body-swap",
+          "road-trip",
+          "wedding-crasher",
+          "fake-relationship",
+          "fish-out-of-water"
+        ]
+      },
+      {
+        "id": "humor-style",
+        "choices": [
+          "slapstick",
+          "witty-banter",
+          "cringe",
+          "satire",
+          "absurdist"
+        ]
+      },
+      {
+        "id": "comedic-duo",
+        "choices": [
+          "odd-couple",
+          "buddy-cops",
+          "best-friends"
+        ]
+      }
+    ],
+    "profileCount": 78,
+    "profileHash": "7958e003827cbdf4bdf81a623612580253c86439cee12e82f0e34da3b4e53d91"
+  },
+  "DRAMA": {
+    "questions": [
+      {
+        "id": "conflict",
+        "choices": [
+          "family-feud",
+          "legal-battle",
+          "addiction",
+          "political-scandal",
+          "forbidden-love"
+        ]
+      },
+      {
+        "id": "tone",
+        "choices": [
+          "gritty",
+          "melancholic",
+          "intense"
+        ]
+      },
+      {
+        "id": "resolution",
+        "choices": [
+          "redemption",
+          "tragedy",
+          "bittersweet"
+        ]
+      }
+    ],
+    "profileCount": 66,
+    "profileHash": "838c0fc7cb21ad15b8c243fd67bbb7836a9b1e8ec91705146dcf94cc3de50834"
+  },
+  "ROMANCE": {
+    "questions": [
+      {
+        "id": "meet-cute",
+        "choices": [
+          "enemies-to-lovers",
+          "childhood-friends",
+          "chance-encounter",
+          "online-dating",
+          "workplace-romance"
+        ]
+      },
+      {
+        "id": "obstacle",
+        "choices": [
+          "distance",
+          "family-disapproval",
+          "career-ambition"
+        ]
+      }
+    ],
+    "profileCount": 48,
+    "profileHash": "9a092f745ab39cd9a50aff412f5b531c78b9d37eaddc3edcbe5d215fcfa8ce35"
+  },
+  "THRILLER": {
+    "questions": [
+      {
+        "id": "mystery",
+        "choices": [
+          "missing-person",
+          "serial-killer",
+          "conspiracy",
+          "heist",
+          "espionage"
+        ]
+      },
+      {
+        "id": "pacing",
+        "choices": [
+          "slow-burn",
+          "breakneck",
+          "psychological"
+        ]
+      }
+    ],
+    "profileCount": 48,
+    "profileHash": "b3ceee63b6934be8af8a6cb677f0e50b0a097525dbd0790b1c4c4c821c096849"
+  },
+  "MYSTERY": {
+    "questions": [
+      {
+        "id": "mystery-engine",
+        "choices": [
+          "locked-room",
+          "cold-case",
+          "missing-heir"
+        ]
+      },
+      {
+        "id": "mystery-reveal",
+        "choices": [
+          "betrayal-reveal",
+          "hidden-identity",
+          "system-coverup"
+        ]
+      }
+    ],
+    "profileCount": 36,
+    "profileHash": "b3275ca6d35836fc0434fde84c54f64fe8aaf42301b54a5173457e9bd41a448c"
+  },
+  "ADVENTURE": {
+    "questions": [
+      {
+        "id": "goal",
+        "choices": [
+          "lost-city",
+          "ancient-artifact",
+          "survival",
+          "mythical-creature",
+          "rescue-mission"
+        ]
+      },
+      {
+        "id": "location",
+        "choices": [
+          "jungle",
+          "desert",
+          "mountains"
+        ]
+      }
+    ],
+    "profileCount": 48,
+    "profileHash": "701c1cf901e6c6e54b6cc74f84bea169319ed9e412fb03cd4408639fd7e025f0"
+  },
+  "SUPERHERO": {
+    "questions": [
+      {
+        "id": "origin",
+        "choices": [
+          "lab-accident",
+          "alien-tech",
+          "training",
+          "mythical-heritage",
+          "tech-genius"
+        ]
+      },
+      {
+        "id": "villain-type",
+        "choices": [
+          "dark-mirror",
+          "cosmic-threat",
+          "street-level"
+        ]
+      }
+    ],
+    "profileCount": 48,
+    "profileHash": "1e384ff20d371d699a323de006774ad38d9c1837ffe249fd461d6213172dbdf8"
+  },
+  "MUSICAL": {
+    "questions": [
+      {
+        "id": "music-style",
+        "choices": [
+          "original-songs",
+          "jukebox",
+          "backstage"
+        ]
+      },
+      {
+        "id": "emotional-core",
+        "choices": [
+          "first-love",
+          "fame-cost",
+          "community"
+        ]
+      }
+    ],
+    "profileCount": 36,
+    "profileHash": "d3dabc8e40824b8c07318db9bedf828413814a3b6528d5936bb5854c0d963e5e"
+  },
+  "BIOPIC": {
+    "questions": [
+      {
+        "id": "subject-angle",
+        "choices": [
+          "rise",
+          "fallout",
+          "final-years"
+        ]
+      },
+      {
+        "id": "access",
+        "choices": [
+          "authorized",
+          "unauthorized",
+          "ensemble-history"
+        ]
+      }
+    ],
+    "profileCount": 36,
+    "profileHash": "94afd25e077bc79f534d0cdf7981e9f02ad579b25dec0de24424d324c5cf2f22"
+  },
+  "SPORTS": {
+    "questions": [
+      {
+        "id": "sports-arc",
+        "choices": [
+          "underdog",
+          "rivalry",
+          "comeback"
+        ]
+      },
+      {
+        "id": "arena",
+        "choices": [
+          "final-match",
+          "locker-room",
+          "public-trial"
+        ]
+      }
+    ],
+    "profileCount": 36,
+    "profileHash": "3edfaf846648f4c3e2b0d9b4c14549432b54daa11d961e235734a20642d6656b"
+  },
+  "ANIMATION": {
+    "questions": [
+      {
+        "id": "animation-world",
+        "choices": [
+          "talking-creatures",
+          "toybox-city",
+          "mature-animation"
+        ]
+      }
+    ],
+    "profileCount": 18,
+    "profileHash": "4bb9d2d517206a10e869831b94d0cfb3c9dece6351982d0184f7f22714aed1f2"
+  },
+  "FANTASY": {
+    "questions": [
+      {
+        "id": "myth",
+        "choices": [
+          "lost-heir",
+          "forbidden-magic",
+          "monster-alliance"
+        ]
+      }
+    ],
+    "profileCount": 18,
+    "profileHash": "37fc609fd617848679988b75b06529fe1953dda37036e00b93892e1ae67f84b8"
+  },
+  "CRIME": {
+    "questions": [
+      {
+        "id": "crime-focus",
+        "choices": [
+          "detective-case",
+          "mob-family",
+          "true-crime"
+        ]
+      }
+    ],
+    "profileCount": 18,
+    "profileHash": "03d40197306db9fe96d40ef9103f3ea92dfadcfbca04e68936e2c42c0c27b99b"
+  },
+  "DOCUMENTARY": {
+    "questions": [
+      {
+        "id": "doc-approach",
+        "choices": [
+          "investigative",
+          "intimate-profile",
+          "cultural-moment"
+        ]
+      },
+      {
+        "id": "source-access",
+        "choices": [
+          "archive",
+          "interviews",
+          "verite"
+        ]
+      }
+    ],
+    "profileCount": 36,
+    "profileHash": "6f59c137c0ffe9094820f223fd95bbf2b796fe1acd240b6c81edcb24bf76f655"
+  }
+}

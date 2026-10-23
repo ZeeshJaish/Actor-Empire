@@ -1,0 +1,12 @@
+PASS subscribers cannot use a rental-only catalogue without a store entitlement
+PASS an Essential subscription cannot borrow the unsubscribed premium early-access plan
+PASS a currently subscribed valid plan supplies a positive home alternative
+PASS expired title rights cannot support an existing subscription alternative
+PASS foreign title rights cannot support a local existing subscription alternative
+PASS a future store purchase cannot be backdated into committed home access
+PASS a vested perpetual purchase remains a home alternative after its title license expires
+PASS a paid rental remains a home alternative during its final valid week
+PASS a legacy purchased title keeps vested access when no launch slate was saved
+PASS an unfinished cinema-linked NPC title cannot become a playable alternative from signed rights alone
+PASS unsupported cinema-title language cannot become a local NPC playback alternative
+Alternative routes audit: 11 passed, 0 failed

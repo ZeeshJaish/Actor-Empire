@@ -28,7 +28,8 @@ export const prepareOrdinaryCinemaWeek=(source:Player,actions:CareerAction[]):Pl
    record('Life choice: '+(option.labelKey||option.label),before,0);
   }else if(event.type==='PRODUCTION_CRISIS'||event.type==='DIRECTOR_DECISION'){
    const options=event.data.options||[];
-   const index=options.findIndex((o:any)=>!o.isGolden&&!/\$|pr\.label|cgi\.label/i.test([o.labelKey,o.label].join(' ')));
+   // Generated crises store empty labels; their money key still charges $25k.
+   const index=options.findIndex((o:any)=>!o.isGolden&&!/\$|pr\.label|cgi\.label|\.money\.label/i.test([o.labelKey,o.label].join(' ')));
    if(index<0)throw new Error('No ordinary affordable production choice');
    player=applyCrisisImpact(player,event,index).updatedPlayer;record('Production choice: '+(options[index].labelKey||options[index].label),before,0);
   }else throw new Error('Ordinary journey needs an actual choice handler for '+event.type);

@@ -1,0 +1,37 @@
+{
+  "kind": "OBSERVED_COMPLETED_NONPLAYER_RUNS_WITHIN_ONE_AUTHORED_OWNER_SOAK",
+  "completed": 85,
+  "stillActive": 34,
+  "medianGrossM": 61.15413282,
+  "maxGrossM": 812.54338225,
+  "oneBillion": 0,
+  "twoBillion": 0,
+  "top": [
+    {
+      "id": "studio_ai_project_14c729f",
+      "owner": "APPLE_TV",
+      "grossM": 812.54338225
+    },
+    {
+      "id": "studio_ai_project_1w67nwu",
+      "owner": "NETFLIX",
+      "grossM": 543.48221567
+    },
+    {
+      "id": "studio_ai_project_0kr6j7z",
+      "owner": "AMAZON_STUDIOS",
+      "grossM": 455.90693018
+    },
+    {
+      "id": "studio_ai_project_05siwl3",
+      "owner": "NETFLIX",
+      "grossM": 455.26724856
+    },
+    {
+      "id": "studio_ai_project_095vb19",
+      "owner": "MARVEL_STUDIOS",
+      "grossM": 126.43214392
+    }
+  ],
+  "limitation": "Observed completed NPC titles in one evolving world; starts before final fixture checkpoint and spans mixed tuning-4 calibrations. Not an unbiased all-career or player hit rate; active films excluded."
+}

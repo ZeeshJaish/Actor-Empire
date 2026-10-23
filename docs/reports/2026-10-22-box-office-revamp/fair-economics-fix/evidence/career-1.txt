@@ -1,0 +1,11 @@
+{"seed":1,"week":1,"cash":1750,"health":79.85,"films":0,"ownPaid":[]}
+{"seed":1,"week":14,"cash":2700,"health":77.89999999999992,"films":0,"ownPaid":[]}
+{"seed":1,"week":27,"cash":6525,"health":75.94999999999985,"films":0,"ownPaid":[]}
+{"seed":1,"week":40,"cash":10425,"health":75.59999999999974,"films":6,"ownPaid":[]}
+{"seed":1,"week":53,"cash":14325,"health":76.14999999999964,"films":16,"ownPaid":[]}
+{"seed":1,"week":66,"cash":17725,"health":76.89999999999952,"films":20,"ownPaid":[]}
+{"seed":1,"week":79,"cash":24225,"health":75.94999999999939,"films":25,"ownPaid":[]}
+{"seed":1,"week":87,"cash":28745,"health":77.04999999999933,"films":32,"ownPaid":["aud_active_1800000000880_0.16833423590287566"]}
+{"seed":1,"week":92,"cash":31245,"health":76.69999999999928,"films":33,"ownPaid":["aud_active_1800000000880_0.16833423590287566"]}
+{"seed":1,"week":97,"cash":32245,"health":76.44999999999922,"films":36,"ownPaid":["aud_active_1800000000880_0.16833423590287566"]}
+{"seed":1,"week":105,"cash":33845,"health":76.04999999999913,"films":39,"ownPaid":["aud_active_1800000000880_0.16833423590287566"]}

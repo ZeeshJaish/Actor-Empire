@@ -1,17 +1,26 @@
-import { Genre } from '../../types';
+import type { Genre, ScriptAttributes, StoryCompass } from '../../types';
+import { SCRIPT_VARIATIONS } from './scriptVariations';
+
+export type ScriptChoiceCompass = Partial<Pick<StoryCompass, 'perspective' | 'conflictSource' | 'worldRule' | 'tone' | 'castShape'>>;
+
+export interface ScriptChoice {
+    id: string;
+    text: string;
+    reviewSnippet: string;
+    newsHeadline: string;
+    /** Library metadata only. Saves continue to store questionId/choiceId. */
+    dna?: Partial<ScriptAttributes>;
+    compass?: ScriptChoiceCompass;
+    premise?: string;
+}
 
 export interface ScriptQuestion {
     id: string;
     question: string;
-    options: {
-        id: string;
-        text: string;
-        reviewSnippet: string;
-        newsHeadline: string;
-    }[];
+    options: ScriptChoice[];
 }
 
-export const SCRIPT_TEMPLATES: Record<Genre, ScriptQuestion[]> = {
+const LEGACY_SCRIPT_TEMPLATES: Record<Genre, ScriptQuestion[]> = {
     ACTION: [
         {
             id: 'protagonist',
@@ -442,3 +451,11 @@ export const SCRIPT_TEMPLATES: Record<Genre, ScriptQuestion[]> = {
         }
     ]
 };
+
+// Append only: saved IDs, existing choice order, and question counts stay stable.
+export const SCRIPT_TEMPLATES = Object.fromEntries(
+    Object.entries(LEGACY_SCRIPT_TEMPLATES).map(([genre, questions]) => [genre, questions.map(question => ({
+        ...question,
+        options: [...question.options, ...(SCRIPT_VARIATIONS[genre as Genre]?.[question.id] || [])],
+    }))])
+) as Record<Genre, ScriptQuestion[]>;

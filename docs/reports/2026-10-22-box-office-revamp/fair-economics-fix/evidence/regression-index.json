@@ -1,0 +1,127 @@
+[
+  {
+    "name": "inputs",
+    "exitCode": 0,
+    "elapsedMs": 1099
+  },
+  {
+    "name": "delivery",
+    "exitCode": 0,
+    "elapsedMs": 827
+  },
+  {
+    "name": "finance",
+    "exitCode": 0,
+    "elapsedMs": 318
+  },
+  {
+    "name": "finance-contracts",
+    "exitCode": 0,
+    "elapsedMs": 671
+  },
+  {
+    "name": "finance-ui",
+    "exitCode": 0,
+    "elapsedMs": 4797
+  },
+  {
+    "name": "phase1-integration",
+    "exitCode": 0,
+    "elapsedMs": 12143
+  },
+  {
+    "name": "awareness",
+    "exitCode": 0,
+    "elapsedMs": 5072
+  },
+  {
+    "name": "phase2-integration",
+    "exitCode": 0,
+    "elapsedMs": 22939
+  },
+  {
+    "name": "audience",
+    "exitCode": 0,
+    "elapsedMs": 17356
+  },
+  {
+    "name": "market",
+    "exitCode": 0,
+    "elapsedMs": 19657
+  },
+  {
+    "name": "migration",
+    "exitCode": 0,
+    "elapsedMs": 66814
+  },
+  {
+    "name": "integration",
+    "exitCode": 0,
+    "elapsedMs": 75381
+  },
+  {
+    "name": "presentation",
+    "exitCode": 0,
+    "elapsedMs": 10807
+  },
+  {
+    "name": "rights",
+    "exitCode": 0,
+    "elapsedMs": 29040
+  },
+  {
+    "name": "booking",
+    "exitCode": 0,
+    "elapsedMs": 11878
+  },
+  {
+    "name": "alternatives",
+    "exitCode": 0,
+    "elapsedMs": 11359
+  },
+  {
+    "name": "alternative-routes",
+    "exitCode": 0,
+    "elapsedMs": 19450
+  },
+  {
+    "name": "alternative-batching",
+    "exitCode": 0,
+    "elapsedMs": 6209
+  },
+  {
+    "name": "fingerprint",
+    "exitCode": 0,
+    "elapsedMs": 5876
+  },
+  {
+    "name": "save-boundary",
+    "exitCode": 0,
+    "elapsedMs": 3386
+  },
+  {
+    "name": "royalty-batch",
+    "exitCode": 0,
+    "elapsedMs": 195
+  },
+  {
+    "name": "career-actions",
+    "exitCode": 0,
+    "elapsedMs": 420
+  },
+  {
+    "name": "industry-budget-suitability-b3",
+    "exitCode": 0,
+    "elapsedMs": 165
+  },
+  {
+    "name": "studio-ai-release-planning-b6",
+    "exitCode": 0,
+    "elapsedMs": 257
+  },
+  {
+    "name": "studio-ai-commercial-result-b6",
+    "exitCode": 0,
+    "elapsedMs": 335
+  }
+]

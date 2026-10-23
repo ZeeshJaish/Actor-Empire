@@ -1,0 +1,7 @@
+{
+  "testedBundleSha256": "12c3b6c500102838f788e4d18d2eea28992d4b6cc7a6f0aa7142f54dab66229e",
+  "finalBundleSha256": "9c9be4dc2c2e6269c48066e0812b23d477e23cd8872c8c71b29e5f2c060dec0b",
+  "normalizedExecutablesIdentical": true,
+  "onlyDelta": "Validate optional legacyBookingCentsPerShow as safe nonnegative integer; no economics change for valid quotes",
+  "scope": "Pure cinema kernel and controlled full-world fixture; final NPC budget/release planning is verified by final normal careers separately"
+}

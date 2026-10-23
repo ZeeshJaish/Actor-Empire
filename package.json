@@ -619,7 +619,9 @@
     "audit:stock-acquisition-recovery": "node scripts/audit-stock-acquisition-app-recovery.cjs",
     "audit:stock-forbes-routes": "esbuild scripts/probe-stock-forbes-routes.tsx --bundle --platform=node --format=cjs --loader:.csv=text --outfile=/tmp/probe-stock-forbes-routes.cjs && STOCK_ROUTE_ASSERT=1 node /tmp/probe-stock-forbes-routes.cjs",
     "audit:stock-forbes-routes-browser": "node scripts/audit-stock-forbes-routes-browser.cjs",
-    "audit:public-tender-contract": "esbuild scripts/audit-public-tender-contract.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-public-tender-contract.mjs && node /tmp/audit-public-tender-contract.mjs"
+    "audit:public-tender-contract": "esbuild scripts/audit-public-tender-contract.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-public-tender-contract.mjs && node /tmp/audit-public-tender-contract.mjs",
+    "audit:script-variations": "esbuild scripts/audit-script-variations.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-script-variations.mjs && node /tmp/ae-script-variations.mjs",
+    "audit:script-variation-flow": "esbuild scripts/audit-script-variation-flow.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-script-variation-flow.mjs && node /tmp/ae-script-variation-flow.mjs"
   },
   "dependencies": {
     "@capacitor-community/admob": "^8.0.0",

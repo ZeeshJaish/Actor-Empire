@@ -20,7 +20,7 @@ export const CINEMA_EXPOSURE_PROFILE = {
 } as const;
 
 /** Candidate behavior/supply coefficients. Phase 6 calibrates these against full careers. */
-export const CINEMA_MARKET_TUNING_VERSION = 4;
+export const CINEMA_MARKET_TUNING_VERSION = 5;
 export const CINEMA_AUDIENCE_PROFILE = {
     contactRatePerSatisfiedViewer: 1.8, contactOverlap: 0.35,
     favoriteLift: 0.28, maxFavoriteLift: 0.35,

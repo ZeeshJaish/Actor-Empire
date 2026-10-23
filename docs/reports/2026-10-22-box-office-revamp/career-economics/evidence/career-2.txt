@@ -1,0 +1,17 @@
+{"seed":2,"week":1,"cash":1750,"health":79.85,"films":0,"ownPaid":[]}
+{"seed":2,"week":14,"cash":3960,"health":77.89999999999992,"films":0,"ownPaid":[]}
+{"seed":2,"week":27,"cash":8525,"health":75.94999999999985,"films":0,"ownPaid":[]}
+{"seed":2,"week":40,"cash":13465,"health":75.59999999999974,"films":6,"ownPaid":[]}
+{"seed":2,"week":53,"cash":18405,"health":74.64999999999961,"films":13,"ownPaid":[]}
+{"seed":2,"week":66,"cash":23345,"health":75.2999999999995,"films":19,"ownPaid":[]}
+{"seed":2,"week":79,"cash":28285,"health":76.14999999999938,"films":25,"ownPaid":[]}
+{"seed":2,"week":92,"cash":33225,"health":76.99999999999926,"films":32,"ownPaid":[]}
+{"seed":2,"week":105,"cash":38165,"health":76.64999999999915,"films":37,"ownPaid":[]}
+{"seed":2,"week":118,"cash":43105,"health":77.39999999999904,"films":44,"ownPaid":[]}
+{"seed":2,"week":131,"cash":48045,"health":77.34999999999891,"films":53,"ownPaid":[]}
+{"seed":2,"week":144,"cash":52985,"health":76.69999999999877,"films":61,"ownPaid":[]}
+{"seed":2,"week":157,"cash":57925,"health":77.44999999999865,"films":69,"ownPaid":[]}
+{"seed":2,"week":170,"cash":62865,"health":78.19999999999854,"films":79,"ownPaid":[]}
+{"seed":2,"week":183,"cash":67805,"health":78.24999999999841,"films":87,"ownPaid":[]}
+{"seed":2,"week":196,"cash":72745,"health":79.7999999999983,"films":97,"ownPaid":[]}
+{"seed":2,"status":"HORIZON_COMPLETE","weeks":208,"ownPaid":0,"elapsedMs":633485}

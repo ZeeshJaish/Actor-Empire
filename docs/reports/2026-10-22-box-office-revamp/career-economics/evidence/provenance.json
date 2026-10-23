@@ -1,0 +1,30 @@
+{
+  "head": "ced702a7e365c8c07d5708b7874da645ef46f33a",
+  "branch": "codex/streaming-tap-lag",
+  "accessed": "2026-10-23",
+  "executedBundleSha256": "78c8b57af32dcb6917ccea9eb4f06576b72a737c9cbf5b182a7dcd735fecc66a",
+  "originalAuditSourceSha256": "9358f797ca3f4231b690e396f071eccecba682d5b1666e29193e5be53bf7f454",
+  "archivedAuditSourceSha256": "7c32e5798ef9521ca5e92ccb18105df1b71dbe570394f83b5d8b21438cf45377",
+  "checkedTrackedSources": 1752,
+  "trackedSourceDriftDuringAudit": [],
+  "typecheck": {
+    "exitCode": 0,
+    "transcript": "typecheck.txt"
+  },
+  "migration": {
+    "exitCode": 0,
+    "groups": 24,
+    "transcript": "migration.txt"
+  },
+  "financeContracts": {
+    "exitCode": 0,
+    "transcript": "finance-contracts.txt"
+  },
+  "notes": [
+    "Only new report and audit files were created in this follow-up; initial dirty changes were preserved",
+    "Hash baseline captured while long runs were already in progress; no production edits were made during this follow-up",
+    "Executed bundle is preserved in the temporary run directory; report archives the same logic with portable imports and a type-only Map annotation",
+    "Four runtime/module seeds retain the common standard world roster and studio AI seed profiles; correlated title observations are not independent outcome draws",
+    "No commit, push, branch change, historical refunds or live-save mutations"
+  ]
+}

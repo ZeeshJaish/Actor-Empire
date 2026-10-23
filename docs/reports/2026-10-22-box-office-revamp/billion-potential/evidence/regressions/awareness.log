@@ -1,0 +1,18 @@
+PASS private unknown packages have no audience and footprint alone changes nothing
+PASS a public star announcement creates bounded organic awareness with no paid campaign
+PASS healthy new-studio scores cannot create established recognition
+PASS paid reach saturates the existing audience with declining marginal growth
+PASS duplicate events apply once and conflicting duplicate identities are rejected
+PASS source order is stable and new sources only reach the still-unaware population
+PASS many duplicate actor credits never create extra fans
+PASS cameo recognition is smaller than a meaningful lead credit
+PASS favorites and studio trust require actual experience evidence
+PASS repeat announcements do not pay out the same actor recognition again
+PASS a real announcement can reach a new country once without re-paying recognition elsewhere
+PASS committed announcement recognition is frozen rather than re-valued from later fame
+PASS local discovery requires real local footfall, independent of screens
+PASS future events, unpaid campaigns and legacy hype do not become actual exposure
+PASS streaming promotion is bounded by actual accessible reach, not subscribers
+PASS exposure event commits are immutable, idempotent and survive JSON reload
+PASS malformed counts and duplicate cohort identities cannot mint people
+PASS forecast projection uses only known quality and creates no history

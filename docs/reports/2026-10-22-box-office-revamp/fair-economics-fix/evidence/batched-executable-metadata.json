@@ -1,0 +1,5 @@
+{
+  "sha256": "0b0789d92daedd4a98bb999ef3f46028aea3f048f28fff463c87a3669021664f",
+  "entrypoint": "audit-normal-career.ts",
+  "scope": "Pinned financial candidate C; archived from running worker to preserve exact resumability despite unrelated workspace changes"
+}

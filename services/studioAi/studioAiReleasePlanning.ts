@@ -1,6 +1,7 @@
 import type { IndustryContentFingerprint, IndustryProductionCommitment, NPCStudioState, StudioAiReleaseMode, WorldState } from '../../types';
 import { resolveStreamingRightsCompatibility } from '../streamingRightsCompatibility';
 import { appendStudioAiProductionKey } from './studioAiProductionState';
+import { studioAiMarketingRate, studioAiTheatricalMode } from './studioAiCinemaRelease';
 
 export interface PlanStudioAiProductionReleaseInput {
     world: WorldState;
@@ -13,7 +14,7 @@ export interface PlanStudioAiProductionReleaseInput {
 export interface PlanStudioAiProductionReleaseResult {
     production: IndustryProductionCommitment;
     mode: StudioAiReleaseMode;
-    blockedReason: 'MISSING_STREAMING_RIGHTS' | 'NONE';
+    blockedReason: 'MISSING_STREAMING_RIGHTS' | 'INSUFFICIENT_MARKETING' | 'NONE';
     changed: boolean;
 }
 
@@ -35,7 +36,7 @@ const hasActiveStreamingRight = (world: WorldState, projectId: string, sellerPar
 export const planStudioAiProductionRelease = (input: PlanStudioAiProductionReleaseInput): PlanStudioAiProductionReleaseResult => {
     const execution = input.production.studioAiExecution;
     if (!execution || execution.selectedReleaseMode || !execution.finalQuality || input.production.status !== 'AWAITING_RELEASE') {
-        return { production: input.production, mode: execution?.selectedReleaseMode || 'HOLD', blockedReason: execution?.releaseBlockedReason === 'MISSING_STREAMING_RIGHTS' ? 'MISSING_STREAMING_RIGHTS' : 'NONE', changed: false };
+        return { production: input.production, mode: execution?.selectedReleaseMode || 'HOLD', blockedReason: execution?.releaseBlockedReason === 'MISSING_STREAMING_RIGHTS' ? 'MISSING_STREAMING_RIGHTS' : execution?.releaseBlockedReason==='INSUFFICIENT_MARKETING'?'INSUFFICIENT_MARKETING':'NONE', changed: false };
     }
     const needsStreaming = input.fingerprint.releasePath === 'STREAMING_FIRST' || input.fingerprint.releasePath === 'HYBRID';
     const streamingReady = hasActiveStreamingRight(input.world, input.production.canonicalProjectId, input.production.producerStudioId, input.absoluteWeek);
@@ -46,13 +47,14 @@ export const planStudioAiProductionRelease = (input: PlanStudioAiProductionRelea
         && input.absoluteWeek - rightsHoldStartedAtAbsoluteWeek >= rightsMarketPatienceWeeks;
     let mode: StudioAiReleaseMode;
     if (needsStreaming && !streamingReady && !useTheatricalMarketFallback) mode = 'HOLD';
-    else if (useTheatricalMarketFallback) mode = 'LIMITED_THEATRICAL';
+    else if (useTheatricalMarketFallback) mode = studioAiTheatricalMode(input.production,input.fingerprint);
     else if (input.fingerprint.releasePath === 'STREAMING_FIRST') mode = 'STREAMING_ONLY';
     else if (input.fingerprint.releasePath === 'HYBRID') mode = 'THEATRICAL_THEN_STREAMING';
-    else if (input.fingerprint.releasePath === 'LIMITED_EVENT') mode = 'LIMITED_THEATRICAL';
-    else if (execution.finalQuality.prestigePotential >= 80 && execution.finalQuality.commercialPotential < 90) mode = 'PRESTIGE_THEATRICAL';
-    else if (execution.finalQuality.commercialPotential >= 82) mode = 'WIDE_THEATRICAL';
-    else mode = 'LIMITED_THEATRICAL';
+    else mode = studioAiTheatricalMode(input.production,input.fingerprint);
+    let blockedReason:PlanStudioAiProductionReleaseResult['blockedReason']=mode==='HOLD'?'MISSING_STREAMING_RIGHTS':'NONE';
+    if(mode!=='HOLD'&&input.studio.cashReserve < Math.round(input.production.budgetMillions*studioAiMarketingRate(mode)*1000)/1000){
+        mode='HOLD';blockedReason='INSUFFICIENT_MARKETING';
+    }
     const blocked = mode === 'HOLD';
     const publicReleaseStrategy = mode === 'STREAMING_ONLY' ? 'STREAMING_ONLY' as const : blocked ? null : 'THEATRICAL' as const;
     const waitWeeks = blocked ? 4 : Math.max(1, 5 - Math.floor(input.studio.ai!.competence.distribution / 25));
@@ -64,11 +66,11 @@ export const planStudioAiProductionRelease = (input: PlanStudioAiProductionRelea
             ...execution, selectedReleaseMode: mode, publicReleaseStrategy,
             releasePlannedAtAbsoluteWeek: input.absoluteWeek,
             plannedReleaseAbsoluteWeek: blocked ? undefined : input.absoluteWeek + waitWeeks,
-            releaseBlockedReason: blocked ? 'MISSING_STREAMING_RIGHTS' : 'NONE',
+            releaseBlockedReason: blockedReason,
             nextReviewAbsoluteWeek: blocked ? input.absoluteWeek + waitWeeks : input.absoluteWeek + 1,
             holdStartedAtAbsoluteWeek: blocked ? rightsHoldStartedAtAbsoluteWeek : null,
             processedKeys: appendStudioAiProductionKey(execution.processedKeys, `b6-release-plan:${input.production.id}:${mode}`),
         },
     };
-    return { production, mode, blockedReason: blocked ? 'MISSING_STREAMING_RIGHTS' : 'NONE', changed: true };
+    return { production, mode, blockedReason, changed: true };
 };

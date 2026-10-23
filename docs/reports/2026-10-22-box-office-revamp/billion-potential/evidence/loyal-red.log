@@ -1,0 +1,30 @@
+PASS real exposure creates bounded first intent
+PASS quality without exposure produces no first admissions
+PASS satisfied seen audience can request a paid repeat
+PASS weak delivered experience suppresses repeats
+PASS recent repeated visits reduce repeat requests
+PASS real satisfied exposure enables bounded local discovery
+PASS discovery source cannot replay in the same week
+PASS known nearby streaming window increases zero-admission defer
+PASS private or foreign streaming window cannot invent local waiting
+PASS actual precursor experience earns event interest
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: A predominantly satisfied returning audience must have materially stronger intent than the casual segment
+    at file:///private/var/folders/h0/t4fqx33d23l2fh_9h7n17cqr0000gp/T/actor-box-office-JDxo0z/audience.mjs:16535:10
+    at test (file:///private/var/folders/h0/t4fqx33d23l2fh_9h7n17cqr0000gp/T/actor-box-office-JDxo0z/audience.mjs:16471:3)
+    at file:///private/var/folders/h0/t4fqx33d23l2fh_9h7n17cqr0000gp/T/actor-box-office-JDxo0z/audience.mjs:16521:1
+    at ModuleJob.run (node:internal/modules/esm/module_job:377:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:671:26)
+    at async file:///Users/zeesh/Vibe%20code/Actor%20empire/[eval1]:1:198 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}
+
+Node.js v24.11.1

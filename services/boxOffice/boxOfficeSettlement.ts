@@ -50,7 +50,9 @@ export const summarizeCinemaFinance = (ledger: CinemaLedger): CinemaFinanceSumma
     const totalPaidCostsCents = sumCents([totals.PRODUCTION_COST || 0, totals.MARKETING_COST || 0, totals.BOOKING_COST || 0, totals.LOCALIZATION_COST || 0]);
     const investorPayoutCents = totals.INVESTOR_PAYOUT || 0, talentBackendCents = totals.TALENT_BACKEND || 0;
     const netStudioReceiptsCents = producerReceiptsCents - sumCents([investorPayoutCents, talentBackendCents]);
-    const netProfitCents = netStudioReceiptsCents - totalPaidCostsCents;
+    // Investor distributions divide ownership returns. Charging them against the
+    // full production cost again mixes project profit with the studio's return.
+    const netProfitCents = producerReceiptsCents - talentBackendCents - totalPaidCostsCents;
     if (!Number.isSafeInteger(netProfitCents)) throw new RangeError('Cinema profit exceeds safe integer cents');
     return { publicGrossCents: totals.THEATRICAL_GROSS || 0, theatricalProducerReceiptsCents: totals.PRODUCER_RECEIPTS || 0,
         producerReceiptsCents, netStudioReceiptsCents, totalPaidCostsCents,
@@ -77,6 +79,7 @@ const hasActualMoney = (value: unknown): value is number => typeof value === 'nu
  */
 export const getCinemaProjectFinance = (source: CinemaFinanceSource): CinemaFinanceSummary & {
     receiptsEstimated: boolean; costsEstimated: boolean; studioReturnPercent: number | null;
+    studioCashAtRiskCents: number; studioProfitCents: number; platformProductionCoverCents: number;
 } => {
     const details = source.projectDetails;
     const gross = nonnegative(source.gross ?? source.totalGross);
@@ -108,9 +111,16 @@ export const getCinemaProjectFinance = (source: CinemaFinanceSource): CinemaFina
         ? Math.max(0, funding.studioCashAtRisk - refund) + Math.max(0, marketing - reserve)
         : funding.studioCashAtRisk + marketing;
     const riskCents = sumCents([dollarsToCinemaCents(risk), dollarsToCinemaCents(booking), dollarsToCinemaCents(localization)]);
+    // A commissioned production's applied cover paid its production cost already.
+    // It improves project economics, but is not fresh post-release studio cash.
+    const platformProductionCoverCents = dollarsToCinemaCents(Math.min(production, funding.platformFunding));
+    const netProfitCents = summary.netProfitCents + platformProductionCoverCents;
+    const studioProfitCents = summary.netStudioReceiptsCents - riskCents;
+    if (![netProfitCents,studioProfitCents].every(Number.isSafeInteger)) throw new RangeError('Cinema profit exceeds safe integer cents');
     const costsEstimated = Boolean((source.talentParticipation || details?.talentParticipation)?.contracts.length && !hasActualMoney(source.talentBackendPaid));
-    return { ...summary, receiptsEstimated, costsEstimated,
-        studioReturnPercent: riskCents > 0 ? (summary.netStudioReceiptsCents - riskCents) / riskCents * 100 : null };
+    return { ...summary, netProfitCents, receiptsEstimated, costsEstimated,
+        studioCashAtRiskCents: riskCents, studioProfitCents, platformProductionCoverCents,
+        studioReturnPercent: riskCents > 0 ? studioProfitCents / riskCents * 100 : null };
 };
 
 /** NPC treasuries use millions; cash moves retain ticket cents across coarse budget quotes. */

@@ -1,0 +1,15 @@
+PASS partial country inputs cannot inherit absent countries screens
+PASS standard distributor revenue-share exhibition does not charge producers per show
+PASS a booked paid-show agreement retains its price when the next supply quote changes
+PASS existing physical screens do not move with weekly population access or seed
+PASS complete world preserves every existing chain regional screen total
+PASS automatic prices still respond to country economy independently of footprint
+PASS repeated unviable exhibition ends without waiting for a tiny absolute ticket threshold
+PASS opening shows use public package expectations instead of secret final delivery
+PASS booking observations are retained for renewal and have no owner preference
+PASS a tiny residual audience cannot keep a full scheduled screen indefinitely
+PASS a previously weak run stays open when viable demand is denied screen time
+PASS real screen-day packing retains each feasible minimum before expansion
+PASS secret script accessibility cannot change an unviewed crossover opening
+PASS succession rebases booking observations while historical receipt identities stay frozen
+Booking audit: 14 passed, 0 failed

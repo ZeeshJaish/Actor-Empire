@@ -50,7 +50,8 @@ export const cinemaIndustryProjectDetails = (player: Player, project: IndustryPr
         releaseStrategy: project.releaseStrategy || 'THEATRICAL',
         screeningStrategy: production?.studioAiExecution?.selectedReleaseMode === 'LIMITED_THEATRICAL' || outside?.releasePath === 'FESTIVAL' ? 'REGIONAL' : 'INTERNATIONAL',
         directorId: project.directorId, directorName: project.directorName, castList: project.cinemaCast || cast, universeId: project.universeId,
-        originalLanguageId: 'english', cinemaExposure: project.cinemaExposure, talentParticipation: talent?.talentParticipation,
+        originalLanguageId: project.originalLanguageId || 'english', releaseRegionIds:project.releaseRegionIds,
+        cinemaExposure: project.cinemaExposure, talentParticipation: talent?.talentParticipation,
         hiddenStats: { qualityScore: quality, scriptQuality: production?.writerSkill || outside?.scoutReport.scriptQuality || quality,
             directorQuality: outside?.scoutReport.directorQuality || quality, castingStrength: talent?.packageScore || outside?.scoutReport.castQuality || quality,
             rawHype: 0, distributionPower: 0, prestigeBonus: 0 } };
@@ -68,6 +69,7 @@ export const normalizeLiveTitle = (player: Player, id: string, project: ProjectD
         countryIds:c.territory==='GLOBAL'&&!c.countryIds.length ? countries.map(m=>m.id) : [...c.countryIds],absoluteWeek:c.startsAtAbsoluteWeek,publiclyKnown:true}));
     if(!signed.length&&release?.streaming)windows.push({platformId:release.streaming.platformId,countryIds:countries.map(c=>c.id),absoluteWeek:release.streaming.startWeekAbsolute || releaseWeek,publiclyKnown:true});
     title.market = { releaseWeek, runtimeMinutes: Math.max(45, Math.min(240, Number((project as any).runtimeMinutes) || 120)),
+        bookingContract:player.world.cinemaMarket?.bookingContracts?.[id] || 'REVENUE_SHARE',
         languages: [project.originalLanguageId || 'english'], countryIds: countries.map(c => c.id), chainIds: [...new Set(Object.values(chains).flat())], chainIdsByCountry: chains, format: 'STANDARD',
         universeId: project.universeId, returningCharacterIds: [...new Set(title.cast.flatMap(c => c.characterIds))],
         payoff: title.delivery.deliveredQuality || 50, accessibility: title.delivery.scriptQuality, urgency: ['ACTION', 'ADVENTURE', 'SCI_FI', 'SUPERHERO', 'FANTASY'].includes(project.genre) ? 65 : 45,

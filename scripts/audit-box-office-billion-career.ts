@@ -21,6 +21,9 @@ const seed=Number(process.env.CINEMA_BILLION_SEED||0);
 const executionCodeSha256=createHash('sha256').update(readFileSync(new URL(import.meta.url))).digest('hex');
 const saveEvery=Number(process.env.CINEMA_BILLION_SAVE_EVERY||1);assert.ok(Number.isInteger(saveEvery)&&saveEvery>0);
 const horizon=Number(process.env.CINEMA_BILLION_HORIZON||156);assert.ok(Number.isInteger(horizon)&&horizon>0);
+// An optional observation endpoint for attainment proofs. It never closes a
+// theatrical run or changes its paid result; ongoing films remain censored.
+const attainmentCents=Number(process.env.CINEMA_BILLION_ATTAINMENT_CENTS||0);assert.ok(Number.isSafeInteger(attainmentCents)&&attainmentCents>=0);
 const cases=(process.env.CINEMA_BILLION_CASES||'standalone,earned,weak,small,wide-small').split(',');
 const rows:any[]=[];
 const save=()=>writeFileSync(join(out,`results-${seed}.json`),JSON.stringify({kind:'ACTUAL_GAME_WEEK_FUNDED_EXISTING_OWNER',executionCodeSha256,tuningVersion:CINEMA_MARKET_TUNING_VERSION,audienceProfile:CINEMA_AUDIENCE_PROFILE,seed,saveEvery,horizon,rows,
@@ -95,8 +98,9 @@ for(const name of cases){
             slate:player.world.cinemaMarket!.weeks.at(-1)!.titles.length});
         if(w%10===0)console.log('CAREER_FINAL',name,seed,w+1,player.world.cinemaMarket!.titles[film.id].grossCents/1e8,weekly.at(-1)!.slate);
         if(paid.closed){closed=true;break}
+        if(attainmentCents&&player.world.cinemaMarket!.titles[film.id].grossCents>=attainmentCents)break;
     }
-    assert.ok(closed,'Observation horizon reached; this is censored, never a forced theatrical exit');
+    assert.ok(closed||attainmentCents&&player.world.cinemaMarket!.titles[film.id].grossCents>=attainmentCents,'Observation horizon reached; this is censored, never a forced theatrical exit');
     const facts=player.world.cinemaMarket!.titles[film.id];assert.equal(facts.legacyGrossCents,0);
     const finalPrepared=prepareVerifiedPlayerForPersistence(player,'PROCESS_WEEK');
     await saveVerifiedGameData(store,key,finalPrepared.player,finalPrepared.manifest);player=finalPrepared.player;
@@ -104,7 +108,8 @@ for(const name of cases){
     let gross=0,week95=0;for(const w of weekly){gross+=w.grossCents;if(gross>=facts.grossCents*.95){week95=w.week;break}}
     const row={name,film,precursors,checkpoint,totalWeeks,runWeeks:weekly.length,week95,grossCents:facts.grossCents,receiptsCents:facts.producerReceiptsCents,
         profitCents:facts.producerReceiptsCents-facts.bookingCostCents-(film.budget+film.campaign)*100,
-        first:facts.firstAdmissions,repeats:facts.repeatAdmissions,weekly,allClosed:closed,runMs:Math.round(performance.now()-started),
+        first:facts.firstAdmissions,repeats:facts.repeatAdmissions,weekly,allClosed:closed,censored:!closed,attainmentCents,
+        ...(attainmentCents?{observation:'ATTAINMENT_ONLY; profit and percentiles are to-date, not lifetime results'}:{}),runMs:Math.round(performance.now()-started),
         countries:Object.keys(player.world.worldPopulation!.countries).length,platforms:Object.keys(player.world.platforms||{}).length};
     rows.push(row);save();writeFileSync(join(out,`${name}-final-${seed}.json`),JSON.stringify(player));
     console.log('CAREER_RESULT',JSON.stringify({name,seed,grossM:row.grossCents/1e8,profitM:row.profitCents/1e8,runWeeks:row.runWeeks,week95,totalWeeks}));

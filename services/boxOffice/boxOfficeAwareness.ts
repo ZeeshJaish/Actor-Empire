@@ -139,7 +139,7 @@ export const projectCinemaForecastInput = (input: CinemaWeekInput, known: Cinema
             cast: uniqueCast(title.cast).map(person => ({ personId: person.personId, name: person.name, roleType: person.roleType, roleWeight: person.roleWeight,
                 fame: person.fame, stature: person.stature, isPlayer: person.isPlayer, characterIds: [...person.characterIds] })),
             directorId: title.directorId, playerCredited: title.playerCredited,
-            ...(title.market ? {market:{releaseWeek:title.market.releaseWeek,runtimeMinutes:title.market.runtimeMinutes,languages:[...title.market.languages],
+            ...(title.market ? {market:{releaseWeek:title.market.releaseWeek,bookingContract:title.market.bookingContract,runtimeMinutes:title.market.runtimeMinutes,languages:[...title.market.languages],
                 chainIdsByCountry:structuredClone(title.market.chainIdsByCountry),countryIds:[...title.market.countryIds],chainIds:[...title.market.chainIds],format:title.market.format,
                 universeId:title.market.universeId,returningCharacterIds:title.market.returningCharacterIds ? [...title.market.returningCharacterIds] : undefined,
                 payoff:title.market.payoff,accessibility:title.market.accessibility,urgency:title.market.urgency,

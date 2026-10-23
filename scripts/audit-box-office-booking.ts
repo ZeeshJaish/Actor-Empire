@@ -18,6 +18,24 @@ test('partial country inputs cannot inherit absent countries screens',()=>{
     full.countries=Object.values(pop.countries).map(c=>({id:c.id,regionId:c.regionId,population:c.population,cinemaAccess:c.cinemaAccessPercent,purchasingPower:90,inflation:10,languages:c.languages}));
     assert.deepEqual(screens(partial),screens(full));
 });
+test('standard distributor revenue-share exhibition does not charge producers per show',()=>{
+ const f=makeCinemaMarketFixture();delete f.supply;
+ const q=quoteCinemaSupply(f);
+ assert.ok(q.pools.length>0);
+ assert.ok(q.pools.every(p=>p.bookingCentsPerShow===0),'Standard exhibition is paid through the cinema share');
+ const result=simulateCinemaWeek(f);
+ assert.ok(result.exhibition!.some(e=>e.shows>0));
+ assert.equal(result.costEvents.reduce((n,c)=>n+c.amountCents,0),0);
+});
+test('a booked paid-show agreement retains its price when the next supply quote changes',()=>{
+ const f=makeCinemaMarketFixture();f.supply!.pools[0].bookingCentsPerShow=100;
+ const first=simulateCinemaWeek(f);
+ const next=structuredClone(f);next.absoluteWeek++;next.marketState=first.nextState;
+ next.supply!.pools[0].bookingCentsPerShow=0;
+ const second=simulateCinemaWeek(next),shows=second.exhibition!.filter(e=>e.shows>0).reduce((n,e)=>n+e.shows,0);
+ assert.ok(shows>0);
+ assert.equal(second.costEvents.reduce((n,c)=>n+c.amountCents,0),shows*100,'A live quote cannot erase a signed booking obligation');
+});
 test('existing physical screens do not move with weekly population access or seed',()=>{
     const a=makeCinemaMarketFixture();delete a.supply;
     a.countries=[...a.countries!,{...a.countries![0],id:'CA',population:500_000}];

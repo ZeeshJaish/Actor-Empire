@@ -1,0 +1,2 @@
+PASS alternative catalogue age is batched across countries and exact route results are reused
+PASS targeted AI route lookup preserves canonical permission and skips unrelated titles

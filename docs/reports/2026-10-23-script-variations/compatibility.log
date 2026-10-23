@@ -1,0 +1,9 @@
+
+  ...../../tmp/ae-script-variation-final/audit-canon-story-cheat.js    4.7mb ⚠️
+  ../../../../tmp/ae-script-variation-final/audit-sequel-flow.js       4.7mb ⚠️
+  ..../../tmp/ae-script-variation-final/audit-character-identity.js  802.6kb
+
+⚡ Done in 117ms
+Character identity audit passed: story inference, offer persistence, and public career arc.
+Canon story cheat audit passed: universe, franchise, Greenlight, cast story, and news fixture are ready.
+Sequel flow audit passed.

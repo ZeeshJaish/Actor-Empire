@@ -8291,6 +8291,8 @@ export interface YearlyFinance {
 }
 
 export interface IndustryProject {
+    /** Committed geography for newly released NPC films; missing legacy geography keeps its prior defaults. */
+    releaseRegionIds?: BoxOfficeRegionId[];
     cinema?: CinemaProjectMarker;
     cinemaCast?: CastMember[];
     id: string;

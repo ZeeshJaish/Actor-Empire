@@ -2,9 +2,24 @@
   "source": {
     "services/boxOffice/boxOfficeAudience.ts": "e21044a77c52144043457ef1e454095ad4ad7a90290e2e2f61a1b651faec641c",
     "services/boxOffice/boxOfficeProfiles.ts": "ff50a49edfe5f1f9543aad52b87e36f07db299167134f4c195bd06a41005f730",
-    "services/boxOffice/boxOfficeMigration.ts": "1783926a4ddf53c7f61a9def60f5077f6c4821f63c7697d0704e1ca5aac123e6",
-    "services/streamingFundingLogic.ts": "b500ad033111a1f74a21d44f117f8dac483b09816c1160cc1a46d4a204a18b35"
+    "services/boxOffice/boxOfficeMigration.ts": "ead7877df9f81bee4256b20946f65858f581fbc77c2dc8c2881a7d3fcd91c25f",
+    "services/streamingFundingLogic.ts": "b500ad033111a1f74a21d44f117f8dac483b09816c1160cc1a46d4a204a18b35",
+    "App.tsx": "44724593c32e589e671153b29e2b90f9b7a8bb7da3515bdcd17f75dd5f02ae36"
   },
   "matrixEconomicEquivalence": "Final-B pre-index arithmetic; indexed full game-week cinema and prepared-player output SHA256 exactly equal",
-  "executedMatrixSha256": "93f56e597411eafe9a769e038c057ac343c69f3e03ab070e9732249c1dda69dc"
+  "executedMatrixSha256": "93f56e597411eafe9a769e038c057ac343c69f3e03ab070e9732249c1dda69dc",
+  "earnedCheckpointSha256": "787da646061df80f4b5a1ead613c3143336ec8686034800558daff7d6ad2580d",
+  "finalTypecheck": {
+    "exit": 0,
+    "heapMiB": 8192
+  },
+  "finalBuild": {
+    "exit": 0,
+    "seconds": 22.97
+  },
+  "postEconomicMeasurementChanges": "App hydration now preserves all release fields; tracked display mirrors recover from unchanged paid ledger. Same prepared-player and cinema-result hashes confirmed before/after this repair.",
+  "hydrationEquivalence": {
+    "before": "hydration-equivalence-before.json",
+    "after": "hydration-equivalence-after.json"
+  }
 }

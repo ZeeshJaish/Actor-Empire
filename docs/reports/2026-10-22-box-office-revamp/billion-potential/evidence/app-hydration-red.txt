@@ -1,0 +1,16 @@
+APP_BILLION seed isolated earned save
+APP_BILLION actual Age Up 1
+APP_BILLION opening reload retains exact paid facts
+APP_BILLION billion reload retains exact paid facts
+AssertionError [ERR_ASSERTION]: Actual financial screen must show canonical paid receipts after reload
+
+'$99.0M' !== '$96.4M'
+
+    at /Users/zeesh/Vibe code/Actor empire/scripts/audit-box-office-billion-app.cjs:51:269 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: '$99.0M',
+  expected: '$96.4M',
+  operator: 'strictEqual',
+  diff: 'simple'
+}

@@ -1,0 +1,7 @@
+{
+  "status": "PASS",
+  "exitCode": 0,
+  "heapMB": 1536,
+  "scope": "853 application and changed-audit TypeScript roots with original compiler options; generated/native root bundles and unrelated labs excluded",
+  "log": "typecheck-capped-direct.txt"
+}
