@@ -1,0 +1,770 @@
+{
+  "modSuccession": [
+    {
+      "parentDeceased": false,
+      "heir": "son",
+      "pack": "united_states",
+      "parentEnabled": [
+        "united_states"
+      ],
+      "childEnabled": [
+        "united_states"
+      ],
+      "childEnabledAfterReload": [
+        "united_states"
+      ],
+      "parentPackActorProfiles": 65,
+      "childPackActorProfiles": 65,
+      "parentCreatorOptions": 78,
+      "childCreatorOptions": 78,
+      "parentModHistory": 1,
+      "childModHistory": 1
+    },
+    {
+      "parentDeceased": false,
+      "heir": "daughter",
+      "pack": "united_states",
+      "parentEnabled": [
+        "united_states"
+      ],
+      "childEnabled": [
+        "united_states"
+      ],
+      "childEnabledAfterReload": [
+        "united_states"
+      ],
+      "parentPackActorProfiles": 65,
+      "childPackActorProfiles": 65,
+      "parentCreatorOptions": 78,
+      "childCreatorOptions": 78,
+      "parentModHistory": 1,
+      "childModHistory": 1
+    },
+    {
+      "parentDeceased": true,
+      "heir": "son",
+      "pack": "united_states",
+      "parentEnabled": [
+        "united_states"
+      ],
+      "childEnabled": [
+        "united_states"
+      ],
+      "childEnabledAfterReload": [
+        "united_states"
+      ],
+      "parentPackActorProfiles": 65,
+      "childPackActorProfiles": 65,
+      "parentCreatorOptions": 78,
+      "childCreatorOptions": 78,
+      "parentModHistory": 1,
+      "childModHistory": 1
+    },
+    {
+      "parentDeceased": true,
+      "heir": "daughter",
+      "pack": "united_states",
+      "parentEnabled": [
+        "united_states"
+      ],
+      "childEnabled": [
+        "united_states"
+      ],
+      "childEnabledAfterReload": [
+        "united_states"
+      ],
+      "parentPackActorProfiles": 65,
+      "childPackActorProfiles": 65,
+      "parentCreatorOptions": 78,
+      "childCreatorOptions": 78,
+      "parentModHistory": 1,
+      "childModHistory": 1
+    }
+  ],
+  "streaming": [
+    {
+      "type": "MOVIE",
+      "budget": 10000000,
+      "maximumFixedPayout": 123632000,
+      "maximumExposure": 123632000,
+      "maximumMinimumGuarantee": 123632000,
+      "offers": [
+        {
+          "buyer": "YOUTUBE",
+          "minimumGuarantee": 123632000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 123632000
+        },
+        {
+          "buyer": "VIU",
+          "minimumGuarantee": 6427000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 6427000
+        },
+        {
+          "buyer": "APPLE_TV",
+          "minimumGuarantee": 62475000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 62475000
+        },
+        {
+          "buyer": "YOUTUBE",
+          "minimumGuarantee": 92776000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 92776000
+        },
+        {
+          "buyer": "VIU",
+          "minimumGuarantee": 8468000,
+          "productionFunding": 1131000,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 9599000
+        },
+        {
+          "buyer": "APPLE_TV",
+          "minimumGuarantee": 79990000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 79990000
+        },
+        {
+          "buyer": "YOUTUBE",
+          "minimumGuarantee": 84426000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 84426000
+        },
+        {
+          "buyer": "VIU",
+          "minimumGuarantee": 7705000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 7705000
+        },
+        {
+          "buyer": "APPLE_TV",
+          "minimumGuarantee": 86389000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 86389000
+        }
+      ]
+    },
+    {
+      "type": "MOVIE",
+      "budget": 1000000000,
+      "maximumFixedPayout": 123632000,
+      "maximumExposure": 123632000,
+      "maximumMinimumGuarantee": 123632000,
+      "offers": [
+        {
+          "buyer": "YOUTUBE",
+          "minimumGuarantee": 123632000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 123632000
+        },
+        {
+          "buyer": "VIU",
+          "minimumGuarantee": 6427000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 6427000
+        },
+        {
+          "buyer": "APPLE_TV",
+          "minimumGuarantee": 62475000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 62475000
+        },
+        {
+          "buyer": "YOUTUBE",
+          "minimumGuarantee": 92776000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 92776000
+        },
+        {
+          "buyer": "VIU",
+          "minimumGuarantee": 8468000,
+          "productionFunding": 1131000,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 9599000
+        },
+        {
+          "buyer": "APPLE_TV",
+          "minimumGuarantee": 79990000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 79990000
+        },
+        {
+          "buyer": "YOUTUBE",
+          "minimumGuarantee": 84426000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 84426000
+        },
+        {
+          "buyer": "VIU",
+          "minimumGuarantee": 7705000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 7705000
+        },
+        {
+          "buyer": "APPLE_TV",
+          "minimumGuarantee": 86389000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 86389000
+        }
+      ]
+    },
+    {
+      "type": "MOVIE",
+      "budget": 1000000000000,
+      "maximumFixedPayout": 123632000,
+      "maximumExposure": 123632000,
+      "maximumMinimumGuarantee": 123632000,
+      "offers": [
+        {
+          "buyer": "YOUTUBE",
+          "minimumGuarantee": 123632000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 123632000
+        },
+        {
+          "buyer": "VIU",
+          "minimumGuarantee": 6427000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 6427000
+        },
+        {
+          "buyer": "APPLE_TV",
+          "minimumGuarantee": 62475000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 62475000
+        },
+        {
+          "buyer": "YOUTUBE",
+          "minimumGuarantee": 92776000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 92776000
+        },
+        {
+          "buyer": "VIU",
+          "minimumGuarantee": 8468000,
+          "productionFunding": 1131000,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 9599000
+        },
+        {
+          "buyer": "APPLE_TV",
+          "minimumGuarantee": 79990000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 79990000
+        },
+        {
+          "buyer": "YOUTUBE",
+          "minimumGuarantee": 84426000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 84426000
+        },
+        {
+          "buyer": "VIU",
+          "minimumGuarantee": 7705000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 7705000
+        },
+        {
+          "buyer": "APPLE_TV",
+          "minimumGuarantee": 86389000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 86389000
+        }
+      ]
+    },
+    {
+      "type": "SERIES",
+      "budget": 10000000,
+      "maximumFixedPayout": 525600000,
+      "maximumExposure": 581400000,
+      "maximumMinimumGuarantee": 489500000,
+      "offers": [
+        {
+          "buyer": "YOUTUBE",
+          "minimumGuarantee": 476700000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 476700000
+        },
+        {
+          "buyer": "SHAHID",
+          "minimumGuarantee": 6700000,
+          "productionFunding": 2000000,
+          "futureSeasonFunding": 1900000,
+          "fixedPayout": 10600000
+        },
+        {
+          "buyer": "VIU",
+          "minimumGuarantee": 6200000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 6200000
+        },
+        {
+          "buyer": "APPLE_TV",
+          "minimumGuarantee": 179600000,
+          "productionFunding": 36100000,
+          "futureSeasonFunding": 36700000,
+          "fixedPayout": 252400000
+        },
+        {
+          "buyer": "DSTV_STREAM",
+          "minimumGuarantee": 5900000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 5900000
+        },
+        {
+          "buyer": "PRIME_VIDEO",
+          "minimumGuarantee": 194900000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 194900000
+        },
+        {
+          "buyer": "TVING",
+          "minimumGuarantee": 6200000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 6200000
+        },
+        {
+          "buyer": "YOUTUBE",
+          "minimumGuarantee": 357700000,
+          "productionFunding": 91800000,
+          "futureSeasonFunding": 76100000,
+          "fixedPayout": 525600000
+        },
+        {
+          "buyer": "SHAHID",
+          "minimumGuarantee": 6100000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 6100000
+        },
+        {
+          "buyer": "VIU",
+          "minimumGuarantee": 7600000,
+          "productionFunding": 3000000,
+          "futureSeasonFunding": 2700000,
+          "fixedPayout": 13300000
+        },
+        {
+          "buyer": "APPLE_TV",
+          "minimumGuarantee": 453200000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 453200000
+        },
+        {
+          "buyer": "DSTV_STREAM",
+          "minimumGuarantee": 10300000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 10300000
+        },
+        {
+          "buyer": "PRIME_VIDEO",
+          "minimumGuarantee": 370600000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 370600000
+        },
+        {
+          "buyer": "TVING",
+          "minimumGuarantee": 14900000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 14900000
+        },
+        {
+          "buyer": "YOUTUBE",
+          "minimumGuarantee": 325500000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 325500000
+        },
+        {
+          "buyer": "SHAHID",
+          "minimumGuarantee": 6500000,
+          "productionFunding": 2500000,
+          "futureSeasonFunding": 2200000,
+          "fixedPayout": 11200000
+        },
+        {
+          "buyer": "VIU",
+          "minimumGuarantee": 6900000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 6900000
+        },
+        {
+          "buyer": "APPLE_TV",
+          "minimumGuarantee": 489500000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 489500000
+        },
+        {
+          "buyer": "DSTV_STREAM",
+          "minimumGuarantee": 9400000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 9400000
+        },
+        {
+          "buyer": "PRIME_VIDEO",
+          "minimumGuarantee": 337200000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 337200000
+        },
+        {
+          "buyer": "TVING",
+          "minimumGuarantee": 13600000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 13600000
+        }
+      ]
+    },
+    {
+      "type": "SERIES",
+      "budget": 1000000000,
+      "maximumFixedPayout": 525600000,
+      "maximumExposure": 581400000,
+      "maximumMinimumGuarantee": 489500000,
+      "offers": [
+        {
+          "buyer": "YOUTUBE",
+          "minimumGuarantee": 476700000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 476700000
+        },
+        {
+          "buyer": "SHAHID",
+          "minimumGuarantee": 6700000,
+          "productionFunding": 2000000,
+          "futureSeasonFunding": 1900000,
+          "fixedPayout": 10600000
+        },
+        {
+          "buyer": "VIU",
+          "minimumGuarantee": 6200000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 6200000
+        },
+        {
+          "buyer": "APPLE_TV",
+          "minimumGuarantee": 179600000,
+          "productionFunding": 36100000,
+          "futureSeasonFunding": 36700000,
+          "fixedPayout": 252400000
+        },
+        {
+          "buyer": "DSTV_STREAM",
+          "minimumGuarantee": 5900000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 5900000
+        },
+        {
+          "buyer": "PRIME_VIDEO",
+          "minimumGuarantee": 194900000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 194900000
+        },
+        {
+          "buyer": "TVING",
+          "minimumGuarantee": 6200000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 6200000
+        },
+        {
+          "buyer": "YOUTUBE",
+          "minimumGuarantee": 357700000,
+          "productionFunding": 91800000,
+          "futureSeasonFunding": 76100000,
+          "fixedPayout": 525600000
+        },
+        {
+          "buyer": "SHAHID",
+          "minimumGuarantee": 6100000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 6100000
+        },
+        {
+          "buyer": "VIU",
+          "minimumGuarantee": 7600000,
+          "productionFunding": 3000000,
+          "futureSeasonFunding": 2700000,
+          "fixedPayout": 13300000
+        },
+        {
+          "buyer": "APPLE_TV",
+          "minimumGuarantee": 453200000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 453200000
+        },
+        {
+          "buyer": "DSTV_STREAM",
+          "minimumGuarantee": 10300000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 10300000
+        },
+        {
+          "buyer": "PRIME_VIDEO",
+          "minimumGuarantee": 370600000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 370600000
+        },
+        {
+          "buyer": "TVING",
+          "minimumGuarantee": 14900000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 14900000
+        },
+        {
+          "buyer": "YOUTUBE",
+          "minimumGuarantee": 325500000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 325500000
+        },
+        {
+          "buyer": "SHAHID",
+          "minimumGuarantee": 6500000,
+          "productionFunding": 2500000,
+          "futureSeasonFunding": 2200000,
+          "fixedPayout": 11200000
+        },
+        {
+          "buyer": "VIU",
+          "minimumGuarantee": 6900000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 6900000
+        },
+        {
+          "buyer": "APPLE_TV",
+          "minimumGuarantee": 489500000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 489500000
+        },
+        {
+          "buyer": "DSTV_STREAM",
+          "minimumGuarantee": 9400000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 9400000
+        },
+        {
+          "buyer": "PRIME_VIDEO",
+          "minimumGuarantee": 337200000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 337200000
+        },
+        {
+          "buyer": "TVING",
+          "minimumGuarantee": 13600000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 13600000
+        }
+      ]
+    },
+    {
+      "type": "SERIES",
+      "budget": 1000000000000,
+      "maximumFixedPayout": 525600000,
+      "maximumExposure": 581400000,
+      "maximumMinimumGuarantee": 489500000,
+      "offers": [
+        {
+          "buyer": "YOUTUBE",
+          "minimumGuarantee": 476700000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 476700000
+        },
+        {
+          "buyer": "SHAHID",
+          "minimumGuarantee": 6700000,
+          "productionFunding": 2000000,
+          "futureSeasonFunding": 1900000,
+          "fixedPayout": 10600000
+        },
+        {
+          "buyer": "VIU",
+          "minimumGuarantee": 6200000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 6200000
+        },
+        {
+          "buyer": "APPLE_TV",
+          "minimumGuarantee": 179600000,
+          "productionFunding": 36100000,
+          "futureSeasonFunding": 36700000,
+          "fixedPayout": 252400000
+        },
+        {
+          "buyer": "DSTV_STREAM",
+          "minimumGuarantee": 5900000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 5900000
+        },
+        {
+          "buyer": "PRIME_VIDEO",
+          "minimumGuarantee": 194900000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 194900000
+        },
+        {
+          "buyer": "TVING",
+          "minimumGuarantee": 6200000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 6200000
+        },
+        {
+          "buyer": "YOUTUBE",
+          "minimumGuarantee": 357700000,
+          "productionFunding": 91800000,
+          "futureSeasonFunding": 76100000,
+          "fixedPayout": 525600000
+        },
+        {
+          "buyer": "SHAHID",
+          "minimumGuarantee": 6100000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 6100000
+        },
+        {
+          "buyer": "VIU",
+          "minimumGuarantee": 7600000,
+          "productionFunding": 3000000,
+          "futureSeasonFunding": 2700000,
+          "fixedPayout": 13300000
+        },
+        {
+          "buyer": "APPLE_TV",
+          "minimumGuarantee": 453200000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 453200000
+        },
+        {
+          "buyer": "DSTV_STREAM",
+          "minimumGuarantee": 10300000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 10300000
+        },
+        {
+          "buyer": "PRIME_VIDEO",
+          "minimumGuarantee": 370600000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 370600000
+        },
+        {
+          "buyer": "TVING",
+          "minimumGuarantee": 14900000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 14900000
+        },
+        {
+          "buyer": "YOUTUBE",
+          "minimumGuarantee": 325500000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 325500000
+        },
+        {
+          "buyer": "SHAHID",
+          "minimumGuarantee": 6500000,
+          "productionFunding": 2500000,
+          "futureSeasonFunding": 2200000,
+          "fixedPayout": 11200000
+        },
+        {
+          "buyer": "VIU",
+          "minimumGuarantee": 6900000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 6900000
+        },
+        {
+          "buyer": "APPLE_TV",
+          "minimumGuarantee": 489500000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 489500000
+        },
+        {
+          "buyer": "DSTV_STREAM",
+          "minimumGuarantee": 9400000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 9400000
+        },
+        {
+          "buyer": "PRIME_VIDEO",
+          "minimumGuarantee": 337200000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 337200000
+        },
+        {
+          "buyer": "TVING",
+          "minimumGuarantee": 13600000,
+          "productionFunding": 0,
+          "futureSeasonFunding": 0,
+          "fixedPayout": 13600000
+        }
+      ]
+    }
+  ]
+}

@@ -748,6 +748,23 @@ export const getEnabledGlobalActorPackIds = (player?: Pick<Player, 'flags'>): st
     return Array.isArray(packIds) ? packIds.filter(id => typeof id === 'string') : [];
 };
 
+/** Old heirs lost the selection flags while retaining pack profiles. Recover only proven save-local packs. */
+export const recoverInheritedGlobalActorPackIds = (flags: Player['flags']): string[] => {
+    const selected = [...new Set(getEnabledGlobalActorPackIds({ flags }))];
+    if (selected.length || !flags?.legacyParent) return selected;
+    const valid = new Set(GLOBAL_ACTOR_PACKS.map(pack => pack.id));
+    const recovered = new Set<string>((Array.isArray(flags.modHistory) ? flags.modHistory : [])
+        .filter(row => row?.type === 'GLOBAL_ACTOR_PACK' && valid.has(row.packId)).map(row => row.packId));
+    const profiles = Array.isArray(flags.extraNPCs) ? flags.extraNPCs : [];
+    for (const pack of GLOBAL_ACTOR_PACKS) {
+        const candidates = profiles.filter(npc => npc?.id?.startsWith(`mod_actor_${pack.id}_`));
+        if (!candidates.length) continue;
+        const names = new Map(createGlobalActorPackNPCs(pack.id).map(npc => [npc.id, npc.name]));
+        if (candidates.some(npc => names.get(npc.id) === npc.name)) recovered.add(pack.id);
+    }
+    return [...recovered];
+};
+
 const generateRandomNPC = (seed: number | string): NPCActor => {
     const gender: Gender = Math.random() > 0.5 ? 'MALE' : 'FEMALE';
     const first = FIRST_NAMES[Math.floor(Math.random() * FIRST_NAMES.length)];

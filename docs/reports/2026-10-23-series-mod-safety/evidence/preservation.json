@@ -1,0 +1,30 @@
+{
+  "unchangedPreexistingDirtyFiles": [
+    "docs/reports/2026-10-22-box-office-revamp/career-economics/audit-normal-career.ts",
+    "docs/reports/2026-10-22-box-office-revamp/career-economics/run-audit.mjs",
+    "docs/reports/2026-10-23-cinema-closeout/progress.md",
+    "scripts/audit-box-office-career-actions.ts",
+    "scripts/build/lucideImports.mjs",
+    "scripts/fixtures/ordinaryCinemaCareer.ts",
+    "services/boxOffice/boxOfficeAudience.ts",
+    "services/boxOffice/boxOfficeMarket.ts",
+    "services/livingEnsemble.ts",
+    "services/saveCompaction.ts",
+    "services/saveGenerations.ts",
+    "services/talentNegotiation.ts",
+    "services/talentRoster.ts",
+    "types.ts",
+    "views/StudioPage.tsx",
+    "views/lifestyle/business/GreenlightWizard.tsx",
+    "views/lifestyle/business/components/GreenlightCastStep.tsx",
+    "views/lifestyle/business/greenlightProjectBuilder.ts",
+    "views/lifestyle/business/greenlightUtils.ts",
+    "views/lifestyle/business/greenlightValidation.ts"
+  ],
+  "changedByConcurrentWorkNotEditedHere": [],
+  "sharedFilesIntentionallyEditedHere": [
+    "package.json",
+    "services/gameLoop.ts",
+    "services/saveMigration.ts"
+  ]
+}

@@ -79,6 +79,16 @@ export const isCastableMovieRoleId = (id?: string | null, extraNPCs: any[] = [])
     !id || id === 'UNKNOWN' || id === 'PLAYER_SELF' || id === 'STUDIO_STAFF' || Boolean(getCastableNpcById(id, extraNPCs))
 );
 
+/** Keep unresolved inherited roles visible, but never turn a known non-actor into cast. */
+export const isMissingMovieActorProfile = (id?: string | null, extraNPCs: any[] = []) => Boolean(
+    id && !['UNKNOWN', 'PLAYER_SELF', 'STUDIO_STAFF'].includes(id)
+    && ![...NPC_DATABASE, ...extraNPCs].some(npc => npc.id === id),
+);
+
+export const shouldPreserveReturningMovieRole = (id?: string | null, extraNPCs: any[] = []) => (
+    isCastableMovieRoleId(id, extraNPCs) || isMissingMovieActorProfile(id, extraNPCs)
+);
+
 export const getInitialMusicArtistTargetCount = (concept?: any): number => {
     const strategy = (concept?.musicStrategy || concept?.musicPlan?.strategy || 'LEAD_SINGLE') as ProjectMusicStrategy;
     const savedCount = Number(concept?.selectedMusicArtistTargetCount ?? concept?.musicPlan?.artistTargetCount);

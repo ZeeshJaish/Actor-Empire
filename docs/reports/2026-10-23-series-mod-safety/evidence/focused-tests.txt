@@ -1,0 +1,43 @@
+
+> pr-6.6.3@1.0.25 audit:series-mod-safety
+> esbuild scripts/audit-series-mod-safety.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-series-mod-safety.mjs && node /tmp/ae-series-mod-safety.mjs && esbuild scripts/audit-series-value.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-series-value.mjs && node /tmp/ae-series-value.mjs && esbuild scripts/audit-series-automatic.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-series-automatic.mjs && node /tmp/ae-series-automatic.mjs && esbuild scripts/audit-series-regional-distribution.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-series-regional.mjs && node /tmp/ae-series-regional.mjs
+
+
+  ../../../../tmp/ae-series-mod-safety.mjs  6.5mb ⚠️
+
+⚡ Done in 100ms
+PASS mod succession {"parentDeceased":false,"heir":"son","pack":"united_states","parentEnabled":["united_states"],"childEnabled":["united_states"],"childEnabledAfterReload":["united_states"],"parentPackActorProfiles":65,"childPackActorProfiles":65,"parentCreatorOptions":78,"childCreatorOptions":78,"parentModHistory":1,"childModHistory":1}
+PASS mod succession {"parentDeceased":false,"heir":"daughter","pack":"united_states","parentEnabled":["united_states"],"childEnabled":["united_states"],"childEnabledAfterReload":["united_states"],"parentPackActorProfiles":65,"childPackActorProfiles":65,"parentCreatorOptions":78,"childCreatorOptions":78,"parentModHistory":1,"childModHistory":1}
+PASS mod succession {"parentDeceased":true,"heir":"son","pack":"united_states","parentEnabled":["united_states"],"childEnabled":["united_states"],"childEnabledAfterReload":["united_states"],"parentPackActorProfiles":65,"childPackActorProfiles":65,"parentCreatorOptions":78,"childCreatorOptions":78,"parentModHistory":1,"childModHistory":1}
+PASS mod succession {"parentDeceased":true,"heir":"daughter","pack":"united_states","parentEnabled":["united_states"],"childEnabled":["united_states"],"childEnabledAfterReload":["united_states"],"parentPackActorProfiles":65,"childPackActorProfiles":65,"parentCreatorOptions":78,"childCreatorOptions":78,"parentModHistory":1,"childModHistory":1}
+PASS affected heir recovery, current actor stats, idempotence, unrelated careers and deceased actor safety
+MEASURED streaming {"type":"MOVIE","budget":10000000,"maximumFixedPayout":123632000,"maximumExposure":123632000,"maximumMinimumGuarantee":123632000}
+MEASURED streaming {"type":"MOVIE","budget":1000000000,"maximumFixedPayout":123632000,"maximumExposure":123632000,"maximumMinimumGuarantee":123632000}
+MEASURED streaming {"type":"MOVIE","budget":1000000000000,"maximumFixedPayout":123632000,"maximumExposure":123632000,"maximumMinimumGuarantee":123632000}
+MEASURED streaming {"type":"SERIES","budget":10000000,"maximumFixedPayout":525600000,"maximumExposure":581400000,"maximumMinimumGuarantee":489500000}
+MEASURED streaming {"type":"SERIES","budget":1000000000,"maximumFixedPayout":525600000,"maximumExposure":581400000,"maximumMinimumGuarantee":489500000}
+MEASURED streaming {"type":"SERIES","budget":1000000000000,"maximumFixedPayout":525600000,"maximumExposure":581400000,"maximumMinimumGuarantee":489500000}
+PASS series budget invariance and inherited mod configuration through the actual production paths.
+
+  ../../../../tmp/ae-series-value.mjs  5.4mb ⚠️
+
+⚡ Done in 41ms
+PASS fractional cash is a strict cap even for an immediately selectable opening offer
+PASS current buyer spending restrictions
+PASS compatible non-exclusive series rights retain and register a second buyer
+PASS observed series results affect value; unrelated franchises and production cost do not
+PASS automatic buyers have a supported cash authority
+PASS pending signed obligations reduce available bidding cash
+PASS exact release UI handler rejects oversized old offers, signs real current offer and pays once
+PASS actor demand can rise independently of the buyer valuation
+PASS real funded-series UI signing keeps current production and future-season funding separate from spendable guarantee
+
+  ../../../../tmp/ae-series-automatic.mjs  9.3mb ⚠️
+
+⚡ Done in 78ms
+PASS legacy automatic series replaces inflated bids, signs within buyer value and remains one contract next week
+
+  ../../../../tmp/ae-series-regional.mjs  40.3kb
+
+⚡ Done in 18ms
+PASS regional series distribution keeps signed buyer identity and exact view/revenue totals

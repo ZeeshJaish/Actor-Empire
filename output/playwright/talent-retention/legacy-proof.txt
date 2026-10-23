@@ -1,0 +1,6 @@
+### Result
+[{"width":320,"actorVisible":true,"contractVisible":true,"recoveryExplanation":true,"noHorizontalOverflow":true},{"width":390,"actorVisible":true,"contractVisible":true,"recoveryExplanation":true,"noHorizontalOverflow":true},{"width":1440,"actorVisible":true,"contractVisible":true,"recoveryExplanation":true,"noHorizontalOverflow":true}]
+### Ran Playwright code
+```js
+await (async (page) => { if(!(await page.getByRole('button',{name:'Roster (1)',exact:true}).isVisible()))throw new Error('Missing contract count'); if(!(await page.getByRole('heading',{name:'Mira Retention',exact:true}).isVisible()))throw new Error('Missing saved actor name'); if(!(await page.getByText('Profile unavailable.',{exact:true}).isVisible()))throw new Error('Missing recovery explanation'); const results=[]; for(const width of [320,390,1440]){await page.setViewportSize({width,height:844});const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth);if(overflow)throw new Error('Horizontal overflow at '+width);if(width===390)await page.screenshot({path:'output/playwright/talent-retention/legacy-missing-profile.png'});results.push({width,actorVisible:true,contractVisible:true,recoveryExplanation:true,noHorizontalOverflow:true});}return results; })(page);
+```

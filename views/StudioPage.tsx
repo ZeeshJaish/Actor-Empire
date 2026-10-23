@@ -6,6 +6,7 @@ import { getAvailableTalent, NPC_DATABASE } from '../services/npcLogic';
 import { calculateNPCAsk } from '../services/talentService';
 import { getStudioGroup } from '../services/studioGroup';
 import { hasTalentUses, mergeParentStudioTalentRosters } from '../services/talentRoster';
+import { getSavedTalentName, isActorProfileSnapshot, isKnownDeceasedNpc } from '../services/npcRetention';
 
 interface StudioPageProps {
     player: Player;
@@ -67,7 +68,11 @@ export const StudioPage: React.FC<StudioPageProps> = ({ player, studioId, onUpda
     };
 
     const getNPCById = (id: string) => {
-        return [...availableActors, ...NPC_DATABASE, ...(player.flags.extraNPCs || [])].find(n => n.id === id);
+        if (isKnownDeceasedNpc(player, id)) return undefined;
+        const snapshot = signedContracts.find(contract => contract.npcId === id)?.actorSnapshot;
+        return (player.flags.extraNPCs || []).find(n => n.id === id)
+            || NPC_DATABASE.find(n => n.id === id)
+            || (isActorProfileSnapshot(snapshot, id) ? snapshot : undefined);
     };
 
     const ask = selectedNPC && studio ? calculateNPCAsk(getTalentNegotiationActor(player, studio.id, selectedNPC), negotiationDuration) : null;
@@ -121,19 +126,20 @@ export const StudioPage: React.FC<StudioPageProps> = ({ player, studioId, onUpda
                         ) : (
                             signedContracts.map(contract => {
                                 const npc = getNPCById(contract.npcId);
-                                if (!npc) return null;
+                                const actorName = npc?.name || getSavedTalentName(player, contract.npcId) || 'Signed actor';
                                 return (
                                     <div key={contract.id} className="bg-zinc-900 border border-zinc-800 rounded-3xl p-4 flex items-center gap-4">
-                                        <img src={npc.avatar} alt={npc.name} className="w-16 h-16 rounded-2xl bg-black border border-zinc-700" />
-                                        <div className="flex-1">
+                                        {npc ? <img src={npc.avatar} alt={actorName} className="w-16 h-16 shrink-0 rounded-2xl bg-black border border-zinc-700" /> : <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-zinc-700 bg-black text-zinc-400"><Users size={24} /></div>}
+                                        <div className="min-w-0 flex-1">
                                             <div className="flex items-center gap-2">
-                                                <h3 className="font-bold text-white">{npc.name}</h3>
-                                                <span className="text-[10px] px-1.5 py-0.5 bg-zinc-800 text-zinc-400 rounded-md font-black uppercase">{npc.tier}</span>
+                                                <h3 className="break-words font-bold text-white">{actorName}</h3>
+                                                {npc && <span className="text-[10px] px-1.5 py-0.5 bg-zinc-800 text-zinc-400 rounded-md font-black uppercase">{npc.tier}</span>}
                                             </div>
-                                            <div className="text-xs text-zinc-500 flex items-center gap-3 mt-1">
+                                            {npc ? <div className="text-xs text-zinc-500 flex items-center gap-3 mt-1">
                                                 <span className="flex items-center gap-1"><TrendingUp size={12}/> {Math.floor(npc.stats?.fame || 0)} Fame</span>
                                                 <span className="flex items-center gap-1"><Star size={12}/> {Math.floor(npc.stats?.talent || 0)} Talent</span>
-                                            </div>
+                                            </div> : <p className="mt-1 text-xs leading-relaxed text-zinc-300">{isKnownDeceasedNpc(player, contract.npcId) ? <><strong>Actor deceased.</strong> Contract records and past credits are preserved.</> : <><strong>Profile unavailable.</strong> Your contract is preserved. Restore a verified backup to recover this actor’s details.</>}</p>}
+                                            {!hasTalentUses(contract) && <p className="mt-1 text-xs text-zinc-400">{contract.status === 'TERMINATED' ? 'Contract terminated' : 'Film commitment complete'}</p>}
                                             <div className="mt-2 flex flex-wrap gap-2">
                                                 <span className="text-[10px] font-bold text-amber-500 uppercase tracking-widest bg-amber-500/10 px-2 py-1 rounded-lg flex items-center gap-1">
                                                     <Film size={10}/> {contract.moviesRemaining}/{contract.totalMovies} Movies Left

@@ -1,0 +1,9 @@
+
+> pr-6.6.3@1.0.25 audit:distribution-revenue
+> esbuild scripts/audit-distribution-revenue.ts --bundle --platform=node --format=esm --outfile=/tmp/audit-distribution-revenue.mjs && node /tmp/audit-distribution-revenue.mjs
+
+
+  ../../../../tmp/audit-distribution-revenue.mjs  3.9mb ⚠️
+
+⚡ Done in 51ms
+Distribution revenue audit passed.

@@ -1,0 +1,20 @@
+{
+  "extends": "../../../tsconfig.json",
+  "files": [
+    "../../../scripts/audit-series-mod-safety.ts",
+    "../../../services/seriesStreamingValue.ts",
+    "../../../services/streamingBidding.ts",
+    "../../../services/legacyLogic.ts",
+    "../../../services/saveMigration.ts",
+    "../../../views/lifestyle/business/ReleaseWizard.tsx",
+    "../../../services/gameLoop.ts",
+    "../../../scripts/audit-series-value.ts",
+    "../../../scripts/audit-series-automatic.ts",
+    "../../../scripts/audit-series-mod-flow.ts",
+    "../../../scripts/audit-series-regional-distribution.ts"
+  ],
+  "include": [],
+  "exclude": [
+    "../../../functions"
+  ]
+}

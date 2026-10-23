@@ -1,0 +1,6 @@
+PASS current buyer spending restrictions
+PASS compatible non-exclusive series rights retain a second buyer
+PASS observed series results affect value; unrelated franchises and production cost do not
+PASS automatic buyers have a supported cash authority
+PASS pending signed obligations reduce available bidding cash
+PASS exact release UI handler rejects oversized old offers, signs real current offer and pays once

@@ -1,0 +1,73 @@
+{
+  "verifiedAtUtc": "2026-10-23T09:18:32.763169+00:00",
+  "head": "9d8fcc1b8892e1b8f5784da56fb42ad9d6145a9a",
+  "branch": "codex/streaming-tap-lag",
+  "scopeSha256": {
+    "package.json": "4d49f68a0e9988490ce94bbab03acdcc1913a1fef3956e00d5ed6874fe05384f",
+    "types.ts": "195f09a37b89b51f4184be46346ce6147f5c79862b7b2e79b6136789c052b284",
+    "services/npcRetention.ts": "2ad7f47a17f53c9f667692df09e7017f4a2c1972cf088adf430ea0e26d47034f",
+    "services/talentRoster.ts": "da0fd05e3ac8b62af99b16153a4fec8836a66f241cf0c8bf46fb1336e8b59ea4",
+    "services/talentNegotiation.ts": "398f86196a9e668b639caed00ec158b4ddc7c8ea1a774378bced5a375dc5feb6",
+    "services/livingEnsemble.ts": "c79e5b1714cd1a6518f7e6cafbc19da60fdc628177dbb819b3bc1bb852bc2e9d",
+    "services/gameLoop.ts": "aa0155ef0c8adff30e7e2c6f849acfb17f57748568530a444862cb232421fee8",
+    "services/saveCompaction.ts": "0745ca09020b851b2f14597513c47e30732f8fda1e1d2515f34539e1abe90039",
+    "services/saveGenerations.ts": "fd474bbf8fc134653f9400cbb00d8f11ed1ae8746d1ca778bc45bdb8d2aed79d",
+    "services/saveMigration.ts": "e4de78071155d4cd74b1bcd1191144c2fa73bc5f9f11df626ec76ee4d46544a9",
+    "views/StudioPage.tsx": "a0405565a723b86d6b61377a57d902050cf13188574bd294804aa9878ba3eefd",
+    "views/lifestyle/business/greenlightUtils.ts": "badd310b93cdde590a9d615b12f17d12495faf56430817af9183e43e10538365",
+    "views/lifestyle/business/GreenlightWizard.tsx": "dd9a1c69886d981f80f93eca9fd9e555518f3850d7f8974069dd3771fad1cf9a",
+    "views/lifestyle/business/greenlightValidation.ts": "0309044cd65bdd484a3dd5fe0bd3438460f01ac188e2e6e592717490363a6ef6",
+    "views/lifestyle/business/greenlightProjectBuilder.ts": "6c6066cb934aabec1e5de76d7128a4144a1b0f8a3f7543c05e234fd09ac46ef1",
+    "views/lifestyle/business/components/GreenlightCastStep.tsx": "aef0e3f64499647286679350ff74c5ebf29cea416d944fe2b37de550ca39b441",
+    "scripts/audit-talent-retention.ts": "6e3710b8795ead8bdcaa2514ecdbb904376c71d6e895e018e4d613447bf3701b",
+    "scripts/audit-talent-roster-flow.ts": "5920f2d0e78b6a357bd706ad1ae5bc8381072077faafe1d82aa8cc5f910ad6ac",
+    "scripts/audit-talent-save-recovery.ts": "9865bca08680555dda63d87e4e6aaa10c97c4ada0b786d48ba1656a86a869418"
+  },
+  "verification": {
+    "audit:talent-retention": {
+      "exit": 0,
+      "groups": 13
+    },
+    "audit:talent-save-recovery": {
+      "exit": 0,
+      "cases": 15
+    },
+    "audit:talent-roster-flow": {
+      "exit": 0,
+      "hires": 4,
+      "originalMovies": 2,
+      "sequels": 2,
+      "actualWeeks": 72,
+      "verifiedSaveReloads": 26
+    },
+    "audit:talent-contracts": {
+      "exit": 0
+    },
+    "audit:save-generations": {
+      "exit": 0
+    },
+    "audit:save-integrity": {
+      "exit": 0
+    },
+    "audit:dynasty-career": {
+      "exit": 0
+    },
+    "build": {
+      "exit": 0
+    },
+    "scopedTypecheck": {
+      "exit": 0,
+      "config": "docs/reports/2026-10-23-talent-retention/tsconfig.json"
+    },
+    "repositoryTypecheck": {
+      "exit": 2,
+      "existingFailure": "vite.config.ts TS2769; plugin.enforce string is not pre | post"
+    },
+    "diffCheck": {
+      "exit": 0
+    }
+  },
+  "review": "Retention, deceased actor guards and narrowed backup provenance independently reviewed; no remaining actionable findings.",
+  "browser": "Real StudioPage signing UI and QA subset reload, missing profile at 320/390/1440px, exact snapshot recovery at 390px. Complete engine/generation flow tested separately.",
+  "preservation": "No personal save loaded; isolated fixtures only. Unrelated concurrent work preserved. No stage/commit/push/reset/restore performed."
+}

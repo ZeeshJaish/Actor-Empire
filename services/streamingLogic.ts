@@ -243,3 +243,10 @@ export const checkStreamingExit = (platformId: PlatformId, views: number, weeks:
 
     return false;
 };
+
+/** Existing size-based proxy for non-core operators; their signed buyer identity is retained. */
+export const getStreamingSimulationPlatformId = (platformId: string, subscribersMillions: number): PlatformId => (
+    Object.prototype.hasOwnProperty.call(PLATFORMS, platformId) ? platformId as PlatformId
+        : subscribersMillions >= 150 ? 'NETFLIX' : subscribersMillions >= 75 ? 'DISNEY_PLUS'
+            : subscribersMillions >= 25 ? 'HULU' : 'APPLE_TV'
+);

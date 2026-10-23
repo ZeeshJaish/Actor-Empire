@@ -1,0 +1,3 @@
+{"actorProfilePresent":true,"actualRosterComponentCount":1,"actualActorCardVisible":true,"emptyStateVisible":false}
+{"actorProfilePresent":false,"actualRosterComponentCount":1,"actualActorCardVisible":false,"emptyStateVisible":false}
+PASS real StudioPage rendering reproduces count=1 with no actor card and no empty-state explanation.

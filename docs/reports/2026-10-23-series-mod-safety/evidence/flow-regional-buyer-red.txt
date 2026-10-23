@@ -1,0 +1,37 @@
+
+> pr-6.6.3@1.0.25 audit:series-mod-flow
+> esbuild scripts/audit-series-mod-flow.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-series-mod-flow.mjs && node /tmp/ae-series-mod-flow.mjs
+
+
+  ../../../../tmp/ae-series-mod-flow.mjs  9.7mb ⚠️
+
+⚡ Done in 263ms
+PASS production proj_8000000 1 PRE_PRODUCTION
+PASS production proj_8000000 7 PRODUCTION
+PASS production proj_8000000 8 PRODUCTION
+PASS production proj_8000000 15 POST_PRODUCTION
+PASS production proj_8000000 16 POST_PRODUCTION
+PASS production proj_8000000 24 POST_PRODUCTION
+PASS production proj_8000000 27 AWAITING_RELEASE
+PASS signed proj_8000000: guarantee 131800000, production fund 0, locked next-season fund 0; one payment
+PASS production proj_8000001 1 PRE_PRODUCTION
+PASS production proj_8000001 7 PRODUCTION
+PASS production proj_8000001 8 PRODUCTION
+PASS production proj_8000001 16 PRODUCTION
+PASS production proj_8000001 18 POST_PRODUCTION
+PASS production proj_8000001 24 POST_PRODUCTION
+PASS production proj_8000001 30 AWAITING_RELEASE
+PASS signed proj_8000001: guarantee 165300000, production fund 0, locked next-season fund 0; one payment
+file:///private/tmp/ae-series-mod-flow.mjs:108285
+    platform.audienceMult * 32 + regionBreakdowns.filter((region) => region.audienceShare >= 0.08).length * 7,
+             ^
+
+TypeError: Cannot read properties of undefined (reading 'audienceMult')
+    at calculateStreamingDistributionBreakdown (file:///private/tmp/ae-series-mod-flow.mjs:108285:14)
+    at file:///private/tmp/ae-series-mod-flow.mjs:162373:40
+    at Array.forEach (<anonymous>)
+    at processGameWeek (file:///private/tmp/ae-series-mod-flow.mjs:161518:14)
+    at async tick (file:///private/tmp/ae-series-mod-flow.mjs:168579:13)
+    at async file:///private/tmp/ae-series-mod-flow.mjs:168714:3
+
+Node.js v24.11.1

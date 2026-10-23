@@ -1,3 +1,4 @@
+import { buildSeriesStreamingSessionInput, quoteSeriesStreamingRights } from '../../../services/seriesStreamingValue';
 import { quoteCinemaRightsForBuyer, applyCinemaRightsQuoteToBidder } from '../../../services/boxOffice/boxOfficeRightsAdapter';
 import React, { useState, useMemo } from 'react';
 import { commitCinemaReleaseExposure } from '../../../services/boxOffice/boxOfficeExposureAdapters';
@@ -636,7 +637,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
             studioPlatformRelations: studio?.studioState?.platformRelations || {},
         });
         try {
-        const session = createStreamingBiddingSession({
+        const roomInput: Parameters<typeof createStreamingBiddingSession>[0] = {
             projectId: project.id,
             title: project.name || project.title || 'Untitled project',
             sellerStudioId: biddingSellerStudioId,
@@ -670,7 +671,10 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                     strategicCountryIds: worldPlatform?.ai?.capabilities.activeCountryIds || platform.strategicCountryIds,
                 };
             }),
-        });
+        };
+        const session = createStreamingBiddingSession(isSeries
+            ? buildSeriesStreamingSessionInput(player, project.projectDetails, project.id, biddingLotBuild.lot, roomInput.platforms)
+            : roomInput);
         persistBiddingSession(session);
         } catch(error) {setBiddingRightsMessage(error instanceof Error ? error.message : 'No eligible buyer can fund this room.');}
     };
@@ -725,6 +729,13 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
             const quote=quoteCinemaRightsForBuyer(player,project.projectDetails || project,project.id,bid.platformId,promisedPremiereAbsoluteWeek,structuredAcceptance.offer.durationWeeks,structuredAcceptance.offer.countryIds,structuredAcceptance.offer.exclusivity,structuredAcceptance.offer.windowType);
             if(!quote.eligible || Math.round(structuredAcceptance.offer.fixedExposure*100)>quote.maximumBidCents){
                 setBiddingRightsMessage('Buyer resources or audience value changed. Reopen the room for an affordable offer.');return;
+            }
+        }
+        if (structuredAcceptance && isSeries && !Object.values(player.world.streamingRightsContracts || {}).some((c:import('../../../types').StreamingRightsContract)=>c.sourceOfferId===structuredAcceptance.offer.id)) {
+            const quote = quoteSeriesStreamingRights(player, project.projectDetails, project.id, bid.platformId,
+                promisedPremiereAbsoluteWeek, structuredAcceptance.offer.durationWeeks, structuredAcceptance.offer);
+            if (structuredAcceptance.offer.fixedExposure > quote.maximumBid) {
+                setBiddingRightsMessage('Buyer resources or audience value changed. Reopen the room for an affordable offer.'); return;
             }
         }
         const preparedSigning = structuredAcceptance

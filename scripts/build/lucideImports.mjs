@@ -5,6 +5,7 @@ import {dirname,join} from 'node:path';
 /** Resolve named exports through the installed package's own export table.
  * Avoid traversing thousands of unused icons. Namespace/default imports retain
  * the upstream barrel, including its complete public export semantics.
+ * @returns {import('vite').Plugin}
  */
 export function lucideBuildImports(){
  const require=createRequire(import.meta.url),directory=dirname(require.resolve('lucide-react/package.json'));

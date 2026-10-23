@@ -1,0 +1,6 @@
+### Result
+{"rosterCount":1,"actor":"Milo Hayes","moviesRemaining":3,"money":1990000000,"identityMatchesSignedSnapshot":true}
+### Ran Playwright code
+```js
+await (async (page) => { if (!(await page.getByRole('button',{name:'Roster (1)',exact:true}).isVisible())) throw new Error('Contract count incorrect'); const saved=await page.evaluate(()=>JSON.parse(localStorage.getItem('ae-talent-retention-qa-only'))); if(saved.contracts[0].actorSnapshot.id!==saved.actors[0].id)throw new Error('Signed identity mismatch'); if(!(await page.getByRole('heading',{name:saved.actors[0].name,exact:true}).isVisible()))throw new Error('Hired actor not visible after reload'); await page.screenshot({path:'output/playwright/talent-retention/hired-roster.png'}); return {rosterCount:1,actor:saved.actors[0].name,moviesRemaining:saved.contracts[0].moviesRemaining,money:saved.money,identityMatchesSignedSnapshot:true}; })(page);
+```

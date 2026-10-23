@@ -1,0 +1,11 @@
+{
+  "App.tsx": "44724593c32e589e671153b29e2b90f9b7a8bb7da3515bdcd17f75dd5f02ae36",
+  "services/legacyLogic.ts": "4eb5cd5dd50f4dc1ae857c4a6ce08523b4fc198980efd3c54890d0cedadd6d3c",
+  "services/saveMigration.ts": "e4de78071155d4cd74b1bcd1191144c2fa73bc5f9f11df626ec76ee4d46544a9",
+  "services/youtubeLogic.ts": "dd868476fd403b35b46ae0456383b1a473597c73833a29573717778620de9093",
+  "views/SettingsPage.tsx": "4e1d15171958e7f9c2cb373a5ad98c044a27d0d8bca6b6583e2000f9b46c7813",
+  "views/lifestyle/business/ReleaseWizard.tsx": "ed976315f5fddd73b0abd395c4bca8fd83ca17f562811f7ac17ed5dab4ac44ba",
+  "services/streamingBidding.ts": "d1f8267edc6b8f6e0a33a2db915f95d42cc6e3fa5ea17b2b1bfc62f5926bb9c9",
+  "services/boxOffice/boxOfficeRightsAdapter.ts": "3405d8657d1af44380e8098b1f9d8fea26e4827610a4eec2c63ced78213e75b2",
+  "services/boxOffice/boxOfficeRightsValue.ts": "e6e54ed7d775d5aa09f9d16aeb7074f1d50350634e15817a88989dc12ceb2ecd"
+}

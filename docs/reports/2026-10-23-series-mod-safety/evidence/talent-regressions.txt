@@ -1,0 +1,22 @@
+
+> pr-6.6.3@1.0.25 audit:talent-retention
+> esbuild scripts/audit-talent-retention.ts --bundle --platform=node --format=cjs --loader:.csv=text --outfile=/tmp/ae-talent-retention.cjs && node /tmp/ae-talent-retention.cjs
+
+
+  ../../../../tmp/ae-talent-retention.cjs  8.8mb ⚠️
+
+⚡ Done in 223ms
+PASS quarterly cleanup preserves an active hired actor despite 400 newer profiles
+PASS save compaction protects past cast
+PASS save compaction protects sequel draft
+PASS save compaction protects subsidiary contract
+PASS save compaction protects universe
+PASS save compaction protects relationship
+PASS an unresolved old contract still renders its saved name, terms and recovery state
+PASS newly hired contract preserves an exact actor snapshot through normalization and load
+PASS restoring a missing snapshot does not reprice or reset a legacy installment contract
+PASS finite film uses and outstanding installments remain separate and idempotent
+PASS profile recovery never revives a deceased dynasty actor
+PASS unknown inherited cast stays visible but cannot be silently funded
+PASS mirror reconciliation keeps a valid snapshot and newer live statistics win
+Talent retention: 13 groups passed.

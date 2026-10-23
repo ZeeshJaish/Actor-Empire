@@ -2,12 +2,13 @@ import { inspectStockSaveContainers, inspectStockSaveCompatibility, migrateStock
 import { CinemaMigrationError, inspectCinemaSavedState, migrateCinemaState } from './boxOffice/boxOfficeMigration';
 import { preserveCinemaCastRecognition } from './boxOffice/boxOfficeInputs';
 import { repairTalentNegotiations } from './talentNegotiation';
+import { isKnownDeceasedNpc, restoreContractActorProfiles } from './npcRetention';
 import { normalizeCinemaReceiptHistory } from './boxOffice/boxOfficeReceiptHistory';
 import { INITIAL_PLAYER, type Business, type Message, type NewsItem, type Player, type PortfolioItem, type Relationship, type ScheduledEvent, type Stock, type StockTakeoverCase } from '../types';
 import { ensureLifestyleActivityState } from './lifestyleActivities';
 import { getAbsoluteWeek, getRelationshipContactAbsoluteWeek, inferStreamingStartWeekAbsolute } from './legacyLogic';
 import { normalizeNewPlayerTutorialState } from './newPlayerTutorial';
-import { createGlobalActorPackNPCs } from './npcLogic';
+import { createGlobalActorPackNPCs, recoverInheritedGlobalActorPackIds } from './npcLogic';
 import {
     getStockOutstandingShares,
     initializeStocks,
@@ -764,7 +765,11 @@ const migrateFlags = (flags: any, player: Player) => {
             nextFlags.acquisitionDebtLegacyRefundWeekKey = `${player.age}:${player.currentWeek}`;
         }
     }
-    const enabledGlobalActorPacks = toArray<string>(nextFlags.enabledGlobalActorPacks).map(String);
+    // Preserve exact signed profiles before optional pack catalogue hydration.
+    // Otherwise a regenerated catalogue row could replace a missing saved actor.
+    const profileRepair = restoreContractActorProfiles({ ...player, flags: nextFlags } as Player);
+    if (profileRepair.flags?.extraNPCs) nextFlags.extraNPCs = profileRepair.flags.extraNPCs;
+    const enabledGlobalActorPacks = recoverInheritedGlobalActorPackIds(nextFlags as Player['flags']);
     if (enabledGlobalActorPacks.length > 0) {
         const existingExtraNPCs = toObjectSeries<any>(nextFlags.extraNPCs);
         const existingKeys = new Set([
@@ -775,6 +780,7 @@ const migrateFlags = (flags: any, player: Player) => {
         const missingPackNPCs = packNPCs.filter(npc => {
             const id = String(npc.id || '');
             const name = String(npc.name || '');
+            if (isKnownDeceasedNpc({ flags: nextFlags } as Player, id)) return false;
             if (existingKeys.has(id) || existingKeys.has(name)) return false;
             existingKeys.add(id);
             existingKeys.add(name);
@@ -1338,11 +1344,11 @@ export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
             ),
         },
     };
-    const repairedPlayer = repairTalentNegotiations(normalizePlayerProfileAvatars(migrateLegacyCharacterIdentity(reverseLegacyImportedAcquisitionDebtCharge(
+    const repairedPlayer = restoreContractActorProfiles(repairTalentNegotiations(normalizePlayerProfileAvatars(migrateLegacyCharacterIdentity(reverseLegacyImportedAcquisitionDebtCharge(
         repairAcquiredStudioAssetPortfolios(
             repairInDevelopmentContinuationScripts(repairAcquiredStudioFinance(migratedPlayer)),
         ),
-    ))));
+    )))));
     const productionHouses = repairedPlayer.businesses.filter(business => business.type === 'PRODUCTION_HOUSE');
     const parentStudio = productionHouses.find(business => (
         business.studioState?.acquisitionOrigin !== 'STUDIO_ACQUISITION'

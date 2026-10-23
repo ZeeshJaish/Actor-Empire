@@ -1,4 +1,5 @@
 import { StudioContract } from '../types';
+import { isActorProfileSnapshot } from './npcRetention';
 
 type StudioContractInput = Partial<StudioContract> & {
     actorId?: unknown;
@@ -35,6 +36,7 @@ export const normalizeStudioContract = (
         id,
         ...(typeof value.studioId === 'string' && value.studioId ? { studioId: value.studioId } : {}),
         npcId,
+        ...(isActorProfileSnapshot(value.actorSnapshot, npcId) ? { actorSnapshot: value.actorSnapshot } : {}),
         type: 'MOVIE_DEAL',
         paymentMode: value.paymentMode === 'WEEKLY_INSTALLMENTS' ? 'WEEKLY_INSTALLMENTS' : 'UPFRONT',
         totalAmount,
@@ -85,6 +87,7 @@ export const mergeParentStudioTalentRosters = (
                 ? 'TERMINATED' : existing.status === 'EXPIRED' || normalized.status === 'EXPIRED' || moviesRemaining <= 0 ? 'EXPIRED' : 'ACTIVE';
             byIdentity.set(identity, {
                 ...existing, moviesRemaining, status,
+                ...(!existing.actorSnapshot && normalized.actorSnapshot ? { actorSnapshot: normalized.actorSnapshot } : {}),
                 installmentsPaid: Math.max(existing.installmentsPaid, normalized.installmentsPaid),
                 amountPaid: Math.max(existing.amountPaid || 0, normalized.amountPaid || 0),
                 lastPaymentAbsoluteWeek: Math.max(existing.lastPaymentAbsoluteWeek ?? -1, normalized.lastPaymentAbsoluteWeek ?? -1),

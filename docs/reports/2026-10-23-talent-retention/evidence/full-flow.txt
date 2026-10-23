@@ -1,0 +1,20 @@
+PASS original-production week 1: PRE_PRODUCTION,PRE_PRODUCTION
+PASS original-production week 7: PRODUCTION,PRODUCTION
+PASS original-production week 8: PRODUCTION,PRODUCTION
+PASS original-production week 16: PRODUCTION,PRODUCTION
+PASS original-production week 19: POST_PRODUCTION,PRODUCTION
+PASS original-production week 20: POST_PRODUCTION,POST_PRODUCTION
+PASS original-production week 24: POST_PRODUCTION,POST_PRODUCTION
+PASS original-production week 31: AWAITING_RELEASE,POST_PRODUCTION
+PASS original-production week 32: AWAITING_RELEASE,AWAITING_RELEASE
+PASS sequel-production week 1: PRE_PRODUCTION,PRE_PRODUCTION
+PASS sequel-production week 7: PRODUCTION,PRODUCTION
+PASS sequel-production week 8: PRODUCTION,PRODUCTION
+PASS sequel-production week 15: PRODUCTION,POST_PRODUCTION
+PASS sequel-production week 16: PRODUCTION,POST_PRODUCTION
+PASS sequel-production week 20: POST_PRODUCTION,POST_PRODUCTION
+PASS sequel-production week 24: POST_PRODUCTION,POST_PRODUCTION
+PASS sequel-production week 27: POST_PRODUCTION,AWAITING_RELEASE
+PASS sequel-production week 28: POST_PRODUCTION,DELIVERED
+PASS sequel-production week 32: AWAITING_RELEASE,DELIVERED
+PASS four hires (generated + built-in; parent + subsidiary; upfront + installments) → two original movies → real premieres → two sequels → full production → five next weeks; 75 actual weeks and 28 verified save/reloads. Actors, contracts, cash, shares and ownership preserved.

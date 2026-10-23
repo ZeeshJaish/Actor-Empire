@@ -14,19 +14,22 @@ import {commitCinemaWeek} from '../../../../services/boxOffice/boxOfficeLiveSett
 import {createSaveIntegrityManifest} from '../../../../services/saveIntegrity';
 import {cinemaAuditRandom,cinemaAuditClock,readCinemaAuditCheckpoint,writeCinemaAuditCheckpoint} from '../../../../scripts/fixtures/cinemaAuditCheckpoint';
 import type {CinemaWeekResult} from '../../../../services/boxOffice/boxOfficeTypes';
-import type {Player} from '../../../../types';
+import type {Player,Genre} from '../../../../types';
 const seed=Number(process.env.CAREER_SEED||0),horizon=Number(process.env.CAREER_WEEKS||208);
+const policyGenre=(process.env.CAREER_GENRE||'DRAMA') as Genre;
+assert.ok(['DRAMA','COMEDY','ACTION'].includes(policyGenre));
 const out=process.env.CAREER_OUTPUT||'/private/tmp/actor-cinema-career-economics-20261023';mkdirSync(out,{recursive:true});
 const executionCodeSha256=createHash('sha256').update(readFileSync(new URL(import.meta.url))).digest('hex');
 const checkpointPath=`${out}/career-${seed}-checkpoint.json.gz`,batchWeeks=Number(process.env.CAREER_BATCH_WEEKS||13);
 assert.ok(Number.isInteger(batchWeeks)&&batchWeeks>0&&batchWeeks%13===0);
 const checkpoint=process.env.CAREER_RESUME==='0'?undefined:readCinemaAuditCheckpoint<any>(checkpointPath);
-if(checkpoint){assert.equal(checkpoint.executionCodeSha256,executionCodeSha256,'Checkpoint source differs');assert.equal(checkpoint.seed,seed);assert.equal(checkpoint.horizon,horizon)}
+if(checkpoint){assert.equal(checkpoint.executionCodeSha256,executionCodeSha256,'Checkpoint source differs');assert.equal(checkpoint.seed,seed);assert.equal(checkpoint.horizon,horizon);assert.equal(checkpoint.policyGenre||'DRAMA',policyGenre)}
 const rng=cinemaAuditRandom(`ordinary-career-economics:${seed}`,checkpoint?.randomCalls||0),clock=cinemaAuditClock(checkpoint?.clockNext);
 Math.random=rng.next;Date.now=clock.now;
 let player:Player=checkpoint?.player??makeCinemaLongSave('ordinary-starter');if(!checkpoint)assert.equal(player.money,2000);
 const store=new CinemaMemorySaveStore(),key=`ordinary:${seed}`,actions:CareerAction[]=checkpoint?.actions||[],ownIds=new Set<string>(checkpoint?.ownIds||[]);
 const metadata=new Map<string,any>(checkpoint?.metadata||[]),ownWeekly=new Map<string,any[]>(checkpoint?.ownWeekly||[]);
+const capturedPhases=new Set<string>(checkpoint?.capturedPhases||[]);
 let saves=checkpoint?.saves||0,reloads=checkpoint?.reloads||0,replays=checkpoint?.replays||0,executedWeeks=checkpoint?.executedWeeks||0,
  resumeBootstrapWrites=checkpoint?.resumeBootstrapWrites||0,failedPromotionChecked=checkpoint?.failedPromotionChecked||false,status='RUNNING',failure:string|undefined;
 const started=performance.now();
@@ -63,11 +66,11 @@ const report=()=>{
    producerNetAfterSignedSharesCents:t.producerReceiptsCents-t.bookingCostCents-t.talentPaidCents-t.actorPaidCents-t.investorPaidCents,
    weekly:ownWeekly.get(t.titleId)};
  });
- const row={kind:'NORMAL_INITIAL_PLAYER_CAREER_CURRENT_ACTION_POLICY',executionCodeSha256,seed,horizon,status,failure,executedWeeks,saves,reloads,replays,failedPromotionChecked,resumeBootstrapWrites,
+ const row={kind:'NORMAL_INITIAL_PLAYER_CAREER_CURRENT_ACTION_POLICY',executionCodeSha256,policyGenre,seed,horizon,status,failure,executedWeeks,saves,reloads,replays,failedPromotionChecked,resumeBootstrapWrites,
   startingMoney:2000,endingMoney:player.money,alive:!player.flags.isDead,health:player.stats.health,age:player.age,week:player.currentWeek,
   ownTitleIds:[...ownIds],ownPaidFilms:films.filter(f=>f.ownCredit),films,actions:actions.length,actionLog:actions,
   elapsedMs:elapsed(),saveBytes:serializedPlayer.length,playerSha256:createHash('sha256').update(serializedPlayer).digest('hex'),peakRssBytes,
-  limits:['One existing sustainable DRAMA/minor-role action policy; not all player strategies','No authored cash, skill, cast, delivered craft or audience grants',
+  limits:[`Sustainable ${policyGenre}/minor-role action policy; not all player strategies`,'No authored cash, skill, cast, delivered craft or audience grants',
    'Actual game loop each week, verified persistence at paid opening/closure or every 13 weeks; not full UI per week',
    'Open runs are censored and excluded from lifetime hit/flop denominators','Project theatrical result excludes future streaming/home media and investor ownership distributions']};
  writeFileSync(`${out}/career-${seed}.json`,JSON.stringify(row,null,2));
@@ -80,7 +83,11 @@ try{
  const batchStart=executedWeeks;
  for(let i=executedWeeks;i<horizon;i++){
   if(player.flags.isDead){status='CAREER_ENDED_DEATH';break}
-  player=prepareOrdinaryCinemaWeek(player,actions);assert.ok(player.money>=0,'Ordinary policy must fund its actions');
+  if(process.env.CAREER_CAPTURE_PHASES==='1')for(const c of player.commitments){
+   const phase=c.projectDetails?.type==='MOVIE'?c.projectPhase:undefined;
+   if(phase&&!capturedPhases.has(phase)){writeCinemaAuditCheckpoint(`${out}/career-${seed}-phase-${phase}.json.gz`,{executionCodeSha256,seed,policyGenre,executedWeeks,player});capturedPhases.add(phase)}
+  }
+  player=prepareOrdinaryCinemaWeek(player,actions,policyGenre);assert.ok(player.money>=0,'Ordinary policy must fund its actions');
   for(const c of player.commitments)if(c.projectDetails?.type==='MOVIE')ownIds.add(c.id);
   const priorClock=getAbsoluteWeek(player.age,player.currentWeek);let cinema:CinemaWeekResult|undefined;
   const r=await processGameWeek(player,{onCinemaResult:x=>cinema=x});assert.ok(cinema);
@@ -118,7 +125,7 @@ try{
   if(player.money<0){status='CAREER_UNFUNDED';break}
   if(executedWeeks-batchStart>=batchWeeks&&executedWeeks<horizon){
    writeCinemaAuditCheckpoint(checkpointPath,{executionCodeSha256,seed,horizon,player,actions,ownIds:[...ownIds],metadata:[...metadata],ownWeekly:[...ownWeekly],
-    saves,reloads,replays,executedWeeks,resumeBootstrapWrites,failedPromotionChecked,randomCalls:rng.calls(),clockNext:clock.next(),elapsedMs:elapsed(),peakRssBytes});
+    policyGenre,capturedPhases:[...capturedPhases],saves,reloads,replays,executedWeeks,resumeBootstrapWrites,failedPromotionChecked,randomCalls:rng.calls(),clockNext:clock.next(),elapsedMs:elapsed(),peakRssBytes});
    status='CHECKPOINT_READY';break;
   }
  }

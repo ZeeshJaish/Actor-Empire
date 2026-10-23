@@ -1,4 +1,5 @@
 import { consumeTalentUses } from '../../../services/talentRoster';
+import { isMissingMovieActorProfile } from './greenlightUtils';
 import { preserveCinemaCastRecognition } from '../../../services/boxOffice/boxOfficeInputs';
 import { commitCinemaAnnouncement, prepareCinemaPackageExposure } from '../../../services/boxOffice/boxOfficeExposureAdapters';
 import { getAbsoluteWeek } from '../../../services/legacyLogic';
@@ -205,6 +206,8 @@ export const buildGreenlightProject = ({
             }
         }
 
+        const missingActors = castList.filter(c => isMissingMovieActorProfile(c.actorId, player.flags.extraNPCs || []));
+        if (missingActors.length) throw new Error(`Actor profile unavailable: ${missingActors.map(c => c.actorName || c.actorId).join(', ')}. Restore a verified backup or recast before greenlighting.`);
         const safeMovieCastList = castList.filter(c => (
             isCastableMovieRoleId(c.actorId, player.flags.extraNPCs || [])
         ));

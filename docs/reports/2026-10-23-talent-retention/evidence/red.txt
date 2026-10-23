@@ -1,0 +1,54 @@
+FAIL quarterly cleanup preserves an active hired actor despite 400 newer profiles: Expected values to be strictly deep-equal:
++ actual - expected
+
++ undefined
+- {
+-   avatar: 'data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%2
+FAIL save compaction protects past cast: Expected values to be strictly deep-equal:
++ actual - expected
+
++ undefined
+- {
+-   avatar: 'data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%2
+FAIL save compaction protects sequel draft: Expected values to be strictly deep-equal:
++ actual - expected
+
++ undefined
+- {
+-   avatar: 'data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%2
+PASS save compaction protects subsidiary contract
+PASS save compaction protects universe
+PASS save compaction protects relationship
+FAIL an unresolved old contract still renders its saved name, terms and recovery state: The expression evaluated to a falsy value:
+
+  ok(html.includes(actor.name))
+
+FAIL newly hired contract preserves an exact actor snapshot through normalization and load: Expected values to be strictly equal:
++ actual - expected
+
++ undefined
+- 'retention-qa-actor'
+
+FAIL restoring a missing snapshot does not reprice or reset a legacy installment contract: Expected values to be strictly deep-equal:
++ actual - expected
+
++ undefined
+- {
+-   avatar: 'data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%2
+PASS finite film uses and outstanding installments remain separate and idempotent
+/private/tmp/ae-talent-retention.cjs:153681
+if (failed) throw new Error(`${failed}/${cases.length} talent retention checks failed`);
+            ^
+
+Error: 6/10 talent retention checks failed
+    at Object.<anonymous> (/private/tmp/ae-talent-retention.cjs:153681:19)
+    at Module._compile (node:internal/modules/cjs/loader:1761:14)
+    at Object..js (node:internal/modules/cjs/loader:1893:10)
+    at Module.load (node:internal/modules/cjs/loader:1481:32)
+    at Module._load (node:internal/modules/cjs/loader:1300:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+    at node:internal/main/run_main_module:33:47
+
+Node.js v24.11.1

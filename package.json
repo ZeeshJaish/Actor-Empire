@@ -624,7 +624,12 @@
     "audit:script-variations": "esbuild scripts/audit-script-variations.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-script-variations.mjs && node /tmp/ae-script-variations.mjs",
     "audit:script-variation-flow": "esbuild scripts/audit-script-variation-flow.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-script-variation-flow.mjs && node /tmp/ae-script-variation-flow.mjs",
     "audit:script-broad-expansion": "esbuild scripts/audit-script-broad-expansion.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-script-broad-expansion.mjs && node /tmp/ae-script-broad-expansion.mjs",
-    "audit:script-broad-flow": "esbuild scripts/audit-script-broad-flow.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-script-broad-flow.mjs && node /tmp/ae-script-broad-flow.mjs"
+    "audit:script-broad-flow": "esbuild scripts/audit-script-broad-flow.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-script-broad-flow.mjs && node /tmp/ae-script-broad-flow.mjs",
+    "audit:talent-retention": "esbuild scripts/audit-talent-retention.ts --bundle --platform=node --format=cjs --loader:.csv=text --outfile=/tmp/ae-talent-retention.cjs && node /tmp/ae-talent-retention.cjs",
+    "audit:talent-roster-flow": "esbuild scripts/audit-talent-roster-flow.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-talent-roster-flow.mjs && node /tmp/ae-talent-roster-flow.mjs",
+    "audit:talent-save-recovery": "esbuild scripts/audit-talent-save-recovery.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-talent-save-recovery.mjs && node /tmp/ae-talent-save-recovery.mjs",
+    "audit:series-mod-safety": "esbuild scripts/audit-series-mod-safety.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-series-mod-safety.mjs && node /tmp/ae-series-mod-safety.mjs && esbuild scripts/audit-series-value.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-series-value.mjs && node /tmp/ae-series-value.mjs && esbuild scripts/audit-series-automatic.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-series-automatic.mjs && node /tmp/ae-series-automatic.mjs && esbuild scripts/audit-series-regional-distribution.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-series-regional.mjs && node /tmp/ae-series-regional.mjs",
+    "audit:series-mod-flow": "esbuild scripts/audit-series-mod-flow.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-series-mod-flow.mjs && node /tmp/ae-series-mod-flow.mjs"
   },
   "dependencies": {
     "@capacitor-community/admob": "^8.0.0",

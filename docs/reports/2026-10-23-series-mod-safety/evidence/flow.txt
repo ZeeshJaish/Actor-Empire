@@ -1,0 +1,29 @@
+
+> pr-6.6.3@1.0.25 audit:series-mod-flow
+> esbuild scripts/audit-series-mod-flow.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-series-mod-flow.mjs && node /tmp/ae-series-mod-flow.mjs
+
+
+  ../../../../tmp/ae-series-mod-flow.mjs  9.7mb ⚠️
+
+⚡ Done in 125ms
+PASS production proj_8000000 1 PRE_PRODUCTION
+PASS production proj_8000000 7 PRODUCTION
+PASS production proj_8000000 8 PRODUCTION
+PASS production proj_8000000 16 PRODUCTION
+PASS production proj_8000000 18 POST_PRODUCTION
+PASS production proj_8000000 24 POST_PRODUCTION
+PASS production proj_8000000 30 AWAITING_RELEASE
+PASS signed proj_8000000: guarantee 78900000, production fund 0, locked next-season fund 0; one payment
+PASS production proj_8000001 1 PRE_PRODUCTION
+PASS production proj_8000001 7 PRODUCTION
+PASS production proj_8000001 8 PRODUCTION
+PASS production proj_8000001 16 PRODUCTION
+PASS production proj_8000001 19 POST_PRODUCTION
+PASS production proj_8000001 24 POST_PRODUCTION
+PASS production proj_8000001 31 AWAITING_RELEASE
+PASS signed proj_8000001: guarantee 118900000, production fund 0, locked next-season fund 0; one payment
+PASS living parent → son → 3 weeks/reloads: mods, actors, contracts and inheritance preserved
+PASS living parent → daughter → 3 weeks/reloads: mods, actors, contracts and inheritance preserved
+PASS deceased parent → son → 3 weeks/reloads: mods, actors, contracts and inheritance preserved
+PASS deceased parent → daughter → 3 weeks/reloads: mods, actors, contracts and inheritance preserved
+PASS full series production → exact release signing → observed first season → higher actor demand/new contract → season two production/signing → next weeks → four succession paths; 88 actual game weeks, 39 verified save/reloads.

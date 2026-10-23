@@ -1,0 +1,17 @@
+{
+  "extends": "../../../tsconfig.json",
+  "files": [
+    "../../../scripts/audit-talent-retention.ts",
+    "../../../scripts/audit-talent-roster-flow.ts",
+    "../../../services/npcRetention.ts",
+    "../../../services/saveMigration.ts",
+    "../../../views/StudioPage.tsx",
+    "../../../views/lifestyle/business/GreenlightWizard.tsx",
+    "../../../views/lifestyle/business/components/GreenlightCastStep.tsx",
+    "../../../scripts/audit-talent-save-recovery.ts"
+  ],
+  "include": [],
+  "exclude": [
+    "../../../functions"
+  ]
+}

@@ -13,6 +13,8 @@ const root = resolve(here, '../../../..');
 const output = resolve(process.env.CAREER_OUTPUT || '/private/tmp/actor-cinema-career-economics-rerun');
 const seeds = (process.env.CAREER_SEEDS || '0,1,2,3').split(',').map(Number);
 const horizon = Number(process.env.CAREER_WEEKS || 208);
+const policyGenre=process.env.CAREER_GENRE||'DRAMA';
+if(!['DRAMA','COMEDY','ACTION'].includes(policyGenre))throw new Error('Choose an implemented ordinary career policy');
 const concurrency = Number(process.env.CAREER_CONCURRENCY || 1);
 const heapMB=Number(process.env.CAREER_CHILD_HEAP_MB||1536),batchWeeks=Number(process.env.CAREER_BATCH_WEEKS||13),maxBatches=Number(process.env.CAREER_MAX_BATCHES||0);
 if (!seeds.every(Number.isSafeInteger) || !Number.isSafeInteger(horizon) || horizon < 1
@@ -68,6 +70,7 @@ try {
         while(true){
             let prior;try{prior=JSON.parse(await readFile(join(output,`career-${seed}.json`),'utf8'))}catch{}
             if(prior&&(prior.executionCodeSha256!==signature||prior.horizon!==horizon))throw new Error('Existing evidence uses different source or horizon; keep it and choose a separate output folder');
+            if(prior&&(prior.policyGenre||'DRAMA')!==policyGenre)throw new Error('Existing evidence uses a different action policy; use a separate output folder');
             if(['HORIZON_COMPLETE','CAREER_ENDED_DEATH'].includes(prior?.status)){console.log(JSON.stringify({seed,status:'RETAIN_COMPLETED_RESULT',outcome:prior.status}));break}
             if(['AUDIT_OR_POLICY_FAILURE','CAREER_UNFUNDED'].includes(prior?.status)){failed=true;console.log(JSON.stringify({seed,status:'RETAIN_FAILED_RESULT',outcome:prior.status}));break}
             if(prior?.executedWeeks>0){try{await access(join(output,`career-${seed}-checkpoint.json.gz`))}catch{throw new Error('Interrupted evidence has no durable checkpoint; keep it and use a separate output folder')}}

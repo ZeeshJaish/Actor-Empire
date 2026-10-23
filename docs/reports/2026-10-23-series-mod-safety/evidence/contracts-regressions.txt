@@ -1,0 +1,43 @@
+
+> pr-6.6.3@1.0.25 audit:talent-contracts
+> esbuild scripts/audit-talent-signing.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-talent-signing.mjs && node /tmp/audit-talent-signing.mjs && esbuild scripts/audit-talent-contract-lifecycle.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-talent-contract-lifecycle.mjs && node /tmp/audit-talent-contract-lifecycle.mjs && npm run audit:greenlight-project-builder
+
+
+  ../../../../tmp/audit-talent-signing.mjs  6.3mb ⚠️
+
+⚡ Done in 107ms
+PASS monotonic money, prestige discounts, guarantee and ICON salary
+PASS immutable signing, one charge, duplicate, zero and affordability guards
+PASS persisted attempts and exact 12-week cooldown across new year
+PASS revising upwards uses fixed saved roll; repeating identical offer cannot reroll
+PASS subsidiary owner treasury and roster isolation
+PASS film obligations finish early, migration midway, exact settlement and no duplicate weekly charges
+PASS re-sign preserves prior debt; inactive contracts never consume uses
+PASS legacy unreachable week 61 cooldown repaired and expires
+PASS real studio prestige from awards and filmography improves discount acceptance
+PASS saved negotiation quote survives runtime NPC stats regeneration
+PASS full actor identity saved on signing/rejection and unique market cards
+PASS negotiation retry preserves actor genre experience
+
+  ../../../../tmp/audit-talent-contract-lifecycle.mjs  9.5mb ⚠️
+
+⚡ Done in 82ms
+PASS 1.5x guarantees acceptance even for independent ICON
+PASS invalid zero offer cannot sign
+PASS exhausted film uses retain and settle pending installments
+PASS stale HQ mirror cannot restore consumed uses or lose paid installments
+PASS migration preserves signed prices and legacy paid installments
+PASS signed weekly contract bills first next week once and mirrors both rosters
+PASS subsidiary expired deal continues EMI on its own treasury only
+PASS EMI ends before uses: no extra installment but upkeep continues
+
+> pr-6.6.3@1.0.25 audit:greenlight-project-builder
+> esbuild scripts/audit-greenlight-project-builder.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-greenlight-project-builder.mjs && node /tmp/audit-greenlight-project-builder.mjs
+
+
+  ../../../../tmp/audit-greenlight-project-builder.mjs  10.5mb ⚠️
+
+⚡ Done in 83ms
+Greenlight project builder audit passed: package, funding, and launch buzz preserve their core outputs.
+Greenlight contract lifecycle passed: one use per project, zero extra salary, last use retains unpaid EMI.
+Full talent flow passed: immutable signing -> zero cast salary -> funded Greenlight -> last use -> verified save preparation -> EMI after exhaustion -> migration/reload.

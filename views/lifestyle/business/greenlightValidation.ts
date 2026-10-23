@@ -60,6 +60,7 @@ export interface GreenlightValidationInput {
     crewModes: Record<string, GreenlightCrewMode>;
     selectedCrew: Record<string, string | null>;
     castRoles: readonly GreenlightValidationCastRole[];
+    missingActorProfileNames?: readonly string[];
     effectiveConnectedIntent: ConnectedProjectIntent;
     linkedKnownCastCount: number;
     hasUniverseConnection: boolean;
@@ -92,12 +93,14 @@ export const validateGreenlightProject = ({
     unresolvedReturningTalentNames,
     unresolvedReturningTalentCount,
     talentConflictNames = [],
+    missingActorProfileNames = [],
     effectiveStudioFundingPool,
     netGreenlightCashRequirement,
 }: GreenlightValidationInput): GreenlightValidationResult => {
     if (!hasSelectedScript) return { can: false, errors: ['No script selected'] };
 
     const errors: string[] = [];
+    if (missingActorProfileNames.length) errors.push(`Actor profile unavailable: ${[...new Set(missingActorProfileNames)].join(', ')}. Restore a verified backup or choose another actor before greenlighting.`);
     if (scriptStatus === 'IN_DEVELOPMENT') errors.push('Scripting is still in progress');
     if (selectedLocationCount === 0) errors.push('No filming locations selected');
     if (playerEnergy < energyCost) errors.push(`Greenlight needs ${energyCost} energy`);

@@ -1,0 +1,9 @@
+
+> pr-6.6.3@1.0.25 audit:legacy-inheritance
+> esbuild scripts/audit-legacy-inheritance.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-legacy-inheritance.mjs && node /tmp/audit-legacy-inheritance.mjs
+
+
+  ../../../../tmp/audit-legacy-inheritance.mjs  6.3mb ⚠️
+
+⚡ Done in 208ms
+Legacy inheritance audit passed.

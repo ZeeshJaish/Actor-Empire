@@ -64,7 +64,7 @@ console.log('PASS small funded campaign supports usable channel increments');
 // silently reusing the DRAMA policy for every purportedly different career.
 {
  const p=structuredClone(INITIAL_PLAYER),actions:CareerAction[]=[];
- p.stats.genreXP.DRAMA=100;p.stats.genreXP.COMEDY=0;
+ p.pendingEvents=[];p.stats.genreXP.DRAMA=100;p.stats.genreXP.COMEDY=0;
  const result=prepareOrdinaryCinemaWeek(p,actions,'COMEDY');
  assert.ok(result.stats.genreXP.COMEDY>0,'COMEDY strategy must actually train COMEDY');
  assert.equal(result.stats.genreXP.DRAMA,100,'Training choice must preserve other genre XP');

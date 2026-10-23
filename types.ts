@@ -8039,6 +8039,8 @@ export interface StudioContract {
     /** Owning production house. Missing on older saves means the parent/HQ studio. */
     studioId?: string;
     npcId: string;
+    /** Exact signed actor identity, used only if the live saved profile is missing. */
+    actorSnapshot?: NPCActor;
     type: ContractType;
     paymentMode: PaymentMode;
     totalAmount: number;

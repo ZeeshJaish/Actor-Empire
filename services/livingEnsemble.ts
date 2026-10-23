@@ -1,3 +1,4 @@
+import { retainReferencedNpcProfiles } from './npcRetention';
 import {
     type BackgroundCastingControl,
     type BackgroundCastingPlan,
@@ -622,7 +623,7 @@ export const processLivingEnsembleWeek = (player: Player): Player => {
         inbox: inbox.slice(0, 120),
         flags: {
             ...workingPlayer.flags,
-            extraNPCs: extraNPCs.slice(-240),
+            extraNPCs: retainReferencedNpcProfiles(workingPlayer, extraNPCs, 240),
             livingEnsembleState: state,
         },
     };

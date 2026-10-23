@@ -1,0 +1,10 @@
+
+> pr-6.6.3@1.0.25 audit:streaming-active-bidding-phase2
+> esbuild scripts/audit-streaming-active-bidding-phase2.ts --bundle --platform=node --format=cjs --loader:.csv=text --outfile=/tmp/audit-streaming-active-bidding-phase2.cjs && node /tmp/audit-streaming-active-bidding-phase2.cjs
+
+
+  ../../../../tmp/audit-streaming-active-bidding-phase2.cjs   7.0mb ⚠️
+  ../../../../tmp/audit-streaming-active-bidding-phase2.css  14.0kb
+
+⚡ Done in 152ms
+Streaming active bidding Phase 2 audit passed.

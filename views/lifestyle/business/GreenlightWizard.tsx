@@ -111,6 +111,8 @@ import {
     MUSIC_AVAILABILITY_SORT_SCORE,
     getCastableNpcById,
     isCastableMovieRoleId,
+    isMissingMovieActorProfile,
+    shouldPreserveReturningMovieRole,
     getInitialMusicArtistTargetCount,
     getInitialSelectedMusicCreditRoles,
     getMusicStrategyForSelectedRoles,
@@ -1057,7 +1059,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 if (details.castList && details.castList.length > 0 && isCastDefault) {
                     const returningBase = selectedScript.returningTalent || currentReturningTalent || [];
                     const newCastList = details.castList.filter((c: any) => (
-                        isCastableMovieRoleId(c.actorId, player.flags.extraNPCs || [])
+                        shouldPreserveReturningMovieRole(c.actorId, player.flags.extraNPCs || [])
                     )).map((c: any) => {
                         let salary = c.salary || 0;
                         // Check if this actor is in the returning talent list to get their new demand
@@ -1088,7 +1090,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                         const merged = [...(selectedScript.returningTalent || []), ...prev];
                         const existingKeys = new Set(merged.map((talent: any) => `${talent.id}:${talent.role}`));
                         const additions = details.castList
-                            .filter((c: any) => c.actorId && c.actorId !== 'UNKNOWN' && isCastableMovieRoleId(c.actorId, player.flags.extraNPCs || []))
+                            .filter((c: any) => c.actorId && c.actorId !== 'UNKNOWN' && shouldPreserveReturningMovieRole(c.actorId, player.flags.extraNPCs || []))
                             .map((c: any) => {
                                 const role = c.roleType === 'LEAD' ? 'LEAD_ACTOR' : 'SUPPORTING_ACTOR';
                                 const originalSalary = Math.max(100_000, Math.floor(c.salary || lastInstallment.budget * (c.roleType === 'LEAD' ? 0.08 : 0.03) || 100_000));
@@ -2482,6 +2484,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         crewModes,
         selectedCrew,
         castRoles: castList,
+        missingActorProfileNames: castList.filter(role => isMissingMovieActorProfile(role.actorId, player.flags.extraNPCs || [])).map(role => role.actorName || 'Selected actor'),
         effectiveConnectedIntent,
         linkedKnownCastCount: linkedUniverseCastCount,
         hasUniverseConnection: Boolean(selectedUniverseId || selectedScript?.universeId),
@@ -2493,7 +2496,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         talentConflictNames: selectedTalentConflictNames,
         effectiveStudioFundingPool,
         netGreenlightCashRequirement,
-    }), [selectedScript, selectedLocations, crewModes, selectedCrew, castList, effectiveStudioFundingPool, netGreenlightCashRequirement, unresolvedReturningTalent, selectedTalentConflictNames, effectiveConnectedIntent, linkedUniverseCastCount, selectedUniverseId, selectedFranchiseId, player.energy.current, greenlightEnergyCost]);
+    }), [selectedScript, selectedLocations, crewModes, selectedCrew, castList, player.flags.extraNPCs, effectiveStudioFundingPool, netGreenlightCashRequirement, unresolvedReturningTalent, selectedTalentConflictNames, effectiveConnectedIntent, linkedUniverseCastCount, selectedUniverseId, selectedFranchiseId, player.energy.current, greenlightEnergyCost]);
 
     const commissionBudgetError = isPlayerPlatformCommission && packageBudget > lockedStreamingFundingAmount
         ? `Package exceeds the ${platformCommissionOffer!.platformName} production cap by ${formatMoney(packageBudget - lockedStreamingFundingAmount)}. Reduce cast, crew, music, equipment, or locations.`

@@ -1,0 +1,12 @@
+CONTROL hire: {"contractCount":1,"remaining":3,"actorProfilePresent":true,"sequelCastEligible":true,"extraNpcCount":1}
+REPRO quarterly cleanup: {"contractCount":1,"remaining":3,"actorProfilePresent":false,"sequelCastEligible":false,"extraNpcCount":240}
+REPRO actual game week: {"contractCount":1,"remaining":3,"actorProfilePresent":false,"sequelCastEligible":false,"extraNpcCount":240}
+REPRO verified save/reload: {"status":"CURRENT","contractCount":1,"remaining":3,"actorProfilePresent":false,"sequelCastEligible":false,"extraNpcCount":240}
+COMPACTION reference: {"reference":"PAST_PROJECT","actorRetained":false,"sequelCastEligible":false}
+COMPACTION reference: {"reference":"RETURNING_SCRIPT","actorRetained":false,"sequelCastEligible":false}
+COMPACTION reference: {"reference":"ACTIVE_CONTRACT","actorRetained":true,"sequelCastEligible":true}
+COMPACTION reference: {"reference":"ACTIVE_PRODUCTION","actorRetained":true,"sequelCastEligible":true}
+EXPECTED contract usage: {"movie":1,"remaining":2,"status":"ACTIVE"}
+EXPECTED contract usage: {"movie":2,"remaining":1,"status":"ACTIVE"}
+EXPECTED contract usage: {"movie":3,"remaining":0,"status":"EXPIRED"}
+PASS all diagnostic expectations reproduced. Production code unchanged; no real save read.

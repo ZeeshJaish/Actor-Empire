@@ -1,0 +1,26 @@
+
+> pr-6.6.3@1.0.25 audit:talent-roster-flow
+> esbuild scripts/audit-talent-roster-flow.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-talent-roster-flow.mjs && node /tmp/ae-talent-roster-flow.mjs
+
+
+  ../../../../tmp/ae-talent-roster-flow.mjs  9.7mb ⚠️
+
+⚡ Done in 173ms
+PASS original-production week 1: PRE_PRODUCTION,PRE_PRODUCTION
+PASS original-production week 7: PRODUCTION,PRODUCTION
+PASS original-production week 8: PRODUCTION,PRODUCTION
+PASS original-production week 16: PRODUCTION,PRODUCTION
+PASS original-production week 17: POST_PRODUCTION,PRODUCTION
+PASS original-production week 19: POST_PRODUCTION,POST_PRODUCTION
+PASS original-production week 24: POST_PRODUCTION,POST_PRODUCTION
+PASS original-production week 29: AWAITING_RELEASE,POST_PRODUCTION
+PASS original-production week 31: AWAITING_RELEASE,AWAITING_RELEASE
+PASS sequel-production week 1: PRE_PRODUCTION,PRE_PRODUCTION
+PASS sequel-production week 7: PRODUCTION,PRODUCTION
+PASS sequel-production week 8: PRODUCTION,PRODUCTION
+PASS sequel-production week 16: POST_PRODUCTION,PRODUCTION
+PASS sequel-production week 18: POST_PRODUCTION,POST_PRODUCTION
+PASS sequel-production week 24: POST_PRODUCTION,POST_PRODUCTION
+PASS sequel-production week 28: AWAITING_RELEASE,POST_PRODUCTION
+PASS sequel-production week 30: AWAITING_RELEASE,AWAITING_RELEASE
+PASS four hires (generated + built-in; parent + subsidiary; upfront + installments) → two original movies → real premieres → two sequels → full production → five next weeks; 72 actual weeks and 26 verified save/reloads. Actors, contracts, cash, shares and ownership preserved.

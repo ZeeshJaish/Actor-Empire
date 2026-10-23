@@ -1,0 +1,23 @@
+
+> pr-6.6.3@1.0.25 audit:talent-save-recovery
+> esbuild scripts/audit-talent-save-recovery.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-talent-save-recovery.mjs && node /tmp/ae-talent-save-recovery.mjs
+
+
+  ../../../../tmp/ae-talent-save-recovery.mjs  4.9mb ⚠️
+
+⚡ Done in 149ms
+PASS valid: current cash, contract progress, ownership and durable source preserved; previous reads 1
+PASS tampered: current cash, contract progress, ownership and durable source preserved; previous reads 1
+PASS different-career: current cash, contract progress, ownership and durable source preserved; previous reads 1
+PASS same-default-id-other-studio: current cash, contract progress, ownership and durable source preserved; previous reads 1
+PASS same-owner-other-contract: current cash, contract progress, ownership and durable source preserved; previous reads 1
+PASS different-signing-terms: current cash, contract progress, ownership and durable source preserved; previous reads 1
+PASS synthesized-contract-id: current cash, contract progress, ownership and durable source preserved; previous reads 0
+PASS uncontracted-history: current cash, contract progress, ownership and durable source preserved; previous reads 0
+PASS deceased: current cash, contract progress, ownership and durable source preserved; previous reads 0
+PASS missing: current cash, contract progress, ownership and durable source preserved; previous reads 1
+PASS read-error: current cash, contract progress, ownership and durable source preserved; previous reads 1
+PASS already-present: current cash, contract progress, ownership and durable source preserved; previous reads 0
+PASS contract-snapshot: current cash, contract progress, ownership and durable source preserved; previous reads 0
+PASS static-and-family: current cash, contract progress, ownership and durable source preserved; previous reads 0
+PASS legacy-owner-mirror: current cash, contract progress, ownership and durable source preserved; previous reads 1

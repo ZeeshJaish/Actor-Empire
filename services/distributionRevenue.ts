@@ -348,9 +348,10 @@ export const calculateStreamingDistributionBreakdown = (
     platformId: PlatformId,
     weeklyViews: number,
     weeklyRevenue: number,
-    week: number
+    week: number,
+    simulationPlatformId: PlatformId = platformId,
 ): StreamingDistributionBreakdown => {
-    const platform = PLATFORMS[platformId];
+    const platform = PLATFORMS[simulationPlatformId];
     const focusRegionIds = normalizeReleaseRegionIds(project.releaseRegionIds || []);
     const focusRegionSet = new Set<BoxOfficeRegionId>(focusRegionIds);
     const focusHasRegions = focusRegionSet.size > 0;

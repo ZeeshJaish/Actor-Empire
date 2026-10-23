@@ -1,0 +1,15 @@
+
+  ../../../../tmp/ae-budget-mod-reports.mjs  6.5mb ⚠️
+
+⚡ Done in 147ms
+REPRODUCED mod succession {"parentDeceased":false,"heir":"son","pack":"united_states","parentEnabled":["united_states"],"childEnabled":[],"childEnabledAfterReload":[],"parentPackActorProfiles":65,"childPackActorProfiles":65,"parentCreatorOptions":78,"childCreatorOptions":67,"parentModHistory":1,"childModHistory":0}
+REPRODUCED mod succession {"parentDeceased":false,"heir":"daughter","pack":"united_states","parentEnabled":["united_states"],"childEnabled":[],"childEnabledAfterReload":[],"parentPackActorProfiles":65,"childPackActorProfiles":65,"parentCreatorOptions":78,"childCreatorOptions":67,"parentModHistory":1,"childModHistory":0}
+REPRODUCED mod succession {"parentDeceased":true,"heir":"son","pack":"united_states","parentEnabled":["united_states"],"childEnabled":[],"childEnabledAfterReload":[],"parentPackActorProfiles":65,"childPackActorProfiles":65,"parentCreatorOptions":78,"childCreatorOptions":67,"parentModHistory":1,"childModHistory":0}
+REPRODUCED mod succession {"parentDeceased":true,"heir":"daughter","pack":"united_states","parentEnabled":["united_states"],"childEnabled":[],"childEnabledAfterReload":[],"parentPackActorProfiles":65,"childPackActorProfiles":65,"parentCreatorOptions":78,"childCreatorOptions":67,"parentModHistory":1,"childModHistory":0}
+MEASURED streaming {"type":"MOVIE","budget":10000000,"maximumFixedPayout":123632000,"maximumExposure":123632000,"maximumMinimumGuarantee":123632000}
+MEASURED streaming {"type":"MOVIE","budget":1000000000,"maximumFixedPayout":123632000,"maximumExposure":123632000,"maximumMinimumGuarantee":123632000}
+MEASURED streaming {"type":"MOVIE","budget":1000000000000,"maximumFixedPayout":123632000,"maximumExposure":123632000,"maximumMinimumGuarantee":123632000}
+MEASURED streaming {"type":"SERIES","budget":10000000,"maximumFixedPayout":345800000,"maximumExposure":382500000,"maximumMinimumGuarantee":321900000}
+MEASURED streaming {"type":"SERIES","budget":1000000000,"maximumFixedPayout":2260800000,"maximumExposure":2260800000,"maximumMinimumGuarantee":1488600000}
+MEASURED streaming {"type":"SERIES","budget":1000000000000,"maximumFixedPayout":2260800000,"maximumExposure":2260800000,"maximumMinimumGuarantee":1488600000}
+CONFIRMED: mod enabled-state reset; movie bids budget-independent in revamp; series remains budget-sensitive within buyer limits. No production edits.

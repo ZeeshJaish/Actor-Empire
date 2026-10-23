@@ -395,6 +395,9 @@ export const buildLegacyStudioInheritance = (
         studio: inheritedStudio,
         world: inheritedWorld,
         flags: {
+            // Pack selections belong to the save/world, not the retiring career.
+            ...(Array.isArray(player.flags?.enabledGlobalActorPacks) ? { enabledGlobalActorPacks: [...new Set(player.flags.enabledGlobalActorPacks.filter((id: unknown) => typeof id === 'string'))] } : {}),
+            ...(Array.isArray(player.flags?.modHistory) ? { modHistory: clone(player.flags.modHistory) } : {}),
             legacyParent,
             legacyStudioProjects: legacyProjects,
             legacyCareerArchive,

@@ -2,7 +2,7 @@ import {applyCareerAuditionApplication,acceptCareerPartTimeJob} from '../../serv
 /** Authored action policy, not a skill/cash grant. Mirrors current App action costs. */
 import {resolveLifeEventFallback} from '../../services/lifeEventFallback';
 import {applyCrisisImpact} from '../../services/productionService';
-import type {Player} from '../../types';
+import type {Player,Genre} from '../../types';
 import {IMPROVEMENT_CATALOG,GENRE_TRAINING_CATALOG} from '../../services/lifestyleLogic';
 import {calculateAuditionGain,calculateProductionGain,calculateGenreFit,rewardGenreExperience,ROLE_DEFINITIONS} from '../../services/roleLogic';
 import {spendPlayerEnergy,syncWeeklyEnergyForCommitments} from '../../services/premiumLogic';
@@ -11,7 +11,7 @@ import {LIFESTYLE_ACTIVITY_CATALOG,createDefaultLifestyleActivitySelections,reso
 import {applyProjectPromotionAttribution} from '../../services/projectPromotionAttribution';
 
 export interface CareerAction {week:number;action:string;cashBefore:number;cashAfter:number;energy:number;projectId?:string}
-export const prepareOrdinaryCinemaWeek=(source:Player,actions:CareerAction[]):Player=>{
+export const prepareOrdinaryCinemaWeek=(source:Player,actions:CareerAction[],trainingGenre:Genre='DRAMA'):Player=>{
  let player=source;
  const record=(action:string,cashBefore:number,energy:number,projectId?:string)=>actions.push({week:getAbsoluteWeek(player.age,player.currentWeek),action,cashBefore,cashAfter:player.money,energy,projectId});
  // Resolve the same unmonetized choices the full App presents, before advancing.
@@ -67,11 +67,11 @@ export const prepareOrdinaryCinemaWeek=(source:Player,actions:CareerAction[]):Pl
   if(job){player=acceptCareerPartTimeJob(player,structuredClone(job));record('Accept current job: '+job.name,player.money,job.energyCost)}
  }
  if(audition)syncWeeklyEnergyForCommitments(player,old);
- const genre=GENRE_TRAINING_CATALOG.find(o=>o.genre==='DRAMA')!;
- while(!audition&&!player.commitments.some(c=>c.projectDetails)&&player.stats.genreXP.DRAMA<100&&player.money>=genre.cost+1000&&player.energy.current>=genre.energy){
-  const before=player.money;player.money-=genre.cost;spendPlayerEnergy(player,genre.energy,'Genre training');rewardGenreExperience(player,'DRAMA',1);record('Train DRAMA',before,genre.energy);
+ const genre=GENRE_TRAINING_CATALOG.find(o=>o.genre===trainingGenre)!;
+ while(!audition&&!player.commitments.some(c=>c.projectDetails)&&player.stats.genreXP[trainingGenre]<100&&player.money>=genre.cost+1000&&player.energy.current>=genre.energy){
+  const before=player.money;player.money-=genre.cost;spendPlayerEnergy(player,genre.energy,'Genre training');rewardGenreExperience(player,trainingGenre,1);record('Train '+trainingGenre,before,genre.energy);
  }
- if(!player.commitments.some(c=>c.projectDetails)&&!player.applications.length&&player.money>=2000&&player.energy.current>=25&&player.stats.genreXP.DRAMA>=100){
+ if(!player.commitments.some(c=>c.projectDetails)&&!player.applications.length&&player.money>=2000&&player.energy.current>=25&&player.stats.genreXP[trainingGenre]>=100){
   const offer=(player.weeklyOpportunities.auditions||[]).filter(o=>o.project.type==='MOVIE'&&!o.project.isFamous&&o.project.releaseStrategy==='THEATRICAL'&&['MINOR','CAMEO'].includes(o.roleType)&&calculateGenreFit(player,o.project).fitScore>=80)
    .sort((a,b)=>ROLE_DEFINITIONS[a.roleType].difficulty-ROLE_DEFINITIONS[b.roleType].difficulty)[0];
   if(offer){player=applyCareerAuditionApplication(player,offer,`ordinary-application-${getAbsoluteWeek(player.age,player.currentWeek)}`);record('Apply current audition: '+offer.projectName,player.money,25)}

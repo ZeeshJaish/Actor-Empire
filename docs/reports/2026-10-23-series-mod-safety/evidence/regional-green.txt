@@ -1,0 +1,1 @@
+PASS regional series distribution keeps signed buyer identity and exact view/revenue totals

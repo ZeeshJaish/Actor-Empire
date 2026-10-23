@@ -91,7 +91,8 @@ export const negotiateTalentContract = (
         return { player: { ...player, flags, talentNegotiations: { ...player.talentNegotiations, [key]: nextState } }, result };
     }
     const contract = { ...createContract(npc.id, 'MOVIE_DEAL', paymentMode, duration, result.totalContractValue, result.maintenanceFee, player.currentWeek),
-        studioId: studio.id, lastPaymentAbsoluteWeek: now };
+        studioId: studio.id, lastPaymentAbsoluteWeek: now,
+        actorSnapshot: structuredClone(flags.extraNPCs.find(actor => actor.id === npc.id)!) };
     const roster = [...contracts, contract];
     const upfront = paymentMode === 'UPFRONT' ? result.totalContractValue : 0;
     const negotiations = { ...player.talentNegotiations }; delete negotiations[key];

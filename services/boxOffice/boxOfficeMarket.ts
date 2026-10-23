@@ -92,6 +92,14 @@ export const simulateCinemaWeek = (input:CinemaWeekInput):CinemaWeekResult => {
     const titleScreens=new Map<string,number>();
     const exhibition:NonNullable<CinemaWeekResult['exhibition']>=[];
     const titleIndex=new Map(input.titles.map(t=>[t.id,t])),poolIndex=new Map(supply.pools.map(p=>[p.id,p]));
+    const runs=structuredClone(input.marketState?.runs || []);
+    const runKey=(titleId:string,poolId:string)=>JSON.stringify([titleId,poolId]);
+    const runIndex=new Map<string,(typeof runs)[number]>(),closedRuns=new Set<string>();
+    for(const run of runs){
+        const key=runKey(run.titleId,run.poolId);
+        if(!runIndex.has(key))runIndex.set(key,run);
+        if(run.closed)closedRuns.add(key);
+    }
     const inputCohortIndex=new Map(input.cohorts.map(c=>[c.id,c]));
     const inputCohortsByCountry=group(input.cohorts,c=>c.countryId);
     for(const o of supply.offers)if(!titleIndex.has(o.titleId)||!poolIndex.has(o.poolId))throw new Error('Unknown cinema offer identity');
@@ -99,7 +107,7 @@ export const simulateCinemaWeek = (input:CinemaWeekInput):CinemaWeekResult => {
         const t=titleIndex.get(o.titleId)!,pool=poolIndex.get(o.poolId)!;
         return t.market && t.market.releaseWeek<=input.absoluteWeek && t.market.countryIds.includes(pool.countryId)
             && (t.market.chainIdsByCountry?.[pool.countryId] || t.market.chainIds).includes(pool.chainId) && t.market.format===pool.format
-            && !input.marketState?.runs.some(r=>r.titleId===t.id && r.poolId===pool.id && r.closed);
+            && !closedRuns.has(runKey(t.id,pool.id));
     });
     const snapshot=buildCinemaAudienceSnapshot({...input,supply});
     const requests=snapshot.choices.filter(r=>r.kind!=='DEFER').map(r=>({...r,id:`${r.titleId}:${r.cohortId}:${r.kind}`,remaining:r.requestedAdmissions}));
@@ -111,7 +119,6 @@ export const simulateCinemaWeek = (input:CinemaWeekInput):CinemaWeekResult => {
     const cohortsByCountry=group(cohorts,c=>inputCohortIndex.get(c.cohortId)!.countryId);
     const offersByPool=group(supply.offers,o=>o.poolId);
     const allocations:CinemaAdmissionAllocation[]=[],costEvents:CinemaWeekResult['costEvents']=[],supplyRows:CinemaWeekResult['supply']=[];
-    const runs=structuredClone(input.marketState?.runs || []);
     for(const pool of [...supply.pools].sort((a,b)=>a.ticketPriceCents-b.ticketPriceCents||a.id.localeCompare(b.id))) {
         const titleIds=(offersByPool.get(pool.id)||[]).map(o=>o.titleId).sort();
         const candidates=(requestsByCountry.get(pool.countryId)||[]).filter(r=>r.remaining>0 && titleIds.includes(r.titleId));
@@ -127,7 +134,7 @@ export const simulateCinemaWeek = (input:CinemaWeekInput):CinemaWeekResult => {
             const title=titleIndex.get(id)!;
             const demand=cinemaSum(candidates.filter(r=>r.titleId===id).map(r=>wanted.get(r.id)||0));
             const grace=input.absoluteWeek-title.market!.releaseWeek<P.discoveryGraceWeeks;
-            return {id,demand,discovery:grace,prior:runs.find(r=>r.titleId===id&&r.poolId===pool.id),minutes:title.market!.runtimeMinutes+P.turnaroundMinutes};
+            return {id,demand,discovery:grace,prior:runIndex.get(runKey(id,pool.id)),minutes:title.market!.runtimeMinutes+P.turnaroundMinutes};
         });
         const booking=planCinemaBookings(pool,desired,input.seed,input.absoluteWeek),shows=booking.shows;
         const localCohorts=countryCohorts.filter(c=>candidatesByCohort.has(c.cohortId));
@@ -149,7 +156,7 @@ export const simulateCinemaWeek = (input:CinemaWeekInput):CinemaWeekResult => {
             const scheduledScreens=Math.min(pool.screens,Math.ceil(showCount*(titleIndex.get(titleId)!.market!.runtimeMinutes+P.turnaroundMinutes)/(P.openingMinutesPerDay*P.daysPerWeek)));
             titleScreens.set(titleId,(titleScreens.get(titleId)||0)+scheduledScreens);
             exhibition.push({titleId,poolId:pool.id,shows:showCount,screens:scheduledScreens});
-            const prior=runs.find(r=>r.titleId===titleId && r.poolId===pool.id);
+            const prior=runIndex.get(runKey(titleId,pool.id));
             const contract=titleIndex.get(titleId)!.market!.bookingContract;
             const bookingCentsPerShow=prior?.bookingCentsPerShow ?? (contract==='REVENUE_SHARE'?0:
                 contract==='LEGACY_SHOW_FEES'?pool.legacyBookingCentsPerShow ?? pool.bookingCentsPerShow:pool.bookingCentsPerShow);
@@ -160,7 +167,7 @@ export const simulateCinemaWeek = (input:CinemaWeekInput):CinemaWeekResult => {
             const viable=showCount>0&&contribution>0&&sold/(showCount*pool.seatsPerShow)>=P.minimumOccupancy;
             const quietWeeks=capacityDenied ? prior?.quietWeeks || 0 : viable?0:(prior?.quietWeeks || 0)+1;
             const run={titleId,poolId:pool.id,quietWeeks,bookingCentsPerShow,lastBookedWeek:input.absoluteWeek,lastShows:showCount,lastAdmissions:sold,closed:!capacityDenied && releaseAge>=P.discoveryGraceWeeks && quietWeeks>=P.quietWeeksBeforeExit};
-            if(prior)Object.assign(prior,run);else runs.push(run);
+            if(prior)Object.assign(prior,run);else {runs.push(run);runIndex.set(runKey(titleId,pool.id),run)}
             // Standard exhibition is paid through the exhibitor share. An existing
             // fixed-show agreement retains its actual launch and renewal charges.
             const cost=cinemaCount((showCount+(!prior?1:0))*bookingCentsPerShow,'booking cost');

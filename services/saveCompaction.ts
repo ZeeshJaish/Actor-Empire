@@ -1,3 +1,4 @@
+import { retainReferencedNpcProfiles } from './npcRetention';
 import { STUDIO_AI_LEDGER_LIMIT } from './studioAi/studioAiState';
 import { PLATFORM_AI_RUNTIME_SCHEMA_VERSION, type Player } from '../types';
 import { getAbsoluteWeek } from './legacyLogic';
@@ -276,61 +277,6 @@ const compactStudioAiCompanies = (value: unknown, absoluteWeek: number) => {
   }));
 };
 
-const getProjectReferencedNpcIds = (project: any, referencedIds: Set<string>) => {
-  if (!project || typeof project !== 'object') return;
-  [project.directorId, project.actorId, project.npcId, project.sourceNpcId].forEach(id => {
-    if (id) referencedIds.add(String(id));
-  });
-  (project.castList || []).forEach((cast: any) => {
-    [cast?.npcId, cast?.actorId, cast?.id].forEach(id => {
-      if (id) referencedIds.add(String(id));
-    });
-  });
-  (project.crewList || []).forEach((crew: any) => {
-    [crew?.npcId, crew?.id].forEach(id => {
-      if (id) referencedIds.add(String(id));
-    });
-  });
-};
-
-const getReferencedNpcIds = (player: any): Set<string> => {
-  const referencedIds = new Set<string>();
-  (player.relationships || []).forEach((relationship: any) => {
-    [relationship?.id, relationship?.npcId, relationship?.sourceNpcId].forEach(id => {
-      if (id) referencedIds.add(String(id));
-    });
-  });
-  (player.studio?.talentRoster || []).forEach((contract: any) => {
-    [contract?.npcId, contract?.actorId, contract?.directorId].forEach(id => {
-      if (id) referencedIds.add(String(id));
-    });
-  });
-  (player.businesses || []).forEach((business: any) => {
-    (business?.studioState?.talentRoster || []).forEach((contract: any) => {
-      [contract?.npcId, contract?.actorId, contract?.directorId].forEach(id => {
-        if (id) referencedIds.add(String(id));
-      });
-    });
-    (business?.studioState?.subsidiaryProjectProposals || []).forEach((proposal: any) => {
-      getProjectReferencedNpcIds(proposal, referencedIds);
-    });
-  });
-  (player.commitments || []).forEach((commitment: any) => getProjectReferencedNpcIds(commitment?.projectDetails, referencedIds));
-  (player.activeReleases || []).forEach((release: any) => getProjectReferencedNpcIds(release?.projectDetails, referencedIds));
-  (player.world?.talentBookings || []).forEach((booking: any) => {
-    if (booking?.npcId) referencedIds.add(String(booking.npcId));
-  });
-  Object.values(player.world?.universes || {}).forEach((universe: any) => {
-    (universe?.roster || []).forEach((character: any) => {
-      [character?.actorId, character?.id].forEach(id => {
-        if (id) referencedIds.add(String(id));
-      });
-    });
-  });
-  Object.keys(normalizeDynastyCareerState(player).members).forEach(id => referencedIds.add(id));
-  return referencedIds;
-};
-
 const compactDynastyCareerArchives = (player: any) => {
   const archives = player.flags?.dynastyCareerArchives;
   if (!archives || typeof archives !== 'object' || Array.isArray(archives)) return {};
@@ -345,15 +291,7 @@ const compactDynastyCareerArchives = (player: any) => {
 const compactExtraNPCs = (player: any) => {
   const extraNPCs = Array.isArray(player.flags?.extraNPCs) ? player.flags.extraNPCs : undefined;
   if (!extraNPCs) return extraNPCs;
-  const referencedIds = getReferencedNpcIds(player);
-  const compactedById = new Map<string, any>();
-  extraNPCs
-    .filter((npc: any) => npc?.id && referencedIds.has(String(npc.id)))
-    .forEach((npc: any) => compactedById.set(String(npc.id), npc));
-  extraNPCs.slice(-EXTRA_NPC_RECENT_MAX_ITEMS)
-    .filter((npc: any) => npc?.id)
-    .forEach((npc: any) => compactedById.set(String(npc.id), npc));
-  return Array.from(compactedById.values());
+  return retainReferencedNpcProfiles(player, extraNPCs, EXTRA_NPC_RECENT_MAX_ITEMS);
 };
 
 const getUsableWorldProjectId = (id: unknown): string | null => (

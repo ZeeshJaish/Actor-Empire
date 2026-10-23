@@ -86,6 +86,8 @@ export interface CreateStreamingBiddingSessionInput {
     genre?: string;
     projectBudget: number;
     packageScore: number;
+    /** Observed released-season results; absent for an unproven first season. Never production cost. */
+    seriesPerformance?: { viewingAccounts: number; rating?: number };
     theatricalGross?: number;
     platforms: StreamingBiddingPlatformInput[];
     rightsLot?: StreamingBiddingRightsLot;
@@ -288,18 +290,26 @@ const buildPlatformState = (
         0.42,
         1.7,
     );
-    const expectedTitleGross = platform.cinemaExpectedValue !== undefined ? Math.max(0,Math.floor(platform.cinemaExpectedValue)) : roundMoney(Math.max(
-        Math.max(1_000_000, input.projectBudget) * qualityMultiplier * (input.projectType === 'SERIES' ? 1.18 : 1) * rightsLotValueMultiplier,
+    const observed = input.seriesPerformance;
+    const performanceMultiplier = observed
+        ? clamp(0.55 + clamp(Math.log10(1 + Math.max(0, observed.viewingAccounts)) / 8, 0, 1) * 0.6
+            + clamp((observed.rating ?? 5) / 10, 0, 1) * 0.5, 0.55, 1.65)
+        : 1;
+    const expectedTitleGross = input.projectType === 'SERIES'
+        ? roundMoney(platform.baseBid * 2.5 * qualityMultiplier * rightsLotValueMultiplier * performanceMultiplier)
+        : platform.cinemaExpectedValue !== undefined ? Math.max(0,Math.floor(platform.cinemaExpectedValue)) : roundMoney(Math.max(
+        Math.max(1_000_000, input.projectBudget) * qualityMultiplier * rightsLotValueMultiplier,
         theatricalProof * rightsLotValueMultiplier,
         platform.baseBid * 2.5 * rightsLotValueMultiplier,
     ));
-    const fixedExposureCeiling = platform.cinemaMaximumBid !== undefined
-        ? Math.floor(Math.max(0,Math.min(platform.cashAvailable,platform.acquisitionCeiling,platform.cinemaMaximumBid))/1000)*1000
-        : roundMoney(Math.min(
+    const availableCeiling = Math.min(
         Math.max(0, platform.cashAvailable),
         Math.max(0, platform.acquisitionCeiling) * relationshipMultiplier,
         expectedTitleGross * clamp(0.72 + relationshipMultiplier * 0.28, 0.7, 1.2),
-    ));
+    );
+    const fixedExposureCeiling = platform.cinemaMaximumBid !== undefined
+        ? Math.floor(Math.max(0,Math.min(platform.cashAvailable,platform.acquisitionCeiling,platform.cinemaMaximumBid))/1000)*1000
+        : input.projectType === 'SERIES' ? Math.floor(availableCeiling / 100_000) * 100_000 : roundMoney(availableCeiling);
     const rng = createDeterministicRng(`${sessionId}:${platform.id}:arrival`);
     return {
         cinemaValueBased:platform.cinemaMaximumBid!==undefined,

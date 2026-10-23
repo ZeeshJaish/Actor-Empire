@@ -1,0 +1,53 @@
+{
+  "verifiedAtUtc": "2026-10-23T10:01:37.575011+00:00",
+  "head": "9d8fcc1b8892e1b8f5784da56fb42ad9d6145a9a",
+  "branch": "codex/streaming-tap-lag",
+  "sha256": {
+    "services/seriesStreamingValue.ts": "7c1310ce995bd8083f64ae0f19132ce060f8e796a07f465274980b2b407d2f16",
+    "services/streamingBidding.ts": "ebbc8dd139b1f7cd138838533938a1cc3c1f47c3463d66dce404dd726d82c246",
+    "services/legacyLogic.ts": "d280aa655c5f4a832c63e1d879fdfc9e4c4fdc47600304a3c11d7e475d4bdde2",
+    "services/npcLogic.ts": "80323378e66aa1cfbaeba7de28bfdfb1a19d75d03946e3d324630e0f41404117",
+    "services/saveMigration.ts": "b65bef737d3a5d2368df1ede96fa17e5e56a9cd0787269a4554d8abb2ec8ada0",
+    "services/gameLoop.ts": "249e8244992481078f8f0c1a475cf772f2c2d1c69e9acb147d86b8eb22f3c042",
+    "services/streamingLogic.ts": "82c5b262e8fb8f8f93d3da9264c80ba344c7317c29a83e1f7a8abe2fc86a43d3",
+    "services/distributionRevenue.ts": "f66e238ba55121400cd79976ec0192979021ebe32ba329e3744db27b8666f869",
+    "views/lifestyle/business/ReleaseWizard.tsx": "070fbd18c0bc26c88791325df40f3a17521b1d286720fe0783ef96a25a5e3f2d",
+    "package.json": "f612324b5e0227cb6704fc7da4e481d6dd94aed73e15ce684e00e607b7b1d5b9",
+    "scripts/audit-series-mod-safety.ts": "7cee7caf9ca9f808ca6ffd36fae7403431dc307a68094076ba8059dd16cb2961",
+    "scripts/audit-series-value.ts": "418d8b41ccd95255a45f2062a3c15334871f8f7a5dfc285b65c10948d7a6626d",
+    "scripts/audit-series-automatic.ts": "e55350b74a984c06d16f5503adb526a79bab6cc0174a50312dc707fcea789974",
+    "scripts/audit-series-regional-distribution.ts": "290cd97aa3e6c96404bd5a4d415dfa0b929e378fdc33c2af98150f506df3facf",
+    "scripts/audit-series-mod-flow.ts": "adb3701005c757254a0ef7572c37b068fbc1e226c125ba5e2656f8cd6d3e7a45",
+    "scripts/fixtures/legacySuccessionHandler.ts": "c1107cd144148ffd44aee017f84a5e9ea90ff17a176974bbd93173a5c56f9945",
+    "scripts/fixtures/seriesReleaseHandler.ts": "8a9ce4917706add500f1367b572603f7c216063cd646c9680a1d5860712b937a"
+  },
+  "verification": {
+    "audit:series-mod-safety": 0,
+    "audit:series-mod-flow": {
+      "exit": 0,
+      "actualWeeks": 88,
+      "verifiedSaveReloads": 39,
+      "successionBranches": 4
+    },
+    "lint": 0,
+    "build": 0,
+    "audit:streaming-active-bidding-phase2": 0,
+    "audit:streaming-rights-calendar-phase4": 0,
+    "audit:distribution-revenue": 0,
+    "audit:legacy-inheritance": 0,
+    "audit:dynasty-career": 0,
+    "audit:save-integrity": 0,
+    "audit:save-generations": 0,
+    "audit:talent-save-recovery": 0,
+    "audit:talent-contracts": 0,
+    "audit:talent-retention": 0,
+    "box-office-rights": {
+      "exit": 0,
+      "groups": 18
+    },
+    "focusedTypecheck": 0,
+    "diff-check": 0
+  },
+  "testBoundary": "Isolated funded fixtures; real engine/production/save/rights services and exact App/ReleaseWizard callback source; React/slot storage sinks captured. No manual browser career or personal save access.",
+  "git": "No staging, commit, push or destructive restoration."
+}

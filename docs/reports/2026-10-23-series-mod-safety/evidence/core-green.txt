@@ -1,0 +1,12 @@
+PASS mod succession {"parentDeceased":false,"heir":"son","pack":"united_states","parentEnabled":["united_states"],"childEnabled":["united_states"],"childEnabledAfterReload":["united_states"],"parentPackActorProfiles":65,"childPackActorProfiles":65,"parentCreatorOptions":78,"childCreatorOptions":78,"parentModHistory":1,"childModHistory":1}
+PASS mod succession {"parentDeceased":false,"heir":"daughter","pack":"united_states","parentEnabled":["united_states"],"childEnabled":["united_states"],"childEnabledAfterReload":["united_states"],"parentPackActorProfiles":65,"childPackActorProfiles":65,"parentCreatorOptions":78,"childCreatorOptions":78,"parentModHistory":1,"childModHistory":1}
+PASS mod succession {"parentDeceased":true,"heir":"son","pack":"united_states","parentEnabled":["united_states"],"childEnabled":["united_states"],"childEnabledAfterReload":["united_states"],"parentPackActorProfiles":65,"childPackActorProfiles":65,"parentCreatorOptions":78,"childCreatorOptions":78,"parentModHistory":1,"childModHistory":1}
+PASS mod succession {"parentDeceased":true,"heir":"daughter","pack":"united_states","parentEnabled":["united_states"],"childEnabled":["united_states"],"childEnabledAfterReload":["united_states"],"parentPackActorProfiles":65,"childPackActorProfiles":65,"parentCreatorOptions":78,"childCreatorOptions":78,"parentModHistory":1,"childModHistory":1}
+PASS affected heir recovery, current actor stats, idempotence, unrelated careers and deceased actor safety
+MEASURED streaming {"type":"MOVIE","budget":10000000,"maximumFixedPayout":123632000,"maximumExposure":123632000,"maximumMinimumGuarantee":123632000}
+MEASURED streaming {"type":"MOVIE","budget":1000000000,"maximumFixedPayout":123632000,"maximumExposure":123632000,"maximumMinimumGuarantee":123632000}
+MEASURED streaming {"type":"MOVIE","budget":1000000000000,"maximumFixedPayout":123632000,"maximumExposure":123632000,"maximumMinimumGuarantee":123632000}
+MEASURED streaming {"type":"SERIES","budget":10000000,"maximumFixedPayout":525600000,"maximumExposure":581400000,"maximumMinimumGuarantee":489500000}
+MEASURED streaming {"type":"SERIES","budget":1000000000,"maximumFixedPayout":525600000,"maximumExposure":581400000,"maximumMinimumGuarantee":489500000}
+MEASURED streaming {"type":"SERIES","budget":1000000000000,"maximumFixedPayout":525600000,"maximumExposure":581400000,"maximumMinimumGuarantee":489500000}
+PASS series budget invariance and inherited mod configuration through the actual production paths.

@@ -56,6 +56,8 @@ export const buildCinemaAudienceSnapshot = (input: CinemaWeekInput): {choices: C
         const prior = input.marketState?.titles.find(t=>t.titleId===title.id);
         const priorCells=new Map(prior?.cells.map(c=>[c.cohortId,c]));
         const titleOffers=(input.supply?.offers || []).filter(o=>o.titleId===title.id).map(o=>pools.get(o.poolId)!).filter(Boolean);
+        const offersByCountry=new Map<string,typeof titleOffers>();
+        for(const offer of titleOffers){const local=offersByCountry.get(offer.countryId)||[];local.push(offer);offersByCountry.set(offer.countryId,local)}
         const exposure = buildCinemaExposure({titleId:title.id,absoluteWeek:input.absoluteWeek,cast:castUnique(title.cast),
             studio:{releasedTitleCount:0,prestige:0},storyAttention:title.exposure?.storyAttention || 0,musicAttention:title.exposure?.musicAttention || 0,
             cohorts:input.cohorts.map(c=>({...c,priorAwarePeople:priorCells.get(c.id)?.awarePeople || 0})),
@@ -121,7 +123,7 @@ export const buildCinemaAudienceSnapshot = (input: CinemaWeekInput): {choices: C
             const fit = (genres[m.persona]?.includes(title.genre) ? 1 : .7) * localFit;
             const quality = input.knowledge==='FORECAST' ? title.delivery.estimatedQuality ?? 55 : title.delivery.deliveredQuality ?? title.delivery.estimatedQuality ?? 55;
             const satisfaction = Math.round(clamp(fraction(quality)*.85 + fit*.15 - Math.max(0,(title.exposure?.attentionPotential || 0)-quality)/500)*100);
-            const offers = titleOffers.filter(p=>p.countryId===cohort.countryId);
+            const offers = offersByCountry.get(cohort.countryId)||[];
             const price = offers.length ? Math.min(...offers.map(p=>p.ticketPriceCents)) : 0;
             const accessible = facts.countryIds.includes(cohort.countryId) && offers.length>0;
             const minutes = Math.ceil(facts.runtimeMinutes+m.travelMinutes);

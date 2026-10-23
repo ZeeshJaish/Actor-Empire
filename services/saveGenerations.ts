@@ -1,4 +1,6 @@
 import type { Player } from '../types';
+import { NPC_DATABASE } from './npcLogic';
+import { getMissingContractActorIds, recoverNpcProfilesFromPrevious, restoreContractActorProfiles } from './npcRetention';
 import {
     SAVE_INTEGRITY_FORMAT_VERSION,
     type SaveIntegrityManifest,
@@ -69,6 +71,8 @@ export const getSaveGenerationKeys = (currentKey: string): SaveGenerationKeys =>
     integrity: `${currentKey}__integrity`,
     quarantine: `${currentKey}__quarantine`,
 });
+
+const databaseNpcIds = new Set(NPC_DATABASE.map(npc => npc.id));
 
 const saveQueues = new WeakMap<SaveGenerationStore, Map<string, Promise<void>>>();
 
@@ -186,9 +190,19 @@ export const loadVerifiedGameData = async (
     }
     const currentVerification = verifySaveIntegrity(current, manifest);
     if (!('violations' in currentVerification)) {
+        let player = restoreContractActorProfiles(current);
+        const missingIds = getMissingContractActorIds(player, databaseNpcIds);
+        if (missingIds.size > 0) {
+            // Optional profile-only repair must never make a valid current save
+            // depend on the availability of its previous generation.
+            try {
+                const previous = verifyGeneration(await store.read(keys.previous));
+                if (previous.ok) player = recoverNpcProfilesFromPrevious(player, previous.generation.player, missingIds);
+            } catch { /* Keep the verified current career and its visible recovery state. */ }
+        }
         return {
             status: 'CURRENT',
-            player: current,
+            player,
             previous: null,
             violations: [],
             needsRecoveryCheckpoint: manifest.needsRecoveryCheckpoint === true,

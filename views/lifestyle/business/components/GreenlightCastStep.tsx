@@ -18,6 +18,7 @@ import {
 import { CharacterIdentityControls } from './CharacterIdentityControls';
 import { StoryCompassStrip } from './StoryCompassStrip';
 import type { GreenlightCastRole } from '../greenlightTypes';
+import { isMissingMovieActorProfile } from '../greenlightUtils';
 
 interface GreenlightCastStepProps {
     player: Player;
@@ -278,6 +279,7 @@ export const GreenlightCastStep: React.FC<GreenlightCastStepProps> = ({
                                         ) : (
                                             <div className="text-base sm:text-xl font-black text-zinc-500 italic">Pending Audition</div>
                                         )}
+                                        {isMissingMovieActorProfile(role.actorId, player.flags.extraNPCs || []) && <p className="mt-2 text-xs leading-relaxed text-amber-200">Profile unavailable. Restore a verified backup or choose another actor to continue with this role.</p>}
                                     </div>
 
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
