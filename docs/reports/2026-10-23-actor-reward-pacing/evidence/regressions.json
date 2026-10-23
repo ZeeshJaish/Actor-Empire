@@ -1,0 +1,38 @@
+[
+  {
+    "name": "audit:casting",
+    "status": 0
+  },
+  {
+    "name": "audit:connected-director-casting",
+    "status": 0
+  },
+  {
+    "name": "audit:actor-career-arcs",
+    "status": 0
+  },
+  {
+    "name": "audit:owned-production-career",
+    "status": 0
+  },
+  {
+    "name": "audit:save-generations",
+    "status": 0
+  },
+  {
+    "name": "audit:save-migration",
+    "status": 0
+  },
+  {
+    "name": "audit:actor-reward-pacing",
+    "status": 0
+  },
+  {
+    "name": "audit:career-team-renewal",
+    "status": 0
+  },
+  {
+    "name": "audit:actor-reward-boosts",
+    "status": 0
+  }
+]

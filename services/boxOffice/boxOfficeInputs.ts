@@ -66,7 +66,7 @@ export const normalizeCinemaTitle = ({ titleId, owner, project, player }: {
     return { id: titleId, owner: { ...owner }, projectType: project.type, genre: project.genre, budgetCents,
         cast: [...people.values()].sort((a, b) => a.personId.localeCompare(b.personId)), directorId,
         playerCredited: Boolean(playerDirected || people.has('PLAYER_SELF')), delivery: buildCinemaDeliveryInput(project),
-        ...(project.cinemaExposure ? { exposure: readCinemaExposureRecord(project) } : {}) };
+        ...(project.cinemaExposure ? { exposure: readCinemaExposureRecord(project, titleId) } : {}) };
 };
 
 /** Complete an offered package before its premiere, including its principal credit.

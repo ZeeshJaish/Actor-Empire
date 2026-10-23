@@ -1,0 +1,38 @@
+[
+  {
+    "route": "free",
+    "variant": "baseline",
+    "cases": 3,
+    "medianCashChange": 28880103,
+    "minimumCashChange": 28014892,
+    "maximumCashChange": 30435478,
+    "meanNewlyObservedRoleQuotedPay": 25074782.666666668
+  },
+  {
+    "route": "free",
+    "variant": "balanced",
+    "cases": 3,
+    "medianCashChange": 25465198,
+    "minimumCashChange": 22753328,
+    "maximumCashChange": 25727491,
+    "meanNewlyObservedRoleQuotedPay": 10789347.333333334
+  },
+  {
+    "route": "boosted",
+    "variant": "baseline",
+    "cases": 3,
+    "medianCashChange": 5717039,
+    "minimumCashChange": 1891335,
+    "maximumCashChange": 9787819,
+    "meanNewlyObservedRoleQuotedPay": 1870733
+  },
+  {
+    "route": "boosted",
+    "variant": "balanced",
+    "cases": 3,
+    "medianCashChange": 5717039,
+    "minimumCashChange": 1891335,
+    "maximumCashChange": 7656703,
+    "meanNewlyObservedRoleQuotedPay": 1870733
+  }
+]

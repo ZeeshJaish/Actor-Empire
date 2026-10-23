@@ -1,0 +1,402 @@
+{
+  "status": "UNFUNDED",
+  "strategy": "team",
+  "seed": 0,
+  "horizon": 52,
+  "weeks": 1,
+  "reloads": 1,
+  "saves": 1,
+  "replays": 1,
+  "genre": "DRAMA",
+  "cash": -5225,
+  "skills": {
+    "delivery": 0,
+    "memorization": 0.48,
+    "expression": 0,
+    "improvisation": 0,
+    "discipline": 0.48,
+    "presence": 0,
+    "charisma": 0,
+    "writing": 0
+  },
+  "energy": {
+    "current": 180,
+    "max": 180
+  },
+  "bonusEnergyBank": 95,
+  "genreXP": {
+    "ACTION": 0,
+    "DRAMA": 70.00910016133284,
+    "COMEDY": 0,
+    "ROMANCE": 17.50227504033321,
+    "THRILLER": 17.50227504033321,
+    "MYSTERY": 0,
+    "HORROR": 0,
+    "SCI_FI": 0,
+    "ADVENTURE": 0,
+    "SUPERHERO": 0,
+    "MUSICAL": 0,
+    "BIOPIC": 0,
+    "SPORTS": 0,
+    "ANIMATION": 0,
+    "FANTASY": 0,
+    "CRIME": 0,
+    "DOCUMENTARY": 0
+  },
+  "fame": 0,
+  "reputation": 0,
+  "experience": 0,
+  "arc": "NEWCOMER",
+  "curve": [
+    {
+      "seed": 0,
+      "weeks": 0,
+      "cash": 2000,
+      "craft": 0,
+      "genre": 0,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 0,
+      "health": 80,
+      "energy": 100,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "activePersonalRoles": 0,
+      "phases": []
+    },
+    {
+      "seed": 0,
+      "weeks": 1,
+      "cash": -5225,
+      "craft": 0.13714285714285715,
+      "genre": 70.00910016133284,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 0,
+      "health": 79.85,
+      "energy": 180,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "activePersonalRoles": 0,
+      "phases": []
+    }
+  ],
+  "credits": [],
+  "phases": [],
+  "actions": [
+    {
+      "week": 0,
+      "type": "simulated-purchase:cash_75000",
+      "cost": -75000,
+      "energy": 0
+    },
+    {
+      "week": 0,
+      "type": "simulated-purchase:energy_500",
+      "cost": 0,
+      "energy": -500
+    },
+    {
+      "week": 0,
+      "type": "paid-course:ws_intro_acting",
+      "cost": 400,
+      "energy": 15
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    }
+  ],
+  "signed": [],
+  "peakRSS": 591724544
+}

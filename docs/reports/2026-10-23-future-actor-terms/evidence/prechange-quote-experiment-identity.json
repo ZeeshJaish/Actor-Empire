@@ -1,0 +1,4 @@
+{
+  "sha256": "f840b880168195c0f337a9ea4304ff638889074a00939a8be289e58bec669747",
+  "scope": "Frozen pre-production-change executable; ordinary experiment script now refuses overwrites or a changed baseline generator"
+}

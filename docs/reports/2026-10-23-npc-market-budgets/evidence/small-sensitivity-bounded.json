@@ -1,0 +1,339 @@
+{
+  "status": "ONE_COMPLETE_SEED_VERIFIED",
+  "fullyObservedSeed": 0,
+  "completeCases": 11,
+  "additionalCompletedCases": 3,
+  "rows": [
+    {
+      "seed": 0,
+      "name": "q30-campaign0.05",
+      "quality": 30,
+      "campaignM": 0.05,
+      "wide": false,
+      "peak": false,
+      "grossCents": 115535141,
+      "receiptsCents": 57294863,
+      "bookingCents": 0,
+      "first": 83692,
+      "repeats": 0,
+      "weeks": 19,
+      "week95": 11,
+      "censored": false,
+      "budgetViews": [
+        {
+          "budgetM": 2,
+          "profitCents": -147705137
+        },
+        {
+          "budgetM": 10,
+          "profitCents": -947705137
+        },
+        {
+          "budgetM": 25,
+          "profitCents": -2447705137
+        }
+      ]
+    },
+    {
+      "seed": 0,
+      "name": "q30-campaign0.5",
+      "quality": 30,
+      "campaignM": 0.5,
+      "wide": false,
+      "peak": false,
+      "grossCents": 1182814560,
+      "receiptsCents": 587298082,
+      "bookingCents": 0,
+      "first": 856623,
+      "repeats": 0,
+      "weeks": 29,
+      "week95": 13,
+      "censored": false,
+      "budgetViews": [
+        {
+          "budgetM": 2,
+          "profitCents": 337298082
+        },
+        {
+          "budgetM": 10,
+          "profitCents": -462701918
+        },
+        {
+          "budgetM": 25,
+          "profitCents": -1962701918
+        }
+      ]
+    },
+    {
+      "seed": 0,
+      "name": "q30-campaign2",
+      "quality": 30,
+      "campaignM": 2,
+      "wide": false,
+      "peak": false,
+      "grossCents": 4472349828,
+      "receiptsCents": 2220955852,
+      "bookingCents": 0,
+      "first": 3238893,
+      "repeats": 0,
+      "weeks": 35,
+      "week95": 13,
+      "censored": false,
+      "budgetViews": [
+        {
+          "budgetM": 2,
+          "profitCents": 1820955852
+        },
+        {
+          "budgetM": 10,
+          "profitCents": 1020955852
+        },
+        {
+          "budgetM": 25,
+          "profitCents": -479044148
+        }
+      ]
+    },
+    {
+      "seed": 0,
+      "name": "q65-campaign0.05",
+      "quality": 65,
+      "campaignM": 0.05,
+      "wide": false,
+      "peak": false,
+      "grossCents": 193433811,
+      "receiptsCents": 95956211,
+      "bookingCents": 0,
+      "first": 139067,
+      "repeats": 1046,
+      "weeks": 22,
+      "week95": 12,
+      "censored": false,
+      "budgetViews": [
+        {
+          "budgetM": 2,
+          "profitCents": -109043789
+        },
+        {
+          "budgetM": 10,
+          "profitCents": -909043789
+        },
+        {
+          "budgetM": 25,
+          "profitCents": -2409043789
+        }
+      ]
+    },
+    {
+      "seed": 0,
+      "name": "q65-campaign0.5",
+      "quality": 65,
+      "campaignM": 0.5,
+      "wide": false,
+      "peak": false,
+      "grossCents": 1955383246,
+      "receiptsCents": 970969225,
+      "bookingCents": 0,
+      "first": 1404032,
+      "repeats": 12086,
+      "weeks": 32,
+      "week95": 14,
+      "censored": false,
+      "budgetViews": [
+        {
+          "budgetM": 2,
+          "profitCents": 720969225
+        },
+        {
+          "budgetM": 10,
+          "profitCents": -79030775
+        },
+        {
+          "budgetM": 25,
+          "profitCents": -1579030775
+        }
+      ]
+    },
+    {
+      "seed": 0,
+      "name": "q65-campaign2",
+      "quality": 65,
+      "campaignM": 2,
+      "wide": false,
+      "peak": false,
+      "grossCents": 7355128594,
+      "receiptsCents": 3652626502,
+      "bookingCents": 0,
+      "first": 5279956,
+      "repeats": 46604,
+      "weeks": 38,
+      "week95": 14,
+      "censored": false,
+      "budgetViews": [
+        {
+          "budgetM": 2,
+          "profitCents": 3252626502
+        },
+        {
+          "budgetM": 10,
+          "profitCents": 2452626502
+        },
+        {
+          "budgetM": 25,
+          "profitCents": 952626502
+        }
+      ]
+    },
+    {
+      "seed": 0,
+      "name": "q90-campaign0.05",
+      "quality": 90,
+      "campaignM": 0.05,
+      "wide": false,
+      "peak": false,
+      "grossCents": 345683624,
+      "receiptsCents": 171445806,
+      "bookingCents": 0,
+      "first": 247444,
+      "repeats": 2950,
+      "weeks": 35,
+      "week95": 20,
+      "censored": false,
+      "budgetViews": [
+        {
+          "budgetM": 2,
+          "profitCents": -33554194
+        },
+        {
+          "budgetM": 10,
+          "profitCents": -833554194
+        },
+        {
+          "budgetM": 25,
+          "profitCents": -2333554194
+        }
+      ]
+    },
+    {
+      "seed": 0,
+      "name": "q90-campaign0.5",
+      "quality": 90,
+      "campaignM": 0.5,
+      "wide": false,
+      "peak": false,
+      "grossCents": 3497265302,
+      "receiptsCents": 1736682431,
+      "bookingCents": 0,
+      "first": 2500471,
+      "repeats": 31801,
+      "weeks": 51,
+      "week95": 21,
+      "censored": false,
+      "budgetViews": [
+        {
+          "budgetM": 2,
+          "profitCents": 1486682431
+        },
+        {
+          "budgetM": 10,
+          "profitCents": 686682431
+        },
+        {
+          "budgetM": 25,
+          "profitCents": -813317569
+        }
+      ]
+    },
+    {
+      "seed": 0,
+      "name": "q90-campaign2",
+      "quality": 90,
+      "campaignM": 2,
+      "wide": false,
+      "peak": false,
+      "grossCents": 12924872154,
+      "receiptsCents": 6418966472,
+      "bookingCents": 0,
+      "first": 9237238,
+      "repeats": 120984,
+      "weeks": 59,
+      "week95": 21,
+      "censored": false,
+      "budgetViews": [
+        {
+          "budgetM": 2,
+          "profitCents": 6018966472
+        },
+        {
+          "budgetM": 10,
+          "profitCents": 5218966472
+        },
+        {
+          "budgetM": 25,
+          "profitCents": 3718966472
+        }
+      ]
+    },
+    {
+      "seed": 0,
+      "name": "q90-wide",
+      "quality": 90,
+      "campaignM": 0.5,
+      "wide": true,
+      "peak": false,
+      "grossCents": 3497265302,
+      "receiptsCents": 1736682431,
+      "bookingCents": 0,
+      "first": 2500471,
+      "repeats": 31801,
+      "weeks": 51,
+      "week95": 21,
+      "censored": false,
+      "budgetViews": [
+        {
+          "budgetM": 2,
+          "profitCents": 1486682431
+        },
+        {
+          "budgetM": 10,
+          "profitCents": 686682431
+        },
+        {
+          "budgetM": 25,
+          "profitCents": -813317569
+        }
+      ]
+    },
+    {
+      "seed": 0,
+      "name": "q90-peak",
+      "quality": 90,
+      "campaignM": 0.5,
+      "wide": false,
+      "peak": true,
+      "grossCents": 1285322919,
+      "receiptsCents": 663973775,
+      "bookingCents": 0,
+      "first": 880268,
+      "repeats": 2303,
+      "weeks": 50,
+      "week95": 27,
+      "censored": false,
+      "budgetViews": [
+        {
+          "budgetM": 2,
+          "profitCents": 413973775
+        },
+        {
+          "budgetM": 10,
+          "profitCents": -386026225
+        },
+        {
+          "budgetM": 25,
+          "profitCents": -1886026225
+        }
+      ]
+    }
+  ],
+  "limitation": "Optional exhaustive 33-case sweep stopped deliberately to prioritize actual careers with one worker; not a 33-case pass"
+}

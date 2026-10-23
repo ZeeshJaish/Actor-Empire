@@ -1,0 +1,287 @@
+{
+  "focused": {
+    "strategy": "boosted",
+    "status": "HORIZON_COMPLETE",
+    "weeks": 733,
+    "years": 14.1,
+    "legendWeek": 651,
+    "weeksAfterFirstLegend": 82,
+    "firstPremiere": 64,
+    "craft50": 154,
+    "craft80": 325,
+    "anyActingSkill95": 328,
+    "anyActingSkill100": 401,
+    "allActingSkills95": 653,
+    "allActingSkills100": null,
+    "fame50": 214,
+    "fame94": 510,
+    "cash": 35716337,
+    "debt": 86801,
+    "netCashAfterDebt": 35629536,
+    "totalBorrowed": 100000,
+    "craft": 99.93825384244715,
+    "skills": {
+      "delivery": 100,
+      "memorization": 100,
+      "expression": 100,
+      "improvisation": 99.75608660585684,
+      "discipline": 100,
+      "presence": 99.81169029127332,
+      "charisma": 100,
+      "writing": 0
+    },
+    "fame": 96.58364406599961,
+    "reputation": 92,
+    "experience": 100,
+    "releasedCredits": 32,
+    "archivedCredits": 30,
+    "recentCareerEvidence": {
+      "credits": 32,
+      "recentCredits": 5,
+      "recentPerformance": 92,
+      "workSignal": 0.9743589743589743,
+      "audience": 0.9511673615882555,
+      "spanWeeks": 670,
+      "strongCredits": 5
+    },
+    "grossSignedActingSalaryReceived": 4571796,
+    "agentCommissionsDebited": 491272,
+    "verifiedReloads": 152,
+    "verifiedSaves": 152,
+    "cinemaSettlementReplayRejections": 733,
+    "simulatedPurchaseActions": [
+      {
+        "week": 0,
+        "type": "simulated-purchase:cash_75000",
+        "cost": -75000,
+        "energy": 0
+      },
+      {
+        "week": 0,
+        "type": "simulated-purchase:energy_500",
+        "cost": 0,
+        "energy": -500
+      }
+    ],
+    "minimumCash": -33019,
+    "negativeCashWeeks": 38,
+    "firstCashMillion": 534,
+    "firstCashTenMillion": 548,
+    "largestWeeklyCashIncreases": [
+      {
+        "week": 721,
+        "increase": 7955944
+      },
+      {
+        "week": 652,
+        "increase": 2313894
+      },
+      {
+        "week": 656,
+        "increase": 1962021
+      },
+      {
+        "week": 655,
+        "increase": 1927136
+      },
+      {
+        "week": 657,
+        "increase": 1709422
+      }
+    ],
+    "failure": null,
+    "handoffWeek": 681,
+    "comparisonWeeks": 52,
+    "sourceVersion": "Before continuation exposure repair; retained baseline, not final-source validation"
+  },
+  "neglect": {
+    "strategy": "boosted",
+    "status": "HORIZON_COMPLETE",
+    "weeks": 733,
+    "years": 14.1,
+    "legendWeek": 651,
+    "weeksAfterFirstLegend": 82,
+    "firstPremiere": 64,
+    "craft50": 154,
+    "craft80": 325,
+    "anyActingSkill95": 328,
+    "anyActingSkill100": 401,
+    "allActingSkills95": 653,
+    "allActingSkills100": null,
+    "fame50": 214,
+    "fame94": 510,
+    "cash": 27584327,
+    "debt": 86801,
+    "netCashAfterDebt": 27497526,
+    "totalBorrowed": 100000,
+    "craft": 99.93606735349043,
+    "skills": {
+      "delivery": 100,
+      "memorization": 100,
+      "expression": 100,
+      "improvisation": 99.75608660585684,
+      "discipline": 100,
+      "presence": 99.79638486857618,
+      "charisma": 100,
+      "writing": 0
+    },
+    "fame": 95.16699999999958,
+    "reputation": 90,
+    "experience": 100,
+    "releasedCredits": 31,
+    "archivedCredits": 30,
+    "recentCareerEvidence": {
+      "credits": 31,
+      "recentCredits": 4,
+      "recentPerformance": 88.5,
+      "workSignal": 0.8293123543123543,
+      "audience": 0.9531188739702732,
+      "spanWeeks": 670,
+      "strongCredits": 4
+    },
+    "grossSignedActingSalaryReceived": 4355693,
+    "agentCommissionsDebited": 465340,
+    "verifiedReloads": 152,
+    "verifiedSaves": 152,
+    "cinemaSettlementReplayRejections": 733,
+    "simulatedPurchaseActions": [
+      {
+        "week": 0,
+        "type": "simulated-purchase:cash_75000",
+        "cost": -75000,
+        "energy": 0
+      },
+      {
+        "week": 0,
+        "type": "simulated-purchase:energy_500",
+        "cost": 0,
+        "energy": -500
+      }
+    ],
+    "minimumCash": -33019,
+    "negativeCashWeeks": 38,
+    "firstCashMillion": 534,
+    "firstCashTenMillion": 548,
+    "largestWeeklyCashIncreases": [
+      {
+        "week": 652,
+        "increase": 2313894
+      },
+      {
+        "week": 656,
+        "increase": 1962021
+      },
+      {
+        "week": 655,
+        "increase": 1927136
+      },
+      {
+        "week": 657,
+        "increase": 1709422
+      },
+      {
+        "week": 658,
+        "increase": 1481626
+      }
+    ],
+    "failure": null,
+    "handoffWeek": 681,
+    "comparisonWeeks": 52,
+    "sourceVersion": "Before continuation exposure repair; retained baseline, not final-source validation"
+  },
+  "overbooked": {
+    "strategy": "boosted",
+    "status": "HORIZON_COMPLETE",
+    "weeks": 733,
+    "years": 14.1,
+    "legendWeek": 651,
+    "weeksAfterFirstLegend": 82,
+    "firstPremiere": 64,
+    "craft50": 154,
+    "craft80": 325,
+    "anyActingSkill95": 328,
+    "anyActingSkill100": 401,
+    "allActingSkills95": 653,
+    "allActingSkills100": null,
+    "fame50": 214,
+    "fame94": 510,
+    "cash": 36109432,
+    "debt": 86801,
+    "netCashAfterDebt": 36022631,
+    "totalBorrowed": 100000,
+    "craft": 99.6071567961392,
+    "skills": {
+      "delivery": 100,
+      "memorization": 99.99726848256064,
+      "expression": 100,
+      "improvisation": 98.26137374876376,
+      "discipline": 100,
+      "presence": 98.99145534164998,
+      "charisma": 100,
+      "writing": 0
+    },
+    "fame": 100,
+    "reputation": 94,
+    "experience": 100,
+    "releasedCredits": 34,
+    "archivedCredits": 31,
+    "recentCareerEvidence": {
+      "credits": 34,
+      "recentCredits": 6,
+      "recentPerformance": 89.83333333333333,
+      "workSignal": 0.9905788655788654,
+      "audience": 0.9486119746873929,
+      "spanWeeks": 670,
+      "strongCredits": 6
+    },
+    "grossSignedActingSalaryReceived": 5132076,
+    "agentCommissionsDebited": 506512,
+    "verifiedReloads": 152,
+    "verifiedSaves": 152,
+    "cinemaSettlementReplayRejections": 733,
+    "simulatedPurchaseActions": [
+      {
+        "week": 0,
+        "type": "simulated-purchase:cash_75000",
+        "cost": -75000,
+        "energy": 0
+      },
+      {
+        "week": 0,
+        "type": "simulated-purchase:energy_500",
+        "cost": 0,
+        "energy": -500
+      }
+    ],
+    "minimumCash": -33019,
+    "negativeCashWeeks": 38,
+    "firstCashMillion": 534,
+    "firstCashTenMillion": 548,
+    "largestWeeklyCashIncreases": [
+      {
+        "week": 702,
+        "increase": 7974480
+      },
+      {
+        "week": 652,
+        "increase": 2313894
+      },
+      {
+        "week": 656,
+        "increase": 1962021
+      },
+      {
+        "week": 655,
+        "increase": 1927136
+      },
+      {
+        "week": 657,
+        "increase": 1709422
+      }
+    ],
+    "failure": null,
+    "handoffWeek": 681,
+    "comparisonWeeks": 52,
+    "sourceVersion": "Before continuation exposure repair; retained baseline, not final-source validation"
+  }
+}

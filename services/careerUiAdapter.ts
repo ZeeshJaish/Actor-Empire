@@ -2,6 +2,7 @@ import type { Commitment, OwnedProductionActionId, OwnedProductionTrackType, Pla
 import { getAbsoluteWeek, getElapsedWeeks } from './legacyLogic';
 import { deriveOwnedProductionCareerItems, getPlayerActingCommitments } from './ownedProductionCareer';
 import { getBuzzLabel } from './roleLogic';
+import { hasCareerRehearsalLearning } from './actorCareerBalance';
 
 export type CareerUiStage = 'audition' | 'development' | 'prep' | 'shooting' | 'promo' | 'upcoming';
 
@@ -111,7 +112,7 @@ const mapCommitment = (player: Player, commitment: Commitment): CareerUiProject 
   const performance = Math.max(0, Math.min(100, Number(commitment.productionPerformance || 0)));
 
   if (commitment.projectPhase === 'AUDITION') {
-    const done = readiness >= 100;
+    const done = readiness >= 100 && !hasCareerRehearsalLearning(player, commitment);
     return {
       id: commitment.id,
       title: commitment.name,
@@ -136,7 +137,7 @@ const mapCommitment = (player: Player, commitment: Commitment): CareerUiProject 
   }
 
   if (commitment.projectPhase === 'PRE_PRODUCTION') {
-    const done = readiness >= 100;
+    const done = readiness >= 100 && !hasCareerRehearsalLearning(player, commitment);
     return {
       id: commitment.id,
       title: commitment.name,
@@ -150,7 +151,7 @@ const mapCommitment = (player: Player, commitment: Commitment): CareerUiProject 
   }
 
   if (commitment.projectPhase === 'PRODUCTION') {
-    const done = performance >= 100;
+    const done = performance >= 100 && !hasCareerRehearsalLearning(player, commitment);
     return {
       id: commitment.id,
       title: commitment.name,

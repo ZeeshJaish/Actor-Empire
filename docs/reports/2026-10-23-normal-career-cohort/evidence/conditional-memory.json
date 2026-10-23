@@ -1,0 +1,48 @@
+{
+  "peakTreeMiB": 1406.109375,
+  "peakWorkerRssMiB": 1617.125,
+  "guardStops": [
+    {
+      "peakOwnedWorkerTreeRssMiB": 1406.109375,
+      "stopReason": "System swap growth exceeded 512MiB",
+      "heapMiB": 1024,
+      "batchWeeks": 3,
+      "seed": 0,
+      "at": "2026-10-23T13:21:59.667Z"
+    },
+    {
+      "peakOwnedWorkerTreeRssMiB": 1319.859375,
+      "stopReason": "System swap growth exceeded 512MiB",
+      "heapMiB": 1024,
+      "batchWeeks": 1,
+      "seed": 0,
+      "at": "2026-10-23T13:30:30.663Z"
+    },
+    {
+      "peakOwnedWorkerTreeRssMiB": 317.90625,
+      "stopReason": "System swap growth exceeded 512MiB",
+      "heapMiB": 768,
+      "batchWeeks": 1,
+      "seed": 0,
+      "at": "2026-10-23T13:31:15.365Z"
+    },
+    {
+      "peakOwnedWorkerTreeRssMiB": 778.46875,
+      "stopReason": "System swap growth exceeded 512MiB",
+      "heapMiB": 768,
+      "batchWeeks": 1,
+      "seed": 0,
+      "at": "2026-10-23T13:43:06.016Z"
+    }
+  ],
+  "finalAttempt": {
+    "peakOwnedWorkerTreeRssMiB": 806.265625,
+    "stopReason": null,
+    "heapMiB": 512,
+    "batchWeeks": 1,
+    "seed": 0,
+    "at": "2026-10-23T13:45:56.587Z"
+  },
+  "finalAttemptOutcome": "512MB audit heap exhausted; protected week168 checkpoint unchanged; not a gameplay or user-save failure",
+  "heavyWorkersStopped": true
+}

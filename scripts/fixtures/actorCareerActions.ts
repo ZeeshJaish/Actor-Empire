@@ -15,15 +15,15 @@ function collect(node: import('typescript').Node) {
     ts.forEachChild(node, collect);
 }
 collect(ast);
+const actionCode = ts.transpileModule([...declarations.values()].join('\n')+'\nreturn {handleImproveAction,handleRehearse,handleOwnedProductionFocus};',
+    {compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText;
 /** Run the exact production UI callbacks; only React state and toast/render sinks are captured. */
 export function careerActionHarness(input: Player) {
     let current = input;
     const deps = { ...balance, OWNED_PRODUCTION_ACTIONS,applyOwnedProductionFocusAction,getOwnedProductionActionProgress, calculateAuditionGain, calculateProductionGain, rewardGenreExperience, spendPlayerEnergy,
         setPlayer: (fn: (p:Player)=>Player) => { current=fn(current); }, tr: (key:string)=>key,
         setToastMessage:()=>{}, handlePromotionAction:()=>{} };
-    const code = ts.transpileModule([...declarations.values()].join('\n')+'\nreturn {handleImproveAction,handleRehearse,handleOwnedProductionFocus};',
-        {compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText;
-    const actions = new Function(...Object.keys(deps),code)(...Object.values(deps));
+    const actions = new Function(...Object.keys(deps),actionCode)(...Object.values(deps));
     return { improve:(category:string,name:string,option:ImprovementOption)=>{actions.handleImproveAction(category,name,option);return current},
         ownedFocus:(id:string,action:import('../../types').OwnedProductionActionId)=>{actions.handleOwnedProductionFocus(id,action);return current},
         rehearse:(id:string)=>{actions.handleRehearse(id);return current}, player:()=>current };

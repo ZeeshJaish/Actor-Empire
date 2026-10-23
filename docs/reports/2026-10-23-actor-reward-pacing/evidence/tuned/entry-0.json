@@ -1,0 +1,3973 @@
+{
+  "status": "HORIZON_COMPLETE",
+  "strategy": "entry",
+  "seed": 0,
+  "horizon": 104,
+  "weeks": 104,
+  "reloads": 21,
+  "saves": 21,
+  "replays": 104,
+  "genre": "DRAMA",
+  "cash": 36027,
+  "skills": {
+    "delivery": 43.03658524571569,
+    "memorization": 50.724744684465065,
+    "expression": 19.610363840539826,
+    "improvisation": 13.530820689512275,
+    "discipline": 50.821973947505164,
+    "presence": 20.877138209446546,
+    "charisma": 8.384794425920155,
+    "writing": 0
+  },
+  "energy": {
+    "current": 85,
+    "max": 85
+  },
+  "bonusEnergyBank": 0,
+  "genreXP": {
+    "ACTION": 0,
+    "DRAMA": 72.60910016133283,
+    "COMEDY": 0,
+    "ROMANCE": 18.15227504033321,
+    "THRILLER": 18.15227504033321,
+    "MYSTERY": 0,
+    "HORROR": 0,
+    "SCI_FI": 0,
+    "ADVENTURE": 0,
+    "SUPERHERO": 0,
+    "MUSICAL": 0,
+    "BIOPIC": 0,
+    "SPORTS": 0,
+    "ANIMATION": 0,
+    "FANTASY": 0,
+    "CRIME": 0,
+    "DOCUMENTARY": 0
+  },
+  "fame": 0.4936013168411744,
+  "reputation": 1.005,
+  "experience": 4,
+  "arc": "NEWCOMER",
+  "curve": [
+    {
+      "seed": 0,
+      "weeks": 0,
+      "cash": 2000,
+      "craft": 0,
+      "genre": 0,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 0,
+      "health": 80,
+      "energy": 100,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "activePersonalRoles": 0,
+      "phases": []
+    },
+    {
+      "seed": 0,
+      "weeks": 1,
+      "cash": 1475,
+      "craft": 0.13714285714285715,
+      "genre": 11.4148134375,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 0,
+      "health": 79.85,
+      "energy": 85,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": []
+    },
+    {
+      "seed": 0,
+      "weeks": 2,
+      "cash": 1350,
+      "craft": 0.2736,
+      "genre": 21.472356397781972,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 0,
+      "health": 79.69999999999999,
+      "energy": 85,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": []
+    },
+    {
+      "seed": 0,
+      "weeks": 3,
+      "cash": 1550,
+      "craft": 0.40937485714285715,
+      "genre": 28.650270959859814,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 0,
+      "health": 79.54999999999998,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": []
+    },
+    {
+      "seed": 0,
+      "weeks": 4,
+      "cash": 1750,
+      "craft": 1.8886758694285712,
+      "genre": 35.13686542955041,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 0,
+      "health": 79.39999999999998,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 1,
+      "phases": []
+    },
+    {
+      "seed": 0,
+      "weeks": 5,
+      "cash": 2050,
+      "craft": 2.3336686434598244,
+      "genre": 35.13686542955041,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 0,
+      "health": 79.24999999999997,
+      "energy": 85,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 1,
+      "phases": [
+        "AUDITION"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 6,
+      "cash": 2350,
+      "craft": 2.770908113704792,
+      "genre": 35.13686542955041,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 0,
+      "health": 79.09999999999997,
+      "energy": 85,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 7,
+      "cash": 2150,
+      "craft": 2.8941964302791257,
+      "genre": 40.9987223032049,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 0,
+      "health": 78.94999999999996,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 8,
+      "cash": 2350,
+      "craft": 3.016868305270587,
+      "genre": 46.355418453158066,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 0,
+      "health": 78.79999999999995,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 9,
+      "cash": 2550,
+      "craft": 3.138926820887091,
+      "genre": 51.29626442466945,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 0,
+      "health": 78.64999999999995,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 10,
+      "cash": 4750,
+      "craft": 4.468784863157809,
+      "genre": 55.85354343225582,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 0,
+      "health": 78.49999999999994,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 11,
+      "cash": 4600,
+      "craft": 4.583583795984877,
+      "genre": 57.99774311233848,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 0,
+      "health": 78.34999999999994,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 12,
+      "cash": 4800,
+      "craft": 4.69780873414781,
+      "genre": 62.03477399868033,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 0,
+      "health": 78.19999999999993,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 13,
+      "cash": 5000,
+      "craft": 4.811462547619928,
+      "genre": 65.75840274917861,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 0,
+      "health": 78.04999999999993,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 14,
+      "cash": 5200,
+      "craft": 6.049749258852023,
+      "genre": 69.19295934829881,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 0,
+      "health": 77.89999999999992,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 15,
+      "cash": 5075,
+      "craft": 6.156643369700619,
+      "genre": 70.00910016133284,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 0,
+      "health": 77.74999999999991,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 16,
+      "cash": 5375,
+      "craft": 6.263003009994974,
+      "genre": 70.00910016133284,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 0,
+      "health": 77.59999999999991,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 17,
+      "cash": 5675,
+      "craft": 6.368830852087856,
+      "genre": 70.00910016133284,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 0,
+      "health": 77.4499999999999,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 18,
+      "cash": 7975,
+      "craft": 7.521851648650332,
+      "genre": 70.00910016133284,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 0,
+      "health": 77.2999999999999,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 1,
+      "phases": [
+        "AUDITION"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 19,
+      "cash": 8275,
+      "craft": 7.868695136565802,
+      "genre": 70.00910016133284,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 0,
+      "health": 77.14999999999989,
+      "energy": 85,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 1,
+      "phases": [
+        "AUDITION"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 20,
+      "cash": 8575,
+      "craft": 8.209495418647293,
+      "genre": 70.00910016133284,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 0,
+      "health": 76.99999999999989,
+      "energy": 85,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 1,
+      "phases": [
+        "AUDITION"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 21,
+      "cash": 8875,
+      "craft": 8.209495418647293,
+      "genre": 70.00910016133284,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 0,
+      "health": 76.84999999999988,
+      "energy": 85,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 1,
+      "phases": [
+        "AUDITION"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 22,
+      "cash": 9175,
+      "craft": 8.209495418647293,
+      "genre": 70.00910016133284,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 0,
+      "health": 76.69999999999987,
+      "energy": 85,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 1,
+      "phases": [
+        "AUDITION"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 23,
+      "cash": 9475,
+      "craft": 8.209495418647293,
+      "genre": 70.50910016133284,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 1,
+      "health": 76.54999999999987,
+      "energy": 85,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 1,
+      "phases": [
+        "AUDITION"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 24,
+      "cash": 9775,
+      "craft": 8.687395418647293,
+      "genre": 70.50910016133284,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 1,
+      "health": 76.39999999999986,
+      "energy": 85,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 1,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 25,
+      "cash": 10075,
+      "craft": 9.156968757866043,
+      "genre": 70.50910016133284,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 1,
+      "health": 76.24999999999986,
+      "energy": 85,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 1,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 26,
+      "cash": 10375,
+      "craft": 9.61836051535725,
+      "genre": 70.50910016133284,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 1,
+      "health": 76.09999999999985,
+      "energy": 85,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 1,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 27,
+      "cash": 10675,
+      "craft": 10.071713242398792,
+      "genre": 70.50910016133284,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 1,
+      "health": 75.94999999999985,
+      "energy": 85,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 1,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 28,
+      "cash": 10975,
+      "craft": 10.517167006535272,
+      "genre": 70.50910016133284,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 1,
+      "health": 75.79999999999984,
+      "energy": 85,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 1,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 29,
+      "cash": 11275,
+      "craft": 10.95485943485318,
+      "genre": 70.50910016133284,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 1,
+      "health": 75.64999999999984,
+      "energy": 85,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 1,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 30,
+      "cash": 11575,
+      "craft": 11.384925756502067,
+      "genre": 70.50910016133284,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 1,
+      "health": 75.49999999999983,
+      "energy": 85,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 1,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 31,
+      "cash": 11875,
+      "craft": 11.80749884447485,
+      "genre": 70.50910016133284,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 1,
+      "health": 75.34999999999982,
+      "energy": 85,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 1,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 32,
+      "cash": 12175,
+      "craft": 12.222709256660158,
+      "genre": 70.50910016133284,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 1,
+      "health": 75.19999999999982,
+      "energy": 85,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 1,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 33,
+      "cash": 12475,
+      "craft": 12.630685276179406,
+      "genre": 70.50910016133284,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 1,
+      "health": 75.04999999999981,
+      "energy": 85,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 1,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 34,
+      "cash": 12775,
+      "craft": 12.630685276179406,
+      "genre": 70.50910016133284,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 1,
+      "health": 74.8999999999998,
+      "energy": 85,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 1,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 35,
+      "cash": 13075,
+      "craft": 12.630685276179406,
+      "genre": 70.50910016133284,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 1,
+      "health": 74.8499999999998,
+      "energy": 85,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 1,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 36,
+      "cash": 13375,
+      "craft": 12.630685276179406,
+      "genre": 70.50910016133284,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 1,
+      "health": 74.79999999999978,
+      "energy": 85,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 1,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 37,
+      "cash": 13675,
+      "craft": 12.630685276179406,
+      "genre": 70.50910016133284,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 1,
+      "health": 74.74999999999977,
+      "energy": 85,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 1,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 38,
+      "cash": 13975,
+      "craft": 12.630685276179406,
+      "genre": 70.50910016133284,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 1,
+      "health": 74.69999999999976,
+      "energy": 85,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 1,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 39,
+      "cash": 14275,
+      "craft": 12.630685276179406,
+      "genre": 70.50910016133284,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 1,
+      "health": 74.64999999999975,
+      "energy": 85,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 1,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 40,
+      "cash": 14575,
+      "craft": 12.630685276179406,
+      "genre": 70.50910016133284,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 1,
+      "health": 75.59999999999974,
+      "energy": 85,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 1,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 41,
+      "cash": 14875,
+      "craft": 12.630685276179406,
+      "genre": 70.50910016133284,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 1,
+      "health": 75.44999999999973,
+      "energy": 85,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 1,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 42,
+      "cash": 15175,
+      "craft": 12.630685276179406,
+      "genre": 70.50910016133284,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 1,
+      "health": 75.29999999999973,
+      "energy": 85,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 1,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 43,
+      "cash": 15475,
+      "craft": 12.630685276179406,
+      "genre": 70.50910016133284,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 1,
+      "health": 75.14999999999972,
+      "energy": 85,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 1,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 44,
+      "cash": 15775,
+      "craft": 12.630685276179406,
+      "genre": 70.50910016133284,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 1,
+      "health": 74.99999999999972,
+      "energy": 85,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 1,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 45,
+      "cash": 16075,
+      "craft": 12.630685276179406,
+      "genre": 70.50910016133284,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 1,
+      "health": 74.9499999999997,
+      "energy": 85,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 1,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 46,
+      "cash": 16375,
+      "craft": 12.630685276179406,
+      "genre": 70.50910016133284,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 1,
+      "health": 74.8999999999997,
+      "energy": 85,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 1,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 47,
+      "cash": 16675,
+      "craft": 12.630685276179406,
+      "genre": 70.50910016133284,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 1,
+      "health": 74.84999999999968,
+      "energy": 85,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 1,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 48,
+      "cash": 16975,
+      "craft": 12.630685276179406,
+      "genre": 70.50910016133284,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 1,
+      "health": 74.79999999999967,
+      "energy": 85,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 1,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 49,
+      "cash": 17275,
+      "craft": 12.630685276179406,
+      "genre": 70.50910016133284,
+      "fame": 0,
+      "reputation": 0,
+      "experience": 1,
+      "health": 74.74999999999966,
+      "energy": 85,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 0,
+      "paidMovieIncome": 0,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 1,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 50,
+      "cash": 20227,
+      "craft": 12.630685276179406,
+      "genre": 72.10910016133283,
+      "fame": 0.768,
+      "reputation": 0.96,
+      "experience": 3,
+      "health": 74.69999999999965,
+      "energy": 85,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 51,
+      "cash": 20127,
+      "craft": 12.726780656229026,
+      "genre": 72.10910016133283,
+      "fame": 0.76032,
+      "reputation": 0.96,
+      "experience": 3,
+      "health": 75.64999999999964,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 52,
+      "cash": 20427,
+      "craft": 12.822395559378398,
+      "genre": 72.10910016133283,
+      "fame": 0.7527168,
+      "reputation": 0.96,
+      "experience": 3,
+      "health": 75.49999999999963,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 53,
+      "cash": 20727,
+      "craft": 12.917532388012024,
+      "genre": 72.10910016133283,
+      "fame": 0.745189632,
+      "reputation": 0.96,
+      "experience": 3,
+      "health": 75.34999999999962,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 54,
+      "cash": 21027,
+      "craft": 13.954071920182534,
+      "genre": 72.10910016133283,
+      "fame": 0.73773773568,
+      "reputation": 0.96,
+      "experience": 3,
+      "health": 75.19999999999962,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 55,
+      "cash": 20927,
+      "craft": 14.04355036701214,
+      "genre": 72.10910016133283,
+      "fame": 0.7303603583232,
+      "reputation": 0.96,
+      "experience": 3,
+      "health": 75.04999999999961,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 56,
+      "cash": 21227,
+      "craft": 14.132581421607597,
+      "genre": 72.10910016133283,
+      "fame": 0.723056754739968,
+      "reputation": 0.96,
+      "experience": 3,
+      "health": 74.89999999999961,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 57,
+      "cash": 21527,
+      "craft": 14.221167320930075,
+      "genre": 72.10910016133283,
+      "fame": 0.7158261871925683,
+      "reputation": 0.96,
+      "experience": 3,
+      "health": 74.8499999999996,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 58,
+      "cash": 21827,
+      "craft": 15.186332840523322,
+      "genre": 72.10910016133283,
+      "fame": 0.7086679253206426,
+      "reputation": 0.96,
+      "experience": 3,
+      "health": 74.79999999999959,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 59,
+      "cash": 21327,
+      "craft": 15.335655462664233,
+      "genre": 72.10910016133283,
+      "fame": 0.7015812460674362,
+      "reputation": 0.96,
+      "experience": 3,
+      "health": 74.74999999999957,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 60,
+      "cash": 21627,
+      "craft": 15.483742001440877,
+      "genre": 72.10910016133283,
+      "fame": 0.6945654336067618,
+      "reputation": 0.96,
+      "experience": 3,
+      "health": 74.69999999999956,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 61,
+      "cash": 21927,
+      "craft": 15.630604174829758,
+      "genre": 72.10910016133283,
+      "fame": 0.6876197792706942,
+      "reputation": 0.96,
+      "experience": 3,
+      "health": 74.64999999999955,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 62,
+      "cash": 22227,
+      "craft": 17.00765637298944,
+      "genre": 72.10910016133283,
+      "fame": 0.6807435814779872,
+      "reputation": 0.96,
+      "experience": 3,
+      "health": 74.59999999999954,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 63,
+      "cash": 22127,
+      "craft": 17.090973515217346,
+      "genre": 72.10910016133283,
+      "fame": 0.6739361456632074,
+      "reputation": 0.96,
+      "experience": 3,
+      "health": 74.54999999999953,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 64,
+      "cash": 22427,
+      "craft": 17.173874071734108,
+      "genre": 72.10910016133283,
+      "fame": 0.6671967842065752,
+      "reputation": 0.96,
+      "experience": 3,
+      "health": 74.49999999999952,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 65,
+      "cash": 22727,
+      "craft": 17.256360125468287,
+      "genre": 72.10910016133283,
+      "fame": 0.6605248163645094,
+      "reputation": 0.96,
+      "experience": 3,
+      "health": 74.4499999999995,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 66,
+      "cash": 23027,
+      "craft": 18.155066302415584,
+      "genre": 72.10910016133283,
+      "fame": 0.6539195682008644,
+      "reputation": 0.96,
+      "experience": 3,
+      "health": 74.3999999999995,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 67,
+      "cash": 22527,
+      "craft": 18.292292031049445,
+      "genre": 72.10910016133283,
+      "fame": 0.6473803725188557,
+      "reputation": 0.96,
+      "experience": 3,
+      "health": 74.34999999999948,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 68,
+      "cash": 22827,
+      "craft": 18.428387354399568,
+      "genre": 72.10910016133283,
+      "fame": 0.6409065687936671,
+      "reputation": 0.96,
+      "experience": 3,
+      "health": 75.29999999999947,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 69,
+      "cash": 23127,
+      "craft": 18.563362971888782,
+      "genre": 72.10910016133283,
+      "fame": 0.6344975031057305,
+      "reputation": 0.96,
+      "experience": 3,
+      "health": 75.14999999999947,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 70,
+      "cash": 23427,
+      "craft": 19.83995396707214,
+      "genre": 72.10910016133283,
+      "fame": 0.6281525280746731,
+      "reputation": 0.96,
+      "experience": 3,
+      "health": 74.99999999999946,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 71,
+      "cash": 23327,
+      "craft": 19.918018041136758,
+      "genre": 72.10910016133283,
+      "fame": 0.6218710027939264,
+      "reputation": 0.96,
+      "experience": 3,
+      "health": 74.94999999999945,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 72,
+      "cash": 23627,
+      "craft": 19.995769858905113,
+      "genre": 72.10910016133283,
+      "fame": 0.6156522927659871,
+      "reputation": 0.96,
+      "experience": 3,
+      "health": 74.89999999999944,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 73,
+      "cash": 23927,
+      "craft": 20.073210669402396,
+      "genre": 72.10910016133283,
+      "fame": 0.6094957698383272,
+      "reputation": 0.96,
+      "experience": 3,
+      "health": 74.84999999999943,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 74,
+      "cash": 24227,
+      "craft": 20.918566947320436,
+      "genre": 72.10910016133283,
+      "fame": 0.6034008121399439,
+      "reputation": 0.96,
+      "experience": 3,
+      "health": 74.79999999999941,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 75,
+      "cash": 23727,
+      "craft": 21.04469643631894,
+      "genre": 72.10910016133283,
+      "fame": 0.5973668040185445,
+      "reputation": 0.96,
+      "experience": 3,
+      "health": 75.7499999999994,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 76,
+      "cash": 24027,
+      "craft": 21.16979210083753,
+      "genre": 72.10910016133283,
+      "fame": 0.5913931359783591,
+      "reputation": 0.96,
+      "experience": 3,
+      "health": 75.5999999999994,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 77,
+      "cash": 24327,
+      "craft": 21.293863710444985,
+      "genre": 72.10910016133283,
+      "fame": 0.5854792046185755,
+      "reputation": 0.96,
+      "experience": 3,
+      "health": 75.44999999999939,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 78,
+      "cash": 24627,
+      "craft": 22.47759150401442,
+      "genre": 72.10910016133283,
+      "fame": 0.5796244125723897,
+      "reputation": 0.96,
+      "experience": 3,
+      "health": 75.29999999999939,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 79,
+      "cash": 24127,
+      "craft": 22.59354130715138,
+      "genre": 72.10910016133283,
+      "fame": 0.5738281684466658,
+      "reputation": 0.96,
+      "experience": 3,
+      "health": 75.14999999999938,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 0,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 80,
+      "cash": 24427,
+      "craft": 22.70854555626777,
+      "genre": 72.10910016133283,
+      "fame": 0.6282487588798642,
+      "reputation": 1.005,
+      "experience": 3,
+      "health": 74.99999999999937,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 1,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 81,
+      "cash": 24727,
+      "craft": 22.822613172043777,
+      "genre": 72.10910016133283,
+      "fame": 0.6219662712910655,
+      "reputation": 1.005,
+      "experience": 3,
+      "health": 74.94999999999936,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 1,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 82,
+      "cash": 25027,
+      "craft": 23.920481950425586,
+      "genre": 72.10910016133283,
+      "fame": 0.6157466085781549,
+      "reputation": 1.005,
+      "experience": 3,
+      "health": 74.89999999999935,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 1,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 83,
+      "cash": 24927,
+      "craft": 23.99423157256921,
+      "genre": 72.10910016133283,
+      "fame": 0.6095891424923734,
+      "reputation": 1.005,
+      "experience": 3,
+      "health": 74.84999999999934,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 1,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 84,
+      "cash": 25227,
+      "craft": 24.06768619622426,
+      "genre": 72.10910016133283,
+      "fame": 0.6034932510674497,
+      "reputation": 1.005,
+      "experience": 3,
+      "health": 74.79999999999933,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 1,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 85,
+      "cash": 25527,
+      "craft": 24.140847001384685,
+      "genre": 72.10910016133283,
+      "fame": 0.5974583185567751,
+      "reputation": 1.005,
+      "experience": 3,
+      "health": 74.74999999999932,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 1,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 86,
+      "cash": 25827,
+      "craft": 24.93948205624475,
+      "genre": 72.10910016133283,
+      "fame": 0.5914837353712074,
+      "reputation": 1.005,
+      "experience": 3,
+      "health": 74.6999999999993,
+      "energy": 70,
+      "arc": "NEWCOMER",
+      "credits": 1,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 87,
+      "cash": 26927,
+      "craft": 25.17948205624475,
+      "genre": 72.10910016133283,
+      "fame": 0.5855688980174952,
+      "reputation": 1.005,
+      "experience": 3,
+      "health": 74.6499999999993,
+      "energy": 60,
+      "arc": "NEWCOMER",
+      "credits": 1,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 88,
+      "cash": 29227,
+      "craft": 25.41699634195904,
+      "genre": 72.10910016133283,
+      "fame": 0.5797132090373203,
+      "reputation": 1.005,
+      "experience": 3,
+      "health": 74.59999999999928,
+      "energy": 60,
+      "arc": "NEWCOMER",
+      "credits": 1,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 89,
+      "cash": 29527,
+      "craft": 25.652053413387613,
+      "genre": 72.10910016133283,
+      "fame": 0.573916076946947,
+      "reputation": 1.005,
+      "experience": 3,
+      "health": 74.54999999999927,
+      "energy": 60,
+      "arc": "NEWCOMER",
+      "credits": 1,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 90,
+      "cash": 29827,
+      "craft": 25.884681427137604,
+      "genre": 72.10910016133283,
+      "fame": 0.5681769161774776,
+      "reputation": 1.005,
+      "experience": 3,
+      "health": 74.49999999999926,
+      "energy": 60,
+      "arc": "NEWCOMER",
+      "credits": 1,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 91,
+      "cash": 30127,
+      "craft": 26.114908200651445,
+      "genre": 72.10910016133283,
+      "fame": 0.5624951470157028,
+      "reputation": 1.005,
+      "experience": 3,
+      "health": 74.44999999999925,
+      "energy": 60,
+      "arc": "NEWCOMER",
+      "credits": 1,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 92,
+      "cash": 30427,
+      "craft": 26.357046930668112,
+      "genre": 72.10910016133283,
+      "fame": 0.5568701955455457,
+      "reputation": 1.005,
+      "experience": 3,
+      "health": 74.39999999999924,
+      "energy": 60,
+      "arc": "NEWCOMER",
+      "credits": 1,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 93,
+      "cash": 30727,
+      "craft": 26.582553340204036,
+      "genre": 72.10910016133283,
+      "fame": 0.5513014935900903,
+      "reputation": 1.005,
+      "experience": 3,
+      "health": 74.34999999999923,
+      "energy": 60,
+      "arc": "NEWCOMER",
+      "credits": 1,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 0,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 94,
+      "cash": 31027,
+      "craft": 28.08456992987795,
+      "genre": 72.10910016133283,
+      "fame": 0.5457884786541893,
+      "reputation": 1.005,
+      "experience": 3,
+      "health": 74.29999999999922,
+      "energy": 60,
+      "arc": "NEWCOMER",
+      "credits": 1,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 1,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 95,
+      "cash": 31327,
+      "craft": 28.32737480403309,
+      "genre": 72.10910016133283,
+      "fame": 0.5403305938676475,
+      "reputation": 1.005,
+      "experience": 3,
+      "health": 75.2499999999992,
+      "energy": 85,
+      "arc": "NEWCOMER",
+      "credits": 1,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 1,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 96,
+      "cash": 31627,
+      "craft": 28.56679230738889,
+      "genre": 72.10910016133283,
+      "fame": 0.534927287928971,
+      "reputation": 1.005,
+      "experience": 3,
+      "health": 75.0999999999992,
+      "energy": 85,
+      "arc": "NEWCOMER",
+      "credits": 1,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 1,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 97,
+      "cash": 33927,
+      "craft": 28.56679230738889,
+      "genre": 72.10910016133283,
+      "fame": 0.5295780150496814,
+      "reputation": 1.005,
+      "experience": 3,
+      "health": 74.94999999999919,
+      "energy": 85,
+      "arc": "NEWCOMER",
+      "credits": 1,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 1,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 98,
+      "cash": 34227,
+      "craft": 28.56679230738889,
+      "genre": 72.10910016133283,
+      "fame": 0.5242822348991846,
+      "reputation": 1.005,
+      "experience": 3,
+      "health": 74.89999999999918,
+      "energy": 85,
+      "arc": "NEWCOMER",
+      "credits": 1,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 1,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 99,
+      "cash": 34527,
+      "craft": 28.56679230738889,
+      "genre": 72.10910016133283,
+      "fame": 0.5190394125501927,
+      "reputation": 1.005,
+      "experience": 3,
+      "health": 75.84999999999917,
+      "energy": 85,
+      "arc": "NEWCOMER",
+      "credits": 1,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 1,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 100,
+      "cash": 34827,
+      "craft": 28.56679230738889,
+      "genre": 72.10910016133283,
+      "fame": 0.5138490184246908,
+      "reputation": 1.005,
+      "experience": 3,
+      "health": 75.69999999999916,
+      "energy": 85,
+      "arc": "NEWCOMER",
+      "credits": 1,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 1,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 101,
+      "cash": 35127,
+      "craft": 28.56679230738889,
+      "genre": 72.60910016133283,
+      "fame": 0.5087105282404438,
+      "reputation": 1.005,
+      "experience": 4,
+      "health": 75.54999999999916,
+      "energy": 85,
+      "arc": "NEWCOMER",
+      "credits": 1,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 1,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 102,
+      "cash": 35427,
+      "craft": 28.906429402790554,
+      "genre": 72.60910016133283,
+      "fame": 0.5036234229580394,
+      "reputation": 1.005,
+      "experience": 4,
+      "health": 75.39999999999915,
+      "energy": 85,
+      "arc": "NEWCOMER",
+      "credits": 1,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 1,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 103,
+      "cash": 35727,
+      "craft": 29.240632227100935,
+      "genre": 72.60910016133283,
+      "fame": 0.49858718872845903,
+      "reputation": 1.005,
+      "experience": 4,
+      "health": 75.24999999999915,
+      "energy": 85,
+      "arc": "NEWCOMER",
+      "credits": 1,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 1,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    },
+    {
+      "seed": 0,
+      "weeks": 104,
+      "cash": 36027,
+      "craft": 29.56948872044353,
+      "genre": 72.60910016133283,
+      "fame": 0.4936013168411744,
+      "reputation": 1.005,
+      "experience": 4,
+      "health": 75.09999999999914,
+      "energy": 85,
+      "arc": "NEWCOMER",
+      "credits": 1,
+      "releasedCredits": 1,
+      "paidMovieIncome": 2652,
+      "purchasedCash": 0,
+      "bonusEnergyBank": 0,
+      "activePersonalRoles": 1,
+      "phases": [
+        "AUDITION",
+        "PRODUCTION",
+        "POST_PRODUCTION",
+        "AWAITING_RELEASE"
+      ]
+    }
+  ],
+  "credits": [
+    "aud_active_1800000000289_0.2647297920193523"
+  ],
+  "phases": [
+    "AUDITION",
+    "PRODUCTION",
+    "POST_PRODUCTION",
+    "AWAITING_RELEASE"
+  ],
+  "actions": [
+    {
+      "week": 0,
+      "type": "paid-course:ws_intro_acting",
+      "cost": 400,
+      "energy": 15
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 1,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 1,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 1,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 1,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 1,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 2,
+      "type": "accept-paid-job",
+      "cost": 0,
+      "energy": 15
+    },
+    {
+      "week": 2,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 2,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 2,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 2,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 2,
+      "type": "apply:MINOR",
+      "cost": 0,
+      "energy": 25,
+      "projectId": "aud_1800000000037_0.21646653907373548"
+    },
+    {
+      "week": 3,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 3,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 3,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 3,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 3,
+      "type": "apply:MINOR",
+      "cost": 0,
+      "energy": 25,
+      "projectId": "aud_1800000000037_0.21646653907373548"
+    },
+    {
+      "week": 4,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000082_0.3665370426606387"
+    },
+    {
+      "week": 4,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000082_0.3665370426606387"
+    },
+    {
+      "week": 4,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000082_0.3665370426606387"
+    },
+    {
+      "week": 5,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000082_0.3665370426606387"
+    },
+    {
+      "week": 5,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000082_0.3665370426606387"
+    },
+    {
+      "week": 5,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000082_0.3665370426606387"
+    },
+    {
+      "week": 5,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000082_0.3665370426606387"
+    },
+    {
+      "week": 6,
+      "type": "paid-course:ws_intro_acting",
+      "cost": 400,
+      "energy": 15
+    },
+    {
+      "week": 6,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 6,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 6,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 6,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 7,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 7,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 7,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 7,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 8,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 8,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 8,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 8,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 9,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 0
+    },
+    {
+      "week": 9,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 9,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 9,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 10,
+      "type": "paid-course:ws_intro_acting",
+      "cost": 400,
+      "energy": 15
+    },
+    {
+      "week": 10,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 10,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 11,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 11,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 11,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 11,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 12,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 12,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 12,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 12,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 13,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 13,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 13,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 13,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 14,
+      "type": "paid-course:ws_intro_acting",
+      "cost": 400,
+      "energy": 15
+    },
+    {
+      "week": 14,
+      "type": "genre:DRAMA",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 17,
+      "type": "apply:MINOR",
+      "cost": 0,
+      "energy": 15,
+      "projectId": "aud_1800000000276_0.4309204122982919"
+    },
+    {
+      "week": 18,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 18,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 18,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 19,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 19,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 19,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 19,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 20,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 20,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 20,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 20,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 21,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 21,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 21,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 21,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 22,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 0,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 23,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 23,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 23,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 23,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 24,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 24,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 24,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 24,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 25,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 25,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 25,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 25,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 26,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 26,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 26,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 26,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 27,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 27,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 27,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 27,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 28,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 28,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 28,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 28,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 29,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 29,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 29,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 29,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 30,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 30,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 30,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 30,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 31,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 31,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 31,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 31,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 32,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 32,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 32,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 32,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 33,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 33,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 0,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 34,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 34,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 0,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 35,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 35,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 0,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 36,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 36,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 0,
+      "projectId": "aud_active_1800000000289_0.2647297920193523"
+    },
+    {
+      "week": 37,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 38,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 39,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 44,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 45,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 46,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 47,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 48,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 49,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 50,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 50,
+      "type": "paid-course:ws_intro_acting",
+      "cost": 400,
+      "energy": 15
+    },
+    {
+      "week": 54,
+      "type": "paid-course:ws_intro_acting",
+      "cost": 400,
+      "energy": 15
+    },
+    {
+      "week": 56,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 57,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 58,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 58,
+      "type": "paid-course:ws_vocal",
+      "cost": 800,
+      "energy": 15
+    },
+    {
+      "week": 59,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 60,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 61,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 62,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 62,
+      "type": "paid-course:ws_intro_acting",
+      "cost": 400,
+      "energy": 15
+    },
+    {
+      "week": 63,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 64,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 65,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 66,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 66,
+      "type": "paid-course:ws_vocal",
+      "cost": 800,
+      "energy": 15
+    },
+    {
+      "week": 67,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 70,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 70,
+      "type": "paid-course:ws_intro_acting",
+      "cost": 400,
+      "energy": 15
+    },
+    {
+      "week": 71,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 72,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 73,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 74,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 74,
+      "type": "paid-course:ws_vocal",
+      "cost": 800,
+      "energy": 15
+    },
+    {
+      "week": 78,
+      "type": "paid-course:ws_vocal",
+      "cost": 800,
+      "energy": 15
+    },
+    {
+      "week": 80,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 81,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 82,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 82,
+      "type": "paid-course:ws_intro_acting",
+      "cost": 400,
+      "energy": 15
+    },
+    {
+      "week": 83,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 84,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 85,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 86,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 0
+    },
+    {
+      "week": 86,
+      "type": "paid-course:ws_improv_club",
+      "cost": 1200,
+      "energy": 25
+    },
+    {
+      "week": 87,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 0
+    },
+    {
+      "week": 88,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 89,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 90,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 91,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 91,
+      "type": "wellbeing:opt_meditate",
+      "cost": 0,
+      "energy": 5
+    },
+    {
+      "week": 92,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 93,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 93,
+      "type": "apply:SUPPORTING",
+      "cost": 0,
+      "energy": 25,
+      "projectId": "aud_1800000001196_0.6094275182113051"
+    },
+    {
+      "week": 94,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 94,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001214_0.8345831807237118"
+    },
+    {
+      "week": 94,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001214_0.8345831807237118"
+    },
+    {
+      "week": 95,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001214_0.8345831807237118"
+    },
+    {
+      "week": 95,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001214_0.8345831807237118"
+    },
+    {
+      "week": 95,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001214_0.8345831807237118"
+    },
+    {
+      "week": 95,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001214_0.8345831807237118"
+    },
+    {
+      "week": 96,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 10,
+      "projectId": "aud_active_1800000001214_0.8345831807237118"
+    },
+    {
+      "week": 96,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001214_0.8345831807237118"
+    },
+    {
+      "week": 96,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001214_0.8345831807237118"
+    },
+    {
+      "week": 96,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001214_0.8345831807237118"
+    },
+    {
+      "week": 97,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 97,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001214_0.8345831807237118"
+    },
+    {
+      "week": 97,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001214_0.8345831807237118"
+    },
+    {
+      "week": 97,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001214_0.8345831807237118"
+    },
+    {
+      "week": 98,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 98,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001214_0.8345831807237118"
+    },
+    {
+      "week": 98,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001214_0.8345831807237118"
+    },
+    {
+      "week": 98,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001214_0.8345831807237118"
+    },
+    {
+      "week": 99,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001214_0.8345831807237118"
+    },
+    {
+      "week": 99,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 0,
+      "projectId": "aud_active_1800000001214_0.8345831807237118"
+    },
+    {
+      "week": 100,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 0,
+      "projectId": "aud_active_1800000001214_0.8345831807237118"
+    },
+    {
+      "week": 101,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001214_0.8345831807237118"
+    },
+    {
+      "week": 101,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001214_0.8345831807237118"
+    },
+    {
+      "week": 101,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001214_0.8345831807237118"
+    },
+    {
+      "week": 101,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001214_0.8345831807237118"
+    },
+    {
+      "week": 102,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001214_0.8345831807237118"
+    },
+    {
+      "week": 102,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001214_0.8345831807237118"
+    },
+    {
+      "week": 102,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001214_0.8345831807237118"
+    },
+    {
+      "week": 102,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001214_0.8345831807237118"
+    },
+    {
+      "week": 103,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001214_0.8345831807237118"
+    },
+    {
+      "week": 103,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001214_0.8345831807237118"
+    },
+    {
+      "week": 103,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001214_0.8345831807237118"
+    },
+    {
+      "week": 103,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001214_0.8345831807237118"
+    }
+  ],
+  "signed": [
+    [
+      "aud_active_1800000000082_0.3665370426606387",
+      11863
+    ],
+    [
+      "aud_active_1800000000289_0.2647297920193523",
+      2652
+    ],
+    [
+      "aud_active_1800000001214_0.8345831807237118",
+      3783
+    ]
+  ],
+  "peakRSS": 1457520640
+}

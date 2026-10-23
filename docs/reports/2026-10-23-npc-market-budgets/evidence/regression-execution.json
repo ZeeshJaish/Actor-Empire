@@ -1,0 +1,62 @@
+[
+  {
+    "name": "studio-ai-market-budget",
+    "exitCode": 0
+  },
+  {
+    "name": "studio-ai-slate-admission-b5",
+    "exitCode": 0
+  },
+  {
+    "name": "studio-ai-greenlight-b5",
+    "exitCode": 0
+  },
+  {
+    "name": "studio-ai-slate-execution-b5",
+    "exitCode": 0
+  },
+  {
+    "name": "studio-ai-production-handoff-b6",
+    "exitCode": 0
+  },
+  {
+    "name": "studio-ai-production-talent-b6",
+    "exitCode": 0
+  },
+  {
+    "name": "studio-ai-production-economy-b6",
+    "exitCode": 0
+  },
+  {
+    "name": "studio-ai-save-b1",
+    "exitCode": 0
+  },
+  {
+    "name": "studio-ai-commercial-result-b6",
+    "exitCode": 0
+  },
+  {
+    "name": "box-office-integration",
+    "exitCode": 0
+  },
+  {
+    "name": "box-office-migration",
+    "exitCode": 0
+  },
+  {
+    "name": "box-office-booking",
+    "exitCode": 0
+  },
+  {
+    "name": "box-office-market",
+    "exitCode": 0
+  },
+  {
+    "name": "box-office-fair-package",
+    "exitCode": 0
+  },
+  {
+    "name": "cinema-small-fairness",
+    "exitCode": null
+  }
+]

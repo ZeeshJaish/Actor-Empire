@@ -1,4 +1,4 @@
-import type { Commitment, Player, RoleType, Genre } from '../types';
+import type { Commitment, Player, RoleType, Genre, PastProject, OutcomeTier } from '../types';
 import { spendPlayerEnergy } from './premiumLogic';
 
 export const ACTOR_CAREER_BALANCE_VERSION = 1 as const;
@@ -86,6 +86,24 @@ export const getCareerFinalPerformance = (p: Player, c: Commitment): number => {
 };
 
 /** Shared by UI and ordinary-career verification: one paid action, one selected project. */
+const careerRehearsalLearningState = (p: Player, c: Commitment) => {
+    const distributed = c.careerRewardPacingVersion === 1;
+    const learned = Math.max(0, c.careerLearningActions || 0);
+    const week = absoluteWeek(p);
+    const weeklyLearning = c.careerLearningWeek === week ? Math.max(0, c.careerLearningActionsThisWeek || 0) : 0;
+    const preparation = c.projectPhase === 'PRE_PRODUCTION' || c.projectPhase === 'AUDITION';
+    const learningLimit = preparation ? 4 : distributed ? 24 : 8;
+    const relevantSkills = preparation ? ['memorization', 'discipline'] as const : ['expression', 'delivery'] as const;
+    const canLearn = learned < learningLimit && (!distributed || weeklyLearning < 2
+        && relevantSkills.some(skill => clamp(p.stats.skills[skill]) < 100));
+    return {distributed, learned, week, weeklyLearning, canLearn};
+};
+
+export const hasCareerRehearsalLearning = (p: Player, c: Commitment): boolean => c.careerRewardPacingVersion === 1
+    && !c.careerPerformanceFinalized && isPersonalCareerActing(c)
+    && ['PRE_PRODUCTION', 'AUDITION', 'PRODUCTION'].includes(c.projectPhase || '')
+    && careerRehearsalLearningState(p, c).canLearn;
+
 export const applyCareerRehearsal = (input: Player, projectId: string): { player: Player; changed: boolean; message?: string } => {
     const c = input.commitments.find(row => row.id === projectId);
     if (!c || c.careerBalanceVersion !== 1 || !isPersonalCareerActing(c) || c.careerPerformanceFinalized) return { player: input, changed: false };
@@ -94,7 +112,9 @@ export const applyCareerRehearsal = (input: Player, projectId: string): { player
     const cost = pre ? 10 : 20;
     const key = pre || audition ? 'auditionPerformance' : 'productionPerformance';
     const current = clamp(c[key] || 0);
-    if (input.energy.current < cost || current >= 100) return { player: input, changed: false };
+    const {distributed, learned, week, weeklyLearning, canLearn} = careerRehearsalLearningState(input, c);
+    // New projects reserve most learning for filming. Every increment still costs rehearsal energy.
+    if (input.energy.current < cost || current >= 100 && (!distributed || !canLearn)) return { player: input, changed: false };
     const p = ensureActorCareerBalance(input);
     const craft = audition ? (p.stats.skills.memorization + p.stats.skills.discipline) / 2
         : (p.stats.skills.expression + p.stats.skills.presence) / 2;
@@ -102,16 +122,15 @@ export const applyCareerRehearsal = (input: Player, projectId: string): { player
     const base = (pre ? 4 : audition ? 6 + craft * .1 : 3 + craft * .08) * rolePreparation;
     const attention = (1 + managerSupport(p)) / (1 + Math.max(0, getCareerProjectLoad(p) - 1) * .25);
     const gain = Math.max(.5, base * Math.max(.12, 1 - current / 110) * attention);
-    const learned = Math.max(0, c.careerLearningActions || 0);
     const skills = { ...p.stats.skills };
-    // Reserve half the bounded learning allowance for actually performing the role.
-    const learningLimit = pre || audition ? 4 : 8;
-    if (learned < learningLimit) for (const skill of pre || audition ? ['memorization', 'discipline'] as const : ['expression', 'delivery'] as const)
+    if (canLearn) for (const skill of pre || audition ? ['memorization', 'discipline'] as const : ['expression', 'delivery'] as const)
         skills[skill] = clamp(skills[skill] + getCareerLearningGain(skills[skill], .35));
     const next: Player = { ...p, energy: { ...p.energy }, flags: { ...p.flags }, stats: { ...p.stats, skills },
-        commitments: p.commitments.map(row => row.id === c.id ? { ...c, [key]: Math.min(100, current + gain), careerLearningActions: Math.min(8, learned + Number(learned < learningLimit)) } : row) };
+        commitments: p.commitments.map(row => row.id === c.id ? { ...c, [key]: Math.min(100, current + gain),
+            careerLearningActions: Math.min(distributed ? 24 : 8, learned + Number(canLearn)),
+            ...(distributed ? {careerLearningWeek: week, careerLearningActionsThisWeek: weeklyLearning + Number(canLearn)} : {}) } : row) };
     spendPlayerEnergy(next, cost, `Project rehearsal: ${c.name}`);
-    return { player: next, changed: true, message: `${c.name}: ${Math.round(Math.min(100, current + gain))}% ${pre || audition ? 'preparation' : 'scene preparation'}${getCareerProjectLoad(p) > 1 ? ' · attention shared across current roles' : ''}.` };
+    return { player: next, changed: true, message: `${c.name}: ${Math.round(Math.min(100, current + gain))}% ${pre || audition ? 'preparation' : 'scene preparation'}${distributed && canLearn ? ' · role skills improved' : ''}${getCareerProjectLoad(p) > 1 ? ' · attention shared across current roles' : ''}.` };
 };
 
 export const getCareerPublicityGain = (p: Player): number => {
@@ -119,6 +138,36 @@ export const getCareerPublicityGain = (p: Player): number => {
     const evidence = getCareerEvidence(p, true);
     const ceiling = clamp(15 + Math.min(30, evidence.credits * 3) + evidence.workSignal * 35 + evidence.audience * 18, 15, 98);
     return tierGain * clamp((ceiling - p.stats.fame) / 20, 0, 1) * (.35 + .65 * Math.max(evidence.workSignal, evidence.audience));
+};
+
+/** A small earned audience fades gradually; established celebrity keeps the existing decay. */
+export const getCareerFameDecay = (fame: number): number => Math.min(.18, clamp(fame) * .01);
+
+/** One small personal credit at premiere, independent of a producer's financial return. */
+export const applyCareerReleaseRecognition = (p: Player, c: Commitment): {player: Player; commitment: Commitment} => {
+    if (c.careerRewardPacingVersion !== 1 || !c.careerPerformanceFinalized || !isPersonalCareerActing(c)
+        || c.projectDetails?.hiddenStats?.careerRecognitionApplied) return {player: p, commitment: c};
+    const signal = clamp((Number(c.productionPerformance || 0) - 45) / 25, 0, 1);
+    const visibility = c.roleType === 'LEAD' ? 2 : c.roleType === 'SUPPORTING' || c.roleType === 'ENSEMBLE' ? 1.25 : .8;
+    return {
+        player: signal > 0 ? {...p, stats: {...p.stats, fame: clamp(p.stats.fame + signal * visibility),
+            reputation: clamp(p.stats.reputation + signal)}} : p,
+        commitment: {...c, projectDetails: c.projectDetails ? {...c.projectDetails, hiddenStats: {
+            ...c.projectDetails.hiddenStats, careerRecognitionApplied: true,
+        }} : undefined},
+    };
+};
+
+/** NPC platform originals without a disclosed receipt history have no observable producer ROI.
+ * Keep the stored history intact. Ratings still drive critical success/failure in the career arc.
+ */
+export const getCareerReportedOutcome = (project: Partial<PastProject>, p: Player): OutcomeTier | undefined => {
+    const externalPlatform = ['NETFLIX', 'APPLE_TV', 'DISNEY_PLUS', 'HULU', 'YOUTUBE'].includes(project.studioId || '');
+    const owned = p.businesses?.some(b => b.id === project.studioId);
+    const unobserved = externalPlatform && !owned && project.streamingPlatform && Number(project.totalViews || 0) > 0
+        && !project.streamingContractId && !project.platformProductionFunding
+        && Number(project.gross || 0) === 0 && Number(project.streamingRevenue || 0) === 0;
+    return unobserved ? undefined : project.outcomeTier;
 };
 
 export const getCareerCommercialMultiplier = (p: Player): number => {

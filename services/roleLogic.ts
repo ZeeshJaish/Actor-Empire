@@ -1,4 +1,5 @@
 import { resolveCareerOfferRole } from './actorCareerBalance';
+import { quoteActorBackend } from './actorOfferTerms';
 import { completeOfferedCinemaCast } from './boxOffice/boxOfficeInputs';
 import { interpolateProductionBudget, getProductionScale, getProductionBudgetReference } from './studioProductionEconomy';
 
@@ -332,7 +333,7 @@ export const generateBreakthroughAuditionInvite = (
         if (famousProject && !usedTitles.includes(famousProject.title)) {
             const roleType: RoleType = random() < 0.65 ? 'SUPPORTING' : 'ENSEMBLE';
             const roleLabel = getWeeklyOfferRoleLabel(language, roleType);
-            const opportunity = createFamousOpportunity(famousProject, roleType, 'DIRECT', language);
+            const opportunity = createFamousOpportunity(famousProject, roleType, 'DIRECT', language, player);
             opportunity.source = 'DIRECTOR';
             opportunity.config = {
                 ...opportunity.config,
@@ -1578,6 +1579,7 @@ export const calculateFuturePotential = (
 
 export const generateSequelOffer = (original: ActiveRelease, player: Player): NegotiationData => {
     const hypeBoost = 20; 
+    const roleType = (original.roleType && ROLE_DEFINITIONS[original.roleType]) ? original.roleType : 'LEAD';
     const basePay = calculateProjectPay(original.roleType, original.projectDetails.budgetTier, original.type, original.projectDetails.estimatedBudget);
     let newPay = Math.floor(basePay * 1.5);
     
@@ -1591,6 +1593,10 @@ export const generateSequelOffer = (original: ActiveRelease, player: Player): Ne
     
     const project: ProjectDetails = {
         ...original.projectDetails,
+        // A new installment has its own announcement and producing-studio campaign.
+        cinemaExposure: undefined, offeredCinemaLaunch: undefined,
+        reservedMarketingBudget: undefined, marketingBudgetSpent: undefined,
+        totalCampaignSpend: undefined, marketingChannelAllocations: undefined,
         title: newTitle,
         subtype: 'SEQUEL',
         franchiseId: original.projectDetails.franchiseId || original.id,
@@ -1606,11 +1612,11 @@ export const generateSequelOffer = (original: ActiveRelease, player: Player): Ne
     const isRoyaltyEligible = player.stats.fame >= 50 && player.stats.reputation >= 50 && player.stats.experience >= 20; 
     let royaltyPercentage = 0;
     if (isRoyaltyEligible) {
-        royaltyPercentage = 1 + Math.floor(Math.random() * 3); 
-        newPay = Math.floor(newPay * 0.75); 
+        // Keep the existing offer roll; it does not alter the movie's quality.
+        const pointRoll = Math.floor(Math.random() * 3);
+        royaltyPercentage = quoteActorBackend(player, roleType, original.type, .9 + pointRoll * .05);
+        newPay = Math.floor(newPay * (1 - Math.min(.25, royaltyPercentage * .1)));
     }
-
-    const roleType = (original.roleType && ROLE_DEFINITIONS[original.roleType]) ? original.roleType : 'LEAD';
 
     const opportunity: AuditionOpportunity = {
         id: `seq_offer_${Date.now()}`,
@@ -1632,7 +1638,7 @@ export const generateSequelOffer = (original: ActiveRelease, player: Player): Ne
         maxRounds: 3,
         status: 'PENDING',
         studioPatience: 50 + Math.random() * 50,
-        hasRoyaltyOption: isRoyaltyEligible,
+        hasRoyaltyOption: royaltyPercentage > 0,
         royaltyPercentage
     };
 };
@@ -1660,6 +1666,9 @@ export const generateRenewalOffer = (original: ActiveRelease, player: Player): N
     // 3. Project Details
     const project: ProjectDetails = {
         ...original.projectDetails,
+        cinemaExposure: undefined, offeredCinemaLaunch: undefined,
+        reservedMarketingBudget: undefined, marketingBudgetSpent: undefined,
+        totalCampaignSpend: undefined, marketingChannelAllocations: undefined,
         title: newTitle,
         subtype: 'SEQUEL', // Treat as sequel/continuation in the system
         franchiseId: original.projectDetails.franchiseId || original.id,
@@ -1672,12 +1681,9 @@ export const generateRenewalOffer = (original: ActiveRelease, player: Player): N
     };
     project.musicPlan = buildAutomaticProjectMusicPlan(project);
 
-    // TV residuals usually implied in basePay for this game or handled via royalty
-    let royaltyPercentage = original.royaltyPercentage || 0;
-    // Syndication/backend bonus for high fame
-    if (player.stats.fame > 60) royaltyPercentage = Math.max(royaltyPercentage, 1.0); 
-
     const roleType = original.roleType || 'LEAD';
+    // This is a new season offer, not a rewrite of the previous season's deal.
+    const royaltyPercentage = quoteActorBackend(player, roleType, original.type);
 
     const opportunity: AuditionOpportunity = {
         id: `renew_offer_${Date.now()}`,
@@ -1699,7 +1705,7 @@ export const generateRenewalOffer = (original: ActiveRelease, player: Player): N
         maxRounds: 3,
         status: 'PENDING',
         studioPatience: 70, // Networks are generally stable
-        hasRoyaltyOption: true,
+        hasRoyaltyOption: royaltyPercentage > 0,
         royaltyPercentage
     };
 };

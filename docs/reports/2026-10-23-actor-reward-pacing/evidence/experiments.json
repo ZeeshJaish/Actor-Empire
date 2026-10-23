@@ -1,0 +1,223 @@
+{
+  "kind": "Controlled audit-only candidates before production changes",
+  "fameCases": [
+    {
+      "start": 0,
+      "flat": 0,
+      "proportional": 0
+    },
+    {
+      "start": 0.021,
+      "flat": 0,
+      "proportional": 0.01842794148297833
+    },
+    {
+      "start": 0.1225,
+      "flat": 0,
+      "proportional": 0.10749632531737358
+    },
+    {
+      "start": 1,
+      "flat": 0,
+      "proportional": 0.8775210229989681
+    },
+    {
+      "start": 10,
+      "flat": 7.660000000000004,
+      "proportional": 8.775210229989678
+    },
+    {
+      "start": 50,
+      "flat": 47.660000000000004,
+      "proportional": 47.660000000000004
+    },
+    {
+      "start": 94,
+      "flat": 91.65999999999991,
+      "proportional": 91.65999999999991
+    }
+  ],
+  "prGainAtZero": 0.13124999999999998,
+  "currentZeroFameGuardBlocksPR": true,
+  "currentRehearsal": [
+    {
+      "week": 0,
+      "changes": 5,
+      "craft": 1.1791829475005857,
+      "learned": 5,
+      "preparation": 24.965273484882644
+    },
+    {
+      "week": 1,
+      "changes": 5,
+      "craft": 1.8622178237514981,
+      "learned": 8,
+      "preparation": 45.14284434592328
+    },
+    {
+      "week": 2,
+      "changes": 5,
+      "craft": 1.8622178237514981,
+      "learned": 8,
+      "preparation": 60.6952396448729
+    },
+    {
+      "week": 3,
+      "changes": 5,
+      "craft": 1.8622178237514981,
+      "learned": 8,
+      "preparation": 72.518254629569
+    },
+    {
+      "week": 4,
+      "changes": 5,
+      "craft": 1.8622178237514981,
+      "learned": 8,
+      "preparation": 81.5061745378155
+    },
+    {
+      "week": 5,
+      "changes": 5,
+      "craft": 1.8622178237514981,
+      "learned": 8,
+      "preparation": 88.3388398420226
+    },
+    {
+      "week": 6,
+      "changes": 5,
+      "craft": 1.8622178237514981,
+      "learned": 8,
+      "preparation": 93.53306894462968
+    },
+    {
+      "week": 7,
+      "changes": 5,
+      "craft": 1.8622178237514981,
+      "learned": 8,
+      "preparation": 97.48174998916407
+    },
+    {
+      "week": 8,
+      "changes": 4,
+      "craft": 1.8622178237514981,
+      "learned": 8,
+      "preparation": 100
+    },
+    {
+      "week": 9,
+      "changes": 0,
+      "craft": 1.8622178237514981,
+      "learned": 8,
+      "preparation": 100
+    },
+    {
+      "week": 10,
+      "changes": 0,
+      "craft": 1.8622178237514981,
+      "learned": 8,
+      "preparation": 100
+    },
+    {
+      "week": 11,
+      "changes": 0,
+      "craft": 1.8622178237514981,
+      "learned": 8,
+      "preparation": 100
+    },
+    {
+      "week": 12,
+      "changes": 0,
+      "craft": 1.8622178237514981,
+      "learned": 8,
+      "preparation": 100
+    },
+    {
+      "week": 13,
+      "changes": 0,
+      "craft": 1.8622178237514981,
+      "learned": 8,
+      "preparation": 100
+    },
+    {
+      "week": 14,
+      "changes": 0,
+      "craft": 1.8622178237514981,
+      "learned": 8,
+      "preparation": 100
+    },
+    {
+      "week": 15,
+      "changes": 0,
+      "craft": 1.8622178237514981,
+      "learned": 8,
+      "preparation": 100
+    },
+    {
+      "week": 16,
+      "changes": 0,
+      "craft": 1.8622178237514981,
+      "learned": 8,
+      "preparation": 100
+    },
+    {
+      "week": 17,
+      "changes": 0,
+      "craft": 1.8622178237514981,
+      "learned": 8,
+      "preparation": 100
+    },
+    {
+      "week": 18,
+      "changes": 0,
+      "craft": 1.8622178237514981,
+      "learned": 8,
+      "preparation": 100
+    },
+    {
+      "week": 19,
+      "changes": 0,
+      "craft": 1.8622178237514981,
+      "learned": 8,
+      "preparation": 100
+    }
+  ],
+  "learningCandidates": [
+    {
+      "limit": 8,
+      "actions": 8,
+      "energyCost": 160,
+      "targetSkill": 6.517762383130243,
+      "distinctGrowthWeeks": 4
+    },
+    {
+      "limit": 16,
+      "actions": 16,
+      "energyCost": 320,
+      "targetSkill": 12.593011990396452,
+      "distinctGrowthWeeks": 8
+    },
+    {
+      "limit": 24,
+      "actions": 24,
+      "energyCost": 480,
+      "targetSkill": 18.255792500179673,
+      "distinctGrowthWeeks": 12
+    },
+    {
+      "limit": 40,
+      "actions": 40,
+      "energyCost": 800,
+      "targetSkill": 28.454060596316207,
+      "distinctGrowthWeeks": 20
+    }
+  ],
+  "unchanged": [
+    "No cash grants",
+    "No film outcomes or contracts changed",
+    "No base course/genre multipliers changed"
+  ],
+  "limits": [
+    "Candidate learning rows are arithmetic experiments, not full engine careers",
+    "No revenue or retention prediction"
+  ]
+}

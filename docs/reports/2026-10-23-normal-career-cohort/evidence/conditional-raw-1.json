@@ -1,0 +1,372 @@
+{
+  "kind": "CONDITIONAL_ALIVE_EARNED_ADVANCED_OWNER",
+  "executable": "7c7a88dc9764151b670b7ee4d0d9bbe9ddefc2970853edda3187f813c01a8c02",
+  "seed": 1,
+  "weak": true,
+  "horizon": 156,
+  "status": "NATURALLY_CLOSED",
+  "stage": "FINAL",
+  "precursors": [
+    {
+      "id": "precursor-0",
+      "grossCents": 68765529427,
+      "firstAdmissions": 60510001
+    },
+    {
+      "id": "precursor-1",
+      "grossCents": 68653658599,
+      "firstAdmissions": 58888665
+    },
+    {
+      "id": "precursor-2",
+      "grossCents": 61301396109,
+      "firstAdmissions": 54474132
+    },
+    {
+      "id": "precursor-3",
+      "grossCents": 59361395631,
+      "firstAdmissions": 51461662
+    }
+  ],
+  "budget": 300000000,
+  "campaign": 350000000,
+  "weeks": 41,
+  "preWeeks": 104,
+  "finalWeeks": 41,
+  "saves": 45,
+  "reloads": 4,
+  "replays": 41,
+  "failedPromotionChecked": true,
+  "peakRssBytes": 1362837504,
+  "healthcareSpent": 20000,
+  "healthcare": [
+    {
+      "week": 3,
+      "spent": 20000,
+      "conditions": [
+        "back_pain"
+      ]
+    }
+  ],
+  "alive": true,
+  "grossB": 0.53394560091,
+  "profitCents": -39023194664,
+  "grossCents": 53394560091,
+  "receiptsCents": 25976805336,
+  "bookingCostCents": 0,
+  "talentPaidCents": 0,
+  "actorPaidCents": 0,
+  "firstAdmissions": 47255432,
+  "repeatAdmissions": 0,
+  "qualityInput": 25,
+  "closed": true,
+  "censored": false,
+  "weekly": [
+    {
+      "week": 1,
+      "grossCents": 19931304688,
+      "totalGrossCents": 19931304688,
+      "closed": false,
+      "slate": 26
+    },
+    {
+      "week": 2,
+      "grossCents": 8671064303,
+      "totalGrossCents": 28602368991,
+      "closed": false,
+      "slate": 26
+    },
+    {
+      "week": 3,
+      "grossCents": 5984188373,
+      "totalGrossCents": 34586557364,
+      "closed": false,
+      "slate": 27
+    },
+    {
+      "week": 4,
+      "grossCents": 4414498888,
+      "totalGrossCents": 39001056252,
+      "closed": false,
+      "slate": 27
+    },
+    {
+      "week": 5,
+      "grossCents": 3361880267,
+      "totalGrossCents": 42362936519,
+      "closed": false,
+      "slate": 27
+    },
+    {
+      "week": 6,
+      "grossCents": 2591875409,
+      "totalGrossCents": 44954811928,
+      "closed": false,
+      "slate": 26
+    },
+    {
+      "week": 7,
+      "grossCents": 2015188927,
+      "totalGrossCents": 46970000855,
+      "closed": false,
+      "slate": 26
+    },
+    {
+      "week": 8,
+      "grossCents": 1287621005,
+      "totalGrossCents": 48257621860,
+      "closed": false,
+      "slate": 27
+    },
+    {
+      "week": 9,
+      "grossCents": 1013095862,
+      "totalGrossCents": 49270717722,
+      "closed": false,
+      "slate": 28
+    },
+    {
+      "week": 10,
+      "grossCents": 801774096,
+      "totalGrossCents": 50072491818,
+      "closed": false,
+      "slate": 28
+    },
+    {
+      "week": 11,
+      "grossCents": 630514229,
+      "totalGrossCents": 50703006047,
+      "closed": false,
+      "slate": 27
+    },
+    {
+      "week": 12,
+      "grossCents": 502719979,
+      "totalGrossCents": 51205726026,
+      "closed": false,
+      "slate": 27
+    },
+    {
+      "week": 13,
+      "grossCents": 397350575,
+      "totalGrossCents": 51603076601,
+      "closed": false,
+      "slate": 25
+    },
+    {
+      "week": 14,
+      "grossCents": 383389802,
+      "totalGrossCents": 51986466403,
+      "closed": false,
+      "slate": 25
+    },
+    {
+      "week": 15,
+      "grossCents": 303736069,
+      "totalGrossCents": 52290202472,
+      "closed": false,
+      "slate": 25
+    },
+    {
+      "week": 16,
+      "grossCents": 240025081,
+      "totalGrossCents": 52530227553,
+      "closed": false,
+      "slate": 25
+    },
+    {
+      "week": 17,
+      "grossCents": 187536022,
+      "totalGrossCents": 52717763575,
+      "closed": false,
+      "slate": 27
+    },
+    {
+      "week": 18,
+      "grossCents": 148017586,
+      "totalGrossCents": 52865781161,
+      "closed": false,
+      "slate": 28
+    },
+    {
+      "week": 19,
+      "grossCents": 116357475,
+      "totalGrossCents": 52982138636,
+      "closed": false,
+      "slate": 28
+    },
+    {
+      "week": 20,
+      "grossCents": 91442885,
+      "totalGrossCents": 53073581521,
+      "closed": false,
+      "slate": 29
+    },
+    {
+      "week": 21,
+      "grossCents": 73557550,
+      "totalGrossCents": 53147139071,
+      "closed": false,
+      "slate": 28
+    },
+    {
+      "week": 22,
+      "grossCents": 57089750,
+      "totalGrossCents": 53204228821,
+      "closed": false,
+      "slate": 29
+    },
+    {
+      "week": 23,
+      "grossCents": 44337373,
+      "totalGrossCents": 53248566194,
+      "closed": false,
+      "slate": 27
+    },
+    {
+      "week": 24,
+      "grossCents": 34684528,
+      "totalGrossCents": 53283250722,
+      "closed": false,
+      "slate": 27
+    },
+    {
+      "week": 25,
+      "grossCents": 26909376,
+      "totalGrossCents": 53310160098,
+      "closed": false,
+      "slate": 28
+    },
+    {
+      "week": 26,
+      "grossCents": 20587889,
+      "totalGrossCents": 53330747987,
+      "closed": false,
+      "slate": 27
+    },
+    {
+      "week": 27,
+      "grossCents": 16432351,
+      "totalGrossCents": 53347180338,
+      "closed": false,
+      "slate": 29
+    },
+    {
+      "week": 28,
+      "grossCents": 12630711,
+      "totalGrossCents": 53359811049,
+      "closed": false,
+      "slate": 28
+    },
+    {
+      "week": 29,
+      "grossCents": 9231201,
+      "totalGrossCents": 53369042250,
+      "closed": false,
+      "slate": 27
+    },
+    {
+      "week": 30,
+      "grossCents": 6676400,
+      "totalGrossCents": 53375718650,
+      "closed": false,
+      "slate": 27
+    },
+    {
+      "week": 31,
+      "grossCents": 5008573,
+      "totalGrossCents": 53380727223,
+      "closed": false,
+      "slate": 28
+    },
+    {
+      "week": 32,
+      "grossCents": 3821978,
+      "totalGrossCents": 53384549201,
+      "closed": false,
+      "slate": 27
+    },
+    {
+      "week": 33,
+      "grossCents": 2781208,
+      "totalGrossCents": 53387330409,
+      "closed": false,
+      "slate": 26
+    },
+    {
+      "week": 34,
+      "grossCents": 2073918,
+      "totalGrossCents": 53389404327,
+      "closed": false,
+      "slate": 25
+    },
+    {
+      "week": 35,
+      "grossCents": 1525057,
+      "totalGrossCents": 53390929384,
+      "closed": false,
+      "slate": 25
+    },
+    {
+      "week": 36,
+      "grossCents": 1206046,
+      "totalGrossCents": 53392135430,
+      "closed": false,
+      "slate": 25
+    },
+    {
+      "week": 37,
+      "grossCents": 948800,
+      "totalGrossCents": 53393084230,
+      "closed": false,
+      "slate": 26
+    },
+    {
+      "week": 38,
+      "grossCents": 747960,
+      "totalGrossCents": 53393832190,
+      "closed": false,
+      "slate": 27
+    },
+    {
+      "week": 39,
+      "grossCents": 422369,
+      "totalGrossCents": 53394254559,
+      "closed": false,
+      "slate": 26
+    },
+    {
+      "week": 40,
+      "grossCents": 171626,
+      "totalGrossCents": 53394426185,
+      "closed": false,
+      "slate": 27
+    },
+    {
+      "week": 41,
+      "grossCents": 133906,
+      "totalGrossCents": 53394560091,
+      "closed": true,
+      "slate": 26
+    }
+  ],
+  "summary": {
+    "all": {
+      "completed": 1
+    },
+    "small": {
+      "completed": 0
+    },
+    "player": {
+      "completed": 0
+    }
+  },
+  "elapsedMs": 13355,
+  "limitations": [
+    "Prepared advanced owner, not a fresh normal career; excluded from ordinary hit/rarity rates",
+    "Capital and completed craft packages authored; four precursor audiences earned in actual earlier weeks while owner remains alive",
+    "Weak finale forks the exact same alive earned checkpoint and RNG/clock state; it does not get different precursor successes",
+    "Actual paid clinic service, Greenlight funding, paid campaign, real premiere, world competition, weekly settlement and verified persistence run unchanged",
+    "Observation stops at $3B attainment without closing the theatrical run; profit is collected to date, not lifetime"
+  ]
+}

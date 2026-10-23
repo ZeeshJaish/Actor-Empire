@@ -1,0 +1,47 @@
+{
+  "all12CasesCompleted": true,
+  "totalActualAdditionalGameWeeks": 624,
+  "futureSeeds": [
+    0,
+    7,
+    19
+  ],
+  "independentFreshCareers": false,
+  "matchedConditionalCareerFixtures": 2,
+  "startingPlayerUnmodified": true,
+  "runtimeChangedPaths": [
+    "services/actorOfferTerms.ts",
+    "services/famousMovieLogic.ts",
+    "services/roleLogic.ts",
+    "services/teamLogic.ts",
+    "services/universeLogic.ts"
+  ],
+  "candidateSourcesStillMatchCurrent": true,
+  "existingSignedAndStreamingTermsChecked": true,
+  "additionalVerifiedReloads": 168,
+  "additionalDuplicateSettlementRejections": 624,
+  "initialDirtyUntrackedPaths": 180,
+  "initialPathsChangedThisTask": [
+    "services/roleLogic.ts"
+  ],
+  "concurrentUnrelatedPathChanges": [
+    "docs/reports/2026-10-23-npc-market-budgets/progress.md",
+    "scripts/audit-cinema-normal-cohort.ts"
+  ],
+  "unrelatedChangesRestoredOrOverwritten": false,
+  "independentReview": "No critical production issues; experiment evidence overwrite guard and salary concession assertion feedback addressed",
+  "build": {
+    "exitCode": 0,
+    "signal": null,
+    "heapMB": 2048,
+    "peakOwnedTreeRssMiB": 2431.5,
+    "stopReason": null,
+    "systemGuard": "darwin"
+  },
+  "focusedTypecheckPassed": true,
+  "fullWorkspaceTypecheckPassed": false,
+  "fullWorkspaceTypecheckNote": "Not repeated: previous full-scope diagnostic has pre-existing includes-on-never audit errors; raw generated-JS configurations exhausted heap",
+  "noRealPurchases": true,
+  "noPersonalSaves": true,
+  "commitOrPush": false
+}

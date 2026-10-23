@@ -1,0 +1,33 @@
+{
+  "focusedExitCode": 0,
+  "focusedSourceStable": true,
+  "typesMatchInitialWithOnlyOwnAdditiveFieldRemoved": true,
+  "actorRewardFilesPreserved": [
+    {
+      "path": "App.tsx",
+      "initialBackupExists": true,
+      "sameAsInitialBackup": true
+    },
+    {
+      "path": "services/actorCareerBalance.ts",
+      "initialBackupExists": true,
+      "sameAsInitialBackup": true
+    },
+    {
+      "path": "services/actorCareerArc.ts",
+      "initialBackupExists": true,
+      "sameAsInitialBackup": true
+    },
+    {
+      "path": "services/careerUiAdapter.ts",
+      "initialBackupExists": true,
+      "sameAsInitialBackup": true
+    },
+    {
+      "path": "services/gameLoop.ts",
+      "initialBackupExists": true,
+      "sameAsInitialBackup": true
+    }
+  ],
+  "userScope": "Lightweight checks only; no long simulation or full build running"
+}

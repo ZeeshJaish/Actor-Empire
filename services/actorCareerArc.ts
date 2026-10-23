@@ -1,4 +1,4 @@
-import { hasCareerLegendStanding } from './actorCareerBalance';
+import { hasCareerLegendStanding, getCareerReportedOutcome } from './actorCareerBalance';
 import { PastProject, Player } from '../types';
 import { getRoleIdentityArcCandidate } from './actorRoleIdentity';
 
@@ -169,25 +169,27 @@ const getProjectSortWeek = (project: PastProject): number => {
 
 const getProjectRating = (project: PastProject): number => Number(project.imdbRating || project.rating || 0);
 
-const isHitProject = (project: PastProject): boolean => {
+const isHitProject = (project: PastProject, player: Player): boolean => {
+    const outcome = getCareerReportedOutcome(project, player);
     const rating = getProjectRating(project);
     const budget = Number(project.budget || 0);
     const gross = Number(project.gross || 0) + Number(project.streamingRevenue || 0);
     return (
-        project.outcomeTier === 'MASSIVE_SUCCESS' ||
-        project.outcomeTier === 'SUCCESS' ||
+        outcome === 'MASSIVE_SUCCESS' ||
+        outcome === 'SUCCESS' ||
         rating >= 7.4 ||
         (budget > 0 && gross >= budget * 2)
     );
 };
 
-const isFlopProject = (project: PastProject): boolean => {
+const isFlopProject = (project: PastProject, player: Player): boolean => {
+    const outcome = getCareerReportedOutcome(project, player);
     const rating = getProjectRating(project);
     const budget = Number(project.budget || 0);
     const gross = Number(project.gross || 0) + Number(project.streamingRevenue || 0);
     return (
-        project.outcomeTier === 'MAJOR_FAILURE' ||
-        project.outcomeTier === 'FAILURE' ||
+        outcome === 'MAJOR_FAILURE' ||
+        outcome === 'FAILURE' ||
         rating <= 5.2 ||
         (budget > 0 && gross > 0 && gross <= budget * 0.55)
     );
@@ -199,6 +201,8 @@ const isPrestigeProject = (project: PastProject): boolean => (
 );
 
 export const getActorCareerArc = (player: Player): ActorCareerArc => {
+    const hitProject = (project: PastProject) => isHitProject(project, player);
+    const flopProject = (project: PastProject) => isFlopProject(project, player);
     const fame = Number(player.stats?.fame || 0);
     const reputation = Number(player.stats?.reputation || 0);
     const experience = Number(player.stats?.experience || 0);
@@ -210,13 +214,13 @@ export const getActorCareerArc = (player: Player): ActorCareerArc => {
     const latest = recentProjects[0];
     const awardsWon = (player.awards || []).filter(award => award.outcome === 'WON').length;
     const awardsTotal = (player.awards || []).length;
-    const recentHits = recentProjects.filter(isHitProject).length;
-    const recentFlops = recentProjects.filter(isFlopProject).length;
+    const recentHits = recentProjects.filter(hitProject).length;
+    const recentFlops = recentProjects.filter(flopProject).length;
     const recentPrestige = recentProjects.filter(isPrestigeProject).length;
     const recentGross = recentProjects.reduce((sum, project) => sum + Number(project.gross || 0) + Number(project.streamingRevenue || 0), 0);
-    const latestIsHit = latest ? isHitProject(latest) : false;
-    const latestIsFlop = latest ? isFlopProject(latest) : false;
-    const hadRecentFlopBeforeLatest = recentProjects.slice(1, 4).some(isFlopProject);
+    const latestIsHit = latest ? hitProject(latest) : false;
+    const latestIsFlop = latest ? flopProject(latest) : false;
+    const hadRecentFlopBeforeLatest = recentProjects.slice(1, 4).some(flopProject);
     const baseSignals = ([
         projects.length === 0 ? { key: 'home.actorArc.signal.noCredits' } : { key: 'home.actorArc.signal.creditCount', vars: { count: projects.length } },
         latestIsHit && latest ? { key: 'home.actorArc.signal.latestHit', vars: { title: latest.name } } : null,
@@ -247,9 +251,9 @@ export const getActorCareerArc = (player: Player): ActorCareerArc => {
         ]);
     }
 
-    if (recentThree.length >= 2 && recentThree.filter(isFlopProject).length >= 2) {
+    if (recentThree.length >= 2 && recentThree.filter(flopProject).length >= 2) {
         return arc('FLOP_ERA', [
-            { key: 'home.actorArc.signal.flopCluster', vars: { count: recentThree.filter(isFlopProject).length } },
+            { key: 'home.actorArc.signal.flopCluster', vars: { count: recentThree.filter(flopProject).length } },
         ]);
     }
 
@@ -264,7 +268,7 @@ export const getActorCareerArc = (player: Player): ActorCareerArc => {
         ]);
     }
 
-    if (recentThree.length >= 3 && recentThree.every(isHitProject)) {
+    if (recentThree.length >= 3 && recentThree.every(hitProject)) {
         return arc('HIT_STREAK', [
             { key: 'home.actorArc.signal.hitStreak', vars: { count: recentThree.length } },
         ]);

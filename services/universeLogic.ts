@@ -1,5 +1,6 @@
 
 import { Universe, UniverseId, UniverseContract, Player, ProjectDetails, NewsItem, StudioId, Genre, IndustryProject, NPCActor, UniversePhase, RoleType, ProjectSubtype, ContractFilm, AuditionOpportunity, Gender, ActiveRelease, CastMember, UniverseCharacter, Script, GameLanguage, CharacterStoryRole, CharacterAbilityType, CharacterStoryFunction, CharacterNature, CharacterIdentitySource } from '../types';
+import { quoteActorFranchiseSalary, quoteActorFranchiseBackend } from './actorOfferTerms';
 import { STUDIO_CATALOG } from './studioLogic';
 import { NPC_DATABASE } from './npcLogic';
 import { generateProjectTitle, getEstimatedBudget, generateProjectDetails } from './roleLogic';
@@ -1540,7 +1541,7 @@ export const generateDirectEntryOffer = (player: Player, universeId: UniverseId)
         universeId: universeId,
         characterName: arc.name, 
         films: films,
-        salaryTotal: 30000000 + (player.stats.fame * 100000),
+        salaryTotal: quoteActorFranchiseSalary(player, films),
         fanTrust: 50,
         startWeek: player.currentWeek
     };
@@ -1615,6 +1616,7 @@ export const generateRandomUniverseOpportunity = (player: Player, source: 'AGENT
     project.genre = tmpl.genre;
     project.visibleHype = 'HIGH';
     project.isFamous = true; // Treats as famous for prestige
+    contract.salaryTotal = quoteActorFranchiseSalary(player, films, project.estimatedBudget);
     
     // Adjust visual label if it's a cameo
     const label = filmDef.role === 'CAMEO' ? universeText(language, 'opportunity.universeCameo') : universeText(language, 'opportunity.franchiseLead');
@@ -1630,7 +1632,7 @@ export const generateRandomUniverseOpportunity = (player: Player, source: 'AGENT
         estimatedIncome: contract.salaryTotal,
         source: source,
         universeContract: contract,
-        royaltyPercentage: 2.0
+        royaltyPercentage: quoteActorFranchiseBackend(player, films)
     };
 };
 

@@ -112,6 +112,7 @@ export const normalizeIndustryContentFingerprint = (raw: unknown): IndustryConte
         originalLanguage: text(item.originalLanguage, 'ENGLISH'), priorityMarket: text(item.priorityMarket, 'GLOBAL'),
         commercialIntent: bounded(item.commercialIntent), prestigeIntent: bounded(item.prestigeIntent), creativeRisk: bounded(item.creativeRisk),
         starPowerTarget: bounded(item.starPowerTarget), releasePath: item.releasePath as IndustryContentReleasePath,
+        ...(item.cinemaScopeVersion===1?{cinemaScopeVersion:1 as const}:{}),
         sourceIntent: item.sourceIntent as IndustryContentSourceIntent, relationship: item.relationship as IndustryContentRelationship,
         budgetSuitability: normalizeBudget(item.budgetSuitability), noveltySignature: text(item.noveltySignature, item.id.trim()),
         noveltyScore: bounded(item.noveltyScore), createdAtAbsoluteWeek: whole(item.createdAtAbsoluteWeek), decisionCycle: whole(item.decisionCycle),

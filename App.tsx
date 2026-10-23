@@ -386,6 +386,9 @@ const normalizeCommitment = (commitment: Partial<Commitment>): Commitment => ({
     payoutType: commitment.payoutType || 'WEEKLY',
     ...(commitment.careerBalanceVersion === 1 ? { careerBalanceVersion: 1 as const } : {}),
     ...(commitment.careerLearningActions !== undefined ? { careerLearningActions: commitment.careerLearningActions } : {}),
+    ...(commitment.careerRewardPacingVersion === 1 ? { careerRewardPacingVersion: 1 as const } : {}),
+    ...(commitment.careerLearningWeek !== undefined ? { careerLearningWeek: commitment.careerLearningWeek } : {}),
+    ...(commitment.careerLearningActionsThisWeek !== undefined ? { careerLearningActionsThisWeek: commitment.careerLearningActionsThisWeek } : {}),
     ...(commitment.careerPerformanceFinalized !== undefined ? { careerPerformanceFinalized: commitment.careerPerformanceFinalized } : {}),
     ...(commitment.careerPreparationScore !== undefined ? { careerPreparationScore: commitment.careerPreparationScore } : {}),
     ...(commitment.lumpSum !== undefined ? { lumpSum: commitment.lumpSum } : {}),
@@ -4000,6 +4003,7 @@ export const App: React.FC = () => {
                                         team: {
                                             ...p.team,
                                             agent: agent,
+                                            lastAgentFeePaidWeek: getAbsoluteWeek(p.age, p.currentWeek),
                                             availableAgents: (p.team.availableAgents || []).filter(a => a.id !== agent.id)
                                         },
                                         relationships: newRels
@@ -4047,6 +4051,7 @@ export const App: React.FC = () => {
                                         team: {
                                             ...p.team,
                                             manager: manager,
+                                            lastManagerFeePaidWeek: getAbsoluteWeek(p.age, p.currentWeek),
                                             availableManagers: (p.team.availableManagers || []).filter(m => m.id !== manager.id)
                                         },
                                         relationships: newRels

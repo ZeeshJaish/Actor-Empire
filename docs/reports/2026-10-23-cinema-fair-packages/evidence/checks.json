@@ -1,0 +1,72 @@
+[
+  {
+    "suite": "inputs",
+    "exitCode": 0,
+    "ms": 200
+  },
+  {
+    "suite": "fair-package",
+    "exitCode": 0,
+    "ms": 2667
+  },
+  {
+    "suite": "awareness",
+    "exitCode": 0,
+    "ms": 146
+  },
+  {
+    "suite": "phase2-integration",
+    "exitCode": 0,
+    "ms": 3307
+  },
+  {
+    "suite": "audience",
+    "exitCode": 0,
+    "ms": 375
+  },
+  {
+    "suite": "market",
+    "exitCode": 0,
+    "ms": 930
+  },
+  {
+    "suite": "migration",
+    "exitCode": 0,
+    "ms": 5749
+  },
+  {
+    "suite": "integration",
+    "exitCode": 0,
+    "ms": 12781
+  },
+  {
+    "suite": "finance-contracts",
+    "exitCode": 0,
+    "ms": 91
+  },
+  {
+    "suite": "finance-ui",
+    "exitCode": 0,
+    "ms": 459
+  },
+  {
+    "suite": "presentation",
+    "exitCode": 0,
+    "ms": 999
+  },
+  {
+    "suite": "rights",
+    "exitCode": 0,
+    "ms": 4757
+  },
+  {
+    "suite": "booking",
+    "exitCode": 0,
+    "ms": 161
+  },
+  {
+    "suite": "release-announcement",
+    "exitCode": 0,
+    "ms": 2788
+  }
+]

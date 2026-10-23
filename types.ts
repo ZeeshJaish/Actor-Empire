@@ -2163,6 +2163,8 @@ export interface StudioFinanceEntry {
 }
 
 export interface ProjectHiddenStats {
+    /** Idempotent personal premiere recognition; never a financial payout. */
+    careerRecognitionApplied?: boolean;
     /** Player-visible production estimate, distinct from hidden delivered quality. */
     estimatedQualityScore?: number;
     scriptQuality: number;
@@ -7383,6 +7385,10 @@ export interface Commitment {
     /** Versioned preparation rules; absent means preserve the signed legacy project. */
     careerBalanceVersion?: 1;
     careerLearningActions?: number;
+    /** New projects only; old active projects retain their original learning allowance. */
+    careerRewardPacingVersion?: 1;
+    careerLearningWeek?: number;
+    careerLearningActionsThisWeek?: number;
     careerPerformanceFinalized?: boolean;
     careerPreparationScore?: number;
     id: string;
@@ -8882,6 +8888,8 @@ export interface IndustryContentFingerprint {
     prestigeIntent: number;
     creativeRisk: number;
     starPowerTarget: number;
+    /** New unsigned NPC movie scope; old fingerprints/cast contracts remain unmarked. */
+    cinemaScopeVersion?: 1;
     releasePath: IndustryContentReleasePath;
     sourceIntent: IndustryContentSourceIntent;
     relationship: IndustryContentRelationship;

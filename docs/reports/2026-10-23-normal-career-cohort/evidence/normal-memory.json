@@ -1,0 +1,28 @@
+{
+  "peakOwnedTreeMiB": 1564.265625,
+  "peakWorkerMaxRssMiB": 1832.609375,
+  "stops": [
+    {
+      "peakOwnedWorkerTreeRssMiB": 1507.453125,
+      "stopReason": "System swap growth exceeded 512MiB",
+      "heapMiB": 1280,
+      "batchWeeks": 3,
+      "seed": 1,
+      "at": "2026-10-23T12:25:31.190Z"
+    }
+  ],
+  "finalController": {
+    "peakOwnedWorkerTreeRssMiB": 1564.265625,
+    "stopReason": null,
+    "heapMiB": 1024,
+    "batchWeeks": 1,
+    "seed": 3,
+    "at": "2026-10-23T13:09:35.812Z"
+  },
+  "limits": {
+    "treeMiB": 3072,
+    "minSystemFreePercent": 15,
+    "maxSwapGrowthPerBatchMiB": 512
+  },
+  "singleOwnedWorker": true
+}

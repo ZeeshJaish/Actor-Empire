@@ -1,0 +1,138 @@
+[
+  {
+    "path": "/tmp/ae-lifetime-v3-free/free/career-0-results.json",
+    "status": "CHECKPOINT_READY",
+    "weeks": 152,
+    "cash": 48071,
+    "failure": null,
+    "countsAsAdditionalFreshSample": false
+  },
+  {
+    "path": "/tmp/ae-lifetime-v3-boosted/boosted/career-0-results.json",
+    "status": "CAREER_ENDED",
+    "weeks": 116,
+    "cash": 74054,
+    "failure": null,
+    "countsAsAdditionalFreshSample": false
+  },
+  {
+    "path": "/tmp/ae-lifetime-care-free/free/career-0-results.json",
+    "status": "CHECKPOINT_READY",
+    "weeks": 344,
+    "cash": 277741,
+    "failure": null,
+    "countsAsAdditionalFreshSample": false
+  },
+  {
+    "path": "/tmp/ae-lifetime-care-boosted/boosted/career-0-results.json",
+    "status": "CHECKPOINT_READY",
+    "weeks": 352,
+    "cash": 44366,
+    "failure": null,
+    "countsAsAdditionalFreshSample": false
+  },
+  {
+    "path": "/tmp/ae-lifetime-managed-free/free/career-0-results.json",
+    "status": "CHECKPOINT_READY",
+    "weeks": 362,
+    "cash": 153400,
+    "failure": null,
+    "countsAsAdditionalFreshSample": false
+  },
+  {
+    "path": "/tmp/ae-lifetime-managed-boosted/boosted/career-0-results.json",
+    "status": "UNFUNDED",
+    "weeks": 357,
+    "cash": -47159,
+    "failure": null,
+    "countsAsAdditionalFreshSample": false
+  },
+  {
+    "path": "/tmp/ae-lifetime-ambitious-free/free/career-0-results.json",
+    "status": "CHECKPOINT_READY",
+    "weeks": 392,
+    "cash": 76348,
+    "failure": null,
+    "countsAsAdditionalFreshSample": false
+  },
+  {
+    "path": "/tmp/ae-lifetime-ambitious-boosted/boosted/career-0-results.json",
+    "status": "UNFUNDED",
+    "weeks": 357,
+    "cash": -33019,
+    "failure": null,
+    "countsAsAdditionalFreshSample": false
+  },
+  {
+    "path": "/tmp/ae-lifetime-budget-free/free/career-0-results.json",
+    "status": "CHECKPOINT_READY",
+    "weeks": 492,
+    "cash": 15988113,
+    "failure": null,
+    "countsAsAdditionalFreshSample": false
+  },
+  {
+    "path": "/tmp/ae-lifetime-budget-boosted/boosted/career-0-results.json",
+    "status": "FAILURE",
+    "weeks": 357,
+    "cash": 0,
+    "failure": "AssertionError [ERR_ASSERTION]: batch-start\n+ actual - expected\n... Skipped lines\n\n  {\n    awards: [],\n    businesses: [],\n    commitments: [\n      {\n...\n    followers: 827726,\n+   money: 0,\n-   money: -33019,\n    portfolio: [],\n    reputation: 7.7925,\n    signedTeam: {\n      agent: {\n        annualFee: 60000,\n\n    at reload (file:///private/tmp/ae-lifetime-budget-boosted/worker.mjs:180599:11)\n    at async file:///private/tmp/ae-lifetime-budget-boosted/worker.mjs:180613:3",
+    "countsAsAdditionalFreshSample": false
+  },
+  {
+    "path": "/tmp/ae-lifetime-complete-free/free/career-0-results.json",
+    "status": "CHECKPOINT_READY",
+    "weeks": 588,
+    "cash": 27098484,
+    "failure": null,
+    "countsAsAdditionalFreshSample": false
+  },
+  {
+    "path": "/tmp/ae-lifetime-complete-boosted/boosted/career-0-results.json",
+    "status": "UNFUNDED",
+    "weeks": 361,
+    "cash": -114,
+    "failure": null,
+    "countsAsAdditionalFreshSample": false
+  },
+  {
+    "path": "/tmp/ae-lifetime-finance-boosted/boosted/career-0-results.json",
+    "status": "UNFUNDED",
+    "weeks": 385,
+    "cash": -23,
+    "failure": null,
+    "countsAsAdditionalFreshSample": false
+  },
+  {
+    "path": "/tmp/ae-lifetime-final-free/free/career-0-results.json",
+    "status": "LEGEND_PLUS_TWO_YEARS",
+    "weeks": 599,
+    "cash": 27818999,
+    "failure": null,
+    "countsAsAdditionalFreshSample": false
+  },
+  {
+    "path": "/tmp/ae-lifetime-final-boosted/boosted/career-0-results.json",
+    "status": "FAILURE",
+    "weeks": 733,
+    "cash": 41177655,
+    "failure": "Error: Exposure belongs to a different cinema title\n    at buildCinemaExposure (file:///private/tmp/ae-lifetime-final-boosted/worker.mjs:90790:70)\n    at buildCinemaAwarenessSnapshot (file:///private/tmp/ae-lifetime-final-boosted/worker.mjs:140787:8)\n    at quoteCinemaRightsForBuyer (file:///private/tmp/ae-lifetime-final-boosted/worker.mjs:141889:21)\n    at processGameWeek (file:///private/tmp/ae-lifetime-final-boosted/worker.mjs:167820:21)\n    at async file:///private/tmp/ae-lifetime-final-boosted/worker.mjs:180732:20",
+    "countsAsAdditionalFreshSample": false
+  },
+  {
+    "path": "/tmp/ae-lifetime-exposure-red/boosted/career-0-results.json",
+    "status": "FAILURE",
+    "weeks": 733,
+    "cash": 41177655,
+    "failure": "Error: Exposure belongs to a different cinema title\n    at buildCinemaExposure (file:///private/tmp/ae-lifetime-exposure-red/worker.mjs:90790:70)\n    at buildCinemaAwarenessSnapshot (file:///private/tmp/ae-lifetime-exposure-red/worker.mjs:140787:8)\n    at quoteCinemaRightsForBuyer (file:///private/tmp/ae-lifetime-exposure-red/worker.mjs:141889:21)\n    at processGameWeek (file:///private/tmp/ae-lifetime-exposure-red/worker.mjs:167820:21)\n    at async file:///private/tmp/ae-lifetime-exposure-red/worker.mjs:180732:20",
+    "countsAsAdditionalFreshSample": false
+  },
+  {
+    "path": "/tmp/ae-lifetime-exposure-recovery/boosted/career-0-results.json",
+    "status": "CHECKPOINT_READY",
+    "weeks": 729,
+    "cash": 38678873,
+    "failure": null,
+    "countsAsAdditionalFreshSample": false
+  }
+]

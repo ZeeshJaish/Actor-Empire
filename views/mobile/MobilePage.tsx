@@ -352,7 +352,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
               id: `audition_invite_${Date.now()}`,
               name: opp.projectName,
               type: 'ACTING_GIG',
-              careerBalanceVersion: 1,
+              careerBalanceVersion: 1, careerRewardPacingVersion: 1,
               roleType: opp.roleType,
               energyCost: 0,
               income: 0,
@@ -466,7 +466,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                       id: `uni_job_${Date.now()}_${index}`,
                       name: film.title,
                       type: 'ACTING_GIG',
-                      careerBalanceVersion: 1,
+                      careerBalanceVersion: 1, careerRewardPacingVersion: 1,
                       roleType: film.role,
                       energyCost: 0,
                       income: 0,
@@ -491,7 +491,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                   id: `job_${Date.now()}`,
                   name: opp.projectName,
                   type: 'ACTING_GIG',
-                  careerBalanceVersion: 1,
+                  careerBalanceVersion: 1, careerRewardPacingVersion: 1,
                   roleType: opp.roleType,
                   energyCost: 0,
                   income: 0,
@@ -709,6 +709,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
           team: {
               ...props.player!.team,
               agent,
+              lastAgentFeePaidWeek: getAbsoluteWeek(props.player!.age, props.player!.currentWeek),
               availableAgents: (props.player!.team.availableAgents || []).filter(candidate => candidate.id !== agent.id)
           },
           logs: [...props.player!.logs, {
@@ -732,6 +733,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
           team: {
               ...props.player!.team,
               manager,
+              lastManagerFeePaidWeek: getAbsoluteWeek(props.player!.age, props.player!.currentWeek),
               availableManagers: (props.player!.team.availableManagers || []).filter(candidate => candidate.id !== manager.id)
           },
           logs: [...props.player!.logs, {

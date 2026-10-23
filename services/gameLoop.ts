@@ -1,4 +1,4 @@
-import { ensureActorCareerBalance, getCareerLearningGain, getCareerPassivePreparation, getCareerFinalPerformance, getCareerPublicityGain, getCareerProductionStartPerformance, isPersonalCareerActing } from './actorCareerBalance';
+import { ensureActorCareerBalance, getCareerLearningGain, getCareerPassivePreparation, getCareerFinalPerformance, getCareerPublicityGain, getCareerProductionStartPerformance, isPersonalCareerActing, getCareerFameDecay, applyCareerReleaseRecognition, getCareerReportedOutcome } from './actorCareerBalance';
 import { createSeriesStreamingBids, quoteSeriesStreamingRights } from './seriesStreamingValue';
 import { settleStockCash } from './stockSettlement';
 import { markStockDividendsSettled } from './stockLogic';
@@ -1393,6 +1393,18 @@ const createPastProjectArchiveSnapshot = (
     const qualityScore = ensureFiniteNumber(projectDetails.hiddenStats?.qualityScore, ensureFiniteNumber(release.productionPerformance, 50));
     const playerRoleType = getPlayerProjectRoleType(release.roleType, projectDetails.castList);
     const playerCastMember = projectDetails.castList?.find(member => member.isPlayer || member.actorId === 'PLAYER_SELF');
+    const calculatedOutcome = calculateRunOutcome(
+        getProjectMarketOutcomeRevenue(release, totalGross + streamingRevenue + soundtrackRevenue, ensureFiniteNumber(release.budget)),
+        ensureFiniteNumber(release.budget), release.imdbRating || 5
+    ).tier;
+    const reportedOutcome = getCareerReportedOutcome({
+        outcomeTier: calculatedOutcome, studioId: projectDetails.studioId,
+        streamingPlatform: release.streaming?.platformId,
+        streamingContractId: release.streamingContractId || release.streaming?.contractId,
+        platformProductionFunding: release.platformProductionFunding || projectDetails.hiddenStats?.platformProductionFundingApplied,
+        gross: totalGross, streamingRevenue: streamingRevenue + soundtrackRevenue,
+        totalViews: ensureFiniteNumber(options.totalViews ?? release.streaming?.totalViews),
+    }, options.player);
     const playerCharacterProfile = playerCastMember?.storyRole
         ? {
             storyFunction: playerCastMember.storyFunction || 'PROTAGONIST' as const,
@@ -1418,15 +1430,7 @@ const createPastProjectArchiveSnapshot = (
         projectQuality: qualityScore,
         imdbRating: release.imdbRating,
         boxOfficeResult: `$${(totalGross / 1000000).toFixed(1)}M`,
-        outcomeTier: calculateRunOutcome(
-            getProjectMarketOutcomeRevenue(
-                release,
-                totalGross + streamingRevenue + soundtrackRevenue,
-                ensureFiniteNumber(release.budget)
-            ),
-            ensureFiniteNumber(release.budget),
-            release.imdbRating || 5
-        ).tier,
+        outcomeTier: reportedOutcome || 'NEUTRAL',
         subtype: projectDetails.subtype,
         writerId: projectDetails.writerId,
         writerName: projectDetails.writerName,
@@ -3339,14 +3343,21 @@ export const processGameWeek = async (
         });
 
     // Annual Fees
-    if (nextPlayer.team.agent && nextPlayer.currentWeek === 1) {
+    const teamFeeAbsoluteWeek = getAbsoluteWeek(nextPlayer.age, nextPlayer.currentWeek);
+    const agentFeeDue = nextPlayer.team.lastAgentFeePaidWeek > 0
+        ? teamFeeAbsoluteWeek - nextPlayer.team.lastAgentFeePaidWeek >= 52 : nextPlayer.currentWeek === 1;
+    const managerFeeDue = nextPlayer.team.lastManagerFeePaidWeek > 0
+        ? teamFeeAbsoluteWeek - nextPlayer.team.lastManagerFeePaidWeek >= 52 : nextPlayer.currentWeek === 1;
+    if (nextPlayer.team.agent && agentFeeDue) {
         const annualFee = ensureFiniteNumber(nextPlayer.team.agent.annualFee);
         addTransaction(-annualFee, 'EXPENSE', `Agent Fee (${nextPlayer.team.agent.name})`);
+        nextPlayer.team.lastAgentFeePaidWeek = teamFeeAbsoluteWeek;
         logsToAdd.push({msg: `Paid annual agent fee: $${annualFee.toLocaleString()}`, type: 'neutral'});
     }
-    if (nextPlayer.team.manager && nextPlayer.currentWeek === 1) {
+    if (nextPlayer.team.manager && managerFeeDue) {
         const annualFee = ensureFiniteNumber(nextPlayer.team.manager.annualFee);
         addTransaction(-annualFee, 'EXPENSE', `Manager Fee (${nextPlayer.team.manager.name})`);
+        nextPlayer.team.lastManagerFeePaidWeek = teamFeeAbsoluteWeek;
         logsToAdd.push({msg: `Paid annual manager fee: $${annualFee.toLocaleString()}`, type: 'neutral'});
     }
 
@@ -3355,9 +3366,12 @@ export const processGameWeek = async (
     lifestyleMembers.forEach(role => {
         const member = nextPlayer.team[role] as TeamMember | null;
         if (member) {
-            addTransaction(-member.weeklyCost, 'EXPENSE', `${member.type} Fee (${member.name})`);
+            const prepaid = nextPlayer.flags.teamMemberFeePrepaid;
+            if (prepaid?.memberId !== member.id || prepaid?.absoluteWeek !== teamFeeAbsoluteWeek)
+                addTransaction(-member.weeklyCost, 'EXPENSE', `${member.type} Fee (${member.name})`);
         }
     });
+    delete nextPlayer.flags.teamMemberFeePrepaid;
     emitLoopStage('creator_talent_done', {
         talent_roster: nextPlayer.studio?.talentRoster?.length || 0,
         team_agents: nextPlayer.team.availableAgents?.length || 0,
@@ -3580,7 +3594,6 @@ export const processGameWeek = async (
 
     const BASE_DECAY = 1.0 * difficultyMult;
     const HEALTH_DECAY = 0.5 * difficultyMult;
-    const FAME_DECAY = 0.18; // Middle ground: fame still grows, but weekly momentum no longer snowballs too quickly.
     emitLoopStage('health_social_start');
     const healthBeforeWeeklyChanges = Number(nextPlayer.stats.health || 0);
 
@@ -3598,9 +3611,7 @@ export const processGameWeek = async (
     nextPlayer.stats.looks = Math.max(0, Math.min(100, nextPlayer.stats.looks - BASE_DECAY + looksBonus));
 
     const fameBonus = getCareerPublicityGain(nextPlayer);
-    if (nextPlayer.stats.fame > 0) {
-        nextPlayer.stats.fame = Math.max(0, Math.min(100, nextPlayer.stats.fame - FAME_DECAY + fameBonus));
-    }
+    nextPlayer.stats.fame = Math.max(0, Math.min(100, nextPlayer.stats.fame - getCareerFameDecay(nextPlayer.stats.fame) + fameBonus));
 
     const healthConditionsResult = processHealthConditionsWeek(nextPlayer);
     nextPlayer = healthConditionsResult.player;
@@ -4012,6 +4023,7 @@ export const processGameWeek = async (
 
                     newAuditionCommitments.push({
                         careerBalanceVersion: 1,
+                        careerRewardPacingVersion: 1,
                         id: `aud_active_${Date.now()}_${Math.random()}`,
                         name: opp.projectName,
                         type: 'ACTING_GIG',
@@ -4280,6 +4292,9 @@ export const processGameWeek = async (
             if (updatedC.projectDetails?.releaseStrategy) {
                 if (weeksLeft <= 0) {
                     let imdb = calculateIMDbRating(updatedC);
+                const recognition = applyCareerReleaseRecognition(nextPlayer, updatedC);
+                nextPlayer = recognition.player;
+                updatedC = recognition.commitment;
                 const budget = updatedC.projectDetails?.estimatedBudget || getEstimatedBudget(updatedC.projectDetails?.budgetTier || 'LOW');
                 const isTV = updatedC.projectDetails?.type === 'SERIES';
                 const isStreamingOnly = isTV || updatedC.projectDetails?.releaseStrategy === 'STREAMING_ONLY';

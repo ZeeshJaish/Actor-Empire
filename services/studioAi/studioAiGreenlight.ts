@@ -4,10 +4,12 @@ import type {
     NPCStudioState,
     StudioAiSlateCommitment,
     StudioAiSlateScores,
+    WorldState,
 } from '../../types';
 import { createDeterministicId, createDeterministicRng } from '../deterministicRandom';
 import { normalizeStudioAiState } from './studioAiState';
 import type { StudioAiDevelopmentTransaction } from './studioAiSlateAdmission';
+import { pendingStudioCinemaCampaignMillions, planStudioCinemaInvestment, studioCinemaCampaignRate } from './studioAiCinemaInvestment';
 
 interface ReviewStudioSlateCommitmentInput {
     studio: NPCStudioState;
@@ -15,6 +17,7 @@ interface ReviewStudioSlateCommitmentInput {
     fingerprint: IndustryContentFingerprint;
     proposal: IndustryIntelligenceProposal;
     absoluteWeek: number;
+    world?: WorldState;
 }
 
 export interface StudioAiGreenlightReviewResult {
@@ -126,17 +129,28 @@ export const reviewStudioSlateCommitment = (input: ReviewStudioSlateCommitmentIn
     }
 
     const reserveWeeks = 10 + ai.profile.financialDiscipline / 6;
-    const availableCash = Math.max(0, input.studio.cashReserve - ai.finance.weeklyOperatingCostMillions * reserveWeeks - ai.finance.committedSpendMillions);
-    const affordableBudget = Math.min(input.proposal.affordabilityCeilingMillions, availableCash);
+    const availableCash = Math.max(0, input.studio.cashReserve - ai.finance.weeklyOperatingCostMillions * reserveWeeks - ai.finance.committedSpendMillions
+        - pendingStudioCinemaCampaignMillions(input.world,input.studio.id));
+    const campaignRate=input.world&&input.fingerprint.format==='MOVIE'?studioCinemaCampaignRate(input.fingerprint):0;
+    const affordableBudget = Math.min(input.proposal.affordabilityCeilingMillions, availableCash/(1+campaignRate));
     if (greenlightConfidence >= 58 && affordableBudget >= input.fingerprint.budgetSuitability.minimumMillions) {
         const riskStretch = (ai.profile.riskTolerance - 50) / 220;
         const confidenceStretch = (greenlightConfidence - 50) / 250;
         const target = input.commitment.proposedBudgetMillions * (1 + riskStretch + confidenceStretch);
-        const greenlightBudgetMillions = money(clamp(
+        let greenlightBudgetMillions = money(clamp(
             target,
             Math.min(input.fingerprint.budgetSuitability.minimumMillions, affordableBudget),
             Math.min(input.fingerprint.budgetSuitability.ambitiousMaximumMillions, affordableBudget),
         ));
+        if(input.commitment.source==='INDEPENDENT'){
+            const investment=planStudioCinemaInvestment({world:input.world,studio:input.studio,fingerprint:input.fingerprint,
+                absoluteWeek:input.absoluteWeek,targetMillions:greenlightBudgetMillions,minimumMillions:input.fingerprint.budgetSuitability.minimumMillions});
+            if(investment){
+                if(investment.productionMillions<input.fingerprint.budgetSuitability.minimumMillions)
+                    return {reviewed:true,reason:'REVIEWED',commitment:{...base,status:'TURNAROUND',nextReviewAbsoluteWeek:null}};
+                greenlightBudgetMillions=investment.productionMillions;
+            }
+        }
         return {
             reviewed: true,
             reason: 'REVIEWED',

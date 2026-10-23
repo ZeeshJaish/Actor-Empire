@@ -1,0 +1,4 @@
+{
+  "ownedTaskWorkers": [],
+  "scope": "Only Node workers referencing this task temp folder; unrelated jobs neither stopped nor counted"
+}

@@ -8,11 +8,12 @@ const clamp = (n: number, lo = 0, hi = 1): number => Math.max(lo, Math.min(hi, N
 const fraction = (n: number): number => clamp(n / 100);
 const people = (n: number): number => Math.floor(Math.max(0, n));
 // Same persona preferences as WE6; no changes to streaming's calculations or audience wallets.
-const genres: Record<string, readonly string[]> = {
+export const CINEMA_PERSONA_GENRES: Record<string, readonly string[]> = {
     FAMILY_HOUSEHOLDS: ['ANIMATION','ADVENTURE','COMEDY','FANTASY'], VALUE_SEEKERS: ['ACTION','COMEDY','CRIME','THRILLER'],
     FANDOM_LOYALISTS: ['SUPERHERO','SCI_FI','FANTASY','ACTION'], PRESTIGE_EXPLORERS: ['DRAMA','BIOPIC','DOCUMENTARY','MYSTERY'],
     LOCAL_FIRST: ['DRAMA','ROMANCE','COMEDY','CRIME'], HABIT_STREAMERS: ['MYSTERY','CRIME','COMEDY','DRAMA'],
 };
+const genres = CINEMA_PERSONA_GENRES;
 const castUnique = <T extends {personId: string; roleWeight: number; characterIds:string[]}>(cast: readonly T[]): T[] => {
     const result = new Map<string,T>();
     for (const person of cast) {

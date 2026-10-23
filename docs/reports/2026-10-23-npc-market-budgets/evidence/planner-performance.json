@@ -1,0 +1,989 @@
+{
+  "checkpoint": "/private/tmp/actor-npc-market-budget-20261023/baseline-latest/career-0.json.gz",
+  "age": 17,
+  "week": 37,
+  "studios": 24,
+  "productions": 292,
+  "observedAffinityEntries": 6407,
+  "cases": 40,
+  "medianMs": 5.063500000000033,
+  "p95Ms": 9.998790999999983,
+  "maxMs": 13.868999999999971,
+  "stress100kAffinityMs": 9.667124999999999,
+  "peakRssMiB": 296.71875,
+  "rows": [
+    {
+      "studio": "PARAMOUNT",
+      "language": "SPANISH",
+      "genre": "MYSTERY",
+      "originalTarget": 27.95,
+      "minimum": 12.7,
+      "result": {
+        "productionMillions": 0,
+        "campaignMillions": 0,
+        "expectedProducerReceiptsMillions": 3.337,
+        "countryIds": [
+          "AR",
+          "BO",
+          "BZ",
+          "CL",
+          "CO",
+          "CR",
+          "CU",
+          "DO",
+          "EC",
+          "ES",
+          "GQ",
+          "GT",
+          "HN",
+          "MX",
+          "NI",
+          "PA",
+          "PE",
+          "PY",
+          "SV",
+          "US",
+          "UY",
+          "VE"
+        ],
+        "eligiblePeople": 325446400
+      },
+      "ms": 13.868999999999971
+    },
+    {
+      "studio": "PARAMOUNT",
+      "language": "KOREAN",
+      "genre": "SCI_FI",
+      "originalTarget": 70.75,
+      "minimum": 32.1,
+      "result": {
+        "productionMillions": 0,
+        "campaignMillions": 0,
+        "expectedProducerReceiptsMillions": 0.47,
+        "countryIds": [
+          "KR"
+        ],
+        "eligiblePeople": 26152313
+      },
+      "ms": 4.725291999999968
+    },
+    {
+      "studio": "PARAMOUNT",
+      "language": "JAPANESE",
+      "genre": "FANTASY",
+      "originalTarget": 65.6,
+      "minimum": 29.7,
+      "result": {
+        "productionMillions": 0,
+        "campaignMillions": 0,
+        "expectedProducerReceiptsMillions": 1.243,
+        "countryIds": [
+          "JP"
+        ],
+        "eligiblePeople": 61944476
+      },
+      "ms": 4.219459000000029
+    },
+    {
+      "studio": "PARAMOUNT",
+      "language": "PORTUGUESE",
+      "genre": "ADVENTURE",
+      "originalTarget": 58.05,
+      "minimum": 26.3,
+      "result": {
+        "productionMillions": 0,
+        "campaignMillions": 0,
+        "expectedProducerReceiptsMillions": 1.419,
+        "countryIds": [
+          "AO",
+          "BR",
+          "CV",
+          "GW",
+          "MZ",
+          "PT",
+          "ST",
+          "TL"
+        ],
+        "eligiblePeople": 104549381
+      },
+      "ms": 5.8249589999999785
+    },
+    {
+      "studio": "PARAMOUNT",
+      "language": "TELUGU",
+      "genre": "THRILLER",
+      "originalTarget": 24.95,
+      "minimum": 11.3,
+      "result": {
+        "productionMillions": 0,
+        "campaignMillions": 0,
+        "expectedProducerReceiptsMillions": 0.362,
+        "countryIds": [
+          "IN"
+        ],
+        "eligiblePeople": 313878039
+      },
+      "ms": 5.738125000000025
+    },
+    {
+      "studio": "PARAMOUNT",
+      "language": "ENGLISH",
+      "genre": "CRIME",
+      "originalTarget": 27.3,
+      "minimum": 12.4,
+      "result": {
+        "productionMillions": 0,
+        "campaignMillions": 0,
+        "expectedProducerReceiptsMillions": 6.166,
+        "countryIds": [
+          "AE",
+          "AG",
+          "AU",
+          "BB",
+          "BS",
+          "BW",
+          "BZ",
+          "CA",
+          "CM",
+          "DM",
+          "FJ",
+          "FM",
+          "GB",
+          "GD",
+          "GH",
+          "GM",
+          "GY",
+          "IE",
+          "IN",
+          "JM",
+          "KE",
+          "KI",
+          "KN",
+          "LC",
+          "LR",
+          "LS",
+          "MH",
+          "MT",
+          "MU",
+          "MW",
+          "MY",
+          "NA",
+          "NG",
+          "NR",
+          "NZ",
+          "PG",
+          "PH",
+          "PK",
+          "PW",
+          "RW",
+          "SB",
+          "SC",
+          "SD",
+          "SG",
+          "SL",
+          "SS",
+          "SZ",
+          "TO",
+          "TT",
+          "TV",
+          "TZ",
+          "UG",
+          "US",
+          "VC",
+          "VU",
+          "WS",
+          "ZA",
+          "ZM",
+          "ZW"
+        ],
+        "eligiblePeople": 809664329
+      },
+      "ms": 8.72912500000001
+    },
+    {
+      "studio": "PARAMOUNT",
+      "language": "JAPANESE",
+      "genre": "BIOPIC",
+      "originalTarget": 25.1,
+      "minimum": 11.4,
+      "result": {
+        "productionMillions": 0,
+        "campaignMillions": 0,
+        "expectedProducerReceiptsMillions": 1.09,
+        "countryIds": [
+          "JP"
+        ],
+        "eligiblePeople": 61944476
+      },
+      "ms": 4.039666999999952
+    },
+    {
+      "studio": "HBO",
+      "language": "GERMAN",
+      "genre": "ANIMATION",
+      "originalTarget": 60.400000000000006,
+      "minimum": 27.4,
+      "result": {
+        "productionMillions": 0,
+        "campaignMillions": 0,
+        "expectedProducerReceiptsMillions": 0.864,
+        "countryIds": [
+          "AT",
+          "BE",
+          "CH",
+          "DE",
+          "LI",
+          "LU"
+        ],
+        "eligiblePeople": 56649176
+      },
+      "ms": 4.483667000000025
+    },
+    {
+      "studio": "HBO",
+      "language": "SPANISH",
+      "genre": "HORROR",
+      "originalTarget": 23.95,
+      "minimum": 10.9,
+      "result": {
+        "productionMillions": 0,
+        "campaignMillions": 0,
+        "expectedProducerReceiptsMillions": 2.319,
+        "countryIds": [
+          "AR",
+          "BO",
+          "BZ",
+          "CL",
+          "CO",
+          "CR",
+          "CU",
+          "DO",
+          "EC",
+          "ES",
+          "GQ",
+          "GT",
+          "HN",
+          "MX",
+          "NI",
+          "PA",
+          "PE",
+          "PY",
+          "SV",
+          "US",
+          "UY",
+          "VE"
+        ],
+        "eligiblePeople": 325446400
+      },
+      "ms": 5.569542000000013
+    },
+    {
+      "studio": "HBO",
+      "language": "KOREAN",
+      "genre": "FANTASY",
+      "originalTarget": 68.05,
+      "minimum": 30.9,
+      "result": {
+        "productionMillions": 0,
+        "campaignMillions": 0,
+        "expectedProducerReceiptsMillions": 0.458,
+        "countryIds": [
+          "KR"
+        ],
+        "eligiblePeople": 26152313
+      },
+      "ms": 4.147583999999995
+    },
+    {
+      "studio": "HBO",
+      "language": "FRENCH",
+      "genre": "ACTION",
+      "originalTarget": 63.5,
+      "minimum": 28.8,
+      "result": {
+        "productionMillions": 0,
+        "campaignMillions": 0,
+        "expectedProducerReceiptsMillions": 0.939,
+        "countryIds": [
+          "BE",
+          "BF",
+          "BI",
+          "BJ",
+          "CA",
+          "CD",
+          "CF",
+          "CG",
+          "CH",
+          "CI",
+          "CM",
+          "DJ",
+          "FR",
+          "GA",
+          "GN",
+          "GQ",
+          "HT",
+          "KM",
+          "LB",
+          "LU",
+          "MC",
+          "MG",
+          "ML",
+          "MU",
+          "NE",
+          "RW",
+          "SC",
+          "SN",
+          "TD",
+          "TG",
+          "TN",
+          "VU"
+        ],
+        "eligiblePeople": 119081779
+      },
+      "ms": 6.054750000000013
+    },
+    {
+      "studio": "HBO",
+      "language": "GERMAN",
+      "genre": "SUPERHERO",
+      "originalTarget": 58.8,
+      "minimum": 26.7,
+      "result": {
+        "productionMillions": 0,
+        "campaignMillions": 0,
+        "expectedProducerReceiptsMillions": 0.821,
+        "countryIds": [
+          "AT",
+          "BE",
+          "CH",
+          "DE",
+          "LI",
+          "LU"
+        ],
+        "eligiblePeople": 56649176
+      },
+      "ms": 4.282624999999996
+    },
+    {
+      "studio": "HBO",
+      "language": "TELUGU",
+      "genre": "ADVENTURE",
+      "originalTarget": 48.05,
+      "minimum": 21.8,
+      "result": {
+        "productionMillions": 0,
+        "campaignMillions": 0,
+        "expectedProducerReceiptsMillions": 0.339,
+        "countryIds": [
+          "IN"
+        ],
+        "eligiblePeople": 313878039
+      },
+      "ms": 4.084042000000011
+    },
+    {
+      "studio": "HBO",
+      "language": "SPANISH",
+      "genre": "DOCUMENTARY",
+      "originalTarget": 30.3,
+      "minimum": 13.7,
+      "result": {
+        "productionMillions": 0,
+        "campaignMillions": 0,
+        "expectedProducerReceiptsMillions": 1.04,
+        "countryIds": [
+          "US"
+        ],
+        "eligiblePeople": 168731661
+      },
+      "ms": 5.397791999999981
+    },
+    {
+      "studio": "HBO",
+      "language": "JAPANESE",
+      "genre": "ADVENTURE",
+      "originalTarget": 59.9,
+      "minimum": 27.2,
+      "result": {
+        "productionMillions": 0,
+        "campaignMillions": 0,
+        "expectedProducerReceiptsMillions": 0.914,
+        "countryIds": [
+          "JP"
+        ],
+        "eligiblePeople": 61944476
+      },
+      "ms": 4.118207999999981
+    },
+    {
+      "studio": "HBO",
+      "language": "KOREAN",
+      "genre": "FANTASY",
+      "originalTarget": 69.7,
+      "minimum": 31.6,
+      "result": {
+        "productionMillions": 0,
+        "campaignMillions": 0,
+        "expectedProducerReceiptsMillions": 0.458,
+        "countryIds": [
+          "KR"
+        ],
+        "eligiblePeople": 26152313
+      },
+      "ms": 4.303458999999975
+    },
+    {
+      "studio": "HBO",
+      "language": "GERMAN",
+      "genre": "BIOPIC",
+      "originalTarget": 25.1,
+      "minimum": 11.4,
+      "result": {
+        "productionMillions": 0,
+        "campaignMillions": 0,
+        "expectedProducerReceiptsMillions": 0.937,
+        "countryIds": [
+          "AT",
+          "BE",
+          "CH",
+          "DE",
+          "LI",
+          "LU"
+        ],
+        "eligiblePeople": 56649176
+      },
+      "ms": 4.445499999999981
+    },
+    {
+      "studio": "WARNER_BROS",
+      "language": "FRENCH",
+      "genre": "COMEDY",
+      "originalTarget": 26.45,
+      "minimum": 12,
+      "result": {
+        "productionMillions": 0,
+        "campaignMillions": 0,
+        "expectedProducerReceiptsMillions": 1.097,
+        "countryIds": [
+          "BE",
+          "BF",
+          "BI",
+          "BJ",
+          "CA",
+          "CD",
+          "CF",
+          "CG",
+          "CH",
+          "CI",
+          "CM",
+          "DJ",
+          "FR",
+          "GA",
+          "GN",
+          "GQ",
+          "HT",
+          "KM",
+          "LB",
+          "LU",
+          "MC",
+          "MG",
+          "ML",
+          "MU",
+          "NE",
+          "RW",
+          "SC",
+          "SN",
+          "TD",
+          "TG",
+          "TN",
+          "VU"
+        ],
+        "eligiblePeople": 119081779
+      },
+      "ms": 7.066541000000029
+    },
+    {
+      "studio": "WARNER_BROS",
+      "language": "TAMIL",
+      "genre": "ACTION",
+      "originalTarget": 56.05,
+      "minimum": 25.4,
+      "result": {
+        "productionMillions": 0,
+        "campaignMillions": 0,
+        "expectedProducerReceiptsMillions": 0.407,
+        "countryIds": [
+          "IN"
+        ],
+        "eligiblePeople": 313878039
+      },
+      "ms": 4.781000000000006
+    },
+    {
+      "studio": "WARNER_BROS",
+      "language": "HINDI",
+      "genre": "DRAMA",
+      "originalTarget": 25.799999999999997,
+      "minimum": 11.7,
+      "result": {
+        "productionMillions": 0,
+        "campaignMillions": 0,
+        "expectedProducerReceiptsMillions": 1.478,
+        "countryIds": [
+          "FJ",
+          "IN"
+        ],
+        "eligiblePeople": 314083909
+      },
+      "ms": 9.998790999999983
+    },
+    {
+      "studio": "WARNER_BROS",
+      "language": "TAMIL",
+      "genre": "SUPERHERO",
+      "originalTarget": 65,
+      "minimum": 29.5,
+      "result": {
+        "productionMillions": 0,
+        "campaignMillions": 0,
+        "expectedProducerReceiptsMillions": 0.53,
+        "countryIds": [
+          "IN",
+          "LK",
+          "MY",
+          "SG"
+        ],
+        "eligiblePeople": 336192566
+      },
+      "ms": 6.3956249999999955
+    },
+    {
+      "studio": "WARNER_BROS",
+      "language": "GERMAN",
+      "genre": "ADVENTURE",
+      "originalTarget": 65.1,
+      "minimum": 29.5,
+      "result": {
+        "productionMillions": 0,
+        "campaignMillions": 0,
+        "expectedProducerReceiptsMillions": 0.676,
+        "countryIds": [
+          "DE"
+        ],
+        "eligiblePeople": 41320803
+      },
+      "ms": 8.862791999999956
+    },
+    {
+      "studio": "WARNER_BROS",
+      "language": "TELUGU",
+      "genre": "BIOPIC",
+      "originalTarget": 23,
+      "minimum": 10.4,
+      "result": {
+        "productionMillions": 0,
+        "campaignMillions": 0,
+        "expectedProducerReceiptsMillions": 0.378,
+        "countryIds": [
+          "IN"
+        ],
+        "eligiblePeople": 313878039
+      },
+      "ms": 9.633707999999956
+    },
+    {
+      "studio": "WARNER_BROS",
+      "language": "ENGLISH",
+      "genre": "ROMANCE",
+      "originalTarget": 24.95,
+      "minimum": 11.3,
+      "result": {
+        "productionMillions": 0,
+        "campaignMillions": 0,
+        "expectedProducerReceiptsMillions": 2.308,
+        "countryIds": [
+          "US"
+        ],
+        "eligiblePeople": 168731661
+      },
+      "ms": 9.326958000000047
+    },
+    {
+      "studio": "UNIVERSAL",
+      "language": "KOREAN",
+      "genre": "SPORTS",
+      "originalTarget": 31.25,
+      "minimum": 14.2,
+      "result": {
+        "productionMillions": 0,
+        "campaignMillions": 0,
+        "expectedProducerReceiptsMillions": 0.445,
+        "countryIds": [
+          "KP",
+          "KR"
+        ],
+        "eligiblePeople": 31930250
+      },
+      "ms": 4.6455420000000345
+    },
+    {
+      "studio": "UNIVERSAL",
+      "language": "TAMIL",
+      "genre": "ADVENTURE",
+      "originalTarget": 70.65,
+      "minimum": 32,
+      "result": {
+        "productionMillions": 0,
+        "campaignMillions": 0,
+        "expectedProducerReceiptsMillions": 0.559,
+        "countryIds": [
+          "IN",
+          "LK",
+          "MY",
+          "SG"
+        ],
+        "eligiblePeople": 336192566
+      },
+      "ms": 5.630083999999954
+    },
+    {
+      "studio": "UNIVERSAL",
+      "language": "TAMIL",
+      "genre": "THRILLER",
+      "originalTarget": 31.349999999999998,
+      "minimum": 14.2,
+      "result": {
+        "productionMillions": 0,
+        "campaignMillions": 0,
+        "expectedProducerReceiptsMillions": 0.478,
+        "countryIds": [
+          "IN",
+          "LK",
+          "MY",
+          "SG"
+        ],
+        "eligiblePeople": 336192566
+      },
+      "ms": 5.063500000000033
+    },
+    {
+      "studio": "UNIVERSAL",
+      "language": "SPANISH",
+      "genre": "BIOPIC",
+      "originalTarget": 23.1,
+      "minimum": 10.5,
+      "result": {
+        "productionMillions": 0,
+        "campaignMillions": 0,
+        "expectedProducerReceiptsMillions": 0.761,
+        "countryIds": [
+          "US"
+        ],
+        "eligiblePeople": 168731661
+      },
+      "ms": 4.85450000000003
+    },
+    {
+      "studio": "UNIVERSAL",
+      "language": "TAMIL",
+      "genre": "ROMANCE",
+      "originalTarget": 24.95,
+      "minimum": 11.3,
+      "result": {
+        "productionMillions": 0,
+        "campaignMillions": 0,
+        "expectedProducerReceiptsMillions": 0.404,
+        "countryIds": [
+          "IN",
+          "LK",
+          "MY",
+          "SG"
+        ],
+        "eligiblePeople": 336192566
+      },
+      "ms": 6.068291999999985
+    },
+    {
+      "studio": "UNIVERSAL",
+      "language": "FRENCH",
+      "genre": "CRIME",
+      "originalTarget": 28.3,
+      "minimum": 12.8,
+      "result": {
+        "productionMillions": 0,
+        "campaignMillions": 0,
+        "expectedProducerReceiptsMillions": 0.947,
+        "countryIds": [
+          "BE",
+          "BF",
+          "BI",
+          "BJ",
+          "CA",
+          "CD",
+          "CF",
+          "CG",
+          "CH",
+          "CI",
+          "CM",
+          "DJ",
+          "FR",
+          "GA",
+          "GN",
+          "GQ",
+          "HT",
+          "KM",
+          "LB",
+          "LU",
+          "MC",
+          "MG",
+          "ML",
+          "MU",
+          "NE",
+          "RW",
+          "SC",
+          "SN",
+          "TD",
+          "TG",
+          "TN",
+          "VU"
+        ],
+        "eligiblePeople": 119081779
+      },
+      "ms": 6.1143749999999955
+    },
+    {
+      "studio": "UNIVERSAL",
+      "language": "KOREAN",
+      "genre": "COMEDY",
+      "originalTarget": 26.799999999999997,
+      "minimum": 12.2,
+      "result": {
+        "productionMillions": 0,
+        "campaignMillions": 0,
+        "expectedProducerReceiptsMillions": 0.402,
+        "countryIds": [
+          "KR"
+        ],
+        "eligiblePeople": 26152313
+      },
+      "ms": 4.000665999999967
+    },
+    {
+      "studio": "UNIVERSAL",
+      "language": "TELUGU",
+      "genre": "HORROR",
+      "originalTarget": 33.6,
+      "minimum": 15.2,
+      "result": {
+        "productionMillions": 0,
+        "campaignMillions": 0,
+        "expectedProducerReceiptsMillions": 0.479,
+        "countryIds": [
+          "IN"
+        ],
+        "eligiblePeople": 313878039
+      },
+      "ms": 4.1227910000000065
+    },
+    {
+      "studio": "ARTISAN_PICTURES",
+      "language": "TAMIL",
+      "genre": "COMEDY",
+      "originalTarget": 15.1,
+      "minimum": 6.8,
+      "result": {
+        "productionMillions": 0,
+        "campaignMillions": 0,
+        "expectedProducerReceiptsMillions": 0.294,
+        "countryIds": [
+          "IN",
+          "LK",
+          "MY",
+          "SG"
+        ],
+        "eligiblePeople": 336192566
+      },
+      "ms": 3.897625000000005
+    },
+    {
+      "studio": "ARTISAN_PICTURES",
+      "language": "GERMAN",
+      "genre": "ROMANCE",
+      "originalTarget": 13.799999999999999,
+      "minimum": 6.3,
+      "result": {
+        "productionMillions": 0,
+        "campaignMillions": 0,
+        "expectedProducerReceiptsMillions": 0.352,
+        "countryIds": [
+          "AT",
+          "BE",
+          "CH",
+          "DE",
+          "LI",
+          "LU"
+        ],
+        "eligiblePeople": 56649176
+      },
+      "ms": 3.983292000000006
+    },
+    {
+      "studio": "ARTISAN_PICTURES",
+      "language": "KOREAN",
+      "genre": "DRAMA",
+      "originalTarget": 15.049999999999999,
+      "minimum": 6.8,
+      "result": {
+        "productionMillions": 0,
+        "campaignMillions": 0,
+        "expectedProducerReceiptsMillions": 0.222,
+        "countryIds": [
+          "KP",
+          "KR"
+        ],
+        "eligiblePeople": 31930250
+      },
+      "ms": 3.679499999999962
+    },
+    {
+      "studio": "ARTISAN_PICTURES",
+      "language": "SPANISH",
+      "genre": "THRILLER",
+      "originalTarget": 15.45,
+      "minimum": 7,
+      "result": {
+        "productionMillions": 0,
+        "campaignMillions": 0,
+        "expectedProducerReceiptsMillions": 1.323,
+        "countryIds": [
+          "AR",
+          "BO",
+          "BZ",
+          "CL",
+          "CO",
+          "CR",
+          "CU",
+          "DO",
+          "EC",
+          "ES",
+          "GQ",
+          "GT",
+          "HN",
+          "MX",
+          "NI",
+          "PA",
+          "PE",
+          "PY",
+          "SV",
+          "US",
+          "UY",
+          "VE"
+        ],
+        "eligiblePeople": 325446400
+      },
+      "ms": 5.127125000000035
+    },
+    {
+      "studio": "ARTISAN_PICTURES",
+      "language": "PORTUGUESE",
+      "genre": "COMEDY",
+      "originalTarget": 12.5,
+      "minimum": 5.7,
+      "result": {
+        "productionMillions": 0,
+        "campaignMillions": 0,
+        "expectedProducerReceiptsMillions": 0.623,
+        "countryIds": [
+          "BR"
+        ],
+        "eligiblePeople": 88494150
+      },
+      "ms": 9.136500000000012
+    },
+    {
+      "studio": "ARTISAN_PICTURES",
+      "language": "FRENCH",
+      "genre": "ACTION",
+      "originalTarget": 37.9,
+      "minimum": 17.2,
+      "result": {
+        "productionMillions": 0,
+        "campaignMillions": 0,
+        "expectedProducerReceiptsMillions": 0.497,
+        "countryIds": [
+          "BE",
+          "BF",
+          "BI",
+          "BJ",
+          "CA",
+          "CD",
+          "CF",
+          "CG",
+          "CH",
+          "CI",
+          "CM",
+          "DJ",
+          "FR",
+          "GA",
+          "GN",
+          "GQ",
+          "HT",
+          "KM",
+          "LB",
+          "LU",
+          "MC",
+          "MG",
+          "ML",
+          "MU",
+          "NE",
+          "RW",
+          "SC",
+          "SN",
+          "TD",
+          "TG",
+          "TN",
+          "VU"
+        ],
+        "eligiblePeople": 119081779
+      },
+      "ms": 5.3726669999999785
+    },
+    {
+      "studio": "NETFLIX",
+      "language": "TAMIL",
+      "genre": "HORROR",
+      "originalTarget": 27.8,
+      "minimum": 12.6,
+      "result": {
+        "productionMillions": 0,
+        "campaignMillions": 0,
+        "expectedProducerReceiptsMillions": 0.45,
+        "countryIds": [
+          "IN",
+          "LK",
+          "MY",
+          "SG"
+        ],
+        "eligiblePeople": 336192566
+      },
+      "ms": 4.041833999999994
+    },
+    {
+      "studio": "NETFLIX",
+      "language": "KOREAN",
+      "genre": "FANTASY",
+      "originalTarget": 77.2,
+      "minimum": 35,
+      "result": {
+        "productionMillions": 0,
+        "campaignMillions": 0,
+        "expectedProducerReceiptsMillions": 0.515,
+        "countryIds": [
+          "KR"
+        ],
+        "eligiblePeople": 26152313
+      },
+      "ms": 3.935624999999959
+    }
+  ]
+}

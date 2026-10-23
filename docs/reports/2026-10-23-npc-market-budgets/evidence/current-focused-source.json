@@ -1,0 +1,29 @@
+{
+  "before": {
+    "services/studioAi/studioAiCinemaInvestment.ts": "a681f1d0726c938aaf9b33b4f8390dab0924f4c0cfa52b9dfed5e3e51a97a1b1",
+    "services/studioAi/studioAiSlateAdmission.ts": "aee669f92a0c64a195a894af5590183795672411726f58fe25b95f0ce0d32806",
+    "services/studioAi/studioAiGreenlight.ts": "6257915cae762131eb0b4072b235430e658679a087c13e06e1a1c10e34d5e047",
+    "services/studioAi/studioAiProductionTalent.ts": "00e8aa9bf947f118cc26b21b7adb1b54bf34db60f3a9a451e7792e2fe27cd90e",
+    "services/industryTalentSelection.ts": "f80ab9a1d1e1fb331eaad3b7b3754291c767e0faba18ee9bdbbf848ae9699b5f",
+    "services/roleLogic.ts": "d9eb018712b51749aca1a5467acf664ff1de065422fcd730c22a4f3bfd791ab3",
+    "services/famousMovieLogic.ts": "97e8ea1921cf3813ad061d0d6e0dfd7d27ad3fd21aca90121b58cba157d520b1",
+    "services/universeLogic.ts": "b9ec11f6c5a771f005916346fbfa1cf9b6dc15567828228042f34718f71861e4",
+    "services/teamLogic.ts": "7f4d8030e8d52258326295a210f38ca2c66a2f24d377d5f4d06229526e65dadd",
+    "services/actorCareerBalance.ts": "2bcd2933a094d4a6cb192c66f6acb8e7d17e3da731295fe7597f3dd8e3d0c236",
+    "services/actorOfferTerms.ts": "cbe1bba31ab893f273a91042143950c1c1892fca00f66274c7a307e560a01a1e"
+  },
+  "after": {
+    "services/studioAi/studioAiCinemaInvestment.ts": "a681f1d0726c938aaf9b33b4f8390dab0924f4c0cfa52b9dfed5e3e51a97a1b1",
+    "services/studioAi/studioAiSlateAdmission.ts": "aee669f92a0c64a195a894af5590183795672411726f58fe25b95f0ce0d32806",
+    "services/studioAi/studioAiGreenlight.ts": "6257915cae762131eb0b4072b235430e658679a087c13e06e1a1c10e34d5e047",
+    "services/studioAi/studioAiProductionTalent.ts": "00e8aa9bf947f118cc26b21b7adb1b54bf34db60f3a9a451e7792e2fe27cd90e",
+    "services/industryTalentSelection.ts": "f80ab9a1d1e1fb331eaad3b7b3754291c767e0faba18ee9bdbbf848ae9699b5f",
+    "services/roleLogic.ts": "d9eb018712b51749aca1a5467acf664ff1de065422fcd730c22a4f3bfd791ab3",
+    "services/famousMovieLogic.ts": "97e8ea1921cf3813ad061d0d6e0dfd7d27ad3fd21aca90121b58cba157d520b1",
+    "services/universeLogic.ts": "b9ec11f6c5a771f005916346fbfa1cf9b6dc15567828228042f34718f71861e4",
+    "services/teamLogic.ts": "7f4d8030e8d52258326295a210f38ca2c66a2f24d377d5f4d06229526e65dadd",
+    "services/actorCareerBalance.ts": "2bcd2933a094d4a6cb192c66f6acb8e7d17e3da731295fe7597f3dd8e3d0c236",
+    "services/actorOfferTerms.ts": "cbe1bba31ab893f273a91042143950c1c1892fca00f66274c7a307e560a01a1e"
+  },
+  "exitCode": 0
+}

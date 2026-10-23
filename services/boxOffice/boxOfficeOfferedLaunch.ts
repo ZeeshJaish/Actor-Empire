@@ -6,6 +6,7 @@ import { WORLD_COUNTRY_DEFINITIONS } from '../worldEconomy/worldCountryRegistry'
 import { commitCinemaReleaseExposure } from './boxOfficeExposureAdapters';
 import { moveCinemaNpcCash } from './boxOfficeSettlement';
 import { findCinemaBusiness } from './boxOfficeWeek';
+import { readCinemaExposureRecord } from './boxOfficeAwareness';
 
 /** One atomic premiere candidate. The ordinary processed-week save owns durability.
  * Only the producing NPC treasury funds this campaign; an actor's posts/pay are separate.
@@ -13,11 +14,21 @@ import { findCinemaBusiness } from './boxOfficeWeek';
  */
 export const fundOfferedCinemaLaunch = (player:Player,project:ProjectDetails,titleId:string):{world:Player['world'];project:ProjectDetails} => {
     const unchanged={world:player.world,project};
-    if(project.type!=='MOVIE'||project.releaseStrategy==='STREAMING_ONLY'||project.offeredCinemaLaunch
+    if(project.type!=='MOVIE'||project.releaseStrategy==='STREAMING_ONLY'
         ||findCinemaBusiness(player,project.studioId)||project.castPackageSource==='AUTHORED'
         ||player.activeReleases.some(r=>r.id===titleId)||player.pastProjects.some(r=>r.id===titleId)
-        ||player.world.cinemaMarket?.titles[titleId]||player.world.projects.some(r=>r.id===titleId)
-        ||(project.marketingBudgetSpent || 0)>0||(project.totalCampaignSpend || 0)>0||(project.reservedMarketingBudget || 0)>0
+        ||player.world.cinemaMarket?.titles[titleId]||player.world.projects.some(r=>r.id===titleId))return unchanged;
+    const events=project.cinemaExposure?.events || [];
+    // Repair only an unambiguous, not-yet-released NPC continuation copy.
+    // Real child payments, explicit reserves and historical premieres stay protected.
+    if(project.subtype==='SEQUEL'&&project.franchiseId&&project.franchiseId!==titleId
+        &&project.offeredCinemaLaunch?.studioId===project.studioId&&project.offeredCinemaLaunch.campaignCostCents>0
+        &&!(project.reservedMarketingBudget || 0)&&events.some(e=>e.kind==='PAID_CAMPAIGN'&&e.titleId!==titleId)
+        &&!events.some(e=>e.kind==='PAID_CAMPAIGN'&&e.titleId===titleId)){
+        project={...project,offeredCinemaLaunch:undefined,cinemaExposure:readCinemaExposureRecord(project,titleId),
+            marketingBudgetSpent:undefined,totalCampaignSpend:undefined,marketingChannelAllocations:undefined};
+    }
+    if(project.offeredCinemaLaunch||(project.marketingBudgetSpent || 0)>0||(project.totalCampaignSpend || 0)>0||(project.reservedMarketingBudget || 0)>0
         ||project.cinemaExposure?.events.some(e=>e.kind==='PAID_CAMPAIGN'))return unchanged;
     const absoluteWeek=getAbsoluteWeek(player.age,player.currentWeek);
     const sourceStudio=player.world.studios?.[project.studioId];

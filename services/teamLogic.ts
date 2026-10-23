@@ -333,7 +333,7 @@ export const generateAgentOffers = (player: Player): AuditionOpportunity | null 
             if (Math.random() < 0.6) {
                 const famousMovie = getNextFamousMovie(player);
                 if (famousMovie) {
-                    const premium = createFamousOpportunity(famousMovie, 'SUPPORTING', 'AGENT', getPlayerLanguage(player));
+                    const premium = createFamousOpportunity(famousMovie, 'SUPPORTING', 'AGENT', getPlayerLanguage(player), player);
                     if (resolveCareerOfferRole(player, premium.roleType, premium.project.genre) === premium.roleType) return premium; // Agents usually get supporting in these big ones first
                 }
             } 
@@ -551,7 +551,7 @@ export const generateDirectOffer = (player: Player): AuditionOpportunity | null 
              if (Math.random() < 0.5) {
                 const famousMovie = getNextFamousMovie(player);
                 if (famousMovie) {
-                    const premium = createFamousOpportunity(famousMovie, 'LEAD', 'DIRECT', getPlayerLanguage(player));
+                    const premium = createFamousOpportunity(famousMovie, 'LEAD', 'DIRECT', getPlayerLanguage(player), player);
                     if (resolveCareerOfferRole(player, premium.roleType, premium.project.genre) === premium.roleType) return premium; // Direct offers are usually Lead
                 }
             } 

@@ -1,0 +1,12 @@
+[
+  {
+    "name": "missing-world",
+    "rejected": true,
+    "expected": "FAIL the actual studio slate forwards"
+  },
+  {
+    "name": "missing-campaign-reserve",
+    "rejected": true,
+    "expected": "FAIL unreleased movies retain campaign cash"
+  }
+]

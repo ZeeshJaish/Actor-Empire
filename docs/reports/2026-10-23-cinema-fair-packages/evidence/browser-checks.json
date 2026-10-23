@@ -1,0 +1,60 @@
+[
+  {
+    "name": "Earned career premiere",
+    "result": {
+      "week": 11,
+      "money": 42300,
+      "campaign": 1375408.8,
+      "launch": {
+        "version": 1,
+        "absoluteWeek": 841,
+        "studioId": "PARAMOUNT",
+        "campaignCostCents": 137540880
+      },
+      "cast": [
+        {
+          "name": "Phase 6 ordinary-starter",
+          "roleType": "MINOR",
+          "isPlayer": true
+        },
+        {
+          "name": "Nova Black",
+          "roleType": "LEAD",
+          "isPlayer": false
+        }
+      ],
+      "countries": [
+        "US"
+      ],
+      "ledger": [
+        {
+          "id": "offered-cinema-campaign:aud_active_1800000001173_0.3244509235955775",
+          "absoluteWeek": 841,
+          "category": "RELEASE_MARKETING",
+          "amountMillions": -1.3754088,
+          "balanceAfterMillions": 2483.3313104,
+          "description": "A Prime Moon: offered-film release campaign"
+        }
+      ],
+      "unchangedPriorReceipts": 51
+    },
+    "at": "2026-10-23T11:44:02.971Z"
+  },
+  {
+    "name": "Cinema finance display",
+    "result": "Project financial report\n\nSubstantial loss to date \u00b7 theatrical run in progress\n\nPublic theatrical gross\n$7.7M\nTheatrical producer receipts\n$4.1M\nTheatrical cost recovery before backend\n-$14.5M\nCollected release receipts, all media\n$4.1M\nProduction and paid release costs\n$18.6M\nInvestor distributions\n$0\nTalent backend paid\n$0\nNet studio receipts\n$4.1M\nCollected project profit / loss\n-$14.5M\nStudio cash at risk\n$18.6M\nStudio profit / loss after financing\n-$14.5M\n\nSigned actor backend paid since tracking began: $0\n\nTotal actor earnings are not recorded on this release.\n\nProfit uses receipts collected to date. Future streaming and soundtrack income is excluded. Theater cost recovery compares theatrical receipts with paid project costs before backend and financing; collected project profit includes paid backend and applied platform cover, before investor distributions. Studio profit uses its own funded cash. Actor earnings and performance are separate from the producer's return. Upfront actor pay is already in production cost.",
+    "at": "2026-10-23T11:44:53.713Z"
+  },
+  {
+    "name": "Reload and next-week payment protection",
+    "result": {
+      "week": 12,
+      "money": 42700,
+      "gross": 14175375.06,
+      "campaign": 1375408.8,
+      "ledger": 1,
+      "salary": 1
+    },
+    "at": "2026-10-23T11:45:56.721Z"
+  }
+]

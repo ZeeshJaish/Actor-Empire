@@ -1023,7 +1023,7 @@ const reverseLegacyImportedAcquisitionDebtCharge = (player: Player): Player => {
 
     return {
         ...player,
-        money: Math.max(0, Number(player.money || 0)) + refundAmount,
+        money: Number(player.money || 0) + refundAmount,
         finance: {
             ...player.finance,
             history: toArray<any>(player.finance?.history).filter(transaction => !reversedTransactionIds.has(transaction.id)),
@@ -1102,7 +1102,8 @@ export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
         age: migratedAge,
         totalPlayTimeMs: Math.max(0, Math.min(Number.MAX_SAFE_INTEGER, Math.round(Number(base.totalPlayTimeMs || 0)))),
         currentWeek: migratedCurrentWeek,
-        money: Number.isFinite(Number(base.money)) ? Math.max(0, Number(base.money)) : INITIAL_PLAYER.money,
+        // Weekly fees can legitimately leave a deficit; reload must retain that obligation.
+        money: Number.isFinite(Number(base.money)) ? Number(base.money) : INITIAL_PLAYER.money,
         world: {
             ...base.world,
             platformAiCatalogueDistressDeals: normalizePlatformAiCatalogueDistressDeals(

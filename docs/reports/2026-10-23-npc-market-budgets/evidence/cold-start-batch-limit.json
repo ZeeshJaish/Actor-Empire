@@ -1,0 +1,122 @@
+{
+  "wholeWeeks": 8,
+  "splitBatchWeeks": 2,
+  "playerCashEqual": true,
+  "cinemaStateEqual": true,
+  "randomCalls": [
+    16714,
+    16714
+  ],
+  "clock": [
+    1800000000146,
+    1800000000146
+  ],
+  "differences": [
+    {
+      "path": ".world.studios.npc_venture_0tzfzz8.cashReserve",
+      "a": 42.121330381287386,
+      "b": 42.16267835385801
+    },
+    {
+      "path": ".world.studios.npc_venture_0tzfzz8.ai.finance.runwayWeeks",
+      "a": 100.29,
+      "b": 100.39
+    },
+    {
+      "path": ".world.studios.npc_venture_0tzfzz8.ai.ledger.0.balanceAfterMillions",
+      "a": 42.5663532,
+      "b": 42.60770118
+    },
+    {
+      "path": ".world.studios.npc_venture_0tzfzz8.ai.ledger.1.balanceAfterMillions",
+      "a": 42.1463532,
+      "b": 42.18770118
+    },
+    {
+      "path": ".world.studios.npc_venture_0tzfzz8.ai.ledger.2.balanceAfterMillions",
+      "a": 42.58245559,
+      "b": 42.62380356
+    },
+    {
+      "path": ".world.studios.npc_venture_0tzfzz8.ai.ledger.3.balanceAfterMillions",
+      "a": 42.16245559,
+      "b": 42.20380356
+    },
+    {
+      "path": ".world.studios.npc_venture_0tzfzz8.ai.ledger.4.balanceAfterMillions",
+      "a": 42.59672664,
+      "b": 42.63807462
+    },
+    {
+      "path": ".world.studios.npc_venture_0tzfzz8.ai.ledger.5.balanceAfterMillions",
+      "a": 42.17672664,
+      "b": 42.21807462
+    },
+    {
+      "path": ".world.studios.npc_venture_0tzfzz8.ai.ledger.6.balanceAfterMillions",
+      "a": 42.61409058,
+      "b": 42.65543856
+    },
+    {
+      "path": ".world.studios.npc_venture_0tzfzz8.ai.ledger.7.balanceAfterMillions",
+      "a": 42.19409058,
+      "b": 42.23543856
+    },
+    {
+      "path": ".world.studios.npc_venture_0tzfzz8.ai.ledger.8.balanceAfterMillions",
+      "a": 42.63133038,
+      "b": 42.67267835
+    },
+    {
+      "path": ".world.studios.npc_venture_0tzfzz8.ai.ledger.9.balanceAfterMillions",
+      "a": 42.21133038,
+      "b": 42.25267835
+    },
+    {
+      "path": ".world.studios.npc_venture_0tzfzz8.ai.legacyVenture.cashReserve",
+      "a": 42.121330381287386,
+      "b": 42.16267835385801
+    },
+    {
+      "path": ".world.studios.npc_venture_0tzfzz8.ai.intelligence.proposals.0.expectedExposureMillions",
+      "a": 1.4721123621112508,
+      "b": 1.4735595411512228
+    },
+    {
+      "path": ".world.studios.npc_venture_0tzfzz8.ai.intelligence.proposals.0.affordabilityCeilingMillions",
+      "a": 12.618,
+      "b": 12.631
+    },
+    {
+      "path": ".world.studios.npc_venture_0tzfzz8.ai.intelligence.proposals.1.expectedExposureMillions",
+      "a": 0.5890563782527218,
+      "b": 0.5896352498687106
+    },
+    {
+      "path": ".world.studios.npc_venture_0tzfzz8.ai.intelligence.proposals.1.affordabilityCeilingMillions",
+      "a": 12.623,
+      "b": 12.635
+    },
+    {
+      "path": ".world.studios.npc_venture_0tzfzz8.ai.intelligence.proposals.2.affordabilityCeilingMillions",
+      "a": 12.627,
+      "b": 12.64
+    },
+    {
+      "path": ".world.studios.npc_venture_0tzfzz8.ai.intelligence.proposals.3.expectedExposureMillions",
+      "a": 0.957913560804488,
+      "b": 0.9588542271804698
+    },
+    {
+      "path": ".world.studios.npc_venture_0tzfzz8.ai.intelligence.proposals.3.affordabilityCeilingMillions",
+      "a": 12.632,
+      "b": 12.644
+    },
+    {
+      "path": ".world.npcVentures.npc_venture_0tzfzz8.cashReserve",
+      "a": 42.121330381287386,
+      "b": 42.16267835385801
+    }
+  ],
+  "limitation": "Whole vs cold-started process batches are not identical: newly founded venture initial capital and derived finance/proposals differ. Do not claim batch-independent deterministic full-world results."
+}

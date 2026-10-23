@@ -1,0 +1,22 @@
+{
+  "variant": "balanced",
+  "route": "free",
+  "source": "/tmp/ae-lifetime-repaired-free/free/career-0.json.gz",
+  "sourceCheckpointSha256": "4f732c4c9bfeac502348d06e48ab172393a7b038d8a398e8688381cbcf7c07fe",
+  "playerHash": "5a2dcfd3768a2bfb3bb866c953b38bd66e4ea071324eeab88705ea4fa5d97a42",
+  "handoffWeek": 612,
+  "horizon": 664,
+  "seeds": [
+    0,
+    7,
+    19
+  ],
+  "comparisonWeeks": 52,
+  "decisionMode": "overbooked",
+  "scope": "Conditional future-seed continuations of two earned fresh-origin careers, not independent fresh careers",
+  "auditChanges": [
+    "Pinned new executable/horizon",
+    "Reset future RNG call counter for each named future seed; player, cash, signed offers/contracts, clock and history unchanged"
+  ],
+  "realPurchases": false
+}

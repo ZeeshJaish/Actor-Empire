@@ -32,6 +32,8 @@ export const packageStudioAiProductionTalent = (input: PackageStudioAiProduction
         genre: input.production.genre, productionCalendar: input.production.productionCalendar,
         bookings: input.world.talentBookings, companyTalentSkill: input.studio.ai.competence.talentRelations,
         budgetMillions: input.production.budgetMillions, seedNamespace: input.studio.ai.seed,
+        starPowerTarget:input.production.projectType==='MOVIE'&&execution.fingerprintSnapshot?.cinemaScopeVersion===1
+            ?execution.fingerprintSnapshot.starPowerTarget:undefined,
     });
     if (!selection) return { world: input.world, production: input.production, changed: false };
     const languageName = execution.fingerprintSnapshot?.originalLanguage?.toLowerCase()

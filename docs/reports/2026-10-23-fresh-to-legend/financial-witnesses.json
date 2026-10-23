@@ -1,0 +1,175 @@
+{
+  "free": {
+    "largestCanonicalTheatricalActorPayouts": [
+      {
+        "projectId": "job_1800000010754",
+        "name": "No Country for Old Men",
+        "personalPerformance": 89,
+        "projectQuality": 100,
+        "gross": 950227706.25,
+        "canonicalActorPaid": 17598921.0,
+        "closed": false
+      },
+      {
+        "projectId": "aud_active_1800000006321_0.3823604234494269",
+        "name": "The Shawshank Redemption",
+        "personalPerformance": 56,
+        "projectQuality": 98.468,
+        "gross": 840006928.65,
+        "canonicalActorPaid": 14875973.0,
+        "closed": true
+      }
+    ],
+    "highRatedZeroReceiptStreamingLabels": [
+      {
+        "id": "job_1800000004920",
+        "name": "Savage Ocean",
+        "studioId": "PIXAR",
+        "streamingPlatform": "HULU",
+        "imdbRating": 7.673664445709436,
+        "playerRolePerformance": 88,
+        "totalViews": 29768424,
+        "gross": 0,
+        "streamingRevenue": 0,
+        "outcomeTier": "MAJOR_FAILURE",
+        "streamingContractId": "streaming_contract_1c2qb4k",
+        "contractAccessSource": "LEGACY_SNAPSHOT",
+        "contractGuaranteeStatus": "LEGACY_PAID",
+        "minimumGuarantee": 0,
+        "productionFunding": 0,
+        "licensorRevenueShare": 0,
+        "followUp": "Reconcile placeholder/disclosed receipts before treating this financial label as fair actor difficulty; no receipt or reputation rewrite in this task"
+      },
+      {
+        "id": "job_1800000007902",
+        "name": "The Frontier of Bone: Season 2",
+        "studioId": "LUCASFILM",
+        "streamingPlatform": "NETFLIX",
+        "imdbRating": 7.702256834064613,
+        "playerRolePerformance": 92,
+        "totalViews": 143296338,
+        "gross": 0,
+        "streamingRevenue": 0,
+        "outcomeTier": "MAJOR_FAILURE",
+        "streamingContractId": "streaming_contract_0esspme",
+        "contractAccessSource": "LEGACY_SNAPSHOT",
+        "contractGuaranteeStatus": "LEGACY_PAID",
+        "minimumGuarantee": 0,
+        "productionFunding": 0,
+        "licensorRevenueShare": 0,
+        "followUp": "Reconcile placeholder/disclosed receipts before treating this financial label as fair actor difficulty; no receipt or reputation rewrite in this task"
+      },
+      {
+        "id": "job_1800000008950",
+        "name": "The Frontier of Bone: Season 3",
+        "studioId": "LUCASFILM",
+        "streamingPlatform": "DISNEY_PLUS",
+        "imdbRating": 7.492424107296389,
+        "playerRolePerformance": 94,
+        "totalViews": 779832072,
+        "gross": 0,
+        "streamingRevenue": 0,
+        "outcomeTier": "MAJOR_FAILURE",
+        "streamingContractId": "streaming_contract_1ite9qv",
+        "contractAccessSource": "LEGACY_SNAPSHOT",
+        "contractGuaranteeStatus": "LEGACY_PAID",
+        "minimumGuarantee": 0,
+        "productionFunding": 0,
+        "licensorRevenueShare": 0,
+        "followUp": "Reconcile placeholder/disclosed receipts before treating this financial label as fair actor difficulty; no receipt or reputation rewrite in this task"
+      },
+      {
+        "id": "aud_active_1800000009515_0.5376821800600737",
+        "name": "Fleeting World",
+        "studioId": "AMAZON_STUDIOS",
+        "streamingPlatform": "APPLE_TV",
+        "imdbRating": 7.86806523972191,
+        "playerRolePerformance": 90,
+        "totalViews": 269485545,
+        "gross": 0,
+        "streamingRevenue": 0,
+        "outcomeTier": "MAJOR_FAILURE",
+        "streamingContractId": "streaming_contract_0rt009i",
+        "contractAccessSource": "LEGACY_SNAPSHOT",
+        "contractGuaranteeStatus": "LEGACY_PAID",
+        "minimumGuarantee": 0,
+        "productionFunding": 0,
+        "licensorRevenueShare": 0,
+        "followUp": "Reconcile placeholder/disclosed receipts before treating this financial label as fair actor difficulty; no receipt or reputation rewrite in this task"
+      },
+      {
+        "id": "job_1800000011645",
+        "name": "Zero Heart",
+        "studioId": "MARVEL_STUDIOS",
+        "streamingPlatform": "NETFLIX",
+        "imdbRating": 8.451094676274806,
+        "playerRolePerformance": 90,
+        "totalViews": 85817953,
+        "gross": 0,
+        "streamingRevenue": 0,
+        "outcomeTier": "MAJOR_FAILURE",
+        "streamingContractId": "streaming_contract_0i5zlrs",
+        "contractAccessSource": "LEGACY_SNAPSHOT",
+        "contractGuaranteeStatus": "LEGACY_PAID",
+        "minimumGuarantee": 0,
+        "productionFunding": 0,
+        "licensorRevenueShare": 0,
+        "followUp": "Reconcile placeholder/disclosed receipts before treating this financial label as fair actor difficulty; no receipt or reputation rewrite in this task"
+      }
+    ],
+    "salaryIsNotTotalCareerIncome": true
+  },
+  "boosted": {
+    "largestCanonicalTheatricalActorPayouts": [
+      {
+        "projectId": "job_1800000013160",
+        "name": "Parasite 2",
+        "personalPerformance": 94,
+        "projectQuality": 100,
+        "gross": 902660545.75,
+        "canonicalActorPaid": 18579580.0,
+        "closed": true
+      },
+      {
+        "projectId": "job_1800000010445",
+        "name": "Parasite",
+        "personalPerformance": 90,
+        "projectQuality": 100,
+        "gross": 785588698.03,
+        "canonicalActorPaid": 12556187.0,
+        "closed": true
+      },
+      {
+        "projectId": "uni_job_1800000015003_0",
+        "name": "Captain America: The First Avenger",
+        "personalPerformance": 92,
+        "projectQuality": 80.04,
+        "gross": 438957294.73,
+        "canonicalActorPaid": 5141497.0,
+        "closed": false
+      }
+    ],
+    "highRatedZeroReceiptStreamingLabels": [
+      {
+        "id": "job_1800000008221",
+        "name": "Violet Dust",
+        "studioId": "MGM",
+        "streamingPlatform": "DISNEY_PLUS",
+        "imdbRating": 7.785222278116274,
+        "playerRolePerformance": 91,
+        "totalViews": 37264142,
+        "gross": 0,
+        "streamingRevenue": 0,
+        "outcomeTier": "MAJOR_FAILURE",
+        "streamingContractId": "streaming_contract_1h4oe2s",
+        "contractAccessSource": "LEGACY_SNAPSHOT",
+        "contractGuaranteeStatus": "LEGACY_PAID",
+        "minimumGuarantee": 0,
+        "productionFunding": 0,
+        "licensorRevenueShare": 0,
+        "followUp": "Reconcile placeholder/disclosed receipts before treating this financial label as fair actor difficulty; no receipt or reputation rewrite in this task"
+      }
+    ],
+    "salaryIsNotTotalCareerIncome": true
+  }
+}

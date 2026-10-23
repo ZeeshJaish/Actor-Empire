@@ -1,0 +1,65 @@
+{
+  "control": "97b0108d795ad566440466766acec39764a5b5319f875faedefe61e388d6297d",
+  "calibrated": "805c8f500f42d1e1bb2606b7350d6eec6430029fbb59822ef86f326b4730129a",
+  "productDifferences": [
+    "types.ts",
+    "services/industryIntelligence/industryIntelligenceState.ts",
+    "services/industryTalentSelection.ts",
+    "services/studioAi/studioAiGreenlight.ts",
+    "services/studioAi/studioAiSlateAdmission.ts",
+    "services/studioAi/studioAiSlateExecution.ts",
+    "services/studioAi/studioAiProductionTalent.ts",
+    "services/boxOffice/boxOfficeAudience.ts",
+    "services/studioAi/studioAiCinemaInvestment.ts"
+  ],
+  "rewardFiles": [
+    {
+      "path": "App.tsx",
+      "equal": true,
+      "hash": "dd34438a4064f288fe0b185fad981baa26b40c76bba8b7868406728970938e4e",
+      "inExecutable": true
+    },
+    {
+      "path": "services/actorCareerBalance.ts",
+      "equal": true,
+      "hash": "2bcd2933a094d4a6cb192c66f6acb8e7d17e3da731295fe7597f3dd8e3d0c236",
+      "inExecutable": true
+    },
+    {
+      "path": "services/actorCareerArc.ts",
+      "equal": true,
+      "hash": "9eb297442db25793ed9802b5a0140b6ae1cdc4206a40aca9f1d0f3eaee42bcbb",
+      "inExecutable": true
+    },
+    {
+      "path": "services/careerUiAdapter.ts",
+      "inExecutable": false,
+      "note": "Not included in the executable input map; no equality claim inferred from missing hashes"
+    },
+    {
+      "path": "services/gameLoop.ts",
+      "equal": true,
+      "hash": "8442994ebaa9fb183b6c7f17176e7572752c3f7d66d558e6a4caa864cd177a4c",
+      "inExecutable": true
+    },
+    {
+      "path": "scripts/fixtures/actorCareerActions.ts",
+      "equal": true,
+      "hash": "4674dabcfb880336d819f386da0d4bb7f002b165d64c5f2ae87fc6a91262f2a8",
+      "inExecutable": true
+    },
+    {
+      "path": "services/boxOffice/boxOfficeOfferedLaunch.ts",
+      "equal": true,
+      "hash": "a30ae30954c25519a71b5dd525a1df4d72993d1768b5984b376ac4e2236309e8",
+      "inExecutable": true
+    }
+  ],
+  "sourceDrift": [
+    "services/famousMovieLogic.ts",
+    "services/roleLogic.ts",
+    "services/universeLogic.ts",
+    "services/teamLogic.ts"
+  ],
+  "status": "PINNED_PRE_CONCURRENT_ACTOR_BACKEND_CHANGES_NOT_A_COMPLETED_COHORT"
+}

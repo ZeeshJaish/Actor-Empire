@@ -1,0 +1,6391 @@
+{
+  "scope": "Counterfactual quotation comparisons, not simulated hit rates or earned career income",
+  "seeds": [
+    0,
+    7,
+    19,
+    31,
+    43,
+    59,
+    71,
+    97
+  ],
+  "candidates": {
+    "light": {
+      "points": 0.8,
+      "franchisePremium": 2
+    },
+    "balanced": {
+      "points": 0.6,
+      "franchisePremium": 1.5
+    },
+    "strict": {
+      "points": 0.4,
+      "franchisePremium": 1
+    }
+  },
+  "records": [
+    {
+      "route": "entry",
+      "seed": 0,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "MINOR",
+      "salary": 10000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 10000,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 10000,
+          "points": 0
+        },
+        "strict": {
+          "salary": 10000,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 0,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "CAMEO",
+      "salary": 20000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 20000,
+          "points": 0.01
+        },
+        "balanced": {
+          "salary": 20000,
+          "points": 0.01
+        },
+        "strict": {
+          "salary": 20000,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 0,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "SUPPORTING",
+      "salary": 60000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 60000,
+          "points": 0.26
+        },
+        "balanced": {
+          "salary": 60000,
+          "points": 0.2
+        },
+        "strict": {
+          "salary": 60000,
+          "points": 0.13
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 0,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "ENSEMBLE",
+      "salary": 80000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 80000,
+          "points": 0.39
+        },
+        "balanced": {
+          "salary": 80000,
+          "points": 0.29
+        },
+        "strict": {
+          "salary": 80000,
+          "points": 0.19
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 0,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "LEAD",
+      "salary": 200000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 200000,
+          "points": 0.6
+        },
+        "balanced": {
+          "salary": 200000,
+          "points": 0.44
+        },
+        "strict": {
+          "salary": 200000,
+          "points": 0.3
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 0,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "MINOR",
+      "salary": 7500,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 7500,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 7500,
+          "points": 0
+        },
+        "strict": {
+          "salary": 7500,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 0,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "CAMEO",
+      "salary": 15000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 15000,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 15000,
+          "points": 0
+        },
+        "strict": {
+          "salary": 15000,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 0,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "SUPPORTING",
+      "salary": 45000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 45000,
+          "points": 0.16
+        },
+        "balanced": {
+          "salary": 45000,
+          "points": 0.12
+        },
+        "strict": {
+          "salary": 45000,
+          "points": 0.08
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 0,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "ENSEMBLE",
+      "salary": 60000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 60000,
+          "points": 0.23
+        },
+        "balanced": {
+          "salary": 60000,
+          "points": 0.17
+        },
+        "strict": {
+          "salary": 60000,
+          "points": 0.11
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 0,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "LEAD",
+      "salary": 150000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 150000,
+          "points": 0.36
+        },
+        "balanced": {
+          "salary": 150000,
+          "points": 0.26
+        },
+        "strict": {
+          "salary": 150000,
+          "points": 0.18
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 0,
+      "kind": "FRANCHISE",
+      "role": "SUPPORTING",
+      "films": 6,
+      "roleUnits": 2.8000000000000003,
+      "budget": 76376559,
+      "salary": 30000000,
+      "points": 2,
+      "alternatives": {
+        "light": {
+          "salary": 5861736,
+          "points": 0.3
+        },
+        "balanced": {
+          "salary": 4396302,
+          "points": 0.23
+        },
+        "strict": {
+          "salary": 2930868,
+          "points": 0.15
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 7,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "MINOR",
+      "salary": 10000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 10000,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 10000,
+          "points": 0
+        },
+        "strict": {
+          "salary": 10000,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 7,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "CAMEO",
+      "salary": 20000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 20000,
+          "points": 0.01
+        },
+        "balanced": {
+          "salary": 20000,
+          "points": 0.01
+        },
+        "strict": {
+          "salary": 20000,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 7,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "SUPPORTING",
+      "salary": 60000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 60000,
+          "points": 0.26
+        },
+        "balanced": {
+          "salary": 60000,
+          "points": 0.2
+        },
+        "strict": {
+          "salary": 60000,
+          "points": 0.13
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 7,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "ENSEMBLE",
+      "salary": 80000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 80000,
+          "points": 0.39
+        },
+        "balanced": {
+          "salary": 80000,
+          "points": 0.29
+        },
+        "strict": {
+          "salary": 80000,
+          "points": 0.19
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 7,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "LEAD",
+      "salary": 200000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 200000,
+          "points": 0.6
+        },
+        "balanced": {
+          "salary": 200000,
+          "points": 0.44
+        },
+        "strict": {
+          "salary": 200000,
+          "points": 0.3
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 7,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "MINOR",
+      "salary": 7500,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 7500,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 7500,
+          "points": 0
+        },
+        "strict": {
+          "salary": 7500,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 7,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "CAMEO",
+      "salary": 15000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 15000,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 15000,
+          "points": 0
+        },
+        "strict": {
+          "salary": 15000,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 7,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "SUPPORTING",
+      "salary": 45000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 45000,
+          "points": 0.16
+        },
+        "balanced": {
+          "salary": 45000,
+          "points": 0.12
+        },
+        "strict": {
+          "salary": 45000,
+          "points": 0.08
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 7,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "ENSEMBLE",
+      "salary": 60000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 60000,
+          "points": 0.23
+        },
+        "balanced": {
+          "salary": 60000,
+          "points": 0.17
+        },
+        "strict": {
+          "salary": 60000,
+          "points": 0.11
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 7,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "LEAD",
+      "salary": 150000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 150000,
+          "points": 0.36
+        },
+        "balanced": {
+          "salary": 150000,
+          "points": 0.26
+        },
+        "strict": {
+          "salary": 150000,
+          "points": 0.18
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 7,
+      "kind": "FRANCHISE",
+      "role": "LEAD",
+      "films": 3,
+      "roleUnits": 2.4,
+      "budget": 64868297,
+      "salary": 30000000,
+      "points": 2,
+      "alternatives": {
+        "light": {
+          "salary": 4177726,
+          "points": 0.42
+        },
+        "balanced": {
+          "salary": 3133294,
+          "points": 0.31
+        },
+        "strict": {
+          "salary": 2088863,
+          "points": 0.21
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 19,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "MINOR",
+      "salary": 10000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 10000,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 10000,
+          "points": 0
+        },
+        "strict": {
+          "salary": 10000,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 19,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "CAMEO",
+      "salary": 20000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 20000,
+          "points": 0.01
+        },
+        "balanced": {
+          "salary": 20000,
+          "points": 0.01
+        },
+        "strict": {
+          "salary": 20000,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 19,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "SUPPORTING",
+      "salary": 60000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 60000,
+          "points": 0.26
+        },
+        "balanced": {
+          "salary": 60000,
+          "points": 0.2
+        },
+        "strict": {
+          "salary": 60000,
+          "points": 0.13
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 19,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "ENSEMBLE",
+      "salary": 80000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 80000,
+          "points": 0.39
+        },
+        "balanced": {
+          "salary": 80000,
+          "points": 0.29
+        },
+        "strict": {
+          "salary": 80000,
+          "points": 0.19
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 19,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "LEAD",
+      "salary": 200000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 200000,
+          "points": 0.6
+        },
+        "balanced": {
+          "salary": 200000,
+          "points": 0.44
+        },
+        "strict": {
+          "salary": 200000,
+          "points": 0.3
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 19,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "MINOR",
+      "salary": 7500,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 7500,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 7500,
+          "points": 0
+        },
+        "strict": {
+          "salary": 7500,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 19,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "CAMEO",
+      "salary": 15000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 15000,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 15000,
+          "points": 0
+        },
+        "strict": {
+          "salary": 15000,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 19,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "SUPPORTING",
+      "salary": 45000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 45000,
+          "points": 0.16
+        },
+        "balanced": {
+          "salary": 45000,
+          "points": 0.12
+        },
+        "strict": {
+          "salary": 45000,
+          "points": 0.08
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 19,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "ENSEMBLE",
+      "salary": 60000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 60000,
+          "points": 0.23
+        },
+        "balanced": {
+          "salary": 60000,
+          "points": 0.17
+        },
+        "strict": {
+          "salary": 60000,
+          "points": 0.11
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 19,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "LEAD",
+      "salary": 150000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 150000,
+          "points": 0.36
+        },
+        "balanced": {
+          "salary": 150000,
+          "points": 0.26
+        },
+        "strict": {
+          "salary": 150000,
+          "points": 0.18
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 19,
+      "kind": "FRANCHISE",
+      "role": "CAMEO",
+      "films": 6,
+      "roleUnits": 3.6,
+      "budget": 48564110,
+      "salary": 30000000,
+      "points": 2,
+      "alternatives": {
+        "light": {
+          "salary": 4015679,
+          "points": 0.29
+        },
+        "balanced": {
+          "salary": 3011759,
+          "points": 0.22
+        },
+        "strict": {
+          "salary": 2007839,
+          "points": 0.14
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 31,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "MINOR",
+      "salary": 10000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 10000,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 10000,
+          "points": 0
+        },
+        "strict": {
+          "salary": 10000,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 31,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "CAMEO",
+      "salary": 20000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 20000,
+          "points": 0.01
+        },
+        "balanced": {
+          "salary": 20000,
+          "points": 0.01
+        },
+        "strict": {
+          "salary": 20000,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 31,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "SUPPORTING",
+      "salary": 60000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 60000,
+          "points": 0.26
+        },
+        "balanced": {
+          "salary": 60000,
+          "points": 0.2
+        },
+        "strict": {
+          "salary": 60000,
+          "points": 0.13
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 31,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "ENSEMBLE",
+      "salary": 80000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 80000,
+          "points": 0.39
+        },
+        "balanced": {
+          "salary": 80000,
+          "points": 0.29
+        },
+        "strict": {
+          "salary": 80000,
+          "points": 0.19
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 31,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "LEAD",
+      "salary": 200000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 200000,
+          "points": 0.6
+        },
+        "balanced": {
+          "salary": 200000,
+          "points": 0.44
+        },
+        "strict": {
+          "salary": 200000,
+          "points": 0.3
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 31,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "MINOR",
+      "salary": 7500,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 7500,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 7500,
+          "points": 0
+        },
+        "strict": {
+          "salary": 7500,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 31,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "CAMEO",
+      "salary": 15000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 15000,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 15000,
+          "points": 0
+        },
+        "strict": {
+          "salary": 15000,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 31,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "SUPPORTING",
+      "salary": 45000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 45000,
+          "points": 0.16
+        },
+        "balanced": {
+          "salary": 45000,
+          "points": 0.12
+        },
+        "strict": {
+          "salary": 45000,
+          "points": 0.08
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 31,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "ENSEMBLE",
+      "salary": 60000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 60000,
+          "points": 0.23
+        },
+        "balanced": {
+          "salary": 60000,
+          "points": 0.17
+        },
+        "strict": {
+          "salary": 60000,
+          "points": 0.11
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 31,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "LEAD",
+      "salary": 150000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 150000,
+          "points": 0.36
+        },
+        "balanced": {
+          "salary": 150000,
+          "points": 0.26
+        },
+        "strict": {
+          "salary": 150000,
+          "points": 0.18
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 31,
+      "kind": "FRANCHISE",
+      "role": "SUPPORTING",
+      "films": 6,
+      "roleUnits": 2.7,
+      "budget": 61628966,
+      "salary": 30000000,
+      "points": 2,
+      "alternatives": {
+        "light": {
+          "salary": 4401191,
+          "points": 0.29
+        },
+        "balanced": {
+          "salary": 3300893,
+          "points": 0.21
+        },
+        "strict": {
+          "salary": 2200595,
+          "points": 0.14
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 43,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "MINOR",
+      "salary": 10000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 10000,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 10000,
+          "points": 0
+        },
+        "strict": {
+          "salary": 10000,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 43,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "CAMEO",
+      "salary": 20000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 20000,
+          "points": 0.01
+        },
+        "balanced": {
+          "salary": 20000,
+          "points": 0.01
+        },
+        "strict": {
+          "salary": 20000,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 43,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "SUPPORTING",
+      "salary": 60000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 60000,
+          "points": 0.26
+        },
+        "balanced": {
+          "salary": 60000,
+          "points": 0.2
+        },
+        "strict": {
+          "salary": 60000,
+          "points": 0.13
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 43,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "ENSEMBLE",
+      "salary": 80000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 80000,
+          "points": 0.39
+        },
+        "balanced": {
+          "salary": 80000,
+          "points": 0.29
+        },
+        "strict": {
+          "salary": 80000,
+          "points": 0.19
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 43,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "LEAD",
+      "salary": 200000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 200000,
+          "points": 0.6
+        },
+        "balanced": {
+          "salary": 200000,
+          "points": 0.44
+        },
+        "strict": {
+          "salary": 200000,
+          "points": 0.3
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 43,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "MINOR",
+      "salary": 7500,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 7500,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 7500,
+          "points": 0
+        },
+        "strict": {
+          "salary": 7500,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 43,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "CAMEO",
+      "salary": 15000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 15000,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 15000,
+          "points": 0
+        },
+        "strict": {
+          "salary": 15000,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 43,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "SUPPORTING",
+      "salary": 45000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 45000,
+          "points": 0.16
+        },
+        "balanced": {
+          "salary": 45000,
+          "points": 0.12
+        },
+        "strict": {
+          "salary": 45000,
+          "points": 0.08
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 43,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "ENSEMBLE",
+      "salary": 60000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 60000,
+          "points": 0.23
+        },
+        "balanced": {
+          "salary": 60000,
+          "points": 0.17
+        },
+        "strict": {
+          "salary": 60000,
+          "points": 0.11
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 43,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "LEAD",
+      "salary": 150000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 150000,
+          "points": 0.36
+        },
+        "balanced": {
+          "salary": 150000,
+          "points": 0.26
+        },
+        "strict": {
+          "salary": 150000,
+          "points": 0.18
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 43,
+      "kind": "FRANCHISE",
+      "role": "LEAD",
+      "films": 3,
+      "roleUnits": 2.4,
+      "budget": 114831094,
+      "salary": 30000000,
+      "points": 2,
+      "alternatives": {
+        "light": {
+          "salary": 8973044,
+          "points": 0.42
+        },
+        "balanced": {
+          "salary": 6729783,
+          "points": 0.31
+        },
+        "strict": {
+          "salary": 4486522,
+          "points": 0.21
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 59,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "MINOR",
+      "salary": 10000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 10000,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 10000,
+          "points": 0
+        },
+        "strict": {
+          "salary": 10000,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 59,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "CAMEO",
+      "salary": 20000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 20000,
+          "points": 0.01
+        },
+        "balanced": {
+          "salary": 20000,
+          "points": 0.01
+        },
+        "strict": {
+          "salary": 20000,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 59,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "SUPPORTING",
+      "salary": 60000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 60000,
+          "points": 0.26
+        },
+        "balanced": {
+          "salary": 60000,
+          "points": 0.2
+        },
+        "strict": {
+          "salary": 60000,
+          "points": 0.13
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 59,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "ENSEMBLE",
+      "salary": 80000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 80000,
+          "points": 0.39
+        },
+        "balanced": {
+          "salary": 80000,
+          "points": 0.29
+        },
+        "strict": {
+          "salary": 80000,
+          "points": 0.19
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 59,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "LEAD",
+      "salary": 200000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 200000,
+          "points": 0.6
+        },
+        "balanced": {
+          "salary": 200000,
+          "points": 0.44
+        },
+        "strict": {
+          "salary": 200000,
+          "points": 0.3
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 59,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "MINOR",
+      "salary": 7500,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 7500,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 7500,
+          "points": 0
+        },
+        "strict": {
+          "salary": 7500,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 59,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "CAMEO",
+      "salary": 15000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 15000,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 15000,
+          "points": 0
+        },
+        "strict": {
+          "salary": 15000,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 59,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "SUPPORTING",
+      "salary": 45000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 45000,
+          "points": 0.16
+        },
+        "balanced": {
+          "salary": 45000,
+          "points": 0.12
+        },
+        "strict": {
+          "salary": 45000,
+          "points": 0.08
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 59,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "ENSEMBLE",
+      "salary": 60000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 60000,
+          "points": 0.23
+        },
+        "balanced": {
+          "salary": 60000,
+          "points": 0.17
+        },
+        "strict": {
+          "salary": 60000,
+          "points": 0.11
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 59,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "LEAD",
+      "salary": 150000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 150000,
+          "points": 0.36
+        },
+        "balanced": {
+          "salary": 150000,
+          "points": 0.26
+        },
+        "strict": {
+          "salary": 150000,
+          "points": 0.18
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 59,
+      "kind": "FRANCHISE",
+      "role": "LEAD",
+      "films": 3,
+      "roleUnits": 2.4,
+      "budget": 107121524,
+      "salary": 30000000,
+      "points": 2,
+      "alternatives": {
+        "light": {
+          "salary": 8089429,
+          "points": 0.42
+        },
+        "balanced": {
+          "salary": 6067071,
+          "points": 0.31
+        },
+        "strict": {
+          "salary": 4044714,
+          "points": 0.21
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 71,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "MINOR",
+      "salary": 10000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 10000,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 10000,
+          "points": 0
+        },
+        "strict": {
+          "salary": 10000,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 71,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "CAMEO",
+      "salary": 20000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 20000,
+          "points": 0.01
+        },
+        "balanced": {
+          "salary": 20000,
+          "points": 0.01
+        },
+        "strict": {
+          "salary": 20000,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 71,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "SUPPORTING",
+      "salary": 60000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 60000,
+          "points": 0.26
+        },
+        "balanced": {
+          "salary": 60000,
+          "points": 0.2
+        },
+        "strict": {
+          "salary": 60000,
+          "points": 0.13
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 71,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "ENSEMBLE",
+      "salary": 80000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 80000,
+          "points": 0.39
+        },
+        "balanced": {
+          "salary": 80000,
+          "points": 0.29
+        },
+        "strict": {
+          "salary": 80000,
+          "points": 0.19
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 71,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "LEAD",
+      "salary": 200000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 200000,
+          "points": 0.6
+        },
+        "balanced": {
+          "salary": 200000,
+          "points": 0.44
+        },
+        "strict": {
+          "salary": 200000,
+          "points": 0.3
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 71,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "MINOR",
+      "salary": 7500,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 7500,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 7500,
+          "points": 0
+        },
+        "strict": {
+          "salary": 7500,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 71,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "CAMEO",
+      "salary": 15000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 15000,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 15000,
+          "points": 0
+        },
+        "strict": {
+          "salary": 15000,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 71,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "SUPPORTING",
+      "salary": 45000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 45000,
+          "points": 0.16
+        },
+        "balanced": {
+          "salary": 45000,
+          "points": 0.12
+        },
+        "strict": {
+          "salary": 45000,
+          "points": 0.08
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 71,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "ENSEMBLE",
+      "salary": 60000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 60000,
+          "points": 0.23
+        },
+        "balanced": {
+          "salary": 60000,
+          "points": 0.17
+        },
+        "strict": {
+          "salary": 60000,
+          "points": 0.11
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 71,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "LEAD",
+      "salary": 150000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 150000,
+          "points": 0.36
+        },
+        "balanced": {
+          "salary": 150000,
+          "points": 0.26
+        },
+        "strict": {
+          "salary": 150000,
+          "points": 0.18
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 71,
+      "kind": "FRANCHISE",
+      "role": "LEAD",
+      "films": 3,
+      "roleUnits": 3,
+      "budget": 93060495,
+      "salary": 30000000,
+      "points": 2,
+      "alternatives": {
+        "light": {
+          "salary": 7875454,
+          "points": 0.48
+        },
+        "balanced": {
+          "salary": 5906590,
+          "points": 0.36
+        },
+        "strict": {
+          "salary": 3937727,
+          "points": 0.24
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 97,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "MINOR",
+      "salary": 10000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 10000,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 10000,
+          "points": 0
+        },
+        "strict": {
+          "salary": 10000,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 97,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "CAMEO",
+      "salary": 20000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 20000,
+          "points": 0.01
+        },
+        "balanced": {
+          "salary": 20000,
+          "points": 0.01
+        },
+        "strict": {
+          "salary": 20000,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 97,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "SUPPORTING",
+      "salary": 60000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 60000,
+          "points": 0.26
+        },
+        "balanced": {
+          "salary": 60000,
+          "points": 0.2
+        },
+        "strict": {
+          "salary": 60000,
+          "points": 0.13
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 97,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "ENSEMBLE",
+      "salary": 80000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 80000,
+          "points": 0.39
+        },
+        "balanced": {
+          "salary": 80000,
+          "points": 0.29
+        },
+        "strict": {
+          "salary": 80000,
+          "points": 0.19
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 97,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "LEAD",
+      "salary": 200000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 200000,
+          "points": 0.6
+        },
+        "balanced": {
+          "salary": 200000,
+          "points": 0.44
+        },
+        "strict": {
+          "salary": 200000,
+          "points": 0.3
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 97,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "MINOR",
+      "salary": 7500,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 7500,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 7500,
+          "points": 0
+        },
+        "strict": {
+          "salary": 7500,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 97,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "CAMEO",
+      "salary": 15000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 15000,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 15000,
+          "points": 0
+        },
+        "strict": {
+          "salary": 15000,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 97,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "SUPPORTING",
+      "salary": 45000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 45000,
+          "points": 0.16
+        },
+        "balanced": {
+          "salary": 45000,
+          "points": 0.12
+        },
+        "strict": {
+          "salary": 45000,
+          "points": 0.08
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 97,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "ENSEMBLE",
+      "salary": 60000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 60000,
+          "points": 0.23
+        },
+        "balanced": {
+          "salary": 60000,
+          "points": 0.17
+        },
+        "strict": {
+          "salary": 60000,
+          "points": 0.11
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 97,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "LEAD",
+      "salary": 150000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 150000,
+          "points": 0.36
+        },
+        "balanced": {
+          "salary": 150000,
+          "points": 0.26
+        },
+        "strict": {
+          "salary": 150000,
+          "points": 0.18
+        }
+      }
+    },
+    {
+      "route": "entry",
+      "seed": 97,
+      "kind": "FRANCHISE",
+      "role": "LEAD",
+      "films": 10,
+      "roleUnits": 5.7,
+      "budget": 116501573,
+      "salary": 30000000,
+      "points": 2,
+      "alternatives": {
+        "light": {
+          "salary": 21747087,
+          "points": 0.3
+        },
+        "balanced": {
+          "salary": 16310315,
+          "points": 0.23
+        },
+        "strict": {
+          "salary": 10873543,
+          "points": 0.15
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 0,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "MINOR",
+      "salary": 10000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 10000,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 10000,
+          "points": 0
+        },
+        "strict": {
+          "salary": 10000,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 0,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "CAMEO",
+      "salary": 20000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 20000,
+          "points": 0.04
+        },
+        "balanced": {
+          "salary": 20000,
+          "points": 0.03
+        },
+        "strict": {
+          "salary": 20000,
+          "points": 0.02
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 0,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "SUPPORTING",
+      "salary": 60000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 60000,
+          "points": 0.88
+        },
+        "balanced": {
+          "salary": 60000,
+          "points": 0.66
+        },
+        "strict": {
+          "salary": 60000,
+          "points": 0.44
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 0,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "ENSEMBLE",
+      "salary": 80000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 80000,
+          "points": 1.27
+        },
+        "balanced": {
+          "salary": 80000,
+          "points": 0.95
+        },
+        "strict": {
+          "salary": 80000,
+          "points": 0.63
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 0,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "LEAD",
+      "salary": 200000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 200000,
+          "points": 1.96
+        },
+        "balanced": {
+          "salary": 200000,
+          "points": 1.47
+        },
+        "strict": {
+          "salary": 200000,
+          "points": 0.98
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 0,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "MINOR",
+      "salary": 7500,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 7500,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 7500,
+          "points": 0
+        },
+        "strict": {
+          "salary": 7500,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 0,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "CAMEO",
+      "salary": 15000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 15000,
+          "points": 0.02
+        },
+        "balanced": {
+          "salary": 15000,
+          "points": 0.02
+        },
+        "strict": {
+          "salary": 15000,
+          "points": 0.01
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 0,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "SUPPORTING",
+      "salary": 45000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 45000,
+          "points": 0.52
+        },
+        "balanced": {
+          "salary": 45000,
+          "points": 0.39
+        },
+        "strict": {
+          "salary": 45000,
+          "points": 0.26
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 0,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "ENSEMBLE",
+      "salary": 60000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 60000,
+          "points": 0.76
+        },
+        "balanced": {
+          "salary": 60000,
+          "points": 0.57
+        },
+        "strict": {
+          "salary": 60000,
+          "points": 0.38
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 0,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "LEAD",
+      "salary": 150000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 150000,
+          "points": 1.17
+        },
+        "balanced": {
+          "salary": 150000,
+          "points": 0.88
+        },
+        "strict": {
+          "salary": 150000,
+          "points": 0.58
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 0,
+      "kind": "FRANCHISE",
+      "role": "SUPPORTING",
+      "films": 6,
+      "roleUnits": 2.8000000000000003,
+      "budget": 76376559,
+      "salary": 39954400,
+      "points": 2,
+      "alternatives": {
+        "light": {
+          "salary": 8544022,
+          "points": 1
+        },
+        "balanced": {
+          "salary": 6408017,
+          "points": 0.75
+        },
+        "strict": {
+          "salary": 4272011,
+          "points": 0.5
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 7,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "MINOR",
+      "salary": 10000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 10000,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 10000,
+          "points": 0
+        },
+        "strict": {
+          "salary": 10000,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 7,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "CAMEO",
+      "salary": 20000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 20000,
+          "points": 0.04
+        },
+        "balanced": {
+          "salary": 20000,
+          "points": 0.03
+        },
+        "strict": {
+          "salary": 20000,
+          "points": 0.02
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 7,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "SUPPORTING",
+      "salary": 60000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 60000,
+          "points": 0.88
+        },
+        "balanced": {
+          "salary": 60000,
+          "points": 0.66
+        },
+        "strict": {
+          "salary": 60000,
+          "points": 0.44
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 7,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "ENSEMBLE",
+      "salary": 80000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 80000,
+          "points": 1.27
+        },
+        "balanced": {
+          "salary": 80000,
+          "points": 0.95
+        },
+        "strict": {
+          "salary": 80000,
+          "points": 0.63
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 7,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "LEAD",
+      "salary": 200000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 200000,
+          "points": 1.96
+        },
+        "balanced": {
+          "salary": 200000,
+          "points": 1.47
+        },
+        "strict": {
+          "salary": 200000,
+          "points": 0.98
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 7,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "MINOR",
+      "salary": 7500,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 7500,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 7500,
+          "points": 0
+        },
+        "strict": {
+          "salary": 7500,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 7,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "CAMEO",
+      "salary": 15000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 15000,
+          "points": 0.02
+        },
+        "balanced": {
+          "salary": 15000,
+          "points": 0.02
+        },
+        "strict": {
+          "salary": 15000,
+          "points": 0.01
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 7,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "SUPPORTING",
+      "salary": 45000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 45000,
+          "points": 0.52
+        },
+        "balanced": {
+          "salary": 45000,
+          "points": 0.39
+        },
+        "strict": {
+          "salary": 45000,
+          "points": 0.26
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 7,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "ENSEMBLE",
+      "salary": 60000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 60000,
+          "points": 0.76
+        },
+        "balanced": {
+          "salary": 60000,
+          "points": 0.57
+        },
+        "strict": {
+          "salary": 60000,
+          "points": 0.38
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 7,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "LEAD",
+      "salary": 150000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 150000,
+          "points": 1.17
+        },
+        "balanced": {
+          "salary": 150000,
+          "points": 0.88
+        },
+        "strict": {
+          "salary": 150000,
+          "points": 0.58
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 7,
+      "kind": "FRANCHISE",
+      "role": "LEAD",
+      "films": 3,
+      "roleUnits": 2.4,
+      "budget": 64868297,
+      "salary": 39954400,
+      "points": 2,
+      "alternatives": {
+        "light": {
+          "salary": 6089422,
+          "points": 1.38
+        },
+        "balanced": {
+          "salary": 4567067,
+          "points": 1.03
+        },
+        "strict": {
+          "salary": 3044711,
+          "points": 0.69
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 19,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "MINOR",
+      "salary": 10000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 10000,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 10000,
+          "points": 0
+        },
+        "strict": {
+          "salary": 10000,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 19,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "CAMEO",
+      "salary": 20000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 20000,
+          "points": 0.04
+        },
+        "balanced": {
+          "salary": 20000,
+          "points": 0.03
+        },
+        "strict": {
+          "salary": 20000,
+          "points": 0.02
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 19,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "SUPPORTING",
+      "salary": 60000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 60000,
+          "points": 0.88
+        },
+        "balanced": {
+          "salary": 60000,
+          "points": 0.66
+        },
+        "strict": {
+          "salary": 60000,
+          "points": 0.44
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 19,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "ENSEMBLE",
+      "salary": 80000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 80000,
+          "points": 1.27
+        },
+        "balanced": {
+          "salary": 80000,
+          "points": 0.95
+        },
+        "strict": {
+          "salary": 80000,
+          "points": 0.63
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 19,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "LEAD",
+      "salary": 200000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 200000,
+          "points": 1.96
+        },
+        "balanced": {
+          "salary": 200000,
+          "points": 1.47
+        },
+        "strict": {
+          "salary": 200000,
+          "points": 0.98
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 19,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "MINOR",
+      "salary": 7500,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 7500,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 7500,
+          "points": 0
+        },
+        "strict": {
+          "salary": 7500,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 19,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "CAMEO",
+      "salary": 15000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 15000,
+          "points": 0.02
+        },
+        "balanced": {
+          "salary": 15000,
+          "points": 0.02
+        },
+        "strict": {
+          "salary": 15000,
+          "points": 0.01
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 19,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "SUPPORTING",
+      "salary": 45000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 45000,
+          "points": 0.52
+        },
+        "balanced": {
+          "salary": 45000,
+          "points": 0.39
+        },
+        "strict": {
+          "salary": 45000,
+          "points": 0.26
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 19,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "ENSEMBLE",
+      "salary": 60000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 60000,
+          "points": 0.76
+        },
+        "balanced": {
+          "salary": 60000,
+          "points": 0.57
+        },
+        "strict": {
+          "salary": 60000,
+          "points": 0.38
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 19,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "LEAD",
+      "salary": 150000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 150000,
+          "points": 1.17
+        },
+        "balanced": {
+          "salary": 150000,
+          "points": 0.88
+        },
+        "strict": {
+          "salary": 150000,
+          "points": 0.58
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 19,
+      "kind": "FRANCHISE",
+      "role": "CAMEO",
+      "films": 6,
+      "roleUnits": 3.6,
+      "budget": 48564110,
+      "salary": 39954400,
+      "points": 2,
+      "alternatives": {
+        "light": {
+          "salary": 5853223,
+          "points": 0.96
+        },
+        "balanced": {
+          "salary": 4389917,
+          "points": 0.72
+        },
+        "strict": {
+          "salary": 2926611,
+          "points": 0.48
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 31,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "MINOR",
+      "salary": 10000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 10000,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 10000,
+          "points": 0
+        },
+        "strict": {
+          "salary": 10000,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 31,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "CAMEO",
+      "salary": 20000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 20000,
+          "points": 0.04
+        },
+        "balanced": {
+          "salary": 20000,
+          "points": 0.03
+        },
+        "strict": {
+          "salary": 20000,
+          "points": 0.02
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 31,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "SUPPORTING",
+      "salary": 60000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 60000,
+          "points": 0.88
+        },
+        "balanced": {
+          "salary": 60000,
+          "points": 0.66
+        },
+        "strict": {
+          "salary": 60000,
+          "points": 0.44
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 31,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "ENSEMBLE",
+      "salary": 80000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 80000,
+          "points": 1.27
+        },
+        "balanced": {
+          "salary": 80000,
+          "points": 0.95
+        },
+        "strict": {
+          "salary": 80000,
+          "points": 0.63
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 31,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "LEAD",
+      "salary": 200000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 200000,
+          "points": 1.96
+        },
+        "balanced": {
+          "salary": 200000,
+          "points": 1.47
+        },
+        "strict": {
+          "salary": 200000,
+          "points": 0.98
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 31,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "MINOR",
+      "salary": 7500,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 7500,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 7500,
+          "points": 0
+        },
+        "strict": {
+          "salary": 7500,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 31,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "CAMEO",
+      "salary": 15000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 15000,
+          "points": 0.02
+        },
+        "balanced": {
+          "salary": 15000,
+          "points": 0.02
+        },
+        "strict": {
+          "salary": 15000,
+          "points": 0.01
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 31,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "SUPPORTING",
+      "salary": 45000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 45000,
+          "points": 0.52
+        },
+        "balanced": {
+          "salary": 45000,
+          "points": 0.39
+        },
+        "strict": {
+          "salary": 45000,
+          "points": 0.26
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 31,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "ENSEMBLE",
+      "salary": 60000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 60000,
+          "points": 0.76
+        },
+        "balanced": {
+          "salary": 60000,
+          "points": 0.57
+        },
+        "strict": {
+          "salary": 60000,
+          "points": 0.38
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 31,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "LEAD",
+      "salary": 150000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 150000,
+          "points": 1.17
+        },
+        "balanced": {
+          "salary": 150000,
+          "points": 0.88
+        },
+        "strict": {
+          "salary": 150000,
+          "points": 0.58
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 31,
+      "kind": "FRANCHISE",
+      "role": "SUPPORTING",
+      "films": 6,
+      "roleUnits": 2.7,
+      "budget": 61628966,
+      "salary": 39954400,
+      "points": 2,
+      "alternatives": {
+        "light": {
+          "salary": 6415143,
+          "points": 0.95
+        },
+        "balanced": {
+          "salary": 4811357,
+          "points": 0.71
+        },
+        "strict": {
+          "salary": 3207571,
+          "points": 0.47
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 43,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "MINOR",
+      "salary": 10000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 10000,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 10000,
+          "points": 0
+        },
+        "strict": {
+          "salary": 10000,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 43,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "CAMEO",
+      "salary": 20000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 20000,
+          "points": 0.04
+        },
+        "balanced": {
+          "salary": 20000,
+          "points": 0.03
+        },
+        "strict": {
+          "salary": 20000,
+          "points": 0.02
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 43,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "SUPPORTING",
+      "salary": 60000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 60000,
+          "points": 0.88
+        },
+        "balanced": {
+          "salary": 60000,
+          "points": 0.66
+        },
+        "strict": {
+          "salary": 60000,
+          "points": 0.44
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 43,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "ENSEMBLE",
+      "salary": 80000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 80000,
+          "points": 1.27
+        },
+        "balanced": {
+          "salary": 80000,
+          "points": 0.95
+        },
+        "strict": {
+          "salary": 80000,
+          "points": 0.63
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 43,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "LEAD",
+      "salary": 200000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 200000,
+          "points": 1.96
+        },
+        "balanced": {
+          "salary": 200000,
+          "points": 1.47
+        },
+        "strict": {
+          "salary": 200000,
+          "points": 0.98
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 43,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "MINOR",
+      "salary": 7500,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 7500,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 7500,
+          "points": 0
+        },
+        "strict": {
+          "salary": 7500,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 43,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "CAMEO",
+      "salary": 15000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 15000,
+          "points": 0.02
+        },
+        "balanced": {
+          "salary": 15000,
+          "points": 0.02
+        },
+        "strict": {
+          "salary": 15000,
+          "points": 0.01
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 43,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "SUPPORTING",
+      "salary": 45000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 45000,
+          "points": 0.52
+        },
+        "balanced": {
+          "salary": 45000,
+          "points": 0.39
+        },
+        "strict": {
+          "salary": 45000,
+          "points": 0.26
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 43,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "ENSEMBLE",
+      "salary": 60000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 60000,
+          "points": 0.76
+        },
+        "balanced": {
+          "salary": 60000,
+          "points": 0.57
+        },
+        "strict": {
+          "salary": 60000,
+          "points": 0.38
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 43,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "LEAD",
+      "salary": 150000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 150000,
+          "points": 1.17
+        },
+        "balanced": {
+          "salary": 150000,
+          "points": 0.88
+        },
+        "strict": {
+          "salary": 150000,
+          "points": 0.58
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 43,
+      "kind": "FRANCHISE",
+      "role": "LEAD",
+      "films": 3,
+      "roleUnits": 2.4,
+      "budget": 114831094,
+      "salary": 39954400,
+      "points": 2,
+      "alternatives": {
+        "light": {
+          "salary": 13079041,
+          "points": 1.38
+        },
+        "balanced": {
+          "salary": 9809280,
+          "points": 1.03
+        },
+        "strict": {
+          "salary": 6539520,
+          "points": 0.69
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 59,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "MINOR",
+      "salary": 10000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 10000,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 10000,
+          "points": 0
+        },
+        "strict": {
+          "salary": 10000,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 59,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "CAMEO",
+      "salary": 20000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 20000,
+          "points": 0.04
+        },
+        "balanced": {
+          "salary": 20000,
+          "points": 0.03
+        },
+        "strict": {
+          "salary": 20000,
+          "points": 0.02
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 59,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "SUPPORTING",
+      "salary": 60000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 60000,
+          "points": 0.88
+        },
+        "balanced": {
+          "salary": 60000,
+          "points": 0.66
+        },
+        "strict": {
+          "salary": 60000,
+          "points": 0.44
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 59,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "ENSEMBLE",
+      "salary": 80000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 80000,
+          "points": 1.27
+        },
+        "balanced": {
+          "salary": 80000,
+          "points": 0.95
+        },
+        "strict": {
+          "salary": 80000,
+          "points": 0.63
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 59,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "LEAD",
+      "salary": 200000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 200000,
+          "points": 1.96
+        },
+        "balanced": {
+          "salary": 200000,
+          "points": 1.47
+        },
+        "strict": {
+          "salary": 200000,
+          "points": 0.98
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 59,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "MINOR",
+      "salary": 7500,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 7500,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 7500,
+          "points": 0
+        },
+        "strict": {
+          "salary": 7500,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 59,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "CAMEO",
+      "salary": 15000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 15000,
+          "points": 0.02
+        },
+        "balanced": {
+          "salary": 15000,
+          "points": 0.02
+        },
+        "strict": {
+          "salary": 15000,
+          "points": 0.01
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 59,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "SUPPORTING",
+      "salary": 45000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 45000,
+          "points": 0.52
+        },
+        "balanced": {
+          "salary": 45000,
+          "points": 0.39
+        },
+        "strict": {
+          "salary": 45000,
+          "points": 0.26
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 59,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "ENSEMBLE",
+      "salary": 60000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 60000,
+          "points": 0.76
+        },
+        "balanced": {
+          "salary": 60000,
+          "points": 0.57
+        },
+        "strict": {
+          "salary": 60000,
+          "points": 0.38
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 59,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "LEAD",
+      "salary": 150000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 150000,
+          "points": 1.17
+        },
+        "balanced": {
+          "salary": 150000,
+          "points": 0.88
+        },
+        "strict": {
+          "salary": 150000,
+          "points": 0.58
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 59,
+      "kind": "FRANCHISE",
+      "role": "LEAD",
+      "films": 3,
+      "roleUnits": 2.4,
+      "budget": 107121524,
+      "salary": 39954400,
+      "points": 2,
+      "alternatives": {
+        "light": {
+          "salary": 11791090,
+          "points": 1.38
+        },
+        "balanced": {
+          "salary": 8843317,
+          "points": 1.03
+        },
+        "strict": {
+          "salary": 5895545,
+          "points": 0.69
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 71,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "MINOR",
+      "salary": 10000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 10000,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 10000,
+          "points": 0
+        },
+        "strict": {
+          "salary": 10000,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 71,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "CAMEO",
+      "salary": 20000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 20000,
+          "points": 0.04
+        },
+        "balanced": {
+          "salary": 20000,
+          "points": 0.03
+        },
+        "strict": {
+          "salary": 20000,
+          "points": 0.02
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 71,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "SUPPORTING",
+      "salary": 60000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 60000,
+          "points": 0.88
+        },
+        "balanced": {
+          "salary": 60000,
+          "points": 0.66
+        },
+        "strict": {
+          "salary": 60000,
+          "points": 0.44
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 71,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "ENSEMBLE",
+      "salary": 80000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 80000,
+          "points": 1.27
+        },
+        "balanced": {
+          "salary": 80000,
+          "points": 0.95
+        },
+        "strict": {
+          "salary": 80000,
+          "points": 0.63
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 71,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "LEAD",
+      "salary": 200000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 200000,
+          "points": 1.96
+        },
+        "balanced": {
+          "salary": 200000,
+          "points": 1.47
+        },
+        "strict": {
+          "salary": 200000,
+          "points": 0.98
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 71,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "MINOR",
+      "salary": 7500,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 7500,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 7500,
+          "points": 0
+        },
+        "strict": {
+          "salary": 7500,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 71,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "CAMEO",
+      "salary": 15000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 15000,
+          "points": 0.02
+        },
+        "balanced": {
+          "salary": 15000,
+          "points": 0.02
+        },
+        "strict": {
+          "salary": 15000,
+          "points": 0.01
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 71,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "SUPPORTING",
+      "salary": 45000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 45000,
+          "points": 0.52
+        },
+        "balanced": {
+          "salary": 45000,
+          "points": 0.39
+        },
+        "strict": {
+          "salary": 45000,
+          "points": 0.26
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 71,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "ENSEMBLE",
+      "salary": 60000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 60000,
+          "points": 0.76
+        },
+        "balanced": {
+          "salary": 60000,
+          "points": 0.57
+        },
+        "strict": {
+          "salary": 60000,
+          "points": 0.38
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 71,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "LEAD",
+      "salary": 150000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 150000,
+          "points": 1.17
+        },
+        "balanced": {
+          "salary": 150000,
+          "points": 0.88
+        },
+        "strict": {
+          "salary": 150000,
+          "points": 0.58
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 71,
+      "kind": "FRANCHISE",
+      "role": "LEAD",
+      "films": 3,
+      "roleUnits": 3,
+      "budget": 93060495,
+      "salary": 39954400,
+      "points": 2,
+      "alternatives": {
+        "light": {
+          "salary": 11479202,
+          "points": 1.56
+        },
+        "balanced": {
+          "salary": 8609401,
+          "points": 1.17
+        },
+        "strict": {
+          "salary": 5739601,
+          "points": 0.78
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 97,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "MINOR",
+      "salary": 10000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 10000,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 10000,
+          "points": 0
+        },
+        "strict": {
+          "salary": 10000,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 97,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "CAMEO",
+      "salary": 20000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 20000,
+          "points": 0.04
+        },
+        "balanced": {
+          "salary": 20000,
+          "points": 0.03
+        },
+        "strict": {
+          "salary": 20000,
+          "points": 0.02
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 97,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "SUPPORTING",
+      "salary": 60000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 60000,
+          "points": 0.88
+        },
+        "balanced": {
+          "salary": 60000,
+          "points": 0.66
+        },
+        "strict": {
+          "salary": 60000,
+          "points": 0.44
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 97,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "ENSEMBLE",
+      "salary": 80000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 80000,
+          "points": 1.27
+        },
+        "balanced": {
+          "salary": 80000,
+          "points": 0.95
+        },
+        "strict": {
+          "salary": 80000,
+          "points": 0.63
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 97,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "LEAD",
+      "salary": 200000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 200000,
+          "points": 1.96
+        },
+        "balanced": {
+          "salary": 200000,
+          "points": 1.47
+        },
+        "strict": {
+          "salary": 200000,
+          "points": 0.98
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 97,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "MINOR",
+      "salary": 7500,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 7500,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 7500,
+          "points": 0
+        },
+        "strict": {
+          "salary": 7500,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 97,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "CAMEO",
+      "salary": 15000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 15000,
+          "points": 0.02
+        },
+        "balanced": {
+          "salary": 15000,
+          "points": 0.02
+        },
+        "strict": {
+          "salary": 15000,
+          "points": 0.01
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 97,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "SUPPORTING",
+      "salary": 45000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 45000,
+          "points": 0.52
+        },
+        "balanced": {
+          "salary": 45000,
+          "points": 0.39
+        },
+        "strict": {
+          "salary": 45000,
+          "points": 0.26
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 97,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "ENSEMBLE",
+      "salary": 60000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 60000,
+          "points": 0.76
+        },
+        "balanced": {
+          "salary": 60000,
+          "points": 0.57
+        },
+        "strict": {
+          "salary": 60000,
+          "points": 0.38
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 97,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "LEAD",
+      "salary": 150000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 150000,
+          "points": 1.17
+        },
+        "balanced": {
+          "salary": 150000,
+          "points": 0.88
+        },
+        "strict": {
+          "salary": 150000,
+          "points": 0.58
+        }
+      }
+    },
+    {
+      "route": "free",
+      "seed": 97,
+      "kind": "FRANCHISE",
+      "role": "LEAD",
+      "films": 10,
+      "roleUnits": 5.7,
+      "budget": 116501573,
+      "salary": 39954400,
+      "points": 2,
+      "alternatives": {
+        "light": {
+          "salary": 31698389,
+          "points": 1.01
+        },
+        "balanced": {
+          "salary": 23773792,
+          "points": 0.75
+        },
+        "strict": {
+          "salary": 15849194,
+          "points": 0.5
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 0,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "MINOR",
+      "salary": 10000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 10000,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 10000,
+          "points": 0
+        },
+        "strict": {
+          "salary": 10000,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 0,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "CAMEO",
+      "salary": 20000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 20000,
+          "points": 0.04
+        },
+        "balanced": {
+          "salary": 20000,
+          "points": 0.03
+        },
+        "strict": {
+          "salary": 20000,
+          "points": 0.02
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 0,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "SUPPORTING",
+      "salary": 60000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 60000,
+          "points": 0.84
+        },
+        "balanced": {
+          "salary": 60000,
+          "points": 0.63
+        },
+        "strict": {
+          "salary": 60000,
+          "points": 0.42
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 0,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "ENSEMBLE",
+      "salary": 80000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 80000,
+          "points": 1.21
+        },
+        "balanced": {
+          "salary": 80000,
+          "points": 0.91
+        },
+        "strict": {
+          "salary": 80000,
+          "points": 0.6
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 0,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "LEAD",
+      "salary": 200000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 200000,
+          "points": 1.87
+        },
+        "balanced": {
+          "salary": 200000,
+          "points": 1.4
+        },
+        "strict": {
+          "salary": 200000,
+          "points": 0.93
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 0,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "MINOR",
+      "salary": 7500,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 7500,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 7500,
+          "points": 0
+        },
+        "strict": {
+          "salary": 7500,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 0,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "CAMEO",
+      "salary": 15000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 15000,
+          "points": 0.02
+        },
+        "balanced": {
+          "salary": 15000,
+          "points": 0.02
+        },
+        "strict": {
+          "salary": 15000,
+          "points": 0.01
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 0,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "SUPPORTING",
+      "salary": 45000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 45000,
+          "points": 0.5
+        },
+        "balanced": {
+          "salary": 45000,
+          "points": 0.37
+        },
+        "strict": {
+          "salary": 45000,
+          "points": 0.25
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 0,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "ENSEMBLE",
+      "salary": 60000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 60000,
+          "points": 0.73
+        },
+        "balanced": {
+          "salary": 60000,
+          "points": 0.54
+        },
+        "strict": {
+          "salary": 60000,
+          "points": 0.36
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 0,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "LEAD",
+      "salary": 150000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 150000,
+          "points": 1.12
+        },
+        "balanced": {
+          "salary": 150000,
+          "points": 0.84
+        },
+        "strict": {
+          "salary": 150000,
+          "points": 0.56
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 0,
+      "kind": "FRANCHISE",
+      "role": "SUPPORTING",
+      "films": 6,
+      "roleUnits": 2.8000000000000003,
+      "budget": 76376559,
+      "salary": 39908899.999999955,
+      "points": 2,
+      "alternatives": {
+        "light": {
+          "salary": 8374087,
+          "points": 0.96
+        },
+        "balanced": {
+          "salary": 6280565,
+          "points": 0.72
+        },
+        "strict": {
+          "salary": 4187043,
+          "points": 0.48
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 7,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "MINOR",
+      "salary": 10000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 10000,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 10000,
+          "points": 0
+        },
+        "strict": {
+          "salary": 10000,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 7,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "CAMEO",
+      "salary": 20000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 20000,
+          "points": 0.04
+        },
+        "balanced": {
+          "salary": 20000,
+          "points": 0.03
+        },
+        "strict": {
+          "salary": 20000,
+          "points": 0.02
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 7,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "SUPPORTING",
+      "salary": 60000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 60000,
+          "points": 0.84
+        },
+        "balanced": {
+          "salary": 60000,
+          "points": 0.63
+        },
+        "strict": {
+          "salary": 60000,
+          "points": 0.42
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 7,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "ENSEMBLE",
+      "salary": 80000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 80000,
+          "points": 1.21
+        },
+        "balanced": {
+          "salary": 80000,
+          "points": 0.91
+        },
+        "strict": {
+          "salary": 80000,
+          "points": 0.6
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 7,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "LEAD",
+      "salary": 200000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 200000,
+          "points": 1.87
+        },
+        "balanced": {
+          "salary": 200000,
+          "points": 1.4
+        },
+        "strict": {
+          "salary": 200000,
+          "points": 0.93
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 7,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "MINOR",
+      "salary": 7500,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 7500,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 7500,
+          "points": 0
+        },
+        "strict": {
+          "salary": 7500,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 7,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "CAMEO",
+      "salary": 15000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 15000,
+          "points": 0.02
+        },
+        "balanced": {
+          "salary": 15000,
+          "points": 0.02
+        },
+        "strict": {
+          "salary": 15000,
+          "points": 0.01
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 7,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "SUPPORTING",
+      "salary": 45000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 45000,
+          "points": 0.5
+        },
+        "balanced": {
+          "salary": 45000,
+          "points": 0.37
+        },
+        "strict": {
+          "salary": 45000,
+          "points": 0.25
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 7,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "ENSEMBLE",
+      "salary": 60000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 60000,
+          "points": 0.73
+        },
+        "balanced": {
+          "salary": 60000,
+          "points": 0.54
+        },
+        "strict": {
+          "salary": 60000,
+          "points": 0.36
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 7,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "LEAD",
+      "salary": 150000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 150000,
+          "points": 1.12
+        },
+        "balanced": {
+          "salary": 150000,
+          "points": 0.84
+        },
+        "strict": {
+          "salary": 150000,
+          "points": 0.56
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 7,
+      "kind": "FRANCHISE",
+      "role": "LEAD",
+      "films": 3,
+      "roleUnits": 2.4,
+      "budget": 64868297,
+      "salary": 39908899.999999955,
+      "points": 2,
+      "alternatives": {
+        "light": {
+          "salary": 5968307,
+          "points": 1.32
+        },
+        "balanced": {
+          "salary": 4476230,
+          "points": 0.99
+        },
+        "strict": {
+          "salary": 2984153,
+          "points": 0.66
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 19,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "MINOR",
+      "salary": 10000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 10000,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 10000,
+          "points": 0
+        },
+        "strict": {
+          "salary": 10000,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 19,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "CAMEO",
+      "salary": 20000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 20000,
+          "points": 0.04
+        },
+        "balanced": {
+          "salary": 20000,
+          "points": 0.03
+        },
+        "strict": {
+          "salary": 20000,
+          "points": 0.02
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 19,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "SUPPORTING",
+      "salary": 60000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 60000,
+          "points": 0.84
+        },
+        "balanced": {
+          "salary": 60000,
+          "points": 0.63
+        },
+        "strict": {
+          "salary": 60000,
+          "points": 0.42
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 19,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "ENSEMBLE",
+      "salary": 80000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 80000,
+          "points": 1.21
+        },
+        "balanced": {
+          "salary": 80000,
+          "points": 0.91
+        },
+        "strict": {
+          "salary": 80000,
+          "points": 0.6
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 19,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "LEAD",
+      "salary": 200000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 200000,
+          "points": 1.87
+        },
+        "balanced": {
+          "salary": 200000,
+          "points": 1.4
+        },
+        "strict": {
+          "salary": 200000,
+          "points": 0.93
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 19,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "MINOR",
+      "salary": 7500,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 7500,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 7500,
+          "points": 0
+        },
+        "strict": {
+          "salary": 7500,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 19,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "CAMEO",
+      "salary": 15000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 15000,
+          "points": 0.02
+        },
+        "balanced": {
+          "salary": 15000,
+          "points": 0.02
+        },
+        "strict": {
+          "salary": 15000,
+          "points": 0.01
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 19,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "SUPPORTING",
+      "salary": 45000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 45000,
+          "points": 0.5
+        },
+        "balanced": {
+          "salary": 45000,
+          "points": 0.37
+        },
+        "strict": {
+          "salary": 45000,
+          "points": 0.25
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 19,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "ENSEMBLE",
+      "salary": 60000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 60000,
+          "points": 0.73
+        },
+        "balanced": {
+          "salary": 60000,
+          "points": 0.54
+        },
+        "strict": {
+          "salary": 60000,
+          "points": 0.36
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 19,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "LEAD",
+      "salary": 150000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 150000,
+          "points": 1.12
+        },
+        "balanced": {
+          "salary": 150000,
+          "points": 0.84
+        },
+        "strict": {
+          "salary": 150000,
+          "points": 0.56
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 19,
+      "kind": "FRANCHISE",
+      "role": "CAMEO",
+      "films": 6,
+      "roleUnits": 3.6,
+      "budget": 48564110,
+      "salary": 39908899.999999955,
+      "points": 2,
+      "alternatives": {
+        "light": {
+          "salary": 5736806,
+          "points": 0.92
+        },
+        "balanced": {
+          "salary": 4302604,
+          "points": 0.69
+        },
+        "strict": {
+          "salary": 2868403,
+          "points": 0.46
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 31,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "MINOR",
+      "salary": 10000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 10000,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 10000,
+          "points": 0
+        },
+        "strict": {
+          "salary": 10000,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 31,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "CAMEO",
+      "salary": 20000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 20000,
+          "points": 0.04
+        },
+        "balanced": {
+          "salary": 20000,
+          "points": 0.03
+        },
+        "strict": {
+          "salary": 20000,
+          "points": 0.02
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 31,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "SUPPORTING",
+      "salary": 60000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 60000,
+          "points": 0.84
+        },
+        "balanced": {
+          "salary": 60000,
+          "points": 0.63
+        },
+        "strict": {
+          "salary": 60000,
+          "points": 0.42
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 31,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "ENSEMBLE",
+      "salary": 80000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 80000,
+          "points": 1.21
+        },
+        "balanced": {
+          "salary": 80000,
+          "points": 0.91
+        },
+        "strict": {
+          "salary": 80000,
+          "points": 0.6
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 31,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "LEAD",
+      "salary": 200000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 200000,
+          "points": 1.87
+        },
+        "balanced": {
+          "salary": 200000,
+          "points": 1.4
+        },
+        "strict": {
+          "salary": 200000,
+          "points": 0.93
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 31,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "MINOR",
+      "salary": 7500,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 7500,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 7500,
+          "points": 0
+        },
+        "strict": {
+          "salary": 7500,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 31,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "CAMEO",
+      "salary": 15000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 15000,
+          "points": 0.02
+        },
+        "balanced": {
+          "salary": 15000,
+          "points": 0.02
+        },
+        "strict": {
+          "salary": 15000,
+          "points": 0.01
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 31,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "SUPPORTING",
+      "salary": 45000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 45000,
+          "points": 0.5
+        },
+        "balanced": {
+          "salary": 45000,
+          "points": 0.37
+        },
+        "strict": {
+          "salary": 45000,
+          "points": 0.25
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 31,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "ENSEMBLE",
+      "salary": 60000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 60000,
+          "points": 0.73
+        },
+        "balanced": {
+          "salary": 60000,
+          "points": 0.54
+        },
+        "strict": {
+          "salary": 60000,
+          "points": 0.36
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 31,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "LEAD",
+      "salary": 150000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 150000,
+          "points": 1.12
+        },
+        "balanced": {
+          "salary": 150000,
+          "points": 0.84
+        },
+        "strict": {
+          "salary": 150000,
+          "points": 0.56
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 31,
+      "kind": "FRANCHISE",
+      "role": "SUPPORTING",
+      "films": 6,
+      "roleUnits": 2.7,
+      "budget": 61628966,
+      "salary": 39908899.999999955,
+      "points": 2,
+      "alternatives": {
+        "light": {
+          "salary": 6287550,
+          "points": 0.91
+        },
+        "balanced": {
+          "salary": 4715663,
+          "points": 0.68
+        },
+        "strict": {
+          "salary": 3143775,
+          "points": 0.45
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 43,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "MINOR",
+      "salary": 10000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 10000,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 10000,
+          "points": 0
+        },
+        "strict": {
+          "salary": 10000,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 43,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "CAMEO",
+      "salary": 20000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 20000,
+          "points": 0.04
+        },
+        "balanced": {
+          "salary": 20000,
+          "points": 0.03
+        },
+        "strict": {
+          "salary": 20000,
+          "points": 0.02
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 43,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "SUPPORTING",
+      "salary": 60000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 60000,
+          "points": 0.84
+        },
+        "balanced": {
+          "salary": 60000,
+          "points": 0.63
+        },
+        "strict": {
+          "salary": 60000,
+          "points": 0.42
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 43,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "ENSEMBLE",
+      "salary": 80000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 80000,
+          "points": 1.21
+        },
+        "balanced": {
+          "salary": 80000,
+          "points": 0.91
+        },
+        "strict": {
+          "salary": 80000,
+          "points": 0.6
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 43,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "LEAD",
+      "salary": 200000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 200000,
+          "points": 1.87
+        },
+        "balanced": {
+          "salary": 200000,
+          "points": 1.4
+        },
+        "strict": {
+          "salary": 200000,
+          "points": 0.93
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 43,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "MINOR",
+      "salary": 7500,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 7500,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 7500,
+          "points": 0
+        },
+        "strict": {
+          "salary": 7500,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 43,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "CAMEO",
+      "salary": 15000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 15000,
+          "points": 0.02
+        },
+        "balanced": {
+          "salary": 15000,
+          "points": 0.02
+        },
+        "strict": {
+          "salary": 15000,
+          "points": 0.01
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 43,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "SUPPORTING",
+      "salary": 45000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 45000,
+          "points": 0.5
+        },
+        "balanced": {
+          "salary": 45000,
+          "points": 0.37
+        },
+        "strict": {
+          "salary": 45000,
+          "points": 0.25
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 43,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "ENSEMBLE",
+      "salary": 60000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 60000,
+          "points": 0.73
+        },
+        "balanced": {
+          "salary": 60000,
+          "points": 0.54
+        },
+        "strict": {
+          "salary": 60000,
+          "points": 0.36
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 43,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "LEAD",
+      "salary": 150000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 150000,
+          "points": 1.12
+        },
+        "balanced": {
+          "salary": 150000,
+          "points": 0.84
+        },
+        "strict": {
+          "salary": 150000,
+          "points": 0.56
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 43,
+      "kind": "FRANCHISE",
+      "role": "LEAD",
+      "films": 3,
+      "roleUnits": 2.4,
+      "budget": 114831094,
+      "salary": 39908899.999999955,
+      "points": 2,
+      "alternatives": {
+        "light": {
+          "salary": 12818906,
+          "points": 1.32
+        },
+        "balanced": {
+          "salary": 9614180,
+          "points": 0.99
+        },
+        "strict": {
+          "salary": 6409453,
+          "points": 0.66
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 59,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "MINOR",
+      "salary": 10000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 10000,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 10000,
+          "points": 0
+        },
+        "strict": {
+          "salary": 10000,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 59,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "CAMEO",
+      "salary": 20000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 20000,
+          "points": 0.04
+        },
+        "balanced": {
+          "salary": 20000,
+          "points": 0.03
+        },
+        "strict": {
+          "salary": 20000,
+          "points": 0.02
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 59,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "SUPPORTING",
+      "salary": 60000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 60000,
+          "points": 0.84
+        },
+        "balanced": {
+          "salary": 60000,
+          "points": 0.63
+        },
+        "strict": {
+          "salary": 60000,
+          "points": 0.42
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 59,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "ENSEMBLE",
+      "salary": 80000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 80000,
+          "points": 1.21
+        },
+        "balanced": {
+          "salary": 80000,
+          "points": 0.91
+        },
+        "strict": {
+          "salary": 80000,
+          "points": 0.6
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 59,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "LEAD",
+      "salary": 200000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 200000,
+          "points": 1.87
+        },
+        "balanced": {
+          "salary": 200000,
+          "points": 1.4
+        },
+        "strict": {
+          "salary": 200000,
+          "points": 0.93
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 59,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "MINOR",
+      "salary": 7500,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 7500,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 7500,
+          "points": 0
+        },
+        "strict": {
+          "salary": 7500,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 59,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "CAMEO",
+      "salary": 15000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 15000,
+          "points": 0.02
+        },
+        "balanced": {
+          "salary": 15000,
+          "points": 0.02
+        },
+        "strict": {
+          "salary": 15000,
+          "points": 0.01
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 59,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "SUPPORTING",
+      "salary": 45000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 45000,
+          "points": 0.5
+        },
+        "balanced": {
+          "salary": 45000,
+          "points": 0.37
+        },
+        "strict": {
+          "salary": 45000,
+          "points": 0.25
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 59,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "ENSEMBLE",
+      "salary": 60000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 60000,
+          "points": 0.73
+        },
+        "balanced": {
+          "salary": 60000,
+          "points": 0.54
+        },
+        "strict": {
+          "salary": 60000,
+          "points": 0.36
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 59,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "LEAD",
+      "salary": 150000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 150000,
+          "points": 1.12
+        },
+        "balanced": {
+          "salary": 150000,
+          "points": 0.84
+        },
+        "strict": {
+          "salary": 150000,
+          "points": 0.56
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 59,
+      "kind": "FRANCHISE",
+      "role": "LEAD",
+      "films": 3,
+      "roleUnits": 2.4,
+      "budget": 107121524,
+      "salary": 39908899.999999955,
+      "points": 2,
+      "alternatives": {
+        "light": {
+          "salary": 11556572,
+          "points": 1.32
+        },
+        "balanced": {
+          "salary": 8667429,
+          "points": 0.99
+        },
+        "strict": {
+          "salary": 5778286,
+          "points": 0.66
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 71,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "MINOR",
+      "salary": 10000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 10000,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 10000,
+          "points": 0
+        },
+        "strict": {
+          "salary": 10000,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 71,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "CAMEO",
+      "salary": 20000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 20000,
+          "points": 0.04
+        },
+        "balanced": {
+          "salary": 20000,
+          "points": 0.03
+        },
+        "strict": {
+          "salary": 20000,
+          "points": 0.02
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 71,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "SUPPORTING",
+      "salary": 60000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 60000,
+          "points": 0.84
+        },
+        "balanced": {
+          "salary": 60000,
+          "points": 0.63
+        },
+        "strict": {
+          "salary": 60000,
+          "points": 0.42
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 71,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "ENSEMBLE",
+      "salary": 80000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 80000,
+          "points": 1.21
+        },
+        "balanced": {
+          "salary": 80000,
+          "points": 0.91
+        },
+        "strict": {
+          "salary": 80000,
+          "points": 0.6
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 71,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "LEAD",
+      "salary": 200000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 200000,
+          "points": 1.87
+        },
+        "balanced": {
+          "salary": 200000,
+          "points": 1.4
+        },
+        "strict": {
+          "salary": 200000,
+          "points": 0.93
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 71,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "MINOR",
+      "salary": 7500,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 7500,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 7500,
+          "points": 0
+        },
+        "strict": {
+          "salary": 7500,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 71,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "CAMEO",
+      "salary": 15000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 15000,
+          "points": 0.02
+        },
+        "balanced": {
+          "salary": 15000,
+          "points": 0.02
+        },
+        "strict": {
+          "salary": 15000,
+          "points": 0.01
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 71,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "SUPPORTING",
+      "salary": 45000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 45000,
+          "points": 0.5
+        },
+        "balanced": {
+          "salary": 45000,
+          "points": 0.37
+        },
+        "strict": {
+          "salary": 45000,
+          "points": 0.25
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 71,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "ENSEMBLE",
+      "salary": 60000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 60000,
+          "points": 0.73
+        },
+        "balanced": {
+          "salary": 60000,
+          "points": 0.54
+        },
+        "strict": {
+          "salary": 60000,
+          "points": 0.36
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 71,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "LEAD",
+      "salary": 150000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 150000,
+          "points": 1.12
+        },
+        "balanced": {
+          "salary": 150000,
+          "points": 0.84
+        },
+        "strict": {
+          "salary": 150000,
+          "points": 0.56
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 71,
+      "kind": "FRANCHISE",
+      "role": "LEAD",
+      "films": 3,
+      "roleUnits": 3,
+      "budget": 93060495,
+      "salary": 39908899.999999955,
+      "points": 2,
+      "alternatives": {
+        "light": {
+          "salary": 11250888,
+          "points": 1.5
+        },
+        "balanced": {
+          "salary": 8438166,
+          "points": 1.12
+        },
+        "strict": {
+          "salary": 5625444,
+          "points": 0.75
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 97,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "MINOR",
+      "salary": 10000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 10000,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 10000,
+          "points": 0
+        },
+        "strict": {
+          "salary": 10000,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 97,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "CAMEO",
+      "salary": 20000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 20000,
+          "points": 0.04
+        },
+        "balanced": {
+          "salary": 20000,
+          "points": 0.03
+        },
+        "strict": {
+          "salary": 20000,
+          "points": 0.02
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 97,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "SUPPORTING",
+      "salary": 60000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 60000,
+          "points": 0.84
+        },
+        "balanced": {
+          "salary": 60000,
+          "points": 0.63
+        },
+        "strict": {
+          "salary": 60000,
+          "points": 0.42
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 97,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "ENSEMBLE",
+      "salary": 80000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 80000,
+          "points": 1.21
+        },
+        "balanced": {
+          "salary": 80000,
+          "points": 0.91
+        },
+        "strict": {
+          "salary": 80000,
+          "points": 0.6
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 97,
+      "kind": "FAMOUS",
+      "type": "MOVIE",
+      "role": "LEAD",
+      "salary": 200000,
+      "points": 2.5,
+      "alternatives": {
+        "light": {
+          "salary": 200000,
+          "points": 1.87
+        },
+        "balanced": {
+          "salary": 200000,
+          "points": 1.4
+        },
+        "strict": {
+          "salary": 200000,
+          "points": 0.93
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 97,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "MINOR",
+      "salary": 7500,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 7500,
+          "points": 0
+        },
+        "balanced": {
+          "salary": 7500,
+          "points": 0
+        },
+        "strict": {
+          "salary": 7500,
+          "points": 0
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 97,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "CAMEO",
+      "salary": 15000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 15000,
+          "points": 0.02
+        },
+        "balanced": {
+          "salary": 15000,
+          "points": 0.02
+        },
+        "strict": {
+          "salary": 15000,
+          "points": 0.01
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 97,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "SUPPORTING",
+      "salary": 45000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 45000,
+          "points": 0.5
+        },
+        "balanced": {
+          "salary": 45000,
+          "points": 0.37
+        },
+        "strict": {
+          "salary": 45000,
+          "points": 0.25
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 97,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "ENSEMBLE",
+      "salary": 60000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 60000,
+          "points": 0.73
+        },
+        "balanced": {
+          "salary": 60000,
+          "points": 0.54
+        },
+        "strict": {
+          "salary": 60000,
+          "points": 0.36
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 97,
+      "kind": "FAMOUS",
+      "type": "SERIES",
+      "role": "LEAD",
+      "salary": 150000,
+      "points": 1.5,
+      "alternatives": {
+        "light": {
+          "salary": 150000,
+          "points": 1.12
+        },
+        "balanced": {
+          "salary": 150000,
+          "points": 0.84
+        },
+        "strict": {
+          "salary": 150000,
+          "points": 0.56
+        }
+      }
+    },
+    {
+      "route": "boosted",
+      "seed": 97,
+      "kind": "FRANCHISE",
+      "role": "LEAD",
+      "films": 10,
+      "roleUnits": 5.7,
+      "budget": 116501573,
+      "salary": 39908899.999999955,
+      "points": 2,
+      "alternatives": {
+        "light": {
+          "salary": 31067928,
+          "points": 0.96
+        },
+        "balanced": {
+          "salary": 23300946,
+          "points": 0.72
+        },
+        "strict": {
+          "salary": 15533964,
+          "points": 0.48
+        }
+      }
+    }
+  ],
+  "summaries": [
+    {
+      "route": "entry",
+      "kind": "FAMOUS",
+      "variant": "baseline",
+      "count": 80,
+      "meanSalary": 64750,
+      "meanPoints": 2,
+      "meanBackendOn250MContractualProfit": 5000000,
+      "maxPoints": 2.5
+    },
+    {
+      "route": "entry",
+      "kind": "FAMOUS",
+      "variant": "light",
+      "count": 80,
+      "meanSalary": 64750,
+      "meanPoints": 0.20099999999999998,
+      "meanBackendOn250MContractualProfit": 502500,
+      "maxPoints": 0.6
+    },
+    {
+      "route": "entry",
+      "kind": "FAMOUS",
+      "variant": "balanced",
+      "count": 80,
+      "meanSalary": 64750,
+      "meanPoints": 0.1489999999999999,
+      "meanBackendOn250MContractualProfit": 372500,
+      "maxPoints": 0.44
+    },
+    {
+      "route": "entry",
+      "kind": "FAMOUS",
+      "variant": "strict",
+      "count": 80,
+      "meanSalary": 64750,
+      "meanPoints": 0.099,
+      "meanBackendOn250MContractualProfit": 247500,
+      "maxPoints": 0.3
+    },
+    {
+      "route": "entry",
+      "kind": "FRANCHISE",
+      "variant": "baseline",
+      "count": 8,
+      "meanSalary": 30000000,
+      "meanPoints": 2,
+      "meanBackendOn250MContractualProfit": 5000000,
+      "maxPoints": 2
+    },
+    {
+      "route": "entry",
+      "kind": "FRANCHISE",
+      "variant": "light",
+      "count": 8,
+      "meanSalary": 8142668.25,
+      "meanPoints": 0.365,
+      "meanBackendOn250MContractualProfit": 912500,
+      "maxPoints": 0.48
+    },
+    {
+      "route": "entry",
+      "kind": "FRANCHISE",
+      "variant": "balanced",
+      "count": 8,
+      "meanSalary": 6107000.875,
+      "meanPoints": 0.2725,
+      "meanBackendOn250MContractualProfit": 681250,
+      "maxPoints": 0.36
+    },
+    {
+      "route": "entry",
+      "kind": "FRANCHISE",
+      "variant": "strict",
+      "count": 8,
+      "meanSalary": 4071333.875,
+      "meanPoints": 0.18125,
+      "meanBackendOn250MContractualProfit": 453125,
+      "maxPoints": 0.24
+    },
+    {
+      "route": "free",
+      "kind": "FAMOUS",
+      "variant": "baseline",
+      "count": 80,
+      "meanSalary": 64750,
+      "meanPoints": 2,
+      "meanBackendOn250MContractualProfit": 5000000,
+      "maxPoints": 2.5
+    },
+    {
+      "route": "free",
+      "kind": "FAMOUS",
+      "variant": "light",
+      "count": 80,
+      "meanSalary": 64750,
+      "meanPoints": 0.6620000000000004,
+      "meanBackendOn250MContractualProfit": 1655000,
+      "maxPoints": 1.96
+    },
+    {
+      "route": "free",
+      "kind": "FAMOUS",
+      "variant": "balanced",
+      "count": 80,
+      "meanSalary": 64750,
+      "meanPoints": 0.49700000000000016,
+      "meanBackendOn250MContractualProfit": 1242500,
+      "maxPoints": 1.47
+    },
+    {
+      "route": "free",
+      "kind": "FAMOUS",
+      "variant": "strict",
+      "count": 80,
+      "meanSalary": 64750,
+      "meanPoints": 0.33,
+      "meanBackendOn250MContractualProfit": 825000,
+      "maxPoints": 0.98
+    },
+    {
+      "route": "free",
+      "kind": "FRANCHISE",
+      "variant": "baseline",
+      "count": 8,
+      "meanSalary": 39954400,
+      "meanPoints": 2,
+      "meanBackendOn250MContractualProfit": 5000000,
+      "maxPoints": 2
+    },
+    {
+      "route": "free",
+      "kind": "FRANCHISE",
+      "variant": "light",
+      "count": 8,
+      "meanSalary": 11868691.5,
+      "meanPoints": 1.2025,
+      "meanBackendOn250MContractualProfit": 3006250,
+      "maxPoints": 1.56
+    },
+    {
+      "route": "free",
+      "kind": "FRANCHISE",
+      "variant": "balanced",
+      "count": 8,
+      "meanSalary": 8901518.5,
+      "meanPoints": 0.89875,
+      "meanBackendOn250MContractualProfit": 2246875,
+      "maxPoints": 1.17
+    },
+    {
+      "route": "free",
+      "kind": "FRANCHISE",
+      "variant": "strict",
+      "count": 8,
+      "meanSalary": 5934345.5,
+      "meanPoints": 0.6,
+      "meanBackendOn250MContractualProfit": 1500000,
+      "maxPoints": 0.78
+    },
+    {
+      "route": "boosted",
+      "kind": "FAMOUS",
+      "variant": "baseline",
+      "count": 80,
+      "meanSalary": 64750,
+      "meanPoints": 2,
+      "meanBackendOn250MContractualProfit": 5000000,
+      "maxPoints": 2.5
+    },
+    {
+      "route": "boosted",
+      "kind": "FAMOUS",
+      "variant": "light",
+      "count": 80,
+      "meanSalary": 64750,
+      "meanPoints": 0.633,
+      "meanBackendOn250MContractualProfit": 1582500,
+      "maxPoints": 1.87
+    },
+    {
+      "route": "boosted",
+      "kind": "FAMOUS",
+      "variant": "balanced",
+      "count": 80,
+      "meanSalary": 64750,
+      "meanPoints": 0.47400000000000003,
+      "meanBackendOn250MContractualProfit": 1185000,
+      "maxPoints": 1.4
+    },
+    {
+      "route": "boosted",
+      "kind": "FAMOUS",
+      "variant": "strict",
+      "count": 80,
+      "meanSalary": 64750,
+      "meanPoints": 0.31500000000000006,
+      "meanBackendOn250MContractualProfit": 787500,
+      "maxPoints": 0.93
+    },
+    {
+      "route": "boosted",
+      "kind": "FRANCHISE",
+      "variant": "baseline",
+      "count": 8,
+      "meanSalary": 39908899.99999995,
+      "meanPoints": 2,
+      "meanBackendOn250MContractualProfit": 5000000,
+      "maxPoints": 2
+    },
+    {
+      "route": "boosted",
+      "kind": "FRANCHISE",
+      "variant": "light",
+      "count": 8,
+      "meanSalary": 11632630.5,
+      "meanPoints": 1.15125,
+      "meanBackendOn250MContractualProfit": 2878125,
+      "maxPoints": 1.5
+    },
+    {
+      "route": "boosted",
+      "kind": "FRANCHISE",
+      "variant": "balanced",
+      "count": 8,
+      "meanSalary": 8724472.875,
+      "meanPoints": 0.8625,
+      "meanBackendOn250MContractualProfit": 2156250,
+      "maxPoints": 1.12
+    },
+    {
+      "route": "boosted",
+      "kind": "FRANCHISE",
+      "variant": "strict",
+      "count": 8,
+      "meanSalary": 5816315.125,
+      "meanPoints": 0.5750000000000002,
+      "meanBackendOn250MContractualProfit": 1437500,
+      "maxPoints": 0.75
+    }
+  ]
+}

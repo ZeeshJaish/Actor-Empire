@@ -50,8 +50,10 @@ assert.equal(regional.studio.cashReserve,200-60*.08,'Campaign funding is still c
 const middleEastProduction=structuredClone(regionalProduction);
 middleEastProduction.studioAiExecution!.fingerprintSnapshot={originalLanguage:'ENGLISH',priorityMarket:'MIDDLE_EAST'} as any;
 const middleEast=releaseStudioAiProduction({world,studio,production:middleEastProduction,absoluteWeek:WEEK});
-assert.deepEqual(middleEast.project!.releaseRegionIds,['ASIA'],'The existing cinema map places Middle Eastern markets in ASIA');
-assert.ok(middleEast.project!.cinemaExposure!.events.find(e=>e.kind==='PAID_CAMPAIGN')!.countryIds?.includes('SA'),'A Middle East campaign must actually reach Saudi Arabia');
+assert.ok(middleEast.project!.releaseRegionIds?.includes('NORTH_AMERICA'),'An English package can target its reachable primary-language audience despite a Middle East preference');
+const englishCampaign=middleEast.project!.cinemaExposure!.events.find(e=>e.kind==='PAID_CAMPAIGN')!;
+assert.ok(englishCampaign.countryIds?.includes('US'),'Priority preference must not force a campaign away from its viable language market');
+assert.deepEqual(englishCampaign.countryIds,middleEast.project!.releaseCountryIds,'Campaign geography must match the funded access plan');
 const legacyRegional=structuredClone(regionalProduction);delete legacyRegional.studioAiExecution!.fingerprintSnapshot;
 const knownStudio=structuredClone(studio);knownStudio.ai!.intelligence={content:{selectedFingerprints:[{id:'fp',originalLanguage:'HINDI',priorityMarket:'INDIA'}]}} as any;
 const legacyRelease=releaseStudioAiProduction({world,studio:knownStudio,production:legacyRegional,absoluteWeek:WEEK});

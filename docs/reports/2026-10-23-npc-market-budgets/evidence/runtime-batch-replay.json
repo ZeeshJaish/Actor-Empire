@@ -1,0 +1,10 @@
+{
+  "wholeVsSplitEqual": true,
+  "weeks": 8,
+  "wholeBatch": 8,
+  "splitBatch": 2,
+  "playerHash": "f2238d886177a6898d976a7fcedbcd1b74b8f356f1fce71392d71548d8d4d396",
+  "npcDatabaseHash": "34a96978d083faffea63217c0e4d82dde1d7ff9ac6462e48786b9c13b90f91d5",
+  "randomCalls": 16714,
+  "clockNext": 1800000000146
+}

@@ -114,7 +114,7 @@ export const executeStudioAiSlateWeek = (input: ExecuteStudioAiSlateWeekInput): 
 
     proposals.forEach(proposal => {
         const fingerprint = proposal.contentFingerprintId ? findFingerprint(studio, proposal.contentFingerprintId) : undefined;
-        const admission = admitStudioContentProposal({ studio, proposal, fingerprint, absoluteWeek: input.absoluteWeek });
+        const admission = admitStudioContentProposal({ studio, proposal, fingerprint, absoluteWeek: input.absoluteWeek, world: input.world });
         const slate = studio.ai!.slate!;
         studio = {
             ...studio,
@@ -129,6 +129,8 @@ export const executeStudioAiSlateWeek = (input: ExecuteStudioAiSlateWeekInput): 
         };
         if (admission.accepted && admission.commitment && admission.transaction) {
             admittedCount += 1;
+            if(admission.fingerprint&&studio.ai!.intelligence)studio={...studio,ai:{...studio.ai!,intelligence:{...studio.ai!.intelligence,
+                content:{...studio.ai!.intelligence.content,selectedFingerprints:studio.ai!.intelligence.content.selectedFingerprints.map(f=>f.id===admission.fingerprint!.id?admission.fingerprint!:f)}}}};
             studio = updateProposalStatus(studio, proposal.id, 'EXECUTED');
             studio = updateFingerprintLifecycle(studio, admission.commitment.fingerprintId, 'COMMITTED');
             studio = applyStudioAiDevelopmentTransaction(studio, admission.transaction);
@@ -170,7 +172,7 @@ export const executeStudioAiSlateWeek = (input: ExecuteStudioAiSlateWeekInput): 
             reviewedCount += 1;
             return;
         }
-        const review = reviewStudioSlateCommitment({ studio, commitment, fingerprint, proposal, absoluteWeek: input.absoluteWeek });
+        const review = reviewStudioSlateCommitment({ studio, commitment, fingerprint, proposal, absoluteWeek: input.absoluteWeek, world: input.world });
         if (!review.reviewed) return;
         const becameGreenlit = commitment.status !== 'GREENLIT' && review.commitment.status === 'GREENLIT';
         studio = {

@@ -17,6 +17,8 @@ export interface IndustryTalentSelectionInput {
     companyTalentSkill: number;
     budgetMillions: number;
     seedNamespace?: string;
+    /** Private planned cast scope; omitted by commissioned and existing generic routes. */
+    starPowerTarget?: number;
 }
 
 export interface IndustryTalentPackage {
@@ -54,7 +56,9 @@ const rank = (candidates: NPCActor[], input: IndustryTalentSelectionInput, role:
         });
         const rng = createDeterministicRng(`${input.seedNamespace || 'industry'}:${input.player.id}:${input.companyId}:${input.canonicalProjectId}:${role}:${candidate.id}`);
         const budgetFit = Math.min(8, Math.max(-4, input.budgetMillions / 25 - (TIER_SCORE[candidate.tier] - 50) / 12));
-        return { candidate, eligible: decision.eligible !== false, score: TIER_SCORE[candidate.tier] + prestigeFit(candidate, input.genre) + decision.modifier + budgetFit + input.companyTalentSkill * 0.05 + rng() * 8 };
+        const scopePenalty=role==='ACTOR'&&input.starPowerTarget!==undefined
+            ?Math.max(0,candidate.stats.fame-Math.max(0,Math.min(100,input.starPowerTarget)))*1.2:0;
+        return { candidate, eligible: decision.eligible !== false, score: TIER_SCORE[candidate.tier] + prestigeFit(candidate, input.genre) + decision.modifier + budgetFit + input.companyTalentSkill * 0.05 + rng() * 8-scopePenalty };
     }).filter(row => row.eligible)
         .sort((left, right) => right.score - left.score || left.candidate.id.localeCompare(right.candidate.id))
         .map(row => row.candidate);

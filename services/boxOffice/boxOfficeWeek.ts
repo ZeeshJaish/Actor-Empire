@@ -62,8 +62,6 @@ export const normalizeLiveTitle = (player: Player, id: string, project: ProjectD
     const regions = getReleaseRegionIdsForProject(project), countries = world.countries!.filter(c => regions.includes(c.regionId)
         &&(!project.releaseCountryIds||project.releaseCountryIds.includes(c.id)));
     const chains = Object.fromEntries(countries.map(c => [c.id, project.releaseChainSelections?.[c.regionId] || getDefaultCinemaChainIdsForRegion(project, c.regionId)]));
-    if (title.exposure)
-        title.exposure = { ...title.exposure, events: title.exposure.events.map(e => ({ ...e, titleId: id })) };
     const signed=Object.values(player.world.streamingRightsContracts || {}).filter(c=>c.sourceProjectId===id);
     const now=player.world.worldPopulation?.lastProcessedAbsoluteWeek ?? getAbsoluteWeek(player.age,player.currentWeek);
     const windows=signed.filter(c=>c.status==='ACTIVE'&&c.expiresAtAbsoluteWeek>now).map(c=>({platformId:c.buyer.platformId || c.buyerPlatformId,

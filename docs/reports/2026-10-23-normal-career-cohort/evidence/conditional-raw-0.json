@@ -1,0 +1,561 @@
+{
+  "kind": "CONDITIONAL_ALIVE_EARNED_ADVANCED_OWNER",
+  "executable": "7c7a88dc9764151b670b7ee4d0d9bbe9ddefc2970853edda3187f813c01a8c02",
+  "seed": 0,
+  "weak": false,
+  "horizon": 156,
+  "status": "CHECKPOINT_READY",
+  "stage": "FINAL",
+  "precursors": [
+    {
+      "id": "precursor-0",
+      "grossCents": 68765529427,
+      "firstAdmissions": 60510001
+    },
+    {
+      "id": "precursor-1",
+      "grossCents": 68653658599,
+      "firstAdmissions": 58888665
+    },
+    {
+      "id": "precursor-2",
+      "grossCents": 61301396109,
+      "firstAdmissions": 54474132
+    },
+    {
+      "id": "precursor-3",
+      "grossCents": 59361395631,
+      "firstAdmissions": 51461662
+    }
+  ],
+  "budget": 300000000,
+  "campaign": 350000000,
+  "weeks": 168,
+  "preWeeks": 104,
+  "finalWeeks": 64,
+  "saves": 104,
+  "reloads": 12,
+  "replays": 168,
+  "failedPromotionChecked": true,
+  "peakRssBytes": 1695678464,
+  "healthcareSpent": 100000,
+  "healthcare": [
+    {
+      "week": 52,
+      "spent": 20000,
+      "conditions": [
+        "back_pain"
+      ]
+    },
+    {
+      "week": 91,
+      "spent": 20000,
+      "conditions": [
+        "back_pain"
+      ]
+    },
+    {
+      "week": 107,
+      "spent": 20000,
+      "conditions": [
+        "back_pain"
+      ]
+    },
+    {
+      "week": 147,
+      "spent": 20000,
+      "conditions": [
+        "back_pain"
+      ]
+    },
+    {
+      "week": 157,
+      "spent": 20000,
+      "conditions": [
+        "back_pain"
+      ]
+    }
+  ],
+  "alive": true,
+  "grossB": 2.31429965564,
+  "profitCents": 47834557216,
+  "grossCents": 231429965564,
+  "receiptsCents": 112834557216,
+  "bookingCostCents": 0,
+  "talentPaidCents": 0,
+  "actorPaidCents": 0,
+  "firstAdmissions": 203214155,
+  "repeatAdmissions": 938753,
+  "qualityInput": 100,
+  "closed": false,
+  "censored": true,
+  "weekly": [
+    {
+      "week": 1,
+      "grossCents": 19931304688,
+      "totalGrossCents": 19931304688,
+      "closed": false,
+      "slate": 26
+    },
+    {
+      "week": 2,
+      "grossCents": 22714983791,
+      "totalGrossCents": 42646288479,
+      "closed": false,
+      "slate": 26
+    },
+    {
+      "week": 3,
+      "grossCents": 19621599694,
+      "totalGrossCents": 62267888173,
+      "closed": false,
+      "slate": 27
+    },
+    {
+      "week": 4,
+      "grossCents": 17500124374,
+      "totalGrossCents": 79768012547,
+      "closed": false,
+      "slate": 27
+    },
+    {
+      "week": 5,
+      "grossCents": 15639442336,
+      "totalGrossCents": 95407454883,
+      "closed": false,
+      "slate": 27
+    },
+    {
+      "week": 6,
+      "grossCents": 13932621200,
+      "totalGrossCents": 109340076083,
+      "closed": false,
+      "slate": 26
+    },
+    {
+      "week": 7,
+      "grossCents": 12426049012,
+      "totalGrossCents": 121766125095,
+      "closed": false,
+      "slate": 26
+    },
+    {
+      "week": 8,
+      "grossCents": 11066241821,
+      "totalGrossCents": 132832366916,
+      "closed": false,
+      "slate": 27
+    },
+    {
+      "week": 9,
+      "grossCents": 9907739467,
+      "totalGrossCents": 142740106383,
+      "closed": false,
+      "slate": 28
+    },
+    {
+      "week": 10,
+      "grossCents": 8943709438,
+      "totalGrossCents": 151683815821,
+      "closed": false,
+      "slate": 28
+    },
+    {
+      "week": 11,
+      "grossCents": 6510343143,
+      "totalGrossCents": 158194158964,
+      "closed": false,
+      "slate": 27
+    },
+    {
+      "week": 12,
+      "grossCents": 5737455685,
+      "totalGrossCents": 163931614649,
+      "closed": false,
+      "slate": 27
+    },
+    {
+      "week": 13,
+      "grossCents": 5028811488,
+      "totalGrossCents": 168960426137,
+      "closed": false,
+      "slate": 25
+    },
+    {
+      "week": 14,
+      "grossCents": 4710364387,
+      "totalGrossCents": 173670790524,
+      "closed": false,
+      "slate": 25
+    },
+    {
+      "week": 15,
+      "grossCents": 5317684326,
+      "totalGrossCents": 178988474850,
+      "closed": false,
+      "slate": 25
+    },
+    {
+      "week": 16,
+      "grossCents": 4740945265,
+      "totalGrossCents": 183729420115,
+      "closed": false,
+      "slate": 25
+    },
+    {
+      "week": 17,
+      "grossCents": 4303028093,
+      "totalGrossCents": 188032448208,
+      "closed": false,
+      "slate": 28
+    },
+    {
+      "week": 18,
+      "grossCents": 3891619491,
+      "totalGrossCents": 191924067699,
+      "closed": false,
+      "slate": 28
+    },
+    {
+      "week": 19,
+      "grossCents": 3522087742,
+      "totalGrossCents": 195446155441,
+      "closed": false,
+      "slate": 28
+    },
+    {
+      "week": 20,
+      "grossCents": 3182637327,
+      "totalGrossCents": 198628792768,
+      "closed": false,
+      "slate": 29
+    },
+    {
+      "week": 21,
+      "grossCents": 2884195888,
+      "totalGrossCents": 201512988656,
+      "closed": false,
+      "slate": 29
+    },
+    {
+      "week": 22,
+      "grossCents": 2617450703,
+      "totalGrossCents": 204130439359,
+      "closed": false,
+      "slate": 30
+    },
+    {
+      "week": 23,
+      "grossCents": 2376154055,
+      "totalGrossCents": 206506593414,
+      "closed": false,
+      "slate": 29
+    },
+    {
+      "week": 24,
+      "grossCents": 2157999758,
+      "totalGrossCents": 208664593172,
+      "closed": false,
+      "slate": 28
+    },
+    {
+      "week": 25,
+      "grossCents": 1962731356,
+      "totalGrossCents": 210627324528,
+      "closed": false,
+      "slate": 29
+    },
+    {
+      "week": 26,
+      "grossCents": 1784472862,
+      "totalGrossCents": 212411797390,
+      "closed": false,
+      "slate": 29
+    },
+    {
+      "week": 27,
+      "grossCents": 1740661622,
+      "totalGrossCents": 214152459012,
+      "closed": false,
+      "slate": 28
+    },
+    {
+      "week": 28,
+      "grossCents": 1583905076,
+      "totalGrossCents": 215736364088,
+      "closed": false,
+      "slate": 28
+    },
+    {
+      "week": 29,
+      "grossCents": 1447660982,
+      "totalGrossCents": 217184025070,
+      "closed": false,
+      "slate": 27
+    },
+    {
+      "week": 30,
+      "grossCents": 1317866757,
+      "totalGrossCents": 218501891827,
+      "closed": false,
+      "slate": 27
+    },
+    {
+      "week": 31,
+      "grossCents": 1199023588,
+      "totalGrossCents": 219700915415,
+      "closed": false,
+      "slate": 28
+    },
+    {
+      "week": 32,
+      "grossCents": 1092705427,
+      "totalGrossCents": 220793620842,
+      "closed": false,
+      "slate": 27
+    },
+    {
+      "week": 33,
+      "grossCents": 967836644,
+      "totalGrossCents": 221761457486,
+      "closed": false,
+      "slate": 27
+    },
+    {
+      "week": 34,
+      "grossCents": 883827488,
+      "totalGrossCents": 222645284974,
+      "closed": false,
+      "slate": 25
+    },
+    {
+      "week": 35,
+      "grossCents": 806652529,
+      "totalGrossCents": 223451937503,
+      "closed": false,
+      "slate": 25
+    },
+    {
+      "week": 36,
+      "grossCents": 736245792,
+      "totalGrossCents": 224188183295,
+      "closed": false,
+      "slate": 25
+    },
+    {
+      "week": 37,
+      "grossCents": 672846210,
+      "totalGrossCents": 224861029505,
+      "closed": false,
+      "slate": 27
+    },
+    {
+      "week": 38,
+      "grossCents": 614523706,
+      "totalGrossCents": 225475553211,
+      "closed": false,
+      "slate": 27
+    },
+    {
+      "week": 39,
+      "grossCents": 561650993,
+      "totalGrossCents": 226037204204,
+      "closed": false,
+      "slate": 27
+    },
+    {
+      "week": 40,
+      "grossCents": 513881478,
+      "totalGrossCents": 226551085682,
+      "closed": false,
+      "slate": 28
+    },
+    {
+      "week": 41,
+      "grossCents": 470027451,
+      "totalGrossCents": 227021113133,
+      "closed": false,
+      "slate": 27
+    },
+    {
+      "week": 42,
+      "grossCents": 431224329,
+      "totalGrossCents": 227452337462,
+      "closed": false,
+      "slate": 26
+    },
+    {
+      "week": 43,
+      "grossCents": 395133188,
+      "totalGrossCents": 227847470650,
+      "closed": false,
+      "slate": 28
+    },
+    {
+      "week": 44,
+      "grossCents": 350000369,
+      "totalGrossCents": 228197471019,
+      "closed": false,
+      "slate": 26
+    },
+    {
+      "week": 45,
+      "grossCents": 321650802,
+      "totalGrossCents": 228519121821,
+      "closed": false,
+      "slate": 27
+    },
+    {
+      "week": 46,
+      "grossCents": 294612359,
+      "totalGrossCents": 228813734180,
+      "closed": false,
+      "slate": 27
+    },
+    {
+      "week": 47,
+      "grossCents": 277873874,
+      "totalGrossCents": 229091608054,
+      "closed": false,
+      "slate": 27
+    },
+    {
+      "week": 48,
+      "grossCents": 254722079,
+      "totalGrossCents": 229346330133,
+      "closed": false,
+      "slate": 27
+    },
+    {
+      "week": 49,
+      "grossCents": 233610050,
+      "totalGrossCents": 229579940183,
+      "closed": false,
+      "slate": 29
+    },
+    {
+      "week": 50,
+      "grossCents": 215281625,
+      "totalGrossCents": 229795221808,
+      "closed": false,
+      "slate": 29
+    },
+    {
+      "week": 51,
+      "grossCents": 197329803,
+      "totalGrossCents": 229992551611,
+      "closed": false,
+      "slate": 30
+    },
+    {
+      "week": 52,
+      "grossCents": 181478403,
+      "totalGrossCents": 230174030014,
+      "closed": false,
+      "slate": 31
+    },
+    {
+      "week": 53,
+      "grossCents": 166005690,
+      "totalGrossCents": 230340035704,
+      "closed": false,
+      "slate": 31
+    },
+    {
+      "week": 54,
+      "grossCents": 152161313,
+      "totalGrossCents": 230492197017,
+      "closed": false,
+      "slate": 30
+    },
+    {
+      "week": 55,
+      "grossCents": 139517824,
+      "totalGrossCents": 230631714841,
+      "closed": false,
+      "slate": 31
+    },
+    {
+      "week": 56,
+      "grossCents": 134833249,
+      "totalGrossCents": 230766548090,
+      "closed": false,
+      "slate": 29
+    },
+    {
+      "week": 57,
+      "grossCents": 123793774,
+      "totalGrossCents": 230890341864,
+      "closed": false,
+      "slate": 29
+    },
+    {
+      "week": 58,
+      "grossCents": 81708423,
+      "totalGrossCents": 230972050287,
+      "closed": false,
+      "slate": 29
+    },
+    {
+      "week": 59,
+      "grossCents": 75284289,
+      "totalGrossCents": 231047334576,
+      "closed": false,
+      "slate": 27
+    },
+    {
+      "week": 60,
+      "grossCents": 69228260,
+      "totalGrossCents": 231116562836,
+      "closed": false,
+      "slate": 27
+    },
+    {
+      "week": 61,
+      "grossCents": 88477376,
+      "totalGrossCents": 231205040212,
+      "closed": false,
+      "slate": 25
+    },
+    {
+      "week": 62,
+      "grossCents": 81269599,
+      "totalGrossCents": 231286309811,
+      "closed": false,
+      "slate": 24
+    },
+    {
+      "week": 63,
+      "grossCents": 74804813,
+      "totalGrossCents": 231361114624,
+      "closed": false,
+      "slate": 26
+    },
+    {
+      "week": 64,
+      "grossCents": 68850940,
+      "totalGrossCents": 231429965564,
+      "closed": false,
+      "slate": 28
+    }
+  ],
+  "summary": {
+    "all": {
+      "completed": 0
+    },
+    "small": {
+      "completed": 0
+    },
+    "player": {
+      "completed": 0
+    }
+  },
+  "elapsedMs": 7146,
+  "limitations": [
+    "Prepared advanced owner, not a fresh normal career; excluded from ordinary hit/rarity rates",
+    "Capital and completed craft packages authored; four precursor audiences earned in actual earlier weeks while owner remains alive",
+    "Weak finale forks the exact same alive earned checkpoint and RNG/clock state; it does not get different precursor successes",
+    "Actual paid clinic service, Greenlight funding, paid campaign, real premiere, world competition, weekly settlement and verified persistence run unchanged",
+    "Observation stops at $3B attainment without closing the theatrical run; profit is collected to date, not lifetime"
+  ]
+}

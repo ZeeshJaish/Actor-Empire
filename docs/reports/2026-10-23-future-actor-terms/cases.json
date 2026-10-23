@@ -1,0 +1,1334 @@
+[
+  {
+    "variant": "baseline",
+    "route": "free",
+    "seed": 0,
+    "start": 612,
+    "end": 664,
+    "weeks": 52,
+    "status": "HORIZON_COMPLETE",
+    "startingCash": 27926748,
+    "endingCash": 58362226,
+    "cashChange": 30435478,
+    "craft": 98.88615493607004,
+    "fame": 100,
+    "reputation": 98.5,
+    "newlyObservedRoleQuotes": [
+      {
+        "id": "job_1800000012958",
+        "name": "Ocean Hiding",
+        "role": "SUPPORTING",
+        "salary": 24586,
+        "pointsIfStillLive": 0,
+        "phase": null
+      },
+      {
+        "id": "job_1800000012991",
+        "name": "Hidden Star",
+        "role": "LEAD",
+        "salary": 236453,
+        "pointsIfStillLive": 0,
+        "phase": null
+      },
+      {
+        "id": "job_1800000013084",
+        "name": "Thunder Empire",
+        "role": "LEAD",
+        "salary": 1468439,
+        "pointsIfStillLive": 0,
+        "phase": null
+      },
+      {
+        "id": "aud_active_1800000013429_0.5801426509860903",
+        "name": "Spark Surviving",
+        "role": "SUPPORTING",
+        "salary": 68128,
+        "pointsIfStillLive": null,
+        "phase": "AWAITING_RELEASE"
+      },
+      {
+        "id": "aud_active_1800000013450_0.16976020974107087",
+        "name": "Spark Surviving",
+        "role": "SUPPORTING",
+        "salary": 68128,
+        "pointsIfStillLive": null,
+        "phase": "AWAITING_RELEASE"
+      },
+      {
+        "id": "job_1800000013522",
+        "name": "Over Moon",
+        "role": "LEAD",
+        "salary": 1046662,
+        "pointsIfStillLive": 0,
+        "phase": "POST_PRODUCTION"
+      },
+      {
+        "id": "job_1800000013903",
+        "name": "Analog Moon",
+        "role": "LEAD",
+        "salary": 25000,
+        "pointsIfStillLive": 0,
+        "phase": "PRODUCTION"
+      },
+      {
+        "id": "job_1800000013935",
+        "name": "Fire Forest",
+        "role": "LEAD",
+        "salary": 365202,
+        "pointsIfStillLive": 0,
+        "phase": "PRE_PRODUCTION"
+      },
+      {
+        "id": "uni_job_1800000014020_0",
+        "name": "Captain America: Civil War",
+        "role": "CAMEO",
+        "salary": 5333333,
+        "pointsIfStillLive": 2,
+        "phase": "PRODUCTION"
+      },
+      {
+        "id": "uni_job_1800000014021_1",
+        "name": "Spider-Man: Homecoming",
+        "role": "LEAD",
+        "salary": 5333333,
+        "pointsIfStillLive": 2,
+        "phase": "SCHEDULED"
+      },
+      {
+        "id": "uni_job_1800000014022_2",
+        "name": "Avengers: Infinity War",
+        "role": "ENSEMBLE",
+        "salary": 5333333,
+        "pointsIfStillLive": 2,
+        "phase": "SCHEDULED"
+      },
+      {
+        "id": "uni_job_1800000014023_3",
+        "name": "Avengers: Endgame",
+        "role": "ENSEMBLE",
+        "salary": 5333333,
+        "pointsIfStillLive": 2,
+        "phase": "SCHEDULED"
+      },
+      {
+        "id": "uni_job_1800000014024_4",
+        "name": "Spider-Man: Far From Home",
+        "role": "LEAD",
+        "salary": 5333333,
+        "pointsIfStillLive": 2,
+        "phase": "SCHEDULED"
+      },
+      {
+        "id": "uni_job_1800000014025_5",
+        "name": "Spider-Man: No Way Home",
+        "role": "LEAD",
+        "salary": 5333333,
+        "pointsIfStillLive": 2,
+        "phase": "SCHEDULED"
+      }
+    ],
+    "totalNewlyObservedRoleQuotedPay": 35302596,
+    "allAcceptanceCashCredits": 8000000,
+    "theatricalPayouts": [
+      {
+        "id": "job_1800000010754",
+        "name": "No Country for Old Men",
+        "paid": 29674.0,
+        "existingAtFork": true
+      },
+      {
+        "id": "job_1800000012580",
+        "name": "E.T. the Extra-Terrestrial",
+        "paid": 21300752.0,
+        "existingAtFork": true
+      }
+    ],
+    "additionalVerifiedReloads": 14,
+    "additionalSettlementReplayRejections": 52,
+    "existingSignedTermsPreserved": true,
+    "prefixSha256": "4f732c4c9bfeac502348d06e48ab172393a7b038d8a398e8688381cbcf7c07fe",
+    "checkpointSha256": "956cb5f10a745e74a49abeb2ce295fe9c7126d5c66b849a29f1b99751fb1a4f4"
+  },
+  {
+    "variant": "baseline",
+    "route": "free",
+    "seed": 7,
+    "start": 612,
+    "end": 664,
+    "weeks": 52,
+    "status": "HORIZON_COMPLETE",
+    "startingCash": 27926748,
+    "endingCash": 55941640,
+    "cashChange": 28014892,
+    "craft": 98.81858127585907,
+    "fame": 100,
+    "reputation": 99.5,
+    "newlyObservedRoleQuotes": [
+      {
+        "id": "job_1800000012958",
+        "name": "Ocean Hiding",
+        "role": "SUPPORTING",
+        "salary": 24586,
+        "pointsIfStillLive": 0,
+        "phase": null
+      },
+      {
+        "id": "aud_active_1800000013010_0.18981500924564898",
+        "name": null,
+        "role": null,
+        "salary": 393315,
+        "pointsIfStillLive": null,
+        "phase": null
+      },
+      {
+        "id": "job_1800000013089",
+        "name": "Golden Scream",
+        "role": "LEAD",
+        "salary": 25000,
+        "pointsIfStillLive": 0,
+        "phase": null
+      },
+      {
+        "id": "job_1800000013168",
+        "name": "Deadpool",
+        "role": "LEAD",
+        "salary": 200000,
+        "pointsIfStillLive": 2.5,
+        "phase": null
+      },
+      {
+        "id": "job_1800000013415",
+        "name": "Day Finding",
+        "role": "LEAD",
+        "salary": 981033,
+        "pointsIfStillLive": 0,
+        "phase": null
+      },
+      {
+        "id": "job_1800000013557",
+        "name": "Blue Valley",
+        "role": "SUPPORTING",
+        "salary": 2860,
+        "pointsIfStillLive": 0,
+        "phase": "POST_PRODUCTION"
+      },
+      {
+        "id": "job_1800000013697",
+        "name": "Over Jump",
+        "role": "LEAD",
+        "salary": 210652,
+        "pointsIfStillLive": 0,
+        "phase": "PRODUCTION"
+      },
+      {
+        "id": "job_1800000013914",
+        "name": "Jump Falling",
+        "role": "LEAD",
+        "salary": 1970387,
+        "pointsIfStillLive": 0,
+        "phase": "PRODUCTION"
+      },
+      {
+        "id": "aud_active_1800000014079_0.7362026639748365",
+        "name": null,
+        "role": null,
+        "salary": 155974,
+        "pointsIfStillLive": null,
+        "phase": null
+      }
+    ],
+    "totalNewlyObservedRoleQuotedPay": 3963807,
+    "allAcceptanceCashCredits": 0,
+    "theatricalPayouts": [
+      {
+        "id": "job_1800000010754",
+        "name": "No Country for Old Men",
+        "paid": 29674.0,
+        "existingAtFork": true
+      },
+      {
+        "id": "job_1800000012580",
+        "name": "E.T. the Extra-Terrestrial",
+        "paid": 21239073.0,
+        "existingAtFork": true
+      },
+      {
+        "id": "job_1800000013168",
+        "name": "Deadpool",
+        "paid": 6070699.0,
+        "existingAtFork": false
+      }
+    ],
+    "additionalVerifiedReloads": 14,
+    "additionalSettlementReplayRejections": 52,
+    "existingSignedTermsPreserved": true,
+    "prefixSha256": "4f732c4c9bfeac502348d06e48ab172393a7b038d8a398e8688381cbcf7c07fe",
+    "checkpointSha256": "9f46358314d744e4883ad5b826cdd168d7556308599d6303b7ba04d9b203846d"
+  },
+  {
+    "variant": "baseline",
+    "route": "free",
+    "seed": 19,
+    "start": 612,
+    "end": 664,
+    "weeks": 52,
+    "status": "HORIZON_COMPLETE",
+    "startingCash": 27926748,
+    "endingCash": 56806851,
+    "cashChange": 28880103,
+    "craft": 98.57094940374925,
+    "fame": 100,
+    "reputation": 98.5,
+    "newlyObservedRoleQuotes": [
+      {
+        "id": "job_1800000012958",
+        "name": "Ocean Hiding",
+        "role": "SUPPORTING",
+        "salary": 24586,
+        "pointsIfStillLive": 0,
+        "phase": null
+      },
+      {
+        "id": "aud_active_1800000013012_0.5237711523659527",
+        "name": "Tear Sleeping",
+        "role": "LEAD",
+        "salary": 366817,
+        "pointsIfStillLive": null,
+        "phase": null
+      },
+      {
+        "id": "job_1800000013096",
+        "name": "Glass Scream",
+        "role": "LEAD",
+        "salary": 512194,
+        "pointsIfStillLive": 0,
+        "phase": null
+      },
+      {
+        "id": "aud_active_1800000013426_0.7789290552027524",
+        "name": "Gentle Love",
+        "role": "CAMEO",
+        "salary": 35373,
+        "pointsIfStillLive": null,
+        "phase": null
+      },
+      {
+        "id": "uni_job_1800000013505_0",
+        "name": "Monarch: Legacy of Monsters (Series)",
+        "role": "LEAD",
+        "salary": 10597440,
+        "pointsIfStillLive": 2,
+        "phase": "POST_PRODUCTION"
+      },
+      {
+        "id": "uni_job_1800000013506_1",
+        "name": "Godzilla x Kong: The New Empire",
+        "role": "SUPPORTING",
+        "salary": 10597440,
+        "pointsIfStillLive": 2,
+        "phase": "SCHEDULED"
+      },
+      {
+        "id": "uni_job_1800000013507_2",
+        "name": "Godzilla x Kong: Supernova",
+        "role": "LEAD",
+        "salary": 10597440,
+        "pointsIfStillLive": 2,
+        "phase": "SCHEDULED"
+      },
+      {
+        "id": "aud_active_1800000013659_0.2125836054328829",
+        "name": "Death Searching",
+        "role": "SUPPORTING",
+        "salary": 47509,
+        "pointsIfStillLive": null,
+        "phase": "POST_PRODUCTION"
+      },
+      {
+        "id": "job_1800000013789",
+        "name": "No Country for Old Men 2",
+        "role": "LEAD",
+        "salary": 3094474,
+        "pointsIfStillLive": 1,
+        "phase": "POST_PRODUCTION"
+      },
+      {
+        "id": "job_1800000014012",
+        "name": "Secret Infinite Federation",
+        "role": "LEAD",
+        "salary": 19634,
+        "pointsIfStillLive": 0,
+        "phase": "PRE_PRODUCTION"
+      },
+      {
+        "id": "job_1800000014090",
+        "name": "Crimson Horizon",
+        "role": "ENSEMBLE",
+        "salary": 65038,
+        "pointsIfStillLive": 0,
+        "phase": "PRE_PRODUCTION"
+      }
+    ],
+    "totalNewlyObservedRoleQuotedPay": 35957945,
+    "allAcceptanceCashCredits": 7948079,
+    "theatricalPayouts": [
+      {
+        "id": "job_1800000010754",
+        "name": "No Country for Old Men",
+        "paid": 29673.0,
+        "existingAtFork": true
+      },
+      {
+        "id": "job_1800000012580",
+        "name": "E.T. the Extra-Terrestrial",
+        "paid": 20484044.0,
+        "existingAtFork": true
+      }
+    ],
+    "additionalVerifiedReloads": 14,
+    "additionalSettlementReplayRejections": 52,
+    "existingSignedTermsPreserved": true,
+    "prefixSha256": "4f732c4c9bfeac502348d06e48ab172393a7b038d8a398e8688381cbcf7c07fe",
+    "checkpointSha256": "7a926ae3b7936018eaf869d877b0b5aedee9d43e89b9a33be79c3f91ffb29d00"
+  },
+  {
+    "variant": "baseline",
+    "route": "boosted",
+    "seed": 0,
+    "start": 755,
+    "end": 807,
+    "weeks": 52,
+    "status": "HORIZON_COMPLETE",
+    "startingCash": 42089958,
+    "endingCash": 43981293,
+    "cashChange": 1891335,
+    "craft": 100,
+    "fame": 99.88,
+    "reputation": 97,
+    "newlyObservedRoleQuotes": [
+      {
+        "id": "aud_active_1800000016244_0.48913507792167366",
+        "name": "Ocean Hiding",
+        "role": "CAMEO",
+        "salary": 35652,
+        "pointsIfStillLive": null,
+        "phase": null
+      },
+      {
+        "id": "job_1800000016250",
+        "name": "A Sea",
+        "role": "LEAD",
+        "salary": 253072,
+        "pointsIfStillLive": 0,
+        "phase": null
+      },
+      {
+        "id": "job_1800000016497",
+        "name": "Black Forest",
+        "role": "LEAD",
+        "salary": 241331,
+        "pointsIfStillLive": 0,
+        "phase": null
+      },
+      {
+        "id": "job_1800000016693",
+        "name": "Light Solar Light",
+        "role": "LEAD",
+        "salary": 149988,
+        "pointsIfStillLive": 0,
+        "phase": "POST_PRODUCTION"
+      },
+      {
+        "id": "job_1800000017075",
+        "name": "The Flame of World",
+        "role": "LEAD",
+        "salary": 201450,
+        "pointsIfStillLive": 0,
+        "phase": "PRODUCTION"
+      },
+      {
+        "id": "aud_active_1800000017245_0.3907203646376729",
+        "name": "River Calling",
+        "role": "SUPPORTING",
+        "salary": 134077,
+        "pointsIfStillLive": null,
+        "phase": "PRODUCTION"
+      }
+    ],
+    "totalNewlyObservedRoleQuotedPay": 1015570,
+    "allAcceptanceCashCredits": 0,
+    "theatricalPayouts": [
+      {
+        "id": "uni_job_1800000015003_0",
+        "name": "Captain America: The First Avenger",
+        "paid": 13222.0,
+        "existingAtFork": true
+      }
+    ],
+    "additionalVerifiedReloads": 14,
+    "additionalSettlementReplayRejections": 52,
+    "existingSignedTermsPreserved": true,
+    "prefixSha256": "ee7c458af03bf88e696de7841ae7959f81cd06bdbad720fc71725d2ae0637cc5",
+    "checkpointSha256": "e0c2606b1e5040b637f9dd7f885907a98ec6318b90f5ecbb41ae6148e2d8d4c7"
+  },
+  {
+    "variant": "baseline",
+    "route": "boosted",
+    "seed": 7,
+    "start": 755,
+    "end": 807,
+    "weeks": 52,
+    "status": "HORIZON_COMPLETE",
+    "startingCash": 42089958,
+    "endingCash": 51877777,
+    "cashChange": 9787819,
+    "craft": 100,
+    "fame": 99.27999999999997,
+    "reputation": 95,
+    "newlyObservedRoleQuotes": [
+      {
+        "id": "aud_active_1800000016247_0.18112202896736562",
+        "name": "Ocean Hiding",
+        "role": "CAMEO",
+        "salary": 35652,
+        "pointsIfStillLive": null,
+        "phase": null
+      },
+      {
+        "id": "aud_active_1800000016267_0.6073874337598681",
+        "name": "Ocean Hiding",
+        "role": "CAMEO",
+        "salary": 35652,
+        "pointsIfStillLive": null,
+        "phase": null
+      },
+      {
+        "id": "job_1800000016548",
+        "name": "The Soul of Laugh",
+        "role": "LEAD",
+        "salary": 25000,
+        "pointsIfStillLive": 0,
+        "phase": null
+      },
+      {
+        "id": "job_1800000016611",
+        "name": "The Sixth Sense",
+        "role": "LEAD",
+        "salary": 200000,
+        "pointsIfStillLive": 2.5,
+        "phase": null
+      },
+      {
+        "id": "job_1800000016826",
+        "name": "Silver Ash",
+        "role": "LEAD",
+        "salary": 302935,
+        "pointsIfStillLive": 0,
+        "phase": "POST_PRODUCTION"
+      },
+      {
+        "id": "job_1800000017018",
+        "name": "The Forest of Cry",
+        "role": "LEAD",
+        "salary": 1727488,
+        "pointsIfStillLive": 0,
+        "phase": "PRODUCTION"
+      },
+      {
+        "id": "job_1800000017264",
+        "name": "Cyber Smile",
+        "role": "LEAD",
+        "salary": 25000,
+        "pointsIfStillLive": 0,
+        "phase": "PRE_PRODUCTION"
+      }
+    ],
+    "totalNewlyObservedRoleQuotedPay": 2351727,
+    "allAcceptanceCashCredits": 0,
+    "theatricalPayouts": [
+      {
+        "id": "uni_job_1800000015003_0",
+        "name": "Captain America: The First Avenger",
+        "paid": 13222.0,
+        "existingAtFork": true
+      },
+      {
+        "id": "uni_job_1800000015004_1",
+        "name": "The Avengers",
+        "paid": 3436416.0,
+        "existingAtFork": true
+      },
+      {
+        "id": "job_1800000016611",
+        "name": "The Sixth Sense",
+        "paid": 4714859.0,
+        "existingAtFork": false
+      }
+    ],
+    "additionalVerifiedReloads": 14,
+    "additionalSettlementReplayRejections": 52,
+    "existingSignedTermsPreserved": true,
+    "prefixSha256": "ee7c458af03bf88e696de7841ae7959f81cd06bdbad720fc71725d2ae0637cc5",
+    "checkpointSha256": "214d057b067ab1e34e9178ac40d125cb056226722e597e08cdf7ea2690012fad"
+  },
+  {
+    "variant": "baseline",
+    "route": "boosted",
+    "seed": 19,
+    "start": 755,
+    "end": 807,
+    "weeks": 52,
+    "status": "HORIZON_COMPLETE",
+    "startingCash": 42089958,
+    "endingCash": 47806997,
+    "cashChange": 5717039,
+    "craft": 100,
+    "fame": 100,
+    "reputation": 96.8,
+    "newlyObservedRoleQuotes": [
+      {
+        "id": "aud_active_1800000016244_0.8640437142457813",
+        "name": "Ocean Hiding",
+        "role": "CAMEO",
+        "salary": 35652,
+        "pointsIfStillLive": null,
+        "phase": null
+      },
+      {
+        "id": "job_1800000016249",
+        "name": "Neo Dream",
+        "role": "LEAD",
+        "salary": 25000,
+        "pointsIfStillLive": 0,
+        "phase": null
+      },
+      {
+        "id": "job_1800000016572",
+        "name": "Ocean Losing",
+        "role": "LEAD",
+        "salary": 25000,
+        "pointsIfStillLive": 0,
+        "phase": null
+      },
+      {
+        "id": "aud_active_1800000016616_0.10301259299740195",
+        "name": "Blue Dream",
+        "role": "LEAD",
+        "salary": 1362843,
+        "pointsIfStillLive": null,
+        "phase": null
+      },
+      {
+        "id": "job_1800000016879",
+        "name": "Blue Jump",
+        "role": "LEAD",
+        "salary": 494271,
+        "pointsIfStillLive": 0,
+        "phase": "POST_PRODUCTION"
+      },
+      {
+        "id": "job_1800000017097",
+        "name": "The Soul of Ash",
+        "role": "LEAD",
+        "salary": 284897,
+        "pointsIfStillLive": 0,
+        "phase": "PRODUCTION"
+      },
+      {
+        "id": "job_1800000017200",
+        "name": "Spark Searching",
+        "role": "ENSEMBLE",
+        "salary": 17239,
+        "pointsIfStillLive": 0,
+        "phase": "PRE_PRODUCTION"
+      }
+    ],
+    "totalNewlyObservedRoleQuotedPay": 2244902,
+    "allAcceptanceCashCredits": 0,
+    "theatricalPayouts": [
+      {
+        "id": "uni_job_1800000015003_0",
+        "name": "Captain America: The First Avenger",
+        "paid": 13221.0,
+        "existingAtFork": true
+      },
+      {
+        "id": "uni_job_1800000015004_1",
+        "name": "The Avengers",
+        "paid": 2944905.0,
+        "existingAtFork": true
+      }
+    ],
+    "additionalVerifiedReloads": 14,
+    "additionalSettlementReplayRejections": 52,
+    "existingSignedTermsPreserved": true,
+    "prefixSha256": "ee7c458af03bf88e696de7841ae7959f81cd06bdbad720fc71725d2ae0637cc5",
+    "checkpointSha256": "7a02f3e4e8dbd7a99b506b89f6e67b00f5e90062cfc4c7d0cba5c4963578256b"
+  },
+  {
+    "variant": "balanced",
+    "route": "free",
+    "seed": 0,
+    "start": 612,
+    "end": 664,
+    "weeks": 52,
+    "status": "HORIZON_COMPLETE",
+    "startingCash": 27926748,
+    "endingCash": 53654239,
+    "cashChange": 25727491,
+    "craft": 98.88615493607004,
+    "fame": 100,
+    "reputation": 98.5,
+    "newlyObservedRoleQuotes": [
+      {
+        "id": "job_1800000012958",
+        "name": "Ocean Hiding",
+        "role": "SUPPORTING",
+        "salary": 24586,
+        "pointsIfStillLive": 0,
+        "phase": null
+      },
+      {
+        "id": "job_1800000012991",
+        "name": "Hidden Star",
+        "role": "LEAD",
+        "salary": 236453,
+        "pointsIfStillLive": 0,
+        "phase": null
+      },
+      {
+        "id": "job_1800000013084",
+        "name": "Thunder Empire",
+        "role": "LEAD",
+        "salary": 1468439,
+        "pointsIfStillLive": 0,
+        "phase": null
+      },
+      {
+        "id": "aud_active_1800000013429_0.5801426509860903",
+        "name": "Spark Surviving",
+        "role": "SUPPORTING",
+        "salary": 68128,
+        "pointsIfStillLive": null,
+        "phase": "AWAITING_RELEASE"
+      },
+      {
+        "id": "aud_active_1800000013450_0.16976020974107087",
+        "name": "Spark Surviving",
+        "role": "SUPPORTING",
+        "salary": 68128,
+        "pointsIfStillLive": null,
+        "phase": "AWAITING_RELEASE"
+      },
+      {
+        "id": "job_1800000013522",
+        "name": "Over Moon",
+        "role": "LEAD",
+        "salary": 1046662,
+        "pointsIfStillLive": 0,
+        "phase": "POST_PRODUCTION"
+      },
+      {
+        "id": "job_1800000013903",
+        "name": "Analog Moon",
+        "role": "LEAD",
+        "salary": 25000,
+        "pointsIfStillLive": 0,
+        "phase": "PRODUCTION"
+      },
+      {
+        "id": "job_1800000013935",
+        "name": "Fire Forest",
+        "role": "LEAD",
+        "salary": 365202,
+        "pointsIfStillLive": 0,
+        "phase": "PRE_PRODUCTION"
+      },
+      {
+        "id": "uni_job_1800000014020_0",
+        "name": "Captain America: Civil War",
+        "role": "CAMEO",
+        "salary": 2194676,
+        "pointsIfStillLive": 0.84,
+        "phase": "PRODUCTION"
+      },
+      {
+        "id": "uni_job_1800000014021_1",
+        "name": "Spider-Man: Homecoming",
+        "role": "LEAD",
+        "salary": 2194676,
+        "pointsIfStillLive": 0.84,
+        "phase": "SCHEDULED"
+      },
+      {
+        "id": "uni_job_1800000014022_2",
+        "name": "Avengers: Infinity War",
+        "role": "ENSEMBLE",
+        "salary": 2194676,
+        "pointsIfStillLive": 0.84,
+        "phase": "SCHEDULED"
+      },
+      {
+        "id": "uni_job_1800000014023_3",
+        "name": "Avengers: Endgame",
+        "role": "ENSEMBLE",
+        "salary": 2194676,
+        "pointsIfStillLive": 0.84,
+        "phase": "SCHEDULED"
+      },
+      {
+        "id": "uni_job_1800000014024_4",
+        "name": "Spider-Man: Far From Home",
+        "role": "LEAD",
+        "salary": 2194676,
+        "pointsIfStillLive": 0.84,
+        "phase": "SCHEDULED"
+      },
+      {
+        "id": "uni_job_1800000014025_5",
+        "name": "Spider-Man: No Way Home",
+        "role": "LEAD",
+        "salary": 2194676,
+        "pointsIfStillLive": 0.84,
+        "phase": "SCHEDULED"
+      }
+    ],
+    "totalNewlyObservedRoleQuotedPay": 16470654,
+    "allAcceptanceCashCredits": 3292013,
+    "theatricalPayouts": [
+      {
+        "id": "job_1800000010754",
+        "name": "No Country for Old Men",
+        "paid": 29674.0,
+        "existingAtFork": true
+      },
+      {
+        "id": "job_1800000012580",
+        "name": "E.T. the Extra-Terrestrial",
+        "paid": 21300752.0,
+        "existingAtFork": true
+      }
+    ],
+    "additionalVerifiedReloads": 14,
+    "additionalSettlementReplayRejections": 52,
+    "existingSignedTermsPreserved": true,
+    "prefixSha256": "4f732c4c9bfeac502348d06e48ab172393a7b038d8a398e8688381cbcf7c07fe",
+    "checkpointSha256": "7607b330dd01506c9e1d4fffcc1c8ca814c9f12c547ed4ceb3b8b0a2751d3574"
+  },
+  {
+    "variant": "balanced",
+    "route": "free",
+    "seed": 7,
+    "start": 612,
+    "end": 664,
+    "weeks": 52,
+    "status": "HORIZON_COMPLETE",
+    "startingCash": 27926748,
+    "endingCash": 53391946,
+    "cashChange": 25465198,
+    "craft": 98.81858127585907,
+    "fame": 100,
+    "reputation": 99.5,
+    "newlyObservedRoleQuotes": [
+      {
+        "id": "job_1800000012958",
+        "name": "Ocean Hiding",
+        "role": "SUPPORTING",
+        "salary": 24586,
+        "pointsIfStillLive": 0,
+        "phase": null
+      },
+      {
+        "id": "aud_active_1800000013010_0.18981500924564898",
+        "name": null,
+        "role": null,
+        "salary": 393315,
+        "pointsIfStillLive": null,
+        "phase": null
+      },
+      {
+        "id": "job_1800000013089",
+        "name": "Golden Scream",
+        "role": "LEAD",
+        "salary": 25000,
+        "pointsIfStillLive": 0,
+        "phase": null
+      },
+      {
+        "id": "job_1800000013168",
+        "name": "Deadpool",
+        "role": "LEAD",
+        "salary": 200000,
+        "pointsIfStillLive": 1.45,
+        "phase": null
+      },
+      {
+        "id": "job_1800000013415",
+        "name": "Day Finding",
+        "role": "LEAD",
+        "salary": 981033,
+        "pointsIfStillLive": 0,
+        "phase": null
+      },
+      {
+        "id": "job_1800000013557",
+        "name": "Blue Valley",
+        "role": "SUPPORTING",
+        "salary": 2860,
+        "pointsIfStillLive": 0,
+        "phase": "POST_PRODUCTION"
+      },
+      {
+        "id": "job_1800000013697",
+        "name": "Over Jump",
+        "role": "LEAD",
+        "salary": 210652,
+        "pointsIfStillLive": 0,
+        "phase": "PRODUCTION"
+      },
+      {
+        "id": "job_1800000013914",
+        "name": "Jump Falling",
+        "role": "LEAD",
+        "salary": 1970387,
+        "pointsIfStillLive": 0,
+        "phase": "PRODUCTION"
+      },
+      {
+        "id": "aud_active_1800000014079_0.7362026639748365",
+        "name": null,
+        "role": null,
+        "salary": 155974,
+        "pointsIfStillLive": null,
+        "phase": null
+      }
+    ],
+    "totalNewlyObservedRoleQuotedPay": 3963807,
+    "allAcceptanceCashCredits": 0,
+    "theatricalPayouts": [
+      {
+        "id": "job_1800000010754",
+        "name": "No Country for Old Men",
+        "paid": 29674.0,
+        "existingAtFork": true
+      },
+      {
+        "id": "job_1800000012580",
+        "name": "E.T. the Extra-Terrestrial",
+        "paid": 21239073.0,
+        "existingAtFork": true
+      },
+      {
+        "id": "job_1800000013168",
+        "name": "Deadpool",
+        "paid": 3521005.0,
+        "existingAtFork": false
+      }
+    ],
+    "additionalVerifiedReloads": 14,
+    "additionalSettlementReplayRejections": 52,
+    "existingSignedTermsPreserved": true,
+    "prefixSha256": "4f732c4c9bfeac502348d06e48ab172393a7b038d8a398e8688381cbcf7c07fe",
+    "checkpointSha256": "910630a58512e75412cb79fca410a438ff8e5e48dc2c9d5e3712009c55c6265f"
+  },
+  {
+    "variant": "balanced",
+    "route": "free",
+    "seed": 19,
+    "start": 612,
+    "end": 664,
+    "weeks": 52,
+    "status": "HORIZON_COMPLETE",
+    "startingCash": 27926748,
+    "endingCash": 50680076,
+    "cashChange": 22753328,
+    "craft": 98.57094940374925,
+    "fame": 100,
+    "reputation": 98.5,
+    "newlyObservedRoleQuotes": [
+      {
+        "id": "job_1800000012958",
+        "name": "Ocean Hiding",
+        "role": "SUPPORTING",
+        "salary": 24586,
+        "pointsIfStillLive": 0,
+        "phase": null
+      },
+      {
+        "id": "aud_active_1800000013012_0.5237711523659527",
+        "name": "Tear Sleeping",
+        "role": "LEAD",
+        "salary": 366817,
+        "pointsIfStillLive": null,
+        "phase": null
+      },
+      {
+        "id": "job_1800000013096",
+        "name": "Glass Scream",
+        "role": "LEAD",
+        "salary": 512194,
+        "pointsIfStillLive": 0,
+        "phase": null
+      },
+      {
+        "id": "aud_active_1800000013426_0.7789290552027524",
+        "name": "Gentle Love",
+        "role": "CAMEO",
+        "salary": 35373,
+        "pointsIfStillLive": null,
+        "phase": null
+      },
+      {
+        "id": "uni_job_1800000013505_0",
+        "name": "Monarch: Legacy of Monsters (Series)",
+        "role": "LEAD",
+        "salary": 2428406,
+        "pointsIfStillLive": 0.95,
+        "phase": "POST_PRODUCTION"
+      },
+      {
+        "id": "uni_job_1800000013506_1",
+        "name": "Godzilla x Kong: The New Empire",
+        "role": "SUPPORTING",
+        "salary": 2428406,
+        "pointsIfStillLive": 0.95,
+        "phase": "SCHEDULED"
+      },
+      {
+        "id": "uni_job_1800000013507_2",
+        "name": "Godzilla x Kong: Supernova",
+        "role": "LEAD",
+        "salary": 2428406,
+        "pointsIfStillLive": 0.95,
+        "phase": "SCHEDULED"
+      },
+      {
+        "id": "aud_active_1800000013659_0.2125836054328829",
+        "name": "Death Searching",
+        "role": "SUPPORTING",
+        "salary": 47509,
+        "pointsIfStillLive": null,
+        "phase": "POST_PRODUCTION"
+      },
+      {
+        "id": "job_1800000013789",
+        "name": "No Country for Old Men 2",
+        "role": "LEAD",
+        "salary": 3577212,
+        "pointsIfStillLive": 1.33,
+        "phase": "POST_PRODUCTION"
+      },
+      {
+        "id": "job_1800000014012",
+        "name": "Secret Infinite Federation",
+        "role": "LEAD",
+        "salary": 19634,
+        "pointsIfStillLive": 0,
+        "phase": "PRE_PRODUCTION"
+      },
+      {
+        "id": "job_1800000014090",
+        "name": "Crimson Horizon",
+        "role": "ENSEMBLE",
+        "salary": 65038,
+        "pointsIfStillLive": 0,
+        "phase": "PRE_PRODUCTION"
+      }
+    ],
+    "totalNewlyObservedRoleQuotedPay": 11933581,
+    "allAcceptanceCashCredits": 1821304,
+    "theatricalPayouts": [
+      {
+        "id": "job_1800000010754",
+        "name": "No Country for Old Men",
+        "paid": 29673.0,
+        "existingAtFork": true
+      },
+      {
+        "id": "job_1800000012580",
+        "name": "E.T. the Extra-Terrestrial",
+        "paid": 20484044.0,
+        "existingAtFork": true
+      }
+    ],
+    "additionalVerifiedReloads": 14,
+    "additionalSettlementReplayRejections": 52,
+    "existingSignedTermsPreserved": true,
+    "prefixSha256": "4f732c4c9bfeac502348d06e48ab172393a7b038d8a398e8688381cbcf7c07fe",
+    "checkpointSha256": "baf2cd819816cbe4c385cc97817edf30e7695c9302f6c2016910393f05ea199a"
+  },
+  {
+    "variant": "balanced",
+    "route": "boosted",
+    "seed": 0,
+    "start": 755,
+    "end": 807,
+    "weeks": 52,
+    "status": "HORIZON_COMPLETE",
+    "startingCash": 42089958,
+    "endingCash": 43981293,
+    "cashChange": 1891335,
+    "craft": 100,
+    "fame": 99.88,
+    "reputation": 97,
+    "newlyObservedRoleQuotes": [
+      {
+        "id": "aud_active_1800000016244_0.48913507792167366",
+        "name": "Ocean Hiding",
+        "role": "CAMEO",
+        "salary": 35652,
+        "pointsIfStillLive": null,
+        "phase": null
+      },
+      {
+        "id": "job_1800000016250",
+        "name": "A Sea",
+        "role": "LEAD",
+        "salary": 253072,
+        "pointsIfStillLive": 0,
+        "phase": null
+      },
+      {
+        "id": "job_1800000016497",
+        "name": "Black Forest",
+        "role": "LEAD",
+        "salary": 241331,
+        "pointsIfStillLive": 0,
+        "phase": null
+      },
+      {
+        "id": "job_1800000016693",
+        "name": "Light Solar Light",
+        "role": "LEAD",
+        "salary": 149988,
+        "pointsIfStillLive": 0,
+        "phase": "POST_PRODUCTION"
+      },
+      {
+        "id": "job_1800000017075",
+        "name": "The Flame of World",
+        "role": "LEAD",
+        "salary": 201450,
+        "pointsIfStillLive": 0,
+        "phase": "PRODUCTION"
+      },
+      {
+        "id": "aud_active_1800000017245_0.3907203646376729",
+        "name": "River Calling",
+        "role": "SUPPORTING",
+        "salary": 134077,
+        "pointsIfStillLive": null,
+        "phase": "PRODUCTION"
+      }
+    ],
+    "totalNewlyObservedRoleQuotedPay": 1015570,
+    "allAcceptanceCashCredits": 0,
+    "theatricalPayouts": [
+      {
+        "id": "uni_job_1800000015003_0",
+        "name": "Captain America: The First Avenger",
+        "paid": 13222.0,
+        "existingAtFork": true
+      }
+    ],
+    "additionalVerifiedReloads": 14,
+    "additionalSettlementReplayRejections": 52,
+    "existingSignedTermsPreserved": true,
+    "prefixSha256": "ee7c458af03bf88e696de7841ae7959f81cd06bdbad720fc71725d2ae0637cc5",
+    "checkpointSha256": "73fa032ae20eec213b0fe1482a92fde57a9502780ce493599f70342489a3e6f7"
+  },
+  {
+    "variant": "balanced",
+    "route": "boosted",
+    "seed": 7,
+    "start": 755,
+    "end": 807,
+    "weeks": 52,
+    "status": "HORIZON_COMPLETE",
+    "startingCash": 42089958,
+    "endingCash": 49746661,
+    "cashChange": 7656703,
+    "craft": 100,
+    "fame": 99.27999999999997,
+    "reputation": 95,
+    "newlyObservedRoleQuotes": [
+      {
+        "id": "aud_active_1800000016247_0.18112202896736562",
+        "name": "Ocean Hiding",
+        "role": "CAMEO",
+        "salary": 35652,
+        "pointsIfStillLive": null,
+        "phase": null
+      },
+      {
+        "id": "aud_active_1800000016267_0.6073874337598681",
+        "name": "Ocean Hiding",
+        "role": "CAMEO",
+        "salary": 35652,
+        "pointsIfStillLive": null,
+        "phase": null
+      },
+      {
+        "id": "job_1800000016548",
+        "name": "The Soul of Laugh",
+        "role": "LEAD",
+        "salary": 25000,
+        "pointsIfStillLive": 0,
+        "phase": null
+      },
+      {
+        "id": "job_1800000016611",
+        "name": "The Sixth Sense",
+        "role": "LEAD",
+        "salary": 200000,
+        "pointsIfStillLive": 1.37,
+        "phase": null
+      },
+      {
+        "id": "job_1800000016826",
+        "name": "Silver Ash",
+        "role": "LEAD",
+        "salary": 302935,
+        "pointsIfStillLive": 0,
+        "phase": "POST_PRODUCTION"
+      },
+      {
+        "id": "job_1800000017018",
+        "name": "The Forest of Cry",
+        "role": "LEAD",
+        "salary": 1727488,
+        "pointsIfStillLive": 0,
+        "phase": "PRODUCTION"
+      },
+      {
+        "id": "job_1800000017264",
+        "name": "Cyber Smile",
+        "role": "LEAD",
+        "salary": 25000,
+        "pointsIfStillLive": 0,
+        "phase": "PRE_PRODUCTION"
+      }
+    ],
+    "totalNewlyObservedRoleQuotedPay": 2351727,
+    "allAcceptanceCashCredits": 0,
+    "theatricalPayouts": [
+      {
+        "id": "uni_job_1800000015003_0",
+        "name": "Captain America: The First Avenger",
+        "paid": 13222.0,
+        "existingAtFork": true
+      },
+      {
+        "id": "uni_job_1800000015004_1",
+        "name": "The Avengers",
+        "paid": 3436416.0,
+        "existingAtFork": true
+      },
+      {
+        "id": "job_1800000016611",
+        "name": "The Sixth Sense",
+        "paid": 2583743.0,
+        "existingAtFork": false
+      }
+    ],
+    "additionalVerifiedReloads": 14,
+    "additionalSettlementReplayRejections": 52,
+    "existingSignedTermsPreserved": true,
+    "prefixSha256": "ee7c458af03bf88e696de7841ae7959f81cd06bdbad720fc71725d2ae0637cc5",
+    "checkpointSha256": "be70a8fb619b4341dc3111499e489bad600c822d51d0249e8e3d1dbe5b9b85d1"
+  },
+  {
+    "variant": "balanced",
+    "route": "boosted",
+    "seed": 19,
+    "start": 755,
+    "end": 807,
+    "weeks": 52,
+    "status": "HORIZON_COMPLETE",
+    "startingCash": 42089958,
+    "endingCash": 47806997,
+    "cashChange": 5717039,
+    "craft": 100,
+    "fame": 100,
+    "reputation": 96.8,
+    "newlyObservedRoleQuotes": [
+      {
+        "id": "aud_active_1800000016244_0.8640437142457813",
+        "name": "Ocean Hiding",
+        "role": "CAMEO",
+        "salary": 35652,
+        "pointsIfStillLive": null,
+        "phase": null
+      },
+      {
+        "id": "job_1800000016249",
+        "name": "Neo Dream",
+        "role": "LEAD",
+        "salary": 25000,
+        "pointsIfStillLive": 0,
+        "phase": null
+      },
+      {
+        "id": "job_1800000016572",
+        "name": "Ocean Losing",
+        "role": "LEAD",
+        "salary": 25000,
+        "pointsIfStillLive": 0,
+        "phase": null
+      },
+      {
+        "id": "aud_active_1800000016616_0.10301259299740195",
+        "name": "Blue Dream",
+        "role": "LEAD",
+        "salary": 1362843,
+        "pointsIfStillLive": null,
+        "phase": null
+      },
+      {
+        "id": "job_1800000016879",
+        "name": "Blue Jump",
+        "role": "LEAD",
+        "salary": 494271,
+        "pointsIfStillLive": 0,
+        "phase": "POST_PRODUCTION"
+      },
+      {
+        "id": "job_1800000017097",
+        "name": "The Soul of Ash",
+        "role": "LEAD",
+        "salary": 284897,
+        "pointsIfStillLive": 0,
+        "phase": "PRODUCTION"
+      },
+      {
+        "id": "job_1800000017200",
+        "name": "Spark Searching",
+        "role": "ENSEMBLE",
+        "salary": 17239,
+        "pointsIfStillLive": 0,
+        "phase": "PRE_PRODUCTION"
+      }
+    ],
+    "totalNewlyObservedRoleQuotedPay": 2244902,
+    "allAcceptanceCashCredits": 0,
+    "theatricalPayouts": [
+      {
+        "id": "uni_job_1800000015003_0",
+        "name": "Captain America: The First Avenger",
+        "paid": 13221.0,
+        "existingAtFork": true
+      },
+      {
+        "id": "uni_job_1800000015004_1",
+        "name": "The Avengers",
+        "paid": 2944905.0,
+        "existingAtFork": true
+      }
+    ],
+    "additionalVerifiedReloads": 14,
+    "additionalSettlementReplayRejections": 52,
+    "existingSignedTermsPreserved": true,
+    "prefixSha256": "ee7c458af03bf88e696de7841ae7959f81cd06bdbad720fc71725d2ae0637cc5",
+    "checkpointSha256": "dbc59d8004c1e146316fdcbdb38da56f2fa7629f52a4e434cd4a84950aef8b99"
+  }
+]

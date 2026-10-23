@@ -1,0 +1,22 @@
+{
+  "variant": "baseline",
+  "route": "boosted",
+  "source": "/tmp/ae-lifetime-repaired-boosted/boosted/career-0.json.gz",
+  "sourceCheckpointSha256": "ee7c458af03bf88e696de7841ae7959f81cd06bdbad720fc71725d2ae0637cc5",
+  "playerHash": "b25ca2e568da07e0b8358f6bc369079c235ba621df6d97b8983e618807880974",
+  "handoffWeek": 755,
+  "horizon": 807,
+  "seeds": [
+    0,
+    7,
+    19
+  ],
+  "comparisonWeeks": 52,
+  "decisionMode": "overbooked",
+  "scope": "Conditional future-seed continuations of two earned fresh-origin careers, not independent fresh careers",
+  "auditChanges": [
+    "Pinned new executable/horizon",
+    "Reset future RNG call counter for each named future seed; player, cash, signed offers/contracts, clock and history unchanged"
+  ],
+  "realPurchases": false
+}

@@ -5,9 +5,12 @@ import type {
     NPCStudioState,
     StudioAiLedgerCategory,
     StudioAiSlateCommitment,
+    WorldState,
 } from '../../types';
 import { createDeterministicId, createDeterministicRng } from '../deterministicRandom';
 import { attachNormalizedStudioAiState, STUDIO_AI_LEDGER_LIMIT } from './studioAiState';
+import { pendingStudioCinemaCampaignMillions, planStudioCinemaInvestment } from './studioAiCinemaInvestment';
+import { createIndustryBudgetSuitability } from '../industryIntelligence/industryBudgetSuitability';
 
 export type StudioAiSlateAdmissionReason =
     | 'ADMITTED'
@@ -20,6 +23,7 @@ export type StudioAiSlateAdmissionReason =
     | 'NO_DEVELOPMENT_CAPACITY'
     | 'INSUFFICIENT_RUNWAY'
     | 'INSUFFICIENT_AFFORDABILITY'
+    | 'INSUFFICIENT_MARKET_SUPPORT'
     | 'MISSING_SOURCE_RIGHT';
 
 export interface StudioAiDevelopmentTransaction {
@@ -36,6 +40,7 @@ export interface StudioAiSlateAdmissionResult {
     reason: StudioAiSlateAdmissionReason;
     commitment?: StudioAiSlateCommitment;
     transaction?: StudioAiDevelopmentTransaction;
+    fingerprint?: IndustryContentFingerprint;
 }
 
 interface AdmitStudioContentProposalInput {
@@ -43,6 +48,7 @@ interface AdmitStudioContentProposalInput {
     proposal: IndustryIntelligenceProposal;
     fingerprint?: IndustryContentFingerprint;
     absoluteWeek: number;
+    world?: WorldState;
 }
 
 const money = (value: number): number => Math.round(Math.max(0, value) * 1000) / 1000;
@@ -55,7 +61,7 @@ export const admitStudioContentProposal = (input: AdmitStudioContentProposalInpu
     const ai = studio.ai!;
     const slate = ai.slate!;
     const proposal = input.proposal;
-    const fingerprint = input.fingerprint;
+    let fingerprint = input.fingerprint;
     if (ai.controller === 'PLAYER') return { accepted: false, reason: 'PLAYER_CONTROLLED' };
     if (RESTRICTED_STATUSES.has(ai.status)) return { accepted: false, reason: 'STUDIO_UNAVAILABLE' };
     if (proposal.companyId !== studio.id || proposal.companyKind !== 'PRODUCTION_STUDIO' || proposal.lane !== 'CONTENT_STRATEGY' || proposal.actionFamily === 'HOLD') {
@@ -78,19 +84,47 @@ export const admitStudioContentProposal = (input: AdmitStudioContentProposalInpu
 
     const protectedWeeks = 8 + ai.profile.financialDiscipline / 8;
     const protectedCash = ai.finance.weeklyOperatingCostMillions * protectedWeeks;
-    const spendableCash = Math.max(0, studio.cashReserve - protectedCash - ai.finance.committedSpendMillions);
+    const spendableCash = Math.max(0, studio.cashReserve - protectedCash - ai.finance.committedSpendMillions
+        - pendingStudioCinemaCampaignMillions(input.world,studio.id));
     const affordability = Math.max(0, Math.min(proposal.affordabilityCeilingMillions, spendableCash * 0.72));
-    const suitability = fingerprint.budgetSuitability;
-    if (affordability < suitability.minimumMillions * 0.5) return { accepted: false, reason: 'INSUFFICIENT_AFFORDABILITY' };
+    let suitability = fingerprint.budgetSuitability;
+    const canRescope=fingerprint.format==='MOVIE'&&['STANDALONE','FOUND_UNIVERSE'].includes(fingerprint.relationship)
+        &&input.world?.worldPopulation&&input.world.worldAudienceEconomy&&input.world.worldAudienceParticipation;
+    if (affordability<=0||affordability < suitability.minimumMillions * 0.5&&!canRescope) return { accepted: false, reason: 'INSUFFICIENT_AFFORDABILITY' };
 
     const rng = createDeterministicRng(`${ai.seed}:b5:admit:${proposal.idempotencyKey}:${fingerprint.id}`);
     const appetite = clamp((ai.profile.budgetAppetite + proposal.urgency + proposal.score.expectedUpside) / 300, 0.15, 0.92);
     const ideal = suitability.idealLowMillions + (suitability.idealHighMillions - suitability.idealLowMillions) * appetite;
-    const proposedBudgetMillions = money(clamp(
+    let proposedBudgetMillions = money(clamp(
         ideal * (0.94 + rng() * 0.14),
         Math.min(suitability.minimumMillions, affordability),
         Math.min(suitability.ambitiousMaximumMillions, affordability),
     ));
+    let investment=planStudioCinemaInvestment({world:input.world,studio,fingerprint,absoluteWeek:input.absoluteWeek,
+        targetMillions:proposedBudgetMillions,minimumMillions:suitability.minimumMillions});
+    // Only a private, unsigned standalone package may change its planned cast scope.
+    // Continuity packages keep their established creative/casting requirement.
+    if(investment&&investment.productionMillions<suitability.minimumMillions&&canRescope){
+        const original=fingerprint;
+        for(const fraction of [.65,.4,.2]){
+            const starPowerTarget=Math.min(original.starPowerTarget,Math.max(15,Math.round(original.starPowerTarget*fraction)));
+            if(starPowerTarget>=original.starPowerTarget)continue;
+            const curve=createIndustryBudgetSuitability({format:original.format,primaryGenre:original.primaryGenre,creativeRisk:original.creativeRisk,
+                starPowerTarget,commercialIntent:original.commercialIntent,affordabilityCeilingMillions:affordability,theatricalPlanning:true});
+            const scoped={...original,starPowerTarget,budgetSuitability:curve,cinemaScopeVersion:1 as const};
+            const target=Math.min(affordability,curve.idealLowMillions+(curve.idealHighMillions-curve.idealLowMillions)*appetite);
+            const quote=planStudioCinemaInvestment({world:input.world,studio,fingerprint:scoped,absoluteWeek:input.absoluteWeek,targetMillions:target,minimumMillions:curve.minimumMillions});
+            if(quote&&quote.productionMillions>=curve.minimumMillions){fingerprint=scoped;suitability=curve;investment=quote;break}
+        }
+    }
+    if(investment){
+        if(investment.productionMillions<suitability.minimumMillions)return {accepted:false,reason:'INSUFFICIENT_MARKET_SUPPORT'};
+        proposedBudgetMillions=investment.productionMillions;
+        // Admission is the first new liability. Version every newly financed movie
+        // package so the actual cast respects the target used by its market quote.
+        // Existing greenlights, selected casts and missing-overlay legacy calls bypass this.
+        fingerprint={...fingerprint,cinemaScopeVersion:1};
+    }
     if (proposedBudgetMillions <= 0) return { accepted: false, reason: 'INSUFFICIENT_AFFORDABILITY' };
 
     const developmentRate = fingerprint.format === 'MOVIE' ? 0.032 : 0.038;
@@ -128,6 +162,7 @@ export const admitStudioContentProposal = (input: AdmitStudioContentProposalInpu
     return {
         accepted: true,
         reason: 'ADMITTED',
+        fingerprint,
         commitment,
         transaction: {
             id: createDeterministicId('studio_ai_development', commitmentId, input.absoluteWeek),

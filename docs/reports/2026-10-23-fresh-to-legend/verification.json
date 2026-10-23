@@ -1,0 +1,395 @@
+{
+  "scope": "Synthetic real-engine and real-action callbacks; isolated stores; not manual UI or real billing",
+  "freshTrajectoryCount": 2,
+  "seeds": [
+    0
+  ],
+  "adaptivePolicies": true,
+  "balanceParametersRetunedThisTurn": false,
+  "productionChangesThisTurn": [
+    "Preserve signed finite cash during migration and valid legacy refund offsets",
+    "New installments start their own campaigns; scoped legacy exposure reads do not retitle parent paid evidence"
+  ],
+  "sources": {
+    "free": {
+      "pinnedSources": 422,
+      "changedSources": [
+        "services/studioAi/studioAiCinemaInvestment.ts",
+        "services/boxOffice/boxOfficeOfferedLaunch.ts"
+      ],
+      "executableHashMatches": true,
+      "runtimeChangedSources": [
+        "services/studioAi/studioAiCinemaInvestment.ts",
+        "services/boxOffice/boxOfficeOfferedLaunch.ts"
+      ],
+      "typeOnlyConcurrentChanges": [],
+      "lateLegacyGuardChanges": [
+        "services/boxOffice/boxOfficeOfferedLaunch.ts"
+      ],
+      "unrelatedConcurrentRuntimeChanges": [
+        "services/studioAi/studioAiCinemaInvestment.ts"
+      ]
+    },
+    "boosted": {
+      "pinnedSources": 422,
+      "changedSources": [
+        "services/studioAi/studioAiCinemaInvestment.ts",
+        "services/boxOffice/boxOfficeOfferedLaunch.ts"
+      ],
+      "executableHashMatches": true,
+      "runtimeChangedSources": [
+        "services/studioAi/studioAiCinemaInvestment.ts",
+        "services/boxOffice/boxOfficeOfferedLaunch.ts"
+      ],
+      "typeOnlyConcurrentChanges": [],
+      "lateLegacyGuardChanges": [
+        "services/boxOffice/boxOfficeOfferedLaunch.ts"
+      ],
+      "unrelatedConcurrentRuntimeChanges": [
+        "services/studioAi/studioAiCinemaInvestment.ts"
+      ]
+    }
+  },
+  "lineages": {
+    "free": {
+      "source": "/tmp/ae-lifetime-final-free/free/career-0.json.gz",
+      "sourceCheckpointSha256": "8f0749c52762367f7fa7c6b476d8a495c2e8f1356ecca53f0952d75483176f6e",
+      "preservedSource": "/tmp/ae-lifetime-repaired-free/prefix.json.gz",
+      "originalExecutable": "69a31fe0d8892110bc42f30b0e07aa6288a0aa29e2426f1114b3a05511a79c9d",
+      "newExecutable": "c587080ddec1479eb7d0c63bb252e6eaea638e18539cadbc980f3c647a7fdb93",
+      "handoffWeek": 599,
+      "legendFollowupWeeks": 117,
+      "playerHash": "c3e3b38491362352169fd5aebd22526809966d814c2078af0cace3e5e2e8d85c",
+      "changes": [
+        "Only executable identity and audit stopping metadata. Exact earned player/RNG/clock, signed cash/loans/contracts and previous performances preserved. New executable fixes installment-specific campaign ownership and legacy awareness reads. No gameplay rebalancing or historical money repair."
+      ],
+      "originalFinalOutcome": "Retained first completion through599; extend13 weeks on repaired source",
+      "finalCheckpointSha256": "4f732c4c9bfeac502348d06e48ab172393a7b038d8a398e8688381cbcf7c07fe",
+      "finalCheckpointWeek": 612,
+      "finalExecutableWeeks": 13,
+      "finalExecutableReloads": 3,
+      "unchangedPrefixVerified": true
+    },
+    "boosted": {
+      "source": "/tmp/ae-lifetime-exposure-recovery/boosted/career-0.json.gz",
+      "sourceCheckpointSha256": "39cfcb68d72c780b15ed91148696700ceb21dce7a7cd7407691e6864d2fcf777",
+      "preservedSource": "/tmp/ae-lifetime-repaired-boosted/prefix.json.gz",
+      "originalExecutable": "69a31fe0d8892110bc42f30b0e07aa6288a0aa29e2426f1114b3a05511a79c9d",
+      "newExecutable": "c587080ddec1479eb7d0c63bb252e6eaea638e18539cadbc980f3c647a7fdb93",
+      "handoffWeek": 729,
+      "legendFollowupWeeks": 104,
+      "playerHash": "491164bd9ce0bf522991bea41c099b27b2c127dcb78c551e20a797ee559680b1",
+      "changes": [
+        "Only executable identity and audit stopping metadata. Exact earned player/RNG/clock, signed cash/loans/contracts and previous performances preserved. New executable fixes installment-specific campaign ownership and legacy awareness reads. No gameplay rebalancing or historical money repair."
+      ],
+      "originalFinalOutcome": "Exact pre-fault replay restored729 from immutable681; original733 failure and equal-curve RED replay retained",
+      "finalCheckpointSha256": "ee7c458af03bf88e696de7841ae7959f81cd06bdbad720fc71725d2ae0637cc5",
+      "finalCheckpointWeek": 755,
+      "finalExecutableWeeks": 26,
+      "finalExecutableReloads": 6,
+      "unchangedPrefixVerified": true
+    }
+  },
+  "concurrentTypeOnlyProof": {
+    "path": "types.ts",
+    "currentSourceSha256": "3040830d70cdaeda3a6604519fe64a1a19e92946a3794723f8a30f51ca132ca0",
+    "headSourceSha256": "cc934c67d59622a4f19ac4cf3f437a5ab73db89b72134da450a210c96a3e9282",
+    "currentRuntimeSha256": "d0adca3d1f0db1d3fe59622775140c01c297602e51a8f54c6546390938e6a15c",
+    "headRuntimeSha256": "d0adca3d1f0db1d3fe59622775140c01c297602e51a8f54c6546390938e6a15c",
+    "runtimeEquivalent": true,
+    "scope": "Concurrent optional type declarations only; does not authorize ignoring any runtime source change"
+  },
+  "currentWholeEconomySnapshotLifetimeValidated": false,
+  "concurrentEconomyRule": "Preserve unrelated evolving source; any runtime drift means lifetime timings apply to the recorded pinned snapshot, not the new whole economy",
+  "latestSourceFollowup": {
+    "free": {
+      "strategy": "free",
+      "status": "LEGEND_PLUS_TWO_YEARS",
+      "weeks": 626,
+      "years": 12.04,
+      "legendWeek": 495,
+      "weeksAfterFirstLegend": 131,
+      "firstPremiere": 52,
+      "craft50": 159,
+      "craft80": 317,
+      "anyActingSkill95": 299,
+      "anyActingSkill100": 331,
+      "allActingSkills95": 624,
+      "allActingSkills100": null,
+      "fame50": 244,
+      "fame94": 469,
+      "cash": 35821692,
+      "debt": 0,
+      "netCashAfterDebt": 35821692,
+      "totalBorrowed": 0,
+      "craft": 98.51986968216103,
+      "skills": {
+        "delivery": 100,
+        "memorization": 98.0219809296376,
+        "expression": 100,
+        "improvisation": 95.27679133648455,
+        "discipline": 100,
+        "presence": 96.3403155090051,
+        "charisma": 100,
+        "writing": 0
+      },
+      "fame": 97.02399999999989,
+      "reputation": 97.8,
+      "experience": 100,
+      "releasedCredits": 31,
+      "archivedCredits": 30,
+      "recentCareerEvidence": {
+        "credits": 31,
+        "recentCredits": 5,
+        "recentPerformance": 92,
+        "workSignal": 0.8846153846153846,
+        "audience": 0.9320461641867431,
+        "spanWeeks": 575,
+        "strongCredits": 5
+      },
+      "grossSignedActingSalaryReceived": 2149918,
+      "agentCommissionsDebited": 134141,
+      "verifiedReloads": 131,
+      "verifiedSaves": 131,
+      "cinemaSettlementReplayRejections": 626,
+      "simulatedPurchaseActions": [],
+      "minimumCash": 1950,
+      "negativeCashWeeks": 0,
+      "firstCashMillion": 368,
+      "firstCashTenMillion": 378,
+      "largestWeeklyCashIncreases": [
+        {
+          "week": 618,
+          "increase": 7974755
+        },
+        {
+          "week": 556,
+          "increase": 1848800
+        },
+        {
+          "week": 557,
+          "increase": 1606334
+        },
+        {
+          "week": 368,
+          "increase": 1478673
+        },
+        {
+          "week": 558,
+          "increase": 1417129
+        }
+      ],
+      "failure": null,
+      "handoffWeek": 612,
+      "additionalWeeks": 14,
+      "sourceChangesSinceBundle": [],
+      "wholeLifetimeOnThisSnapshot": false,
+      "lineage": {
+        "source": "/tmp/ae-lifetime-repaired-free/free/career-0.json.gz",
+        "sourceCheckpointSha256": "4f732c4c9bfeac502348d06e48ab172393a7b038d8a398e8688381cbcf7c07fe",
+        "preservedSource": "/tmp/ae-lifetime-current-smoke-free/prefix.json.gz",
+        "originalExecutable": "c587080ddec1479eb7d0c63bb252e6eaea638e18539cadbc980f3c647a7fdb93",
+        "newExecutable": "65a8bbe2198c218154d473f924789956f51ebeec338988c462e6a028c66e52f5",
+        "handoffWeek": 612,
+        "legendFollowupWeeks": 131,
+        "playerHash": "5a2dcfd3768a2bfb3bb866c953b38bd66e4ea071324eeab88705ea4fa5d97a42",
+        "changes": [
+          "Only executable identity and audit stopping metadata. Exact earned player/RNG/clock, signed cash/loans/contracts and previous performances preserved. New executable fixes installment-specific campaign ownership and legacy awareness reads. No gameplay rebalancing or historical money repair."
+        ],
+        "originalFinalOutcome": "Retained first completion through599; extend13 weeks on repaired source"
+      }
+    },
+    "boosted": {
+      "strategy": "boosted",
+      "status": "LEGEND_PLUS_TWO_YEARS",
+      "weeks": 769,
+      "years": 14.79,
+      "legendWeek": 651,
+      "weeksAfterFirstLegend": 118,
+      "firstPremiere": 64,
+      "craft50": 154,
+      "craft80": 325,
+      "anyActingSkill95": 328,
+      "anyActingSkill100": 401,
+      "allActingSkills95": 653,
+      "allActingSkills100": 739,
+      "fame50": 214,
+      "fame94": 510,
+      "cash": 42011041,
+      "debt": 86801,
+      "netCashAfterDebt": 41924240,
+      "totalBorrowed": 100000,
+      "craft": 100,
+      "skills": {
+        "delivery": 100,
+        "memorization": 100,
+        "expression": 100,
+        "improvisation": 100,
+        "discipline": 100,
+        "presence": 100,
+        "charisma": 100,
+        "writing": 0
+      },
+      "fame": 99.08899999999954,
+      "reputation": 90.2,
+      "experience": 100,
+      "releasedCredits": 32,
+      "archivedCredits": 30,
+      "recentCareerEvidence": {
+        "credits": 32,
+        "recentCredits": 4,
+        "recentPerformance": 91.5,
+        "workSignal": 0.7371794871794872,
+        "audience": 0.9618834657371815,
+        "spanWeeks": 706,
+        "strongCredits": 4
+      },
+      "grossSignedActingSalaryReceived": 7898804,
+      "agentCommissionsDebited": 890513,
+      "verifiedReloads": 157,
+      "verifiedSaves": 157,
+      "cinemaSettlementReplayRejections": 769,
+      "simulatedPurchaseActions": [
+        {
+          "week": 0,
+          "type": "simulated-purchase:cash_75000",
+          "cost": -75000,
+          "energy": 0
+        },
+        {
+          "week": 0,
+          "type": "simulated-purchase:energy_500",
+          "cost": 0,
+          "energy": -500
+        }
+      ],
+      "minimumCash": -33019,
+      "negativeCashWeeks": 38,
+      "firstCashMillion": 534,
+      "firstCashTenMillion": 548,
+      "largestWeeklyCashIncreases": [
+        {
+          "week": 699,
+          "increase": 7962255
+        },
+        {
+          "week": 729,
+          "increase": 3117169
+        },
+        {
+          "week": 652,
+          "increase": 2313894
+        },
+        {
+          "week": 656,
+          "increase": 1962021
+        },
+        {
+          "week": 655,
+          "increase": 1927136
+        }
+      ],
+      "failure": null,
+      "handoffWeek": 755,
+      "additionalWeeks": 14,
+      "sourceChangesSinceBundle": [],
+      "wholeLifetimeOnThisSnapshot": false,
+      "lineage": {
+        "source": "/tmp/ae-lifetime-repaired-boosted/boosted/career-0.json.gz",
+        "sourceCheckpointSha256": "ee7c458af03bf88e696de7841ae7959f81cd06bdbad720fc71725d2ae0637cc5",
+        "preservedSource": "/tmp/ae-lifetime-current-smoke-boosted/prefix.json.gz",
+        "originalExecutable": "c587080ddec1479eb7d0c63bb252e6eaea638e18539cadbc980f3c647a7fdb93",
+        "newExecutable": "65a8bbe2198c218154d473f924789956f51ebeec338988c462e6a028c66e52f5",
+        "handoffWeek": 755,
+        "legendFollowupWeeks": 118,
+        "playerHash": "b25ca2e568da07e0b8358f6bc369079c235ba621df6d97b8983e618807880974",
+        "changes": [
+          "Only executable identity and audit stopping metadata. Exact earned player/RNG/clock, signed cash/loans/contracts and previous performances preserved. New executable fixes installment-specific campaign ownership and legacy awareness reads. No gameplay rebalancing or historical money repair."
+        ],
+        "originalFinalOutcome": "Exact pre-fault replay restored729 from immutable681; original733 failure and equal-curve RED replay retained"
+      }
+    }
+  },
+  "finalEndpointSafety": {
+    "passed": true,
+    "cases": [
+      {
+        "label": "primary-free",
+        "week": 612,
+        "cash": 27926748,
+        "preserved": true
+      },
+      {
+        "label": "primary-boosted",
+        "week": 755,
+        "cash": 42089958,
+        "preserved": true
+      },
+      {
+        "label": "maxed-focused",
+        "week": 859,
+        "cash": 51994270,
+        "preserved": true
+      },
+      {
+        "label": "maxed-neglect",
+        "week": 859,
+        "cash": 51200395,
+        "preserved": true
+      },
+      {
+        "label": "maxed-overbooked",
+        "week": 859,
+        "cash": 86793951,
+        "preserved": true
+      },
+      {
+        "label": "latest-source-free",
+        "week": 626,
+        "cash": 35821692,
+        "preserved": true
+      },
+      {
+        "label": "latest-source-boosted",
+        "week": 769,
+        "cash": 42011041,
+        "preserved": true
+      }
+    ],
+    "scope": "Isolated real verified-store round trips; no personal save slots"
+  },
+  "initialWorkspacePathCount": 77,
+  "initialPathsWithConcurrentChanges": [
+    "docs/reports/2026-10-23-normal-career-cohort/progress.md",
+    "scripts/report-cinema-normal-cohort.ts",
+    "scripts/run-cinema-normal-cohort.mjs",
+    "types.ts"
+  ],
+  "concurrentPathsRestoredOrOverwritten": false,
+  "build": {
+    "exitCode": 0,
+    "signal": null,
+    "heapMB": 2048,
+    "peakOwnedTreeRssMiB": 2062.3,
+    "stopReason": null,
+    "systemGuard": "darwin"
+  },
+  "focusedTypecheck": {
+    "passed": true,
+    "command": "node --max-old-space-size=2304 node_modules/typescript/bin/tsc -p /tmp/ae-lifetime-final-tsconfig.json --noEmit"
+  },
+  "wholeWorkspaceTypecheck": {
+    "passed": false,
+    "reason": "V8 heap exhaustion at 2048 and 3072 MiB; not a type-error result"
+  },
+  "allTypeScriptSourcesCheck": {
+    "passed": false,
+    "reason": "Three existing includes-on-never errors in unchanged HEAD-identical scripts/audit-streaming-ident-defaults.tsx at35/36/45; generated JavaScript excluded in this diagnostic"
+  },
+  "independentScopedReview": "No critical or important issues in either signed-wallet migration or installment exposure/funding fix; both read-only reviews",
+  "lateLegacyDraftReview": "No important issues; protects historical/owned/authored projects, child payments and reserves, retains genuine child promotion and NPC funding idempotence",
+  "masteryPressureCasesComplete": true,
+  "gitCommitOrPush": false,
+  "realPurchases": false,
+  "personalSaveSlotsAccessed": false
+}

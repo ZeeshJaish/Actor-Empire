@@ -1,0 +1,13 @@
+import ts from 'typescript';
+import {readFileSync,writeFileSync} from 'node:fs';
+import {execFileSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
+const path='types.ts',current=readFileSync(path,'utf8'),head=execFileSync('git',['show','HEAD:'+path],{encoding:'utf8'});
+const sha=text=>createHash('sha256').update(text).digest('hex');
+const options={target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext,removeComments:true};
+const currentRuntime=ts.transpileModule(current,{compilerOptions:options}).outputText;
+const headRuntime=ts.transpileModule(head,{compilerOptions:options}).outputText;
+const proof={path,currentSourceSha256:sha(current),headSourceSha256:sha(head),currentRuntimeSha256:sha(currentRuntime),headRuntimeSha256:sha(headRuntime),runtimeEquivalent:currentRuntime===headRuntime,scope:'Concurrent optional type declarations only; does not authorize ignoring any runtime source change'};
+writeFileSync('/tmp/ae-lifetime-type-only-proof.json',JSON.stringify(proof,null,2));
+if(!proof.runtimeEquivalent)throw Error('types.ts includes a runtime change; cannot classify its source drift as type-only');
+console.log(JSON.stringify(proof));

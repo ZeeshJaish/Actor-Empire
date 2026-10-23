@@ -1,0 +1,80 @@
+{
+  "kind": "CONDITIONAL_ATTAINABILITY_NOT_ORDINARY_FREQUENCY",
+  "baselineCommit": "205a93c40dcd95f30f8703d84591462f6714f427",
+  "sharedAliveCheckpointSha256": "ed57d46883b9a6f8da83b904ee6c1b0bbb7b983ad2e9824fe3ab74d27f4c2ea2",
+  "earnedPrecursorWeeks": 104,
+  "precursors": [
+    {
+      "id": "precursor-0",
+      "grossCents": 68765529427,
+      "firstAdmissions": 60510001
+    },
+    {
+      "id": "precursor-1",
+      "grossCents": 68653658599,
+      "firstAdmissions": 58888665
+    },
+    {
+      "id": "precursor-2",
+      "grossCents": 61301396109,
+      "firstAdmissions": 54474132
+    },
+    {
+      "id": "precursor-3",
+      "grossCents": 59361395631,
+      "firstAdmissions": 51461662
+    }
+  ],
+  "strong": {
+    "grossCents": 231429965564,
+    "receiptsCents": 112834557216,
+    "profitCents": 47834557216,
+    "finalWeeks": 64,
+    "closed": false,
+    "censored": true,
+    "alive": true,
+    "weeks": 168,
+    "saves": 104,
+    "reloads": 12,
+    "replays": 168,
+    "failedPromotionChecked": true,
+    "budget": 300000000,
+    "campaign": 350000000,
+    "week95OfObservedGross": 32,
+    "slateRange": [
+      24,
+      31
+    ]
+  },
+  "weak": {
+    "grossCents": 53394560091,
+    "receiptsCents": 25976805336,
+    "profitCents": -39023194664,
+    "finalWeeks": 41,
+    "closed": true,
+    "censored": false,
+    "alive": true,
+    "weeks": 41,
+    "saves": 45,
+    "reloads": 4,
+    "replays": 41,
+    "failedPromotionChecked": true,
+    "budget": 300000000,
+    "campaign": 350000000,
+    "week95OfObservedGross": 12,
+    "slateRange": [
+      25,
+      29
+    ]
+  },
+  "strongObservation": "RESOURCE_CENSORED_AFTER_WEEK64; remains open, not a natural closure or lifetime result",
+  "twoBillionAttained": true,
+  "threeBillionAttained": false,
+  "priorCheckpointRejected": "Old earned snapshot already had isDead=true (Chronic Pain). Excluded as active-owner proof; no resurrection or historical ledger rewrite.",
+  "limitations": [
+    "Authored established owner begins with $3B studio and $1M personal cash; completed craft and cast packages authored. Not a normal-founder affordability journey.",
+    "Four precursor audiences earned while alive through actual processGameWeek; real funding, exposure, world competitors, shared cinema settlement and paid clinic services.",
+    "No estimate of universal blockbuster probability from this conditional contrast or four correlated normal careers.",
+    "$3B and strong lifetime earnings/run length remain unverified."
+  ]
+}

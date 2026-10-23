@@ -4,6 +4,7 @@ import { Player, Agent, Manager, SponsorshipActionType, TeamMember } from '../..
 import { getPlayerLanguage, t } from '../../services/i18n';
 import { ArrowLeft, Send, Camera, Clock, DollarSign, XCircle, AlertTriangle, Dumbbell, Sparkles, Megaphone, HeartPulse, CheckCircle, Stethoscope, ChevronRight } from 'lucide-react';
 import { getPublicistWeekSummary } from '../../services/industryWorld';
+import { getAbsoluteWeek } from '../../services/legacyLogic';
 
 interface TeamAppProps {
   player: Player;
@@ -173,7 +174,8 @@ export const TeamApp: React.FC<TeamAppProps> = ({ player, onBack, onHireAgent, o
           updatedTeam.availableWellness = (updatedTeam.availableWellness || []).filter(candidate => candidate.id !== member.id);
       }
 
-      const updatedFlags = { ...player.flags, teamChangeLocked: true };
+      const updatedFlags = { ...player.flags, teamChangeLocked: true,
+          teamMemberFeePrepaid: {memberId: member.id, absoluteWeek: getAbsoluteWeek(player.age, player.currentWeek)} };
 
       // DEDUCT MONEY (First week payment upfront)
       const newMoney = player.money - member.weeklyCost;

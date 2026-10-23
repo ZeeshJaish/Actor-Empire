@@ -1,0 +1,173 @@
+{
+  "free": {
+    "strategy": "free",
+    "status": "LEGEND_PLUS_TWO_YEARS",
+    "weeks": 612,
+    "years": 11.77,
+    "legendWeek": 495,
+    "weeksAfterFirstLegend": 117,
+    "firstPremiere": 52,
+    "craft50": 159,
+    "craft80": 317,
+    "anyActingSkill95": 299,
+    "anyActingSkill100": 331,
+    "allActingSkills95": null,
+    "allActingSkills100": null,
+    "fame50": 244,
+    "fame94": 469,
+    "cash": 27926748,
+    "debt": 0,
+    "netCashAfterDebt": 27926748,
+    "totalBorrowed": 0,
+    "craft": 98.16870042575985,
+    "skills": {
+      "delivery": 100,
+      "memorization": 97.76710610133546,
+      "expression": 100,
+      "improvisation": 93.87919928073225,
+      "discipline": 100,
+      "presence": 95.79044364749916,
+      "charisma": 99.74415395075215,
+      "writing": 0
+    },
+    "fame": 99.54399999999998,
+    "reputation": 96.8,
+    "experience": 100,
+    "releasedCredits": 31,
+    "archivedCredits": 29,
+    "recentCareerEvidence": {
+      "credits": 31,
+      "recentCredits": 6,
+      "recentPerformance": 91.16666666666667,
+      "workSignal": 0.9743589743589743,
+      "audience": 0.9275083052375559,
+      "spanWeeks": 561,
+      "strongCredits": 6
+    },
+    "grossSignedActingSalaryReceived": 2149918,
+    "agentCommissionsDebited": 134141,
+    "verifiedReloads": 128,
+    "verifiedSaves": 128,
+    "cinemaSettlementReplayRejections": 612,
+    "simulatedPurchaseActions": [],
+    "minimumCash": 1950,
+    "negativeCashWeeks": 0,
+    "firstCashMillion": 368,
+    "firstCashTenMillion": 378,
+    "largestWeeklyCashIncreases": [
+      {
+        "week": 556,
+        "increase": 1848800
+      },
+      {
+        "week": 557,
+        "increase": 1606334
+      },
+      {
+        "week": 368,
+        "increase": 1478673
+      },
+      {
+        "week": 558,
+        "increase": 1417129
+      },
+      {
+        "week": 369,
+        "increase": 1286340
+      }
+    ],
+    "failure": null
+  },
+  "boosted": {
+    "strategy": "boosted",
+    "status": "LEGEND_PLUS_TWO_YEARS",
+    "weeks": 755,
+    "years": 14.52,
+    "legendWeek": 651,
+    "weeksAfterFirstLegend": 104,
+    "firstPremiere": 64,
+    "craft50": 154,
+    "craft80": 325,
+    "anyActingSkill95": 328,
+    "anyActingSkill100": 401,
+    "allActingSkills95": 653,
+    "allActingSkills100": 739,
+    "fame50": 214,
+    "fame94": 510,
+    "cash": 42089958,
+    "debt": 86801,
+    "netCashAfterDebt": 42003157,
+    "totalBorrowed": 100000,
+    "craft": 100,
+    "skills": {
+      "delivery": 100,
+      "memorization": 100,
+      "expression": 100,
+      "improvisation": 100,
+      "discipline": 100,
+      "presence": 100,
+      "charisma": 100,
+      "writing": 0
+    },
+    "fame": 99.08899999999954,
+    "reputation": 90.2,
+    "experience": 100,
+    "releasedCredits": 32,
+    "archivedCredits": 30,
+    "recentCareerEvidence": {
+      "credits": 32,
+      "recentCredits": 5,
+      "recentPerformance": 92,
+      "workSignal": 0.8269230769230769,
+      "audience": 0.9579250462652594,
+      "spanWeeks": 692,
+      "strongCredits": 5
+    },
+    "grossSignedActingSalaryReceived": 7898804,
+    "agentCommissionsDebited": 890513,
+    "verifiedReloads": 154,
+    "verifiedSaves": 154,
+    "cinemaSettlementReplayRejections": 755,
+    "simulatedPurchaseActions": [
+      {
+        "week": 0,
+        "type": "simulated-purchase:cash_75000",
+        "cost": -75000,
+        "energy": 0
+      },
+      {
+        "week": 0,
+        "type": "simulated-purchase:energy_500",
+        "cost": 0,
+        "energy": -500
+      }
+    ],
+    "minimumCash": -33019,
+    "negativeCashWeeks": 38,
+    "firstCashMillion": 534,
+    "firstCashTenMillion": 548,
+    "largestWeeklyCashIncreases": [
+      {
+        "week": 699,
+        "increase": 7962255
+      },
+      {
+        "week": 729,
+        "increase": 3117169
+      },
+      {
+        "week": 652,
+        "increase": 2313894
+      },
+      {
+        "week": 656,
+        "increase": 1962021
+      },
+      {
+        "week": 655,
+        "increase": 1927136
+      }
+    ],
+    "failure": null
+  }
+}

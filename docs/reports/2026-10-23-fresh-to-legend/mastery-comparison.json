@@ -1,0 +1,580 @@
+{
+  "focused": {
+    "strategy": "boosted",
+    "status": "HORIZON_COMPLETE",
+    "weeks": 859,
+    "years": 16.52,
+    "legendWeek": 651,
+    "weeksAfterFirstLegend": 208,
+    "firstPremiere": 64,
+    "craft50": 154,
+    "craft80": 325,
+    "anyActingSkill95": 328,
+    "anyActingSkill100": 401,
+    "allActingSkills95": 653,
+    "allActingSkills100": 739,
+    "fame50": 214,
+    "fame94": 510,
+    "cash": 51994270,
+    "debt": 86801,
+    "netCashAfterDebt": 51907469,
+    "totalBorrowed": 100000,
+    "craft": 100,
+    "skills": {
+      "delivery": 100,
+      "memorization": 100,
+      "expression": 100,
+      "improvisation": 100,
+      "discipline": 100,
+      "presence": 100,
+      "charisma": 100,
+      "writing": 0
+    },
+    "fame": 92.55299999999953,
+    "reputation": 91.285,
+    "experience": 100,
+    "releasedCredits": 34,
+    "archivedCredits": 33,
+    "recentCareerEvidence": {
+      "credits": 34,
+      "recentCredits": 2,
+      "recentPerformance": 96.5,
+      "workSignal": 0.5555555555555556,
+      "audience": 0.9827933916127866,
+      "spanWeeks": 796,
+      "strongCredits": 2
+    },
+    "grossSignedActingSalaryReceived": 14985026,
+    "agentCommissionsDebited": 1740859,
+    "verifiedReloads": 182,
+    "verifiedSaves": 182,
+    "cinemaSettlementReplayRejections": 859,
+    "simulatedPurchaseActions": [
+      {
+        "week": 0,
+        "type": "simulated-purchase:cash_75000",
+        "cost": -75000,
+        "energy": 0
+      },
+      {
+        "week": 0,
+        "type": "simulated-purchase:energy_500",
+        "cost": 0,
+        "energy": -500
+      }
+    ],
+    "minimumCash": -33019,
+    "negativeCashWeeks": 38,
+    "firstCashMillion": 534,
+    "firstCashTenMillion": 548,
+    "largestWeeklyCashIncreases": [
+      {
+        "week": 699,
+        "increase": 7962255
+      },
+      {
+        "week": 804,
+        "increase": 3117363
+      },
+      {
+        "week": 729,
+        "increase": 3117169
+      },
+      {
+        "week": 834,
+        "increase": 3112310
+      },
+      {
+        "week": 652,
+        "increase": 2313894
+      }
+    ],
+    "failure": null,
+    "handoffWeek": 755,
+    "comparisonWeeks": 104,
+    "allActingSkillsAtStart": {
+      "delivery": 100,
+      "memorization": 100,
+      "expression": 100,
+      "improvisation": 100,
+      "discipline": 100,
+      "presence": 100,
+      "charisma": 100
+    },
+    "minimumActingSkillAtStart": 100,
+    "newlyDeliveredPerformances": [
+      {
+        "id": "uni_job_1800000015004_1",
+        "name": "The Avengers",
+        "performance": 93,
+        "initialPhase": "SCHEDULED",
+        "initialPreparation": 50,
+        "fullyPreparedAtFork": false
+      },
+      {
+        "id": "uni_job_1800000015005_2",
+        "name": "Thor: The Dark World",
+        "performance": 100,
+        "initialPhase": "SCHEDULED",
+        "initialPreparation": 50,
+        "fullyPreparedAtFork": false
+      },
+      {
+        "id": "uni_job_1800000015006_3",
+        "name": "Captain America: The Winter Soldier",
+        "performance": 95,
+        "initialPhase": "SCHEDULED",
+        "initialPreparation": 50,
+        "fullyPreparedAtFork": false
+      }
+    ],
+    "meanNewlyDeliveredPerformance": 96.0,
+    "meanNotFullyPreparedAtFork": 96.0,
+    "rehearsalActionsDuringWindow": 46,
+    "maxDistinctProjectsRehearsedInOneWeek": 1,
+    "newPersonalProjectIDsObserved": [
+      "job_1800000018113"
+    ],
+    "existingDeliveredPerformanceStable": true,
+    "sourceDrift": [
+      "services/studioAi/studioAiCinemaInvestment.ts",
+      "services/boxOffice/boxOfficeOfferedLaunch.ts"
+    ],
+    "runtimeSourceDrift": [
+      "services/studioAi/studioAiCinemaInvestment.ts",
+      "services/boxOffice/boxOfficeOfferedLaunch.ts"
+    ],
+    "lineage": {
+      "source": "/tmp/ae-lifetime-repaired-boosted/boosted/career-0.json.gz",
+      "sourceCheckpointSha256": "ee7c458af03bf88e696de7841ae7959f81cd06bdbad720fc71725d2ae0637cc5",
+      "handoffWeek": 755,
+      "decisionMode": "focused",
+      "horizon": 859,
+      "playerHash": "b25ca2e568da07e0b8358f6bc369079c235ba621df6d97b8983e618807880974",
+      "changes": [
+        "Only audit executable/horizon metadata; player, RNG, clock, purchases and signed projects unchanged",
+        "Audit horizon only807\u2192859, retaining identical player/RNG/clock. Every case completes and reloads at807 before extension, so a role that starts near the end of year1 can wrap in year2. No outcome or resource edits."
+      ],
+      "resumeWeek": 807,
+      "resumeSource": "/tmp/ae-lifetime-maxed-slots-boosted-focused/boosted/career-0.json.gz",
+      "resumeCheckpointSha256": "863ee0d1e709d338a21b0b15b8f0513d04f5650dc4f9f6b23d3b43dd171604f8",
+      "resumePlayerHash": "bec7c6d0f735ae2b9443a22cc4dc8b655d7c3becf3661d12ecb6218006cb01c1"
+    }
+  },
+  "neglect": {
+    "strategy": "boosted",
+    "status": "HORIZON_COMPLETE",
+    "weeks": 859,
+    "years": 16.52,
+    "legendWeek": 651,
+    "weeksAfterFirstLegend": 208,
+    "firstPremiere": 64,
+    "craft50": 154,
+    "craft80": 325,
+    "anyActingSkill95": 328,
+    "anyActingSkill100": 401,
+    "allActingSkills95": 653,
+    "allActingSkills100": 739,
+    "fame50": 214,
+    "fame94": 510,
+    "cash": 51200395,
+    "debt": 86801,
+    "netCashAfterDebt": 51113594,
+    "totalBorrowed": 100000,
+    "craft": 100,
+    "skills": {
+      "delivery": 100,
+      "memorization": 100,
+      "expression": 100,
+      "improvisation": 100,
+      "discipline": 100,
+      "presence": 100,
+      "charisma": 100,
+      "writing": 0
+    },
+    "fame": 91.47955394849734,
+    "reputation": 92.22,
+    "experience": 100,
+    "releasedCredits": 34,
+    "archivedCredits": 33,
+    "recentCareerEvidence": {
+      "credits": 34,
+      "recentCredits": 2,
+      "recentPerformance": 85.5,
+      "workSignal": 0.4904817404817405,
+      "audience": 0.9843785011787808,
+      "spanWeeks": 796,
+      "strongCredits": 2
+    },
+    "grossSignedActingSalaryReceived": 14985026,
+    "agentCommissionsDebited": 1740859,
+    "verifiedReloads": 182,
+    "verifiedSaves": 182,
+    "cinemaSettlementReplayRejections": 859,
+    "simulatedPurchaseActions": [
+      {
+        "week": 0,
+        "type": "simulated-purchase:cash_75000",
+        "cost": -75000,
+        "energy": 0
+      },
+      {
+        "week": 0,
+        "type": "simulated-purchase:energy_500",
+        "cost": 0,
+        "energy": -500
+      }
+    ],
+    "minimumCash": -33019,
+    "negativeCashWeeks": 38,
+    "firstCashMillion": 534,
+    "firstCashTenMillion": 548,
+    "largestWeeklyCashIncreases": [
+      {
+        "week": 699,
+        "increase": 7962255
+      },
+      {
+        "week": 805,
+        "increase": 3117358
+      },
+      {
+        "week": 729,
+        "increase": 3117169
+      },
+      {
+        "week": 829,
+        "increase": 3115109
+      },
+      {
+        "week": 652,
+        "increase": 2313894
+      }
+    ],
+    "failure": null,
+    "handoffWeek": 755,
+    "comparisonWeeks": 104,
+    "allActingSkillsAtStart": {
+      "delivery": 100,
+      "memorization": 100,
+      "expression": 100,
+      "improvisation": 100,
+      "discipline": 100,
+      "presence": 100,
+      "charisma": 100
+    },
+    "minimumActingSkillAtStart": 100,
+    "newlyDeliveredPerformances": [
+      {
+        "id": "uni_job_1800000015004_1",
+        "name": "The Avengers",
+        "performance": 86,
+        "initialPhase": "SCHEDULED",
+        "initialPreparation": 50,
+        "fullyPreparedAtFork": false
+      },
+      {
+        "id": "uni_job_1800000015005_2",
+        "name": "Thor: The Dark World",
+        "performance": 85,
+        "initialPhase": "SCHEDULED",
+        "initialPreparation": 50,
+        "fullyPreparedAtFork": false
+      },
+      {
+        "id": "uni_job_1800000015006_3",
+        "name": "Captain America: The Winter Soldier",
+        "performance": 85,
+        "initialPhase": "SCHEDULED",
+        "initialPreparation": 50,
+        "fullyPreparedAtFork": false
+      }
+    ],
+    "meanNewlyDeliveredPerformance": 85.33333333333333,
+    "meanNotFullyPreparedAtFork": 85.33333333333333,
+    "rehearsalActionsDuringWindow": 0,
+    "maxDistinctProjectsRehearsedInOneWeek": 0,
+    "newPersonalProjectIDsObserved": [
+      "job_1800000017992"
+    ],
+    "existingDeliveredPerformanceStable": true,
+    "sourceDrift": [
+      "services/studioAi/studioAiCinemaInvestment.ts",
+      "services/boxOffice/boxOfficeOfferedLaunch.ts"
+    ],
+    "runtimeSourceDrift": [
+      "services/studioAi/studioAiCinemaInvestment.ts",
+      "services/boxOffice/boxOfficeOfferedLaunch.ts"
+    ],
+    "lineage": {
+      "source": "/tmp/ae-lifetime-repaired-boosted/boosted/career-0.json.gz",
+      "sourceCheckpointSha256": "ee7c458af03bf88e696de7841ae7959f81cd06bdbad720fc71725d2ae0637cc5",
+      "handoffWeek": 755,
+      "decisionMode": "neglect",
+      "horizon": 859,
+      "playerHash": "b25ca2e568da07e0b8358f6bc369079c235ba621df6d97b8983e618807880974",
+      "changes": [
+        "Only audit executable/horizon metadata; player, RNG, clock, purchases and signed projects unchanged",
+        "Audit horizon only807\u2192859, retaining identical player/RNG/clock. Every case completes and reloads at807 before extension, so a role that starts near the end of year1 can wrap in year2. No outcome or resource edits."
+      ],
+      "resumeWeek": 807,
+      "resumeSource": "/tmp/ae-lifetime-maxed-slots-boosted-neglect/boosted/career-0.json.gz",
+      "resumeCheckpointSha256": "9650356852e5af61934e5c6671b598cd84f576b76691dc64c2262df555e94039",
+      "resumePlayerHash": "8d22d27b26c98583e04916f8a0f523774f18c66c8993f0728d25e14325573005"
+    }
+  },
+  "overbooked": {
+    "strategy": "boosted",
+    "status": "HORIZON_COMPLETE",
+    "weeks": 859,
+    "years": 16.52,
+    "legendWeek": 651,
+    "weeksAfterFirstLegend": 208,
+    "firstPremiere": 64,
+    "craft50": 154,
+    "craft80": 325,
+    "anyActingSkill95": 328,
+    "anyActingSkill100": 401,
+    "allActingSkills95": 653,
+    "allActingSkills100": 739,
+    "fame50": 214,
+    "fame94": 510,
+    "cash": 86793951,
+    "debt": 86801,
+    "netCashAfterDebt": 86707150,
+    "totalBorrowed": 100000,
+    "craft": 100,
+    "skills": {
+      "delivery": 100,
+      "memorization": 100,
+      "expression": 100,
+      "improvisation": 100,
+      "discipline": 100,
+      "presence": 100,
+      "charisma": 100,
+      "writing": 0
+    },
+    "fame": 100,
+    "reputation": 100,
+    "experience": 100,
+    "releasedCredits": 42,
+    "archivedCredits": 36,
+    "recentCareerEvidence": {
+      "credits": 42,
+      "recentCredits": 6,
+      "recentPerformance": 97,
+      "workSignal": 0.9423076923076923,
+      "audience": 0.9707568699945711,
+      "spanWeeks": 796,
+      "strongCredits": 6
+    },
+    "grossSignedActingSalaryReceived": 16692581,
+    "agentCommissionsDebited": 1902048,
+    "verifiedReloads": 182,
+    "verifiedSaves": 182,
+    "cinemaSettlementReplayRejections": 859,
+    "simulatedPurchaseActions": [
+      {
+        "week": 0,
+        "type": "simulated-purchase:cash_75000",
+        "cost": -75000,
+        "energy": 0
+      },
+      {
+        "week": 0,
+        "type": "simulated-purchase:energy_500",
+        "cost": 0,
+        "energy": -500
+      }
+    ],
+    "minimumCash": -33019,
+    "negativeCashWeeks": 38,
+    "firstCashMillion": 534,
+    "firstCashTenMillion": 548,
+    "largestWeeklyCashIncreases": [
+      {
+        "week": 699,
+        "increase": 7962255
+      },
+      {
+        "week": 802,
+        "increase": 3800013
+      },
+      {
+        "week": 828,
+        "increase": 3198467
+      },
+      {
+        "week": 729,
+        "increase": 3117169
+      },
+      {
+        "week": 652,
+        "increase": 2313894
+      }
+    ],
+    "failure": null,
+    "handoffWeek": 755,
+    "comparisonWeeks": 104,
+    "allActingSkillsAtStart": {
+      "delivery": 100,
+      "memorization": 100,
+      "expression": 100,
+      "improvisation": 100,
+      "discipline": 100,
+      "presence": 100,
+      "charisma": 100
+    },
+    "minimumActingSkillAtStart": 100,
+    "newlyDeliveredPerformances": [
+      {
+        "id": "aud_active_1800000016245_0.10989719512872398",
+        "name": "Ocean Hiding",
+        "performance": 100,
+        "initialPhase": "NOT_YET_SIGNED",
+        "initialPreparation": null,
+        "fullyPreparedAtFork": false
+      },
+      {
+        "id": "job_1800000016818",
+        "name": "Zero Kingdom",
+        "performance": 98,
+        "initialPhase": "NOT_YET_SIGNED",
+        "initialPreparation": null,
+        "fullyPreparedAtFork": false
+      },
+      {
+        "id": "job_1800000016853",
+        "name": "Rise Knowing",
+        "performance": 96,
+        "initialPhase": "NOT_YET_SIGNED",
+        "initialPreparation": null,
+        "fullyPreparedAtFork": false
+      },
+      {
+        "id": "job_1800000017510",
+        "name": "Ocean Breaking",
+        "performance": 98,
+        "initialPhase": "NOT_YET_SIGNED",
+        "initialPreparation": null,
+        "fullyPreparedAtFork": false
+      },
+      {
+        "id": "job_1800000016253",
+        "name": "The Lord of the Rings: The Fellowship of the Ring",
+        "performance": 96,
+        "initialPhase": "NOT_YET_SIGNED",
+        "initialPreparation": null,
+        "fullyPreparedAtFork": false
+      },
+      {
+        "id": "uni_job_1800000015004_1",
+        "name": "The Avengers",
+        "performance": 93,
+        "initialPhase": "SCHEDULED",
+        "initialPreparation": 50,
+        "fullyPreparedAtFork": false
+      },
+      {
+        "id": "aud_active_1800000017151_0.34238774864934385",
+        "name": "Grey's Anatomy",
+        "performance": 98,
+        "initialPhase": "NOT_YET_SIGNED",
+        "initialPreparation": null,
+        "fullyPreparedAtFork": false
+      },
+      {
+        "id": "uni_job_1800000015005_2",
+        "name": "Thor: The Dark World",
+        "performance": 100,
+        "initialPhase": "SCHEDULED",
+        "initialPreparation": 50,
+        "fullyPreparedAtFork": false
+      },
+      {
+        "id": "job_1800000017231",
+        "name": "Grey Wood Laugh",
+        "performance": 90,
+        "initialPhase": "NOT_YET_SIGNED",
+        "initialPreparation": null,
+        "fullyPreparedAtFork": false
+      },
+      {
+        "id": "job_1800000017614",
+        "name": "Minari",
+        "performance": 100,
+        "initialPhase": "NOT_YET_SIGNED",
+        "initialPreparation": null,
+        "fullyPreparedAtFork": false
+      },
+      {
+        "id": "uni_job_1800000015006_3",
+        "name": "Captain America: The Winter Soldier",
+        "performance": 95,
+        "initialPhase": "SCHEDULED",
+        "initialPreparation": 50,
+        "fullyPreparedAtFork": false
+      },
+      {
+        "id": "job_1800000017959",
+        "name": "The Empire of Light",
+        "performance": 98,
+        "initialPhase": "NOT_YET_SIGNED",
+        "initialPreparation": null,
+        "fullyPreparedAtFork": false
+      },
+      {
+        "id": "job_1800000018134",
+        "name": "Infinite Dust",
+        "performance": 93,
+        "initialPhase": "NOT_YET_SIGNED",
+        "initialPreparation": null,
+        "fullyPreparedAtFork": false
+      }
+    ],
+    "meanNewlyDeliveredPerformance": 96.53846153846153,
+    "meanNotFullyPreparedAtFork": 96.53846153846153,
+    "rehearsalActionsDuringWindow": 298,
+    "maxDistinctProjectsRehearsedInOneWeek": 2,
+    "newPersonalProjectIDsObserved": [
+      "aud_active_1800000016245_0.10989719512872398",
+      "job_1800000016253",
+      "aud_active_1800000016701_0.8256132064852864",
+      "job_1800000016818",
+      "job_1800000016853",
+      "aud_active_1800000017151_0.34238774864934385",
+      "job_1800000017231",
+      "job_1800000017510",
+      "job_1800000017614",
+      "job_1800000017959",
+      "job_1800000018134",
+      "job_1800000018601",
+      "aud_active_1800000018641_0.4239605711773038"
+    ],
+    "existingDeliveredPerformanceStable": true,
+    "sourceDrift": [
+      "services/studioAi/studioAiCinemaInvestment.ts",
+      "services/boxOffice/boxOfficeOfferedLaunch.ts"
+    ],
+    "runtimeSourceDrift": [
+      "services/studioAi/studioAiCinemaInvestment.ts",
+      "services/boxOffice/boxOfficeOfferedLaunch.ts"
+    ],
+    "lineage": {
+      "source": "/tmp/ae-lifetime-repaired-boosted/boosted/career-0.json.gz",
+      "sourceCheckpointSha256": "ee7c458af03bf88e696de7841ae7959f81cd06bdbad720fc71725d2ae0637cc5",
+      "handoffWeek": 755,
+      "decisionMode": "overbooked",
+      "horizon": 859,
+      "playerHash": "b25ca2e568da07e0b8358f6bc369079c235ba621df6d97b8983e618807880974",
+      "changes": [
+        "Only audit executable/horizon metadata; player, RNG, clock, purchases and signed projects unchanged",
+        "Audit horizon only807\u2192859, retaining identical player/RNG/clock. Every case completes and reloads at807 before extension, so a role that starts near the end of year1 can wrap in year2. No outcome or resource edits."
+      ],
+      "resumeWeek": 807,
+      "resumeSource": "/tmp/ae-lifetime-maxed-slots-boosted-overbooked/boosted/career-0.json.gz",
+      "resumeCheckpointSha256": "a61bfaa982d0b5f9bdb60d4129d82b8c89a0a7f239cc382dab0e117f95d077a8",
+      "resumePlayerHash": "1bd499ede2f75e3868ff005b4bbb5c0da215211c0c80f38110e9327bb6db87c7"
+    }
+  }
+}

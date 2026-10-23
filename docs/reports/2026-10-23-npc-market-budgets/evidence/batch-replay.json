@@ -1,0 +1,8 @@
+{
+  "sameBatchSize": 2,
+  "weeks": 8,
+  "priorReferenceCleanupChangesPlayer": false,
+  "playerHash": "7f380555c81c12fe4960da5ae8e34463d9fa582c179543653159e583288f8510",
+  "randomCalls": 16714,
+  "clockNext": 1800000000146
+}

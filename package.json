@@ -635,7 +635,11 @@
     "audit:actor-career-balance": "esbuild scripts/audit-actor-career-balance.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-career-balance.mjs && node /tmp/ae-career-balance.mjs",
     "audit:actor-career-flow": "node scripts/run-actor-career-flow.mjs",
     "audit:actor-career-established": "esbuild scripts/audit-actor-career-established.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-career-established.mjs && node /tmp/ae-career-established.mjs",
-    "audit:actor-career-compatibility": "esbuild scripts/audit-actor-career-compatibility.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-career-compatibility.mjs && node /tmp/ae-career-compatibility.mjs"
+    "audit:actor-career-compatibility": "esbuild scripts/audit-actor-career-compatibility.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-career-compatibility.mjs && node /tmp/ae-career-compatibility.mjs",
+    "audit:actor-reward-pacing": "esbuild scripts/audit-actor-reward-pacing.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-actor-reward-pacing.mjs && node /tmp/ae-actor-reward-pacing.mjs",
+    "audit:career-team-renewal": "esbuild scripts/audit-career-team-renewal.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-career-team-renewal.mjs && node /tmp/ae-career-team-renewal.mjs",
+    "audit:actor-reward-boosts": "esbuild scripts/audit-actor-reward-boosts.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-actor-reward-boosts.mjs && node /tmp/ae-actor-reward-boosts.mjs",
+    "audit:actor-reward-curves": "node scripts/run-actor-reward-curves.mjs"
   },
   "dependencies": {
     "@capacitor-community/admob": "^8.0.0",

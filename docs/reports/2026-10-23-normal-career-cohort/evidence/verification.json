@@ -1,0 +1,44 @@
+{
+  "migration": {
+    "status": "PASS",
+    "namedPassChecks": 25,
+    "log": "regression-migration.log"
+  },
+  "integration": {
+    "status": "PASS",
+    "namedPassChecks": 32,
+    "log": "regression-integration.log"
+  },
+  "booking": {
+    "status": "PASS",
+    "namedPassChecks": 14,
+    "log": "regression-booking.log"
+  },
+  "market": {
+    "status": "PASS",
+    "namedPassChecks": 36,
+    "log": "regression-market.log"
+  },
+  "fair-package": {
+    "status": "PASS",
+    "namedPassChecks": 9,
+    "log": "regression-fair-package.log"
+  },
+  "metrics": {
+    "status": "PASS",
+    "cases": "deduplication, denominators, signed backend, financing, open film attainment, positive near-break-even overlap"
+  },
+  "typecheck": {
+    "diagnostics": 0,
+    "sourceFiles": 615,
+    "roots": [
+      "raw-assets.d.ts",
+      "world-atlas.d.ts",
+      "components/streaming-transplant/css-modules.d.ts",
+      "scripts/audit-cinema-career-metrics.ts",
+      "scripts/audit-cinema-normal-cohort.ts",
+      "scripts/audit-cinema-phenomenon.ts",
+      "scripts/report-cinema-normal-cohort.ts"
+    ]
+  }
+}

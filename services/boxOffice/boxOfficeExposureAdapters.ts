@@ -27,7 +27,7 @@ export const getCinemaExposureCohorts = (player: Player): CinemaExposureCohort[]
 );
 const packageInput = (player: Player, project: ProjectDetails, titleId: string): CinemaExposureInput => {
     const title = normalizeCinemaTitle({ titleId, project, player, owner: { id: project.studioId, route: 'PLAYER_STUDIO' } });
-    const record = readCinemaExposureRecord(project);
+    const record = readCinemaExposureRecord(project, titleId);
     return { titleId, absoluteWeek: getAbsoluteWeek(player.age, player.currentWeek), cast: title.cast,
         studio: studioSignals(player, project.studioId), storyAttention: record.storyAttention || 0, musicAttention: record.musicAttention || 0,
         cohorts: getCinemaExposureCohorts(player), events: record.events };
@@ -45,10 +45,11 @@ export const prepareCinemaPackageExposure = ({ player, project, titleId, storyAt
 /** Called at a real public Greenlight/release confirmation, never a private estimate. */
 export const commitCinemaAnnouncement = (player: Player, project: ProjectDetails, titleId: string, absoluteWeek: number): ProjectDetails => {
     if (project.type !== 'MOVIE') return project;
-    const record = readCinemaExposureRecord(project);
-    if (record.events.some(event => event.kind === 'ANNOUNCEMENT')) return project;
+    const record = readCinemaExposureRecord(project, titleId);
+    const scopedProject = { ...project, cinemaExposure: record };
+    if (record.events.some(event => event.kind === 'ANNOUNCEMENT')) return scopedProject;
     const input = packageInput(player, project, titleId);
-    return { ...project, cinemaExposure: appendCinemaExposureEvent(project, { id: `cinema-announcement:${titleId}`, titleId,
+    return { ...scopedProject, cinemaExposure: appendCinemaExposureEvent(scopedProject, { id: `cinema-announcement:${titleId}`, titleId,
         absoluteWeek, kind: 'ANNOUNCEMENT', channel: 'PUBLIC_PROJECT_ANNOUNCEMENT', impressions: 0,
         recognitionShare: getCinemaRecognitionShare(input.cast, input.studio), impressionsEstimated: true }) };
 };
@@ -90,12 +91,12 @@ export const buildCinemaKnownInputs = (player: Player, project: ProjectDetails, 
     const hasEstimate = typeof estimate === 'number' && Number.isFinite(estimate);
     const center = hasEstimate ? score(estimate) : 55;
     const low = hasEstimate ? Math.max(1, center - 10) : 25, high = hasEstimate ? Math.min(100, center + 10) : 85;
-    return { cohorts: getCinemaExposureCohorts(player), titles: [{ ...title, exposure: readCinemaExposureRecord(project), delivery: {
+    return { cohorts: getCinemaExposureCohorts(player), titles: [{ ...title, exposure: readCinemaExposureRecord(project, titleId), delivery: {
         estimatedQuality: center, qualityRange: [low, high], scriptQuality: center, directorQuality: center, castingStrength: center,
     } }] };
 };
 export const buildCinemaAwarenessSnapshot = (player: Player, project: ProjectDetails, titleId: string) => {
-    const input = packageInput(player, project, titleId), record = readCinemaExposureRecord(project);
+    const input = packageInput(player, project, titleId), record = readCinemaExposureRecord(project, titleId);
     const known = buildCinemaKnownInputs(player, project, titleId);
     const forecastInput = projectCinemaForecastInput({ absoluteWeek: input.absoluteWeek, seed: 0, tuningVersion: CINEMA_EXPOSURE_TUNING_VERSION,
         knowledge: 'OBSERVED', titles: [], cohorts: input.cohorts }, known);

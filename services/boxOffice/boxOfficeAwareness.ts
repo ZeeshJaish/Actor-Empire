@@ -112,10 +112,12 @@ export const buildCinemaExposure = (input: CinemaExposureInput): CinemaExposureR
             || input.cohorts.some(c => cast.some(a => !c.actors?.[a.personId])) };
 };
 
-export const readCinemaExposureRecord = (source: { cinemaExposure?: CinemaExposureRecord; hiddenStats?: { rawHype?: number } }): CinemaExposureRecord => (
+/** Older continuations may contain copied parent events. A title-scoped read
+ * excludes that foreign evidence without changing stored history or payments. */
+export const readCinemaExposureRecord = (source: { cinemaExposure?: CinemaExposureRecord; hiddenStats?: { rawHype?: number } }, titleId?: string): CinemaExposureRecord => (
     source.cinemaExposure ? { version: 1, attentionPotential: clamp(source.cinemaExposure.attentionPotential, 0, 100),
         attentionBasis: source.cinemaExposure.attentionBasis, storyAttention: clamp(source.cinemaExposure.storyAttention || 0, 0, 100),
-        musicAttention: clamp(source.cinemaExposure.musicAttention || 0, 0, 100), events: uniqueEvents(source.cinemaExposure.events) }
+        musicAttention: clamp(source.cinemaExposure.musicAttention || 0, 0, 100), events: uniqueEvents(source.cinemaExposure.events).filter(event => !titleId || event.titleId === titleId) }
         : { version: 1, attentionPotential: clamp(source.hiddenStats?.rawHype || 0, 0, 100), attentionBasis: 'LEGACY_ESTIMATE', storyAttention: 0, musicAttention: 0, events: [] }
 );
 export const appendCinemaExposureEvent = (source: Parameters<typeof readCinemaExposureRecord>[0], event: CinemaExposureEvent): CinemaExposureRecord => {

@@ -1,0 +1,8 @@
+{
+  "status": "HEAP_LIMIT",
+  "heapMiB": 640,
+  "exitCode": 134,
+  "completed": false,
+  "reason": "Final scoped TypeScript attempt exceeded its bounded heap; not rerun with a larger heap after user requested lightweight work",
+  "previousPassingReport": "typecheck.json"
+}

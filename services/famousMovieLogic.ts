@@ -2,6 +2,7 @@
 import { GameLanguage, Genre, Player, ProjectDetails, AuditionOpportunity, RoleType, ProjectHiddenStats, StudioId, ProjectType } from '../types';
 import { ROLE_DEFINITIONS } from './roleLogic';
 import { getPlayerLanguage, t } from './i18n';
+import { quoteActorBackend } from './actorOfferTerms';
 
 interface FamousProjectDef {
     title: string;
@@ -214,7 +215,7 @@ export const getNextFamousSeries = (player: Player): FamousProjectDef | null => 
     return pick(available.length > 0 ? available : FAMOUS_SERIES_DB);
 };
 
-export const createFamousOpportunity = (def: FamousProjectDef, roleType: RoleType, source: 'CASTING_APP' | 'AGENT' | 'DIRECT', language: GameLanguage = 'en'): AuditionOpportunity => {
+export const createFamousOpportunity = (def: FamousProjectDef, roleType: RoleType, source: 'CASTING_APP' | 'AGENT' | 'DIRECT', language: GameLanguage = 'en', player?: Player): AuditionOpportunity => {
     // Generate Stats
     const hidden: ProjectHiddenStats = {
         scriptQuality: Math.min(100, def.prestige + Math.random() * 5),
@@ -270,7 +271,7 @@ export const createFamousOpportunity = (def: FamousProjectDef, roleType: RoleTyp
         project: details,
         estimatedIncome: pay,
         source: source,
-        royaltyPercentage: isTV ? 1.5 : 2.5 // TV residuals vs Movie points
+        royaltyPercentage: quoteActorBackend(player, roleType, def.type)
     };
 };
 
@@ -284,7 +285,7 @@ export const generateFamousMovieOpportunity = (player: Player): AuditionOpportun
     // Famous movies usually audition for Supporting or Lead
     const roleType: RoleType = Math.random() > 0.7 ? 'LEAD' : 'SUPPORTING';
     
-    return createFamousOpportunity(movie, roleType, 'CASTING_APP', getPlayerLanguage(player));
+    return createFamousOpportunity(movie, roleType, 'CASTING_APP', getPlayerLanguage(player), player);
 };
 
 // 2. TV Series Path
@@ -295,7 +296,7 @@ export const generateFamousSeriesOpportunity = (player: Player): AuditionOpportu
     // Series usually audition for Lead or Ensemble
     const roleType: RoleType = Math.random() > 0.5 ? 'LEAD' : 'ENSEMBLE';
     
-    return createFamousOpportunity(series, roleType, 'CASTING_APP', getPlayerLanguage(player));
+    return createFamousOpportunity(series, roleType, 'CASTING_APP', getPlayerLanguage(player), player);
 };
 
 // 3. Cameo Break Path (Direct Invite via Message)
@@ -308,7 +309,7 @@ export const generateCameoOffer = (player: Player): { opportunity: AuditionOppor
     if (!project) return null;
 
     const language = getPlayerLanguage(player);
-    const opp = createFamousOpportunity(project, 'CAMEO', 'DIRECT', language);
+    const opp = createFamousOpportunity(project, 'CAMEO', 'DIRECT', language, player);
     
     // Adjust cameo specific income
     opp.estimatedIncome = 15000; 

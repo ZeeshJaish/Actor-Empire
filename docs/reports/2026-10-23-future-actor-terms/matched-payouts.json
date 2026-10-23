@@ -1,0 +1,32 @@
+[
+  {
+    "route": "free",
+    "seed": 7,
+    "titleId": "job_1800000013168",
+    "name": "Deadpool",
+    "oldPoints": 2.5,
+    "newPoints": 1.45,
+    "oldActorPaid": 6070699.0,
+    "newActorPaid": 3521005.0,
+    "sameGross": true,
+    "gross": 531579692.96,
+    "sameProducerReceipts": true,
+    "samePersonalPerformance": true,
+    "personalPerformance": 91
+  },
+  {
+    "route": "boosted",
+    "seed": 7,
+    "titleId": "job_1800000016611",
+    "name": "The Sixth Sense",
+    "oldPoints": 2.5,
+    "newPoints": 1.37,
+    "oldActorPaid": 4714859.0,
+    "newActorPaid": 2583743.0,
+    "sameGross": true,
+    "gross": 439107226.62,
+    "sameProducerReceipts": true,
+    "samePersonalPerformance": true,
+    "personalPerformance": 93
+  }
+]

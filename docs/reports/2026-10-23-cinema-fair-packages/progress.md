@@ -12,3 +12,7 @@ Repair future offered-role ensembles and cash-backed studio campaigns, choose NP
 ## Baseline
 
 Read-only diagnosis: generated minor/cameo packages can contain no lead; no paid offered-role studio campaign is committed at premiere. Limited NPC targeting prioritizes a region even when its language does not match. Existing canonical cinema settlement already separates actor career consequences from producer ROI. Keep that distinction.
+
+## Completed
+
+Cast, studio-funded campaign, country targeting and collected-finance labels implemented. Failing regressions observed before each behavior fix. Final verification: 14 suites / 238 passing assertions or cases; 21 matched runs over three seeds; 861-root source type check; guarded production build; isolated production browser premiere/reload/next-week payment checks using an earned career save. The prior 51 retained receipt records were unchanged. All owned heavy sessions stopped. See README for actual numbers and limits; broader career hit probabilities were not re-estimated by this controlled matrix.

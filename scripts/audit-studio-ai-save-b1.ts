@@ -3,6 +3,7 @@ import { INITIAL_PLAYER, type Player } from '../types';
 import { migratePlayerSave } from '../services/saveMigration';
 import { compareProtectedSaveState, createSaveIntegrityManifest } from '../services/saveIntegrity';
 import { compactPlayerForPersistence } from '../services/saveCompaction';
+import { STUDIO_AI_LEDGER_LIMIT } from '../services/studioAi/studioAiState';
 
 const legacy = structuredClone(INITIAL_PLAYER) as Player;
 legacy.world.studios = {
@@ -71,8 +72,9 @@ oversizedStudio.ai!.ledger = Array.from({ length: 400 }, (_, index) => ({
     description: 'Operating cost',
 }));
 const compacted = compactPlayerForPersistence(oversized);
-assert.equal(compacted.world.studios?.LEGACY_FIXTURE.ai?.ledger.length, 104, 'studio AI ledgers must remain bounded in persisted saves');
-assert.equal(compacted.world.studios?.LEGACY_FIXTURE.ai?.ledger[0]?.id, 'ledger_296', 'compaction must retain the newest studio ledger history');
+assert.equal(compacted.world.studios?.LEGACY_FIXTURE.ai?.ledger.length, STUDIO_AI_LEDGER_LIMIT, 'studio AI ledgers must remain bounded in persisted saves');
+assert.equal(compacted.world.studios?.LEGACY_FIXTURE.ai?.ledger[0]?.id, `ledger_${400-STUDIO_AI_LEDGER_LIMIT}`, 'compaction must retain the newest studio ledger history');
+assert.equal(compacted.world.studios?.LEGACY_FIXTURE.ai?.ledger.at(-1)?.id, 'ledger_399');
 assert.equal(compacted.world.studios?.LEGACY_FIXTURE.ai?.finance.debtPrincipalMillions, 77, 'active debt must never be compacted away');
 assert.equal(compacted.world.studios?.LEGACY_FIXTURE.ai?.controller, 'PLAYER', 'controller handoff state must survive compaction');
 
