@@ -1,0 +1,26 @@
+
+> pr-6.6.3@1.0.25 audit:script-broad-flow
+> esbuild scripts/audit-script-broad-flow.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-script-broad-flow.mjs && node /tmp/ae-script-broad-flow.mjs
+
+
+  ../../../../tmp/ae-script-broad-flow.mjs  9.6mb ⚠️
+
+⚡ Done in 137ms
+PASS 27 concepts → writer development → real greenlight/funding → verified reload.
+PASS weekly engine + save/reload at week 1; phases: PRE_PRODUCTION.
+PASS weekly engine + save/reload at week 7; phases: PRODUCTION.
+PASS weekly engine + save/reload at week 9; phases: PRODUCTION.
+PASS weekly engine + save/reload at week 15; phases: PRODUCTION, POST_PRODUCTION.
+PASS weekly engine + save/reload at week 16; phases: PRODUCTION, POST_PRODUCTION.
+PASS weekly engine + save/reload at week 17; phases: PRODUCTION, POST_PRODUCTION.
+PASS weekly engine + save/reload at week 18; phases: PRODUCTION, POST_PRODUCTION.
+PASS weekly engine + save/reload at week 19; phases: PRODUCTION, POST_PRODUCTION.
+PASS weekly engine + save/reload at week 20; phases: POST_PRODUCTION.
+PASS weekly engine + save/reload at week 25; phases: POST_PRODUCTION.
+PASS weekly engine + save/reload at week 27; phases: POST_PRODUCTION, AWAITING_RELEASE.
+PASS weekly engine + save/reload at week 28; phases: POST_PRODUCTION, AWAITING_RELEASE.
+PASS weekly engine + save/reload at week 29; phases: POST_PRODUCTION, AWAITING_RELEASE.
+PASS weekly engine + save/reload at week 30; phases: POST_PRODUCTION, AWAITING_RELEASE.
+PASS weekly engine + save/reload at week 31; phases: POST_PRODUCTION, AWAITING_RELEASE.
+PASS weekly engine + save/reload at week 32; phases: AWAITING_RELEASE.
+PASS 27 full production calendars (32 weeks), delivery gate, reloads and three subsequent weeks; legacy script, cash, equity and studio ownership persist.

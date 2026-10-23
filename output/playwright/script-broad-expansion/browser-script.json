@@ -1,0 +1,68 @@
+{
+  "id": "script_1792743913326",
+  "title": "The Last Rewind QA",
+  "projectType": "MOVIE",
+  "format": "LIVE_ACTION",
+  "targetAudience": "PG-13",
+  "genres": [
+    "ACTION",
+    "SCI_FI"
+  ],
+  "status": "CONCEPT",
+  "quality": 52,
+  "options": [
+    {
+      "questionId": "protagonist",
+      "choiceId": "professional-thief"
+    },
+    {
+      "questionId": "inciting-incident",
+      "choiceId": "future-warning"
+    },
+    {
+      "questionId": "sidekick",
+      "choiceId": "specialist-heist-crew"
+    },
+    {
+      "questionId": "set-piece",
+      "choiceId": "time-loop-escape"
+    },
+    {
+      "questionId": "villain-motivation",
+      "choiceId": "control-timeline"
+    },
+    {
+      "questionId": "climax-location",
+      "choiceId": "research-facility"
+    },
+    {
+      "questionId": "ending",
+      "choiceId": "repair-timeline-at-cost"
+    }
+  ],
+  "writerId": null,
+  "weeksInDevelopment": 0,
+  "totalDevelopmentWeeks": 0,
+  "isOriginal": true,
+  "logline": "Action/sci-fi: a professional thief accepts an impossible assignment; a future self warns of an approaching disaster; a specialist crew handles the impossible parts; each failed\u2026",
+  "storyCompass": {
+    "perspective": "ENSEMBLE",
+    "conflictSource": "ANTAGONIST",
+    "worldRule": "TECHNOLOGY",
+    "tone": "TRAGIC",
+    "castShape": "ENSEMBLE",
+    "flexibility": "OPEN",
+    "source": "SCRIPT_DNA",
+    "confidence": 75
+  },
+  "attributes": {
+    "plot": 65,
+    "characters": 45,
+    "pacing": 45,
+    "dialogue": 40,
+    "action": 35,
+    "originality": 74
+  },
+  "baseQuality": 52,
+  "developmentCost": 0
+}

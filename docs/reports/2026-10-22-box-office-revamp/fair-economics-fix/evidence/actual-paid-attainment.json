@@ -1,0 +1,1058 @@
+{
+  "kind": "ACTUAL_GAMEPLAY_PAID_CHECKPOINT_ATTAINMENT",
+  "status": "AT_LEAST_2B_OPEN_RUN",
+  "checkpointSha256": "1b0c30fa3b3362cc3304df999da52e139175e132ad7ce66f020767dc71139035",
+  "checkpointBytes": 80252950,
+  "observation": "Latest durable checkpoint after interrupted advanced-owner run; not natural closure or ordinary founder progression",
+  "title": {
+    "titleId": "final-phenomenon",
+    "ownerId": "billion-career-studio",
+    "basis": "UNSETTLED_WEEKLY",
+    "activationWeek": 1632,
+    "legacyGrossCents": 0,
+    "legacyProducerReceiptsCents": null,
+    "grossCents": 231426099725,
+    "producerReceiptsCents": 112705585455,
+    "exhibitorReceiptsCents": 107149243464,
+    "distributionDeductionsCents": 11571270806,
+    "bookingCostCents": 0,
+    "investorPaidCents": 0,
+    "talentPaidCents": 0,
+    "actorPaidCents": 0,
+    "firstAdmissions": 203994760,
+    "repeatAdmissions": 938211,
+    "lastSettledWeek": 1671,
+    "closed": false,
+    "audienceSignals": {
+      "awarePeople": 4381837305,
+      "homeWaitingPeople": 0,
+      "discoveryPeople": 256368,
+      "familiarPeople": 27709871,
+      "countries": [
+        {
+          "countryId": "AD",
+          "awarePeople": 44832,
+          "deferredPeople": 0
+        },
+        {
+          "countryId": "AE",
+          "awarePeople": 6747541,
+          "deferredPeople": 9386
+        },
+        {
+          "countryId": "AF",
+          "awarePeople": 17372045,
+          "deferredPeople": 137
+        },
+        {
+          "countryId": "AG",
+          "awarePeople": 50373,
+          "deferredPeople": 0
+        },
+        {
+          "countryId": "AL",
+          "awarePeople": 1429918,
+          "deferredPeople": 0
+        },
+        {
+          "countryId": "AM",
+          "awarePeople": 1546044,
+          "deferredPeople": 0
+        },
+        {
+          "countryId": "AO",
+          "awarePeople": 19471650,
+          "deferredPeople": 432
+        },
+        {
+          "countryId": "AR",
+          "awarePeople": 26306226,
+          "deferredPeople": 952
+        },
+        {
+          "countryId": "AT",
+          "awarePeople": 5233008,
+          "deferredPeople": 134
+        },
+        {
+          "countryId": "AU",
+          "awarePeople": 16956446,
+          "deferredPeople": 17404
+        },
+        {
+          "countryId": "AZ",
+          "awarePeople": 5192137,
+          "deferredPeople": 43
+        },
+        {
+          "countryId": "BA",
+          "awarePeople": 1612549,
+          "deferredPeople": 1
+        },
+        {
+          "countryId": "BB",
+          "awarePeople": 170416,
+          "deferredPeople": 11
+        },
+        {
+          "countryId": "BD",
+          "awarePeople": 90125948,
+          "deferredPeople": 2301
+        },
+        {
+          "countryId": "BE",
+          "awarePeople": 6733066,
+          "deferredPeople": 208
+        },
+        {
+          "countryId": "BF",
+          "awarePeople": 9674083,
+          "deferredPeople": 47
+        },
+        {
+          "countryId": "BG",
+          "awarePeople": 3817263,
+          "deferredPeople": 47
+        },
+        {
+          "countryId": "BH",
+          "awarePeople": 925293,
+          "deferredPeople": 0
+        },
+        {
+          "countryId": "BI",
+          "awarePeople": 5543450,
+          "deferredPeople": 10
+        },
+        {
+          "countryId": "BJ",
+          "awarePeople": 7297986,
+          "deferredPeople": 76
+        },
+        {
+          "countryId": "BN",
+          "awarePeople": 260963,
+          "deferredPeople": 0
+        },
+        {
+          "countryId": "BO",
+          "awarePeople": 6453259,
+          "deferredPeople": 61
+        },
+        {
+          "countryId": "BR",
+          "awarePeople": 125153271,
+          "deferredPeople": 4304
+        },
+        {
+          "countryId": "BS",
+          "awarePeople": 239223,
+          "deferredPeople": 33
+        },
+        {
+          "countryId": "BT",
+          "awarePeople": 399566,
+          "deferredPeople": 0
+        },
+        {
+          "countryId": "BW",
+          "awarePeople": 1608357,
+          "deferredPeople": 1559
+        },
+        {
+          "countryId": "BY",
+          "awarePeople": 4692583,
+          "deferredPeople": 39
+        },
+        {
+          "countryId": "BZ",
+          "awarePeople": 219134,
+          "deferredPeople": 4
+        },
+        {
+          "countryId": "CA",
+          "awarePeople": 25322596,
+          "deferredPeople": 36394
+        },
+        {
+          "countryId": "CD",
+          "awarePeople": 44169599,
+          "deferredPeople": 692
+        },
+        {
+          "countryId": "CF",
+          "awarePeople": 2192587,
+          "deferredPeople": 0
+        },
+        {
+          "countryId": "CG",
+          "awarePeople": 3201362,
+          "deferredPeople": 11
+        },
+        {
+          "countryId": "CH",
+          "awarePeople": 5066134,
+          "deferredPeople": 110
+        },
+        {
+          "countryId": "CI",
+          "awarePeople": 15715174,
+          "deferredPeople": 324
+        },
+        {
+          "countryId": "CL",
+          "awarePeople": 11383619,
+          "deferredPeople": 356
+        },
+        {
+          "countryId": "CM",
+          "awarePeople": 15514441,
+          "deferredPeople": 16049
+        },
+        {
+          "countryId": "CN",
+          "awarePeople": 816448922,
+          "deferredPeople": 29424
+        },
+        {
+          "countryId": "CO",
+          "awarePeople": 26651976,
+          "deferredPeople": 733
+        },
+        {
+          "countryId": "CR",
+          "awarePeople": 2945854,
+          "deferredPeople": 30
+        },
+        {
+          "countryId": "CU",
+          "awarePeople": 5596300,
+          "deferredPeople": 48
+        },
+        {
+          "countryId": "CV",
+          "awarePeople": 269301,
+          "deferredPeople": 0
+        },
+        {
+          "countryId": "CY",
+          "awarePeople": 722647,
+          "deferredPeople": 0
+        },
+        {
+          "countryId": "CZ",
+          "awarePeople": 6112879,
+          "deferredPeople": 133
+        },
+        {
+          "countryId": "DE",
+          "awarePeople": 47525289,
+          "deferredPeople": 1636
+        },
+        {
+          "countryId": "DJ",
+          "awarePeople": 619721,
+          "deferredPeople": 0
+        },
+        {
+          "countryId": "DK",
+          "awarePeople": 3419537,
+          "deferredPeople": 51
+        },
+        {
+          "countryId": "DM",
+          "awarePeople": 36633,
+          "deferredPeople": 0
+        },
+        {
+          "countryId": "DO",
+          "awarePeople": 5929610,
+          "deferredPeople": 54
+        },
+        {
+          "countryId": "DZ",
+          "awarePeople": 24257592,
+          "deferredPeople": 666
+        },
+        {
+          "countryId": "EC",
+          "awarePeople": 9305307,
+          "deferredPeople": 129
+        },
+        {
+          "countryId": "EE",
+          "awarePeople": 774277,
+          "deferredPeople": 0
+        },
+        {
+          "countryId": "EG",
+          "awarePeople": 60713424,
+          "deferredPeople": 1764
+        },
+        {
+          "countryId": "ER",
+          "awarePeople": 1452628,
+          "deferredPeople": 0
+        },
+        {
+          "countryId": "ES",
+          "awarePeople": 28154240,
+          "deferredPeople": 1073
+        },
+        {
+          "countryId": "ET",
+          "awarePeople": 54029959,
+          "deferredPeople": 902
+        },
+        {
+          "countryId": "FI",
+          "awarePeople": 3201561,
+          "deferredPeople": 39
+        },
+        {
+          "countryId": "FJ",
+          "awarePeople": 499658,
+          "deferredPeople": 123
+        },
+        {
+          "countryId": "FM",
+          "awarePeople": 62343,
+          "deferredPeople": 0
+        },
+        {
+          "countryId": "FR",
+          "awarePeople": 38542622,
+          "deferredPeople": 1438
+        },
+        {
+          "countryId": "GA",
+          "awarePeople": 1254029,
+          "deferredPeople": 0
+        },
+        {
+          "countryId": "GB",
+          "awarePeople": 42221713,
+          "deferredPeople": 60756
+        },
+        {
+          "countryId": "GD",
+          "awarePeople": 64329,
+          "deferredPeople": 0
+        },
+        {
+          "countryId": "GE",
+          "awarePeople": 1901598,
+          "deferredPeople": 3
+        },
+        {
+          "countryId": "GH",
+          "awarePeople": 18280968,
+          "deferredPeople": 17710
+        },
+        {
+          "countryId": "GM",
+          "awarePeople": 1159668,
+          "deferredPeople": 263
+        },
+        {
+          "countryId": "GN",
+          "awarePeople": 6103815,
+          "deferredPeople": 18
+        },
+        {
+          "countryId": "GQ",
+          "awarePeople": 970866,
+          "deferredPeople": 0
+        },
+        {
+          "countryId": "GR",
+          "awarePeople": 5836523,
+          "deferredPeople": 126
+        },
+        {
+          "countryId": "GT",
+          "awarePeople": 9511074,
+          "deferredPeople": 125
+        },
+        {
+          "countryId": "GW",
+          "awarePeople": 892732,
+          "deferredPeople": 0
+        },
+        {
+          "countryId": "GY",
+          "awarePeople": 446965,
+          "deferredPeople": 94
+        },
+        {
+          "countryId": "HN",
+          "awarePeople": 5556680,
+          "deferredPeople": 46
+        },
+        {
+          "countryId": "HR",
+          "awarePeople": 2186252,
+          "deferredPeople": 15
+        },
+        {
+          "countryId": "HT",
+          "awarePeople": 4875437,
+          "deferredPeople": 7
+        },
+        {
+          "countryId": "HU",
+          "awarePeople": 5343604,
+          "deferredPeople": 94
+        },
+        {
+          "countryId": "ID",
+          "awarePeople": 143359058,
+          "deferredPeople": 3729
+        },
+        {
+          "countryId": "IE",
+          "awarePeople": 3426361,
+          "deferredPeople": 3552
+        },
+        {
+          "countryId": "IL",
+          "awarePeople": 5525425,
+          "deferredPeople": 130
+        },
+        {
+          "countryId": "IN",
+          "awarePeople": 754036004,
+          "deferredPeople": 581922
+        },
+        {
+          "countryId": "IQ",
+          "awarePeople": 22823127,
+          "deferredPeople": 520
+        },
+        {
+          "countryId": "IR",
+          "awarePeople": 45572301,
+          "deferredPeople": 1241
+        },
+        {
+          "countryId": "IS",
+          "awarePeople": 226217,
+          "deferredPeople": 0
+        },
+        {
+          "countryId": "IT",
+          "awarePeople": 33860408,
+          "deferredPeople": 1241
+        },
+        {
+          "countryId": "JM",
+          "awarePeople": 1495589,
+          "deferredPeople": 1327
+        },
+        {
+          "countryId": "JO",
+          "awarePeople": 5953692,
+          "deferredPeople": 58
+        },
+        {
+          "countryId": "JP",
+          "awarePeople": 66262214,
+          "deferredPeople": 2545
+        },
+        {
+          "countryId": "KE",
+          "awarePeople": 29504384,
+          "deferredPeople": 32282
+        },
+        {
+          "countryId": "KG",
+          "awarePeople": 3696348,
+          "deferredPeople": 18
+        },
+        {
+          "countryId": "KH",
+          "awarePeople": 9024166,
+          "deferredPeople": 108
+        },
+        {
+          "countryId": "KI",
+          "awarePeople": 71717,
+          "deferredPeople": 0
+        },
+        {
+          "countryId": "KM",
+          "awarePeople": 453124,
+          "deferredPeople": 0
+        },
+        {
+          "countryId": "KN",
+          "awarePeople": 25346,
+          "deferredPeople": 0
+        },
+        {
+          "countryId": "KP",
+          "awarePeople": 13454541,
+          "deferredPeople": 250
+        },
+        {
+          "countryId": "KR",
+          "awarePeople": 29589159,
+          "deferredPeople": 1043
+        },
+        {
+          "countryId": "KW",
+          "awarePeople": 2875182,
+          "deferredPeople": 29
+        },
+        {
+          "countryId": "KZ",
+          "awarePeople": 11585120,
+          "deferredPeople": 444
+        },
+        {
+          "countryId": "LA",
+          "awarePeople": 3985708,
+          "deferredPeople": 26
+        },
+        {
+          "countryId": "LB",
+          "awarePeople": 2972968,
+          "deferredPeople": 10
+        },
+        {
+          "countryId": "LC",
+          "awarePeople": 92834,
+          "deferredPeople": 0
+        },
+        {
+          "countryId": "LI",
+          "awarePeople": 22506,
+          "deferredPeople": 0
+        },
+        {
+          "countryId": "LK",
+          "awarePeople": 11654610,
+          "deferredPeople": 201
+        },
+        {
+          "countryId": "LR",
+          "awarePeople": 2345636,
+          "deferredPeople": 1284
+        },
+        {
+          "countryId": "LS",
+          "awarePeople": 1222628,
+          "deferredPeople": 1002
+        },
+        {
+          "countryId": "LT",
+          "awarePeople": 1650381,
+          "deferredPeople": 6
+        },
+        {
+          "countryId": "LU",
+          "awarePeople": 385476,
+          "deferredPeople": 0
+        },
+        {
+          "countryId": "LV",
+          "awarePeople": 1055567,
+          "deferredPeople": 1
+        },
+        {
+          "countryId": "LY",
+          "awarePeople": 3656634,
+          "deferredPeople": 22
+        },
+        {
+          "countryId": "MA",
+          "awarePeople": 19933810,
+          "deferredPeople": 535
+        },
+        {
+          "countryId": "MC",
+          "awarePeople": 22346,
+          "deferredPeople": 0
+        },
+        {
+          "countryId": "MD",
+          "awarePeople": 1485672,
+          "deferredPeople": 0
+        },
+        {
+          "countryId": "ME",
+          "awarePeople": 359141,
+          "deferredPeople": 0
+        },
+        {
+          "countryId": "MG",
+          "awarePeople": 13099696,
+          "deferredPeople": 84
+        },
+        {
+          "countryId": "MH",
+          "awarePeople": 20002,
+          "deferredPeople": 0
+        },
+        {
+          "countryId": "MK",
+          "awarePeople": 1033174,
+          "deferredPeople": 2
+        },
+        {
+          "countryId": "ML",
+          "awarePeople": 10007260,
+          "deferredPeople": 47
+        },
+        {
+          "countryId": "MM",
+          "awarePeople": 28301321,
+          "deferredPeople": 814
+        },
+        {
+          "countryId": "MN",
+          "awarePeople": 1761439,
+          "deferredPeople": 2
+        },
+        {
+          "countryId": "MR",
+          "awarePeople": 2651417,
+          "deferredPeople": 8
+        },
+        {
+          "countryId": "MT",
+          "awarePeople": 331604,
+          "deferredPeople": 135
+        },
+        {
+          "countryId": "MU",
+          "awarePeople": 794769,
+          "deferredPeople": 807
+        },
+        {
+          "countryId": "MV",
+          "awarePeople": 265131,
+          "deferredPeople": 0
+        },
+        {
+          "countryId": "MW",
+          "awarePeople": 8888938,
+          "deferredPeople": 4964
+        },
+        {
+          "countryId": "MX",
+          "awarePeople": 74068358,
+          "deferredPeople": 2656
+        },
+        {
+          "countryId": "MY",
+          "awarePeople": 20946990,
+          "deferredPeople": 27533
+        },
+        {
+          "countryId": "MZ",
+          "awarePeople": 14568248,
+          "deferredPeople": 106
+        },
+        {
+          "countryId": "NA",
+          "awarePeople": 1550101,
+          "deferredPeople": 1243
+        },
+        {
+          "countryId": "NE",
+          "awarePeople": 11425549,
+          "deferredPeople": 63
+        },
+        {
+          "countryId": "NG",
+          "awarePeople": 150977074,
+          "deferredPeople": 183285
+        },
+        {
+          "countryId": "NI",
+          "awarePeople": 3539273,
+          "deferredPeople": 17
+        },
+        {
+          "countryId": "NL",
+          "awarePeople": 10417482,
+          "deferredPeople": 363
+        },
+        {
+          "countryId": "NO",
+          "awarePeople": 3245015,
+          "deferredPeople": 43
+        },
+        {
+          "countryId": "NP",
+          "awarePeople": 15444576,
+          "deferredPeople": 310
+        },
+        {
+          "countryId": "NR",
+          "awarePeople": 6515,
+          "deferredPeople": 0
+        },
+        {
+          "countryId": "NZ",
+          "awarePeople": 3377498,
+          "deferredPeople": 3656
+        },
+        {
+          "countryId": "OM",
+          "awarePeople": 3023378,
+          "deferredPeople": 32
+        },
+        {
+          "countryId": "PA",
+          "awarePeople": 2506744,
+          "deferredPeople": 20
+        },
+        {
+          "countryId": "PE",
+          "awarePeople": 17882534,
+          "deferredPeople": 407
+        },
+        {
+          "countryId": "PG",
+          "awarePeople": 5706390,
+          "deferredPeople": 4814
+        },
+        {
+          "countryId": "PH",
+          "awarePeople": 60793036,
+          "deferredPeople": 53336
+        },
+        {
+          "countryId": "PK",
+          "awarePeople": 131769063,
+          "deferredPeople": 101472
+        },
+        {
+          "countryId": "PL",
+          "awarePeople": 21565238,
+          "deferredPeople": 764
+        },
+        {
+          "countryId": "PS",
+          "awarePeople": 2747879,
+          "deferredPeople": 8
+        },
+        {
+          "countryId": "PT",
+          "awarePeople": 5830653,
+          "deferredPeople": 122
+        },
+        {
+          "countryId": "PW",
+          "awarePeople": 9027,
+          "deferredPeople": 0
+        },
+        {
+          "countryId": "PY",
+          "awarePeople": 3515697,
+          "deferredPeople": 18
+        },
+        {
+          "countryId": "QA",
+          "awarePeople": 1712402,
+          "deferredPeople": 9
+        },
+        {
+          "countryId": "RO",
+          "awarePeople": 10677213,
+          "deferredPeople": 359
+        },
+        {
+          "countryId": "RS",
+          "awarePeople": 3876365,
+          "deferredPeople": 58
+        },
+        {
+          "countryId": "RU",
+          "awarePeople": 80796444,
+          "deferredPeople": 2721
+        },
+        {
+          "countryId": "RW",
+          "awarePeople": 5937884,
+          "deferredPeople": 3229
+        },
+        {
+          "countryId": "SA",
+          "awarePeople": 19955884,
+          "deferredPeople": 704
+        },
+        {
+          "countryId": "SB",
+          "awarePeople": 437994,
+          "deferredPeople": 77
+        },
+        {
+          "countryId": "SC",
+          "awarePeople": 72070,
+          "deferredPeople": 0
+        },
+        {
+          "countryId": "SD",
+          "awarePeople": 20993460,
+          "deferredPeople": 12290
+        },
+        {
+          "countryId": "SE",
+          "awarePeople": 6028939,
+          "deferredPeople": 172
+        },
+        {
+          "countryId": "SG",
+          "awarePeople": 3766999,
+          "deferredPeople": 4763
+        },
+        {
+          "countryId": "SI",
+          "awarePeople": 1189829,
+          "deferredPeople": 2
+        },
+        {
+          "countryId": "SK",
+          "awarePeople": 3096674,
+          "deferredPeople": 33
+        },
+        {
+          "countryId": "SL",
+          "awarePeople": 3736214,
+          "deferredPeople": 2145
+        },
+        {
+          "countryId": "SM",
+          "awarePeople": 16941,
+          "deferredPeople": 0
+        },
+        {
+          "countryId": "SN",
+          "awarePeople": 9713351,
+          "deferredPeople": 153
+        },
+        {
+          "countryId": "SO",
+          "awarePeople": 7591488,
+          "deferredPeople": 30
+        },
+        {
+          "countryId": "SR",
+          "awarePeople": 324973,
+          "deferredPeople": 0
+        },
+        {
+          "countryId": "SS",
+          "awarePeople": 4967404,
+          "deferredPeople": 2787
+        },
+        {
+          "countryId": "ST",
+          "awarePeople": 119915,
+          "deferredPeople": 0
+        },
+        {
+          "countryId": "SV",
+          "awarePeople": 3275973,
+          "deferredPeople": 13
+        },
+        {
+          "countryId": "SY",
+          "awarePeople": 12697817,
+          "deferredPeople": 222
+        },
+        {
+          "countryId": "SZ",
+          "awarePeople": 643673,
+          "deferredPeople": 266
+        },
+        {
+          "countryId": "TD",
+          "awarePeople": 8121439,
+          "deferredPeople": 33
+        },
+        {
+          "countryId": "TG",
+          "awarePeople": 3921082,
+          "deferredPeople": 4
+        },
+        {
+          "countryId": "TH",
+          "awarePeople": 36814458,
+          "deferredPeople": 983
+        },
+        {
+          "countryId": "TJ",
+          "awarePeople": 5418190,
+          "deferredPeople": 47
+        },
+        {
+          "countryId": "TL",
+          "awarePeople": 721127,
+          "deferredPeople": 0
+        },
+        {
+          "countryId": "TM",
+          "awarePeople": 3788283,
+          "deferredPeople": 18
+        },
+        {
+          "countryId": "TN",
+          "awarePeople": 6177107,
+          "deferredPeople": 68
+        },
+        {
+          "countryId": "TO",
+          "awarePeople": 56129,
+          "deferredPeople": 0
+        },
+        {
+          "countryId": "TR",
+          "awarePeople": 49620953,
+          "deferredPeople": 1786
+        },
+        {
+          "countryId": "TT",
+          "awarePeople": 917308,
+          "deferredPeople": 909
+        },
+        {
+          "countryId": "TV",
+          "awarePeople": 5542,
+          "deferredPeople": 0
+        },
+        {
+          "countryId": "TW",
+          "awarePeople": 13059858,
+          "deferredPeople": 485
+        },
+        {
+          "countryId": "TZ",
+          "awarePeople": 36467803,
+          "deferredPeople": 40826
+        },
+        {
+          "countryId": "UA",
+          "awarePeople": 18876617,
+          "deferredPeople": 425
+        },
+        {
+          "countryId": "UG",
+          "awarePeople": 20585810,
+          "deferredPeople": 12695
+        },
+        {
+          "countryId": "US",
+          "awarePeople": 215261884,
+          "deferredPeople": 318731
+        },
+        {
+          "countryId": "UY",
+          "awarePeople": 1962903,
+          "deferredPeople": 12
+        },
+        {
+          "countryId": "UZ",
+          "awarePeople": 19020873,
+          "deferredPeople": 426
+        },
+        {
+          "countryId": "VA",
+          "awarePeople": 468,
+          "deferredPeople": 0
+        },
+        {
+          "countryId": "VC",
+          "awarePeople": 50589,
+          "deferredPeople": 0
+        },
+        {
+          "countryId": "VE",
+          "awarePeople": 14551989,
+          "deferredPeople": 296
+        },
+        {
+          "countryId": "VN",
+          "awarePeople": 50410316,
+          "deferredPeople": 1277
+        },
+        {
+          "countryId": "VU",
+          "awarePeople": 181291,
+          "deferredPeople": 3
+        },
+        {
+          "countryId": "WS",
+          "awarePeople": 117600,
+          "deferredPeople": 0
+        },
+        {
+          "countryId": "XK",
+          "awarePeople": 907904,
+          "deferredPeople": 0
+        },
+        {
+          "countryId": "YE",
+          "awarePeople": 16602347,
+          "deferredPeople": 134
+        },
+        {
+          "countryId": "ZA",
+          "awarePeople": 38953519,
+          "deferredPeople": 35107
+        },
+        {
+          "countryId": "ZM",
+          "awarePeople": 11192100,
+          "deferredPeople": 11290
+        },
+        {
+          "countryId": "ZW",
+          "awarePeople": 8984766,
+          "deferredPeople": 8485
+        }
+      ]
+    },
+    "satisfactionScoreUnits": 1957621533460,
+    "satisfactionAdmissions": 204932971
+  },
+  "observedRunWeeks": 40,
+  "productionCents": 30000000000,
+  "campaignCents": 20000000000,
+  "costEvidence": "Saved active release retains paid budget/campaign; actual runner asserts 500M funding debit at queue; rolling finance ledger no longer retains initial debit events",
+  "projectProfitToDateCents": 62705585455,
+  "studioCashDollars": 3928064578.09,
+  "personalCashDollars": 698173,
+  "countries": 197,
+  "precursors": [
+    {
+      "id": "precursor-0",
+      "grossCents": 50506549400,
+      "firstAdmissions": 44229235
+    },
+    {
+      "id": "precursor-1",
+      "grossCents": 51382621928,
+      "firstAdmissions": 43824612
+    },
+    {
+      "id": "precursor-2",
+      "grossCents": 46844451073,
+      "firstAdmissions": 41893934
+    },
+    {
+      "id": "precursor-3",
+      "grossCents": 48882584482,
+      "firstAdmissions": 42359996
+    }
+  ],
+  "limitations": [
+    "Authored established $3B owner and completed craft; no ordinary-founder-to-billions probability claim",
+    "Four precursor audiences earned in prior actual game weeks",
+    "No $3B milestone or completed final theatrical run established",
+    "Full raw checkpoint retained in task temp folder, not duplicated into repository evidence"
+  ]
+}

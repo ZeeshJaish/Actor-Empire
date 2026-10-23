@@ -1,0 +1,11 @@
+
+> pr-6.6.3@1.0.25 audit:script-broad-expansion
+> esbuild scripts/audit-script-broad-expansion.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-script-broad-expansion.mjs && node /tmp/ae-script-broad-expansion.mjs
+
+
+  ../../../../tmp/ae-script-broad-expansion.mjs  813.0kb
+
+⚡ Done in 90ms
+PASS 1302 existing concept profiles and all existing question/answer metadata remain unchanged.
+PASS broad story families are selectable in the existing questions.
+PASS 118 additional answers and 26 broad combinations: coherent premise/identity, bounded stats, unchanged canon.

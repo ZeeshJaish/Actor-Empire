@@ -1,0 +1,567 @@
+{
+  "ACTION": {
+    "questions": [
+      {
+        "id": "protagonist",
+        "choices": [
+          "ex-special-forces",
+          "ordinary-guy",
+          "rogue-cop",
+          "retired-assassin",
+          "undercover-agent",
+          "rogue-captain",
+          "martial-artist"
+        ],
+        "choiceHash": "42fcb66f351149dbee53bc837f001f4274b95ab5a2ce7a870c9e347c8533c5c3"
+      },
+      {
+        "id": "inciting-incident",
+        "choices": [
+          "kidnapped-family",
+          "stolen-secrets",
+          "framed",
+          "bank-heist",
+          "crew-mutiny"
+        ],
+        "choiceHash": "b4a91d1a1a3cb8a0cd885ee0735acafe0b3ee1172692fbd64294053260cfda12"
+      },
+      {
+        "id": "sidekick",
+        "choices": [
+          "comic-hacker",
+          "gritty-mentor",
+          "rival-agent",
+          "rival-swordsman"
+        ],
+        "choiceHash": "155ed00bfc95b0813492cf7560461a8bf3d56b86facc19e75f68455eb54cc133"
+      },
+      {
+        "id": "set-piece",
+        "choices": [
+          "mid-air-hijack",
+          "highway-chase",
+          "skyscraper-assault",
+          "boat-chase",
+          "naval-battle",
+          "sword-duel"
+        ],
+        "choiceHash": "e5f53474db171d7f0e6e1a94a43297846aa0bc50a126a34b985287f724adaf8f"
+      },
+      {
+        "id": "villain-motivation",
+        "choices": [
+          "pure-greed",
+          "twisted-justice",
+          "revenge",
+          "imperial-control"
+        ],
+        "choiceHash": "f6da80627cf742e286fce1b1b8c4e44a66b359773e4fb37a706e043f850e9ae0"
+      },
+      {
+        "id": "climax-location",
+        "choices": [
+          "abandoned-warehouse",
+          "rainy-rooftop",
+          "moving-train",
+          "burning-flagship"
+        ],
+        "choiceHash": "5d1eedfee85fc29c89b13dcfcab851c93e8f4b7e57989a6367b361976a39e3e8"
+      },
+      {
+        "id": "ending",
+        "choices": [
+          "hero-sacrifice",
+          "ride-into-sunset",
+          "cliffhanger",
+          "earned-freedom"
+        ],
+        "choiceHash": "850bc7d4cf67d6b0f3b10ad4160b01e9f3c1f8ecbb30970881d0d1ffef54c9bf"
+      }
+    ],
+    "profileCount": 204,
+    "profileHash": "dfc8c8995e2a94bfb2440cad92618df238a1c4128c4ac3881e2856bb99f1607c"
+  },
+  "HORROR": {
+    "questions": [
+      {
+        "id": "threat",
+        "choices": [
+          "supernatural-entity",
+          "masked-killer",
+          "psychological",
+          "cosmic-horror",
+          "techno-horror",
+          "folk-ritual",
+          "sea-monster"
+        ],
+        "choiceHash": "bb10d16b7ed4de376475c119f972a66efbff4be52c335c657ca19bd2b1118487"
+      },
+      {
+        "id": "setting",
+        "choices": [
+          "isolated-cabin",
+          "suburban-home",
+          "abandoned-asylum",
+          "underwater-base",
+          "space-station",
+          "ghost-ship"
+        ],
+        "choiceHash": "f32afa4de6e92bd705f2bafa1191a1bd4670cc7ed9dbefa6e4a751fd02d90412"
+      },
+      {
+        "id": "victim-type",
+        "choices": [
+          "teen-group",
+          "investigative-team",
+          "lone-survivor",
+          "salvage-crew"
+        ],
+        "choiceHash": "b4f1b74fe0ae8e794b2ebb0ab5579b869ba9c42560bfb735cde20871045597ef"
+      },
+      {
+        "id": "twist",
+        "choices": [
+          "all-in-head",
+          "trusted-friend",
+          "never-left",
+          "cycle-continues",
+          "curse-bargain"
+        ],
+        "choiceHash": "2d51e3d15c93ba1299e88eca7a51d24eed0cdb81d3a784d2fedc38b4c0e091c4"
+      }
+    ],
+    "profileCount": 132,
+    "profileHash": "eac315bcc5aedcc361773a7251e89d9dc782b78f8796a01507db0109af9cc5b9"
+  },
+  "SCI_FI": {
+    "questions": [
+      {
+        "id": "concept",
+        "choices": [
+          "ai-uprising",
+          "alien-contact",
+          "time-travel",
+          "multiverse",
+          "genetic-engineering",
+          "space-salvage",
+          "first-colony"
+        ],
+        "choiceHash": "11591a67d5e1e7d299dc6b78224644227c6eb2cc3e3cf9e67c30f0c4d513d5a2"
+      },
+      {
+        "id": "setting",
+        "choices": [
+          "dystopian-earth",
+          "deep-space",
+          "cyberpunk-city",
+          "alien-planet",
+          "orbital-city"
+        ],
+        "choiceHash": "8a230f9daccd0afefc96df1cbe55d2422db589dcf6e515287e9dfa7e7d306edc"
+      },
+      {
+        "id": "tech-level",
+        "choices": [
+          "near-future",
+          "high-tech",
+          "low-tech",
+          "retrofuture"
+        ],
+        "choiceHash": "0d2c6ad619565988cccb45fe3d2b741381da7789d38588bff7aae781977689cc"
+      }
+    ],
+    "profileCount": 96,
+    "profileHash": "2f5a32d682239fa0e63c2c5f2fc52f6b6ce1f98e5323a31c479a270a96b3ed11"
+  },
+  "COMEDY": {
+    "questions": [
+      {
+        "id": "premise",
+        "choices": [
+          "body-swap",
+          "road-trip",
+          "wedding-crasher",
+          "fake-relationship",
+          "fish-out-of-water",
+          "mistaken-identity",
+          "workplace-chaos"
+        ],
+        "choiceHash": "22913517ceed86ed0bcffc5456f70017f1d4c1f36b5921870f8bdd3f1bc7c84d"
+      },
+      {
+        "id": "humor-style",
+        "choices": [
+          "slapstick",
+          "witty-banter",
+          "cringe",
+          "satire",
+          "absurdist",
+          "deadpan"
+        ],
+        "choiceHash": "9af05639b43cd268abf22f2eab8e88a9cea0a63ce8b703e86ed37eb035a5102a"
+      },
+      {
+        "id": "comedic-duo",
+        "choices": [
+          "odd-couple",
+          "buddy-cops",
+          "best-friends",
+          "rival-captains"
+        ],
+        "choiceHash": "07105eca15a976b182d4f19608a581bbf7f4d2845c825e4895989dff94c58b10"
+      }
+    ],
+    "profileCount": 102,
+    "profileHash": "e33e72972df1d19fac541b9d4480c221c6d4449368a5af71d87a2f5c656c6e9a"
+  },
+  "DRAMA": {
+    "questions": [
+      {
+        "id": "conflict",
+        "choices": [
+          "family-feud",
+          "legal-battle",
+          "addiction",
+          "political-scandal",
+          "forbidden-love",
+          "migration-family",
+          "labour-dispute"
+        ],
+        "choiceHash": "5ea896461d248672be76f687d325b1ce67df0bd8f581ad390791f26d22fc08bc"
+      },
+      {
+        "id": "tone",
+        "choices": [
+          "gritty",
+          "melancholic",
+          "intense",
+          "hopeful"
+        ],
+        "choiceHash": "200bf27c3d62647450cda39d9c7aef804e3e30ba32151eb9c55d13b582d21617"
+      },
+      {
+        "id": "resolution",
+        "choices": [
+          "redemption",
+          "tragedy",
+          "bittersweet",
+          "reconciliation"
+        ],
+        "choiceHash": "c650eeaea83ff6d9d42786ea152931c8f443baaa13b4328f0a0d77341286cc63"
+      }
+    ],
+    "profileCount": 90,
+    "profileHash": "f3e40ca2e112f29627bde75170a323373d14f8c46451c64cc993e6c92e98b8e7"
+  },
+  "ROMANCE": {
+    "questions": [
+      {
+        "id": "meet-cute",
+        "choices": [
+          "enemies-to-lovers",
+          "childhood-friends",
+          "chance-encounter",
+          "online-dating",
+          "workplace-romance",
+          "second-chance",
+          "adventure-partners"
+        ],
+        "choiceHash": "e937f7520344d4d6ab38d418183c3ec2909a37f400e74653a35d65eb44f27813"
+      },
+      {
+        "id": "obstacle",
+        "choices": [
+          "distance",
+          "family-disapproval",
+          "career-ambition",
+          "opposing-loyalties"
+        ],
+        "choiceHash": "6c70747b471aa241861b4d0f46524f220a5c3552a613e96cf528eccc91819ce8"
+      }
+    ],
+    "profileCount": 66,
+    "profileHash": "c0cd88aa9a089ff87a8d68a9914bb906e401556453b126c81b68b832ca5240d9"
+  },
+  "THRILLER": {
+    "questions": [
+      {
+        "id": "mystery",
+        "choices": [
+          "missing-person",
+          "serial-killer",
+          "conspiracy",
+          "heist",
+          "espionage",
+          "hostage-negotiation",
+          "maritime-conspiracy"
+        ],
+        "choiceHash": "17e5eea5cfa3b7b69ac97e7c5c626ce24d055027717c7c2005193177d5856bcb"
+      },
+      {
+        "id": "pacing",
+        "choices": [
+          "slow-burn",
+          "breakneck",
+          "psychological",
+          "real-time"
+        ],
+        "choiceHash": "6fbcb462d76984d93e91c06cc94d3f89d3dbce5a83e0f90896f7d38a9e1f3a75"
+      }
+    ],
+    "profileCount": 66,
+    "profileHash": "bca60e4e419c3b1b45b73c41a39037a0679e60af8ab05fadb75e64d3cb29ebab"
+  },
+  "MYSTERY": {
+    "questions": [
+      {
+        "id": "mystery-engine",
+        "choices": [
+          "locked-room",
+          "cold-case",
+          "missing-heir",
+          "missing-ship",
+          "archaeological-cipher"
+        ],
+        "choiceHash": "d38b63dc19c0e0549632fb7f764051cf046f2d3792eb4b1b642daa4e77ffe0f9"
+      },
+      {
+        "id": "mystery-reveal",
+        "choices": [
+          "betrayal-reveal",
+          "hidden-identity",
+          "system-coverup",
+          "staged-disappearance"
+        ],
+        "choiceHash": "80d3ee34d99355273bd1c1ea0921d9a603d2014d8e2356c9782e971af0da4362"
+      }
+    ],
+    "profileCount": 54,
+    "profileHash": "57587cb2141f6c15dfb9f43c7951cdf7522f672d9d7da96d1408533290b51b6a"
+  },
+  "ADVENTURE": {
+    "questions": [
+      {
+        "id": "goal",
+        "choices": [
+          "lost-city",
+          "ancient-artifact",
+          "survival",
+          "mythical-creature",
+          "rescue-mission",
+          "cursed-treasure",
+          "break-sea-curse",
+          "rescue-pirate-crew",
+          "rival-expedition"
+        ],
+        "choiceHash": "9231e20d655a99c163f81c528e76764ab75a99c79f010a64a24c27d22ee02242"
+      },
+      {
+        "id": "location",
+        "choices": [
+          "jungle",
+          "desert",
+          "mountains",
+          "high-seas",
+          "island-chain",
+          "sunken-kingdom",
+          "polar-frontier"
+        ],
+        "choiceHash": "add61f125648ea73eb724ccd8b50b87e3cb62938cb5990ba105c274d889545e9"
+      }
+    ],
+    "profileCount": 96,
+    "profileHash": "ee52d59df0d7308ae12ee7d9de61cd4bb808e0283b838710b2bd799530eef0bb"
+  },
+  "SUPERHERO": {
+    "questions": [
+      {
+        "id": "origin",
+        "choices": [
+          "lab-accident",
+          "alien-tech",
+          "training",
+          "mythical-heritage",
+          "tech-genius",
+          "inherited-mantle",
+          "ocean-guardian"
+        ],
+        "choiceHash": "731240c9355ee428fe9f4f0c092fd959ae514cc33a868d803eed071df939003e"
+      },
+      {
+        "id": "villain-type",
+        "choices": [
+          "dark-mirror",
+          "cosmic-threat",
+          "street-level",
+          "fallen-mentor"
+        ],
+        "choiceHash": "51112031dd3495ec1c0809dcc6fe4d69a645b94aa490de0959723b0b9ed175f3"
+      }
+    ],
+    "profileCount": 66,
+    "profileHash": "8d37787f9851e976522522424c02b32c609438c06cadf2dfd9f9f79c1b3ea74f"
+  },
+  "MUSICAL": {
+    "questions": [
+      {
+        "id": "music-style",
+        "choices": [
+          "original-songs",
+          "jukebox",
+          "backstage",
+          "folk-voyage",
+          "dance-battle"
+        ],
+        "choiceHash": "e832949b1c2d8662c120bbc663a673d6e5d31e8ef5fbbc7a8aafea7ca2d42b46"
+      },
+      {
+        "id": "emotional-core",
+        "choices": [
+          "first-love",
+          "fame-cost",
+          "community",
+          "homecoming"
+        ],
+        "choiceHash": "80020107f23842de3634be0a6bc4eef7f2a7fc2e7e53239b6ef029dd2eea3156"
+      }
+    ],
+    "profileCount": 54,
+    "profileHash": "709fa7bf3dc48d49341738907d0914837a1e990860815280cb7f150f52aa82fd"
+  },
+  "BIOPIC": {
+    "questions": [
+      {
+        "id": "subject-angle",
+        "choices": [
+          "rise",
+          "fallout",
+          "final-years",
+          "pivotal-week",
+          "hidden-work"
+        ],
+        "choiceHash": "e3ff08bff993ec9746e6370e348fb10a3b448051bf354bcd54aa0aa975813a59"
+      },
+      {
+        "id": "access",
+        "choices": [
+          "authorized",
+          "unauthorized",
+          "ensemble-history",
+          "letters-diaries"
+        ],
+        "choiceHash": "bbbc41c3cc77efe8b641be853afee0ffde78f12c4d36a9a3321e3c43da2c49cb"
+      }
+    ],
+    "profileCount": 54,
+    "profileHash": "cb5a6234e3049c8fe2f162ff268db38109bd91118ddcfa9ccc48a74e660c8007"
+  },
+  "SPORTS": {
+    "questions": [
+      {
+        "id": "sports-arc",
+        "choices": [
+          "underdog",
+          "rivalry",
+          "comeback",
+          "endurance-race",
+          "team-rebuild"
+        ],
+        "choiceHash": "17e6c95e0a3e6cd62b0cc380f4623a0732dedf2792c89c04c330a3c84ea84a4b"
+      },
+      {
+        "id": "arena",
+        "choices": [
+          "final-match",
+          "locker-room",
+          "public-trial",
+          "qualifying-round"
+        ],
+        "choiceHash": "d0f35b0936224fc7f08fd0335684179863c1b92d0dd09560f135bdb16f6cf561"
+      }
+    ],
+    "profileCount": 54,
+    "profileHash": "0f2da48422dbe41f20602e0eb4b32a37a8c130f4c9ed234772784fc5977eaebe"
+  },
+  "ANIMATION": {
+    "questions": [
+      {
+        "id": "animation-world",
+        "choices": [
+          "talking-creatures",
+          "toybox-city",
+          "mature-animation",
+          "sky-islands",
+          "undersea-city",
+          "clockwork-world"
+        ],
+        "choiceHash": "4b191d35fbb33df1e6128892c3ea5924f2e32d6422b922ea0422fc585f7fe55d"
+      }
+    ],
+    "profileCount": 36,
+    "profileHash": "6d541577adaead1ac887bf56e62ac82f610dfdaf2a389d6b1c57307d87675607"
+  },
+  "FANTASY": {
+    "questions": [
+      {
+        "id": "myth",
+        "choices": [
+          "lost-heir",
+          "forbidden-magic",
+          "monster-alliance",
+          "cursed-pirate-captain",
+          "dragon-bond",
+          "portal-quest",
+          "mythic-sea-beast"
+        ],
+        "choiceHash": "42f1f1ec33fdc2b1191801dc8a9a6332ced754bd80067b30d6d4ca9ab465961d"
+      }
+    ],
+    "profileCount": 42,
+    "profileHash": "b829a80dc6ee872a64cf0c406657e66b7cef7b9444f5e6326ddd5280a22e7b76"
+  },
+  "CRIME": {
+    "questions": [
+      {
+        "id": "crime-focus",
+        "choices": [
+          "detective-case",
+          "mob-family",
+          "true-crime",
+          "smuggling-network",
+          "con-artists",
+          "prison-escape"
+        ],
+        "choiceHash": "ed52f87a8c0b7bd3775a1a48a25bbdaa00ebf7a0896b0fe167faae45bf9ec425"
+      }
+    ],
+    "profileCount": 36,
+    "profileHash": "5101b034e39e2dd57a4e1bf73eba25ea9e1f86ef0658eada03dbc64bb926c608"
+  },
+  "DOCUMENTARY": {
+    "questions": [
+      {
+        "id": "doc-approach",
+        "choices": [
+          "investigative",
+          "intimate-profile",
+          "cultural-moment",
+          "expedition-record",
+          "oral-history"
+        ],
+        "choiceHash": "c5a6a291f480054b7f85373dc440de90bbdd17c0849b9b8b365608f25f121f7e"
+      },
+      {
+        "id": "source-access",
+        "choices": [
+          "archive",
+          "interviews",
+          "verite",
+          "field-records"
+        ],
+        "choiceHash": "5e9860a2deb846d457cd57eb93d36ee5eb3e1c28cf4acb0f6c415ab40a364833"
+      }
+    ],
+    "profileCount": 54,
+    "profileHash": "91c5df164c95a7d5e7073599993cf862b9d6130ca191143510441ee870995931"
+  }
+}

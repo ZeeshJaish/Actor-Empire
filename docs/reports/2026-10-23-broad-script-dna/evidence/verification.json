@@ -1,0 +1,53 @@
+{
+  "feature": "Broad Script DNA expansion",
+  "answersAddedThisTask": 118,
+  "priorAnswersAdded": 68,
+  "representativeCombinations": 26,
+  "browserConceptsThroughProduction": 1,
+  "productionWeeks": 32,
+  "subsequentWeeks": 3,
+  "verification": {
+    "contentCompatibility": 0,
+    "productionFlowWithBrowserConcept": 0,
+    "focusedTypecheck": 0,
+    "build": 0,
+    "cinemaIntegration": 0,
+    "browserReloadAssertions": 0,
+    "fullWorkspaceLint": 2
+  },
+  "focusedTypecheckConfig": {
+    "extends": "/Users/zeesh/Vibe code/Actor empire/tsconfig.json",
+    "include": [],
+    "exclude": [
+      "/Users/zeesh/Vibe code/Actor empire/functions",
+      "/Users/zeesh/Vibe code/Actor empire/vite.config.ts",
+      "/Users/zeesh/Vibe code/Actor empire/node_modules",
+      "/Users/zeesh/Vibe code/Actor empire/dist"
+    ],
+    "compilerOptions": {
+      "types": [
+        "/Users/zeesh/Vibe code/Actor empire/node_modules/@types/node",
+        "/Users/zeesh/Vibe code/Actor empire/node_modules/vite/client"
+      ]
+    },
+    "files": [
+      "/Users/zeesh/Vibe code/Actor empire/src/data/scriptStoryVariations.ts",
+      "/Users/zeesh/Vibe code/Actor empire/src/data/scriptTemplates.ts",
+      "/Users/zeesh/Vibe code/Actor empire/scripts/audit-script-broad-expansion.ts",
+      "/Users/zeesh/Vibe code/Actor empire/scripts/audit-script-broad-flow.ts",
+      "/Users/zeesh/Vibe code/Actor empire/scripts/fixtures/scriptStoryCombinations.ts",
+      "/Users/zeesh/Vibe code/Actor empire/views/lifestyle/business/components/DevelopmentLabScriptWizard.tsx"
+    ]
+  },
+  "sources": {
+    "src/data/scriptStoryVariations.ts": "577602a66be9d32eecee9e73f2faa8d66e4dd3ff485e812e7bf8f4a017c606ca",
+    "src/data/scriptTemplates.ts": "a97c2ea84d48075a1d9ad80f40bd43ca71232f873b115e84c4312b3f13ec9d21",
+    "scripts/audit-script-broad-expansion.ts": "815044253b6bcf171206e804f8dd7de0fb454ba82e8d3dc40a34662e5dccdbc9",
+    "scripts/audit-script-broad-flow.ts": "8c08a1d216b4bb1462126ec009f0a96d4470e2c19cada1b28ef3477ff1a3d65f",
+    "scripts/fixtures/scriptStoryCombinations.ts": "65ec73da43cd26e8996c8e71adfb7addfccc9650dee022c0af68e22257f97653",
+    "scripts/fixtures/scriptDnaPreBroad.json": "d3707d566e50b12c9becf1980adc084b2826bf8362204a6875d2e11fce7ddd8b",
+    "package.json": "106ca50786b4c4020fd5c8825c5343dd88cd751ccac068fe5f3a31fa44f8ef6f"
+  },
+  "unrelatedChangePolicy": "Unrelated tracked and untracked edits were left in place. Latest full lint fails in concurrently edited Vite icon plugin.",
+  "review": "Independent read-only review found no actionable issues."
+}

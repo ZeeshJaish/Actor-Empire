@@ -1,0 +1,11 @@
+
+> pr-6.6.3@1.0.25 audit:script-variations
+> esbuild scripts/audit-script-variations.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-script-variations.mjs && node /tmp/ae-script-variations.mjs
+
+
+  ../../../../tmp/ae-script-variations.mjs  801.1kb
+
+⚡ Done in 25ms
+PASS 894 pre-expansion DNA profiles retain their scoring and selectable IDs.
+PASS 186 new answers across 17 genres: bounded DNA, genre-scoped identity, deterministic premise, protected canon.
+Script variation content and DNA path passed.

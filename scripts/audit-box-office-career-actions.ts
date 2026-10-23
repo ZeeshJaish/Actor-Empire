@@ -59,3 +59,15 @@ for(const budget of [1,1000,25000,100000,500000]){
 }
 assert.ok(getMarketingAllocationStep(0)>0,'Zero budget must leave the increase button disabled');
 console.log('PASS small funded campaign supports usable channel increments');
+
+// An audit strategy must train its selected genre using actual costs, without
+// silently reusing the DRAMA policy for every purportedly different career.
+{
+ const p=structuredClone(INITIAL_PLAYER),actions:CareerAction[]=[];
+ p.stats.genreXP.DRAMA=100;p.stats.genreXP.COMEDY=0;
+ const result=prepareOrdinaryCinemaWeek(p,actions,'COMEDY');
+ assert.ok(result.stats.genreXP.COMEDY>0,'COMEDY strategy must actually train COMEDY');
+ assert.equal(result.stats.genreXP.DRAMA,100,'Training choice must preserve other genre XP');
+ assert.ok(actions.some(a=>a.action==='Train COMEDY'&&a.cashAfter<a.cashBefore),'Training must pay real money');
+ console.log('PASS selected career policy trains the chosen genre with actual costs');
+}

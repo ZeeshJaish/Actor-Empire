@@ -1,0 +1,6 @@
+### Result
+[{"name":"desktop-before","width":71,"padding":"16px","labelLines":2},{"name":"mobile-before","width":88.65625,"padding":"16px","labelLines":1}]
+### Ran Playwright code
+```js
+await (async (page) => { const results = []; for (const [name, width, height] of [['desktop-before',1440,1100], ['mobile-before',390,844]]) { await page.setViewportSize({width,height}); await page.screenshot({path:'output/playwright/genre-layout/' + name + '.png',fullPage:true}); const measurements = await page.getByRole('button', {name:'Action',exact:true}).first().evaluate(button => { const label = button.lastElementChild; const range = document.createRange(); range.selectNodeContents(label); return {width:button.getBoundingClientRect().width,padding:getComputedStyle(button).padding,labelLines:range.getClientRects().length}; }); results.push({name,...measurements}); } return results; })(page);
+```

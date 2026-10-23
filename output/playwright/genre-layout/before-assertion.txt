@@ -1,0 +1,2 @@
+### Error
+Error: Genre label Action wraps across 2 lines inside the narrow desktop panel

@@ -1,0 +1,34 @@
+PASS live adapter includes all owner routes without paying or mutating
+PASS one common result pays once and JSON replay is identical
+PASS changed receipt for committed week refuses payment
+PASS slate ordering has no effect on receipts or owner payments
+PASS new standard exhibition credits receipts without an unagreed producer show fee
+PASS legacy exhibition agreement still charges its producer once and protects signed terms
+PASS signed investor and actor backend pay only actual new receipts once
+PASS ownership change uses the canonical title and invalidates a stale owner result
+PASS country-specific chosen chains do not create a cross-product release
+PASS new NPC admission pays marketing once and no lifetime or phantom streaming income
+PASS legacy fully paid NPCs never manufacture new attendance or cash
+PASS outside theatrical stake is admitted without synthetic payout or duplicate principal
+PASS cinema calculations preserve pending event callbacks in the live candidate
+PASS changed signed terms cannot settle an old pending result
+PASS commit detaches saved audience from the transient kernel result
+PASS missing canonical NPC owner rejects atomically
+PASS NPC operating ledger keeps the cent already earned from tickets
+PASS altered first-time result cannot invent conserved ticket cash
+PASS changing release budget or destination business makes a result stale
+PASS inherited signed backend continues on heir clock without changing old receipt keys
+PASS inherited parent actor royalty is paid to its signed beneficiary
+PASS earned demand can continue beyond old week or lifetime-gross caps
+PASS a migrated film above three billion keeps historical cash and can earn further paid receipts
+PASS current regional and audience reports agree with saved paid facts
+PASS committed chart retains prior ranks even when last weeks winner retires
+PASS NPC closure finalizes one actual outcome without paying production cash again
+PASS actual no-streamer theatrical exit archives once and stays retired next week
+PASS actual processGameWeek includes newly admitted NPC and player slate in one saved result
+PASS actual release confirmation retry from prior durable state produces one identical receipt
+PASS actual persistence preparation, generation save and replay keep paid history
+PASS actual reload and next game week preserve previous receipt identity and amounts
+PASS actual paid week survives failed promotion and successful retry without duplicate cash
+Live week diagnostic: {"firstGameWeekMs":694,"journeyMs":9018,"titles":4,"cinemaBytes":3035689,"saveBytes":9631103}
+Integration audit: 32 groups passed

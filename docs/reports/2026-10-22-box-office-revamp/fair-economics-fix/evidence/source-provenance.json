@@ -1,0 +1,48 @@
+{
+  "sourceFiles": {
+    "components/CinemaFinancePanel.tsx": "1e1515506d574e453087b3e6ec8a10c2c4c5c024cf8e2e4fbbdb965bd40ae2a1",
+    "services/boxOffice/boxOfficeSettlement.ts": "adc28477a91b3f1811ed3b36b33d8c4d16fcb5dbe7e406af6335440cbb1af812",
+    "services/boxOffice/boxOfficeTypes.ts": "0dfa43d7d2c679aa05ab8fdf26f45970dfab3fef83acd938c18db55dada5c0f7",
+    "services/boxOffice/boxOfficeProfiles.ts": "b7e3c38a06e7d18f129cfa2f22499e10e07f99e886cc09ab15a8667b471656f0",
+    "services/boxOffice/boxOfficeSupply.ts": "02015b7b1feab3a680482a67e538e2504ffd2bcde75daef9c623e50a432641ff",
+    "services/boxOffice/boxOfficeMarket.ts": "33c2790b6bc28f357c011c716370f61638b0fac05d1b6301c90fce7f7ce77cf5",
+    "services/boxOffice/boxOfficeMigration.ts": "9595919e52f320620347ccf035c9f1df7c9e43ec218ee7651fee990584ba6871",
+    "services/boxOffice/boxOfficeWeek.ts": "5b279ae4f4eefb13c415f0ce6080d9adf8a43857b6c43478b4f43567dda9345e",
+    "services/boxOffice/boxOfficeLiveSettlement.ts": "e401fd7936f8f79f3e5c50c2eb0d52c631d3b3fb5f03ec6bec2d4bb08b822ae8",
+    "services/boxOffice/boxOfficeAwareness.ts": "0296643af495c515a8107758dee48100873531a2b636344162a5752b563e28ed",
+    "services/studioAi/studioAiCinemaRelease.ts": "51050f39658e02bb9ce5c0fe8bf767b82f9811c07f98b0023f31d29f9a2d59b1",
+    "services/studioAi/studioAiReleasePlanning.ts": "fa6531ac088fc8f0230816531d36732cc8e23b729819bab356dbe722f8b65fc3",
+    "services/studioAi/studioAiProductionExecution.ts": "f7c07b559fb6a005d8266bfbe757445bce9913f5e68c9f43cf051976d1813dc9",
+    "services/studioAi/studioAiCommercialResult.ts": "798c5699a5a9a0a91b862f0a55f74904a72fc7d40d0f8879eee6bec5ceeca80c",
+    "services/industryIntelligence/industryBudgetSuitability.ts": "e9ed013a7464f4a0f2da87ef7bb158613bf34773f0dc6dc74bc71818da793dc6",
+    "services/industryIntelligence/industryContentGenerator.ts": "d8a82dfdbb2cd5860e8bcdcaba835cb6bb258efa5faeab29530e677b36b41eb7",
+    "types.ts": "b4de7ace365022e95f0416216d324cb949b55a0445e4ffe6bbeabbbb2ae9f82e",
+    "docs/reports/2026-10-22-box-office-revamp/career-economics/audit-normal-career.ts": "43b4c9c890629933aeba549abb5c66fff41c12d312c9d6d69ee1069d79ae4131",
+    "docs/reports/2026-10-22-box-office-revamp/career-economics/run-audit.mjs": "3fa4b76ba8637ea12a22b80d407c5ee18fd327f9a479049c00959ee3ae4513a9",
+    "scripts/fixtures/cinemaAuditCheckpoint.ts": "152cce4da289e55103355750f30a22e3cc32c091a644b559004eada44323644b",
+    "scripts/audit-cinema-audit-checkpoint.ts": "e1d9469300b1062f134062bad2cf0d7a464192689ecbc04c768296f07377d7e7"
+  },
+  "appUnchangedFromTurnBaseline": true,
+  "coverage": {
+    "normalWeeks": 628,
+    "normalWindows": [
+      105,
+      105,
+      105,
+      105,
+      208
+    ],
+    "controlledCases": 40,
+    "regressionSuites": 25
+  },
+  "currentMinifiedProductionBuild": "FAILED_AT_1536MB_HEAP_LIMIT_NOT_CERTIFIED",
+  "sourceTypecheck": "PASS_1536MB",
+  "scope": "Finance, booking and NPC changes verified in pinned audit snapshots; unrelated script/DNA changes coexist and are preserved",
+  "sourceSnapshots": [
+    "candidate-c-executable.json",
+    "batched-executable-metadata.json",
+    "kernel-equivalence.json"
+  ],
+  "realUserSavesTouched": false,
+  "noCommitOrPush": true
+}

@@ -41,6 +41,7 @@
     "audit:streaming-original-playback-repair": "esbuild scripts/audit-streaming-original-playback-repair.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-streaming-original-playback-repair.mjs && node /tmp/audit-streaming-original-playback-repair.mjs",
     "dev": "vite",
     "build": "vite build",
+    "build:low-memory": "node scripts/build-low-memory.mjs",
     "audit:streaming-model-payback": "esbuild scripts/audit-streaming-model-payback.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-streaming-model-payback.mjs && node /tmp/audit-streaming-model-payback.mjs",
     "audit:streaming-market-usage-cost": "esbuild scripts/audit-streaming-market-usage-cost.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-streaming-market-usage-cost.mjs && node /tmp/audit-streaming-market-usage-cost.mjs",
     "audit:streaming-model-profit": "esbuild scripts/audit-streaming-model-profit.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-streaming-model-profit.mjs && node /tmp/audit-streaming-model-profit.mjs",
@@ -621,7 +622,9 @@
     "audit:stock-forbes-routes-browser": "node scripts/audit-stock-forbes-routes-browser.cjs",
     "audit:public-tender-contract": "esbuild scripts/audit-public-tender-contract.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-public-tender-contract.mjs && node /tmp/audit-public-tender-contract.mjs",
     "audit:script-variations": "esbuild scripts/audit-script-variations.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-script-variations.mjs && node /tmp/ae-script-variations.mjs",
-    "audit:script-variation-flow": "esbuild scripts/audit-script-variation-flow.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-script-variation-flow.mjs && node /tmp/ae-script-variation-flow.mjs"
+    "audit:script-variation-flow": "esbuild scripts/audit-script-variation-flow.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-script-variation-flow.mjs && node /tmp/ae-script-variation-flow.mjs",
+    "audit:script-broad-expansion": "esbuild scripts/audit-script-broad-expansion.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-script-broad-expansion.mjs && node /tmp/ae-script-broad-expansion.mjs",
+    "audit:script-broad-flow": "esbuild scripts/audit-script-broad-flow.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-script-broad-flow.mjs && node /tmp/ae-script-broad-flow.mjs"
   },
   "dependencies": {
     "@capacitor-community/admob": "^8.0.0",

@@ -1,5 +1,6 @@
 import type { Genre, ScriptAttributes, StoryCompass } from '../../types';
 import { SCRIPT_VARIATIONS } from './scriptVariations';
+import { SCRIPT_STORY_VARIATIONS } from './scriptStoryVariations';
 
 export type ScriptChoiceCompass = Partial<Pick<StoryCompass, 'perspective' | 'conflictSource' | 'worldRule' | 'tone' | 'castShape'>>;
 
@@ -456,6 +457,6 @@ const LEGACY_SCRIPT_TEMPLATES: Record<Genre, ScriptQuestion[]> = {
 export const SCRIPT_TEMPLATES = Object.fromEntries(
     Object.entries(LEGACY_SCRIPT_TEMPLATES).map(([genre, questions]) => [genre, questions.map(question => ({
         ...question,
-        options: [...question.options, ...(SCRIPT_VARIATIONS[genre as Genre]?.[question.id] || [])],
+        options: [...question.options, ...(SCRIPT_VARIATIONS[genre as Genre]?.[question.id] || []), ...(SCRIPT_STORY_VARIATIONS[genre as Genre]?.[question.id] || [])],
     }))])
 ) as Record<Genre, ScriptQuestion[]>;

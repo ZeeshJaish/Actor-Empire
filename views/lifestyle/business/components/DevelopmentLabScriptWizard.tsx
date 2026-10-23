@@ -475,41 +475,50 @@ export const DevelopmentLabScriptWizard: React.FC<DevelopmentLabScriptWizardProp
                             icon={<Sparkles size={20} />}
                         />
                         <div className="space-y-5">
-                            <div>
-                                <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Primary Genre</div>
-                                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                            <fieldset className="min-w-0">
+                                <legend className="mb-3 text-[10px] font-black uppercase tracking-widest text-zinc-400">Primary Genre</legend>
+                                <div className="flex flex-wrap gap-2">
                                     {genres.map(g => (
-                                        <OptionTile
+                                        <button
                                             key={g}
+                                            type="button"
+                                            aria-pressed={primaryGenre === g}
                                             onClick={() => {
                                                 setPrimaryGenre(g);
                                                 if (g === 'ANIMATION') setFormat('ANIMATED');
                                                 if (!isSubjectDrivenGenre(g)) setSubjectName('');
                                             }}
-                                            active={primaryGenre === g}
-                                            className="min-h-[54px] p-3"
-                                        >
-                                            <div className="text-[10px] sm:text-xs font-black uppercase leading-tight break-words">{formatGenreLabel(g)}</div>
-                                        </OptionTile>
-                                    ))}
-                                </div>
-                            </div>
-                            <div>
-                                <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Secondary Genre</div>
-                                <div className="flex gap-2 overflow-x-auto no-scrollbar">
-                                    {genres.filter(g => g !== primaryGenre).map(g => (
-                                        <button
-                                            key={g}
-                                            onClick={() => setSecondaryGenre(secondaryGenre === g ? '' : g)}
-                                            className={`shrink-0 px-4 py-2.5 rounded-2xl text-[10px] font-black uppercase transition-colors ${
-                                                secondaryGenre === g ? 'bg-white text-black' : 'bg-black border border-zinc-800 text-zinc-500'
+                                            className={`min-h-11 rounded-xl border px-3 py-2.5 text-sm font-bold leading-5 whitespace-nowrap transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 ${
+                                                primaryGenre === g
+                                                    ? 'border-amber-400 bg-amber-400 text-black'
+                                                    : 'border-zinc-800 bg-zinc-950 text-zinc-200 hover:border-zinc-600 hover:bg-zinc-900'
                                             }`}
                                         >
                                             {formatGenreLabel(g)}
                                         </button>
                                     ))}
                                 </div>
-                            </div>
+                            </fieldset>
+                            <fieldset className="min-w-0">
+                                <legend className="mb-3 text-[10px] font-black uppercase tracking-widest text-zinc-400">Secondary Genre <span className="font-medium normal-case tracking-normal">(optional)</span></legend>
+                                <div className="flex flex-wrap gap-2">
+                                    {genres.filter(g => g !== primaryGenre).map(g => (
+                                        <button
+                                            key={g}
+                                            type="button"
+                                            aria-pressed={secondaryGenre === g}
+                                            onClick={() => setSecondaryGenre(secondaryGenre === g ? '' : g)}
+                                            className={`min-h-11 rounded-xl border px-3 py-2.5 text-sm font-bold leading-5 whitespace-nowrap transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 ${
+                                                secondaryGenre === g
+                                                    ? 'border-white bg-white text-black'
+                                                    : 'border-zinc-800 bg-zinc-950 text-zinc-200 hover:border-zinc-600 hover:bg-zinc-900'
+                                            }`}
+                                        >
+                                            {formatGenreLabel(g)}
+                                        </button>
+                                    ))}
+                                </div>
+                            </fieldset>
                             {needsSubject && (
                                 <div className="rounded-[1.5rem] border border-amber-500/20 bg-amber-500/5 p-4">
                                     <div className="text-sm font-black text-white mb-4">{primaryGenre === 'BIOPIC' ? 'Biopic Focus' : 'Documentary Focus'}</div>

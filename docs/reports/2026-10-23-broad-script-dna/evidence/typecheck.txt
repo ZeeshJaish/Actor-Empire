@@ -1,0 +1,16 @@
+
+> pr-6.6.3@1.0.25 lint
+> node --max-old-space-size=8192 ./node_modules/typescript/bin/tsc --noEmit
+
+vite.config.ts(6,29): error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Argument of type '({ mode }: ConfigEnv) => { server: { port: number; host: string; }; plugins: ({ name: string; apply: string; enforce: string; transform(code: any, id: any): { code: any; map: any; }; } | Plugin<any>[])[]; define: { ...; }; resolve: { ...; }; }' is not assignable to parameter of type 'UserConfigExport'.
+      Type '({ mode }: ConfigEnv) => { server: { port: number; host: string; }; plugins: ({ name: string; apply: string; enforce: string; transform(code: any, id: any): { code: any; map: any; }; } | Plugin<any>[])[]; define: { ...; }; resolve: { ...; }; }' is not assignable to type 'UserConfigFnObject'.
+        Call signature return types '{ server: { port: number; host: string; }; plugins: ({ name: string; apply: string; enforce: string; transform(code: any, id: any): { code: any; map: any; }; } | Plugin<any>[])[]; define: { 'process.env.API_KEY': string; 'process.env.GEMINI_API_KEY': string; }; resolve: { ...; }; }' and 'UserConfig' are incompatible.
+          The types of 'plugins' are incompatible between these types.
+            Type '({ name: string; apply: string; enforce: string; transform(code: any, id: any): { code: any; map: any; }; } | Plugin<any>[])[]' is not assignable to type 'PluginOption[]'.
+              Type '{ name: string; apply: string; enforce: string; transform(code: any, id: any): { code: any; map: any; }; } | Plugin<any>[]' is not assignable to type 'PluginOption'.
+                Type '{ name: string; apply: string; enforce: string; transform(code: any, id: any): { code: any; map: any; }; }' is not assignable to type 'PluginOption'.
+                  Type '{ name: string; apply: string; enforce: string; transform(code: any, id: any): { code: any; map: any; }; }' is not assignable to type 'Plugin<any>'.
+                    Types of property 'enforce' are incompatible.
+                      Type 'string' is not assignable to type '"pre" | "post"'.
