@@ -2811,6 +2811,8 @@ export interface ProjectDetails {
     castList?: CastMember[];
     /** Protect authored casting from the legacy offered-package repair. */
     castPackageSource?: 'AUTHORED' | 'OFFER_GENERATED';
+    /** Immutable decision at an offered film's first premiere; never backfilled on released saves. */
+    offeredCinemaLaunch?: { version: 1; absoluteWeek: number; studioId: StudioId; campaignCostCents: number };
     /** Dated public exposure only; private package previews contain no events. */
     cinemaExposure?: CinemaExposureRecord;
     backgroundCastingPlan?: BackgroundCastingPlan;
@@ -2831,6 +2833,7 @@ export interface ProjectDetails {
     installmentNumber?: number;
     screeningStrategy?: ScreeningStrategy;
     releaseRegionIds?: BoxOfficeRegionId[];
+    releaseCountryIds?: string[];
     releaseChainSelections?: Partial<Record<BoxOfficeRegionId, CinemaChainId[]>>;
     campaignPositioning?: CampaignPositioning;
     campaignTimeline?: CampaignTimeline;
@@ -7274,6 +7277,7 @@ export interface Award {
 }
 
 export interface PastProject {
+    releaseCountryIds?: string[];
     originalLanguageId?:string;
     cinema?: CinemaProjectMarker;
     id: string;
@@ -7376,6 +7380,11 @@ export interface PastProject {
 }
 
 export interface Commitment {
+    /** Versioned preparation rules; absent means preserve the signed legacy project. */
+    careerBalanceVersion?: 1;
+    careerLearningActions?: number;
+    careerPerformanceFinalized?: boolean;
+    careerPreparationScore?: number;
     id: string;
     name: string;
     nameKey?: string;
@@ -8293,6 +8302,7 @@ export interface YearlyFinance {
 }
 
 export interface IndustryProject {
+    releaseCountryIds?: string[];
     /** Committed geography for newly released NPC films; missing legacy geography keeps its prior defaults. */
     releaseRegionIds?: BoxOfficeRegionId[];
     cinema?: CinemaProjectMarker;

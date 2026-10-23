@@ -1,0 +1,13 @@
+# Actor career balance — approved scope
+
+User approved the analysis approach: reduce early grind, retain fair late-career challenge without forced flops, evolve existing agent/manager/PR roles, and account for multiple overlapping productions without adding a scheduling screen. Preserve saves, earned skills/XP, cash, ownership, awards and signed contracts. Renewal/streaming-rights fixes remain deferred.
+
+Use a versioned career policy initialized on first new action/week/migration. Existing active commitments keep their legacy progress rules; new projects receive version1 and project-specific preparation. Preserve prior Legend entitlement before changing new attainment criteria. Never retroactively reprice contracts, reduce skill values, debit cash as a repair or replay a reward.
+
+Faster low-level learning should give working competence sooner, while mastery requires ongoing relevant practice. Actor rehearsals use actor craft independently of writing/directing. Shared time across concurrent personal productions limits passive preparation per title; focused rehearsal spends energy on the selected project, with diminishing overload effects rather than automatic failure. Preparation informs final personal performance together with craft, role difficulty and genre fit for new projects only. Existing market craft/box-office rules remain authoritative.
+
+PR supports demonstrated reach and current work rather than manufacturing unlimited fame. Agent improves access and fit within existing offers; manager improves commercial execution but new sponsorship quotes use credible audience/career evidence. Signed sponsorships and salaries retain all terms. New direct lead offers require credible role craft even for a celebrity; creator/cameo careers remain possible. Correct missing BLOCKBUSTER pay and smooth adjacent budget tiers for new offers.
+
+Re-use current credit history, role demand and staff tiers. Keep lifecycle data bounded and idempotent across save/reload and repeated weekly calls. Show relevant preparation/workload feedback in existing messages, not new UI. Verify real handlers, ordinary paid career actions, prepared concurrent/late cases, production/release settlement and verified save generations separately.
+
+Verification-driven refinements: reserve four of eight bounded rehearsal-learning actions for filming; retain pending final-shoot choices before performance finalization; recognize real creator audience and personal directing/writing for PR/commercial demand while keeping actor Legend evidence actor-only. The actual signed-contract flow also exposed a pre-existing double agent-commission debit. Correct future settlement to gross salary plus one commission expense; preserve historical balances and transactions.

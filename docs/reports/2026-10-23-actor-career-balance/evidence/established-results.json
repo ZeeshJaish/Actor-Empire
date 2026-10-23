@@ -1,0 +1,98 @@
+{
+  "kind": "Prepared funded established actor; not a fresh earned career",
+  "weeks": 73,
+  "saves": 19,
+  "deliveries": [
+    [
+      "proj_9100000",
+      {
+        "performance": 89,
+        "preparation": 100,
+        "quality": 84.68,
+        "elapsed": 18
+      }
+    ],
+    [
+      "proj_9100001",
+      {
+        "performance": 50,
+        "preparation": 12.63002312104484,
+        "quality": 77,
+        "elapsed": 18
+      }
+    ],
+    [
+      "proj_9100002",
+      {
+        "performance": 48,
+        "preparation": 7.630023121044833,
+        "quality": 73.76,
+        "elapsed": 18
+      }
+    ],
+    [
+      "proj_9100003",
+      {
+        "performance": 46,
+        "preparation": 3.6300231210448333,
+        "quality": 70.52,
+        "elapsed": 18
+      }
+    ],
+    [
+      "proj_9100004",
+      {
+        "performance": 46,
+        "preparation": 3.8151990514833005,
+        "quality": 67.52,
+        "elapsed": 18
+      }
+    ]
+  ],
+  "frozenAtWrap": [
+    [
+      "proj_9100000",
+      89,
+      84.68
+    ],
+    [
+      "proj_9100001",
+      50,
+      77
+    ],
+    [
+      "proj_9100002",
+      48,
+      73.76
+    ],
+    [
+      "proj_9100003",
+      46,
+      70.52
+    ],
+    [
+      "proj_9100004",
+      46,
+      67.52
+    ]
+  ],
+  "careerCredits": {
+    "credits": 6,
+    "recentCredits": 6,
+    "recentPerformance": 61.666666666666664,
+    "workSignal": 0.46930846930846926,
+    "audience": 0.7642005448554163,
+    "spanWeeks": 44,
+    "strongCredits": 2
+  },
+  "money": 49872470.25,
+  "studioBalance": 531657852.01,
+  "shares": [
+    {
+      "stockId": "stk_nke",
+      "shares": 57,
+      "averageCost": 23.5,
+      "totalInvested": 1339.5
+    }
+  ]
+}

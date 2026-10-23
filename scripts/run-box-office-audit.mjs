@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
-const suites = new Set(['inputs', 'delivery', 'finance', 'finance-contracts', 'finance-ui', 'phase1-integration', 'awareness', 'phase2-integration', 'audience', 'market', 'migration', 'integration', 'presentation', 'rights', 'calibration', 'long-save', 'placement', 'release-announcement', 'save-boundary', 'viewing-routes', 'royalty-batch', 'career-actions', 'booking', 'alternatives', 'alternative-routes', 'alternative-batching', 'fingerprint', 'full-world', 'billion-career', 'billion-app-fixture', 'affinity-index']);
+const suites = new Set(['inputs', 'delivery', 'finance', 'finance-contracts', 'finance-ui', 'phase1-integration', 'awareness', 'phase2-integration', 'audience', 'market', 'migration', 'integration', 'presentation', 'rights', 'calibration', 'long-save', 'placement', 'release-announcement', 'save-boundary', 'viewing-routes', 'royalty-batch', 'career-actions', 'booking', 'alternatives', 'alternative-routes', 'alternative-batching', 'fingerprint', 'full-world', 'billion-career', 'billion-app-fixture', 'affinity-index', 'fair-package', 'matched-package']);
 const suite = process.argv[2];
 if (!suites.has(suite)) throw new Error(`Choose an implemented cinema audit: ${[...suites].join(', ')}`);
 const folder = await mkdtemp(join(tmpdir(), 'actor-box-office-'));
@@ -17,7 +17,7 @@ try {
   if (!Number.isSafeInteger(seed)) throw new Error('Cinema audit seed must be an integer');
   // Seed module initialization too: catalogue defaults and generated IDs consume RNG.
   const bootstrap = `let state=${seed >>> 0},tick=0;Math.random=()=>{let t=state+=0x6D2B79F5;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return((t^(t>>>14))>>>0)/4294967296};Date.now=()=>1800000000000+tick++;await import(${JSON.stringify(pathToFileURL(bundle).href)});`;
-  const result = spawnSync(process.execPath, ['--input-type=module', '--eval', bootstrap], { stdio: 'inherit', timeout: ['long-save','full-world','billion-career'].includes(suite) ? 3_600_000 : suite === 'calibration' ? 900_000 : 120_000 });
+  const result = spawnSync(process.execPath, ['--input-type=module', '--eval', bootstrap], { stdio: 'inherit', timeout: ['long-save','full-world','billion-career'].includes(suite) ? 3_600_000 : ['calibration','matched-package'].includes(suite) ? 900_000 : 120_000 });
   if (result.error) throw result.error;
   process.exitCode = result.status ?? 1;
 } finally { await rm(folder, { recursive: true, force: true }); }

@@ -1,3 +1,11 @@
+# Closeout status — browser scope completed
+
+23 October: low-memory default build, three indexed cinema lookups, accurate small campaign amounts, 33 small-film cases, two additional 208-week ordinary careers, 18 focused checks and application/source type-check passed. Actual production-browser flows covered fresh actions, an earned offered-role opening, prepared studio progression/release, forecast side effects, financial/IMDb screens, legacy paid history, streaming handoff and genuine late-career weeks/reloads. Final late-save App samples: 7.397 / 7.219 / 7.144 seconds; a ~75MB save still has a noticeable wait. No hard earning cap, payment bypass or save verification removal. Native iPhone testing is explicitly deferred by the user. All owned test processes were closed.
+
+Current results and limitations: [README](README.md); compact evidence in `evidence/`. Earlier notes below are chronological progress, not remaining work. Concurrent source-task commits were preserved; this task did not stage, commit, push or reset files.
+
+---
+
 # Remaining cinema verification
 
 Approved: finish low-memory production build, small-film fairness, normal careers and full App testing. One heavy worker at a time, preserve saves/payments, no hard revenue cap. Existing dirty work and committed script variations preserved. Baseline diff/status in /private/tmp/actor-cinema-closeout-20261023.

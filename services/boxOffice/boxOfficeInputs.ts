@@ -69,27 +69,36 @@ export const normalizeCinemaTitle = ({ titleId, owner, project, player }: {
         ...(project.cinemaExposure ? { exposure: readCinemaExposureRecord(project) } : {}) };
 };
 
-/** Only offered packages with an absent/legacy player-only ensemble are reconstructed.
- * Authored studio casting, salaries, character roles and already populated offers stay intact.
+/** Complete an offered package before its premiere, including its principal credit.
+ * Authored studio casting, salaries and the player's signed role stay intact.
  * Select real catalogue actors near the offered craft level; never synthesize star stats.
  */
 export const completeOfferedCinemaCast = (project: ProjectDetails, player?: CinemaCastContext): ProjectDetails => {
     if (project.castPackageSource === 'AUTHORED') return preserveCinemaCastRecognition(project, player);
     const cast = project.castList || [];
-    if (cast.some(member => member.type !== 'DIRECTOR' && !isCinemaPlayerCredit(member))) return preserveCinemaCastRecognition(project, player);
+    const hasPrincipal = cast.some(member => member.type !== 'DIRECTOR' && ['LEAD', 'ENSEMBLE'].includes(member.roleType || ''));
+    if (hasPrincipal && project.castPackageSource !== 'OFFER_GENERATED'
+        && cast.some(member => member.type !== 'DIRECTOR' && !isCinemaPlayerCredit(member))) return preserveCinemaCastRecognition(project, player);
     const spectacle = ['ACTION', 'ADVENTURE', 'SCI_FI', 'SUPERHERO', 'FANTASY', 'ANIMATION'].includes(project.genre);
     const target = spectacle ? (project.estimatedBudget > 120_000_000 ? 7 : project.estimatedBudget > 45_000_000 ? 6 : 4)
         : project.estimatedBudget > 120_000_000 ? 4 : project.estimatedBudget > 45_000_000 ? 3 : 2;
     const rng = createDeterministicRng(`cinema-offer-cast:${project.studioId}:${project.title}:${project.genre}`);
     const craft = score(project.hiddenStats?.castingStrength, 50);
-    const pool = NPC_DATABASE.filter(isCastableActor).map(npc => ({ npc,
+    const existingIds = new Set(cast.filter(member => member.type !== 'DIRECTOR').map(member =>
+        isCinemaPlayerCredit(member) ? 'PLAYER_SELF' : member.actorId || member.npcId || member.id));
+    const pool = NPC_DATABASE.filter(npc => isCastableActor(npc) && !existingIds.has(npc.id)).map(npc => ({ npc,
         priority: Math.abs(score(npc.stats?.talent, 50) - craft) + rng() * 25,
     })).sort((a, b) => a.priority - b.priority || a.npc.id.localeCompare(b.npc.id));
-    const actorCount = new Set(cast.filter(member => member.type !== 'DIRECTOR').map(member =>
-        isCinemaPlayerCredit(member) ? 'PLAYER_SELF' : member.actorId || member.npcId || member.id)).size;
-    const additions: CastMember[] = pool.slice(0, Math.max(0, target - actorCount)).map(({ npc }) => ({
+    const actorCount = existingIds.size;
+    // Prefer the already credited co-star when repairing a generated partial package.
+    const principalId = !hasPrincipal && project.castPackageSource === 'OFFER_GENERATED'
+        ? cast.find(member => member.type !== 'DIRECTOR' && !isCinemaPlayerCredit(member)
+            && member.roleType === 'SUPPORTING' && member.role === 'Co-Star')?.id : undefined;
+    const repaired = cast.map(member => member.id === principalId ? { ...member, roleType: 'LEAD' as RoleType, role: 'Lead' } : member);
+    const additions: CastMember[] = pool.slice(0, Math.max(!hasPrincipal && !principalId ? 1 : 0, target - actorCount)).map(({ npc }, index) => ({
         id: npc.id, npcId: npc.id, actorId: npc.id, actorName: npc.name, name: npc.name,
-        role: 'Co-Star', roleType: 'SUPPORTING', isPlayer: false, image: npc.avatar, type: 'ACTOR',
+        role: !hasPrincipal && !principalId && index === 0 ? 'Lead' : 'Co-Star',
+        roleType: !hasPrincipal && !principalId && index === 0 ? 'LEAD' : 'SUPPORTING', isPlayer: false, image: npc.avatar, type: 'ACTOR',
     }));
-    return preserveCinemaCastRecognition({ ...project, castList: [...cast, ...additions], castPackageSource: 'OFFER_GENERATED' }, player);
+    return preserveCinemaCastRecognition({ ...project, castList: [...repaired, ...additions], castPackageSource: 'OFFER_GENERATED' }, player);
 };

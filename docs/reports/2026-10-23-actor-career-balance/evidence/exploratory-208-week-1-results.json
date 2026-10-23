@@ -1,0 +1,2756 @@
+{
+  "status": "HORIZON_COMPLETE",
+  "seed": 1,
+  "horizon": 208,
+  "weeks": 208,
+  "reloads": 32,
+  "saves": 32,
+  "replays": 208,
+  "genre": "COMEDY",
+  "cash": 103339,
+  "skills": {
+    "delivery": 47.66852621130676,
+    "memorization": 59.17303970850409,
+    "expression": 4.12714031625205,
+    "improvisation": 35.13991535148845,
+    "discipline": 60.01164428627136,
+    "presence": 33.49744195357088,
+    "charisma": 23.021322857658355,
+    "writing": 0
+  },
+  "genreXP": {
+    "ACTION": 0,
+    "DRAMA": 0,
+    "COMEDY": 76.94676494772665,
+    "ROMANCE": 19.236691236931662,
+    "THRILLER": 0,
+    "MYSTERY": 0,
+    "HORROR": 0,
+    "SCI_FI": 0,
+    "ADVENTURE": 0,
+    "SUPERHERO": 0,
+    "MUSICAL": 0,
+    "BIOPIC": 0,
+    "SPORTS": 0,
+    "ANIMATION": 0,
+    "FANTASY": 0,
+    "CRIME": 0,
+    "DOCUMENTARY": 0
+  },
+  "credits": [
+    "aud_active_1800000000303_0.6792156680021435",
+    "aud_active_1800000001048_0.05798807251267135",
+    "aud_active_1800000001623_0.42537417029961944",
+    "aud_active_1800000002058_0.32024873653426766"
+  ],
+  "phases": [
+    "AUDITION",
+    "PRODUCTION",
+    "POST_PRODUCTION",
+    "AWAITING_RELEASE"
+  ],
+  "actions": [
+    {
+      "week": 0,
+      "type": "paid-course:ws_intro_acting",
+      "cost": 400,
+      "energy": 15
+    },
+    {
+      "week": 0,
+      "type": "genre:COMEDY",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:COMEDY",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:COMEDY",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:COMEDY",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 0,
+      "type": "genre:COMEDY",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 1,
+      "type": "genre:COMEDY",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 1,
+      "type": "genre:COMEDY",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 1,
+      "type": "genre:COMEDY",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 1,
+      "type": "genre:COMEDY",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 1,
+      "type": "genre:COMEDY",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 2,
+      "type": "accept-paid-job",
+      "cost": 0,
+      "energy": 30
+    },
+    {
+      "week": 2,
+      "type": "genre:COMEDY",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 2,
+      "type": "genre:COMEDY",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 3,
+      "type": "genre:COMEDY",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 3,
+      "type": "genre:COMEDY",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 4,
+      "type": "paid-course:ws_intro_acting",
+      "cost": 400,
+      "energy": 15
+    },
+    {
+      "week": 4,
+      "type": "genre:COMEDY",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 5,
+      "type": "genre:COMEDY",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 5,
+      "type": "genre:COMEDY",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 6,
+      "type": "genre:COMEDY",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 6,
+      "type": "genre:COMEDY",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 7,
+      "type": "genre:COMEDY",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 7,
+      "type": "genre:COMEDY",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 8,
+      "type": "paid-course:ws_intro_acting",
+      "cost": 400,
+      "energy": 15
+    },
+    {
+      "week": 8,
+      "type": "genre:COMEDY",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 9,
+      "type": "genre:COMEDY",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 9,
+      "type": "genre:COMEDY",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 10,
+      "type": "genre:COMEDY",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 10,
+      "type": "genre:COMEDY",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 11,
+      "type": "genre:COMEDY",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 11,
+      "type": "genre:COMEDY",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 12,
+      "type": "paid-course:ws_intro_acting",
+      "cost": 400,
+      "energy": 15
+    },
+    {
+      "week": 12,
+      "type": "genre:COMEDY",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 13,
+      "type": "genre:COMEDY",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 13,
+      "type": "genre:COMEDY",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 14,
+      "type": "genre:COMEDY",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 14,
+      "type": "genre:COMEDY",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 14,
+      "type": "apply:CAMEO",
+      "cost": 0,
+      "energy": 25,
+      "projectId": "aud_1800000000195_0.08046774379909039"
+    },
+    {
+      "week": 15,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000211_0.6397957855369896"
+    },
+    {
+      "week": 15,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000211_0.6397957855369896"
+    },
+    {
+      "week": 16,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000211_0.6397957855369896"
+    },
+    {
+      "week": 16,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000211_0.6397957855369896"
+    },
+    {
+      "week": 17,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000211_0.6397957855369896"
+    },
+    {
+      "week": 17,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000211_0.6397957855369896"
+    },
+    {
+      "week": 17,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000211_0.6397957855369896"
+    },
+    {
+      "week": 18,
+      "type": "paid-course:ws_intro_acting",
+      "cost": 400,
+      "energy": 15
+    },
+    {
+      "week": 18,
+      "type": "genre:COMEDY",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 18,
+      "type": "genre:COMEDY",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 18,
+      "type": "apply:MINOR",
+      "cost": 0,
+      "energy": 25,
+      "projectId": "aud_1800000000236_0.7486131915356964"
+    },
+    {
+      "week": 19,
+      "type": "genre:COMEDY",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 19,
+      "type": "genre:COMEDY",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 19,
+      "type": "apply:MINOR",
+      "cost": 0,
+      "energy": 25,
+      "projectId": "aud_1800000000236_0.7486131915356964"
+    },
+    {
+      "week": 20,
+      "type": "genre:COMEDY",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 20,
+      "type": "genre:COMEDY",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 20,
+      "type": "apply:MINOR",
+      "cost": 0,
+      "energy": 25,
+      "projectId": "aud_1800000000285_0.30740922479890287"
+    },
+    {
+      "week": 21,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000303_0.6792156680021435"
+    },
+    {
+      "week": 21,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000303_0.6792156680021435"
+    },
+    {
+      "week": 22,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000303_0.6792156680021435"
+    },
+    {
+      "week": 22,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000303_0.6792156680021435"
+    },
+    {
+      "week": 23,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000303_0.6792156680021435"
+    },
+    {
+      "week": 23,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000303_0.6792156680021435"
+    },
+    {
+      "week": 23,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000303_0.6792156680021435"
+    },
+    {
+      "week": 24,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000303_0.6792156680021435"
+    },
+    {
+      "week": 24,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000303_0.6792156680021435"
+    },
+    {
+      "week": 24,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000303_0.6792156680021435"
+    },
+    {
+      "week": 25,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000303_0.6792156680021435"
+    },
+    {
+      "week": 25,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000303_0.6792156680021435"
+    },
+    {
+      "week": 25,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000303_0.6792156680021435"
+    },
+    {
+      "week": 26,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000303_0.6792156680021435"
+    },
+    {
+      "week": 26,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000303_0.6792156680021435"
+    },
+    {
+      "week": 26,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000303_0.6792156680021435"
+    },
+    {
+      "week": 27,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000303_0.6792156680021435"
+    },
+    {
+      "week": 27,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000303_0.6792156680021435"
+    },
+    {
+      "week": 27,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000303_0.6792156680021435"
+    },
+    {
+      "week": 28,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000303_0.6792156680021435"
+    },
+    {
+      "week": 28,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000303_0.6792156680021435"
+    },
+    {
+      "week": 28,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000303_0.6792156680021435"
+    },
+    {
+      "week": 29,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000303_0.6792156680021435"
+    },
+    {
+      "week": 29,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000303_0.6792156680021435"
+    },
+    {
+      "week": 29,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000303_0.6792156680021435"
+    },
+    {
+      "week": 30,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000303_0.6792156680021435"
+    },
+    {
+      "week": 30,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000303_0.6792156680021435"
+    },
+    {
+      "week": 30,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000303_0.6792156680021435"
+    },
+    {
+      "week": 31,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000303_0.6792156680021435"
+    },
+    {
+      "week": 31,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000303_0.6792156680021435"
+    },
+    {
+      "week": 31,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000303_0.6792156680021435"
+    },
+    {
+      "week": 32,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000303_0.6792156680021435"
+    },
+    {
+      "week": 32,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000303_0.6792156680021435"
+    },
+    {
+      "week": 32,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000303_0.6792156680021435"
+    },
+    {
+      "week": 33,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000303_0.6792156680021435"
+    },
+    {
+      "week": 33,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000303_0.6792156680021435"
+    },
+    {
+      "week": 33,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000303_0.6792156680021435"
+    },
+    {
+      "week": 34,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 34,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000303_0.6792156680021435"
+    },
+    {
+      "week": 34,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000303_0.6792156680021435"
+    },
+    {
+      "week": 34,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000303_0.6792156680021435"
+    },
+    {
+      "week": 35,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 35,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000000303_0.6792156680021435"
+    },
+    {
+      "week": 35,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 0,
+      "projectId": "aud_active_1800000000303_0.6792156680021435"
+    },
+    {
+      "week": 36,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 37,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 38,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 39,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 40,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 41,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 46,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 47,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 48,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 49,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 49,
+      "type": "paid-course:ws_vocal",
+      "cost": 800,
+      "energy": 15
+    },
+    {
+      "week": 49,
+      "type": "genre:COMEDY",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 50,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 50,
+      "type": "genre:COMEDY",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 51,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 51,
+      "type": "genre:COMEDY",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 52,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 52,
+      "type": "genre:COMEDY",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 53,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 53,
+      "type": "paid-course:ws_vocal",
+      "cost": 800,
+      "energy": 15
+    },
+    {
+      "week": 54,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 54,
+      "type": "genre:COMEDY",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 55,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 55,
+      "type": "genre:COMEDY",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 56,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 56,
+      "type": "genre:COMEDY",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 57,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 57,
+      "type": "paid-course:ws_intro_acting",
+      "cost": 400,
+      "energy": 15
+    },
+    {
+      "week": 58,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 58,
+      "type": "genre:COMEDY",
+      "cost": 25,
+      "energy": 10
+    },
+    {
+      "week": 59,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 60,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 61,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 61,
+      "type": "paid-course:ws_vocal",
+      "cost": 800,
+      "energy": 15
+    },
+    {
+      "week": 62,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 63,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 64,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 0
+    },
+    {
+      "week": 65,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 65,
+      "type": "paid-course:ws_intro_acting",
+      "cost": 400,
+      "energy": 15
+    },
+    {
+      "week": 66,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 67,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 0
+    },
+    {
+      "week": 68,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 69,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 69,
+      "type": "paid-course:ws_vocal",
+      "cost": 800,
+      "energy": 15
+    },
+    {
+      "week": 70,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 71,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 72,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 73,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 73,
+      "type": "paid-course:ws_vocal",
+      "cost": 800,
+      "energy": 15
+    },
+    {
+      "week": 74,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 75,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 76,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 77,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 0
+    },
+    {
+      "week": 77,
+      "type": "paid-course:ws_intro_acting",
+      "cost": 400,
+      "energy": 15
+    },
+    {
+      "week": 78,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 78,
+      "type": "apply:MINOR",
+      "cost": 0,
+      "energy": 25,
+      "projectId": "aud_1800000001023_0.5457055184524506"
+    },
+    {
+      "week": 79,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 79,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001048_0.05798807251267135"
+    },
+    {
+      "week": 79,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001048_0.05798807251267135"
+    },
+    {
+      "week": 80,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 80,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001048_0.05798807251267135"
+    },
+    {
+      "week": 80,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001048_0.05798807251267135"
+    },
+    {
+      "week": 81,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 81,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001048_0.05798807251267135"
+    },
+    {
+      "week": 81,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001048_0.05798807251267135"
+    },
+    {
+      "week": 82,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 82,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001048_0.05798807251267135"
+    },
+    {
+      "week": 82,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001048_0.05798807251267135"
+    },
+    {
+      "week": 82,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001048_0.05798807251267135"
+    },
+    {
+      "week": 83,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 83,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001048_0.05798807251267135"
+    },
+    {
+      "week": 83,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001048_0.05798807251267135"
+    },
+    {
+      "week": 83,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001048_0.05798807251267135"
+    },
+    {
+      "week": 84,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 84,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 0,
+      "projectId": "aud_active_1800000001048_0.05798807251267135"
+    },
+    {
+      "week": 85,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 85,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 0,
+      "projectId": "aud_active_1800000001048_0.05798807251267135"
+    },
+    {
+      "week": 86,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 86,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001048_0.05798807251267135"
+    },
+    {
+      "week": 86,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001048_0.05798807251267135"
+    },
+    {
+      "week": 86,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001048_0.05798807251267135"
+    },
+    {
+      "week": 87,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 87,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001048_0.05798807251267135"
+    },
+    {
+      "week": 87,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001048_0.05798807251267135"
+    },
+    {
+      "week": 87,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001048_0.05798807251267135"
+    },
+    {
+      "week": 88,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 88,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001048_0.05798807251267135"
+    },
+    {
+      "week": 88,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001048_0.05798807251267135"
+    },
+    {
+      "week": 88,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001048_0.05798807251267135"
+    },
+    {
+      "week": 89,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 89,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001048_0.05798807251267135"
+    },
+    {
+      "week": 89,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001048_0.05798807251267135"
+    },
+    {
+      "week": 89,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001048_0.05798807251267135"
+    },
+    {
+      "week": 90,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 90,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001048_0.05798807251267135"
+    },
+    {
+      "week": 90,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001048_0.05798807251267135"
+    },
+    {
+      "week": 90,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001048_0.05798807251267135"
+    },
+    {
+      "week": 91,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 91,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001048_0.05798807251267135"
+    },
+    {
+      "week": 91,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001048_0.05798807251267135"
+    },
+    {
+      "week": 91,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001048_0.05798807251267135"
+    },
+    {
+      "week": 92,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001048_0.05798807251267135"
+    },
+    {
+      "week": 92,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001048_0.05798807251267135"
+    },
+    {
+      "week": 92,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001048_0.05798807251267135"
+    },
+    {
+      "week": 93,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001048_0.05798807251267135"
+    },
+    {
+      "week": 93,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001048_0.05798807251267135"
+    },
+    {
+      "week": 93,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001048_0.05798807251267135"
+    },
+    {
+      "week": 94,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 0,
+      "projectId": "aud_active_1800000001048_0.05798807251267135"
+    },
+    {
+      "week": 95,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 0,
+      "projectId": "aud_active_1800000001048_0.05798807251267135"
+    },
+    {
+      "week": 96,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 96,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 0,
+      "projectId": "aud_active_1800000001048_0.05798807251267135"
+    },
+    {
+      "week": 97,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 98,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 99,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 100,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 101,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 102,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 103,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 104,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 109,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 109,
+      "type": "wellbeing:opt_meditate",
+      "cost": 0,
+      "energy": 5
+    },
+    {
+      "week": 110,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 110,
+      "type": "paid-course:ws_improv_club",
+      "cost": 1200,
+      "energy": 25
+    },
+    {
+      "week": 111,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 112,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 113,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 114,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 115,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 116,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 117,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 118,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 118,
+      "type": "paid-course:ws_vocal",
+      "cost": 800,
+      "energy": 15
+    },
+    {
+      "week": 119,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 119,
+      "type": "wellbeing:opt_meditate",
+      "cost": 0,
+      "energy": 5
+    },
+    {
+      "week": 120,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 121,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 122,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 122,
+      "type": "paid-course:ws_vocal",
+      "cost": 800,
+      "energy": 15
+    },
+    {
+      "week": 124,
+      "type": "apply:MINOR",
+      "cost": 0,
+      "energy": 25,
+      "projectId": "aud_1800000001610_0.6906838996801525"
+    },
+    {
+      "week": 125,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 125,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001623_0.42537417029961944"
+    },
+    {
+      "week": 125,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001623_0.42537417029961944"
+    },
+    {
+      "week": 126,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 126,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001623_0.42537417029961944"
+    },
+    {
+      "week": 126,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001623_0.42537417029961944"
+    },
+    {
+      "week": 127,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 127,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001623_0.42537417029961944"
+    },
+    {
+      "week": 127,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001623_0.42537417029961944"
+    },
+    {
+      "week": 127,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001623_0.42537417029961944"
+    },
+    {
+      "week": 128,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 128,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001623_0.42537417029961944"
+    },
+    {
+      "week": 128,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001623_0.42537417029961944"
+    },
+    {
+      "week": 128,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001623_0.42537417029961944"
+    },
+    {
+      "week": 129,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001623_0.42537417029961944"
+    },
+    {
+      "week": 129,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 0,
+      "projectId": "aud_active_1800000001623_0.42537417029961944"
+    },
+    {
+      "week": 130,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 0,
+      "projectId": "aud_active_1800000001623_0.42537417029961944"
+    },
+    {
+      "week": 131,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 0,
+      "projectId": "aud_active_1800000001623_0.42537417029961944"
+    },
+    {
+      "week": 132,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001623_0.42537417029961944"
+    },
+    {
+      "week": 132,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001623_0.42537417029961944"
+    },
+    {
+      "week": 132,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001623_0.42537417029961944"
+    },
+    {
+      "week": 133,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001623_0.42537417029961944"
+    },
+    {
+      "week": 133,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001623_0.42537417029961944"
+    },
+    {
+      "week": 133,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001623_0.42537417029961944"
+    },
+    {
+      "week": 134,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 134,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001623_0.42537417029961944"
+    },
+    {
+      "week": 134,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001623_0.42537417029961944"
+    },
+    {
+      "week": 134,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001623_0.42537417029961944"
+    },
+    {
+      "week": 135,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 135,
+      "type": "wellbeing:opt_meditate",
+      "cost": 0,
+      "energy": 5
+    },
+    {
+      "week": 135,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001623_0.42537417029961944"
+    },
+    {
+      "week": 135,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001623_0.42537417029961944"
+    },
+    {
+      "week": 136,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 136,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001623_0.42537417029961944"
+    },
+    {
+      "week": 136,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001623_0.42537417029961944"
+    },
+    {
+      "week": 136,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001623_0.42537417029961944"
+    },
+    {
+      "week": 137,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 0
+    },
+    {
+      "week": 137,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001623_0.42537417029961944"
+    },
+    {
+      "week": 137,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001623_0.42537417029961944"
+    },
+    {
+      "week": 137,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001623_0.42537417029961944"
+    },
+    {
+      "week": 138,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 138,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001623_0.42537417029961944"
+    },
+    {
+      "week": 138,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001623_0.42537417029961944"
+    },
+    {
+      "week": 138,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001623_0.42537417029961944"
+    },
+    {
+      "week": 139,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 139,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001623_0.42537417029961944"
+    },
+    {
+      "week": 139,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001623_0.42537417029961944"
+    },
+    {
+      "week": 139,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001623_0.42537417029961944"
+    },
+    {
+      "week": 140,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 140,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001623_0.42537417029961944"
+    },
+    {
+      "week": 140,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000001623_0.42537417029961944"
+    },
+    {
+      "week": 140,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 0,
+      "projectId": "aud_active_1800000001623_0.42537417029961944"
+    },
+    {
+      "week": 141,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 141,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 0,
+      "projectId": "aud_active_1800000001623_0.42537417029961944"
+    },
+    {
+      "week": 142,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 0
+    },
+    {
+      "week": 143,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 0
+    },
+    {
+      "week": 144,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 145,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 145,
+      "type": "wellbeing:opt_meditate",
+      "cost": 0,
+      "energy": 5
+    },
+    {
+      "week": 149,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 150,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 155,
+      "type": "paid-course:ws_improv_club",
+      "cost": 1200,
+      "energy": 25
+    },
+    {
+      "week": 157,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 157,
+      "type": "wellbeing:opt_meditate",
+      "cost": 0,
+      "energy": 5
+    },
+    {
+      "week": 158,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 0
+    },
+    {
+      "week": 158,
+      "type": "apply:CAMEO",
+      "cost": 0,
+      "energy": 25,
+      "projectId": "aud_1800000002040_0.6142090538050979"
+    },
+    {
+      "week": 159,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 159,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002058_0.32024873653426766"
+    },
+    {
+      "week": 160,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 160,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002058_0.32024873653426766"
+    },
+    {
+      "week": 161,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 161,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002058_0.32024873653426766"
+    },
+    {
+      "week": 162,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 162,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002058_0.32024873653426766"
+    },
+    {
+      "week": 163,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 163,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002058_0.32024873653426766"
+    },
+    {
+      "week": 164,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 164,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002058_0.32024873653426766"
+    },
+    {
+      "week": 164,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002058_0.32024873653426766"
+    },
+    {
+      "week": 164,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002058_0.32024873653426766"
+    },
+    {
+      "week": 165,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 165,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002058_0.32024873653426766"
+    },
+    {
+      "week": 165,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002058_0.32024873653426766"
+    },
+    {
+      "week": 165,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002058_0.32024873653426766"
+    },
+    {
+      "week": 166,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 166,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002058_0.32024873653426766"
+    },
+    {
+      "week": 166,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002058_0.32024873653426766"
+    },
+    {
+      "week": 166,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002058_0.32024873653426766"
+    },
+    {
+      "week": 167,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 167,
+      "type": "wellbeing:opt_meditate",
+      "cost": 0,
+      "energy": 5
+    },
+    {
+      "week": 167,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002058_0.32024873653426766"
+    },
+    {
+      "week": 167,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002058_0.32024873653426766"
+    },
+    {
+      "week": 168,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 168,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002058_0.32024873653426766"
+    },
+    {
+      "week": 168,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002058_0.32024873653426766"
+    },
+    {
+      "week": 168,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002058_0.32024873653426766"
+    },
+    {
+      "week": 169,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 169,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002058_0.32024873653426766"
+    },
+    {
+      "week": 169,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002058_0.32024873653426766"
+    },
+    {
+      "week": 169,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002058_0.32024873653426766"
+    },
+    {
+      "week": 170,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 170,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002058_0.32024873653426766"
+    },
+    {
+      "week": 170,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002058_0.32024873653426766"
+    },
+    {
+      "week": 170,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002058_0.32024873653426766"
+    },
+    {
+      "week": 171,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 171,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002058_0.32024873653426766"
+    },
+    {
+      "week": 171,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002058_0.32024873653426766"
+    },
+    {
+      "week": 171,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002058_0.32024873653426766"
+    },
+    {
+      "week": 172,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 172,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002058_0.32024873653426766"
+    },
+    {
+      "week": 172,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002058_0.32024873653426766"
+    },
+    {
+      "week": 172,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002058_0.32024873653426766"
+    },
+    {
+      "week": 173,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 173,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 0,
+      "projectId": "aud_active_1800000002058_0.32024873653426766"
+    },
+    {
+      "week": 174,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 174,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 0,
+      "projectId": "aud_active_1800000002058_0.32024873653426766"
+    },
+    {
+      "week": 175,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 175,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 0,
+      "projectId": "aud_active_1800000002058_0.32024873653426766"
+    },
+    {
+      "week": 176,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 177,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 177,
+      "type": "wellbeing:opt_meditate",
+      "cost": 0,
+      "energy": 5
+    },
+    {
+      "week": 178,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 179,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 180,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 186,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 187,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 189,
+      "type": "paid-course:ws_improv_club",
+      "cost": 1200,
+      "energy": 25
+    },
+    {
+      "week": 189,
+      "type": "apply:CAMEO",
+      "cost": 0,
+      "energy": 25,
+      "projectId": "aud_1800000002437_0.47929957835003734"
+    },
+    {
+      "week": 190,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002466_0.3997065853327513"
+    },
+    {
+      "week": 190,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002466_0.3997065853327513"
+    },
+    {
+      "week": 191,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002466_0.3997065853327513"
+    },
+    {
+      "week": 191,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002466_0.3997065853327513"
+    },
+    {
+      "week": 192,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002466_0.3997065853327513"
+    },
+    {
+      "week": 192,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002466_0.3997065853327513"
+    },
+    {
+      "week": 193,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002466_0.3997065853327513"
+    },
+    {
+      "week": 193,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002466_0.3997065853327513"
+    },
+    {
+      "week": 194,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 194,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002466_0.3997065853327513"
+    },
+    {
+      "week": 195,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 195,
+      "type": "wellbeing:opt_meditate",
+      "cost": 0,
+      "energy": 5
+    },
+    {
+      "week": 195,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002466_0.3997065853327513"
+    },
+    {
+      "week": 196,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 196,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002466_0.3997065853327513"
+    },
+    {
+      "week": 197,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 197,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002466_0.3997065853327513"
+    },
+    {
+      "week": 198,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 198,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002466_0.3997065853327513"
+    },
+    {
+      "week": 198,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002466_0.3997065853327513"
+    },
+    {
+      "week": 198,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002466_0.3997065853327513"
+    },
+    {
+      "week": 199,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 199,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002466_0.3997065853327513"
+    },
+    {
+      "week": 199,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002466_0.3997065853327513"
+    },
+    {
+      "week": 199,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002466_0.3997065853327513"
+    },
+    {
+      "week": 200,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 200,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002466_0.3997065853327513"
+    },
+    {
+      "week": 200,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002466_0.3997065853327513"
+    },
+    {
+      "week": 200,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002466_0.3997065853327513"
+    },
+    {
+      "week": 201,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 201,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002466_0.3997065853327513"
+    },
+    {
+      "week": 201,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002466_0.3997065853327513"
+    },
+    {
+      "week": 201,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002466_0.3997065853327513"
+    },
+    {
+      "week": 202,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 202,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002466_0.3997065853327513"
+    },
+    {
+      "week": 202,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002466_0.3997065853327513"
+    },
+    {
+      "week": 202,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002466_0.3997065853327513"
+    },
+    {
+      "week": 203,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 203,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002466_0.3997065853327513"
+    },
+    {
+      "week": 203,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002466_0.3997065853327513"
+    },
+    {
+      "week": 203,
+      "type": "project-rehearsal",
+      "cost": 0,
+      "energy": 20,
+      "projectId": "aud_active_1800000002466_0.3997065853327513"
+    },
+    {
+      "week": 204,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 205,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    },
+    {
+      "week": 205,
+      "type": "wellbeing:opt_meditate",
+      "cost": 0,
+      "energy": 5
+    },
+    {
+      "week": 206,
+      "type": "wellbeing:opt_jog",
+      "cost": 0,
+      "energy": 10
+    }
+  ],
+  "signed": [
+    [
+      "aud_active_1800000000211_0.6397957855369896",
+      5258
+    ],
+    [
+      "aud_active_1800000000303_0.6792156680021435",
+      3406
+    ],
+    [
+      "aud_active_1800000001048_0.05798807251267135",
+      1259
+    ],
+    [
+      "aud_active_1800000001623_0.42537417029961944",
+      511
+    ],
+    [
+      "aud_active_1800000002058_0.32024873653426766",
+      1198
+    ],
+    [
+      "aud_active_1800000002466_0.3997065853327513",
+      9082
+    ]
+  ],
+  "peakRSS": 2015182848
+}

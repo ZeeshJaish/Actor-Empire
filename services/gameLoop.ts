@@ -1,8 +1,10 @@
+import { ensureActorCareerBalance, getCareerLearningGain, getCareerPassivePreparation, getCareerFinalPerformance, getCareerPublicityGain, getCareerProductionStartPerformance, isPersonalCareerActing } from './actorCareerBalance';
 import { createSeriesStreamingBids, quoteSeriesStreamingRights } from './seriesStreamingValue';
 import { settleStockCash } from './stockSettlement';
 import { markStockDividendsSettled } from './stockLogic';
 import { recordCinemaStreamingAudience } from './boxOffice/boxOfficeStreamingAudience';
 import { commitCinemaAnnouncement } from './boxOffice/boxOfficeExposureAdapters';
+import { fundOfferedCinemaLaunch } from './boxOffice/boxOfficeOfferedLaunch';
 import { quoteCinemaRightsForBuyer, registerQuotedCinemaStreamingRights, settleQuotedCinemaStreamingSale } from './boxOffice/boxOfficeRightsAdapter';
 import { CINEMA_ROLE_WEIGHTS } from './boxOffice/boxOfficeProfiles';
 import { creditSignedActorBackend } from './talentCareer';
@@ -1489,6 +1491,7 @@ const createPastProjectArchiveSnapshot = (
         bookingCostPaid:release.bookingCostPaid,
         talentBackendPaid:release.talentBackendPaid,
         releaseRegionIds: Array.isArray(projectDetails.releaseRegionIds) ? projectDetails.releaseRegionIds : [],
+        releaseCountryIds: projectDetails.releaseCountryIds,
         releaseChainSelections: projectDetails.releaseChainSelections && typeof projectDetails.releaseChainSelections === 'object'
             ? projectDetails.releaseChainSelections
             : {},
@@ -1584,7 +1587,7 @@ export const processGameWeek = async (
         commitments: player.commitments?.length || 0,
         releases: player.activeReleases?.length || 0,
     });
-    let nextPlayer = clonePlayerForWeekProcessing(player);
+    let nextPlayer = ensureActorCareerBalance(clonePlayerForWeekProcessing(player));
     let triggerAd = false;
     const targetAbsoluteWeek = getAbsoluteWeek(player.age, player.currentWeek) + 1;
     const cinemaMigration=migrateCinemaState(nextPlayer,targetAbsoluteWeek-1);
@@ -3594,7 +3597,7 @@ export const processGameWeek = async (
     const looksBonus = getBonusGain(stylist);
     nextPlayer.stats.looks = Math.max(0, Math.min(100, nextPlayer.stats.looks - BASE_DECAY + looksBonus));
 
-    const fameBonus = getBonusGain(publicist);
+    const fameBonus = getCareerPublicityGain(nextPlayer);
     if (nextPlayer.stats.fame > 0) {
         nextPlayer.stats.fame = Math.max(0, Math.min(100, nextPlayer.stats.fame - FAME_DECAY + fameBonus));
     }
@@ -3785,7 +3788,9 @@ export const processGameWeek = async (
                 Object.entries(c.skillGains).forEach(([key, baseGain]) => {
                     const skillKey = key as keyof ActorSkills;
                     const currentVal = newSkills[skillKey];
-                    const actualGain = (baseGain as number) * (1 - (currentVal / 120));
+                    const actualGain = c.careerBalanceVersion === 1
+                        ? getCareerLearningGain(currentVal, baseGain as number)
+                        : (baseGain as number) * (1 - (currentVal / 120));
                     newSkills[skillKey] = Math.min(100, currentVal + actualGain);
                 });
             }
@@ -3824,7 +3829,7 @@ export const processGameWeek = async (
                 if (c.skillGains) {
                     Object.keys(c.skillGains).forEach((key) => {
                          const skillKey = key as keyof ActorSkills;
-                         newSkills[skillKey] = Math.min(100, newSkills[skillKey] + 2);
+                         newSkills[skillKey] = Math.min(100, newSkills[skillKey] + (c.careerBalanceVersion === 1 ? getCareerLearningGain(newSkills[skillKey], 2) : 2));
                     });
                 }
                 if (c.writerGains) {
@@ -4006,6 +4011,7 @@ export const processGameWeek = async (
                     const duration = getPhaseDuration('AUDITION');
 
                     newAuditionCommitments.push({
+                        careerBalanceVersion: 1,
                         id: `aud_active_${Date.now()}_${Math.random()}`,
                         name: opp.projectName,
                         type: 'ACTING_GIG',
@@ -4059,13 +4065,13 @@ export const processGameWeek = async (
 
     nextPlayer.commitments.forEach(c => {
         let updatedC = { ...c };
-        const isPersonalCareerRole = c.type === 'ACTING_GIG'
+        const isPersonalCareerRole = c.careerBalanceVersion === 1 && isPersonalCareerActing(c) ? true : c.type === 'ACTING_GIG'
             ? isPlayerCastInProject(c)
             : c.type === 'DIRECTOR_GIG'
                 ? (isPlayerDirectingProject(c) || !c.projectDetails?.directorId)
                 : c.type === 'WRITER_GIG';
-        if (c.type === 'ACTING_GIG' && isPersonalCareerRole && (c.projectPhase === 'AUDITION' || c.projectPhase === 'PRODUCTION')) {
-            const passivePoints = calculatePassiveGain(nextPlayer.stats.talent);
+        if ((c.type === 'ACTING_GIG' || c.careerBalanceVersion === 1 && isPersonalCareerActing(c)) && isPersonalCareerRole && (c.projectPhase === 'AUDITION' || c.projectPhase === 'PRODUCTION')) {
+            const passivePoints = getCareerPassivePreparation(nextPlayer, c);
             if (passivePoints > 0) {
                 if (c.projectPhase === 'AUDITION') updatedC.auditionPerformance = Math.min(100, (updatedC.auditionPerformance || 0) + passivePoints);
                 else updatedC.productionPerformance = Math.min(100, (updatedC.productionPerformance || 0) + passivePoints);
@@ -4121,7 +4127,7 @@ export const processGameWeek = async (
                     ? getProductionCalendarPhaseDuration(updatedC, 'PRODUCTION', getPhaseDuration('PRODUCTION'))
                     : getPhaseDuration('PRODUCTION');
                 logsToAdd.push({ msg: `🎬 Pre-production wrapped for "${updatedC.name}". Filming begins!`, type: 'positive' });
-                nextCommitments.push({ ...updatedC, projectPhase: 'PRODUCTION', phaseWeeksLeft: duration, totalPhaseDuration: duration, productionPerformance: 0 });
+                nextCommitments.push({ ...updatedC, projectPhase: 'PRODUCTION', phaseWeeksLeft: duration, totalPhaseDuration: duration, productionPerformance: getCareerProductionStartPerformance(updatedC) });
                 // FIX: Grant +1 Experience here for roles that skipped the 'AUDITION' phase (like Direct Offers) to ensure progression
                 if (isPersonalCareerRole) nextPlayer.stats.experience = Math.min(100, nextPlayer.stats.experience + 1);
             } else { nextCommitments.push({ ...updatedC, phaseWeeksLeft: weeksLeft }); }
@@ -4150,7 +4156,9 @@ export const processGameWeek = async (
             } else { nextCommitments.push({ ...updatedC, phaseWeeksLeft: weeksLeft }); }
         } else if (updatedC.projectPhase === 'PRODUCTION') {
             // Check for Production Crisis (Traits & General)
-            const crisis = checkForProductionCrisis(nextPlayer, updatedC);
+            // A completed shoot waiting for its final choices must not generate another shoot event.
+            const awaitingWrapChoices = updatedC.careerBalanceVersion === 1 && isPersonalCareerActing(updatedC) && (updatedC.phaseWeeksLeft ?? 1) <= 0;
+            const crisis = awaitingWrapChoices ? null : checkForProductionCrisis(nextPlayer, updatedC);
             if (crisis) {
                 if (!nextPlayer.pendingEvents) nextPlayer.pendingEvents = [];
                 nextPlayer.pendingEvents.push({
@@ -4183,7 +4191,7 @@ export const processGameWeek = async (
             }
 
             // Check for Director Decision
-            const decision = checkForDirectorDecision(nextPlayer, updatedC);
+            const decision = awaitingWrapChoices ? null : checkForDirectorDecision(nextPlayer, updatedC);
             if (decision) {
                 if (!nextPlayer.pendingEvents) nextPlayer.pendingEvents = [];
                 nextPlayer.pendingEvents.push({
@@ -4230,6 +4238,23 @@ export const processGameWeek = async (
             }
 
             if (weeksLeft <= 0) {
+                // Resolve the final shoot's choices against preparation before freezing delivered acting.
+                if (updatedC.careerBalanceVersion === 1 && isPersonalCareerActing(updatedC) && nextPlayer.pendingEvents?.some(event =>
+                    ['PRODUCTION_CRISIS', 'DIRECTOR_DECISION'].includes(event.type) && event.data?.projectId === updatedC.id)) {
+                    nextCommitments.push({ ...updatedC, phaseWeeksLeft: 0 });
+                    return;
+                }
+                if (updatedC.careerBalanceVersion === 1 && isPersonalCareerActing(updatedC) && !updatedC.careerPerformanceFinalized) {
+                    const performance = getCareerFinalPerformance(nextPlayer, updatedC);
+                    const visibility = updatedC.roleType === 'LEAD' ? 1 : updatedC.roleType === 'SUPPORTING' || updatedC.roleType === 'ENSEMBLE' ? .65 : .15;
+                    updatedC = { ...updatedC, careerPreparationScore: updatedC.productionPerformance || 0,
+                        productionPerformance: performance, careerPerformanceFinalized: true,
+                        projectDetails: updatedC.projectDetails ? { ...updatedC.projectDetails, hiddenStats: {
+                            ...updatedC.projectDetails.hiddenStats,
+                            qualityScore: Math.max(1, Math.min(100, (updatedC.projectDetails.hiddenStats.qualityScore || 50) + (performance - 50) * .12 * visibility)),
+                        } } : undefined };
+                    logsToAdd.push({ msg: `🎭 ${updatedC.name}: delivered acting ${performance}/100 from this role's preparation, craft and genre fit.`, type: 'neutral' });
+                }
                 const duration = isStudioProductionProject
                     ? getProductionCalendarPhaseDuration(updatedC, 'POST_PRODUCTION', getPhaseDuration('POST_PRODUCTION'))
                     : getPhaseDuration('POST_PRODUCTION');
@@ -4264,10 +4289,13 @@ export const processGameWeek = async (
                     : undefined;
 
                 if (updatedC.projectDetails) {
-                    const isOwnedProduction = nextPlayer.businesses?.some(business => business.id === updatedC.projectDetails!.studioId && business.type === 'PRODUCTION_HOUSE');
+                    const isOwnedProduction = Boolean(findCinemaBusiness(nextPlayer, updatedC.projectDetails.studioId));
                     if (!isOwnedProduction && updatedC.type === 'ACTING_GIG') {
                         if (!updatedC.projectDetails.castList?.length) updatedC.projectDetails.castList = generateCastList(nextPlayer, updatedC.projectDetails, updatedC.roleType || 'MINOR');
                         updatedC.projectDetails = completeOfferedCinemaCast(updatedC.projectDetails, nextPlayer);
+                        const launch = fundOfferedCinemaLaunch(nextPlayer, updatedC.projectDetails, updatedC.id);
+                        nextPlayer.world = launch.world;
+                        updatedC.projectDetails = launch.project;
                     }
                     // A real premiere is public even when an offered role already carried its release strategy.
                     // The release wizard may have announced it earlier; the event is idempotent.
@@ -4382,7 +4410,8 @@ export const processGameWeek = async (
                         finalPay -= commAmt;
                         addTransaction(-commAmt, 'EXPENSE', `Agent Commission (${updatedC.name})`);
                     }
-                    addTransaction(finalPay, 'SALARY', `Salary: ${updatedC.name}`);
+                    // Commission is already a separate cash expense; credit the signed gross fee once.
+                    addTransaction(updatedC.lumpSum, 'SALARY', `Salary: ${updatedC.name}`);
                     logsToAdd.push({ msg: `💰 Payday! Received $${finalPay.toLocaleString()} for "${updatedC.name}".`, type: 'positive' });
                 }
 

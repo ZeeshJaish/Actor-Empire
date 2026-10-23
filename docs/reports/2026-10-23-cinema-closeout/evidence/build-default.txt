@@ -1,0 +1,43 @@
+
+> pr-6.6.3@1.0.25 build
+> node scripts/build-low-memory.mjs --outDir /private/tmp/actor-cinema-closeout-20261023/dist
+
+vite v6.4.1 building for production...
+
+(!) outDir /private/tmp/actor-cinema-closeout-20261023/dist is not inside project root and will not be emptied.
+Use --emptyOutDir to override.
+
+transforming...
+Browserslist: browsers data (caniuse-lite) is 8 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+✓ 2344 modules transformed.
+rendering chunks...
+[plugin vite:reporter] 
+(!) /Users/zeesh/Vibe code/Actor empire/services/crisisGenerator.ts is dynamically imported by /Users/zeesh/Vibe code/Actor empire/views/home/homeProductionQaActions.ts but also statically imported by /Users/zeesh/Vibe code/Actor empire/services/productionService.ts, dynamic import will not move module into another chunk.
+
+[plugin vite:reporter] 
+(!) /Users/zeesh/Vibe code/Actor empire/services/directorGenerator.ts is dynamically imported by /Users/zeesh/Vibe code/Actor empire/views/home/homeProductionQaActions.ts but also statically imported by /Users/zeesh/Vibe code/Actor empire/services/productionService.ts, dynamic import will not move module into another chunk.
+
+[plugin vite:reporter] 
+(!) /Users/zeesh/Vibe code/Actor empire/services/productionService.ts is dynamically imported by /Users/zeesh/Vibe code/Actor empire/views/home/homeProductionQaActions.ts but also statically imported by /Users/zeesh/Vibe code/Actor empire/App.tsx, /Users/zeesh/Vibe code/Actor empire/services/gameLoop.ts, dynamic import will not move module into another chunk.
+
+computing gzip size...
+../../../../private/tmp/actor-cinema-closeout-20261023/dist/index.html                                        6.91 kB │ gzip:     1.91 kB
+../../../../private/tmp/actor-cinema-closeout-20261023/dist/assets/boxOfficeForecast.worker-Dde56AX2.js   4,861.37 kB
+../../../../private/tmp/actor-cinema-closeout-20261023/dist/assets/index-D4nxZlXk.css                     4,234.57 kB │ gzip: 1,635.99 kB
+../../../../private/tmp/actor-cinema-closeout-20261023/dist/assets/web-JCQw-CFH.js                            0.84 kB │ gzip:     0.25 kB
+../../../../private/tmp/actor-cinema-closeout-20261023/dist/assets/web-CFZJeabn.js                            1.56 kB │ gzip:     0.53 kB
+../../../../private/tmp/actor-cinema-closeout-20261023/dist/assets/streamingLaunchQa-wfrDNjAz.js             10.95 kB │ gzip:     4.55 kB
+../../../../private/tmp/actor-cinema-closeout-20261023/dist/assets/web-CE8BGP-Q.js                           16.37 kB │ gzip:     4.79 kB
+../../../../private/tmp/actor-cinema-closeout-20261023/dist/assets/web-B-PEXW14.js                           28.44 kB │ gzip:     5.51 kB
+../../../../private/tmp/actor-cinema-closeout-20261023/dist/assets/web-BC155uKF.js                           40.11 kB │ gzip:    10.39 kB
+../../../../private/tmp/actor-cinema-closeout-20261023/dist/assets/index.esm-H2zVK-Yc.js                     54.48 kB │ gzip:    11.21 kB
+../../../../private/tmp/actor-cinema-closeout-20261023/dist/assets/index-DgZRxd1l.js                     14,666.75 kB │ gzip: 4,136.38 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 17.57s
+Bounded build: {"exitCode":0,"signal":null,"heapMB":2048,"peakOwnedTreeRssMiB":2231.5,"stopReason":null,"systemGuard":"darwin"}

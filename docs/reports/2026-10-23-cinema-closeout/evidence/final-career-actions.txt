@@ -1,0 +1,7 @@
+PASS ordinary policy resolves persisted choices and keeps actions funded
+PASS visible costs remain visible when translated option keys exist
+PASS key-only generated crisis chooses funded option and retains its quality consequence
+PASS updater replay charges one 30E job reservation and one 25E application, source unchanged
+PASS benign cast traits cannot crash a real production week
+PASS small funded campaign supports usable channel increments
+PASS selected career policy trains the chosen genre with actual costs

@@ -1,0 +1,314 @@
+
+> pr-6.6.3@1.0.25 audit:actor-career-established
+> esbuild scripts/audit-actor-career-established.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-career-established.mjs && node /tmp/ae-career-established.mjs
+
+
+  ../../../../tmp/ae-career-established.mjs  9.7mb ⚠️
+
+⚡ Done in 105ms
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: all-five-delivered
++ actual - expected
+... Skipped lines
+
+  {
+    platform_ai_rights_contract_1x6thxx: {
+      accessGrant: {
+        earlyWindowWeeks: 0,
+        modes: [
+...
+      expiresAtAbsoluteWeek: 1662,
++     futureFunding: undefined,
+      futureSeasonFunding: 0,
+      genre: 'SUPERHERO',
+      guaranteeRecoupment: 'NON_RECOUPABLE',
+      id: 'platform_ai_rights_contract_1x6thxx',
+      idempotencyKey: 'streaming-contract:platform_ai_rights_contract_1x6thxx',
+
+    at reload (file:///private/tmp/ae-career-established.mjs:167808:10)
+    at async file:///private/tmp/ae-career-established.mjs:167863:1 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: {
+    platform_ai_rights_contract_1x6thxx: {
+      schemaVersion: 2,
+      id: 'platform_ai_rights_contract_1x6thxx',
+      idempotencyKey: 'streaming-contract:platform_ai_rights_contract_1x6thxx',
+      biddingSessionId: null,
+      sourceOfferId: null,
+      sourceProjectId: 'platform_ai_project_087jlvq',
+      titleAtSigning: 'Netflix SUPERHERO Original',
+      projectType: 'SERIES',
+      genre: 'SUPERHERO',
+      licensorName: 'Universal Pictures',
+      territory: 'MULTI_REGION',
+      countryIds: [
+        'AU', 'CA', 'DE',
+        'FR', 'GB', 'IN',
+        'JP', 'KE', 'KR',
+        'NG', 'US'
+      ],
+      durationWeeks: 104,
+      exclusivity: 'NON_EXCLUSIVE',
+      minimumGuarantee: 5280000,
+      platformRevenueShare: 90,
+      licensorRevenueShare: 10,
+      signedAtAbsoluteWeek: 1558,
+      startsAtAbsoluteWeek: 1558,
+      expiresAtAbsoluteWeek: 1662,
+      status: 'ACTIVE',
+      origin: 'STUDIO_MARKET',
+      buyerPlatformId: 'APPLE_TV',
+      platformContentPlanId: 'platform_ai_content_plan_07t9itr',
+      cataloguePackageId: null,
+      upcomingRightsSaleId: null,
+      contentSource: 'LICENSED_RELEASED_TITLE',
+      sellerType: 'STUDIO',
+      sellerPlatformId: null,
+      windowType: 'FIRST_WINDOW',
+      permanentPurchase: false,
+      marketingGuarantee: 0,
+      viewershipBonusThreshold: 0,
+      viewershipBonusAmount: 0,
+      renewalOption: true,
+      sublicensingAllowed: true,
+      sequelRightsIncluded: false,
+      changeOfControl: 'NOTICE',
+      cancellationPenalty: 1056000,
+      renewedFromLicenseId: null,
+      accessGrant: {
+        schemaVersion: 1,
+        modes: [ 'SUBSCRIPTION', 'AD_SUPPORTED', 'RENTAL' ],
+        earlyWindowWeeks: 0,
+        purchaseFulfillment: 'NONE',
+        source: 'EXPLICIT'
+      },
+      seller: {
+        type: 'NPC_STUDIO',
+        id: 'UNIVERSAL',
+        name: 'Universal Pictures',
+        platformId: null
+      },
+      buyer: {
+        type: 'AI_PLATFORM',
+        id: 'APPLE_TV',
+        name: 'Apple TV+',
+        platformId: 'APPLE_TV'
+      },
+      dealStructure: 'GUARANTEE_REVENUE_SHARE',
+      productionFunding: 0,
+      futureSeasonFunding: 0,
+      futureFunding: undefined,
+      localization: 'DUBS_AND_SUBTITLES',
+      localizationRequirements: [
+        {
+          sourceProjectId: 'platform_ai_project_087jlvq',
+          languageId: 'french',
+          mode: 'DUB',
+          countryIds: [ 'CA', 'FR' ],
+          capabilityTierAtPromise: 2,
+          mandatory: true
+        },
+        {
+          sourceProjectId: 'platform_ai_project_087jlvq',
+          languageId: 'german',
+          mode: 'DUB',
+          countryIds: [ 'DE' ],
+          capabilityTierAtPromise: 2,
+          mandatory: true
+        },
+        {
+          sourceProjectId: 'platform_ai_project_087jlvq',
+          languageId: 'hindi',
+          mode: 'DUB',
+          countryIds: [ 'IN' ],
+          capabilityTierAtPromise: 2,
+          mandatory: true
+        },
+        {
+          sourceProjectId: 'platform_ai_project_087jlvq',
+          languageId: 'japanese',
+          mode: 'DUB',
+          countryIds: [ 'JP' ],
+          capabilityTierAtPromise: 2,
+          mandatory: true
+        },
+        {
+          sourceProjectId: 'platform_ai_project_087jlvq',
+          languageId: 'korean',
+          mode: 'DUB',
+          countryIds: [ 'KR' ],
+          capabilityTierAtPromise: 2,
+          mandatory: true
+        },
+        {
+          sourceProjectId: 'platform_ai_project_087jlvq',
+          languageId: 'spanish',
+          mode: 'DUB',
+          countryIds: [ 'US' ],
+          capabilityTierAtPromise: 2,
+          mandatory: true
+        }
+      ],
+      backendBasis: 'ADS_RENTAL_RECEIPTS',
+      guaranteeRecoupment: 'NON_RECOUPABLE',
+      backendCap: null,
+      cumulativeRoyaltyAccrued: 0,
+      cumulativeRoyaltyPaid: 0,
+      settlement: {
+        guarantee: 'PAID',
+        paymentKey: 'streaming-guarantee:platform_ai_rights_contract_1x6thxx',
+        settledAtAbsoluteWeek: 1558
+      },
+      rootContractId: 'platform_ai_rights_contract_1x6thxx',
+      parentContractId: null,
+      rightsTransactionId: null,
+      transferredToContractId: null,
+      transferredAtAbsoluteWeek: null
+    }
+  },
+  expected: {
+    platform_ai_rights_contract_1x6thxx: {
+      schemaVersion: 2,
+      id: 'platform_ai_rights_contract_1x6thxx',
+      idempotencyKey: 'streaming-contract:platform_ai_rights_contract_1x6thxx',
+      biddingSessionId: null,
+      sourceOfferId: null,
+      sourceProjectId: 'platform_ai_project_087jlvq',
+      titleAtSigning: 'Netflix SUPERHERO Original',
+      projectType: 'SERIES',
+      genre: 'SUPERHERO',
+      licensorName: 'Universal Pictures',
+      territory: 'MULTI_REGION',
+      countryIds: [
+        'AU', 'CA', 'DE',
+        'FR', 'GB', 'IN',
+        'JP', 'KE', 'KR',
+        'NG', 'US'
+      ],
+      durationWeeks: 104,
+      exclusivity: 'NON_EXCLUSIVE',
+      minimumGuarantee: 5280000,
+      platformRevenueShare: 90,
+      licensorRevenueShare: 10,
+      signedAtAbsoluteWeek: 1558,
+      startsAtAbsoluteWeek: 1558,
+      expiresAtAbsoluteWeek: 1662,
+      status: 'ACTIVE',
+      origin: 'STUDIO_MARKET',
+      buyerPlatformId: 'APPLE_TV',
+      platformContentPlanId: 'platform_ai_content_plan_07t9itr',
+      cataloguePackageId: null,
+      upcomingRightsSaleId: null,
+      contentSource: 'LICENSED_RELEASED_TITLE',
+      sellerType: 'STUDIO',
+      sellerPlatformId: null,
+      windowType: 'FIRST_WINDOW',
+      permanentPurchase: false,
+      marketingGuarantee: 0,
+      viewershipBonusThreshold: 0,
+      viewershipBonusAmount: 0,
+      renewalOption: true,
+      sublicensingAllowed: true,
+      sequelRightsIncluded: false,
+      changeOfControl: 'NOTICE',
+      cancellationPenalty: 1056000,
+      renewedFromLicenseId: null,
+      accessGrant: {
+        schemaVersion: 1,
+        modes: [ 'SUBSCRIPTION', 'AD_SUPPORTED', 'RENTAL' ],
+        earlyWindowWeeks: 0,
+        purchaseFulfillment: 'NONE',
+        source: 'EXPLICIT'
+      },
+      seller: {
+        type: 'NPC_STUDIO',
+        id: 'UNIVERSAL',
+        name: 'Universal Pictures',
+        platformId: null
+      },
+      buyer: {
+        type: 'AI_PLATFORM',
+        id: 'APPLE_TV',
+        name: 'Apple TV+',
+        platformId: 'APPLE_TV'
+      },
+      dealStructure: 'GUARANTEE_REVENUE_SHARE',
+      productionFunding: 0,
+      futureSeasonFunding: 0,
+      localization: 'DUBS_AND_SUBTITLES',
+      localizationRequirements: [
+        {
+          sourceProjectId: 'platform_ai_project_087jlvq',
+          languageId: 'french',
+          mode: 'DUB',
+          countryIds: [ 'CA', 'FR' ],
+          capabilityTierAtPromise: 2,
+          mandatory: true
+        },
+        {
+          sourceProjectId: 'platform_ai_project_087jlvq',
+          languageId: 'german',
+          mode: 'DUB',
+          countryIds: [ 'DE' ],
+          capabilityTierAtPromise: 2,
+          mandatory: true
+        },
+        {
+          sourceProjectId: 'platform_ai_project_087jlvq',
+          languageId: 'hindi',
+          mode: 'DUB',
+          countryIds: [ 'IN' ],
+          capabilityTierAtPromise: 2,
+          mandatory: true
+        },
+        {
+          sourceProjectId: 'platform_ai_project_087jlvq',
+          languageId: 'japanese',
+          mode: 'DUB',
+          countryIds: [ 'JP' ],
+          capabilityTierAtPromise: 2,
+          mandatory: true
+        },
+        {
+          sourceProjectId: 'platform_ai_project_087jlvq',
+          languageId: 'korean',
+          mode: 'DUB',
+          countryIds: [ 'KR' ],
+          capabilityTierAtPromise: 2,
+          mandatory: true
+        },
+        {
+          sourceProjectId: 'platform_ai_project_087jlvq',
+          languageId: 'spanish',
+          mode: 'DUB',
+          countryIds: [ 'US' ],
+          capabilityTierAtPromise: 2,
+          mandatory: true
+        }
+      ],
+      backendBasis: 'ADS_RENTAL_RECEIPTS',
+      guaranteeRecoupment: 'NON_RECOUPABLE',
+      backendCap: null,
+      cumulativeRoyaltyAccrued: 0,
+      cumulativeRoyaltyPaid: 0,
+      settlement: {
+        guarantee: 'PAID',
+        paymentKey: 'streaming-guarantee:platform_ai_rights_contract_1x6thxx',
+        settledAtAbsoluteWeek: 1558
+      },
+      rootContractId: 'platform_ai_rights_contract_1x6thxx',
+      parentContractId: null,
+      rightsTransactionId: null,
+      transferredToContractId: null,
+      transferredAtAbsoluteWeek: null
+    }
+  },
+  operator: 'deepStrictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.11.1

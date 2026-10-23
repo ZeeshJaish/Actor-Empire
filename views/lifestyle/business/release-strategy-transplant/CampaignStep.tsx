@@ -3,6 +3,7 @@ import { FilmSheet, type FilmSheetStyle } from './FilmSheet';
 import { Glyph } from './Glyph';
 import type { ReleaseFilmArt } from './model';
 import css from './ReleaseStrategy.module.css';
+import {formatMoney} from '../../../../services/formatUtils';
 
 export interface CampaignPositionModel { id: string; label: string; shortLabel: string; description: string; promise: string; hue: number; style: FilmSheetStyle }
 export interface CampaignTimelineModel { id: string; label: string; description: string; weights: number[] }
@@ -11,7 +12,11 @@ export interface CampaignForecastModel { score: number; label: string; openingRa
 export interface CampaignSoundtrackModel { label: string; score: number; openingLift: number; trailerLift: number; mismatchRisk: number }
 
 const join = (...names: Array<string | false | undefined>) => names.filter(Boolean).join(' ');
-const millions = (value: number) => `$${(Math.max(0, value) / 1_000_000).toFixed(1)}M`;
+// Preserve small allocation steps; rounding every amount to millions hid real spending.
+const campaignMoney = (value: number) => {
+  const amount = Math.max(0, value);
+  return amount < 1_000_000 ? `$${Math.round(amount).toLocaleString()}` : formatMoney(amount);
+};
 
 export const CampaignStep: React.FC<{
   cinema?: boolean;
@@ -85,13 +90,13 @@ export const CampaignStep: React.FC<{
 
     <section className={css.sec}>
       <div className={css.sechead}><span className={css.seclabel}>CHANNEL MIX</span><em className={css.step}>05 / 05</em></div>
-      <div className={css.pool}><div><em>SPENT</em><b>{millions(spent)}</b></div><div className={css.poolfree}><em>AVAILABLE</em><b data-testid="campaign-remaining">{millions(remaining)}</b></div><span className={css.pooltrack}><u style={{ width: `${budget > 0 ? Math.min(100, spent / budget * 100) : 0}%` }} /></span></div>
-      <div className={css.available}>{millions(budget)} AVAILABLE</div>
+      <div className={css.pool}><div><em>SPENT</em><b>{campaignMoney(spent)}</b></div><div className={css.poolfree}><em>AVAILABLE</em><b data-testid="campaign-remaining">{campaignMoney(remaining)}</b></div><span className={css.pooltrack}><u style={{ width: `${budget > 0 ? Math.min(100, spent / budget * 100) : 0}%` }} /></span></div>
+      <div className={css.available}>{campaignMoney(budget)} AVAILABLE</div>
       <div className={css.chans}>{channels.map(channel => {
         const share = budget > 0 ? channel.amount / budget * 100 : 0;
         return <article key={channel.id} className={join(css.chan, channel.amount > 0 && css.on)}>
           <span className={css.chanicon}><Glyph id={channel.icon} /></span><div className={css.chantext}><b>{channel.label}</b><em>{channel.description}</em></div>
-          <div className={css.chanset}><button type="button" className={css.stepbtn} disabled={channel.amount <= 0} onClick={() => onChangeChannel(channel.id, -allocationStep)} aria-label={`Decrease ${channel.label}`}>−</button><span className={css.readout}><b data-testid={`channel-${channel.id}-value`}>{millions(channel.amount)}</b></span><button type="button" className={css.stepbtn} disabled={remaining < allocationStep} onClick={() => onChangeChannel(channel.id, allocationStep)} aria-label={`Increase ${channel.label}`}>+</button></div>
+          <div className={css.chanset}><button type="button" className={css.stepbtn} disabled={channel.amount <= 0} onClick={() => onChangeChannel(channel.id, -allocationStep)} aria-label={`Decrease ${channel.label}`}>−</button><span className={css.readout}><b data-testid={`channel-${channel.id}-value`}>{campaignMoney(channel.amount)}</b></span><button type="button" className={css.stepbtn} disabled={remaining < allocationStep} onClick={() => onChangeChannel(channel.id, allocationStep)} aria-label={`Increase ${channel.label}`}>+</button></div>
           <div className={css.chanfoot}><em>{share.toFixed(0)}% OF POOL</em><span className={css.pips}>{[1,2,3,4,5].map(pip => <i key={pip} className={pib(pip, share) ? css.lit : ''} />)}</span></div><i className={css.chanfill} style={{ width: `${share}%` }} />
         </article>;
       })}</div>

@@ -1,0 +1,17 @@
+{
+  "sha256": "7f20b8b75d7f27ed9565c30668194b4092a651dd2abd1bcebd651f9b0f241937",
+  "sourceHashes": {
+    "services/actorCareerBalance.ts": "bce92f071d1b70107e74c9b4e514ab94b6e0df45b2be4b9638d755075a125f74",
+    "services/gameLoop.ts": "024427e8c7d46c7bf4f079437f833d2b74242d46c054350f2f347c854777c154",
+    "services/roleLogic.ts": "3b4faf299f3dbd10cd2f6a5babe0867243f101d11e093f58afa3600dd5661c39",
+    "services/teamLogic.ts": "b78417b60c27e73a26a40629ab51a34c64a0f9a0cd5ee1a1cf5b62782682e9ad",
+    "services/saveMigration.ts": "6c6c4d1f13da109cfe511e8b8fd3911e475f4df977c964959b0451a39f62dcff",
+    "services/actorCareerArc.ts": "7688b3ee1259c05ac2df0d166154419024bf4d5555c964e7d872eb162b8f1861",
+    "hooks/useGameActions.ts": "aaa2689c2bebeddf6fe33becdf0f1e1394f6726871c1450a5a29f4ad7cc8d47e",
+    "App.tsx": "0d2d8aec39409182ff399e042f07fecde3cd204e3e5185056e07164096063465",
+    "types.ts": "cc934c67d59622a4f19ac4cf3f437a5ab73db89b72134da450a210c96a3e9282",
+    "views/mobile/MobilePage.tsx": "fe849bb91ad832cf102d6d1397612b407eaa20f0a085d8f67c00f63e167d09b8",
+    "views/lifestyle/business/greenlightProjectBuilder.ts": "1b7847d4c3bd0901ca7c24346682cc9ec9e1cf69d681e168ed3626e1425b291e"
+  },
+  "kind": "Current-source ordinary paid actor career; sequential bounded workers"
+}

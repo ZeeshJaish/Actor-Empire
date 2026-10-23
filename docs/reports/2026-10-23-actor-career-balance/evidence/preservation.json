@@ -1,0 +1,362 @@
+[
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/README.md",
+    "originalSha256": "b9e8c73c61614566698fd44b9f6c62e331b08fa5b3a701edc4e347a5f5386bed",
+    "currentSha256": "b9e8c73c61614566698fd44b9f6c62e331b08fa5b3a701edc4e347a5f5386bed",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/after-history-profile.json",
+    "originalSha256": "343c99343546f65aec8fb29119a6aa8be577788c1dd96e83841c1f3ee2d0ba81",
+    "currentSha256": "343c99343546f65aec8fb29119a6aa8be577788c1dd96e83841c1f3ee2d0ba81",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/app-action-log.jsonl",
+    "originalSha256": "4603eddd35de19cd97b13817323a83cc3e719a693e2e0b4e78105336e2b4dbe3",
+    "currentSha256": "4603eddd35de19cd97b13817323a83cc3e719a693e2e0b4e78105336e2b4dbe3",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/app-final-late-home.png",
+    "originalSha256": "6ec4d417785a4849cb2ad7409ad1f9d7a36625806f91b87083e73483ffb5186c",
+    "currentSha256": "6ec4d417785a4849cb2ad7409ad1f9d7a36625806f91b87083e73483ffb5186c",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/app-final-late-timings.json",
+    "originalSha256": "efe4c4ddc9ed2edafc14bcf550cafe7af0b2f9b839a7693971cacf6e2f652baf",
+    "currentSha256": "efe4c4ddc9ed2edafc14bcf550cafe7af0b2f9b839a7693971cacf6e2f652baf",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/app-memory-first.json",
+    "originalSha256": "0ea8392bebd65df043c4c4a83958439423bcd6528218fc98519879d159ec1bb0",
+    "currentSha256": "0ea8392bebd65df043c4c4a83958439423bcd6528218fc98519879d159ec1bb0",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/app-memory.json",
+    "originalSha256": "97025b9bd8a73e13d2fd9cc6bc0104e0da9ff0e78fb92a2d1bc08d8f592fe34a",
+    "currentSha256": "97025b9bd8a73e13d2fd9cc6bc0104e0da9ff0e78fb92a2d1bc08d8f592fe34a",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/app-session-events-first.json",
+    "originalSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "currentSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/app-session-events.json",
+    "originalSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "currentSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/before-history-profile.json",
+    "originalSha256": "eb16662a46bc34f013f99046b72d285d0bbe20482385ea9433902fd56cf83810",
+    "currentSha256": "eb16662a46bc34f013f99046b72d285d0bbe20482385ea9433902fd56cf83810",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/build-default-memory.json",
+    "originalSha256": "3bea9146993f5d13b862c29ddeb49c8c837a15183e7d0d22482e8d981b6cd70c",
+    "currentSha256": "3bea9146993f5d13b862c29ddeb49c8c837a15183e7d0d22482e8d981b6cd70c",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/build-default.txt",
+    "originalSha256": "73cdae196919d7218ea0452cad70434999876b4c5bdded0827abe7c702e9975a",
+    "currentSha256": "73cdae196919d7218ea0452cad70434999876b4c5bdded0827abe7c702e9975a",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/build-final-memory.json",
+    "originalSha256": "5e9e9ed6a1edd9d4e493b614a3d562d7676e3a024b53dc793031271cc0ebd403",
+    "currentSha256": "5e9e9ed6a1edd9d4e493b614a3d562d7676e3a024b53dc793031271cc0ebd403",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/build-final2-memory.json",
+    "originalSha256": "9ae3d7f508dc81c2b49e593b3222de8bb3b4d8faf6d7e458c70eccb8f575e18e",
+    "currentSha256": "9ae3d7f508dc81c2b49e593b3222de8bb3b4d8faf6d7e458c70eccb8f575e18e",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/build-final2.txt",
+    "originalSha256": "f6ad4ee6ba434d27eb8588195dbde7803a925f7016f84d7e943f234364698c4c",
+    "currentSha256": "f6ad4ee6ba434d27eb8588195dbde7803a925f7016f84d7e943f234364698c4c",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/build-guarded.json",
+    "originalSha256": "3c1c99fdd68f89d020cd51fb98d6c0f2d9caf3186d58635233b75996ca941db9",
+    "currentSha256": "3c1c99fdd68f89d020cd51fb98d6c0f2d9caf3186d58635233b75996ca941db9",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/build-pressure-stop.json",
+    "originalSha256": "d1d5f166bbfe07c15c59c21ff9030fe3feff225fbc448fe74a173a6776bd7544",
+    "currentSha256": "d1d5f166bbfe07c15c59c21ff9030fe3feff225fbc448fe74a173a6776bd7544",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/campaign-amounts-green.txt",
+    "originalSha256": "236668cf555cd5588a74caeab1954bcdff27fd6d98fa04288579dbe1ccc25cfc",
+    "currentSha256": "236668cf555cd5588a74caeab1954bcdff27fd6d98fa04288579dbe1ccc25cfc",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/campaign-amounts-red.txt",
+    "originalSha256": "61f47fdaee49edb3b973279aee6be71b94c2b2b1cb0b6d918bd0189bb5225742",
+    "currentSha256": "61f47fdaee49edb3b973279aee6be71b94c2b2b1cb0b6d918bd0189bb5225742",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/campaign-exact-small-320.png",
+    "originalSha256": "fcef3e49b1ec9b31349abc04ffeebc1a380dad50daf1d600bcf5a5c85bfa898e",
+    "currentSha256": "fcef3e49b1ec9b31349abc04ffeebc1a380dad50daf1d600bcf5a5c85bfa898e",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/earned-imdb-320.png",
+    "originalSha256": "794d11b7c9d18b5a8b49c2e289df3706aa57100d0d9047fd9bda00e94b2a886e",
+    "currentSha256": "794d11b7c9d18b5a8b49c2e289df3706aa57100d0d9047fd9bda00e94b2a886e",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/earned-offered-finance.png",
+    "originalSha256": "732d93874f31bcc7ffbef739ffb4f5cb69c864f8941f5e765bd9aff5e35de337",
+    "currentSha256": "732d93874f31bcc7ffbef739ffb4f5cb69c864f8941f5e765bd9aff5e35de337",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/final-affinity-index.txt",
+    "originalSha256": "207dfc20e35dff23cff3a4f3fd75aa067e5f0dd80f519ff3ce6c89f11f0e955c",
+    "currentSha256": "207dfc20e35dff23cff3a4f3fd75aa067e5f0dd80f519ff3ce6c89f11f0e955c",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/final-audience-cost.txt",
+    "originalSha256": "03149ea49f1315ba440bed2f849d417c779d59f9f7cc476acb75ef76fc453ac7",
+    "currentSha256": "03149ea49f1315ba440bed2f849d417c779d59f9f7cc476acb75ef76fc453ac7",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/final-audience.txt",
+    "originalSha256": "53d2aad40c6028a1a6323b43b9ee0bc5ad606aa5d3751e5bbb08a0e4442bfd1f",
+    "currentSha256": "53d2aad40c6028a1a6323b43b9ee0bc5ad606aa5d3751e5bbb08a0e4442bfd1f",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/final-booking.txt",
+    "originalSha256": "4d66469e76c8051999c33919914463b520c24d5126c61cf61912a9a09c22176e",
+    "currentSha256": "4d66469e76c8051999c33919914463b520c24d5126c61cf61912a9a09c22176e",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/final-career-actions.txt",
+    "originalSha256": "e4aec115e9524634808249f804529f2c91fa5733d7478089f076053750cb3718",
+    "currentSha256": "e4aec115e9524634808249f804529f2c91fa5733d7478089f076053750cb3718",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/final-finance-contracts.txt",
+    "originalSha256": "0e5a306ae0837840bce8161c69eae0e478f0fb14c46d0ca2f91285344ab0219c",
+    "currentSha256": "0e5a306ae0837840bce8161c69eae0e478f0fb14c46d0ca2f91285344ab0219c",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/final-finance-ui.txt",
+    "originalSha256": "2cdc0975d777e64ae9dc3fb4a50db80afdb76976a63197c0412c2c51440c15a6",
+    "currentSha256": "2cdc0975d777e64ae9dc3fb4a50db80afdb76976a63197c0412c2c51440c15a6",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/final-history-cost.txt",
+    "originalSha256": "d8092bf7c59c7d1fa06423f22b4b946cf43d91bb1dbf8cbc3919b67a41ec006d",
+    "currentSha256": "d8092bf7c59c7d1fa06423f22b4b946cf43d91bb1dbf8cbc3919b67a41ec006d",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/final-icon-imports.txt",
+    "originalSha256": "482c6a3027ca763caed596418ea971b6d0a65a36616f8f2c4e78c41996658ce7",
+    "currentSha256": "482c6a3027ca763caed596418ea971b6d0a65a36616f8f2c4e78c41996658ce7",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/final-integration.txt",
+    "originalSha256": "67a7cf3eceb964f1a3124fdc39d96e5d5de4cf47ff1369697887895ff39beebe",
+    "currentSha256": "67a7cf3eceb964f1a3124fdc39d96e5d5de4cf47ff1369697887895ff39beebe",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/final-late-timings.json",
+    "originalSha256": "efe4c4ddc9ed2edafc14bcf550cafe7af0b2f9b839a7693971cacf6e2f652baf",
+    "currentSha256": "efe4c4ddc9ed2edafc14bcf550cafe7af0b2f9b839a7693971cacf6e2f652baf",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/final-market.txt",
+    "originalSha256": "3b685448589e8e4ceb5c9126c5be3a6ad981961d58d7275f4e3fc32f3d8b6afd",
+    "currentSha256": "3b685448589e8e4ceb5c9126c5be3a6ad981961d58d7275f4e3fc32f3d8b6afd",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/final-migration.txt",
+    "originalSha256": "388056841da6b1b6c27eb98508be9701b9eaa2815bfca375a68a7a4c74545701",
+    "currentSha256": "388056841da6b1b6c27eb98508be9701b9eaa2815bfca375a68a7a4c74545701",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/final-presentation.txt",
+    "originalSha256": "2c3659e210f5ec40fadf46f62c9d1dcf04047c69c8efb702df16c372e9f6b315",
+    "currentSha256": "2c3659e210f5ec40fadf46f62c9d1dcf04047c69c8efb702df16c372e9f6b315",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/final-release-announcement.txt",
+    "originalSha256": "aa6cf67e228ea532d38d0e70a489ffc5cab2b810d888475edd3a5556aa6b752e",
+    "currentSha256": "aa6cf67e228ea532d38d0e70a489ffc5cab2b810d888475edd3a5556aa6b752e",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/final-rights.txt",
+    "originalSha256": "204e12c53f7149a6df9245ff9b1d470d47db47d781282e1766f6eaef8144d0b4",
+    "currentSha256": "204e12c53f7149a6df9245ff9b1d470d47db47d781282e1766f6eaef8144d0b4",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/final-run-lookup-cost.txt",
+    "originalSha256": "06b8a2781437c2f79688d153bd35eeacf3aaef4c8ed0fcdc425d57e41dbd6675",
+    "currentSha256": "06b8a2781437c2f79688d153bd35eeacf3aaef4c8ed0fcdc425d57e41dbd6675",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/final-save-boundary.txt",
+    "originalSha256": "3df3b304ca18c00f7c90da5df8cd00104bd4605fb5dfb209fb044b20cc040321",
+    "currentSha256": "3df3b304ca18c00f7c90da5df8cd00104bd4605fb5dfb209fb044b20cc040321",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/history-cost-green.txt",
+    "originalSha256": "d8092bf7c59c7d1fa06423f22b4b946cf43d91bb1dbf8cbc3919b67a41ec006d",
+    "currentSha256": "d8092bf7c59c7d1fa06423f22b4b946cf43d91bb1dbf8cbc3919b67a41ec006d",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/history-cost-red.txt",
+    "originalSha256": "19512b704a208b3e95baa0311f3df399430daa601bcbf2479a9296adb968c0e7",
+    "currentSha256": "19512b704a208b3e95baa0311f3df399430daa601bcbf2479a9296adb968c0e7",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/history-whole-week-parity.json",
+    "originalSha256": "b1cc63c798354b604d4c9d1d46366ff855dd103f2d0ad00a502c176e2befe888",
+    "currentSha256": "b1cc63c798354b604d4c9d1d46366ff855dd103f2d0ad00a502c176e2befe888",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/market-final-parity.json",
+    "originalSha256": "57f2291f85f8de301568899b42f9dcd21f85061f8908008c9e2b6bfe77aad565",
+    "currentSha256": "57f2291f85f8de301568899b42f9dcd21f85061f8908008c9e2b6bfe77aad565",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/normal-comedy-career-1.json",
+    "originalSha256": "d77bdfe5b6ddf56ffa655ee28358bf33dc0507b950db36616f6054b546ec32c6",
+    "currentSha256": "d77bdfe5b6ddf56ffa655ee28358bf33dc0507b950db36616f6054b546ec32c6",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/normal-comedy-memory.json",
+    "originalSha256": "9e1200bfcdaa33d21a178813125bd4afdb04b934bb06a0fc6ff4ef81d1253c91",
+    "currentSha256": "9e1200bfcdaa33d21a178813125bd4afdb04b934bb06a0fc6ff4ef81d1253c91",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/normal-drama-career-0.json",
+    "originalSha256": "842e0b0718084817ba06952af8b75a9e1d8c5bf8c6b6c654243f2e54bc1ec736",
+    "currentSha256": "842e0b0718084817ba06952af8b75a9e1d8c5bf8c6b6c654243f2e54bc1ec736",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/normal-drama-memory.json",
+    "originalSha256": "8be5937e21cb3a74c24c33d21c5b8bfc112502d7c857c8af50c912c40bb3d1e5",
+    "currentSha256": "8be5937e21cb3a74c24c33d21c5b8bfc112502d7c857c8af50c912c40bb3d1e5",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/process-cleanup.json",
+    "originalSha256": "ba12f0ba82cce4965be61359d851422d66cafbed410c1c3ace2b362d55f57a86",
+    "currentSha256": "ba12f0ba82cce4965be61359d851422d66cafbed410c1c3ace2b362d55f57a86",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/provenance.json",
+    "originalSha256": "e7e72ce89dd5ad4868f092fdf2723020a879379ee6e905895402846699af3267",
+    "currentSha256": "e7e72ce89dd5ad4868f092fdf2723020a879379ee6e905895402846699af3267",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/small-fairness.json",
+    "originalSha256": "b6b39213af881197bbb42c7a4c2ae446c6b58934cd41671d5a553d370c081639",
+    "currentSha256": "b6b39213af881197bbb42c7a4c2ae446c6b58934cd41671d5a553d370c081639",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/small-studio-finance-320.png",
+    "originalSha256": "0902761f88025a6319b275a1692bd672c5777bd1323de0fb7d1f850f6ffc3c86",
+    "currentSha256": "0902761f88025a6319b275a1692bd672c5777bd1323de0fb7d1f850f6ffc3c86",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/small-summary.json",
+    "originalSha256": "0fbc2c1c1cab9e7a64a12aebc3d10cc10be22e79de1fc090d6c5d27e2844daf5",
+    "currentSha256": "0fbc2c1c1cab9e7a64a12aebc3d10cc10be22e79de1fc090d6c5d27e2844daf5",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/streaming-handoff.png",
+    "originalSha256": "b463354cad4451a22952a3c03b9ecb94e5bf75d1a7d72dc56c22f7a36b6fda77",
+    "currentSha256": "b463354cad4451a22952a3c03b9ecb94e5bf75d1a7d72dc56c22f7a36b6fda77",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/evidence/typecheck-final.txt",
+    "originalSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "currentSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "status": "unchanged"
+  },
+  {
+    "file": "scripts/audit-cinema-history-cost.ts",
+    "originalSha256": "c3a1ecb5d8858b5b392bc38144293f299b7d5d0cb40235c6aa64c30ca16ef326",
+    "currentSha256": "c3a1ecb5d8858b5b392bc38144293f299b7d5d0cb40235c6aa64c30ca16ef326",
+    "status": "unchanged"
+  },
+  {
+    "file": "docs/reports/2026-10-23-cinema-closeout/progress.md",
+    "originalSha256": "bfe85c6ad5bef0a7e619058fb02d9e534b15e7454318bac2ecdeb8123653c5c6",
+    "currentSha256": "bfe85c6ad5bef0a7e619058fb02d9e534b15e7454318bac2ecdeb8123653c5c6",
+    "status": "unchanged"
+  },
+  {
+    "file": "package.json",
+    "originalSha256": "e37a5986c089a64734c4a74020005feaa69d8a6804b308a367cd627e9355e532",
+    "currentSha256": "a8e801d9a834a8460798087840f23db1dca30793d881477d267c5d87e4293335",
+    "status": "changed"
+  },
+  {
+    "file": "services/boxOffice/boxOfficeHistory.ts",
+    "originalSha256": "44f886331716987b4733b793aecd8b8606d03038952c67e4f0d83c5091e324c9",
+    "currentSha256": "44f886331716987b4733b793aecd8b8606d03038952c67e4f0d83c5091e324c9",
+    "status": "unchanged"
+  },
+  {
+    "file": "views/lifestyle/business/release-strategy-transplant/CampaignStep.tsx",
+    "originalSha256": "d701b513c9f281a6fb5c77f460fb452881e3496c0871892b8ae58cecc30ea9d7",
+    "currentSha256": "d701b513c9f281a6fb5c77f460fb452881e3496c0871892b8ae58cecc30ea9d7",
+    "status": "unchanged"
+  }
+]

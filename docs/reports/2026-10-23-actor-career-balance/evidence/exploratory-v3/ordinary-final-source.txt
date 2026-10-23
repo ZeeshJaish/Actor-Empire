@@ -1,0 +1,30 @@
+
+  ../../../../tmp/ae-career-final-source/career-worker.mjs  9.7mb ⚠️
+
+⚡ Done in 84ms
+{"seed":2,"weeks":4,"cash":2150,"craft":1.8886758694285712,"genre":28.650270959859814,"credits":0,"phases":[]}
+{"seed":2,"weeks":8,"cash":3375,"craft":3.647301344178328,"genre":39.5884331314922,"credits":0,"phases":[]}
+{"seed":2,"weeks":12,"cash":4700,"craft":6.049749258852022,"genre":43.731172899997986,"credits":0,"phases":["AUDITION"]}
+{"status":"CHECKPOINT_READY","seed":2,"weeks":13,"credits":0,"reloads":2}
+{"seed":2,"weeks":16,"cash":6500,"craft":6.788244301601789,"genre":44.231172899997986,"credits":0,"phases":["AUDITION","PRODUCTION"]}
+{"seed":2,"weeks":20,"cash":8300,"craft":6.788244301601789,"genre":44.231172899997986,"credits":0,"phases":["AUDITION","PRODUCTION"]}
+{"seed":2,"weeks":24,"cash":10100,"craft":6.788244301601789,"genre":44.231172899997986,"credits":0,"phases":["AUDITION","PRODUCTION"]}
+{"status":"CHECKPOINT_READY","seed":2,"weeks":26,"credits":0,"reloads":4}
+{"seed":2,"weeks":28,"cash":11900,"craft":6.788244301601789,"genre":44.231172899997986,"credits":0,"phases":["AUDITION","PRODUCTION","POST_PRODUCTION"]}
+{"seed":2,"weeks":32,"cash":15700,"craft":6.788244301601789,"genre":44.231172899997986,"credits":0,"phases":["AUDITION","PRODUCTION","POST_PRODUCTION"]}
+{"seed":2,"weeks":36,"cash":17500,"craft":6.788244301601789,"genre":44.231172899997986,"credits":0,"phases":["AUDITION","PRODUCTION","POST_PRODUCTION"]}
+{"status":"CHECKPOINT_READY","seed":2,"weeks":39,"credits":0,"reloads":6}
+{"seed":2,"weeks":40,"cash":20886,"craft":7.798647361753338,"genre":47.11454944199803,"credits":0,"phases":["AUDITION","PRODUCTION","POST_PRODUCTION","AWAITING_RELEASE"]}
+{"seed":2,"weeks":44,"cash":21836,"craft":9.706609037463135,"genre":49.60481328409491,"credits":1,"phases":["AUDITION","PRODUCTION","POST_PRODUCTION","AWAITING_RELEASE"]}
+{"seed":2,"weeks":48,"cash":23111,"craft":11.48339829579746,"genre":55.407534700874294,"credits":1,"phases":["AUDITION","PRODUCTION","POST_PRODUCTION","AWAITING_RELEASE"]}
+{"seed":2,"weeks":52,"cash":24061,"craft":13.230697656159865,"genre":57.56939632671967,"credits":1,"phases":["AUDITION","PRODUCTION","POST_PRODUCTION","AWAITING_RELEASE"]}
+{"status":"CHECKPOINT_READY","seed":2,"weeks":52,"credits":1,"reloads":8}
+{"seed":2,"weeks":56,"cash":25861,"craft":15.480619158783458,"genre":57.56939632671967,"credits":1,"phases":["AUDITION","PRODUCTION","POST_PRODUCTION","AWAITING_RELEASE"]}
+{"seed":2,"weeks":60,"cash":27661,"craft":15.480619158783458,"genre":58.06939632671967,"credits":1,"phases":["AUDITION","PRODUCTION","POST_PRODUCTION","AWAITING_RELEASE"]}
+{"seed":2,"weeks":64,"cash":31461,"craft":15.509190587354889,"genre":58.06939632671967,"credits":1,"phases":["AUDITION","PRODUCTION","POST_PRODUCTION","AWAITING_RELEASE"]}
+{"status":"CHECKPOINT_READY","seed":2,"weeks":65,"credits":1,"reloads":10}
+{"seed":2,"weeks":68,"cash":35261,"craft":15.523476301640601,"genre":58.06939632671967,"credits":1,"phases":["AUDITION","PRODUCTION","POST_PRODUCTION","AWAITING_RELEASE"]}
+{"seed":2,"weeks":72,"cash":37061,"craft":15.537762015926317,"genre":58.06939632671967,"credits":1,"phases":["AUDITION","PRODUCTION","POST_PRODUCTION","AWAITING_RELEASE"]}
+{"seed":2,"weeks":76,"cash":38861,"craft":15.537762015926317,"genre":58.06939632671967,"credits":1,"phases":["AUDITION","PRODUCTION","POST_PRODUCTION","AWAITING_RELEASE"]}
+{"status":"HORIZON_COMPLETE","seed":2,"weeks":78,"credits":1,"reloads":12}
+{"seed":2,"status":"HORIZON_COMPLETE","weeks":78,"credits":1,"reloads":12,"cash":39761}

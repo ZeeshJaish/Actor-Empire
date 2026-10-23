@@ -1,0 +1,1 @@
+{"status":"PASS","cohorts":100,"pools":50,"countryReads":100,"choices":300}

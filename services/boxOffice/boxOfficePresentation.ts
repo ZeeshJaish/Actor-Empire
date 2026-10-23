@@ -49,6 +49,7 @@ export const createArchivedCinemaReleaseRecord = (project: any, untitledLabel: s
             visibleScriptBuzz: '',
             visibleCastStrength: '',
             releaseRegionIds: project.releaseRegionIds || [],
+            releaseCountryIds: project.releaseCountryIds,
             releaseChainSelections: project.releaseChainSelections || {},
         };
     const streamingOnly = gross <= 0 && streamingRevenue > 0 && project.streamingPlatform;

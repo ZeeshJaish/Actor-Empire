@@ -1,0 +1,9 @@
+PASS limited German release must not spend its campaign in an unrelated African priority region
+PASS Spanish release retains Mexico and Spain access instead of only the unrelated priority region
+PASS limited English launch prioritizes a primary-language market rather than the biggest multilingual population
+PASS an explicit empty country plan cannot silently expand to every region
+PASS actual offered premiere funds paid exposure from its producing studio, not actor followers or wallet
+PASS NPC premiere commits language-compatible country supply and the same paid campaign geography
+PASS cash-poor producer scales the campaign to uncommitted cash without borrowing from the actor
+PASS already released saves and paid wizard campaigns never get retroactive casting or campaign charges
+PASS an unreleased legacy offer with a real studio treasury can fund a launch before AI metadata migration

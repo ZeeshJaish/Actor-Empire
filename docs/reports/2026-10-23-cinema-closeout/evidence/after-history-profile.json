@@ -1,0 +1,315 @@
+{
+  "playerSha256": "8542c7887a80cef2185376fd443024c7357e8db737c564311140afd07513aa31",
+  "parts": {
+    "industryMs": 306.76079100000004,
+    "cinemaMs": 4428.1995830000005
+  },
+  "stages": [
+    {
+      "stage": "state_cloned",
+      "durationMs": 290.62595799999997
+    },
+    {
+      "stage": "state_normalized",
+      "durationMs": 7.553792000000044
+    },
+    {
+      "stage": "world_industry_start",
+      "durationMs": 0.18524999999999636
+    },
+    {
+      "stage": "world_turn_start",
+      "durationMs": 0.004583000000025095
+    },
+    {
+      "stage": "world_turn_done",
+      "durationMs": 12.539457999999968
+    },
+    {
+      "stage": "music_industry_start",
+      "durationMs": 0.011500000000069122
+    },
+    {
+      "stage": "music_industry_done",
+      "durationMs": 4.54424999999992
+    },
+    {
+      "stage": "universe_payouts_start",
+      "durationMs": 0.030542000000082226
+    },
+    {
+      "stage": "universe_payouts_done",
+      "durationMs": 0.7016249999999218
+    },
+    {
+      "stage": "world_industry_done",
+      "durationMs": 0.023957999999993262
+    },
+    {
+      "stage": "markets_start",
+      "durationMs": 1.29037500000004
+    },
+    {
+      "stage": "markets_done",
+      "durationMs": 12.72033399999998
+    },
+    {
+      "stage": "creator_talent_start",
+      "durationMs": 0.00916600000005019
+    },
+    {
+      "stage": "creator_talent_done",
+      "durationMs": 5.936916999999994
+    },
+    {
+      "stage": "business_sim_start",
+      "durationMs": 0.009583000000020547
+    },
+    {
+      "stage": "business_sim_done",
+      "durationMs": 0.007834000000002561
+    },
+    {
+      "stage": "health_social_start",
+      "durationMs": 0.7062499999999545
+    },
+    {
+      "stage": "health_social_done",
+      "durationMs": 0.35295799999994415
+    },
+    {
+      "stage": "commitments_releases_start",
+      "durationMs": 0.07170800000005784
+    },
+    {
+      "stage": "commitments_releases_done",
+      "durationMs": 21.745874999999955
+    },
+    {
+      "stage": "awards_start",
+      "durationMs": 0.013709000000062588
+    },
+    {
+      "stage": "awards_done",
+      "durationMs": 0.19862499999999272
+    },
+    {
+      "stage": "end_week_start",
+      "durationMs": 0.02341599999999744
+    },
+    {
+      "stage": "world_population_start",
+      "durationMs": 0.4231250000000273
+    },
+    {
+      "stage": "world_population_done",
+      "durationMs": 3.2975839999999152
+    },
+    {
+      "stage": "world_audience_economy_start",
+      "durationMs": 0.0095410000000129
+    },
+    {
+      "stage": "world_audience_economy_done",
+      "durationMs": 10.161375000000021
+    },
+    {
+      "stage": "world_audience_participation_start",
+      "durationMs": 0.012791999999990367
+    },
+    {
+      "stage": "world_audience_participation_done",
+      "durationMs": 10.53754200000003
+    },
+    {
+      "stage": "streaming_rights_calendar_start",
+      "durationMs": 0.009249999999951797
+    },
+    {
+      "stage": "streaming_rights_calendar_done",
+      "durationMs": 2.566500000000019
+    },
+    {
+      "stage": "streaming_catalogue_packages_start",
+      "durationMs": 0.026250000000004547
+    },
+    {
+      "stage": "streaming_catalogue_packages_done",
+      "durationMs": 0.9732910000000174
+    },
+    {
+      "stage": "streaming_rights_office_start",
+      "durationMs": 0.003666999999950349
+    },
+    {
+      "stage": "streaming_rights_office_done",
+      "durationMs": 0.46633300000007694
+    },
+    {
+      "stage": "streaming_industry_start",
+      "durationMs": 0.0020839999999680003
+    },
+    {
+      "stage": "streaming_industry_done",
+      "durationMs": 4735.739291
+    },
+    {
+      "stage": "owned_streaming_start",
+      "durationMs": 0.009917000000314147
+    },
+    {
+      "stage": "world_streaming_competition_start",
+      "durationMs": 0.7442499999997381
+    },
+    {
+      "stage": "world_streaming_competition_done",
+      "durationMs": 28.753917
+    },
+    {
+      "stage": "world_streaming_customers_start",
+      "durationMs": 0.008541000000150234
+    },
+    {
+      "stage": "world_streaming_customers_inputs_ready",
+      "durationMs": 63.785917000000154
+    },
+    {
+      "stage": "world_streaming_customers_desired_ready",
+      "durationMs": 33.41441699999996
+    },
+    {
+      "stage": "world_streaming_customers_countries_advanced",
+      "durationMs": 19.636082999999417
+    },
+    {
+      "stage": "world_streaming_customers_global_ready",
+      "durationMs": 1.1308749999998327
+    },
+    {
+      "stage": "world_streaming_customers_done",
+      "durationMs": 1.081875000000764
+    },
+    {
+      "stage": "world_streaming_viewing_start",
+      "durationMs": 0.010249999999359716
+    },
+    {
+      "stage": "world_streaming_viewing_audience_ready",
+      "durationMs": 0.9514170000002196
+    },
+    {
+      "stage": "world_streaming_viewing_customers_ready",
+      "durationMs": 1.7874160000001211
+    },
+    {
+      "stage": "world_streaming_viewing_choices_ready",
+      "durationMs": 45.92625000000044
+    },
+    {
+      "stage": "world_streaming_viewing_ai_catalogue_ready",
+      "durationMs": 10.108749999999418
+    },
+    {
+      "stage": "world_streaming_viewing_rival_viewing_ready",
+      "durationMs": 83.48170899999968
+    },
+    {
+      "stage": "world_streaming_viewing_done",
+      "durationMs": 272.06887500000084
+    },
+    {
+      "stage": "world_streaming_platform_economy_start",
+      "durationMs": 0.008165999999619089
+    },
+    {
+      "stage": "world_streaming_platform_economy_done",
+      "durationMs": 24.61016699999982
+    },
+    {
+      "stage": "owned_streaming_processed",
+      "durationMs": 2.276625000000422
+    },
+    {
+      "stage": "owned_streaming_transitions_done",
+      "durationMs": 2.3574579999994967
+    },
+    {
+      "stage": "owned_streaming_done",
+      "durationMs": 0.00837500000034197
+    },
+    {
+      "stage": "end_week_done",
+      "durationMs": 0.020583999999871594
+    },
+    {
+      "stage": "weekly_events_start",
+      "durationMs": 0.0017079999997804407
+    },
+    {
+      "stage": "weekly_event_text_start",
+      "durationMs": 0.0004580000004352769
+    },
+    {
+      "stage": "weekly_event_text_done",
+      "durationMs": 0.08024999999997817
+    },
+    {
+      "stage": "weekly_news_start",
+      "durationMs": 0.0009169999993901001
+    },
+    {
+      "stage": "weekly_news_done",
+      "durationMs": 1.081000000000131
+    },
+    {
+      "stage": "weekly_social_start",
+      "durationMs": 0.003500000000713044
+    },
+    {
+      "stage": "weekly_social_done",
+      "durationMs": 1.0091249999995853
+    },
+    {
+      "stage": "weekly_offers_start",
+      "durationMs": 1.2495420000004742
+    },
+    {
+      "stage": "weekly_offers_done",
+      "durationMs": 0.5034579999992275
+    },
+    {
+      "stage": "weekly_events_done",
+      "durationMs": 0.0042920000005324255
+    },
+    {
+      "stage": "studio_funding_start",
+      "durationMs": 0.001374999999825377
+    },
+    {
+      "stage": "studio_funding_done",
+      "durationMs": 0.0008330000000569271
+    },
+    {
+      "stage": "subsidiaries_start",
+      "durationMs": 0.0004170000001977314
+    },
+    {
+      "stage": "subsidiaries_done",
+      "durationMs": 0.3678749999999127
+    },
+    {
+      "stage": "final_trim_done",
+      "durationMs": 0.16433299999971496
+    },
+    {
+      "stage": "world_integrity_start",
+      "durationMs": 0.003832999999758613
+    },
+    {
+      "stage": "world_integrity_done",
+      "durationMs": 32.85033400000066
+    }
+  ],
+  "week": 41,
+  "peakRssMiB": 1792.671875
+}

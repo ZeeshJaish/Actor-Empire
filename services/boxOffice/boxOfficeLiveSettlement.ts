@@ -12,7 +12,7 @@ import { calculateWeeklySoundtrackRevenue, getMusicArtistCatalog, mergeSoundtrac
 import { buildCinemaWeekInput, findCinemaBusiness, serializeCinemaFacts } from './boxOfficeWeek';
 import { makeCinemaSettledTitle } from './boxOfficeMigration';
 import { compactCinemaMarketState } from './boxOfficeHistory';
-import { dollarsToCinemaCents } from './boxOfficeSettlement';
+import { dollarsToCinemaCents, classifyCinemaProfit } from './boxOfficeSettlement';
 import type { CinemaWeekResult, CinemaCommitResult, CinemaCommittedTitle } from './boxOfficeTypes';
 const sum = (ns: number[]) => ns.reduce((a, b) => { const n = a + b; if (!Number.isSafeInteger(n))
     throw new RangeError('Cinema money overflow'); return n; }, 0);
@@ -189,7 +189,8 @@ export const commitCinemaWeek = (player: Player, result: CinemaWeekResult): Cine
         if (closed && production?.studioAiExecution?.result) {
             const financial = state.titles[row.titleId], oldResult = production.studioAiExecution.result;
             const netMillions = (financial.producerReceiptsCents - financial.bookingCostCents - financial.talentPaidCents - financial.investorPaidCents) / 1e8 - oldResult.productionSpendMillions - oldResult.marketingSpendMillions;
-            const outcome = netMillions >= oldResult.productionSpendMillions * .6 ? 'HIT' : netMillions < 0 ? 'FLOP' : 'SOLID';
+            const severity=classifyCinemaProfit(netMillions*1e8,(oldResult.productionSpendMillions+oldResult.marketingSpendMillions)*1e8+financial.bookingCostCents+financial.talentPaidCents);
+            const outcome = netMillions >= oldResult.productionSpendMillions * .6 ? 'HIT' : severity==='LOSS'||severity==='SUBSTANTIAL_LOSS' ? 'FLOP' : 'SOLID';
             if (outcome === 'HIT' || outcome === 'FLOP')
                 next.world.industryEvents = appendIndustryEventFacts(next.world.industryEvents, [createIndustryEventFact({ absoluteWeek: result.absoluteWeek, companyId: title.owner.id, companyName: next.world.studios?.[title.owner.id]?.name || title.owner.id, projectId: title.id, productionId: production.id, idempotencyKey: `production-result:${production.id}:${outcome}`, type: outcome === 'HIT' ? 'PROJECT_HIT' : 'PROJECT_FLOP', importance: 'HIGH', headline: `${project?.title || title.id}: ${outcome.toLowerCase()} cinema result`, detail: 'Commercial outcome from committed paid admissions, actual producer receipts and costs.', evidence: [{ kind: 'PROJECT', id: title.id, metric: 'theatricalGross', value: grossAfter / 100 }] })]);
             production.studioAiExecution.result = { ...oldResult, cinemaSettlement: 'WEEKLY_CLOSED', theatricalGrossMillions: grossAfter / 1e8, studioReceiptsMillions: financial.producerReceiptsCents / 1e8, netResultMillions: Math.round(netMillions * 1e8) / 1e8, outcome };

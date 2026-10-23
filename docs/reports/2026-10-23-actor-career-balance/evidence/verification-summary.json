@@ -1,0 +1,44 @@
+{
+  "status": "PASS",
+  "focusedChecks": 29,
+  "regressionCommands": 10,
+  "ordinaryCareers": [
+    {
+      "seed": 0,
+      "genre": "DRAMA",
+      "weeks": 78,
+      "archivedCredits": 1,
+      "reloads": 12,
+      "cash": 26184
+    },
+    {
+      "seed": 1,
+      "genre": "COMEDY",
+      "weeks": 78,
+      "archivedCredits": 1,
+      "reloads": 12,
+      "cash": 33484
+    }
+  ],
+  "establishedWeeks": 73,
+  "establishedReloads": 19,
+  "legacyWeeks": 14,
+  "legacyReloads": 15,
+  "coreScenarioWeeks": 243,
+  "coreVerifiedReloads": 58,
+  "fullTypecheckExitCode": 0,
+  "productionBuild": {
+    "exitCode": 0,
+    "signal": null,
+    "heapMB": 2048,
+    "peakOwnedTreeRssMiB": 2382,
+    "stopReason": null,
+    "systemGuard": "darwin"
+  },
+  "preservation": {
+    "existingFiles": 60,
+    "unchangedNonPackageFiles": 59,
+    "allExistingNpmScriptsUnchanged": true
+  },
+  "coverage": "Engine and exact UI action callbacks; late-career resources prepared, not earned; exploratory208weekruns tracked separately."
+}

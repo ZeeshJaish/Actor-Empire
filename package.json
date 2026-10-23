@@ -40,8 +40,10 @@
     "audit:streaming-original-readiness-repair": "esbuild scripts/audit-streaming-original-readiness-repair.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-streaming-original-readiness-repair.mjs && node /tmp/audit-streaming-original-readiness-repair.mjs",
     "audit:streaming-original-playback-repair": "esbuild scripts/audit-streaming-original-playback-repair.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-streaming-original-playback-repair.mjs && node /tmp/audit-streaming-original-playback-repair.mjs",
     "dev": "vite",
-    "build": "vite build",
+    "build": "node scripts/build-low-memory.mjs",
     "build:low-memory": "node scripts/build-low-memory.mjs",
+    "audit:cinema-campaign-amounts": "esbuild scripts/audit-cinema-campaign-amounts.tsx --bundle --platform=node --format=cjs --loader:.css=empty --outfile=/tmp/audit-cinema-campaign-amounts.cjs && node --max-old-space-size=512 /tmp/audit-cinema-campaign-amounts.cjs",
+    "audit:cinema-history-cost": "esbuild scripts/audit-cinema-history-cost.ts --bundle --platform=node --format=esm --outfile=/tmp/audit-cinema-history-cost.mjs && node --max-old-space-size=512 /tmp/audit-cinema-history-cost.mjs",
     "audit:streaming-model-payback": "esbuild scripts/audit-streaming-model-payback.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-streaming-model-payback.mjs && node /tmp/audit-streaming-model-payback.mjs",
     "audit:streaming-market-usage-cost": "esbuild scripts/audit-streaming-market-usage-cost.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-streaming-market-usage-cost.mjs && node /tmp/audit-streaming-market-usage-cost.mjs",
     "audit:streaming-model-profit": "esbuild scripts/audit-streaming-model-profit.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-streaming-model-profit.mjs && node /tmp/audit-streaming-model-profit.mjs",
@@ -629,7 +631,11 @@
     "audit:talent-roster-flow": "esbuild scripts/audit-talent-roster-flow.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-talent-roster-flow.mjs && node /tmp/ae-talent-roster-flow.mjs",
     "audit:talent-save-recovery": "esbuild scripts/audit-talent-save-recovery.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-talent-save-recovery.mjs && node /tmp/ae-talent-save-recovery.mjs",
     "audit:series-mod-safety": "esbuild scripts/audit-series-mod-safety.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-series-mod-safety.mjs && node /tmp/ae-series-mod-safety.mjs && esbuild scripts/audit-series-value.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-series-value.mjs && node /tmp/ae-series-value.mjs && esbuild scripts/audit-series-automatic.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-series-automatic.mjs && node /tmp/ae-series-automatic.mjs && esbuild scripts/audit-series-regional-distribution.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-series-regional.mjs && node /tmp/ae-series-regional.mjs",
-    "audit:series-mod-flow": "esbuild scripts/audit-series-mod-flow.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-series-mod-flow.mjs && node /tmp/ae-series-mod-flow.mjs"
+    "audit:series-mod-flow": "esbuild scripts/audit-series-mod-flow.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-series-mod-flow.mjs && node /tmp/ae-series-mod-flow.mjs",
+    "audit:actor-career-balance": "esbuild scripts/audit-actor-career-balance.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-career-balance.mjs && node /tmp/ae-career-balance.mjs",
+    "audit:actor-career-flow": "node scripts/run-actor-career-flow.mjs",
+    "audit:actor-career-established": "esbuild scripts/audit-actor-career-established.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-career-established.mjs && node /tmp/ae-career-established.mjs",
+    "audit:actor-career-compatibility": "esbuild scripts/audit-actor-career-compatibility.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-career-compatibility.mjs && node /tmp/ae-career-compatibility.mjs"
   },
   "dependencies": {
     "@capacitor-community/admob": "^8.0.0",

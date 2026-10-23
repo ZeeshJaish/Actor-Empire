@@ -1,0 +1,21 @@
+{
+  "extends": "../../../tsconfig.json",
+  "compilerOptions": {
+    "incremental": false,
+    "types": [
+      "node",
+      "vite/client"
+    ]
+  },
+  "include": [
+    "../../../scripts/audit-actor-career-balance.ts",
+    "../../../scripts/audit-actor-career-flow.ts",
+    "../../../scripts/audit-actor-career-established.ts",
+    "../../../scripts/fixtures/actorCareerActions.ts",
+    "../../../scripts/audit-actor-career-compatibility.ts"
+  ],
+  "exclude": [
+    "../../../node_modules",
+    "../../../dist"
+  ]
+}

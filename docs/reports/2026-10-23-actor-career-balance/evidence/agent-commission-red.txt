@@ -1,0 +1,26 @@
+
+> pr-6.6.3@1.0.25 audit:actor-career-compatibility
+> esbuild scripts/audit-actor-career-compatibility.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-career-compatibility.mjs && node /tmp/ae-career-compatibility.mjs
+
+
+  ../../../../tmp/ae-career-compatibility.mjs  9.6mb ⚠️
+
+⚡ Done in 305ms
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Signed 10% commission must be charged exactly once
+
+98766 !== 111111
+
+    at file:///private/tmp/ae-career-compatibility.mjs:166994:8 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 98766,
+  expected: 111111,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.11.1

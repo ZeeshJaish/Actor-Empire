@@ -90,5 +90,15 @@ test('applied platform production cover is recognized once without inventing spe
  assert.equal(f.netProfitCents,-1000);assert.equal((f as any).studioProfitCents,-1000);
  assert.equal(f.producerReceiptsCents,0);assert.equal(f.studioReturnPercent,-100);
 });
+test('near-break-even loss stays exact and later collected media is reported separately from theater recovery',()=>{
+ const source={budget:10e6,totalStudioReceipts:9.8e6,streamingRevenue:3e6,earnings:900000};
+ const f=getCinemaProjectFinance(source) as any;
+ assert.equal(f.theatricalCostRecoveryCents,-20_000_000);
+ assert.equal(f.netProfitCents,280_000_000);
+ assert.equal(f.collectedResult,'PROFIT');
+ const near=getCinemaProjectFinance({...source,streamingRevenue:0}) as any;
+ assert.equal(near.collectedResult,'NEAR_BREAK_EVEN');assert.equal(near.netProfitCents,-20_000_000);
+ assert.equal((getCinemaProjectFinance({...source,totalStudioReceipts:1e6,streamingRevenue:0}) as any).collectedResult,'SUBSTANTIAL_LOSS');
+});
 let failures=0;for(const[name,run]of tests){try{run();console.log('PASS',name)}catch(error){failures++;console.error('FAIL',name,error instanceof Error?error.message:error)}}
 assert.equal(failures,0,`${failures} finance contract regressions`);

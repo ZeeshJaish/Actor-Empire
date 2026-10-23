@@ -1,0 +1,20 @@
+FAIL new blockbuster lead offer does not fall back below HIGH pay: The expression evaluated to a falsy value:
+
+  assert(calculateProjectPay("LEAD", "BLOCKBUSTER", "MOVIE") >= calculateProjectPay("LEAD", "HIGH", "MOVIE"))
+
+FAIL fame alone cannot generate premium direct lead at zero actor craft: The expression evaluated to a falsy value:
+
+  assert(!offer || offer.roleType !== "LEAD")
+
+FAIL new commercial quotes distinguish real audience from empty fame: The expression evaluated to a falsy value:
+
+  assert(a.weeklyPay < b.weeklyPay * 0.4)
+
+FAIL new Legend cannot be manufactured from two award objects without a career: Expected "actual" to be strictly unequal to:
+
+'INDUSTRY_LEGEND'
+FAIL new beginner actor course gains improve useful competence faster: The expression evaluated to a falsy value:
+
+  assert(p.stats.skills.memorization >= 0.4)
+
+Career balance: 0 passed, 5 failed

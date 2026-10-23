@@ -1,3 +1,4 @@
+import { hasCareerLegendStanding } from './actorCareerBalance';
 import { PastProject, Player } from '../types';
 import { getRoleIdentityArcCandidate } from './actorRoleIdentity';
 
@@ -233,7 +234,7 @@ export const getActorCareerArc = (player: Player): ActorCareerArc => {
         buildActorCareerArc(id, uniqueSignals([...prioritySignals, ...baseSignals]))
     );
 
-    if (fame >= 94 && reputation >= 85 && experience >= 85 && (awardsWon >= 2 || projects.length >= 18)) {
+    if (fame >= 94 && reputation >= 85 && experience >= 85 && (awardsWon >= 2 || projects.length >= 18) && hasCareerLegendStanding(player)) {
         return arc('INDUSTRY_LEGEND', [
             { key: 'home.actorArc.signal.legendProfile' },
             { key: 'home.actorArc.signal.awardsWon', vars: { count: awardsWon } },

@@ -1,0 +1,16 @@
+
+> pr-6.6.3@1.0.25 audit:actor-career-established
+> esbuild scripts/audit-actor-career-established.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-career-established.mjs && node /tmp/ae-career-established.mjs
+
+
+  ../../../../tmp/ae-career-established.mjs  9.7mb ⚠️
+
+⚡ Done in 110ms
+{"kind":"prepared-established","weeks":8,"deliveries":0,"stage":"PRODUCTION"}
+{"kind":"prepared-established","weeks":16,"deliveries":0,"stage":"PRODUCTION"}
+{"kind":"prepared-established","weeks":24,"deliveries":5,"stage":"POST_PRODUCTION"}
+{"kind":"prepared-established","weeks":40,"deliveries":5}
+{"kind":"prepared-established","weeks":48,"deliveries":5}
+{"kind":"prepared-established","weeks":56,"deliveries":5}
+{"kind":"prepared-established","weeks":64,"deliveries":5}
+PASS five real concurrent Greenlights → selected paid attention → full production → five premieres → actual continuation development → new Greenlight/full sequel production → premiere → five next weeks; 73 actual weeks, 19 verified save/reloads.

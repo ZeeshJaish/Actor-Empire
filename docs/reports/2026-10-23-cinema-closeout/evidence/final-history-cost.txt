@@ -1,0 +1,1 @@
+{"status":"PASS","cohorts":200,"affinities":9601,"inspections":0}

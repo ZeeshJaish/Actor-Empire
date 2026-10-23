@@ -1,0 +1,163 @@
+RUN audit:actor-career-arcs
+
+> pr-6.6.3@1.0.25 audit:actor-career-arcs
+> esbuild scripts/audit-actor-career-arcs.ts --bundle --platform=node --format=esm --outfile=/tmp/audit-actor-career-arcs.mjs && node /tmp/audit-actor-career-arcs.mjs
+
+Actor career arc audit passed (14 scenarios).
+
+
+  ../../../../tmp/audit-actor-career-arcs.mjs  3.9mb ⚠️
+
+⚡ Done in 40ms
+
+RUN audit:owned-production-career
+
+> pr-6.6.3@1.0.25 audit:owned-production-career
+> esbuild scripts/audit-owned-production-career.ts --bundle --platform=node --format=esm --outfile=/tmp/audit-owned-production-career.mjs && node /tmp/audit-owned-production-career.mjs
+
+Owned production career audit passed.
+
+
+  ../../../../tmp/audit-owned-production-career.mjs  33.4kb
+
+⚡ Done in 21ms
+
+RUN audit:role-performance-feedback
+
+> pr-6.6.3@1.0.25 audit:role-performance-feedback
+> esbuild scripts/audit-role-performance-feedback.ts --bundle --platform=node --format=esm --outfile=/tmp/audit-role-performance-feedback.mjs && node /tmp/audit-role-performance-feedback.mjs
+
+Role performance feedback audit passed: results, mastery, typecasting, and duplicate-safe replay.
+
+
+  ../../../../tmp/audit-role-performance-feedback.mjs  3.9mb ⚠️
+
+⚡ Done in 25ms
+
+RUN audit:role-market-consequences
+
+> pr-6.6.3@1.0.25 audit:role-market-consequences
+> esbuild scripts/audit-role-market-consequences.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-role-market-consequences.mjs && node /tmp/audit-role-market-consequences.mjs
+
+Role-market consequence audit passed: 559/1000 typecast routes, 441/1000 range routes, protected canon, saturation escape, and performance-first awards.
+
+
+  ../../../../tmp/audit-role-market-consequences.mjs  817.0kb
+
+⚡ Done in 32ms
+
+RUN audit:dynasty-career
+
+> pr-6.6.3@1.0.25 audit:dynasty-career
+> esbuild scripts/audit-dynasty-career.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-dynasty-career.mjs && node /tmp/audit-dynasty-career.mjs
+
+Dynasty career audit passed.
+
+
+  ../../../../tmp/audit-dynasty-career.mjs  6.3mb ⚠️
+
+⚡ Done in 59ms
+
+RUN audit:save-integrity
+
+> pr-6.6.3@1.0.25 audit:save-integrity
+> esbuild scripts/audit-save-integrity.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-save-integrity.mjs && node /tmp/audit-save-integrity.mjs
+
+Save integrity audit passed.
+
+
+  ../../../../tmp/audit-save-integrity.mjs  974.8kb
+
+⚡ Done in 31ms
+
+RUN audit:save-generations
+
+> pr-6.6.3@1.0.25 audit:save-generations
+> esbuild scripts/audit-save-generations.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-save-generations.mjs && node /tmp/audit-save-generations.mjs
+
+Save generation audit passed.
+
+
+  ../../../../tmp/audit-save-generations.mjs  989.0kb
+
+⚡ Done in 32ms
+
+RUN audit:talent-retention
+
+> pr-6.6.3@1.0.25 audit:talent-retention
+> esbuild scripts/audit-talent-retention.ts --bundle --platform=node --format=cjs --loader:.csv=text --outfile=/tmp/ae-talent-retention.cjs && node /tmp/ae-talent-retention.cjs
+
+PASS quarterly cleanup preserves an active hired actor despite 400 newer profiles
+PASS save compaction protects past cast
+PASS save compaction protects sequel draft
+PASS save compaction protects subsidiary contract
+PASS save compaction protects universe
+PASS save compaction protects relationship
+PASS an unresolved old contract still renders its saved name, terms and recovery state
+PASS newly hired contract preserves an exact actor snapshot through normalization and load
+PASS restoring a missing snapshot does not reprice or reset a legacy installment contract
+PASS finite film uses and outstanding installments remain separate and idempotent
+PASS profile recovery never revives a deceased dynasty actor
+PASS unknown inherited cast stays visible but cannot be silently funded
+PASS mirror reconciliation keeps a valid snapshot and newer live statistics win
+Talent retention: 13 groups passed.
+
+
+  ../../../../tmp/ae-talent-retention.cjs  8.8mb ⚠️
+
+⚡ Done in 100ms
+
+RUN audit:talent-save-recovery
+
+> pr-6.6.3@1.0.25 audit:talent-save-recovery
+> esbuild scripts/audit-talent-save-recovery.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-talent-save-recovery.mjs && node /tmp/ae-talent-save-recovery.mjs
+
+PASS valid: current cash, contract progress, ownership and durable source preserved; previous reads 1
+PASS tampered: current cash, contract progress, ownership and durable source preserved; previous reads 1
+PASS different-career: current cash, contract progress, ownership and durable source preserved; previous reads 1
+PASS same-default-id-other-studio: current cash, contract progress, ownership and durable source preserved; previous reads 1
+PASS same-owner-other-contract: current cash, contract progress, ownership and durable source preserved; previous reads 1
+PASS different-signing-terms: current cash, contract progress, ownership and durable source preserved; previous reads 1
+PASS synthesized-contract-id: current cash, contract progress, ownership and durable source preserved; previous reads 0
+PASS uncontracted-history: current cash, contract progress, ownership and durable source preserved; previous reads 0
+PASS deceased: current cash, contract progress, ownership and durable source preserved; previous reads 0
+PASS missing: current cash, contract progress, ownership and durable source preserved; previous reads 1
+PASS read-error: current cash, contract progress, ownership and durable source preserved; previous reads 1
+PASS already-present: current cash, contract progress, ownership and durable source preserved; previous reads 0
+PASS contract-snapshot: current cash, contract progress, ownership and durable source preserved; previous reads 0
+PASS static-and-family: current cash, contract progress, ownership and durable source preserved; previous reads 0
+PASS legacy-owner-mirror: current cash, contract progress, ownership and durable source preserved; previous reads 1
+
+
+  ../../../../tmp/ae-talent-save-recovery.mjs  4.9mb ⚠️
+
+⚡ Done in 46ms
+
+RUN audit:streaming-launch-s3-energy
+
+> pr-6.6.3@1.0.25 audit:streaming-launch-s3-energy
+> esbuild scripts/audit-streaming-launch-s3-energy.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-streaming-launch-s3-energy.mjs && node /tmp/audit-streaming-launch-s3-energy.mjs
+
+✔ country quotes total 533E, deduplicate targets, and do not depend on batch boundaries (0.726833ms)
+✔ individual, group and mixed filing settle identical energy and money (10.555333ms)
+✔ insufficient batch energy leaves countries unfiled while affordable individual filings remain possible (7.458083ms)
+✔ remaining countries can be added later without charging already filed countries again (2.04575ms)
+✔ missing cash does not spend energy or start review (1.550792ms)
+✔ additional compliance costs 5E plus the requested money exactly once, including after reload (2.100459ms)
+✔ an inconsistent follow-up state cannot deduct payment without resuming a real request (1.212917ms)
+✔ funded global filing and all geographic group filings settle the same 533E and country fees (72.920792ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 106.0775
+
+
+  ../../../../tmp/audit-streaming-launch-s3-energy.mjs  5.1mb ⚠️
+
+⚡ Done in 46ms
+
+PASS all 10 regression commands

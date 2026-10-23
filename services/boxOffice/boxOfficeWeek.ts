@@ -50,7 +50,7 @@ export const cinemaIndustryProjectDetails = (player: Player, project: IndustryPr
         releaseStrategy: project.releaseStrategy || 'THEATRICAL',
         screeningStrategy: production?.studioAiExecution?.selectedReleaseMode === 'LIMITED_THEATRICAL' || outside?.releasePath === 'FESTIVAL' ? 'REGIONAL' : 'INTERNATIONAL',
         directorId: project.directorId, directorName: project.directorName, castList: project.cinemaCast || cast, universeId: project.universeId,
-        originalLanguageId: project.originalLanguageId || 'english', releaseRegionIds:project.releaseRegionIds,
+        originalLanguageId: project.originalLanguageId || 'english', releaseRegionIds:project.releaseRegionIds, releaseCountryIds:project.releaseCountryIds,
         cinemaExposure: project.cinemaExposure, talentParticipation: talent?.talentParticipation,
         hiddenStats: { qualityScore: quality, scriptQuality: production?.writerSkill || outside?.scoutReport.scriptQuality || quality,
             directorQuality: outside?.scoutReport.directorQuality || quality, castingStrength: talent?.packageScore || outside?.scoutReport.castQuality || quality,
@@ -59,7 +59,8 @@ export const cinemaIndustryProjectDetails = (player: Player, project: IndustryPr
 export const normalizeLiveTitle = (player: Player, id: string, project: ProjectDetails, releaseWeek: number, route: CinemaTitleInput['owner']['route'], world: ReturnType<typeof readCinemaWorldAudience>, release?: ActiveRelease): CinemaTitleInput => {
     const ownerId=project.studioId || player.world.cinemaMarket?.titles[id]?.ownerId || `legacy-owner:${id}`;
     const title = normalizeCinemaTitle({ player, titleId: id, project, owner: { id: ownerId, route } });
-    const regions = getReleaseRegionIdsForProject(project), countries = world.countries!.filter(c => regions.includes(c.regionId));
+    const regions = getReleaseRegionIdsForProject(project), countries = world.countries!.filter(c => regions.includes(c.regionId)
+        &&(!project.releaseCountryIds||project.releaseCountryIds.includes(c.id)));
     const chains = Object.fromEntries(countries.map(c => [c.id, project.releaseChainSelections?.[c.regionId] || getDefaultCinemaChainIdsForRegion(project, c.regionId)]));
     if (title.exposure)
         title.exposure = { ...title.exposure, events: title.exposure.events.map(e => ({ ...e, titleId: id })) };

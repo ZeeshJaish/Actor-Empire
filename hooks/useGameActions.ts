@@ -1,3 +1,4 @@
+import { applyCareerRehearsal, ensureActorCareerBalance, getCareerLearningGain, isPersonalCareerActing } from '../services/actorCareerBalance';
 
 import React, { useState } from 'react';
 import { Player, Commitment, LogEntry, InstaPost, XPost, NewsItem, Stats, ImprovementOption, SocialEventOption, SocialEvent, Relationship, SponsorshipActionType, Message, AuditionOpportunity, NegotiationData, ScheduledEvent, PressInteraction, WriterStats, NPCActor, InteractionType, NPCState, PregnancyCarrier, OwnedProductionActionId } from '../types';
@@ -187,7 +188,7 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
                 const newLog = { week: next.currentWeek, year: next.age, message: logMessage, type: 'neutral' as const };
                 next.logs = [...next.logs, newLog].slice(-50);
             }
-            return next;
+            return ensureActorCareerBalance(next);
         });
     };
 
@@ -201,6 +202,12 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
             const cIndex = prev.commitments.findIndex(c => c.id === commitmentId);
             if (cIndex === -1) return prev;
             const c = prev.commitments[cIndex];
+            if (c.careerBalanceVersion === 1 && isPersonalCareerActing(c)) {
+                const result = applyCareerRehearsal(prev, commitmentId);
+                return result.changed ? { ...result.player, logs: [...prev.logs, {
+                    week: prev.currentWeek, year: prev.age, message: result.message!, type: 'neutral' as const,
+                }].slice(-50) } : prev;
+            }
             let updatedC = { ...c }; let msg = "";
 
             if (c.projectPhase === 'PRE_PRODUCTION') {
@@ -450,10 +457,10 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
                 const genre = activityName as any;
                 const cost = option.moneyCost;
                 const energy = option.energyCost;
-                const newPlayer = JSON.parse(JSON.stringify(prev)) as Player;
+                const newPlayer = ensureActorCareerBalance(JSON.parse(JSON.stringify(prev)) as Player);
                 newPlayer.money -= cost;
                 spendPlayerEnergy(newPlayer, energy, `Training: ${genre}`);
-                rewardGenreExperience(newPlayer, genre, 1);
+                rewardGenreExperience(newPlayer, genre, getCareerLearningGain(newPlayer.stats.genreXP[genre] || 0, 1));
                 newPlayer.logs.push({
                     week: prev.currentWeek, year: prev.age,
                     message: tr('actions.improve.genreLog', { genre }), type: 'neutral'

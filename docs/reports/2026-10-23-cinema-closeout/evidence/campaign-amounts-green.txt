@@ -1,0 +1,1 @@
+Campaign amount presentation: PASS (zero, small pool, paid channel, large pool)

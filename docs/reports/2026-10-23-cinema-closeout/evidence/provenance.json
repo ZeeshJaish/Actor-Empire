@@ -1,0 +1,51 @@
+{
+  "scope": "One heavy worker at a time. No user browser profile or saves opened. Native intentionally deferred.",
+  "head": "f6a9b405d9f2673f05381d196b3ead955ebbe12d",
+  "normalCareers": [
+    {
+      "executionCodeSha256": "2b31a9e468166103ff463195b5f0f902d2ac45c9b7243b550f37d9272c3b82f1",
+      "policyGenre": "DRAMA",
+      "seed": 0,
+      "horizon": 208,
+      "executedWeeks": 208,
+      "saves": 48,
+      "reloads": 32,
+      "replays": 208,
+      "failedPromotionChecked": true
+    },
+    {
+      "executionCodeSha256": "af5be8cf036abb161ae2f99df090a7a9b9fff03e7f297e65a71660920fe2e4fd",
+      "policyGenre": "COMEDY",
+      "seed": 1,
+      "horizon": 208,
+      "executedWeeks": 208,
+      "saves": 52,
+      "reloads": 36,
+      "replays": 208,
+      "failedPromotionChecked": true
+    }
+  ],
+  "sourceHashes": {
+    "services/boxOffice/boxOfficeAudience.ts": "67d43026a474962ab6623bf1a4efaf93849ffa5cc13db0a1b6edc11e7dde691f",
+    "services/boxOffice/boxOfficeMarket.ts": "ba96d1858b2da11c7f9d85a102c4f50b597a400805dcfff6126579ae8aa923e6",
+    "services/boxOffice/boxOfficeHistory.ts": "44f886331716987b4733b793aecd8b8606d03038952c67e4f0d83c5091e324c9",
+    "views/lifestyle/business/release-strategy-transplant/CampaignStep.tsx": "d701b513c9f281a6fb5c77f460fb452881e3496c0871892b8ae58cecc30ea9d7",
+    "scripts/build-low-memory.mjs": "b93c9d7f2f945668fe33a2fa446d7e019c9785697f99ed8a3bacf11c75a3a5c1",
+    "scripts/build/lucideImports.mjs": "f72df282144211a697fa3f0ffd1bcb602c6f798d14316e8726ee7ff2b1ba8d67",
+    "vite.config.ts": "b549c053230e6f6e94350eaaad203117e73da4bbf2ac5489f405c0b12e53ddcf",
+    "package.json": "e37a5986c089a64734c4a74020005feaa69d8a6804b308a367cd627e9355e532"
+  },
+  "finalHead": "f6a9b405d9f2673f05381d196b3ead955ebbe12d",
+  "defaultBuildMatchesBrowserTestedAssets": true,
+  "productionAssets": {
+    "assets/boxOfficeForecast.worker-Dde56AX2.js": "1be49262ba674ad5335aaf8ef412f4f56266f753435cab10c4a58cf09cd5661b",
+    "assets/index-DgZRxd1l.js": "263f0d98977cfd2a57c4f2e7702548b248314a079c41aa6eadd3ed5f0fb4e2e5",
+    "assets/index.esm-H2zVK-Yc.js": "b3094bea3fae573d171a41f619e98c9a93b883cd05e10d92040abb13588ce64e",
+    "assets/streamingLaunchQa-wfrDNjAz.js": "7b5a6e878082a2c61e626f350650b83c9b6614a29d34b1d09c211abaee03d480",
+    "assets/web-B-PEXW14.js": "902e8e59624849897c47fbf85d6a33a0c6abf0669af1318049aaa35cea776b2e",
+    "assets/web-BC155uKF.js": "c958cb0a3104133c486e3727402b197290c60acded38a08f5c258b90c9fe7bb1",
+    "assets/web-CE8BGP-Q.js": "878dfd278a53d327fd4e3ef3320aca8e535bce24b8fc7a2459aabdf8be6024dd",
+    "assets/web-CFZJeabn.js": "de18277c1860aabf98e8ce77f9fca8df3f0b036ca24b1cb82dcca7425a81456e",
+    "assets/web-JCQw-CFH.js": "e1631d4c8bd946bd424b289a509a1be8fc2cb710d60bdd8adecf153911c75ce8"
+  }
+}

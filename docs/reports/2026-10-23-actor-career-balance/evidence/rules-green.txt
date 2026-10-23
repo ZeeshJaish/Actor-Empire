@@ -1,0 +1,38 @@
+
+> pr-6.6.3@1.0.25 audit:actor-career-balance
+> esbuild scripts/audit-actor-career-balance.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-career-balance.mjs && node /tmp/ae-career-balance.mjs
+
+
+  ../../../../tmp/ae-career-balance.mjs  4.9mb ⚠️
+
+⚡ Done in 56ms
+PASS new blockbuster lead offer does not fall back below HIGH pay
+PASS fame alone cannot generate premium direct lead at zero actor craft
+PASS new commercial quotes distinguish real audience from empty fame
+PASS elite agent premium route does not bypass actor craft
+PASS a mastered genre cannot qualify a different unfamiliar direct lead
+PASS new Legend cannot be manufactured from two award objects without a career
+PASS new beginner actor course gains improve useful competence faster
+PASS new learning slows toward mastery without erasing values
+PASS one weekly actor attention budget is shared by five overlapping films
+PASS untrained writing and directing do not reduce acting preparation
+PASS actual owned-studio scene action pays energy for its selected title and cannot repeat or rewrite a wrap
+PASS legacy production progress and signed terms retain their old rules
+PASS focused paid rehearsal affects only its selected film without global XP farming
+PASS audition practice reserves learning for the actual filming phase
+PASS career version initialization is idempotent and preserves money, skills and commitments
+PASS parent or producer-only credits cannot manufacture actor evidence
+PASS PR with no work or audience does not push an already famous actor upward
+PASS real creator audience supports commercial demand without requiring actor credits
+PASS credited directing supports PR without manufacturing actor Legend credits
+PASS strong work supports publicity better than repeated weak work
+PASS entry roles need less preparation than equally unfamiliar lead roles
+PASS new table read preparation carries into production without resetting legacy starts
+PASS final shooting week resolves positive decision before performance freezes
+PASS final shooting week resolves negative decision before performance freezes
+PASS final shooting week resolves delay decision before performance freezes
+PASS sustained excellent acting still earns new Legend standing
+PASS manager supports preparation within a bounded shared weekly budget
+PASS wealth never forces a weak performance and a weak film does not erase excellent personal acting
+PASS perfect preparation alone cannot replace craft but excellent fit can deliver excellent acting
+Career balance: 29 passed, 0 failed

@@ -1,3 +1,4 @@
+import { getCareerCommercialMultiplier, resolveCareerOfferRole } from './actorCareerBalance';
 
 import { Agent, Manager, Player, SponsorshipOffer, SponsorshipCategory, SponsorshipActionType, AuditionOpportunity, BudgetTier, ProjectType, SponsorshipFrequency, TeamMember, RoleType } from '../types';
 import { generateAudition } from './roleLogic'; // We will export this helper from roleLogic
@@ -332,13 +333,14 @@ export const generateAgentOffers = (player: Player): AuditionOpportunity | null 
             if (Math.random() < 0.6) {
                 const famousMovie = getNextFamousMovie(player);
                 if (famousMovie) {
-                    return createFamousOpportunity(famousMovie, 'SUPPORTING', 'AGENT', getPlayerLanguage(player)); // Agents usually get supporting in these big ones first
+                    const premium = createFamousOpportunity(famousMovie, 'SUPPORTING', 'AGENT', getPlayerLanguage(player));
+                    if (resolveCareerOfferRole(player, premium.roleType, premium.project.genre) === premium.roleType) return premium; // Agents usually get supporting in these big ones first
                 }
             } 
             // 2. Try Universe Role
             else {
                 const universeOpp = generateRandomUniverseOpportunity(player, 'AGENT');
-                if (universeOpp) return universeOpp;
+                if (universeOpp && resolveCareerOfferRole(player, universeOpp.roleType, universeOpp.project.genre) === universeOpp.roleType) return universeOpp;
             }
         }
     }
@@ -389,7 +391,7 @@ export const generateAgentOffers = (player: Player): AuditionOpportunity | null 
 
     const usedTitles = [...player.commitments.map(c => c.name), ...player.activeReleases.map(r => r.name)];
     
-    return generateAudition(roleType, tier, usedTitles, player, 'AGENT', type);
+    return generateAudition(resolveCareerOfferRole(player, roleType), tier, usedTitles, player, 'AGENT', type);
 };
 
 
@@ -476,6 +478,9 @@ export const generateManagerOffer = (player: Player): SponsorshipOffer | null =>
         weeklyPay = Math.floor(weeklyPay * creatorPayMultiplier);
     }
 
+    // Future commercial offers reflect demonstrated work/reach; signed sponsorships are unchanged.
+    weeklyPay *= getCareerCommercialMultiplier(player);
+
     // Manager Multiplier (Power 1-10 -> 0.8x to 1.5x)
     const managerMult = 0.8 + (manager.sponsorshipPower * 0.07);
     weeklyPay = Math.floor(weeklyPay * managerMult);
@@ -540,19 +545,20 @@ export const generateDirectOffer = (player: Player): AuditionOpportunity | null 
 
     // --- PREMIUM DIRECT OFFERS ---
     // If superstar status, chance for direct Famous/Universe invite
-    if (player.stats.fame > 70) {
+    if (player.stats.fame > 70 && resolveCareerOfferRole(player, 'LEAD') === 'LEAD') {
         if (Math.random() < 0.35) { // Increased from 0.25
              // 1. Try Famous Movie
              if (Math.random() < 0.5) {
                 const famousMovie = getNextFamousMovie(player);
                 if (famousMovie) {
-                    return createFamousOpportunity(famousMovie, 'LEAD', 'DIRECT', getPlayerLanguage(player)); // Direct offers are usually Lead
+                    const premium = createFamousOpportunity(famousMovie, 'LEAD', 'DIRECT', getPlayerLanguage(player));
+                    if (resolveCareerOfferRole(player, premium.roleType, premium.project.genre) === premium.roleType) return premium; // Direct offers are usually Lead
                 }
             } 
             // 2. Try Universe Role
             else {
                 const universeOpp = generateRandomUniverseOpportunity(player, 'DIRECT');
-                if (universeOpp) return universeOpp;
+                if (universeOpp && resolveCareerOfferRole(player, universeOpp.roleType, universeOpp.project.genre) === universeOpp.roleType) return universeOpp;
             }
         }
     }
@@ -564,5 +570,5 @@ export const generateDirectOffer = (player: Player): AuditionOpportunity | null 
     // Direct offers usually follow the player's trend or random
     const type: ProjectType = Math.random() > 0.5 ? 'MOVIE' : 'SERIES';
 
-    return generateAudition('LEAD', tier, usedTitles, player, 'DIRECT', type);
+    return generateAudition(resolveCareerOfferRole(player, 'LEAD'), tier, usedTitles, player, 'DIRECT', type);
 };

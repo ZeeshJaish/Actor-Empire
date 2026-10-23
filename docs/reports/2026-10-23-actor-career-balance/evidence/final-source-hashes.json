@@ -1,0 +1,19 @@
+{
+  "services/actorCareerBalance.ts": "bce92f071d1b70107e74c9b4e514ab94b6e0df45b2be4b9638d755075a125f74",
+  "services/gameLoop.ts": "af9db94f5f2f09e27eca4f179567aa122ed706c9a9d7598524444fc60ce7f1ac",
+  "services/roleLogic.ts": "3b4faf299f3dbd10cd2f6a5babe0867243f101d11e093f58afa3600dd5661c39",
+  "services/teamLogic.ts": "b78417b60c27e73a26a40629ab51a34c64a0f9a0cd5ee1a1cf5b62782682e9ad",
+  "services/saveMigration.ts": "6c6c4d1f13da109cfe511e8b8fd3911e475f4df977c964959b0451a39f62dcff",
+  "services/actorCareerArc.ts": "7688b3ee1259c05ac2df0d166154419024bf4d5555c964e7d872eb162b8f1861",
+  "hooks/useGameActions.ts": "aaa2689c2bebeddf6fe33becdf0f1e1394f6726871c1450a5a29f4ad7cc8d47e",
+  "App.tsx": "0d2d8aec39409182ff399e042f07fecde3cd204e3e5185056e07164096063465",
+  "types.ts": "0d07f15939251b4fe623ea68afb9a3928ab280d6f0bddf7d4754374609246bb5",
+  "views/mobile/MobilePage.tsx": "fe849bb91ad832cf102d6d1397612b407eaa20f0a085d8f67c00f63e167d09b8",
+  "views/lifestyle/business/greenlightProjectBuilder.ts": "1b7847d4c3bd0901ca7c24346682cc9ec9e1cf69d681e168ed3626e1425b291e",
+  "services/localization/locales/pt-BR.ts": "8e0da67d55457f0a4ae4789e84e202ec62ee7de48c1382ca9de868902b5fd1fe",
+  "services/localization/locales/de.ts": "cadc2f85f37f0c2be62307c4a949df66274a382a7028f96869bad1d4f42aec25",
+  "services/localization/locales/es.ts": "b4fdc61e5fe037892d7282fd9d640cf9e2bfb9e400ed488cecd0eae8fc719c21",
+  "services/localization/locales/tr.ts": "f3ada33d0807abea93bb89f8c68381f52e08267d86f09cce5f9d466dd361aa0a",
+  "services/localization/locales/en.ts": "af4586a0cb7fe2467ae461dfa527f2c655ee92a1d0d6874a07ff08c5e4fbe61c",
+  "services/localization/locales/fr.ts": "d011ec68fa65c27aa9698240380c9254d9eb72dcce9e5b3e688c798a91f47c4e"
+}

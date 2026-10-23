@@ -1,0 +1,13 @@
+{
+  "sameCompletePlayerResult": true,
+  "before": {
+    "industryMs": 248.18525,
+    "cinemaMs": 5691.142625
+  },
+  "after": {
+    "industryMs": 306.76079100000004,
+    "cinemaMs": 4428.1995830000005
+  },
+  "beforePeakRssMiB": 1756.25,
+  "afterPeakRssMiB": 1792.671875
+}

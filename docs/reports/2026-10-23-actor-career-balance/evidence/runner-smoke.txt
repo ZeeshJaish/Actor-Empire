@@ -1,0 +1,7 @@
+
+  ../../../../tmp/ae-career-runner-smoke/career-worker-candidate.mjs  9.7mb ⚠️
+
+⚡ Done in 82ms
+Career audit output: /tmp/ae-career-runner-smoke
+{"status":"HORIZON_COMPLETE","seed":4,"weeks":1,"credits":0,"reloads":2}
+{"seed":4,"status":"HORIZON_COMPLETE","weeks":1,"credits":0,"reloads":2,"cash":1475}

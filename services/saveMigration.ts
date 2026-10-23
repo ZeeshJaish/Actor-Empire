@@ -1,3 +1,4 @@
+import { ensureActorCareerBalance } from './actorCareerBalance';
 import { inspectStockSaveContainers, inspectStockSaveCompatibility, migrateStockPortfolio, recordStockQuoteRepairs, StockSaveRecoveryError } from './stockSaveCompatibility';
 import { CinemaMigrationError, inspectCinemaSavedState, migrateCinemaState } from './boxOffice/boxOfficeMigration';
 import { preserveCinemaCastRecognition } from './boxOffice/boxOfficeInputs';
@@ -1344,11 +1345,11 @@ export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
             ),
         },
     };
-    const repairedPlayer = restoreContractActorProfiles(repairTalentNegotiations(normalizePlayerProfileAvatars(migrateLegacyCharacterIdentity(reverseLegacyImportedAcquisitionDebtCharge(
+    const repairedPlayer = ensureActorCareerBalance(restoreContractActorProfiles(repairTalentNegotiations(normalizePlayerProfileAvatars(migrateLegacyCharacterIdentity(reverseLegacyImportedAcquisitionDebtCharge(
         repairAcquiredStudioAssetPortfolios(
             repairInDevelopmentContinuationScripts(repairAcquiredStudioFinance(migratedPlayer)),
         ),
-    )))));
+    ))))));
     const productionHouses = repairedPlayer.businesses.filter(business => business.type === 'PRODUCTION_HOUSE');
     const parentStudio = productionHouses.find(business => (
         business.studioState?.acquisitionOrigin !== 'STUDIO_ACQUISITION'

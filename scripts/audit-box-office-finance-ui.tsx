@@ -6,6 +6,7 @@ import { createBusiness } from '../services/businessLogic';
 import { makeCinemaFixture } from './fixtures/boxOfficeScenarios';
 import type { Studio, ActiveRelease, PastProject } from '../types';
 import { buildCinemaReleaseDashboardProject, buildCinemaArchiveDashboardProject, createArchivedCinemaReleaseRecord } from '../services/boxOffice/boxOfficePresentation';
+import { CinemaFinancePanel } from '../components/CinemaFinancePanel';
 import { getCinemaProjectFinance } from '../services/boxOffice/boxOfficeSettlement';
 const f=makeCinemaFixture(55);
 const studio=createBusiness('Finance UI Fixture','PRODUCTION_HOUSE','MAJOR_STUDIO',{quality:'STANDARD',pricing:'MARKET',marketing:'LOW'},'🎬',20);
@@ -40,3 +41,11 @@ for(const actual of [undefined,0]){
  assert.equal(finance.receiptsEstimated,actual===undefined);
 }
 console.log('PASS archived release detail adapter preserves missing receipt estimates and genuine zero without actor-pay fallback');
+
+const nearMarkup=renderToStaticMarkup(<CinemaFinancePanel source={{id:'near',budget:10e6,totalStudioReceipts:9.8e6,earnings:5000}}/>);
+assert.ok(nearMarkup.includes('Near break-even'),'A two-percent loss must not be presented as a major flop');
+assert.ok(nearMarkup.includes('Theatrical cost recovery before backend'));
+assert.ok(nearMarkup.includes('Collected project profit / loss'));
+assert.ok(nearMarkup.includes('Actor career earnings'));
+assert.ok(nearMarkup.includes('Future streaming and soundtrack income is excluded'));
+console.log('PASS exact near-break-even, collected-media and actor labels render without forecasting future receipts');

@@ -104,6 +104,28 @@ test('offered ensemble captures actual catalogue recognition at casting',()=>{
  const actors=project.castList!.filter(c=>!c.isPlayer&&c.type==='ACTOR');
  assert.ok(actors.length>0);assert.ok(actors.every(c=>c.cinemaRecognition?.personId===c.actorId));
 });
+test('generated minor role includes a real lead and repairs partial ensembles without promoting the player',()=>{
+ const f=makeCinemaFixture(801);f.project.estimatedBudget=17e6;f.project.genre='COMEDY';
+ const original=[{id:'self',actorId:'PLAYER_SELF',name:f.player.name,role:'Cast',roleType:'MINOR' as const,isPlayer:true,type:'ACTOR' as const,image:''}];
+ f.project.castList=original;
+ const built=completeOfferedCinemaCast(f.project,f.player);
+ assert.ok(built.castList!.some(c=>!c.isPlayer&&c.roleType==='LEAD'),'An offered minor role needs an actual lead');
+ assert.equal(built.castList!.find(c=>c.isPlayer)!.roleType,'MINOR');
+ const partial={...built,castList:built.castList!.map(c=>c.isPlayer?c:{...c,roleType:'SUPPORTING' as const})};
+ const fixed=completeOfferedCinemaCast(partial,f.player);
+ assert.ok(fixed.castList!.some(c=>!c.isPlayer&&c.roleType==='LEAD'));
+ assert.equal(new Set(fixed.castList!.map(c=>c.actorId||c.id)).size,fixed.castList!.length);
+ assert.deepEqual(completeOfferedCinemaCast(JSON.parse(JSON.stringify(fixed)),f.player),fixed);
+ assert.deepEqual(f.project.castList,original);
+});
+test('a signed NPC cameo stays a cameo when an offered package lacks a lead',()=>{
+ const f=makeCinemaFixture(807);f.project.estimatedBudget=10e6;f.project.genre='COMEDY';
+ f.project.castList=[{id:'self',actorId:'PLAYER_SELF',name:f.player.name,role:'Cast',roleType:'MINOR',isPlayer:true,type:'ACTOR',image:''},
+  {id:'guest',actorId:'signed-guest',name:'Signed guest',role:'Cameo',roleType:'CAMEO',isPlayer:false,type:'ACTOR',image:''}];
+ const fixed=completeOfferedCinemaCast(f.project,f.player);
+ assert.equal(fixed.castList!.find(c=>c.id==='guest')!.roleType,'CAMEO');
+ assert.ok(fixed.castList!.some(c=>c.roleType==='LEAD'));
+});
 let failures = 0;
 for (const [name, run] of cases) { try { run(); console.log('PASS', name); } catch (error) { failures++; console.error('FAIL', name, error instanceof Error ? error.message : error); } }
 assert.equal(failures, 0, `${failures} cinema input regressions`);

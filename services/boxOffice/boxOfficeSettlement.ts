@@ -74,12 +74,21 @@ export interface CinemaFinanceSource {
 const nonnegative = (value: unknown): number => typeof value === 'number' && Number.isFinite(value) ? Math.max(0, value) : 0;
 const hasActualMoney = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value >= 0;
 
+/** Severity describes collected project economics; it never rounds or settles money. */
+export const classifyCinemaProfit = (profitCents:number,paidCostCents:number):'PROFIT'|'NEAR_BREAK_EVEN'|'LOSS'|'SUBSTANTIAL_LOSS'|'NO_RECORDED_COST' => {
+    if(paidCostCents<=0)return 'NO_RECORDED_COST';
+    if(Math.abs(profitCents)<=paidCostCents*.05)return 'NEAR_BREAK_EVEN';
+    if(profitCents>0)return 'PROFIT';
+    return profitCents < -paidCostCents*.25 ? 'SUBSTANTIAL_LOSS' : 'LOSS';
+};
+
 /** Pure adapter for current active/history surfaces. No cash is paid or save rewritten.
  * Missing legacy receipts use an explicitly flagged estimate, never actor earnings.
  */
 export const getCinemaProjectFinance = (source: CinemaFinanceSource): CinemaFinanceSummary & {
     receiptsEstimated: boolean; costsEstimated: boolean; studioReturnPercent: number | null;
     studioCashAtRiskCents: number; studioProfitCents: number; platformProductionCoverCents: number;
+    theatricalCostRecoveryCents: number; collectedResult: ReturnType<typeof classifyCinemaProfit>;
 } => {
     const details = source.projectDetails;
     const gross = nonnegative(source.gross ?? source.totalGross);
@@ -119,6 +128,8 @@ export const getCinemaProjectFinance = (source: CinemaFinanceSource): CinemaFina
     if (![netProfitCents,studioProfitCents].every(Number.isSafeInteger)) throw new RangeError('Cinema profit exceeds safe integer cents');
     const costsEstimated = Boolean((source.talentParticipation || details?.talentParticipation)?.contracts.length && !hasActualMoney(source.talentBackendPaid));
     return { ...summary, netProfitCents, receiptsEstimated, costsEstimated,
+        theatricalCostRecoveryCents:summary.theatricalProducerReceiptsCents-summary.totalPaidCostsCents,
+        collectedResult:classifyCinemaProfit(netProfitCents,summary.totalPaidCostsCents),
         studioCashAtRiskCents: riskCents, studioProfitCents, platformProductionCoverCents,
         studioReturnPercent: riskCents > 0 ? studioProfitCents / riskCents * 100 : null };
 };

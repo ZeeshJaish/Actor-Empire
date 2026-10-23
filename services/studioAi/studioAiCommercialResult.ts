@@ -7,7 +7,7 @@ import { releaseProjectTalentBookings } from '../talentBookings';
 import { appendStudioAiProductionKey } from './studioAiProductionState';
 import { STUDIO_AI_LEDGER_LIMIT } from './studioAiState';
 import { settleTalentReceipt } from '../talentCareer';
-import { studioAiCinemaRegions, studioAiMarketingRate } from './studioAiCinemaRelease';
+import { studioAiCinemaCountries, studioAiMarketingRate } from './studioAiCinemaRelease';
 import { WORLD_COUNTRY_DEFINITIONS } from '../worldEconomy/worldCountryRegistry';
 import { normalizeStreamingLanguageId } from '../streamingLocalizationCapabilities';
 import { CINEMA_EXPOSURE_PROFILE } from '../boxOffice/boxOfficeProfiles';
@@ -80,11 +80,11 @@ export const releaseStudioAiProduction = (input: ReleaseStudioAiProductionInput)
     }] : [];
     const talent = execution.talent;
     const fingerprint=execution.fingerprintSnapshot || input.studio.ai.intelligence?.content.selectedFingerprints.find(f=>f.id===execution.fingerprintId);
-    const releaseRegionIds=studioAiCinemaRegions(mode,fingerprint);
-    const campaignCountryIds=WORLD_COUNTRY_DEFINITIONS.filter(c=>releaseRegionIds.includes(c.regionId)).map(c=>c.id);
+    const campaignCountryIds=studioAiCinemaCountries(mode,fingerprint,input.world,marketingSpendMillions*1e6);
+    const releaseRegionIds=[...new Set(WORLD_COUNTRY_DEFINITIONS.filter(c=>campaignCountryIds.includes(c.id)).map(c=>c.regionId))];
     const project: IndustryProject = {
         id: input.production.canonicalProjectId, title: input.production.title, genre: input.production.genre, mediaType: input.production.projectType,
-        ...(weeklyCinema?{releaseRegionIds}:{}),
+        ...(weeklyCinema?{releaseRegionIds,releaseCountryIds:campaignCountryIds}:{}),
         originalLanguageId:normalizeStreamingLanguageId(fingerprint?.originalLanguage || 'english'),
         studioId: input.production.producerStudioId, physicalProducerStudioId: input.production.producerStudioId,
         budgetTier: budgetTier(input.production.budgetMillions), quality: Math.round(quality.creativeQuality), rating,

@@ -1,0 +1,52 @@
+{
+  "status": "PASS",
+  "weeks": 14,
+  "reloads": 15,
+  "grandfatheredLegend": true,
+  "salaries": [
+    {
+      "id": "tx_1810000000124_0.8755920517724007",
+      "week": 14,
+      "year": 15,
+      "amount": 123456,
+      "category": "SALARY",
+      "description": "Salary: Legacy Signed Film"
+    }
+  ],
+  "commissions": [
+    {
+      "id": "tx_1810000000123_0.374146762304008",
+      "week": 14,
+      "year": 15,
+      "amount": -12345,
+      "category": "EXPENSE",
+      "description": "Agent Commission (Legacy Signed Film)"
+    }
+  ],
+  "sponsors": [
+    {
+      "id": "tx_1810000000023_0.9495648075826466",
+      "week": 2,
+      "year": 15,
+      "amount": 8765,
+      "category": "SPONSORSHIP",
+      "description": "Legacy Commercial Final Payment"
+    },
+    {
+      "id": "tx_1810000000013_0.42829049401916564",
+      "week": 1,
+      "year": 15,
+      "amount": 8765,
+      "category": "SPONSORSHIP",
+      "description": "Legacy Commercial Payment"
+    }
+  ],
+  "shares": [
+    {
+      "stockId": "stk_nke",
+      "shares": 57,
+      "averageCost": 23.5,
+      "totalInvested": 1339.5
+    }
+  ]
+}

@@ -1,3 +1,4 @@
+import { resolveCareerOfferRole } from './actorCareerBalance';
 import { completeOfferedCinemaCast } from './boxOffice/boxOfficeInputs';
 import { interpolateProductionBudget, getProductionScale, getProductionBudgetReference } from './studioProductionEconomy';
 
@@ -672,12 +673,12 @@ export const formatRoleRejectionReview = (
     ].filter(Boolean).join('\n\n');
 };
 
-export const calculateProjectPay = (roleType: RoleType, budgetTier: BudgetTier, type: ProjectType): number => {
+export const calculateProjectPay = (roleType: RoleType, budgetTier: BudgetTier, type: ProjectType, budget?: number): number => {
     const base = ROLE_DEFINITIONS[roleType].baseIncome;
-    let multiplier = 1;
-    
-    if (budgetTier === 'MID') multiplier = 20; 
-    if (budgetTier === 'HIGH') multiplier = 300; 
+    const rates = { LOW: 1, MID: 20, HIGH: 120, BLOCKBUSTER: 300 };
+    let multiplier = budget && Number.isFinite(budget)
+        ? interpolateProductionBudget(budget, rates)
+        : rates[budgetTier] || 1;
     
     if (type === 'MOVIE') multiplier *= 1.2; 
     
@@ -829,7 +830,8 @@ export const generateAudition = (
 ): AuditionOpportunity => {
     const type: ProjectType = forcedType || (Math.random() > 0.4 ? 'MOVIE' : 'SERIES');
     const project = generateProjectDetails(tier, type, usedTitles, player);
-    const income = calculateProjectPay(roleType, tier, type);
+    if (source === 'AGENT' || source === 'DIRECT') roleType = resolveCareerOfferRole(player, roleType, project.genre);
+    const income = calculateProjectPay(roleType, tier, type, project.estimatedBudget);
     
     let energyCost = ROLE_DEFINITIONS[roleType].energyCost;
     if (tier === 'HIGH' && roleType === 'LEAD') {
@@ -1576,7 +1578,7 @@ export const calculateFuturePotential = (
 
 export const generateSequelOffer = (original: ActiveRelease, player: Player): NegotiationData => {
     const hypeBoost = 20; 
-    const basePay = calculateProjectPay(original.roleType, original.projectDetails.budgetTier, original.type);
+    const basePay = calculateProjectPay(original.roleType, original.projectDetails.budgetTier, original.type, original.projectDetails.estimatedBudget);
     let newPay = Math.floor(basePay * 1.5);
     
     let newTitle = `${original.name} 2`;
@@ -1652,7 +1654,7 @@ export const generateRenewalOffer = (original: ActiveRelease, player: Player): N
     }
 
     // 2. Pay Increase (20%)
-    const basePay = calculateProjectPay(original.roleType, original.projectDetails.budgetTier, original.type);
+    const basePay = calculateProjectPay(original.roleType, original.projectDetails.budgetTier, original.type, original.projectDetails.estimatedBudget);
     let newPay = Math.floor(basePay * 1.2); 
     
     // 3. Project Details

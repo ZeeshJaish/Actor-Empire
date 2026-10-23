@@ -1,0 +1,9 @@
+
+> pr-6.6.3@1.0.25 audit:actor-career-compatibility
+> esbuild scripts/audit-actor-career-compatibility.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/ae-career-compatibility.mjs && node /tmp/ae-career-compatibility.mjs
+
+
+  ../../../../tmp/ae-career-compatibility.mjs  9.6mb ⚠️
+
+⚡ Done in 91ms
+PASS legacy production, legacy paid class, signed salary paid once, signed commercial paid twice, earned skills/XP, shares and grandfathered Legend; 14 actual weeks, 15 verified save/reloads.

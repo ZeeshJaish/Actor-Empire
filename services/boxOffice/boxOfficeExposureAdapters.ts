@@ -62,7 +62,7 @@ export const commitCinemaReleaseExposure = ({ player, project, titleId, absolute
     const requestedCost = Object.values(allocations).reduce((sum, value) => sum + money(value || 0), 0);
     if (!Number.isSafeInteger(requestedCost) || requestedCost > committedCost) throw new Error('Cinema exposure requires recorded paid marketing');
     let next = commitCinemaAnnouncement(player, project, titleId, absoluteWeek);
-    const countryIds = project.releaseRegionIds?.length
+    const countryIds = project.releaseCountryIds ? [...project.releaseCountryIds] : project.releaseRegionIds?.length
         ? WORLD_COUNTRY_DEFINITIONS.filter(country => project.releaseRegionIds!.includes(country.regionId)).map(country => country.id) : undefined;
     for (const [channel, amount] of Object.entries(allocations).sort(([a], [b]) => a.localeCompare(b))) {
         const paidCostCents = money(amount || 0);

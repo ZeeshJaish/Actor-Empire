@@ -492,6 +492,7 @@ export const buildGreenlightProject = ({
         }
         const talentParticipation = buildGreenlightTalentParticipation(newCommitmentId, talentBackendDraft, selectedParticipants);
         const newCommitment: Commitment = {
+            careerBalanceVersion: 1,
             id: newCommitmentId,
             name: selectedScript.title,
             type: 'JOB',
