@@ -1,0 +1,365 @@
+{
+  "kind": "CONDITIONAL_ALIVE_EARNED_ADVANCED_OWNER",
+  "executable": "965298c2496bab863ef3b060cfe3cc22677be5e6f3dfbe0f0e1989611a705b69",
+  "seed": 1,
+  "weak": true,
+  "horizon": 156,
+  "status": "NATURALLY_CLOSED",
+  "stage": "FINAL",
+  "precursors": [
+    {
+      "id": "precursor-0",
+      "grossCents": 68765529427,
+      "firstAdmissions": 60510001
+    },
+    {
+      "id": "precursor-1",
+      "grossCents": 70110970178,
+      "firstAdmissions": 60394581
+    },
+    {
+      "id": "precursor-2",
+      "grossCents": 64326017621,
+      "firstAdmissions": 57632521
+    },
+    {
+      "id": "precursor-3",
+      "grossCents": 61932740965,
+      "firstAdmissions": 54338026
+    }
+  ],
+  "budget": 300000000,
+  "campaign": 350000000,
+  "weeks": 40,
+  "preWeeks": 104,
+  "finalWeeks": 40,
+  "saves": 42,
+  "reloads": 4,
+  "replays": 40,
+  "failedPromotionChecked": true,
+  "peakRssBytes": 1268957184,
+  "healthcareSpent": 20000,
+  "healthcare": [
+    {
+      "week": 3,
+      "spent": 20000,
+      "conditions": [
+        "back_pain"
+      ]
+    }
+  ],
+  "alive": true,
+  "grossB": 0.53145627678,
+  "profitCents": -39191158466,
+  "grossCents": 53145627678,
+  "receiptsCents": 25808841534,
+  "bookingCostCents": 0,
+  "talentPaidCents": 0,
+  "actorPaidCents": 0,
+  "firstAdmissions": 47343735,
+  "repeatAdmissions": 0,
+  "qualityInput": 25,
+  "closed": true,
+  "censored": false,
+  "weekly": [
+    {
+      "week": 1,
+      "grossCents": 19317650912,
+      "totalGrossCents": 19317650912,
+      "closed": false,
+      "slate": 19
+    },
+    {
+      "week": 2,
+      "grossCents": 8554054214,
+      "totalGrossCents": 27871705126,
+      "closed": false,
+      "slate": 19
+    },
+    {
+      "week": 3,
+      "grossCents": 5874819153,
+      "totalGrossCents": 33746524279,
+      "closed": false,
+      "slate": 19
+    },
+    {
+      "week": 4,
+      "grossCents": 4322658857,
+      "totalGrossCents": 38069183136,
+      "closed": false,
+      "slate": 17
+    },
+    {
+      "week": 5,
+      "grossCents": 3291477619,
+      "totalGrossCents": 41360660755,
+      "closed": false,
+      "slate": 17
+    },
+    {
+      "week": 6,
+      "grossCents": 2537162382,
+      "totalGrossCents": 43897823137,
+      "closed": false,
+      "slate": 17
+    },
+    {
+      "week": 7,
+      "grossCents": 1967848489,
+      "totalGrossCents": 45865671626,
+      "closed": false,
+      "slate": 18
+    },
+    {
+      "week": 8,
+      "grossCents": 1541450684,
+      "totalGrossCents": 47407122310,
+      "closed": false,
+      "slate": 17
+    },
+    {
+      "week": 9,
+      "grossCents": 1212682370,
+      "totalGrossCents": 48619804680,
+      "closed": false,
+      "slate": 17
+    },
+    {
+      "week": 10,
+      "grossCents": 957808831,
+      "totalGrossCents": 49577613511,
+      "closed": false,
+      "slate": 17
+    },
+    {
+      "week": 11,
+      "grossCents": 755385615,
+      "totalGrossCents": 50332999126,
+      "closed": false,
+      "slate": 16
+    },
+    {
+      "week": 12,
+      "grossCents": 596927865,
+      "totalGrossCents": 50929926991,
+      "closed": false,
+      "slate": 17
+    },
+    {
+      "week": 13,
+      "grossCents": 473093172,
+      "totalGrossCents": 51403020163,
+      "closed": false,
+      "slate": 16
+    },
+    {
+      "week": 14,
+      "grossCents": 372700574,
+      "totalGrossCents": 51775720737,
+      "closed": false,
+      "slate": 16
+    },
+    {
+      "week": 15,
+      "grossCents": 294982736,
+      "totalGrossCents": 52070703473,
+      "closed": false,
+      "slate": 16
+    },
+    {
+      "week": 16,
+      "grossCents": 233021595,
+      "totalGrossCents": 52303725068,
+      "closed": false,
+      "slate": 17
+    },
+    {
+      "week": 17,
+      "grossCents": 183232765,
+      "totalGrossCents": 52486957833,
+      "closed": false,
+      "slate": 17
+    },
+    {
+      "week": 18,
+      "grossCents": 143943070,
+      "totalGrossCents": 52630900903,
+      "closed": false,
+      "slate": 18
+    },
+    {
+      "week": 19,
+      "grossCents": 112877061,
+      "totalGrossCents": 52743777964,
+      "closed": false,
+      "slate": 20
+    },
+    {
+      "week": 20,
+      "grossCents": 91392995,
+      "totalGrossCents": 52835170959,
+      "closed": false,
+      "slate": 19
+    },
+    {
+      "week": 21,
+      "grossCents": 71265921,
+      "totalGrossCents": 52906436880,
+      "closed": false,
+      "slate": 18
+    },
+    {
+      "week": 22,
+      "grossCents": 55357198,
+      "totalGrossCents": 52961794078,
+      "closed": false,
+      "slate": 18
+    },
+    {
+      "week": 23,
+      "grossCents": 42997409,
+      "totalGrossCents": 53004791487,
+      "closed": false,
+      "slate": 17
+    },
+    {
+      "week": 24,
+      "grossCents": 33635682,
+      "totalGrossCents": 53038427169,
+      "closed": false,
+      "slate": 14
+    },
+    {
+      "week": 25,
+      "grossCents": 26076737,
+      "totalGrossCents": 53064503906,
+      "closed": false,
+      "slate": 14
+    },
+    {
+      "week": 26,
+      "grossCents": 19965829,
+      "totalGrossCents": 53084469735,
+      "closed": false,
+      "slate": 15
+    },
+    {
+      "week": 27,
+      "grossCents": 15925117,
+      "totalGrossCents": 53100394852,
+      "closed": false,
+      "slate": 14
+    },
+    {
+      "week": 28,
+      "grossCents": 12043173,
+      "totalGrossCents": 53112438025,
+      "closed": false,
+      "slate": 15
+    },
+    {
+      "week": 29,
+      "grossCents": 8780975,
+      "totalGrossCents": 53121219000,
+      "closed": false,
+      "slate": 15
+    },
+    {
+      "week": 30,
+      "grossCents": 6481354,
+      "totalGrossCents": 53127700354,
+      "closed": false,
+      "slate": 15
+    },
+    {
+      "week": 31,
+      "grossCents": 4689301,
+      "totalGrossCents": 53132389655,
+      "closed": false,
+      "slate": 15
+    },
+    {
+      "week": 32,
+      "grossCents": 3710262,
+      "totalGrossCents": 53136099917,
+      "closed": false,
+      "slate": 15
+    },
+    {
+      "week": 33,
+      "grossCents": 2691334,
+      "totalGrossCents": 53138791251,
+      "closed": false,
+      "slate": 15
+    },
+    {
+      "week": 34,
+      "grossCents": 2006041,
+      "totalGrossCents": 53140797292,
+      "closed": false,
+      "slate": 15
+    },
+    {
+      "week": 35,
+      "grossCents": 1468650,
+      "totalGrossCents": 53142265942,
+      "closed": false,
+      "slate": 16
+    },
+    {
+      "week": 36,
+      "grossCents": 1161517,
+      "totalGrossCents": 53143427459,
+      "closed": false,
+      "slate": 16
+    },
+    {
+      "week": 37,
+      "grossCents": 913982,
+      "totalGrossCents": 53144341441,
+      "closed": false,
+      "slate": 17
+    },
+    {
+      "week": 38,
+      "grossCents": 721783,
+      "totalGrossCents": 53145063224,
+      "closed": false,
+      "slate": 17
+    },
+    {
+      "week": 39,
+      "grossCents": 398486,
+      "totalGrossCents": 53145461710,
+      "closed": false,
+      "slate": 19
+    },
+    {
+      "week": 40,
+      "grossCents": 165968,
+      "totalGrossCents": 53145627678,
+      "closed": true,
+      "slate": 19
+    }
+  ],
+  "summary": {
+    "all": {
+      "completed": 1
+    },
+    "small": {
+      "completed": 0
+    },
+    "player": {
+      "completed": 0
+    }
+  },
+  "elapsedMs": 7067,
+  "limitations": [
+    "Prepared advanced owner, not a fresh normal career; excluded from ordinary hit/rarity rates",
+    "Capital and completed craft packages authored; four precursor audiences earned in actual earlier weeks while owner remains alive",
+    "Weak finale forks the exact same alive earned checkpoint and RNG/clock state; it does not get different precursor successes",
+    "Actual paid clinic service, Greenlight funding, paid campaign, real premiere, world competition, weekly settlement and verified persistence run unchanged",
+    "Observation stops at $3B attainment without closing the theatrical run; profit is collected to date, not lifetime"
+  ]
+}

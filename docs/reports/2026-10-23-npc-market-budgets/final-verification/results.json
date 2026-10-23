@@ -1,0 +1,364 @@
+{
+  "commit": "07fdfff",
+  "kind": "NORMAL_APP_POLICY_CAREERS",
+  "careers": [
+    {
+      "seed": 0,
+      "genre": "DRAMA",
+      "weeks": 156,
+      "status": "HORIZON_COMPLETE",
+      "small": {
+        "completed": 25,
+        "recouped": 13,
+        "hits": 4,
+        "profits": 9,
+        "nearBreakEven": 2,
+        "losses": 10,
+        "exactDeficits": 12
+      },
+      "saves": 95,
+      "reloads": 17,
+      "replays": 156,
+      "failedPromotionChecked": true
+    },
+    {
+      "seed": 1,
+      "genre": "COMEDY",
+      "weeks": 156,
+      "status": "HORIZON_COMPLETE",
+      "small": {
+        "completed": 19,
+        "recouped": 12,
+        "hits": 1,
+        "profits": 8,
+        "nearBreakEven": 3,
+        "losses": 7,
+        "exactDeficits": 7
+      },
+      "saves": 90,
+      "reloads": 12,
+      "replays": 156,
+      "failedPromotionChecked": true
+    },
+    {
+      "seed": 2,
+      "genre": "ACTION",
+      "weeks": 116,
+      "status": "CAREER_ENDED",
+      "small": {
+        "completed": 10,
+        "recouped": 7,
+        "hits": 1,
+        "profits": 6,
+        "nearBreakEven": 0,
+        "losses": 3,
+        "exactDeficits": 3
+      },
+      "saves": 66,
+      "reloads": 8,
+      "replays": 116,
+      "failedPromotionChecked": true
+    },
+    {
+      "seed": 3,
+      "genre": "DRAMA",
+      "weeks": 156,
+      "status": "HORIZON_COMPLETE",
+      "small": {
+        "completed": 23,
+        "recouped": 12,
+        "hits": 3,
+        "profits": 7,
+        "nearBreakEven": 3,
+        "losses": 10,
+        "exactDeficits": 11
+      },
+      "saves": 92,
+      "reloads": 14,
+      "replays": 156,
+      "failedPromotionChecked": true
+    }
+  ],
+  "weeks": 584,
+  "observations": 166,
+  "distinctPackages": 74,
+  "summary": {
+    "released": 166,
+    "completed": 105,
+    "open": 61,
+    "unknownCompleted": 0,
+    "all": {
+      "completed": 105,
+      "recouped": 53,
+      "hits": 17,
+      "profits": 31,
+      "nearBreakEven": 12,
+      "losses": 45,
+      "exactDeficits": 52
+    },
+    "small": {
+      "completed": 77,
+      "recouped": 44,
+      "hits": 9,
+      "profits": 30,
+      "nearBreakEven": 8,
+      "losses": 30,
+      "exactDeficits": 33
+    },
+    "player": {
+      "completed": 4,
+      "recouped": 2,
+      "hits": 1,
+      "profits": 1,
+      "nearBreakEven": 1,
+      "losses": 1,
+      "exactDeficits": 2
+    },
+    "billionAttainment": [
+      {
+        "billions": 1,
+        "allReleased": 0,
+        "completed": 0
+      },
+      {
+        "billions": 2,
+        "allReleased": 0,
+        "completed": 0
+      },
+      {
+        "billions": 3,
+        "allReleased": 0,
+        "completed": 0
+      }
+    ]
+  },
+  "earlyReleaseCohort": {
+    "definition": "Films entering cinema in the first 78 career weeks, observed through each career horizon or ending; incomplete runs remain censored",
+    "releaseCutoff": 78,
+    "minimumFollowUpWeeksByCareer": [
+      {
+        "seed": 0,
+        "weeks": 78
+      },
+      {
+        "seed": 1,
+        "weeks": 78
+      },
+      {
+        "seed": 2,
+        "weeks": 38
+      },
+      {
+        "seed": 3,
+        "weeks": 78
+      }
+    ],
+    "summary": {
+      "released": 60,
+      "completed": 60,
+      "open": 0,
+      "unknownCompleted": 0,
+      "all": {
+        "completed": 60,
+        "recouped": 30,
+        "hits": 7,
+        "profits": 20,
+        "nearBreakEven": 8,
+        "losses": 25,
+        "exactDeficits": 30
+      },
+      "small": {
+        "completed": 40,
+        "recouped": 26,
+        "hits": 3,
+        "profits": 20,
+        "nearBreakEven": 4,
+        "losses": 13,
+        "exactDeficits": 14
+      },
+      "player": {
+        "completed": 1,
+        "recouped": 0,
+        "hits": 0,
+        "profits": 0,
+        "nearBreakEven": 1,
+        "losses": 0,
+        "exactDeficits": 1
+      },
+      "billionAttainment": [
+        {
+          "billions": 1,
+          "allReleased": 0,
+          "completed": 0
+        },
+        {
+          "billions": 2,
+          "allReleased": 0,
+          "completed": 0
+        },
+        {
+          "billions": 3,
+          "allReleased": 0,
+          "completed": 0
+        }
+      ]
+    }
+  },
+  "smallQualityBands": [
+    {
+      "name": "<50",
+      "summary": {
+        "completed": 8,
+        "recouped": 2,
+        "hits": 1,
+        "profits": 1,
+        "nearBreakEven": 1,
+        "losses": 5,
+        "exactDeficits": 6
+      }
+    },
+    {
+      "name": "50–74",
+      "summary": {
+        "completed": 46,
+        "recouped": 25,
+        "hits": 0,
+        "profits": 21,
+        "nearBreakEven": 4,
+        "losses": 21,
+        "exactDeficits": 21
+      }
+    },
+    {
+      "name": "75+",
+      "summary": {
+        "completed": 23,
+        "recouped": 17,
+        "hits": 8,
+        "profits": 8,
+        "nearBreakEven": 3,
+        "losses": 4,
+        "exactDeficits": 6
+      }
+    }
+  ],
+  "runWeeks": {
+    "min": 24,
+    "median": 36,
+    "p90": 40,
+    "max": 53
+  },
+  "week95": {
+    "min": 12,
+    "median": 14,
+    "p90": 16,
+    "max": 19
+  },
+  "definitions": {
+    "recoupment": "Theatrical producer receipts cover production, campaign, booking and paid backend; investor ownership distributions excluded",
+    "financialHit": "Theatrical project profit is at least 60% of production budget, matching the normal NPC financial-hit hurdle",
+    "nearBreakEven": "Absolute profit or deficit within 5% of total modeled paid costs; exact deficits remain deficits",
+    "billionAttainment": "Measured public gross crossed the threshold; recent open films can still grow, so attainment is not a final lifetime probability"
+  },
+  "largestObservedGrossCents": 28629538802,
+  "limits": [
+    "Fixed actor policies over four early careers; one ended from health/life progression; not a universal success probability",
+    "All-completed rates can favor short runs; the first-78-weeks release cohort is provided as a follow-up check",
+    "Company/title identities can recur across seeded worlds; observations are correlated, so no independent-binomial confidence interval is claimed",
+    "Future streaming, soundtrack and merchandise receipts are excluded from theatrical results; a theater loss is not a final all-media loss",
+    "Prepared established-owner attainability cases are excluded from these normal-career rates"
+  ],
+  "preparedUniverse": {
+    "kind": "CONDITIONAL_ADVANCED_OWNER_CAPABILITY_NOT_NORMAL_RARITY",
+    "sourceCommit": "07fdfff",
+    "executable": "965298c2496bab863ef3b060cfe3cc22677be5e6f3dfbe0f0e1989611a705b69",
+    "preparedStartingCapital": {
+      "studio": 3000000000,
+      "actor": 1000000
+    },
+    "precursors": [
+      {
+        "id": "precursor-0",
+        "grossCents": 68765529427,
+        "firstAdmissions": 60510001
+      },
+      {
+        "id": "precursor-1",
+        "grossCents": 70110970178,
+        "firstAdmissions": 60394581
+      },
+      {
+        "id": "precursor-2",
+        "grossCents": 64326017621,
+        "firstAdmissions": 57632521
+      },
+      {
+        "id": "precursor-3",
+        "grossCents": 61932740965,
+        "firstAdmissions": 54338026
+      }
+    ],
+    "openingMatches": true,
+    "strong": {
+      "seed": 0,
+      "qualityInput": 100,
+      "observationStatus": "OPEN_CENSORED_AT_64_RELEASE_WEEKS",
+      "finalWeeks": 64,
+      "precursorWeeks": 104,
+      "budget": 300000000,
+      "campaign": 350000000,
+      "grossCents": 233709851780,
+      "receiptsCents": 113713626650,
+      "profitCents": 48713626650,
+      "openingGrossCents": 19317650912,
+      "firstAdmissions": 206687637,
+      "repeatAdmissions": 927545,
+      "closed": false,
+      "censored": true,
+      "saves": 96,
+      "reloads": 12,
+      "replays": 168,
+      "failedPromotionChecked": true,
+      "healthcareSpent": 100000,
+      "peakRssMiB": 1366.828125
+    },
+    "weak": {
+      "seed": 1,
+      "qualityInput": 25,
+      "observationStatus": "NATURALLY_CLOSED",
+      "finalWeeks": 40,
+      "precursorWeeks": 104,
+      "budget": 300000000,
+      "campaign": 350000000,
+      "grossCents": 53145627678,
+      "receiptsCents": 25808841534,
+      "profitCents": -39191158466,
+      "openingGrossCents": 19317650912,
+      "firstAdmissions": 47343735,
+      "repeatAdmissions": 0,
+      "closed": true,
+      "censored": false,
+      "saves": 42,
+      "reloads": 4,
+      "replays": 40,
+      "failedPromotionChecked": true,
+      "healthcareSpent": 20000,
+      "peakRssMiB": 1210.171875
+    },
+    "limitations": [
+      "Prepared advanced owner, not a fresh normal career; excluded from ordinary hit/rarity rates",
+      "Capital and completed craft packages authored; four precursor audiences earned in actual earlier weeks while owner remains alive",
+      "Weak finale forks the exact same alive earned checkpoint and RNG/clock state; it does not get different precursor successes",
+      "Actual paid clinic service, Greenlight funding, paid campaign, real premiere, world competition, weekly settlement and verified persistence run unchanged",
+      "Strong observation ends at 64 release weeks while still open. The in-worker $3B observation trigger was not reached. Collected profit is not a lifetime projection."
+    ]
+  },
+  "safety": {
+    "normalWeeks": 584,
+    "preparedActualSimulatedWeeks": 208,
+    "totalDuplicateWeekRejections": 792,
+    "failedPromotionRecoveries": 6,
+    "saves": 481,
+    "reloads": 67
+  }
+}

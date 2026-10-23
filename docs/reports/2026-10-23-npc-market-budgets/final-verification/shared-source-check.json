@@ -1,0 +1,8 @@
+{
+  "normalExecutable": "8c6ceb1878902029d1ccdc03c8d261612a7d7cc000bb2d94091b11658807207d",
+  "phenomenonExecutable": "965298c2496bab863ef3b060cfe3cc22677be5e6f3dfbe0f0e1989611a705b69",
+  "sharedSourceFiles": 418,
+  "sharedSourceMismatch": [],
+  "phenomenonAuditMatchesWorkingTree": true,
+  "auditOnlyOverride": "scripts/audit-cinema-phenomenon.ts"
+}

@@ -28,6 +28,11 @@
     "noEmit": true
   },
   "exclude": [
-    "functions"
+    "functions",
+    "dist",
+    "android/app/build",
+    "android/app/src/main/assets",
+    "ios/App/App/public",
+    "docs/reports/**/evidence/**/*.mjs"
   ]
 }

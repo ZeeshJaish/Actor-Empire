@@ -12,6 +12,7 @@ import { applyParenthoodAbandonment, applyPartnerBreakup, applyDivorceOutcome, g
 import { getPlayerLanguage, t } from '../services/i18n';
 import { OWNED_PRODUCTION_ACTIONS, applyOwnedProductionFocusAction, getOwnedProductionActionProgress } from '../services/ownedProductionCareer';
 import { applyProjectPromotionAttribution } from '../services/projectPromotionAttribution';
+import { getLinkedNpcRelationship, getNpcRelationshipScore, syncLinkedNpcRelationships } from '../services/relationshipBond';
 
 interface GameActionsProps {
     player: Player;
@@ -106,7 +107,7 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
                 ].slice(-50),
             };
             spendPlayerEnergy(nextState, Math.min(8, prev.energy.current), 'Relationship: Declined intimacy');
-            return nextState;
+            return syncLinkedNpcRelationships(nextState);
         });
         setToastMessage({ title: tr('actions.intimacy.notTonightTitle'), subtext: reason });
     };
@@ -188,7 +189,7 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
                 const newLog = { week: next.currentWeek, year: next.age, message: logMessage, type: 'neutral' as const };
                 next.logs = [...next.logs, newLog].slice(-50);
             }
-            return ensureActorCareerBalance(next);
+            return syncLinkedNpcRelationships(ensureActorCareerBalance(next));
         });
     };
 
@@ -942,6 +943,9 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
 
     const handleNPCInteract = (npc: NPCActor, type: InteractionType) => {
         handleGenericUpdate(prev => {
+            const linkedRelationship = getLinkedNpcRelationship(prev, npc.id);
+            // Befriend is a one-time conversion, not a free repeatable maintenance action.
+            if (type === 'BEFRIEND' && linkedRelationship) return prev;
             const res = calculateInteraction(prev, npc, type);
             if (prev.energy.current < res.energyCost) {
                 setToastMessage({ title: tr('actions.npc.notEnoughEnergyTitle'), subtext: tr('actions.npc.notEnoughEnergySubtext', { energy: res.energyCost.toString() }) });
@@ -959,7 +963,10 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
                 chatHistory: []
             };
 
-            const newScore = Math.min(100, Math.max(0, oldState.relationshipScore + res.relationshipDelta));
+            // An existing Social identity can be explicitly befriended without losing its earned bond.
+            const existingSocial = res.isBefriended ? prev.relationships.find(r => r.npcId === npc.id) : undefined;
+            const currentScore = existingSocial?.closeness ?? getNpcRelationshipScore(prev, npc.id);
+            const newScore = Math.min(100, Math.max(0, currentScore + res.relationshipDelta));
 
             // Add to chat history
             const newChat = [...(oldState.chatHistory || [])];
@@ -996,10 +1003,10 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
                     npcId: npc.id
                 });
                 setToastMessage({ title: tr('actions.npc.newConnectionTitle'), subtext: tr('actions.npc.newConnectionSubtext', { npcName: npc.name }) });
-            } else if (res.success) {
-                // Update closeness if already in relationships
+            } else if (linkedRelationship || res.isBefriended) {
+                // Both gains and losses apply to the shared bond, only after Befriend.
                 updatedRelationships = updatedRelationships.map(r =>
-                    r.npcId === npc.id ? { ...r, closeness: newScore, lastInteractionWeek: prev.currentWeek, lastInteractionAbsolute: getAbsoluteWeek(prev.age, prev.currentWeek) } : r
+                    r.id === (linkedRelationship || existingSocial)?.id ? { ...r, closeness: newScore, lastInteractionWeek: prev.currentWeek, lastInteractionAbsolute: getAbsoluteWeek(prev.age, prev.currentWeek) } : r
                 );
             }
 

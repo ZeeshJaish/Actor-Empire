@@ -3,6 +3,7 @@ import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {processGameWeek} from '../services/gameLoop';
 import {getAbsoluteWeek} from '../services/legacyLogic';
+import {NPC_DATABASE} from '../services/npcLogic';
 import {resolveLifeEventFallback} from '../services/lifeEventFallback';
 import {applyCrisisImpact} from '../services/productionService';
 import {IMPROVEMENT_CATALOG} from '../services/lifestyleLogic';
@@ -26,9 +27,16 @@ const executable=createHash('sha256').update(readFileSync(new URL(import.meta.ur
 const prior=readCinemaAuditCheckpoint<any>(file),branch=!prior&&weak?readCinemaAuditCheckpoint<any>(branchFile):undefined;
 const resume=prior||branch;if(resume){assert.equal(resume.executable,executable);assert.equal(resume.horizon,horizon)}
 if(weak&&!prior)assert.ok(branch,'Strong journey must first earn the shared alive universe checkpoint');
+// Preserve already-earned runtime NPC wealth across cold worker batches, just
+// as the normal-career audit does; no user-save or gameplay reward is changed.
+if(Array.isArray(resume?.npcDatabase)){
+    NPC_DATABASE.length=0;for(const npc of resume.npcDatabase)NPC_DATABASE.push(npc);
+    delete resume.npcDatabase;
+}
 const rng=cinemaAuditRandom('phenomenon-matched-world',resume?.randomCalls||0),clock=cinemaAuditClock(resume?.clockNext||1800000000000);
 Math.random=rng.next;Date.now=clock.now;
 let player:Player=resume?.player||makeBillionCareer();assert.ok(prior||!player.flags.isDead,'No deceased source or resurrection can prove an active owner career');
+if(resume)delete resume.player;
 const filmId='cohort-phenomenon',campaign=350e6,budget=300e6;
 let weeks=prior?.weeks||0,preWeeks=resume?.preWeeks||0,finalWeeks=prior?.finalWeeks||0,stage:string=prior?.stage||(branch?'FINAL':'PRECURSORS');
 let queued=prior?.queued||false,precursors:any[]=resume?.precursors||[],saves=prior?.saves||0,reloads=prior?.reloads||0,replays=prior?.replays||0;
@@ -60,7 +68,7 @@ const persist=async(fault=false)=>{
     if(fault){const old=await loadVerifiedGameData(store,key);assert.equal(old.status,'CURRENT');const expected=protect(old.player!);store.failPromotion=true;await assert.rejects(()=>saveVerifiedGameData(store,key,ready.player,ready.manifest),/promotion/);store.failPromotion=false;const recovered=await loadVerifiedGameData(store,key);assert.equal(protect(recovered.player!),expected);failedPromotionChecked=true;}
     await saveVerifiedGameData(store,key,ready.player,ready.manifest);saves++;const loaded=await loadVerifiedGameData(store,key);assert.equal(loaded.status,'CURRENT');assert.equal(protect(loaded.player!),protect(ready.player));player=loaded.player!;reloads++;
 };
-const snapshot=()=>({executable,horizon,player,preWeeks,finalWeeks,stage,queued,precursors,weeks,saves,reloads,replays,failedPromotionChecked,randomCalls:rng.calls(),clockNext:clock.next(),weekly,peakRssBytes,healthcareSpent,healthcare});
+const snapshot=()=>({executable,horizon,player,npcDatabase:NPC_DATABASE,preWeeks,finalWeeks,stage,queued,precursors,weeks,saves,reloads,replays,failedPromotionChecked,randomCalls:rng.calls(),clockNext:clock.next(),weekly,peakRssBytes,healthcareSpent,healthcare});
 try{
     const next=clock.next();await saveVerifiedGameData(store,key,player,createSaveIntegrityManifest(player,'MIGRATION'));clock.restore(next);saves++;
     const start=weeks;

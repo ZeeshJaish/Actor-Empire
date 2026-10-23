@@ -1,0 +1,8 @@
+{
+  "exitCode": null,
+  "signal": "SIGTERM",
+  "heapMB": 2048,
+  "peakOwnedTreeRssMiB": 1616,
+  "stopReason": "System swap grew over 512MiB",
+  "systemGuard": "darwin"
+}

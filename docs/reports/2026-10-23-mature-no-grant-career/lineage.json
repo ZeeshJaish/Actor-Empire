@@ -1,0 +1,23 @@
+{
+  "origin": {
+    "checkpoint": "/private/tmp/actor-cinema-final-07fdfff-20261023/normal/career-0.json.gz",
+    "checkpointSha256": "5aeec4d9bbfa70ed2f7e01893f4cf56a3817a1032ea49480d91d3bccc4ecbe8d",
+    "executable": "8c6ceb1878902029d1ccdc03c8d261612a7d7cc000bb2d94091b11658807207d",
+    "weeks": 156,
+    "cash": 57643,
+    "sourceRef": "07fdfff",
+    "initialCash": 2000,
+    "manualCapitalGrants": 0
+  },
+  "lineage": [
+    {
+      "checkpoint": "/private/tmp/actor-cinema-mature-no-grants-07fdfff-20261023/policy-v1-source/career-0.json.gz",
+      "checkpointSha256": "c2d44be64f5e0633c5d4c45d29415fe433f6dfd3031da338a166d8ba20daa663",
+      "executable": "831247770f52bf1062d66a1c1d447aba92784d70539891f96346c74d6e75092a",
+      "weeks": 424,
+      "cash": 1094398,
+      "playerSha256": "94cd0b20e8900212edb60e3dc4f9271171c7251fcd2971d28aa5efd446fc20b9",
+      "reason": "Compare current inbox and Casting App choices together; improve actual paid cross-genre preparation; no player state altered"
+    }
+  ]
+}

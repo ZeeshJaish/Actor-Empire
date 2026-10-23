@@ -1,0 +1,15 @@
+{
+  "label": "typecheck-audits-2",
+  "heapMiB": 1536,
+  "peakOwnedTreeRssMiB": 1166.125,
+  "stopReason": null,
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 15270,
+  "script": "node_modules/typescript/bin/tsc",
+  "args": [
+    "--noEmit",
+    "-p",
+    "/Users/zeesh/Vibe code/Actor empire/docs/reports/2026-10-23-npc-market-budgets/final-verification/typecheck/audits-2.json"
+  ]
+}

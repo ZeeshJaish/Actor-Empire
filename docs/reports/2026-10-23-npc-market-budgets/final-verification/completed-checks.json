@@ -1,0 +1,136 @@
+{
+  "sourceCommit": "07fdfff",
+  "typecheck": {
+    "rootFiles": 1855,
+    "typedRoots": 1632,
+    "scopes": 6,
+    "originalTypedRootsRetained": true
+  },
+  "checks": [
+    {
+      "label": "typecheck-application",
+      "heapMiB": 1536,
+      "peakOwnedTreeRssMiB": 1282.90625,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 12923,
+      "script": "node_modules/typescript/bin/tsc",
+      "args": [
+        "--noEmit",
+        "-p",
+        "/Users/zeesh/Vibe code/Actor empire/docs/reports/2026-10-23-npc-market-budgets/final-verification/typecheck/application.json"
+      ]
+    },
+    {
+      "label": "typecheck-audits-1",
+      "heapMiB": 1536,
+      "peakOwnedTreeRssMiB": 1153.40625,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 9155,
+      "script": "node_modules/typescript/bin/tsc",
+      "args": [
+        "--noEmit",
+        "-p",
+        "/Users/zeesh/Vibe code/Actor empire/docs/reports/2026-10-23-npc-market-budgets/final-verification/typecheck/audits-1.json"
+      ]
+    },
+    {
+      "label": "typecheck-audits-2",
+      "heapMiB": 1536,
+      "peakOwnedTreeRssMiB": 1166.125,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 15270,
+      "script": "node_modules/typescript/bin/tsc",
+      "args": [
+        "--noEmit",
+        "-p",
+        "/Users/zeesh/Vibe code/Actor empire/docs/reports/2026-10-23-npc-market-budgets/final-verification/typecheck/audits-2.json"
+      ]
+    },
+    {
+      "label": "typecheck-audits-3",
+      "heapMiB": 1536,
+      "peakOwnedTreeRssMiB": 1496.84375,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 9438,
+      "script": "node_modules/typescript/bin/tsc",
+      "args": [
+        "--noEmit",
+        "-p",
+        "/Users/zeesh/Vibe code/Actor empire/docs/reports/2026-10-23-npc-market-budgets/final-verification/typecheck/audits-3.json"
+      ]
+    },
+    {
+      "label": "typecheck-audits-4",
+      "heapMiB": 1536,
+      "peakOwnedTreeRssMiB": 1532.484375,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 7775,
+      "script": "node_modules/typescript/bin/tsc",
+      "args": [
+        "--noEmit",
+        "-p",
+        "/Users/zeesh/Vibe code/Actor empire/docs/reports/2026-10-23-npc-market-budgets/final-verification/typecheck/audits-4.json"
+      ]
+    },
+    {
+      "label": "typecheck-support-and-prototypes",
+      "heapMiB": 1536,
+      "peakOwnedTreeRssMiB": 1639.375,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 9472,
+      "script": "node_modules/typescript/bin/tsc",
+      "args": [
+        "--noEmit",
+        "-p",
+        "/Users/zeesh/Vibe code/Actor empire/docs/reports/2026-10-23-npc-market-budgets/final-verification/typecheck/support-and-prototypes.json"
+      ]
+    },
+    {
+      "label": "regressions",
+      "heapMiB": 768,
+      "peakOwnedTreeRssMiB": 825.078125,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 22716,
+      "script": "/private/tmp/actor-cinema-final-07fdfff-20261023/run-final-regressions.mjs",
+      "args": []
+    },
+    {
+      "label": "production-build",
+      "heapMiB": 2048,
+      "peakOwnedTreeRssMiB": 2610.921875,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 21700,
+      "script": "scripts/build-low-memory.mjs",
+      "args": [
+        "--outDir",
+        "/private/tmp/actor-cinema-final-07fdfff-20261023/web-build"
+      ]
+    }
+  ],
+  "buildOutput": "/private/tmp/actor-cinema-final-07fdfff-20261023/web-build",
+  "buildWarning": "Main bundle remains large: 14.69MB raw, 4.15MB gzip; compile success is not browser performance clearance",
+  "buildInnerGuard": {
+    "exitCode": 0,
+    "signal": null,
+    "heapMB": 2048,
+    "peakOwnedTreeRssMiB": 2619,
+    "stopReason": null,
+    "systemGuard": "darwin"
+  }
+}

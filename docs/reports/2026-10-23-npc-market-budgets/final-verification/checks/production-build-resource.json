@@ -1,0 +1,14 @@
+{
+  "label": "production-build",
+  "heapMiB": 2048,
+  "peakOwnedTreeRssMiB": 2610.921875,
+  "stopReason": null,
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 21700,
+  "script": "scripts/build-low-memory.mjs",
+  "args": [
+    "--outDir",
+    "/private/tmp/actor-cinema-final-07fdfff-20261023/web-build"
+  ]
+}

@@ -1,0 +1,589 @@
+{
+  "executable": "8c6ceb1878902029d1ccdc03c8d261612a7d7cc000bb2d94091b11658807207d",
+  "careers": [
+    {
+      "seed": 0,
+      "weeks": 156,
+      "status": "HORIZON_COMPLETE",
+      "cash": 57643,
+      "skill": 39.70713431250168,
+      "ownFilmIds": [
+        "aud_active_1800000000293_0.046049175318330526",
+        "aud_active_1800000000848_0.4088848610408604",
+        "aud_active_1800000001229_0.7556751167867333"
+      ],
+      "saves": 95,
+      "reloads": 17,
+      "replays": 156,
+      "failedPromotionChecked": true,
+      "peakRssMiB": 1516.90625
+    },
+    {
+      "seed": 1,
+      "weeks": 156,
+      "status": "HORIZON_COMPLETE",
+      "cash": 73511,
+      "skill": 38.793505924397,
+      "ownFilmIds": [
+        "aud_active_1800010000330_0.4338573489803821",
+        "aud_active_1800010000438_0.618649588432163",
+        "aud_active_1800010000608_0.5883789439685643",
+        "aud_active_1800010002050_0.6851570757571608"
+      ],
+      "saves": 90,
+      "reloads": 12,
+      "replays": 156,
+      "failedPromotionChecked": true,
+      "peakRssMiB": 1146.890625
+    },
+    {
+      "seed": 2,
+      "weeks": 116,
+      "status": "CAREER_ENDED",
+      "cash": 61236,
+      "skill": 31.787851341472685,
+      "ownFilmIds": [
+        "aud_active_1800020000093_0.7356912195682526",
+        "aud_active_1800020000298_0.31230108346790075",
+        "aud_active_1800020000926_0.9518506622407585"
+      ],
+      "saves": 66,
+      "reloads": 8,
+      "replays": 116,
+      "failedPromotionChecked": true,
+      "peakRssMiB": 1251.46875
+    },
+    {
+      "seed": 3,
+      "weeks": 156,
+      "status": "HORIZON_COMPLETE",
+      "cash": 75778,
+      "skill": 38.5143653131669,
+      "ownFilmIds": [
+        "aud_active_1800030000797_0.7324093373026699",
+        "aud_active_1800030001623_0.39805654319934547"
+      ],
+      "saves": 92,
+      "reloads": 14,
+      "replays": 156,
+      "failedPromotionChecked": true,
+      "peakRssMiB": 1486.046875
+    }
+  ],
+  "weeks": 584,
+  "all": {
+    "released": 166,
+    "completed": 105,
+    "open": 61,
+    "unknownCompleted": 0,
+    "all": {
+      "completed": 105,
+      "recouped": 53,
+      "hits": 17,
+      "profits": 31,
+      "nearBreakEven": 12,
+      "losses": 45,
+      "exactDeficits": 52
+    },
+    "small": {
+      "completed": 77,
+      "recouped": 44,
+      "hits": 9,
+      "profits": 30,
+      "nearBreakEven": 8,
+      "losses": 30,
+      "exactDeficits": 33
+    },
+    "player": {
+      "completed": 4,
+      "recouped": 2,
+      "hits": 1,
+      "profits": 1,
+      "nearBreakEven": 1,
+      "losses": 1,
+      "exactDeficits": 2
+    },
+    "billionAttainment": [
+      {
+        "billions": 1,
+        "allReleased": 0,
+        "completed": 0
+      },
+      {
+        "billions": 2,
+        "allReleased": 0,
+        "completed": 0
+      },
+      {
+        "billions": 3,
+        "allReleased": 0,
+        "completed": 0
+      }
+    ],
+    "budgetMillions": {
+      "min": 0.9422,
+      "median": 17.734,
+      "p90": 39.639,
+      "max": 73.274
+    },
+    "publicGrossMillions": {
+      "min": 3.26287076,
+      "median": 41.25820506,
+      "p90": 102.73724045,
+      "max": 286.29538802
+    },
+    "theatricalProfitMillions": {
+      "min": -25.58916248,
+      "median": 0.12900054,
+      "p90": 19.40696771,
+      "max": 48.22953188
+    },
+    "knownDevelopment": {
+      "completed": 101,
+      "recouped": 51
+    }
+  },
+  "early": {
+    "releaseCutoff": 78,
+    "released": 60,
+    "completed": 60,
+    "open": 0,
+    "unknownCompleted": 0,
+    "all": {
+      "completed": 60,
+      "recouped": 30,
+      "hits": 7,
+      "profits": 20,
+      "nearBreakEven": 8,
+      "losses": 25,
+      "exactDeficits": 30
+    },
+    "small": {
+      "completed": 40,
+      "recouped": 26,
+      "hits": 3,
+      "profits": 20,
+      "nearBreakEven": 4,
+      "losses": 13,
+      "exactDeficits": 14
+    },
+    "player": {
+      "completed": 1,
+      "recouped": 0,
+      "hits": 0,
+      "profits": 0,
+      "nearBreakEven": 1,
+      "losses": 0,
+      "exactDeficits": 1
+    },
+    "billionAttainment": [
+      {
+        "billions": 1,
+        "allReleased": 0,
+        "completed": 0
+      },
+      {
+        "billions": 2,
+        "allReleased": 0,
+        "completed": 0
+      },
+      {
+        "billions": 3,
+        "allReleased": 0,
+        "completed": 0
+      }
+    ],
+    "budgetMillions": {
+      "min": 8.551,
+      "median": 20.735,
+      "p90": 39.639,
+      "max": 45.23
+    },
+    "publicGrossMillions": {
+      "min": 14.43240916,
+      "median": 43.58945738,
+      "p90": 86.26532616,
+      "max": 103.18984349
+    },
+    "theatricalProfitMillions": {
+      "min": -25.58916248,
+      "median": 0.43787822,
+      "p90": 19.18234303,
+      "max": 20.78524186
+    },
+    "knownDevelopment": {
+      "completed": 59,
+      "recouped": 30
+    }
+  },
+  "sourceGroups": [
+    {
+      "source": "STUDIO_INDEPENDENT",
+      "all": {
+        "released": 161,
+        "completed": 101,
+        "open": 60,
+        "unknownCompleted": 0,
+        "all": {
+          "completed": 101,
+          "recouped": 51,
+          "hits": 16,
+          "profits": 30,
+          "nearBreakEven": 11,
+          "losses": 44,
+          "exactDeficits": 50
+        },
+        "small": {
+          "completed": 73,
+          "recouped": 42,
+          "hits": 8,
+          "profits": 29,
+          "nearBreakEven": 7,
+          "losses": 29,
+          "exactDeficits": 31
+        },
+        "player": {
+          "completed": 0,
+          "recouped": 0,
+          "hits": 0,
+          "profits": 0,
+          "nearBreakEven": 0,
+          "losses": 0,
+          "exactDeficits": 0
+        },
+        "billionAttainment": [
+          {
+            "billions": 1,
+            "allReleased": 0,
+            "completed": 0
+          },
+          {
+            "billions": 2,
+            "allReleased": 0,
+            "completed": 0
+          },
+          {
+            "billions": 3,
+            "allReleased": 0,
+            "completed": 0
+          }
+        ],
+        "budgetMillions": {
+          "min": 4.41,
+          "median": 18.2,
+          "p90": 39.639,
+          "max": 73.274
+        },
+        "publicGrossMillions": {
+          "min": 5.4312062,
+          "median": 41.92663041,
+          "p90": 102.73724045,
+          "max": 286.29538802
+        },
+        "theatricalProfitMillions": {
+          "min": -25.58916248,
+          "median": 0.43787822,
+          "p90": 19.40696771,
+          "max": 48.22953188
+        },
+        "knownDevelopment": {
+          "completed": 101,
+          "recouped": 51
+        }
+      },
+      "early": {
+        "released": 59,
+        "completed": 59,
+        "open": 0,
+        "unknownCompleted": 0,
+        "all": {
+          "completed": 59,
+          "recouped": 30,
+          "hits": 7,
+          "profits": 20,
+          "nearBreakEven": 7,
+          "losses": 25,
+          "exactDeficits": 29
+        },
+        "small": {
+          "completed": 39,
+          "recouped": 26,
+          "hits": 3,
+          "profits": 20,
+          "nearBreakEven": 3,
+          "losses": 13,
+          "exactDeficits": 13
+        },
+        "player": {
+          "completed": 0,
+          "recouped": 0,
+          "hits": 0,
+          "profits": 0,
+          "nearBreakEven": 0,
+          "losses": 0,
+          "exactDeficits": 0
+        },
+        "billionAttainment": [
+          {
+            "billions": 1,
+            "allReleased": 0,
+            "completed": 0
+          },
+          {
+            "billions": 2,
+            "allReleased": 0,
+            "completed": 0
+          },
+          {
+            "billions": 3,
+            "allReleased": 0,
+            "completed": 0
+          }
+        ],
+        "budgetMillions": {
+          "min": 8.551,
+          "median": 20.735,
+          "p90": 39.639,
+          "max": 45.23
+        },
+        "publicGrossMillions": {
+          "min": 14.43240916,
+          "median": 43.58945738,
+          "p90": 86.26532616,
+          "max": 103.18984349
+        },
+        "theatricalProfitMillions": {
+          "min": -25.58916248,
+          "median": 0.43787822,
+          "p90": 19.18234303,
+          "max": 20.78524186
+        },
+        "knownDevelopment": {
+          "completed": 59,
+          "recouped": 30
+        }
+      }
+    },
+    {
+      "source": "PLAYER_CREDIT",
+      "all": {
+        "released": 5,
+        "completed": 4,
+        "open": 1,
+        "unknownCompleted": 0,
+        "all": {
+          "completed": 4,
+          "recouped": 2,
+          "hits": 1,
+          "profits": 1,
+          "nearBreakEven": 1,
+          "losses": 1,
+          "exactDeficits": 2
+        },
+        "small": {
+          "completed": 4,
+          "recouped": 2,
+          "hits": 1,
+          "profits": 1,
+          "nearBreakEven": 1,
+          "losses": 1,
+          "exactDeficits": 2
+        },
+        "player": {
+          "completed": 4,
+          "recouped": 2,
+          "hits": 1,
+          "profits": 1,
+          "nearBreakEven": 1,
+          "losses": 1,
+          "exactDeficits": 2
+        },
+        "billionAttainment": [
+          {
+            "billions": 1,
+            "allReleased": 0,
+            "completed": 0
+          },
+          {
+            "billions": 2,
+            "allReleased": 0,
+            "completed": 0
+          },
+          {
+            "billions": 3,
+            "allReleased": 0,
+            "completed": 0
+          }
+        ],
+        "budgetMillions": {
+          "min": 0.9422,
+          "median": 9.679728,
+          "p90": 10.98674,
+          "max": 10.98674
+        },
+        "publicGrossMillions": {
+          "min": 3.26287076,
+          "median": 17.25812967,
+          "p90": 19.16630802,
+          "max": 19.16630802
+        },
+        "theatricalProfitMillions": {
+          "min": -1.55980974,
+          "median": 0.12900054,
+          "p90": 2.02431661,
+          "max": 2.02431661
+        },
+        "knownDevelopment": {
+          "completed": 0,
+          "recouped": 0
+        }
+      },
+      "early": {
+        "released": 1,
+        "completed": 1,
+        "open": 0,
+        "unknownCompleted": 0,
+        "all": {
+          "completed": 1,
+          "recouped": 0,
+          "hits": 0,
+          "profits": 0,
+          "nearBreakEven": 1,
+          "losses": 0,
+          "exactDeficits": 1
+        },
+        "small": {
+          "completed": 1,
+          "recouped": 0,
+          "hits": 0,
+          "profits": 0,
+          "nearBreakEven": 1,
+          "losses": 0,
+          "exactDeficits": 1
+        },
+        "player": {
+          "completed": 1,
+          "recouped": 0,
+          "hits": 0,
+          "profits": 0,
+          "nearBreakEven": 1,
+          "losses": 0,
+          "exactDeficits": 1
+        },
+        "billionAttainment": [
+          {
+            "billions": 1,
+            "allReleased": 0,
+            "completed": 0
+          },
+          {
+            "billions": 2,
+            "allReleased": 0,
+            "completed": 0
+          },
+          {
+            "billions": 3,
+            "allReleased": 0,
+            "completed": 0
+          }
+        ],
+        "budgetMillions": {
+          "min": 9.679728,
+          "median": 9.679728,
+          "p90": 9.679728,
+          "max": 9.679728
+        },
+        "publicGrossMillions": {
+          "min": 19.16630802,
+          "median": 19.16630802,
+          "p90": 19.16630802,
+          "max": 19.16630802
+        },
+        "theatricalProfitMillions": {
+          "min": -0.29595961,
+          "median": -0.29595961,
+          "p90": -0.29595961,
+          "max": -0.29595961
+        },
+        "knownDevelopment": {
+          "completed": 0,
+          "recouped": 0
+        }
+      }
+    }
+  ],
+  "independentPlans": {
+    "count": 190,
+    "released": 161,
+    "scoped": 190,
+    "budgetMillions": {
+      "min": 4.41,
+      "median": 18.947,
+      "p90": 39.639,
+      "max": 73.274
+    },
+    "bySeed": [
+      {
+        "seed": 0,
+        "plans": 51,
+        "released": 45
+      },
+      {
+        "seed": 1,
+        "plans": 50,
+        "released": 42
+      },
+      {
+        "seed": 2,
+        "plans": 38,
+        "released": 29
+      },
+      {
+        "seed": 3,
+        "plans": 51,
+        "released": 45
+      }
+    ],
+    "byLanguage": [
+      {
+        "language": "ENGLISH",
+        "count": 16
+      },
+      {
+        "language": "HINDI",
+        "count": 15
+      },
+      {
+        "language": "SPANISH",
+        "count": 24
+      },
+      {
+        "language": "PORTUGUESE",
+        "count": 30
+      },
+      {
+        "language": "FRENCH",
+        "count": 25
+      },
+      {
+        "language": "KOREAN",
+        "count": 31
+      },
+      {
+        "language": "JAPANESE",
+        "count": 21
+      },
+      {
+        "language": "GERMAN",
+        "count": 28
+      }
+    ]
+  },
+  "limitations": [
+    "Normal App action policies, no career grants; prepared billion-dollar fixtures excluded",
+    "Four seeded worlds can repeat studio/title identities; these are correlated observations, not independent probability estimates",
+    "Closed known-cost films only in profit denominators; open titles remain censored",
+    "Theatrical profit excludes future media. Known development costs are shown separately because older histories may lack them",
+    "Unsigned independent movie investment changes; signed commissions and existing contracts retain their rules"
+  ]
+}

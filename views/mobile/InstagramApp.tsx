@@ -11,6 +11,7 @@ import { Camera, Heart, MessageCircle, Send, Search, User, Grid, ArrowLeft, Vide
 import { IndustryClaimContextPanel, getIndustryClaimPresentation } from './IndustryClaimContext';
 import { IndustryNarrativeContext } from './IndustryNarrativeContext';
 import { getEligiblePromotionProjects } from '../../services/projectPromotionAttribution';
+import { getSyncedNpcStates } from '../../services/relationshipBond';
 
 type InstagramFitMode = 'cover' | 'contain';
 const INSTAGRAM_IMAGE_SIZE = 1080;
@@ -312,7 +313,7 @@ export const InstagramApp: React.FC<InstagramAppProps> = ({ player, onBack, onPo
   // Safe Access
   const feed = player.instagram?.feed || [];
   const posts = player.instagram?.posts || [];
-  const npcStates = (player.instagram?.npcStates || {}) as Record<string, NPCState>;
+  const npcStates: Record<string, NPCState> = useMemo(() => getSyncedNpcStates(player), [player.relationships, player.instagram?.npcStates]);
   const creatorProfiles = getEnabledGlobalCreatorSocialProfiles(player);
   const mediaProfiles = player.world.industryMedia
       ? getIndustryMediaSocialProfiles(player.world.industryMedia)

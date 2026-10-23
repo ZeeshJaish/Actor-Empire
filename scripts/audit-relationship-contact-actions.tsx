@@ -43,7 +43,8 @@ check('successful NPC contact refreshes an existing connection absolute clock', 
     const p = fixture(); p.relationships[0].npcId = npc.id; addNpcState(p, 60);
     const test = actionsFor(p); test.actions.handleNPCInteract(npc, 'GREET');
     assert.equal(test.read().relationships[0].lastInteractionAbsolute, getAbsoluteWeek(50, 10));
-    assert.ok(test.read().relationships[0].closeness > 60);
+    assert.equal(test.read().relationships[0].closeness, 53, 'normal +3 greeting uses Social 50, not stale Instagram 60');
+    assert.equal(test.read().instagram.npcStates[npc.id].relationshipScore, 53);
 });
 check('newly befriended NPC starts with the current absolute interaction clock', () => {
     const p = fixture(); addNpcState(p, 80);

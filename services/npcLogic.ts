@@ -11,6 +11,7 @@ import { INVESTOR_LEADERSHIP_POOL, PROJECT_INVESTORS, investorOwnerNpcId, invest
 import { CREW_PROFESSIONALS } from './crewMarket';
 import { STREAMING_EXECUTIVE_CANDIDATES } from './streamingCompany';
 import { WRITER_NPC_LIBRARY } from './writerNpcLibrary';
+import { getNpcRelationshipScore } from './relationshipBond';
 export { getGenderedAvatar } from './npcAvatar';
 import { getGenderedAvatar } from './npcAvatar';
 
@@ -1218,7 +1219,7 @@ export const calculateInteraction = (player: Player, npc: NPCActor, type: Intera
     let isBefriended = false;
 
     const state = player.instagram.npcStates[npc.id] || { relationshipScore: 0, isFollowing: false };
-    const currentRel = state.relationshipScore || 0;
+    const currentRel = getNpcRelationshipScore(player, npc.id);
     const playerFame = player.stats.fame;
 
     // Difficulty Modifier (A-List is hard)

@@ -1,0 +1,23 @@
+{
+  "sourceCommit": "07fdfff839515158154e0f5e22920aa1ad1bf101",
+  "passed": true,
+  "pinnedProductSourceDrift": [],
+  "trackedChanges": [
+    "docs/reports/2026-10-23-npc-market-budgets/README.md",
+    "scripts/audit-cinema-phenomenon.ts",
+    "tsconfig.json"
+  ],
+  "untrackedOnlyVerificationReports": true,
+  "typedRoots": 1632,
+  "allConfiguredRootsCovered": 1855,
+  "normalExecutableUnchanged": true,
+  "phenomenonExecutableUnchanged": true,
+  "phenomenonAuditMatchesCheckedSource": true,
+  "typeCheck": true,
+  "regressions": true,
+  "productionBuild": true,
+  "buildIndexSha256": "8f20914df5e801f9b0d862ef8ee8388c9242568afbfece6a07ab2fddbd954bf7",
+  "noCohortControllerLock": true,
+  "gameplayPaymentOrCapChanges": [],
+  "at": "2026-10-23T17:28:59.947Z"
+}

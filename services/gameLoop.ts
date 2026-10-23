@@ -1,6 +1,7 @@
 import { ensureActorCareerBalance, getCareerLearningGain, getCareerPassivePreparation, getCareerFinalPerformance, getCareerPublicityGain, getCareerProductionStartPerformance, isPersonalCareerActing, getCareerFameDecay, applyCareerReleaseRecognition, getCareerReportedOutcome } from './actorCareerBalance';
 import { createSeriesStreamingBids, quoteSeriesStreamingRights } from './seriesStreamingValue';
 import { settleStockCash } from './stockSettlement';
+import { syncLinkedNpcRelationships } from './relationshipBond';
 import { markStockDividendsSettled } from './stockLogic';
 import { recordCinemaStreamingAudience } from './boxOffice/boxOfficeStreamingAudience';
 import { commitCinemaAnnouncement } from './boxOffice/boxOfficeExposureAdapters';
@@ -7345,5 +7346,5 @@ export const processGameWeek = async (
         logs_added: logsToAdd.length,
         inbox_count: nextPlayer.inbox?.length || 0,
     });
-    return { player: nextPlayer, triggerAd };
+    return { player: syncLinkedNpcRelationships(nextPlayer), triggerAd };
 };

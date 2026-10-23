@@ -1,0 +1,11 @@
+{
+  "label": "mature-policy-choice-green",
+  "heapMiB": 640,
+  "peakOwnedTreeRssMiB": 1030.96875,
+  "stopReason": null,
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 2558,
+  "script": "/private/tmp/actor-cinema-mature-no-grants-07fdfff-20261023/tooling/run-policy-unit.mjs",
+  "args": []
+}

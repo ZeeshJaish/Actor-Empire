@@ -1,0 +1,15 @@
+{
+  "label": "mature-v2-typecheck",
+  "heapMiB": 1024,
+  "peakOwnedTreeRssMiB": 952.1875,
+  "stopReason": null,
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 4162,
+  "script": "node_modules/typescript/bin/tsc",
+  "args": [
+    "--noEmit",
+    "-p",
+    "docs/reports/2026-10-23-mature-no-grant-career/checks/typecheck.json"
+  ]
+}

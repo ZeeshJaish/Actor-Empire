@@ -1,0 +1,11 @@
+{
+  "label": "regressions",
+  "heapMiB": 768,
+  "peakOwnedTreeRssMiB": 825.078125,
+  "stopReason": null,
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 22716,
+  "script": "/private/tmp/actor-cinema-final-07fdfff-20261023/run-final-regressions.mjs",
+  "args": []
+}

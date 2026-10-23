@@ -1,0 +1,10 @@
+{
+  "checkpoint": "/private/tmp/actor-cinema-final-07fdfff-20261023/normal/career-0.json.gz",
+  "checkpointSha256": "5aeec4d9bbfa70ed2f7e01893f4cf56a3817a1032ea49480d91d3bccc4ecbe8d",
+  "executable": "8c6ceb1878902029d1ccdc03c8d261612a7d7cc000bb2d94091b11658807207d",
+  "weeks": 156,
+  "cash": 57643,
+  "sourceRef": "07fdfff",
+  "initialCash": 2000,
+  "manualCapitalGrants": 0
+}

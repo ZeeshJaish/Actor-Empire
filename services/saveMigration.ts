@@ -1,4 +1,5 @@
 import { ensureActorCareerBalance } from './actorCareerBalance';
+import { syncLinkedNpcRelationships } from './relationshipBond';
 import { inspectStockSaveContainers, inspectStockSaveCompatibility, migrateStockPortfolio, recordStockQuoteRepairs, StockSaveRecoveryError } from './stockSaveCompatibility';
 import { CinemaMigrationError, inspectCinemaSavedState, migrateCinemaState } from './boxOffice/boxOfficeMigration';
 import { preserveCinemaCastRecognition } from './boxOffice/boxOfficeInputs';
@@ -1051,8 +1052,8 @@ const withCinemaMigration = (player: Player): Player => {
         const projectDetails = r.type === 'MOVIE' ? preserveCinemaCastRecognition(r.projectDetails, migrated) : r.projectDetails;
         return projectDetails === r.projectDetails ? r : { ...r, projectDetails };
     });
-    return commitments.some((c,i) => c !== migrated.commitments[i]) || activeReleases.some((r,i) => r !== migrated.activeReleases[i])
-        ? { ...migrated, commitments, activeReleases } : migrated;
+    return syncLinkedNpcRelationships(commitments.some((c,i) => c !== migrated.commitments[i]) || activeReleases.some((r,i) => r !== migrated.activeReleases[i])
+        ? { ...migrated, commitments, activeReleases } : migrated);
 };
 export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
     const stockContainerIssues = inspectStockSaveContainers(input);

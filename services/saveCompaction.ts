@@ -1,4 +1,5 @@
 import { retainReferencedNpcProfiles } from './npcRetention';
+import { syncLinkedNpcRelationships } from './relationshipBond';
 import { STUDIO_AI_LEDGER_LIMIT } from './studioAi/studioAiState';
 import { PLATFORM_AI_RUNTIME_SCHEMA_VERSION, type Player } from '../types';
 import { getAbsoluteWeek } from './legacyLogic';
@@ -1098,7 +1099,7 @@ export const compactPlayerForPersistence = (nextPlayer: Player): Player => {
     };
   }
 
-  return safePlayer as Player;
+  return syncLinkedNpcRelationships(safePlayer as Player);
 };
 
 export const compactPlayerForTransfer = async <T extends Player>(player: T): Promise<T> => {

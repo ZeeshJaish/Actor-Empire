@@ -1,0 +1,18 @@
+{
+  "extends": "/Users/zeesh/Vibe code/Actor empire/tsconfig.json",
+  "compilerOptions": {
+    "incremental": false
+  },
+  "files": [
+    "/Users/zeesh/Vibe code/Actor empire/raw-assets.d.ts",
+    "/Users/zeesh/Vibe code/Actor empire/world-atlas.d.ts",
+    "/Users/zeesh/Vibe code/Actor empire/components/streaming-transplant/css-modules.d.ts",
+    "/Users/zeesh/Vibe code/Actor empire/lab/responsiveLayoutQa.tsx",
+    "/Users/zeesh/Vibe code/Actor empire/services/adLogic.ts",
+    "/Users/zeesh/Vibe code/Actor empire/scripts/audit-cinema-mature-career.ts",
+    "/Users/zeesh/Vibe code/Actor empire/scripts/audit-cinema-mature-policy.ts",
+    "/Users/zeesh/Vibe code/Actor empire/scripts/fixtures/cinemaMatureAppPolicy.ts"
+  ],
+  "include": [],
+  "exclude": []
+}

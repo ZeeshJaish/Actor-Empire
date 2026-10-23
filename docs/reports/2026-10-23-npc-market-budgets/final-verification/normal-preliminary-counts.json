@@ -1,0 +1,166 @@
+{
+  "weeks": 584,
+  "careers": [
+    {
+      "seed": 0,
+      "genre": "DRAMA",
+      "status": "HORIZON_COMPLETE",
+      "weeks": 156,
+      "small": {
+        "completed": 25,
+        "recouped": 13,
+        "hits": 4,
+        "profits": 9,
+        "nearBreakEven": 2,
+        "losses": 10,
+        "exactDeficits": 12
+      },
+      "player": {
+        "completed": 3,
+        "recouped": 2,
+        "hits": 1,
+        "profits": 1,
+        "nearBreakEven": 1,
+        "losses": 0,
+        "exactDeficits": 1
+      },
+      "saves": 95,
+      "reloads": 17,
+      "replays": 156,
+      "failedPromotionChecked": true,
+      "cash": 57643
+    },
+    {
+      "seed": 1,
+      "genre": "COMEDY",
+      "status": "HORIZON_COMPLETE",
+      "weeks": 156,
+      "small": {
+        "completed": 19,
+        "recouped": 12,
+        "hits": 1,
+        "profits": 8,
+        "nearBreakEven": 3,
+        "losses": 7,
+        "exactDeficits": 7
+      },
+      "player": {
+        "completed": 0,
+        "recouped": 0,
+        "hits": 0,
+        "profits": 0,
+        "nearBreakEven": 0,
+        "losses": 0,
+        "exactDeficits": 0
+      },
+      "saves": 90,
+      "reloads": 12,
+      "replays": 156,
+      "failedPromotionChecked": true,
+      "cash": 73511
+    },
+    {
+      "seed": 2,
+      "genre": "ACTION",
+      "status": "CAREER_ENDED",
+      "weeks": 116,
+      "small": {
+        "completed": 10,
+        "recouped": 7,
+        "hits": 1,
+        "profits": 6,
+        "nearBreakEven": 0,
+        "losses": 3,
+        "exactDeficits": 3
+      },
+      "player": {
+        "completed": 0,
+        "recouped": 0,
+        "hits": 0,
+        "profits": 0,
+        "nearBreakEven": 0,
+        "losses": 0,
+        "exactDeficits": 0
+      },
+      "saves": 66,
+      "reloads": 8,
+      "replays": 116,
+      "failedPromotionChecked": true,
+      "cash": 61236
+    },
+    {
+      "seed": 3,
+      "genre": "DRAMA",
+      "status": "HORIZON_COMPLETE",
+      "weeks": 156,
+      "small": {
+        "completed": 23,
+        "recouped": 12,
+        "hits": 3,
+        "profits": 7,
+        "nearBreakEven": 3,
+        "losses": 10,
+        "exactDeficits": 11
+      },
+      "player": {
+        "completed": 1,
+        "recouped": 0,
+        "hits": 0,
+        "profits": 0,
+        "nearBreakEven": 0,
+        "losses": 1,
+        "exactDeficits": 1
+      },
+      "saves": 92,
+      "reloads": 14,
+      "replays": 156,
+      "failedPromotionChecked": true,
+      "cash": 75778
+    }
+  ],
+  "all": {
+    "completed": 105,
+    "recouped": 53,
+    "hits": 17,
+    "profits": 31,
+    "nearBreakEven": 12,
+    "losses": 45,
+    "exactDeficits": 52
+  },
+  "small": {
+    "completed": 77,
+    "recouped": 44,
+    "hits": 9,
+    "profits": 30,
+    "nearBreakEven": 8,
+    "losses": 30,
+    "exactDeficits": 33
+  },
+  "player": {
+    "completed": 4,
+    "recouped": 2,
+    "hits": 1,
+    "profits": 1,
+    "nearBreakEven": 1,
+    "losses": 1,
+    "exactDeficits": 2
+  },
+  "released": 166,
+  "open": 61,
+  "billion": [
+    {
+      "billions": 1,
+      "count": 0
+    },
+    {
+      "billions": 2,
+      "count": 0
+    },
+    {
+      "billions": 3,
+      "count": 0
+    }
+  ],
+  "largestGrossMillions": 286.29538802,
+  "peakRssMiB": 1516.90625
+}

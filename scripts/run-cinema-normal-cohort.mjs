@@ -5,7 +5,7 @@ import {createHash} from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 import {resolve,relative,dirname} from 'node:path';
 const out=resolve(process.env.CAREER_OUTPUT||'/private/tmp/actor-normal-career-cohort-20261023');mkdirSync(out,{recursive:true});
-const kind=process.env.CAREER_AUDIT_KIND||'normal';if(!['normal','phenomenon'].includes(kind))throw Error('Unknown career audit kind');
+const kind=process.env.CAREER_AUDIT_KIND||'normal';if(!['normal','phenomenon','mature'].includes(kind))throw Error('Unknown career audit kind');
 const sourceRef=process.env.CAREER_SOURCE_REF;
 const sourceDir=process.env.CAREER_SOURCE_DIR,overridesDir=process.env.CAREER_SOURCE_OVERRIDES_DIR;
 const seeds=(process.env.CAREER_SEEDS||'0,1,2,3').split(',').map(Number),horizon=Number(process.env.CAREER_WEEKS||208),batch=Number(process.env.CAREER_BATCH_WEEKS||6);
@@ -30,11 +30,12 @@ try{
    const contents=override&&existsSync(override)?readFileSync(override,'utf8'):frozenPath&&existsSync(frozenPath)?readFileSync(frozenPath,'utf8'):
     sourceRef&&tracked.has(p)?execFileSync('git',['show',`${sourceRef}:${p}`],{encoding:'utf8',maxBuffer:16e6}):readFileSync(p,'utf8');cache.set(p,contents);return contents;
   };
-  const frozen=new Map(['hooks/useGameActions.ts','App.tsx','scripts/audit-actor-career-flow.ts'].map(p=>[p,readSource(p)]));
-  const built=await build({entryPoints:[kind==='normal'?'scripts/audit-cinema-normal-cohort.ts':'scripts/audit-cinema-phenomenon.ts'],bundle:true,platform:'node',format:'esm',loader:{'.csv':'text','.css':'empty'},outfile:bundle,metafile:true,logLevel:'error',plugins:[{
+  const frozen=new Map(['hooks/useGameActions.ts','App.tsx','scripts/audit-actor-career-flow.ts',...(kind==='mature'?['views/mobile/MobilePage.tsx']:[])].map(p=>[p,readSource(p)]));
+  const entry=kind==='mature'?'scripts/audit-cinema-mature-career.ts':kind==='normal'?'scripts/audit-cinema-normal-cohort.ts':'scripts/audit-cinema-phenomenon.ts';
+  const built=await build({entryPoints:[entry],bundle:true,platform:'node',format:'esm',loader:{'.csv':'text','.css':'empty'},outfile:bundle,metafile:true,logLevel:'error',plugins:[{
    name:'freeze-audit-ui-sources',setup(api){api.onLoad({filter:/\.(tsx?|json|csv)$/},args=>{
     const p=relative(process.cwd(),args.path);if(p.startsWith('node_modules/')||p.startsWith('../'))return;
-    const isHarness=/(actorCareerActions|cinemaNormalAppPolicy)\.ts$/.test(args.path);
+    const isHarness=/(actorCareerActions|cinemaNormalAppPolicy|cinemaMatureAppPolicy)\.ts$/.test(args.path);
     if(!sourceRef&&!sourceDir&&!(overridesDir&&existsSync(resolve(overridesDir,p)))&&!isHarness)return;
     let contents=readSource(p);for(const [p,text] of frozen){
      const pattern=`readFileSync('${p}', 'utf8')`,compact=`readFileSync('${p}','utf8')`;
@@ -53,7 +54,9 @@ try{
  for(const seed of seeds)while(true){
   const reportFile=`${out}/career-${seed}.json`,prior=existsSync(reportFile)?JSON.parse(readFileSync(reportFile,'utf8')):null;
   if(prior&&prior.executable!==metadata.sha256)throw Error('Checkpoint/report executable differs');
-  if(prior&&['HORIZON_COMPLETE','CAREER_ENDED','UNFUNDED','ATTAINMENT_REACHED','NATURALLY_CLOSED'].includes(prior.status)){console.log(JSON.stringify({seed,retained:prior.status,weeks:prior.weeks}));break}
+  const observeThrough=Number(process.env.CAREER_OBSERVE_THROUGH||0);
+  if(prior?.status==='CHECKPOINT_READY'&&observeThrough>0&&prior.weeks>=observeThrough){console.log(JSON.stringify({seed,retained:'OBSERVATION_COMPLETE',weeks:prior.weeks}));break}
+  if(prior&&['HORIZON_COMPLETE','CAREER_ENDED','UNFUNDED','ATTAINMENT_REACHED','NATURALLY_CLOSED','OWNER_READY'].includes(prior.status)){console.log(JSON.stringify({seed,retained:prior.status,weeks:prior.weeks}));break}
   if(prior?.status==='FAILURE')throw Error('Retained failed evidence: '+prior.failure);
   const moduleSeed=(20261023+(kind==='phenomenon'?0:seed)*7919)>>>0;
   const bootstrap=`let state=${moduleSeed},tick=0;Math.random=()=>{let t=state+=0x6D2B79F5;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return((t^(t>>>14))>>>0)/4294967296};Date.now=()=>1800000000000+${seed}*10000000+tick++;await import(${JSON.stringify(pathToFileURL(bundle).href)});`;
