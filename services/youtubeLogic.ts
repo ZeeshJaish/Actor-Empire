@@ -1,3 +1,4 @@
+import {projectBuiltinPerson} from './fictionalNames';
 import { resolveYoutubeWeek, readYoutubeAudience, quoteYoutubeBrand, quoteYoutubeNewSubscribers } from './youtubeEconomy';
 import { availableCreatorSpend, recordCreatorSpend } from './creatorEconomy';
 
@@ -421,7 +422,7 @@ const ALWAYS_ON_CREATOR_THRESHOLD = 20 * M;
 
 export const DEFAULT_GLOBAL_CREATOR_PROFILES = GLOBAL_YOUTUBE_CREATORS.filter(
     creator => creator.followers >= ALWAYS_ON_CREATOR_THRESHOLD
-);
+).map(projectBuiltinPerson);
 
 export const getEnabledGlobalCreatorProfiles = (player: Player) => {
     const enabledPacks = Array.isArray(player.flags?.enabledGlobalActorPacks)
@@ -437,7 +438,8 @@ export const getEnabledGlobalCreatorProfiles = (player: Player) => {
             creator.followers >= ALWAYS_ON_CREATOR_THRESHOLD ||
             enabledCountries.includes(creator.country.toLowerCase())
         )
-        .filter((creator, idx, arr) => arr.findIndex(entry => entry.id === creator.id) === idx);
+        .filter((creator, idx, arr) => arr.findIndex(entry => entry.id === creator.id) === idx)
+        .map(creator => creator.followers >= ALWAYS_ON_CREATOR_THRESHOLD ? projectBuiltinPerson(creator) : creator);
 };
 
 export const getGlobalCreatorCountForPack = (packId: string): number => {

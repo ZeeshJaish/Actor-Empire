@@ -1,0 +1,19 @@
+{
+  "results": [
+    {
+      "width": 320,
+      "namesVisible": true,
+      "packInstallationRemoved": true,
+      "languageAndTutorialRetained": true,
+      "horizontalOverflow": false
+    },
+    {
+      "width": 390,
+      "namesVisible": true,
+      "packInstallationRemoved": true,
+      "languageAndTutorialRetained": true,
+      "horizontalOverflow": false
+    }
+  ],
+  "pageErrors": []
+}

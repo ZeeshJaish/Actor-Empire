@@ -1,3 +1,4 @@
+import {canonicalPersonName} from './fictionalNames';
 import { resolveCareerOfferRole } from './actorCareerBalance';
 import { quoteActorBackend } from './actorOfferTerms';
 import { completeOfferedCinemaCast } from './boxOffice/boxOfficeInputs';
@@ -245,7 +246,7 @@ export interface BreakthroughAuditionInvite {
 
 export const getCastingDirectorStyle = (directorName: string = ''): CastingDirectorStyle => {
     const styles: CastingDirectorStyle[] = ['BALANCED', 'CRAFT_FIRST', 'STAR_DRIVEN', 'GENRE_PURIST', 'RISK_TAKER'];
-    const hash = [...directorName].reduce((total, char) => ((total * 31) + char.charCodeAt(0)) >>> 0, 7);
+    const hash = [...canonicalPersonName(directorName)].reduce((total, char) => ((total * 31) + char.charCodeAt(0)) >>> 0, 7);
     return styles[hash % styles.length];
 };
 

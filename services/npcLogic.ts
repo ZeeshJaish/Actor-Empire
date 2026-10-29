@@ -1,3 +1,4 @@
+import {canonicalPersonName,projectBuiltinPerson} from './fictionalNames';
 
 // ... existing imports
 import { NPCActor, NPCTier, NPCPrestige, Player, InstaPost, InstaPostType, InteractionType, Genre, Gender, ActorTrait, MusicArtist, GameLanguage } from '../types';
@@ -139,7 +140,7 @@ const createInvestorOwnerNPC = ({
     tags?: string[];
     profile?: string;
 }): NPCActor => {
-    const gender = investorOwnerGender(name);
+    const gender = investorOwnerGender(canonicalPersonName(name));
     const netWorth = Math.max(5_000_000, Math.round(cashCapacity * 2.4));
     const tier = investorOwnerTier(cashCapacity);
     return {
@@ -147,22 +148,22 @@ const createInvestorOwnerNPC = ({
         name,
         handle: `@${name.toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 22) || id}`,
         gender,
-        avatar: getGenderedAvatar(gender, name),
+        avatar: getGenderedAvatar(gender, canonicalPersonName(name)),
         tier,
         prestigeBias: tags.includes('prestige') || tags.includes('legacy') ? 'PRESTIGE' : tags.includes('commercial') || tags.includes('global') ? 'COMMERCIAL' : 'MIXED',
-        openness: 18 + (stableHash(name) % 32),
+        openness: 18 + (stableHash(canonicalPersonName(name)) % 32),
         followers: Math.max(80_000, Math.round(netWorth / 12)),
         netWorth,
         occupation: 'INVESTOR',
         bio: `${title || 'Investor'} at ${company}. ${profile}`,
         forbesCategory: 'Entertainment Investor',
         stats: {
-            talent: 55 + (stableHash(`${name}:talent`) % 30),
+            talent: 55 + (stableHash(`${canonicalPersonName(name)}:talent`) % 30),
             fame: Math.min(95, 35 + Math.log10(Math.max(10, netWorth)) * 8),
             genreXP: createGenreXP(['DRAMA'])
         },
         traits: tags.includes('aggressive') || tags.includes('high-risk') ? ['AMBITIOUS', 'DIVA'] : ['PROFESSIONAL', 'AMBITIOUS'],
-        potential: Math.min(100, 60 + (stableHash(`${name}:potential`) % 30)),
+        potential: Math.min(100, 60 + (stableHash(`${canonicalPersonName(name)}:potential`) % 30)),
         isIndependent: true
     };
 };
@@ -913,7 +914,7 @@ export const generateNPCs = (): NPCActor[] => {
         npcs.push(generateRandomNPC(i));
     }
 
-    return npcs;
+    return npcs.map(projectBuiltinPerson);
 };
 
 /** Streaming leaders are real world NPCs, so their portraits and identities are
@@ -940,7 +941,7 @@ export const STREAMING_EXECUTIVE_NPCS: NPCActor[] = STREAMING_EXECUTIVE_CANDIDAT
 }));
 
 // GLOBAL DB (Initialized once in app)
-export const NPC_DATABASE = [...generateNPCs(), ...CREW_PROFESSIONALS, ...STREAMING_EXECUTIVE_NPCS, ...WRITER_NPC_LIBRARY];
+export const NPC_DATABASE = [...generateNPCs(), ...CREW_PROFESSIONALS, ...STREAMING_EXECUTIVE_NPCS, ...WRITER_NPC_LIBRARY].map(projectBuiltinPerson);
 
 // --- TALENT AVAILABILITY LOGIC ---
 
@@ -1340,7 +1341,7 @@ export const calculateProjectFameMultiplier = (castIds: string[], directorName: 
     let totalFame = (playerCredited ? finiteScore(playerFame) : 0) + (Number.isFinite(extraFame) ? Math.max(0, extraFame) : 0);
     
     // Find director fame
-    const director = NPC_DATABASE.find(n => n.name === directorName && n.occupation === 'DIRECTOR');
+    const director = NPC_DATABASE.find(n => canonicalPersonName(n.name) === canonicalPersonName(directorName) && n.occupation === 'DIRECTOR');
     if (director?.stats?.fame) totalFame += director.stats.fame;
     
     // Find cast fame

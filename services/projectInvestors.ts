@@ -1,3 +1,4 @@
+import {canonicalPersonName,fictionalPersonName,canonicalProjectTitle} from './fictionalNames';
 import {
     Business,
     GameLanguage,
@@ -37,7 +38,7 @@ const INVESTOR_LEADERSHIP_REASONS = [
     'aggressive expansion into entertainment'
 ];
 
-export const PROJECT_INVESTORS: ProjectInvestor[] = [
+export const PROJECT_INVESTORS: ProjectInvestor[] = ([
     {
         id: 'investor_marlowe_pictures',
         name: 'Marlowe Pictures',
@@ -295,7 +296,7 @@ export const PROJECT_INVESTORS: ProjectInvestor[] = [
         preferredFundingModes: ['SYNDICATE'],
         description: 'Expensive gap money that appears when top-tier investors hesitate.'
     }
-];
+] satisfies ProjectInvestor[]).map(investor => ({...investor,...(investor.ownerName?{ownerName:fictionalPersonName(investor.ownerName)}:{})}));
 
 const genreFit = (investor: ProjectInvestor, genre: Genre) => (
     investor.preferredGenres.includes(genre) ? 18 : -8
@@ -348,11 +349,11 @@ const hashString = (value: string): number => {
 
 export const investorOwnerNpcId = (investor: ProjectInvestor): string | undefined => {
     if (!investor.ownerName) return undefined;
-    return `investor_owner_${investor.ownerName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')}`;
+    return `investor_owner_${canonicalPersonName(investor.ownerName).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')}`;
 };
 
 export const investorOwnerNpcIdFromName = (ownerName: string): string => (
-    `investor_owner_${ownerName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')}`
+    `investor_owner_${canonicalPersonName(ownerName).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')}`
 );
 
 const getInvestorLeadershipOverride = (
@@ -486,7 +487,7 @@ export const generateProjectInvestorOffers = ({
     const score = getStudioInvestorScore(studio, player);
     const budgetPressure = clamp((packageBudget / 100_000_000) * 12, 0, 16);
     const maxRaise = getMaxInvestorRaise(packageBudget, lockedExternalFunding);
-    const availabilitySeed = `${project.sourceScriptId || project.title}:${player?.currentWeek || 0}:${player?.age || 0}:${fundingMode}`;
+    const availabilitySeed = `${project.sourceScriptId || (project.isFamous ? canonicalProjectTitle(project.title) : project.title)}:${player?.currentWeek || 0}:${player?.age || 0}:${fundingMode}`;
     return PROJECT_INVESTORS
         .map(investor => {
             const modeFit = getInvestorModeFit(investor, fundingMode);

@@ -1,12 +1,10 @@
 
 import React, { useEffect, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { ArrowLeft, Twitter, Send, Star, Globe, LogOut, Coffee, Bug, Puzzle, Lock, CheckCircle2, Users, ChevronRight, FileText, ShieldCheck, Gauge, Database, Copy, Smartphone, MessageCircle, LifeBuoy, Bell, Download, Upload } from 'lucide-react';
+import { ArrowLeft, Twitter, Send, Star, Globe, LogOut, Coffee, Bug, CheckCircle2, ChevronRight, FileText, ShieldCheck, Gauge, Database, Copy, Smartphone, MessageCircle, LifeBuoy, Bell, Download, Upload } from 'lucide-react';
 import { GameLanguage, Player } from '../types';
 import { APP_DISPLAY_VERSION } from '../services/appVersion';
 import { CHANGELOG_ENTRIES, getChangelogTypeLabel, getLatestChangelogEntry, type ChangelogEntry, type ChangelogUpdateType } from '../services/changelog';
-import { createGlobalActorPackNPCs, getGlobalActorPackDescription, getGlobalActorPackLabel, GLOBAL_ACTOR_PACKS } from '../services/npcLogic';
-import { getGlobalCreatorCountForPack } from '../services/youtubeLogic';
 import { getPlayerLanguage, SUPPORTED_LANGUAGES, t } from '../services/i18n';
 import { buildActiveNewPlayerTutorialState, writeNewPlayerTutorialState } from '../services/newPlayerTutorial';
 import { isAndroidSaveTransferSurface, type SaveTransferResult } from '../services/saveTransfer';
@@ -22,7 +20,7 @@ interface SettingsPageProps {
   onMainMenu: () => void;
 }
 
-type SettingsMode = 'SETTINGS' | 'PERFORMANCE' | 'GAMEPLAY' | 'LANGUAGE' | 'SUPPORT' | 'COMMUNITY' | 'MODS' | 'EXTERNAL_ACTORS' | 'DATA_TRANSFER' | 'CHANGELOG';
+type SettingsMode = 'SETTINGS' | 'PERFORMANCE' | 'GAMEPLAY' | 'LANGUAGE' | 'SUPPORT' | 'COMMUNITY' | 'DATA_TRANSFER' | 'CHANGELOG';
 type SettingsIcon = React.ComponentType<{ size?: number; className?: string }>;
 
 const ISSUE_CATEGORIES = [
@@ -473,55 +471,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
     </div>
   );
 
-  const enableActorPack = (packId: string) => {
-    if (enabledPackIds.includes(packId)) return;
-
-    onUpdatePlayer(prev => {
-      const currentPackIds = Array.isArray(prev.flags?.enabledGlobalActorPacks)
-        ? prev.flags.enabledGlobalActorPacks as string[]
-        : [];
-      if (currentPackIds.includes(packId)) return prev;
-
-      const packNPCs = createGlobalActorPackNPCs(packId);
-      const pack = GLOBAL_ACTOR_PACKS.find(entry => entry.id === packId);
-      const packLabel = pack ? getGlobalActorPackLabel(pack, language) : t(language, 'services.npc.globalActorPack.label', { country: 'Global' });
-      const existingExtraNPCs = Array.isArray(prev.flags?.extraNPCs) ? prev.flags.extraNPCs : [];
-      const existingIds = new Set([
-        ...existingExtraNPCs.map((npc: any) => npc.id),
-        ...existingExtraNPCs.map((npc: any) => npc.name)
-      ]);
-      const newNPCs = packNPCs.filter(npc => !existingIds.has(npc.id) && !existingIds.has(npc.name));
-
-      return {
-        ...prev,
-        flags: {
-          ...prev.flags,
-          enabledGlobalActorPacks: [...currentPackIds, packId],
-          extraNPCs: [...existingExtraNPCs, ...newNPCs],
-          modHistory: [
-            ...(Array.isArray(prev.flags?.modHistory) ? prev.flags.modHistory : []),
-            {
-              id: `mod_${packId}_${Date.now()}`,
-              type: 'GLOBAL_ACTOR_PACK',
-              packId,
-              enabledAtAge: prev.age,
-              enabledAtWeek: prev.currentWeek
-            }
-          ]
-        },
-        logs: [
-          {
-            week: prev.currentWeek,
-            year: prev.age,
-            message: t(language, 'settings.globalActorPack.enabledLog', { packLabel }),
-            type: 'positive'
-          },
-          ...prev.logs
-        ].slice(0, 50)
-      };
-    });
-  };
-
   if (mode === 'PERFORMANCE') {
     return (
       <div className="space-y-5 pb-24 pt-4">
@@ -587,19 +536,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
                   )}
                   <span>{selectedLanguageOption?.nativeLabel || language}</span>
                 </div>
-              </div>
-            </div>
-            <ChevronRight size={18} className="text-zinc-500"/>
-          </button>
-          <button
-            onClick={() => setMode('MODS')}
-            className="w-full flex items-center justify-between p-4 bg-amber-500/10 rounded-2xl hover:bg-amber-500/15 transition-colors border border-amber-500/20"
-          >
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-amber-500 rounded-lg text-black"><Puzzle size={20}/></div>
-              <div className="text-left">
-                <div className="font-bold text-white">{tr('settings.modPacks')}</div>
-                <div className="text-xs text-zinc-400">{tr('settings.activePacks', { count: enabledPackIds.length })}</div>
               </div>
             </div>
             <ChevronRight size={18} className="text-zinc-500"/>
@@ -1101,127 +1037,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
     );
   }
 
-  if (mode === 'MODS') {
-    return (
-      <div className="space-y-5 pb-24 pt-4">
-        <div className="flex items-center gap-4">
-          <button onClick={() => setMode('GAMEPLAY')} className="p-2 bg-zinc-900 rounded-full hover:bg-zinc-800 transition-colors">
-              <ArrowLeft size={20} className="text-white"/>
-          </button>
-          <div>
-            <div className="text-[10px] text-amber-400 font-black uppercase tracking-[0.28em]">{tr('settings.optionalContent')}</div>
-            <h2 className="text-3xl font-bold text-white">{tr('settings.mods')}</h2>
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          <button
-            onClick={() => setMode('EXTERNAL_ACTORS')}
-            className="w-full rounded-3xl border border-amber-500/20 bg-amber-500/10 p-5 text-left hover:bg-amber-500/15 transition-all"
-          >
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-amber-500 text-black flex items-center justify-center shrink-0">
-                <Users size={22}/>
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="font-black text-white">{tr('settings.externalTalent')}</div>
-                <div className="text-xs text-zinc-400 mt-1">{tr('settings.externalTalentSub')}</div>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] bg-amber-500/15 px-2 py-1 rounded text-amber-300 font-bold uppercase">{enabledPackIds.length} {tr('common.active')}</span>
-                <ChevronRight size={18} className="text-zinc-500"/>
-              </div>
-            </div>
-          </button>
-
-          <div
-            aria-disabled="true"
-            className="w-full overflow-hidden rounded-3xl border border-zinc-700/80 bg-zinc-900 p-5"
-          >
-            <div className="flex items-start gap-4">
-              <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-zinc-800 text-zinc-300">
-                <Puzzle size={22}/>
-                <span className="absolute -bottom-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full border-2 border-zinc-900 bg-amber-400 text-black">
-                  <Lock size={10} strokeWidth={3}/>
-                </span>
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="font-black text-white">{tr('settings.createMods')}</div>
-                <div className="mt-1 text-xs leading-relaxed text-zinc-400">{tr('settings.createModsSub')}</div>
-                <div className="mt-3 inline-flex max-w-full items-center gap-1.5 rounded-full border border-amber-400/25 bg-amber-400/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-amber-300">
-                  <Lock size={11} className="shrink-0"/>
-                  <span>{tr('settings.comingFutureUpdates')}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (mode === 'EXTERNAL_ACTORS') {
-    return (
-      <div className="space-y-5 pb-24 pt-4">
-        <div className="flex items-center gap-4">
-          <button onClick={() => setMode('MODS')} className="p-2 bg-zinc-900 rounded-full hover:bg-zinc-800 transition-colors">
-              <ArrowLeft size={20} className="text-white"/>
-          </button>
-          <div>
-            <div className="text-[10px] text-amber-400 font-black uppercase tracking-[0.28em]">{tr('settings.mods')}</div>
-            <h2 className="text-3xl font-bold text-white">{tr('settings.externalTalent')}</h2>
-          </div>
-        </div>
-
-        <div className="glass-card p-5 rounded-3xl border border-amber-500/20 bg-amber-500/5">
-          <div className="flex items-start gap-3">
-            <div className="p-2 rounded-2xl bg-amber-500 text-black"><Lock size={18}/></div>
-            <div>
-              <div className="font-black text-white">{tr('settings.saveLockedPacks')}</div>
-              <p className="text-xs text-zinc-400 leading-relaxed mt-1">
-                {tr('settings.saveLockedPacksSub')}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest px-1">{tr('settings.availableCountryPacks')}</h3>
-          {GLOBAL_ACTOR_PACKS.map(pack => {
-            const isEnabled = enabledPackIds.includes(pack.id);
-            const creatorCount = getGlobalCreatorCountForPack(pack.id);
-            return (
-              <div key={pack.id} className={`rounded-3xl border p-4 transition-all ${isEnabled ? 'bg-emerald-500/10 border-emerald-500/25' : 'bg-zinc-900/50 border-white/5'}`}>
-                <div className="flex items-start gap-3">
-                  <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 ${isEnabled ? 'bg-emerald-500 text-black' : 'bg-zinc-800 text-amber-400'}`}>
-                    {isEnabled ? <CheckCircle2 size={20}/> : <Users size={20}/>}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="font-black text-white truncate">{getGlobalActorPackLabel(pack, language)}</div>
-                      <div className="text-[10px] text-zinc-400 font-black uppercase whitespace-nowrap">
-                        {pack.actorCount} talent · {creatorCount} creators
-                      </div>
-                    </div>
-                    <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
-                      {getGlobalActorPackDescription(pack, language)}
-                    </p>
-                    <button
-                      onClick={() => enableActorPack(pack.id)}
-                      disabled={isEnabled}
-                      className={`mt-3 w-full py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all ${isEnabled ? 'bg-emerald-500/15 text-emerald-300 cursor-default' : 'bg-white text-black hover:bg-amber-300'}`}
-                    >
-                      {isEnabled ? tr('settings.enabledForSave') : tr('settings.enablePack')}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-5 pb-24 pt-4">
@@ -1245,10 +1060,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
           onClick={() => setMode('PERFORMANCE')}
         />
         <SettingsRow
-          icon={Puzzle}
+          icon={Globe}
           title={tr('settings.gameplay')}
-          subtitle={tr('settings.gameplaySub', { count: enabledPackIds.length })}
-          value={tr('settings.activeShort', { count: enabledPackIds.length })}
+          subtitle={`${tr('settings.language')} · Replay Tutorial`}
+          value={selectedLanguageOption?.nativeLabel || language}
           onClick={() => setMode('GAMEPLAY')}
         />
         <SettingsRow

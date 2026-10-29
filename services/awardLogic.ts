@@ -1,3 +1,4 @@
+import {fictionalPersonName} from './fictionalNames';
 
 import { GameLanguage, Player, AwardType, PastProject, Award, PendingEvent, PressInteraction, IndustryProject, AwardHistoryEntry, ProjectType } from '../types';
 import { NPC_DATABASE } from './npcLogic';
@@ -1289,10 +1290,10 @@ export const resolveCanonicalAwardSeason = (
                     winnerName = randomActor.name;
                 } else {
                     // Ultimate fallback if DB is somehow empty of a gender (unlikely)
-                    winnerName = isMusicAward ? "Music Team" : isActress ? "Meryl Streep" : "Robert De Niro";
+                    winnerName = isMusicAward ? "Music Team" : isActress ? fictionalPersonName("Meryl Streep") : fictionalPersonName("Robert De Niro");
                 }
                 
-                if (isDirector) winnerName = "Christopher Nolan"; // Placeholder director
+                if (isDirector) winnerName = fictionalPersonName("Christopher Nolan"); // Placeholder director
                 if (isScreenplayAward) winnerName = randomActor?.occupation === 'WRITER' ? randomActor.name : 'Uncredited Writing Team';
                 if (isProjectAward) winnerName = "Producers";
             }

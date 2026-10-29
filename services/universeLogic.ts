@@ -1,3 +1,4 @@
+import {canonicalCharacterName,fictionalCharacterName,canonicalProjectTitle,fictionalProjectTitle,fictionalBuiltinText} from './fictionalNames';
 
 import { Universe, UniverseId, UniverseContract, Player, ProjectDetails, NewsItem, StudioId, Genre, IndustryProject, NPCActor, UniversePhase, RoleType, ProjectSubtype, ContractFilm, AuditionOpportunity, Gender, ActiveRelease, CastMember, UniverseCharacter, Script, GameLanguage, CharacterStoryRole, CharacterAbilityType, CharacterStoryFunction, CharacterNature, CharacterIdentitySource } from '../types';
 import { quoteActorFranchiseSalary, quoteActorFranchiseBackend } from './actorOfferTerms';
@@ -560,8 +561,18 @@ export const getUniverseTemplateStudioName = (universeId: UniverseId): string =>
     return studioId ? (STUDIO_CATALOG[studioId]?.name || String(studioId).replace(/_/g, ' ')) : 'Franchise Casting';
 };
 
-const universeText = (language: GameLanguage, key: string, vars: Record<string, string | number> = {}) =>
-    t(language, `services.universeLogic.${key}`, vars);
+// Display aliases keep the authored arc, role, schedule and financial data intact.
+Object.values(UNIVERSE_TEMPLATES).forEach(template => {
+    template.name = fictionalCharacterName(template.name);
+    template.arcs = template.arcs.map(arc => ({...arc, name: fictionalCharacterName(arc.name),
+        roadmap: arc.roadmap.map(step => ({...step, title: fictionalProjectTitle(step.title)}))}));
+});
+
+const universeText = (language: GameLanguage, key: string, vars: Record<string, string | number> = {}) => {
+    // Project authored template text before interpolation so player/custom names remain exact.
+    const template = fictionalBuiltinText(t(language, `services.universeLogic.${key}`));
+    return Object.entries(vars).reduce((text, [name, value]) => text.split('{' + name + '}').join(String(value)), template);
+};
 
 const getUniverseSagaName = (language: GameLanguage, saga: number | string) =>
     universeText(language, 'saga.name', { saga });
@@ -720,7 +731,7 @@ export const getDefaultUniverseRoster = (universeId: UniverseId, language: GameL
     const actors = NPC_DATABASE.filter(npc => npc.occupation === 'ACTOR');
     return template.arcs.map((arc, index) => {
         const actor = actors[index % Math.max(actors.length, 1)];
-        const characterId = normalizeUniverseCharacterKey(arc.name);
+        const characterId = normalizeUniverseCharacterKey(canonicalCharacterName(arc.name));
         const firstRoadmapEntry = arc.roadmap[0];
         const latestRoadmapEntry = arc.roadmap[arc.roadmap.length - 1];
         return {
@@ -835,10 +846,10 @@ const normalizeUniverseCharacter = (entry: any, universeId: UniverseId, index = 
             ? universeText(language, 'actor.player')
             : universeText(language, 'actor.unknown');
     const safeStatus = ['ACTIVE', 'RECAST', 'RETIRED'].includes(entry.status) ? entry.status : 'ACTIVE';
-    const templateArc = UNIVERSE_TEMPLATES[universeId]?.arcs.find(arc => normalizeUniverseCharacterKey(arc.name) === normalizeUniverseCharacterKey(name));
+    const templateArc = UNIVERSE_TEMPLATES[universeId]?.arcs.find(arc => normalizeUniverseCharacterKey(canonicalCharacterName(arc.name)) === normalizeUniverseCharacterKey(canonicalCharacterName(name)));
     const firstRoadmapEntry = templateArc?.roadmap[0];
     const latestRoadmapEntry = templateArc?.roadmap[(templateArc?.roadmap.length || 1) - 1];
-    const templateCharacter = getDefaultUniverseRoster(universeId, language).find(character => normalizeUniverseCharacterKey(character.name) === normalizeUniverseCharacterKey(name));
+    const templateCharacter = getDefaultUniverseRoster(universeId, language).find(character => normalizeUniverseCharacterKey(canonicalCharacterName(character.name)) === normalizeUniverseCharacterKey(canonicalCharacterName(name)));
     const rawAppearances = toFiniteNumber(entry.appearances, NaN);
     const fallbackAppearances = templateArc?.roadmap.length ?? templateCharacter?.appearances ?? (UNIVERSE_TEMPLATES[universeId] ? 1 : 0);
     const appearances = Math.max(
@@ -1306,8 +1317,8 @@ export const buildUniverseRoster = (
         if (typeof entry.name !== 'string' || typeof entry.actorId !== 'string') return;
 
         const characterId = entry.characterId || entry.id || normalizeUniverseCharacterKey(entry.name);
-        const templateArc = UNIVERSE_TEMPLATES[universe.id]?.arcs.find(arc => normalizeUniverseCharacterKey(arc.name) === normalizeUniverseCharacterKey(entry.name));
-        const templateCharacter = getDefaultUniverseRoster(universe.id, language).find(character => normalizeUniverseCharacterKey(character.name) === normalizeUniverseCharacterKey(entry.name));
+        const templateArc = UNIVERSE_TEMPLATES[universe.id]?.arcs.find(arc => normalizeUniverseCharacterKey(canonicalCharacterName(arc.name)) === normalizeUniverseCharacterKey(canonicalCharacterName(entry.name)));
+        const templateCharacter = getDefaultUniverseRoster(universe.id, language).find(character => normalizeUniverseCharacterKey(canonicalCharacterName(character.name)) === normalizeUniverseCharacterKey(canonicalCharacterName(entry.name)));
         const fallbackAppearances = templateArc?.roadmap.length ?? templateCharacter?.appearances ?? 0;
         const safeAppearances = typeof entry.appearances === 'number' && entry.appearances > 0
             ? entry.appearances
@@ -1503,14 +1514,15 @@ export const initUniverses = (language: GameLanguage = 'en'): Record<UniverseId,
 
 // --- HELPER: CHECK IF TITLE IS RELEASED ---
 const isTitleReleased = (player: Player, title: string): boolean => {
+    const sameTitle = (other: string) => canonicalProjectTitle(other).toLowerCase() === canonicalProjectTitle(title).toLowerCase();
     // Check World Projects (NPC Releases)
-    if (player.world.projects.some(p => p.title === title)) return true;
+    if (player.world.projects.some(p => sameTitle(p.title))) return true;
     // Check Player's Active Releases
-    if (player.activeReleases.some(r => r.name === title)) return true;
+    if (player.activeReleases.some(r => sameTitle(r.name))) return true;
     // Check Player's Past Projects
-    if (player.pastProjects.some(p => p.name === title)) return true;
+    if (player.pastProjects.some(p => sameTitle(p.name))) return true;
     // Check Player's Current Commitments
-    if (player.commitments.some(c => c.name === title)) return true;
+    if (player.commitments.some(c => sameTitle(c.name))) return true;
     
     return false;
 };
@@ -1585,7 +1597,7 @@ export const generateRandomUniverseOpportunity = (player: Player, source: 'AGENT
 
     // Construct Universe Contract starting from this film
     // We need to find the index of this film in the roadmap to get subsequent films
-    const fullArc = tmpl.arcs.find(a => a.name === selection.arcName);
+    const fullArc = tmpl.arcs.find(a => canonicalCharacterName(a.name) === canonicalCharacterName(selection.arcName));
     if (!fullArc) return null;
 
     const startIndex = fullArc.roadmap.findIndex(f => f.title === filmDef.title);
@@ -1844,7 +1856,7 @@ export const processUniverseTurn = (player: Player, universe: Universe): { unive
         // Find an arc that has an unreleased film
         // Exclude player's character if they have a contract
         const validArcs = tmpl.arcs.filter(arc => 
-            !player.activeUniverseContract || player.activeUniverseContract.characterName !== arc.name
+            !player.activeUniverseContract || canonicalCharacterName(player.activeUniverseContract.characterName) !== canonicalCharacterName(arc.name)
         );
 
         // Check roadmap for available films

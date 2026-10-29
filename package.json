@@ -4,6 +4,7 @@
   "version": "1.0.25",
   "type": "module",
   "scripts": {
+    "audit:fictional-names": "node scripts/run-fictional-name-audit.mjs",
     "audit:box-office-migration": "node scripts/run-box-office-audit.mjs migration",
     "audit:box-office-integration": "node scripts/run-box-office-audit.mjs integration",
     "audit:box-office-awareness": "node scripts/run-box-office-audit.mjs awareness",

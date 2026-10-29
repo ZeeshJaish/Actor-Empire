@@ -1,3 +1,4 @@
+import {projectBuiltinPerson} from './fictionalNames';
 import {
     type CrewMarketTier,
     type CrewOccupation,
@@ -118,7 +119,7 @@ const crewForbesCategory = (role: CrewOccupation): string => ({
     VFX_SUPERVISOR: 'VFX Supervisor',
 }[role]);
 
-export const CREW_PROFESSIONALS: NPCActor[] = PROFILES.map(profile => ({
+export const CREW_PROFESSIONALS: NPCActor[] = PROFILES.map((profile): NPCActor => ({
     id: profile.id,
     name: profile.name,
     handle: `@${profile.name.toLowerCase().replace(/[^a-z0-9]+/g, '')}`,
@@ -143,7 +144,7 @@ export const CREW_PROFESSIONALS: NPCActor[] = PROFILES.map(profile => ({
     traits: profile.tier === 'INDIE' ? ['AMBITIOUS', 'WORKAHOLIC'] : ['PROFESSIONAL', 'WORKAHOLIC'],
     potential: Math.max(profile.talent, profile.tier === 'INDIE' ? 88 : profile.talent),
     isIndependent: profile.tier !== 'LEGEND',
-}));
+})).map(projectBuiltinPerson);
 
 export const getCrewMarketAbsoluteWeek = (age: number, week: number): number => (
     (Math.max(1, Math.round(age)) - 1) * 52 + Math.max(1, Math.min(52, Math.round(week)))

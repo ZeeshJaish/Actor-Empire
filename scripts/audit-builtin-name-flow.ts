@@ -1,0 +1,93 @@
+import assert from 'node:assert/strict';
+import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
+Math.random=()=>.5;Date.now=()=>1700000000000;
+const {makeCinemaFixture}=await import('./fixtures/boxOfficeScenarios');
+const {NPC_DATABASE,GLOBAL_ACTOR_PACKS,createGlobalActorPackNPCs}=await import('../services/npcLogic');
+const {migratePlayerSave}=await import('../services/saveMigration');
+const {processGameWeek}=await import('../services/gameLoop');
+const {prepareVerifiedPlayerForPersistence}=await import('../services/savePreparation');
+const {saveVerifiedGameData,loadVerifiedGameData,recoverPreviousGameData}=await import('../services/saveGenerations');
+const {createSaveIntegrityManifest}=await import('../services/saveIntegrity');
+const {CinemaMemorySaveStore}=await import('./fixtures/cinemaSaveStore');
+const {buildLegacyStudioInheritance}=await import('../services/legacyLogic');
+const {migrateBuiltinNames}=await import('../services/builtinNameMigration');
+const fixture=JSON.parse(readFileSync('scripts/fixtures/issued-builtin-identities.json','utf8'));
+const issued=fixture.npcs.find((n:any)=>n.name==='Tom Holland');
+const tom={...NPC_DATABASE.find(n=>n.id===issued.id)!,name:issued.name,handle:issued.handle};
+const installedPack=GLOBAL_ACTOR_PACKS.find(p=>p.id==='india')!;
+assert.ok(installedPack);
+const json=(value:any)=>JSON.parse(JSON.stringify(value));
+const finances=(p:any)=>json({money:p.money,skills:p.skills,stats:p.stats,portfolio:p.portfolio,assets:p.assets,stocks:p.stocks,cinema:p.world.cinemaMarket,rights:p.world.streamingRightsContracts,contracts:p.studio.talentRoster.map(({actorSnapshot,...facts}:any)=>facts)});
+const reports:any[]=[];
+for(const installed of [false,true]){
+ let player:any=makeCinemaFixture(installed?851:850).player;
+ player.money=987654321.25;
+ player.flags={...player.flags,extraNPCs:[tom],...(installed?{enabledGlobalActorPacks:[installedPack.id],modHistory:[{id:'issued-pack-receipt',type:'GLOBAL_ACTOR_PACK',packId:installedPack.id}]}:{})};
+ player.relationships=[{id:tom.id,npcId:tom.id,name:tom.name,relation:'Friend',closeness:82,image:tom.avatar,lastInteractionWeek:player.currentWeek}];
+ player.studio={...player.studio,talentRoster:[{id:'signed-name-transition',npcId:tom.id,actorSnapshot:tom,type:'MOVIE_DEAL',paymentMode:'UPFRONT',totalAmount:1234567.25,amountPaid:1234567.25,maintenanceFee:0,installmentsPaid:1,totalInstallments:1,moviesRemaining:2,totalMovies:3,startWeek:8,status:'ACTIVE'}]};
+ const control=migratePlayerSave({...player,flags:{...player.flags,builtinNameVersion:1}});
+ player=migratePlayerSave(player);
+ assert.deepEqual(finances(player),finances(control),'Load transition must preserve economic facts');
+ assert.equal(player.flags.extraNPCs.find((n:any)=>n.id===tom.id).name,'Tommy Holland');
+ const packProfiles=json(player.flags.extraNPCs.filter((n:any)=>n.id.startsWith('mod_actor_')));
+ assert.deepEqual(packProfiles,json(control.flags.extraNPCs.filter((n:any)=>n.id.startsWith('mod_actor_'))));
+ const packCount=packProfiles.length;
+ assert.equal(migratePlayerSave(JSON.parse(JSON.stringify(player))).flags.extraNPCs.filter((n:any)=>n.id.startsWith('mod_actor_')).length,packCount,'Alias changes must not rehydrate duplicate mod actors');
+ const store=new CinemaMemorySaveStore();let saves=0;
+ const issuedSave=json(control);delete issuedSave.flags.builtinNameVersion;
+ await saveVerifiedGameData(store,'builtin-names-isolated',issuedSave,createSaveIntegrityManifest(issuedSave,'MANUAL'));
+ assert.equal((await loadVerifiedGameData(store,'builtin-names-isolated')).status,'CURRENT');
+ const reload=async()=>{
+  const facts=finances(player),prepared=prepareVerifiedPlayerForPersistence(player,'MANUAL');
+  await saveVerifiedGameData(store,'builtin-names-isolated',prepared.player,prepared.manifest);
+  const loaded=await loadVerifiedGameData(store,'builtin-names-isolated');assert.equal(loaded.status,'CURRENT');
+  player=migratePlayerSave(loaded.player!);assert.deepEqual(finances(player),facts);
+  assert.equal(player.flags.extraNPCs.find((n:any)=>n.id===tom.id).name,'Tommy Holland');
+  assert.equal(player.relationships.find((r:any)=>r.id===tom.id).name,'Tommy Holland');
+  assert.deepEqual(json(player.flags.extraNPCs.filter((n:any)=>n.id.startsWith('mod_actor_'))),packProfiles);
+  saves++;
+ };
+ await reload();
+ await recoverPreviousGameData(store,'builtin-names-isolated');
+ const recovered=await loadVerifiedGameData(store,'builtin-names-isolated');assert.equal(recovered.status,'CURRENT');
+ assert.equal(recovered.player!.flags.extraNPCs.find((n:any)=>n.id===tom.id).name,'Tom Holland','The untouched previous generation still has its originally signed display');
+ player=migratePlayerSave(recovered.player!);assert.equal(player.flags.extraNPCs.find((n:any)=>n.id===tom.id).name,'Tommy Holland');
+ for(let week=0;week<6;week++){player=(await processGameWeek(player)).player;await reload();}
+ const inherited=buildLegacyStudioInheritance(player,{heirAge:18,heirWeek:1});
+ let heir=migratePlayerSave({...makeCinemaFixture(852).player,...inherited,age:18,currentWeek:1,money:12345678});
+ assert.deepEqual(json(heir.flags.extraNPCs.filter((n:any)=>n.id.startsWith('mod_actor_'))),packProfiles,'Heir keeps installed pack profiles');
+ assert.equal(heir.studio.talentRoster.find((c:any)=>c.npcId===tom.id)?.actorSnapshot.name,'Tommy Holland');
+ if(installed)assert.deepEqual(heir.flags.enabledGlobalActorPacks,[installedPack.id]);
+ const p=prepareVerifiedPlayerForPersistence(heir,'MANUAL');await saveVerifiedGameData(store,'builtin-heir-isolated',p.player,p.manifest);
+ assert.equal((await loadVerifiedGameData(store,'builtin-heir-isolated')).status,'CURRENT');
+ store.failPromotion=true;
+ const candidate=prepareVerifiedPlayerForPersistence({...player,money:player.money-1},'MANUAL');
+ await assert.rejects(()=>saveVerifiedGameData(store,'builtin-names-isolated',candidate.player,candidate.manifest));
+ const afterFailure=await loadVerifiedGameData(store,'builtin-names-isolated');assert.equal(afterFailure.player!.money,player.money);
+ reports.push({installed,pack:installed?installedPack.id:null,retainedPackActors:packCount,weeks:6,verifiedSaves:saves+2,oldVerifiedGenerationRecovered:true,heir:true,failedWriteSafe:true});
+}
+// A real ongoing theatrical title must keep earning the same amounts after its display migration.
+const ongoing=makeCinemaFixture(854);ongoing.player.money=1_000_000_000;ongoing.player.flags={...ongoing.player.flags,extraNPCs:[tom],builtinNameVersion:1};
+ongoing.project={...ongoing.project,title:'Interstellar',isFamous:true,directorName:'Christopher Nolan',castList:[{id:'lead',actorId:tom.id,name:tom.name,role:'Lead',roleType:'LEAD',type:'ACTOR',isPlayer:false,image:tom.avatar},{id:'self',actorId:'PLAYER_SELF',name:ongoing.player.name,role:'Supporting',roleType:'SUPPORTING',type:'ACTOR',isPlayer:true,image:''}]};
+ongoing.player.commitments=[{id:'retained-famous-release',name:ongoing.project.title,type:'ACTING_GIG',roleType:'SUPPORTING',energyCost:0,income:0,payoutType:'LUMPSUM',lumpSum:0,projectDetails:ongoing.project,projectPhase:'AWAITING_RELEASE',phaseWeeksLeft:0,totalPhaseDuration:0,productionPerformance:75,auditionPerformance:75} as any];
+const released=(await processGameWeek(ongoing.player)).player;
+assert.ok(released.activeReleases.some(r=>r.name==='Interstellar'),'Admit an actual old-display release first');
+const raw=json(released);delete raw.flags.builtinNameVersion;
+let control=migratePlayerSave({...raw,flags:{...raw.flags,builtinNameVersion:1}}),renamed=migratePlayerSave(raw);
+assert.ok(renamed.activeReleases.some(r=>r.name==='Interstella'));
+const releaseMoney=(p:any)=>json({money:p.money,stats:p.stats,portfolio:p.portfolio,releases:p.activeReleases.map((r:any)=>({id:r.id,gross:r.totalGross,receipts:r.totalStudioReceipts,weekly:r.weeklyGross,royalty:r.royaltyPercentage,budget:r.budget})),history:p.pastProjects.map((r:any)=>({id:r.id,gross:r.gross}))});
+assert.deepEqual(releaseMoney(renamed),releaseMoney(control));
+for(let week=0;week<4;week++){
+ control=(await processGameWeek(control)).player;renamed=(await processGameWeek(renamed)).player;
+ assert.deepEqual(releaseMoney(renamed),releaseMoney(control),'Display aliases must not alter ongoing theatrical payouts or fame');
+ const store=new CinemaMemorySaveStore(),prepared=prepareVerifiedPlayerForPersistence(renamed,'MANUAL');await saveVerifiedGameData(store,'retained-film-isolated',prepared.player,prepared.manifest);
+ const loaded=await loadVerifiedGameData(store,'retained-film-isolated');assert.equal(loaded.status,'CURRENT');renamed=migratePlayerSave(loaded.player!);
+ assert.deepEqual(releaseMoney(renamed),releaseMoney(control));
+}
+
+const crowded:any=makeCinemaFixture(853).player;crowded.flags={extraNPCs:[tom]};crowded.pastProjects=Array.from({length:3000},(_,i)=>({id:`custom-${i}`,name:`Custom ${i}`,castList:[{actorId:tom.id,actorName:tom.name}]}));
+const started=performance.now(),projected=migrateBuiltinNames(crowded),migrationMs=performance.now()-started;
+const fast=performance.now();for(let i=0;i<10000;i++)assert.strictEqual(migrateBuiltinNames(projected),projected);const noOp10kMs=performance.now()-fast;
+mkdirSync('output/playwright/fictional-names',{recursive:true});
+const report={cases:reports,ongoingRelease:{oldAndAliasedPayoutsEqual:true,weeks:4,verifiedReloads:4},crowded:{projects:3000,migrationMs,noOp10kMs}};
+writeFileSync('output/playwright/fictional-names/flow-report.json',JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(report,null,2));

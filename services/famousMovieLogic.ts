@@ -1,3 +1,4 @@
+import {fictionalPersonName,fictionalProjectTitle,canonicalProjectTitle,fictionalBuiltinText} from './fictionalNames';
 
 import { GameLanguage, Genre, Player, ProjectDetails, AuditionOpportunity, RoleType, ProjectHiddenStats, StudioId, ProjectType } from '../types';
 import { ROLE_DEFINITIONS } from './roleLogic';
@@ -131,7 +132,7 @@ export const FAMOUS_MOVIE_DB: FamousProjectDef[] = [
     { title: "Minari", genre: "DRAMA", director: "Lee Isaac Chung", difficulty: 86, studioId: "ARTISAN_PICTURES", prestige: 92, description: '', type: 'MOVIE' },
     { title: "Moonlight", genre: "DRAMA", director: "Barry Jenkins", difficulty: 90, studioId: "ARTISAN_PICTURES", prestige: 97, description: '', type: 'MOVIE' },
     { title: "The King's Speech", genre: "BIOPIC", director: "Tom Hooper", difficulty: 84, studioId: "ARTISAN_PICTURES", prestige: 90, description: '', type: 'MOVIE' }
-];
+].map(def => ({...def,title:fictionalProjectTitle(def.title),director:fictionalPersonName(def.director)})) as FamousProjectDef[];
 
 // 📺 CURATED LIST OF FAMOUS TV SERIES
 export const FAMOUS_SERIES_DB: FamousProjectDef[] = [
@@ -185,13 +186,13 @@ export const FAMOUS_SERIES_DB: FamousProjectDef[] = [
     { title: "Squid Game", genre: "THRILLER", director: "Hwang Dong-hyuk", difficulty: 86, studioId: "NETFLIX", prestige: 91, description: '', type: 'SERIES' },
     { title: "Mindhunter", genre: "CRIME", director: "David Fincher", difficulty: 86, studioId: "NETFLIX", prestige: 90, description: '', type: 'SERIES' },
     { title: "The Witcher", genre: "FANTASY", director: "Lauren Schmidt Hissrich", difficulty: 80, studioId: "NETFLIX", prestige: 82, description: '', type: 'SERIES' }
-];
+].map(def => ({...def,title:fictionalProjectTitle(def.title),director:fictionalPersonName(def.director)})) as FamousProjectDef[];
 
 const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
 
 // --- HELPERS ---
 const getFamousProjectLocaleId = (def: FamousProjectDef) => (
-    def.title.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')
+    canonicalProjectTitle(def.title).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')
 );
 
 export const getFamousProjectDescription = (language: GameLanguage, def: FamousProjectDef) => (
@@ -200,21 +201,23 @@ export const getFamousProjectDescription = (language: GameLanguage, def: FamousP
         const description = t(language, `services.famousProject.description.${getFamousProjectLocaleId(def)}`);
         return description === descriptionKey
             ? t(language, def.type === 'SERIES' ? 'services.famousProject.description.generic.series' : 'services.famousProject.description.generic.movie', { title: def.title })
-            : description;
+            : fictionalBuiltinText(description);
     })()
 );
 
 export const getNextFamousMovie = (player: Player, reserved = createProjectTitleReservations(player)): FamousProjectDef | null => {
+    reserved = new Set([...reserved].map(title => projectTitleKey(canonicalProjectTitle(title))));
     // Filter out movies already released in this world run
-    const released = new Set((player.world.famousMoviesReleased || []).map(projectTitleKey));
-    const available = FAMOUS_MOVIE_DB.filter(m => !released.has(projectTitleKey(m.title)) && !reserved.has(projectTitleKey(m.title)));
+    const released = new Set((player.world.famousMoviesReleased || []).map(title=>projectTitleKey(canonicalProjectTitle(title))));
+    const available = FAMOUS_MOVIE_DB.filter(m => !released.has(projectTitleKey(canonicalProjectTitle(m.title))) && !reserved.has(projectTitleKey(canonicalProjectTitle(m.title))));
     return available.length ? pick(available) : null;
 };
 
 export const getNextFamousSeries = (player: Player, reserved = createProjectTitleReservations(player)): FamousProjectDef | null => {
+    reserved = new Set([...reserved].map(title => projectTitleKey(canonicalProjectTitle(title))));
     // Filter out series already released
-    const released = new Set((player.world.famousMoviesReleased || []).map(projectTitleKey));
-    const available = FAMOUS_SERIES_DB.filter(m => !released.has(projectTitleKey(m.title)) && !reserved.has(projectTitleKey(m.title)));
+    const released = new Set((player.world.famousMoviesReleased || []).map(title=>projectTitleKey(canonicalProjectTitle(title))));
+    const available = FAMOUS_SERIES_DB.filter(m => !released.has(projectTitleKey(canonicalProjectTitle(m.title))) && !reserved.has(projectTitleKey(canonicalProjectTitle(m.title))));
     return available.length ? pick(available) : null;
 };
 

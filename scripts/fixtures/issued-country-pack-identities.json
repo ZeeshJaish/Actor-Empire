@@ -1,0 +1,149 @@
+[
+  {
+    "id": "united_states",
+    "npcCount": 65,
+    "npcHash": "3ffe6336f6eebea8a84d9269fbc634b982ac7456763998980497efe7b81816d0",
+    "optionalCreatorCount": 11,
+    "optionalCreatorHash": "5b85810bb51455fd9c03721c2b6b265fbb312b2093110bbfba57d02bb1ac36bb"
+  },
+  {
+    "id": "united_kingdom",
+    "npcCount": 64,
+    "npcHash": "2f5db132baa73aaa6680fe3e5b48081b0b5e0b32e48eaa951354a9afe2f9a221",
+    "optionalCreatorCount": 20,
+    "optionalCreatorHash": "04a95cb8952567aeeb9625b550fd0d317dff5d0c08e5dfbfcc11391a410fb901"
+  },
+  {
+    "id": "brazil",
+    "npcCount": 61,
+    "npcHash": "9ab1e3d3bf06e7d44637f5d5935870cb05dcb11b8bb783b5d80bca2e1f0425c0",
+    "optionalCreatorCount": 13,
+    "optionalCreatorHash": "5fec8e82b6b5533cd8b041521e63b705fa1c0056c33bd56fdb83a779cc036b5c"
+  },
+  {
+    "id": "germany",
+    "npcCount": 63,
+    "npcHash": "5dc1b88473c5510da8b7d9db1228bd3beee873d369693eac18492f57d48191eb",
+    "optionalCreatorCount": 22,
+    "optionalCreatorHash": "bb9b056a2263a3fc8660dc2762923fcd4b947abc2777c87e3bc86896d589a21d"
+  },
+  {
+    "id": "canada",
+    "npcCount": 61,
+    "npcHash": "bb3599927c59bf91b4a722ae2ff20cba94ae11ce7ddd429372690eb2c28242fa",
+    "optionalCreatorCount": 21,
+    "optionalCreatorHash": "ce75fde55f3d7f2f2f520af7acc66afffb0435ddebd6c70c2dd20e3e1fa654ab"
+  },
+  {
+    "id": "india",
+    "npcCount": 63,
+    "npcHash": "93790f2ecb4d3b22cb3065f5fbd0b3f9b0f8112799621b8da071d595e65ab599",
+    "optionalCreatorCount": 14,
+    "optionalCreatorHash": "d81ae85e77fb0d6f699702a6c362ee3f574dcf70d702b573aaaf46613b9277b7"
+  },
+  {
+    "id": "nigeria",
+    "npcCount": 62,
+    "npcHash": "ffa9dfbfa7015d728121f7e220daa368b4df89b2265baed538056427e66c8243",
+    "optionalCreatorCount": 23,
+    "optionalCreatorHash": "dfecf3f490ec3644747ec24d65706be17f8ad109f6b97cf94ad34442ae801c87"
+  },
+  {
+    "id": "italy",
+    "npcCount": 62,
+    "npcHash": "81d430885b92f6a2eaabdd7d3cd470ca920a9d5c3e447d69559dd10d6703c690",
+    "optionalCreatorCount": 20,
+    "optionalCreatorHash": "e435224d23ba3d9fd1bb1324563271050f932433d23055b263f2ed82b9ad0548"
+  },
+  {
+    "id": "france",
+    "npcCount": 60,
+    "npcHash": "f7804f7d27dceb29edda09935983ffa78a37be9da5cf3c1008d72086586b280a",
+    "optionalCreatorCount": 23,
+    "optionalCreatorHash": "c6c2595855fef90e20652c2b9ddbafa69cc2d0b02e9e7f946dab7a127aedc412"
+  },
+  {
+    "id": "south_africa",
+    "npcCount": 61,
+    "npcHash": "b2003401a920c39882c7c7ea4d9f89632091802fbfb7614b19382117feaf1b26",
+    "optionalCreatorCount": 22,
+    "optionalCreatorHash": "a8c454d0a6cbade3fa2963c8193436b476d03a283c906ae820c5a5e78bfc0672"
+  },
+  {
+    "id": "spain",
+    "npcCount": 62,
+    "npcHash": "a687dc9e32508234f0f088d1aaeb7659d7a585c61f413ced33e46ca6f728067c",
+    "optionalCreatorCount": 19,
+    "optionalCreatorHash": "f25f3ce3ca757fec5a60daff728e7b745ff141e6dc3ba192eaa9445cc33f6f56"
+  },
+  {
+    "id": "australia",
+    "npcCount": 60,
+    "npcHash": "32679137bdb30a3665bac18fedbf30a0f2bc92d0f43036099c5266caf2ef29e0",
+    "optionalCreatorCount": 17,
+    "optionalCreatorHash": "f8ba548aae462ade51fe7fff4cab38ff270a65934f814fc3cbe9046a322dcf71"
+  },
+  {
+    "id": "philippines",
+    "npcCount": 64,
+    "npcHash": "a30f31714d17ee021b8b7bf2505c459aec2001226f27e9a4fc50ace758758350",
+    "optionalCreatorCount": 20,
+    "optionalCreatorHash": "d5bdd971376b97df4ca5f3f4e575da65430659fd12576020cb992af1a3159228"
+  },
+  {
+    "id": "netherlands",
+    "npcCount": 59,
+    "npcHash": "0f12d3b2bec7d294f3d27d617e15b7744c034fa1ff9e6ce910646f2b8702a3b0",
+    "optionalCreatorCount": 22,
+    "optionalCreatorHash": "7229514677574754eedeef64bd70134e7754fb403addc46eae91fdc1fa85207e"
+  },
+  {
+    "id": "indonesia",
+    "npcCount": 62,
+    "npcHash": "ee5605abafd6b3b7befb0f2f6de3ca3d1aad8c62f0d4a9a1be142ee903ce8419",
+    "optionalCreatorCount": 14,
+    "optionalCreatorHash": "11bfa91e45c7a3dc33eb8fda396debee53fbb43563557f588221172dd2975695"
+  },
+  {
+    "id": "t_rkiye",
+    "npcCount": 61,
+    "npcHash": "0daef6e7cc4a6ed2c7aae4cb796d17ddfadf2031fd385067bb2f5d662c279b13",
+    "optionalCreatorCount": 0,
+    "optionalCreatorHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  {
+    "id": "russia",
+    "npcCount": 62,
+    "npcHash": "57888dd08fa7826b4fcf472b7f1e3a5e00e2aca2cb236c25477bc11662187bca",
+    "optionalCreatorCount": 20,
+    "optionalCreatorHash": "f5dcee56f97007d2fe517f9a1d79c8a1e983b900271e605881a58a061937e46a"
+  },
+  {
+    "id": "mexico",
+    "npcCount": 60,
+    "npcHash": "bafe65c318725d3b38fb6650f5fc676cfc03d0c3c7651296b8bb239cc07c3090",
+    "optionalCreatorCount": 17,
+    "optionalCreatorHash": "216c5a15611534b68394cb024bcb6f02702151e9e2b02ef23358ea8cbfcc9d26"
+  },
+  {
+    "id": "poland",
+    "npcCount": 61,
+    "npcHash": "f2419b56aa122f424d771d004ca089fbe2913063137f5baaba1d9a47caf2e7f7",
+    "optionalCreatorCount": 22,
+    "optionalCreatorHash": "0425e7220d3dd3e5dc75a1b58ba0f18e48aa67e899a00c3895a707488109dda6"
+  },
+  {
+    "id": "ireland",
+    "npcCount": 62,
+    "npcHash": "9c32533faa4a3e93c1c3d819e4b81f6da6df2dbd3fc7c2f56c5bce5d51f6ecb3",
+    "optionalCreatorCount": 22,
+    "optionalCreatorHash": "1cafb19ab54267478d3cc2092ef29c7e1da89f317dacb8974852613fcf682084"
+  },
+  {
+    "id": "sweden",
+    "npcCount": 60,
+    "npcHash": "93ef25b73f115a239eb96a2271ddc58dbc5bb08d13d35e0c7e612384aa2adc93",
+    "optionalCreatorCount": 21,
+    "optionalCreatorHash": "ce7f075fa587dc30f65f96dd26abb533c074649e79731dd6f155a2381dfeea95"
+  }
+]

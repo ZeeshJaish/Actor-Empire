@@ -1,0 +1,544 @@
+[
+  {
+    "id": "MCU",
+    "name": "Marvel Cinematic Universe",
+    "roster": [
+      {
+        "id": "iron_man",
+        "characterId": "iron_man",
+        "name": "Iron Man",
+        "actorId": "celeb_act_0"
+      },
+      {
+        "id": "captain_america",
+        "characterId": "captain_america",
+        "name": "Captain America",
+        "actorId": "celeb_act_1"
+      },
+      {
+        "id": "thor",
+        "characterId": "thor",
+        "name": "Thor",
+        "actorId": "celeb_act_2"
+      },
+      {
+        "id": "black_widow",
+        "characterId": "black_widow",
+        "name": "Black Widow",
+        "actorId": "celeb_act_3"
+      },
+      {
+        "id": "black_panther",
+        "characterId": "black_panther",
+        "name": "Black Panther",
+        "actorId": "celeb_act_4"
+      },
+      {
+        "id": "spider_man",
+        "characterId": "spider_man",
+        "name": "Spider-Man",
+        "actorId": "celeb_act_5"
+      },
+      {
+        "id": "doctor_strange",
+        "characterId": "doctor_strange",
+        "name": "Doctor Strange",
+        "actorId": "celeb_act_6"
+      },
+      {
+        "id": "scarlet_witch",
+        "characterId": "scarlet_witch",
+        "name": "Scarlet Witch",
+        "actorId": "celeb_act_7"
+      }
+    ],
+    "offer": {
+      "universeId": "MCU",
+      "characterName": "Black Panther",
+      "films": [
+        {
+          "title": "Captain America: Civil War",
+          "role": "SUPPORTING",
+          "type": "UNIVERSE_ENTRY",
+          "projectType": "MOVIE",
+          "weeksOffset": 10
+        },
+        {
+          "title": "Black Panther",
+          "role": "LEAD",
+          "type": "SPINOFF",
+          "projectType": "MOVIE",
+          "weeksOffset": 60
+        },
+        {
+          "title": "Avengers: Infinity War",
+          "role": "ENSEMBLE",
+          "type": "UNIVERSE_EVENT",
+          "projectType": "MOVIE",
+          "weeksOffset": 110
+        },
+        {
+          "title": "Avengers: Endgame",
+          "role": "ENSEMBLE",
+          "type": "UNIVERSE_EVENT",
+          "projectType": "MOVIE",
+          "weeksOffset": 170
+        },
+        {
+          "title": "Black Panther: Wakanda Forever",
+          "role": "LEAD",
+          "type": "SEQUEL",
+          "projectType": "MOVIE",
+          "weeksOffset": 250
+        }
+      ],
+      "salaryTotal": 9234941,
+      "fanTrust": 50,
+      "startWeek": 1
+    }
+  },
+  {
+    "id": "DCU",
+    "name": "DC Universe",
+    "roster": [
+      {
+        "id": "superman",
+        "characterId": "superman",
+        "name": "Superman",
+        "actorId": "celeb_act_0"
+      },
+      {
+        "id": "batman",
+        "characterId": "batman",
+        "name": "Batman",
+        "actorId": "celeb_act_1"
+      },
+      {
+        "id": "wonder_woman",
+        "characterId": "wonder_woman",
+        "name": "Wonder Woman",
+        "actorId": "celeb_act_2"
+      },
+      {
+        "id": "harley_quinn",
+        "characterId": "harley_quinn",
+        "name": "Harley Quinn",
+        "actorId": "celeb_act_3"
+      },
+      {
+        "id": "the_flash",
+        "characterId": "the_flash",
+        "name": "The Flash",
+        "actorId": "celeb_act_4"
+      },
+      {
+        "id": "aquaman",
+        "characterId": "aquaman",
+        "name": "Aquaman",
+        "actorId": "celeb_act_5"
+      }
+    ],
+    "offer": {
+      "universeId": "DCU",
+      "characterName": "The Flash",
+      "films": [
+        {
+          "title": "Batman v Superman",
+          "role": "CAMEO",
+          "type": "UNIVERSE_ENTRY",
+          "projectType": "MOVIE",
+          "weeksOffset": 10
+        },
+        {
+          "title": "Suicide Squad",
+          "role": "CAMEO",
+          "type": "UNIVERSE_CROSSOVER",
+          "projectType": "MOVIE",
+          "weeksOffset": 30
+        },
+        {
+          "title": "Justice League",
+          "role": "ENSEMBLE",
+          "type": "UNIVERSE_EVENT",
+          "projectType": "MOVIE",
+          "weeksOffset": 70
+        },
+        {
+          "title": "The Flash",
+          "role": "LEAD",
+          "type": "SPINOFF",
+          "projectType": "MOVIE",
+          "weeksOffset": 150
+        },
+        {
+          "title": "Justice League: Crisis",
+          "role": "ENSEMBLE",
+          "type": "UNIVERSE_EVENT",
+          "projectType": "MOVIE",
+          "weeksOffset": 210
+        }
+      ],
+      "salaryTotal": 5958026,
+      "fanTrust": 50,
+      "startWeek": 1
+    }
+  },
+  {
+    "id": "SW",
+    "name": "Star Wars Galaxy",
+    "roster": [
+      {
+        "id": "jedi_prodigy",
+        "characterId": "jedi_prodigy",
+        "name": "Jedi Prodigy",
+        "actorId": "celeb_act_0"
+      },
+      {
+        "id": "rogue_smuggler",
+        "characterId": "rogue_smuggler",
+        "name": "Rogue Smuggler",
+        "actorId": "celeb_act_1"
+      },
+      {
+        "id": "mandalorian_warrior",
+        "characterId": "mandalorian_warrior",
+        "name": "Mandalorian Warrior",
+        "actorId": "celeb_act_2"
+      },
+      {
+        "id": "prime_jedi",
+        "characterId": "prime_jedi",
+        "name": "Prime Jedi",
+        "actorId": "celeb_act_3"
+      }
+    ],
+    "offer": {
+      "universeId": "SW",
+      "characterName": "Mandalorian Warrior",
+      "films": [
+        {
+          "title": "The Mandalorian (Series)",
+          "role": "LEAD",
+          "type": "UNIVERSE_ENTRY",
+          "projectType": "SERIES",
+          "weeksOffset": 10
+        },
+        {
+          "title": "The Book of Boba Fett",
+          "role": "CAMEO",
+          "type": "UNIVERSE_CROSSOVER",
+          "projectType": "MOVIE",
+          "weeksOffset": 60
+        },
+        {
+          "title": "Ahsoka (Series)",
+          "role": "SUPPORTING",
+          "type": "UNIVERSE_CROSSOVER",
+          "projectType": "SERIES",
+          "weeksOffset": 120
+        },
+        {
+          "title": "The Mandalorian and Grogu",
+          "role": "LEAD",
+          "type": "UNIVERSE_EVENT",
+          "projectType": "MOVIE",
+          "weeksOffset": 200
+        }
+      ],
+      "salaryTotal": 7149631,
+      "fanTrust": 50,
+      "startWeek": 1
+    }
+  },
+  {
+    "id": "AVATAR",
+    "name": "Avatar",
+    "roster": [
+      {
+        "id": "na_vi_warrior",
+        "characterId": "na_vi_warrior",
+        "name": "Na'vi Warrior",
+        "actorId": "celeb_act_0"
+      },
+      {
+        "id": "marine_defector",
+        "characterId": "marine_defector",
+        "name": "Marine Defector",
+        "actorId": "celeb_act_1"
+      },
+      {
+        "id": "ash_clan_heir",
+        "characterId": "ash_clan_heir",
+        "name": "Ash Clan Heir",
+        "actorId": "celeb_act_2"
+      }
+    ],
+    "offer": {
+      "universeId": "AVATAR",
+      "characterName": "Marine Defector",
+      "films": [
+        {
+          "title": "Avatar",
+          "role": "SUPPORTING",
+          "type": "UNIVERSE_ENTRY",
+          "projectType": "MOVIE",
+          "weeksOffset": 10
+        },
+        {
+          "title": "Avatar: The Way of Water",
+          "role": "SUPPORTING",
+          "type": "SEQUEL",
+          "projectType": "MOVIE",
+          "weeksOffset": 130
+        },
+        {
+          "title": "Avatar: Fire and Ash",
+          "role": "ENSEMBLE",
+          "type": "SEQUEL",
+          "projectType": "MOVIE",
+          "weeksOffset": 230
+        },
+        {
+          "title": "Avatar 4",
+          "role": "LEAD",
+          "type": "SEQUEL",
+          "projectType": "MOVIE",
+          "weeksOffset": 370
+        }
+      ],
+      "salaryTotal": 5958026,
+      "fanTrust": 50,
+      "startWeek": 1
+    }
+  },
+  {
+    "id": "MONSTERVERSE",
+    "name": "Monsterverse",
+    "roster": [
+      {
+        "id": "titan_tracker",
+        "characterId": "titan_tracker",
+        "name": "Titan Tracker",
+        "actorId": "celeb_act_0"
+      },
+      {
+        "id": "monarch_operative",
+        "characterId": "monarch_operative",
+        "name": "Monarch Operative",
+        "actorId": "celeb_act_1"
+      },
+      {
+        "id": "apex_engineer",
+        "characterId": "apex_engineer",
+        "name": "Apex Engineer",
+        "actorId": "celeb_act_2"
+      }
+    ],
+    "offer": {
+      "universeId": "MONSTERVERSE",
+      "characterName": "Monarch Operative",
+      "films": [
+        {
+          "title": "Monarch: Legacy of Monsters (Series)",
+          "role": "LEAD",
+          "type": "UNIVERSE_ENTRY",
+          "projectType": "SERIES",
+          "weeksOffset": 10
+        },
+        {
+          "title": "Godzilla x Kong: The New Empire",
+          "role": "SUPPORTING",
+          "type": "UNIVERSE_CROSSOVER",
+          "projectType": "MOVIE",
+          "weeksOffset": 90
+        },
+        {
+          "title": "Godzilla x Kong: Supernova",
+          "role": "LEAD",
+          "type": "SEQUEL",
+          "projectType": "MOVIE",
+          "weeksOffset": 210
+        }
+      ],
+      "salaryTotal": 6851730,
+      "fanTrust": 50,
+      "startWeek": 1
+    }
+  },
+  {
+    "id": "JURASSIC",
+    "name": "Jurassic World",
+    "roster": [
+      {
+        "id": "dinosaur_geneticist",
+        "characterId": "dinosaur_geneticist",
+        "name": "Dinosaur Geneticist",
+        "actorId": "celeb_act_0"
+      },
+      {
+        "id": "island_survivor",
+        "characterId": "island_survivor",
+        "name": "Island Survivor",
+        "actorId": "celeb_act_1"
+      },
+      {
+        "id": "black_market_handler",
+        "characterId": "black_market_handler",
+        "name": "Black Market Handler",
+        "actorId": "celeb_act_2"
+      }
+    ],
+    "offer": {
+      "universeId": "JURASSIC",
+      "characterName": "Island Survivor",
+      "films": [
+        {
+          "title": "Jurassic Park III",
+          "role": "SUPPORTING",
+          "type": "UNIVERSE_ENTRY",
+          "projectType": "MOVIE",
+          "weeksOffset": 10
+        },
+        {
+          "title": "Jurassic World",
+          "role": "SUPPORTING",
+          "type": "REBOOT",
+          "projectType": "MOVIE",
+          "weeksOffset": 130
+        },
+        {
+          "title": "Jurassic World Dominion",
+          "role": "ENSEMBLE",
+          "type": "UNIVERSE_EVENT",
+          "projectType": "MOVIE",
+          "weeksOffset": 270
+        },
+        {
+          "title": "Jurassic World Rebirth",
+          "role": "LEAD",
+          "type": "SEQUEL",
+          "projectType": "MOVIE",
+          "weeksOffset": 390
+        }
+      ],
+      "salaryTotal": 5958026,
+      "fanTrust": 50,
+      "startWeek": 1
+    }
+  },
+  {
+    "id": "SPIDER_VERSE",
+    "name": "Spider-Verse",
+    "roster": [
+      {
+        "id": "miles_morales",
+        "characterId": "miles_morales",
+        "name": "Miles Morales",
+        "actorId": "celeb_act_0"
+      },
+      {
+        "id": "spider_woman",
+        "characterId": "spider_woman",
+        "name": "Spider-Woman",
+        "actorId": "celeb_act_1"
+      },
+      {
+        "id": "spider_society_recruit",
+        "characterId": "spider_society_recruit",
+        "name": "Spider Society Recruit",
+        "actorId": "celeb_act_2"
+      }
+    ],
+    "offer": {
+      "universeId": "SPIDER_VERSE",
+      "characterName": "Spider Society Recruit",
+      "films": [
+        {
+          "title": "Spider-Man: Across the Spider-Verse",
+          "role": "SUPPORTING",
+          "type": "UNIVERSE_ENTRY",
+          "projectType": "MOVIE",
+          "weeksOffset": 10
+        },
+        {
+          "title": "Spider-Man: Beyond the Spider-Verse",
+          "role": "ENSEMBLE",
+          "type": "UNIVERSE_EVENT",
+          "projectType": "MOVIE",
+          "weeksOffset": 130
+        },
+        {
+          "title": "Spider-Verse: Web of Worlds",
+          "role": "LEAD",
+          "type": "SPINOFF",
+          "projectType": "MOVIE",
+          "weeksOffset": 270
+        }
+      ],
+      "salaryTotal": 5064322,
+      "fanTrust": 50,
+      "startWeek": 1
+    }
+  },
+  {
+    "id": "FAST_SAGA",
+    "name": "Fast Saga",
+    "roster": [
+      {
+        "id": "street_racer",
+        "characterId": "street_racer",
+        "name": "Street Racer",
+        "actorId": "celeb_act_0"
+      },
+      {
+        "id": "agency_driver",
+        "characterId": "agency_driver",
+        "name": "Agency Driver",
+        "actorId": "celeb_act_1"
+      },
+      {
+        "id": "tech_wheelman",
+        "characterId": "tech_wheelman",
+        "name": "Tech Wheelman",
+        "actorId": "celeb_act_2"
+      }
+    ],
+    "offer": {
+      "universeId": "FAST_SAGA",
+      "characterName": "Agency Driver",
+      "films": [
+        {
+          "title": "Fast & Furious 6",
+          "role": "SUPPORTING",
+          "type": "UNIVERSE_ENTRY",
+          "projectType": "MOVIE",
+          "weeksOffset": 10
+        },
+        {
+          "title": "Fast & Furious Presents: Hobbs & Shaw",
+          "role": "SUPPORTING",
+          "type": "SPINOFF",
+          "projectType": "MOVIE",
+          "weeksOffset": 130
+        },
+        {
+          "title": "Fast X",
+          "role": "ENSEMBLE",
+          "type": "UNIVERSE_CROSSOVER",
+          "projectType": "MOVIE",
+          "weeksOffset": 250
+        },
+        {
+          "title": "Fast X: Part 2",
+          "role": "LEAD",
+          "type": "UNIVERSE_EVENT",
+          "projectType": "MOVIE",
+          "weeksOffset": 350
+        }
+      ],
+      "salaryTotal": 5958026,
+      "fanTrust": 50,
+      "startWeek": 1
+    }
+  }
+]
