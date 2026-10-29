@@ -1,0 +1,17 @@
+{
+  "status": "PASS",
+  "uploads": {
+    "count": 6,
+    "trust": 63,
+    "mood": 63,
+    "energy": 5,
+    "subscribers": 1000175,
+    "totalViews": 335791
+  },
+  "signedContractPayout": 2900000000,
+  "zeroEnergyPostsBlocked": true,
+  "liveAndMerchSettlement": true,
+  "membershipActivation": true,
+  "reloadRetainsLedger": true,
+  "pageErrors": []
+}

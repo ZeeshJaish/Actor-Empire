@@ -7488,6 +7488,20 @@ export interface NegotiationData {
     actorRoyaltyPayeeId?:string;
 }
 
+export interface SponsorshipValueBasis {
+    version: 1;
+    source: 'MANAGER' | 'INSTAGRAM_DM';
+    audienceBasis: 'OBSERVED_ENGAGEMENT' | 'ESTIMATED_REACH';
+    absoluteWeek: number;
+    eligiblePeople: number;
+    reachablePeople: number;
+    qualifiedImpressions: number;
+    referenceCpm: number;
+    weeklyBuyerBudget: number;
+    perDeliverableValue: number;
+    estimatedContractValue: number;
+}
+
 export interface SponsorshipOffer {
     id: string;
     brandName: string;
@@ -7505,6 +7519,8 @@ export interface SponsorshipOffer {
     description: string;
     expiresIn?: number;
     weeksCompleted?: number;
+    // Quoted once on new offers. Legacy and already signed terms are not repriced.
+    valueBasis?: SponsorshipValueBasis;
 }
 
 export interface YoutubeCollabOffer {
@@ -7524,6 +7540,7 @@ export interface YoutubeCollabOffer {
 }
 
 export interface YoutubeBrandDeal {
+    valueBasis?: {version:1; qualifiedViews:number; buyerBudget:number};
     id: string;
     brandName: string;
     category: SponsorshipCategory;
@@ -7802,7 +7819,28 @@ export interface YoutubeVideo {
     };
 }
 
+export type CreatorPlatform = 'YOUTUBE' | 'INSTAGRAM' | 'X';
+export interface CreatorEconomyLedger {
+    schemaVersion: 1;
+    absoluteWeek: number;
+    actions: Record<CreatorPlatform, number>;
+    rewardSpent: Record<string, number>;
+    publicationKeys: string[];
+    fanSpend: number;
+}
+export interface YoutubeEconomyState {
+    schemaVersion: 1;
+    paidMembers?: number;
+    lifetimeViews: number;
+    observedVideoViews: number;
+    lastProcessedAbsoluteWeek: number;
+    recentWeeks: Array<{week:number;views:number;newSubscribers:number}>;
+    recentPublicationKeys: string[];
+    merchDemand: number;
+}
+
 export interface YoutubeChannel {
+    economy?: YoutubeEconomyState;
     handle: string;
     subscribers: number;
     videos: YoutubeVideo[];
@@ -11438,6 +11476,7 @@ export interface PlayerAssetState {
 }
 
 export interface Player {
+    creatorEconomy?: CreatorEconomyLedger;
     id: string;
     name: string;
     age: number;

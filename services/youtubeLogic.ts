@@ -1,3 +1,5 @@
+import { resolveYoutubeWeek, readYoutubeAudience, quoteYoutubeBrand, quoteYoutubeNewSubscribers } from './youtubeEconomy';
+import { availableCreatorSpend, recordCreatorSpend } from './creatorEconomy';
 
 import { GameLanguage, Gender, NPCActor, NPCPrestige, NPCTier, Player, YoutubeBrandDeal, YoutubeChannel, YoutubeCollabOffer, YoutubeCreatorIdentity, YoutubeMerchResult, YoutubeMerchTier, YoutubeMusicVideoFeatureOffer, YoutubeVideo, YoutubeVideoType } from '../types';
 import { getGenderedAvatar, NPC_DATABASE } from './npcLogic';
@@ -127,27 +129,23 @@ export const calculateYoutubeMerchQuote = (
 ): YoutubeMerchQuote => {
     const config = YOUTUBE_MERCH_TIERS[tier];
     const channel = player.youtube;
-    const mood = clamp(Number(channel.fanMood) || 55);
-    const trust = clamp(Number(channel.audienceTrust) || 55);
-    const controversy = clamp(Number(channel.controversy) || 0);
-    const subscribers = Math.max(0, Math.floor(Number(channel.subscribers) || 0));
-    const identity = channel.creatorIdentity || 'ACTOR_VLOGGER';
-    const identityBoost = YOUTUBE_MERCH_IDENTITY_BOOST[identity] || 0;
-    const demand = Math.max(
-        0.25,
-        (mood / 100)
-        + (trust / 180)
-        + (subscribers >= 100_000 ? 0.25 : 0)
-        - (controversy / 180)
-        + identityBoost,
-    );
-    const rawSalesRoll = Number(random());
-    const salesRoll = clamp(Number.isFinite(rawSalesRoll) ? rawSalesRoll : 0.5, 0, 1);
-    const grossRevenue = Math.max(
-        0,
-        Math.floor(subscribers * config.margin * demand * (0.7 + salesRoll * 0.65)),
-    );
-    const netProfit = grossRevenue - config.cost;
+    const audience = readYoutubeAudience(player);
+    const mood = clamp(Number(channel.fanMood) || 0, 0, 100) / 100;
+    const trust = clamp(Number(channel.audienceTrust) || 0, 0, 100) / 100;
+    const safety = 1 - clamp(Number(channel.controversy) || 0, 0, 100) / 150;
+    const roll = clamp(Number(random()) || 0, 0, 1);
+    const lastDrop = Number(channel.lastMerchDropWeek) || 0;
+    const gap = getYoutubeAbsoluteWeek(player) - lastDrop;
+    const repeatFit = lastDrop ? Math.min(1, Math.max(.4, gap / 12)) : 1;
+    const unitPrice = (tier === 'LUXURY' ? 180 : tier === 'PREMIUM' ? 65 : 25) * Math.max(.35, audience.purchasingPower);
+    const unitCost = unitPrice * (1 - config.margin);
+    const demandUnits = Math.floor(audience.engagedPeople * .015 * (.35 + mood * .35 + trust * .3) * safety * repeatFit * (.7 + roll * .6));
+    const fundedUnits = Math.max(0, Math.floor((Math.max(0, player.money) - config.cost) / Math.max(.01, unitCost)));
+    const affordableUnits = Math.floor(availableCreatorSpend(player, audience.engagedPeople) / Math.max(.01, unitPrice));
+    const units = Math.max(0, Math.min(demandUnits, fundedUnits, affordableUnits));
+    const grossRevenue = Math.floor(units * unitPrice);
+    const productionCost = config.cost + Math.ceil(units * unitCost);
+    const netProfit = grossRevenue - productionCost;
     const result: YoutubeMerchResult = netProfit > config.cost * 1.2
         ? 'SOLD_OUT'
         : netProfit < 0
@@ -157,7 +155,7 @@ export const calculateYoutubeMerchQuote = (
     return {
         tier,
         grossRevenue,
-        productionCost: config.cost,
+        productionCost,
         netProfit,
         result,
     };
@@ -279,7 +277,7 @@ export const resolveYoutubeMerchDrop = (
     };
 
     spendPlayerEnergy(nextPlayer, config.energy, `YouTube: Merch ${t(language, config.labelKey)}`);
-    return { success: true, player: nextPlayer, quote };
+    return { success: true, player: recordCreatorSpend(nextPlayer, quote.grossRevenue), quote };
 };
 
 interface GlobalCreatorProfile {
@@ -730,12 +728,13 @@ export const generateYoutubeCollabOffer = (player: Player, language = getPlayerL
     if (channel.subscribers < 1500 || channel.videos.length < 2) return null;
     if ((channel.activeCollabs?.length || 0) >= 2) return null;
 
+    const audience = readYoutubeAudience(player);
     const creatorScore = calculateYoutubeCreatorScore(player);
     const publicImageKey = getYoutubePublicImageKey(player);
     const publicImage = getLocalizedYoutubePublicImageLabel(player, language);
     const pullMultiplier = creatorScore >= 75 ? 0.38 : creatorScore >= 55 ? 0.5 : 0.65;
     const eligibleCreators = [...NPC_DATABASE, ...getEnabledGlobalCreatorProfiles(player)]
-        .filter(npc => npc.followers >= Math.max(3000, channel.subscribers * pullMultiplier));
+        .filter(npc => npc.followers >= Math.max(3000, audience.engagedPeople * pullMultiplier));
     if (eligibleCreators.length === 0) return null;
 
     const creator = pick(eligibleCreators);
@@ -743,8 +742,9 @@ export const generateYoutubeCollabOffer = (player: Player, language = getPlayerL
     const conceptTitle = `${pick(YOUTUBE_COLLAB_CONCEPTS)} with ${creator.name}`;
     const energyCost = requiredType === 'SKIT' ? 24 : requiredType === 'Q_AND_A' ? 14 : 18;
     const imageBoost = creatorScore >= 70 ? 1.18 : creatorScore < 40 ? 0.82 : 1;
-    const bonusViews = Math.max(4000, Math.floor(creator.followers * (0.03 + Math.random() * 0.05) * imageBoost));
-    const bonusSubscribers = Math.max(40, Math.floor(bonusViews / 140));
+    const creatorReach = Math.min(creator.followers * .03, Math.sqrt(creator.followers) * 200, audience.eligiblePeople * .002);
+    const bonusViews = Math.floor(creatorReach * (.65 + Math.random() * .7) * imageBoost);
+    const bonusSubscribers = quoteYoutubeNewSubscribers(player,bonusViews,70);
     const qualityBonus = 10 + Math.floor(Math.random() * 10) + (publicImageKey === 'industryDarling' ? 4 : publicImageKey === 'volatile' ? -2 : 0);
 
     return {
@@ -783,11 +783,11 @@ export const generateYoutubeBrandDeal = (player: Player, language = getPlayerLan
     const category = pick(weightedCategories);
     const brandName = pick(YOUTUBE_BRANDS[category]);
     const requiredType = pick(YOUTUBE_BRAND_TYPES);
-    const imageMultiplier = creatorScore >= 80 ? 1.35 : creatorScore >= 65 ? 1.18 : creatorScore < 35 ? 0.72 : 1;
-    const lifestyleMultiplier = channel.creatorIdentity === 'LIFESTYLE_ICON' ? 1.15 : channel.creatorIdentity === 'CONTROVERSY_MAGNET' ? 0.84 : 1;
-    const payout = Math.max(1500, Math.floor(channel.subscribers * (0.18 + Math.random() * 0.22) * imageMultiplier * lifestyleMultiplier));
+    const value = quoteYoutubeBrand(player, category);
+    const payout = value.payout;
+    if (payout <= 0) return null;
     const energyCost = requiredType === 'TRAILER' ? 20 : 16;
-    const bonusViews = Math.max(6000, Math.floor(channel.subscribers * (0.12 + Math.random() * 0.18) * Math.max(0.75, imageMultiplier)));
+    const bonusViews = value.bonusViews;
     const penalty = Math.floor(payout * 0.4);
 
     return {
@@ -800,6 +800,7 @@ export const generateYoutubeBrandDeal = (player: Player, language = getPlayerLan
             image: publicImage.toLowerCase(),
         }),
         payout,
+        valueBasis: value.basis,
         requiredType,
         energyCost,
         bonusViews,
@@ -859,96 +860,4 @@ export const generateMusicVideoFeatureOffer = (player: Player, language = getPla
     };
 };
 
-export const processYoutubeChannel = (player: Player): { channel: YoutubeChannel, weeklyRevenue: number, newSubs: number, notifications: string[] } => {
-    let channel = { ...player.youtube };
-    let weeklyRevenue = 0;
-    let newSubsTotal = 0;
-    const notifications: string[] = [];
-
-    // 1. Process Videos
-    const updatedVideos = channel.videos.map(video => {
-        // Absolute week calculation to handle year wrap correctly
-        const videoYear = video.yearUploaded || player.age; // Fallback for legacy data
-        const age = getWeeksSinceYoutubeUpload(player.age, player.currentWeek, video.weekUploaded, videoYear);
-
-        // Base growth factor decays over time (Viral curve)
-        // Week 0: 1.0, Week 1: 0.4, Week 4: 0.05
-        let growthFactor = Math.max(0.01, 1 / ((age * 2) + 1));
-
-        // Quality bonus (hidden stat 0-100) -> 0.5 to 2.5 multiplier
-        const qualityBonus = 0.5 + ((video.qualityScore || 50) / 25);
-
-        // Subscriber bonus (more subs = more initial push)
-        // FIX: Ensure minimum push for 0 subs is roughly 500-1000 views for algorithm discovery
-        const subPush = Math.max(1000, channel.subscribers * 0.15);
-
-        // Calculate new views for this week
-        // Random variance
-        const variance = 0.8 + Math.random() * 0.4;
-
-        let newViews = Math.floor(subPush * growthFactor * qualityBonus * variance);
-
-        // CRITICAL: Prevent Infinity/NaN propagation
-        if (!isFinite(newViews)) newViews = 0;
-
-        // Earnings (RPM approx $2.00)
-        let earnings = 0;
-        if (channel.isMonetized) {
-            earnings = (newViews / 1000) * 2.0;
-        }
-        if (!isFinite(earnings)) earnings = 0;
-
-        // FIX: Force integer earnings to prevent decimal overflow in display
-        earnings = Math.floor(earnings);
-
-        weeklyRevenue += earnings;
-
-        // Subs gained from this video this week
-        // FIX: Improved Conversion rate
-        // Base: 1 sub per ~100 views for small channels, harder for large channels
-        // Quality increases conversion
-        let conversionRate = 150; // 1 sub per 150 views baseline
-        if (video.qualityScore > 80) conversionRate = 80; // High quality converts better (1 per 80)
-
-        let subsGained = Math.floor(newViews / conversionRate);
-
-        // "Viral Hit" mechanic: Random chance to double subs if quality is high
-        if (video.qualityScore > 75 && Math.random() < 0.1) {
-            subsGained *= 2;
-        }
-
-        if (!isFinite(subsGained)) subsGained = 0;
-
-        newSubsTotal += subsGained;
-
-        return {
-            ...video,
-            yearUploaded: videoYear, // Ensure field is populated if it was missing
-            views: video.views + newViews,
-            earnings: video.earnings + earnings,
-            weeklyHistory: [...(video.weeklyHistory || []), newViews]
-        };
-    });
-
-    channel.videos = updatedVideos;
-    channel.subscribers += newSubsTotal;
-    channel.lifetimeEarnings += weeklyRevenue;
-
-    // Safety checks for channel totals
-    if (!isFinite(channel.subscribers)) channel.subscribers = 0;
-    if (!isFinite(channel.lifetimeEarnings)) channel.lifetimeEarnings = 0;
-
-    // Recalculate total views
-    const totalViews = channel.videos.reduce((sum, v) => sum + v.views, 0);
-    channel.totalChannelViews = totalViews;
-
-    // 2. Monetization Check
-    if (!channel.isMonetized) {
-        if (channel.subscribers >= YOUTUBE_MONETIZATION_SUBS && totalViews >= YOUTUBE_MONETIZATION_VIEWS) {
-            channel.isMonetized = true;
-            notifications.push("🎉 You are now eligible for YouTube Monetization! Revenue enabled.");
-        }
-    }
-
-    return { channel, weeklyRevenue, newSubs: newSubsTotal, notifications };
-};
+export const processYoutubeChannel = (player: Player): { channel: YoutubeChannel, weeklyRevenue: number, newSubs: number, notifications: string[] } => resolveYoutubeWeek(player);

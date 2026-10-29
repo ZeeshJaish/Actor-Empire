@@ -1,3 +1,4 @@
+import { readCreatorWorld, claimCreatorAction, creatorPositiveReward } from '../../services/creatorEconomy';
 
 import React, { useMemo, useState } from 'react';
 import {
@@ -345,6 +346,11 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
 
     const handlePost = () => {
         if (!tweetContent.trim()) return;
+        if (player.energy.current < 5) return;
+        const actionId = `x_post_player_${Date.now()}_${Math.random()}`;
+        const action = claimCreatorAction(player,'X',actionId);
+        if (action.duplicate) return;
+        const creatorWorld = readCreatorWorld(player);
 
         // FIX: Don't duplicate massive avatar strings if custom.
         const avatarToSave = player.avatar.startsWith('data:') ? '' : player.avatar;
@@ -356,7 +362,8 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
 
         // Base reach is followers + random fame boost (Twitter algorithm can be volatile)
         // Even with 0 followers, hashtags give reach
-        const baseReach = (30 + (currentXFollowers * 0.15) + (fameFactor * 40)) * typeConfig.reach;
+        const effectiveFollowers = Math.min(currentXFollowers,Math.sqrt(currentXFollowers)*300,creatorWorld.eligiblePeople*.15);
+        const baseReach = (30 + (effectiveFollowers * 0.15) + (fameFactor * 40)) * typeConfig.reach * action.reachScale;
 
         // Quality/Timing Roll (0.5x to 2.5x - Twitter is more volatile)
         const qualityMultiplier = 0.5 + (Math.random() * 2.0);
@@ -391,10 +398,12 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
         // Minimum gain for active users
         if (organicGain === 0 && likes > 10) organicGain = 1;
 
+        const remainingPeople = Math.max(0,creatorWorld.eligiblePeople-currentXFollowers);
+        organicGain = Math.min(remainingPeople,Math.floor(organicGain*(creatorWorld.eligiblePeople ? remainingPeople/creatorWorld.eligiblePeople : 0)));
         const newXFollowers = currentXFollowers + organicGain;
 
         const newPost: XPost = {
-            id: `x_post_player_${Date.now()}`,
+            id: actionId,
             authorId: 'PLAYER',
             authorName: player.name,
             authorHandle: player.x.handle,
@@ -422,12 +431,14 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
         const controversyDelta = Math.max(-8, typeConfig.controversy);
         const logType = controversyDelta >= 7 ? 'negative' as const : 'positive' as const;
 
+        const reputationReward = creatorPositiveReward(action.player,'reputation',reputationDelta > 0 ? reputationDelta*action.rewardScale : reputationDelta,2);
+        const fameReward = creatorPositiveReward(reputationReward.player,'fame',likes >= 500 ? action.rewardScale : 0,2);
         const nextPlayer = {
-            ...player,
+            ...fameReward.player,
             stats: {
                 ...player.stats,
-                reputation: Math.max(0, Math.min(100, player.stats.reputation + reputationDelta)),
-                fame: Math.max(0, Math.min(100, player.stats.fame + (likes >= 500 ? 1 : 0)))
+                reputation: Math.max(0, Math.min(100, player.stats.reputation + reputationReward.delta)),
+                fame: Math.max(0, Math.min(100, player.stats.fame + fameReward.delta))
             },
             x: {
                 ...player.x,
@@ -511,15 +522,21 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
     };
 
     const handleQuoteOrReply = (post: XPost, tone: XReplyTone, mode: 'QUOTE' | 'REPLY') => {
+        const energyCost = mode === 'QUOTE' ? 8 : 5;
+        if (player.energy.current < energyCost) return;
+        const actionId = `x_${mode.toLowerCase()}_${Date.now()}_${Math.random()}`;
+        const action = claimCreatorAction(player,'X',actionId);
+        if (action.duplicate) return;
+        const creatorWorld = readCreatorWorld(player);
         const toneConfig = getXReplyToneConfig(tone);
         const sourceReach = Math.max(40, post.likes + post.retweets * 2 + post.replies * 4);
-        const reach = Math.floor(sourceReach * toneConfig.reach * (0.2 + Math.random() * 0.25));
+        const reach = Math.floor(Math.min(creatorWorld.eligiblePeople*.15,sourceReach) * toneConfig.reach * (0.2 + Math.random() * 0.25) * action.reachScale);
         const likes = Math.max(1, Math.floor(reach * (0.08 + Math.random() * 0.08)));
         const retweets = Math.floor(likes * (mode === 'QUOTE' ? 0.35 : 0.18));
         const replies = Math.floor(likes * (toneConfig.controversy > 4 ? 0.28 : 0.1));
-        const gainedFollowers = Math.max(0, Math.floor(likes * (toneConfig.controversy > 4 ? 0.012 : 0.018)));
+        const gainedFollowers = Math.min(Math.max(0,creatorWorld.eligiblePeople-player.x.followers),Math.max(0,Math.floor(likes * (toneConfig.controversy > 4 ? 0.012 : 0.018))));
         const newPost: XPost = {
-            id: `x_${mode.toLowerCase()}_${Date.now()}`,
+            id: actionId,
             authorId: 'PLAYER',
             authorName: player.name,
             authorHandle: player.x.handle,
@@ -542,12 +559,14 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
         };
         const updatedFeed = [newPost, ...feed].slice(0, 80);
         const updatedPosts = [newPost, ...player.x.posts].slice(0, 80);
+        const reputationReward = creatorPositiveReward(action.player,'reputation',toneConfig.reputation > 0 ? toneConfig.reputation*action.rewardScale : toneConfig.reputation,2);
+        const fameReward = creatorPositiveReward(reputationReward.player,'fame',likes >= 1000 ? action.rewardScale : 0,2);
         const nextPlayer = {
-            ...player,
+            ...fameReward.player,
             stats: {
                 ...player.stats,
-                reputation: Math.max(0, Math.min(100, player.stats.reputation + toneConfig.reputation)),
-                fame: Math.max(0, Math.min(100, player.stats.fame + (likes >= 1000 ? 1 : 0)))
+                reputation: Math.max(0, Math.min(100, player.stats.reputation + reputationReward.delta)),
+                fame: Math.max(0, Math.min(100, player.stats.fame + fameReward.delta))
             },
             x: {
                 ...player.x,
@@ -614,6 +633,7 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
     // --- HELPERS ---
 
     const formatNumber = (num: number) => {
+        if (num >= 1000000000) return (num / 1000000000).toFixed(1) + 'B';
         if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
         if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
         return num.toString();
@@ -772,7 +792,7 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                                         <button
                                             key={tone}
                                             onClick={() => handleQuoteOrReply(selectedPost, tone, tone === 'SUPPORT' || tone === 'CLARIFY' ? 'REPLY' : 'QUOTE')}
-                                            disabled={player.energy.current < 5}
+                                            disabled={player.energy.current < (tone === 'SUPPORT' || tone === 'CLARIFY' ? 5 : 8)}
                                             className="rounded-2xl border border-zinc-800 bg-zinc-950 px-3 py-3 text-left disabled:opacity-40"
                                         >
 	                                            <div className="text-sm font-black text-white">{getXReplyToneConfig(tone).label}</div>
@@ -1193,7 +1213,7 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                     <div className="pointer-events-none absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black via-black to-transparent px-4 pt-10 pb-8">
                         <button
                             onClick={handlePost}
-                            disabled={!tweetContent.trim()}
+                            disabled={!tweetContent.trim() || player.energy.current < 5}
                             className="pointer-events-auto w-full rounded-[1.4rem] bg-gradient-to-r from-blue-600 to-sky-400 py-4 text-white font-black tracking-wide shadow-[0_18px_45px_rgba(37,99,235,0.28)] disabled:opacity-50 disabled:from-zinc-800 disabled:to-zinc-800 disabled:text-zinc-500 active:scale-[0.99] transition-transform"
                         >
                             {tr('x.postToX')}

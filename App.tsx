@@ -1,3 +1,4 @@
+import { claimCreatorAction } from './services/creatorEconomy';
 import { acknowledgeStockControlNotice } from './services/stockControlNotices';
 import { isStockSaveRecoveryError } from './services/stockSaveCompatibility';
 import {applyCareerAuditionApplication,acceptCareerPartTimeJob} from './services/careerApplicationActions';
@@ -3781,9 +3782,11 @@ export const App: React.FC = () => {
                                     : tr('app.socialFeedback.followersSubtext', { followers: actualGain.toLocaleString() });
                                 setToastMessage({ title: tr('app.socialFeedback.postedTitle'), subtext: toastMsg });
 
+                                const creatorAction = claimCreatorAction(p,'INSTAGRAM',`instagram:${newPost.id}`);
+                                if (creatorAction.duplicate) return p;
                                 const nextState: Player = {
-                                    ...p,
-                                    stats: { ...p.stats, followers: p.stats.followers + actualGain },
+                                    ...creatorAction.player,
+                                    stats: { ...p.stats, followers: Math.max(p.stats.followers,p.instagram.followers || 0) + actualGain },
                                     instagram: {
                                         ...p.instagram,
                                         followers: Math.max(p.instagram.followers || 0, p.stats.followers) + actualGain,

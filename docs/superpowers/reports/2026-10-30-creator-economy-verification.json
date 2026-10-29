@@ -1,0 +1,1289 @@
+{
+  "curves": {
+    "scope": "Actual creator functions and energy spend; fixed exogenous quality progression and content energy budgets, not a full actor career or real IAP transaction",
+    "rows": [
+      {
+        "initialSubscribers": 0,
+        "seed": 1,
+        "route": "FREE_CONTENT_BUDGET_60E",
+        "uploads": 416,
+        "spentEnergy": 6240,
+        "points": [
+          {
+            "week": 4,
+            "subscribers": 30,
+            "views": 12634,
+            "adIncome": 0,
+            "weeklyAds": 0,
+            "trust": 67
+          },
+          {
+            "week": 12,
+            "subscribers": 117,
+            "views": 46042,
+            "adIncome": 0,
+            "weeklyAds": 0,
+            "trust": 91
+          },
+          {
+            "week": 26,
+            "subscribers": 362,
+            "views": 125235,
+            "adIncome": 0,
+            "weeklyAds": 0,
+            "trust": 100
+          },
+          {
+            "week": 52,
+            "subscribers": 1185,
+            "views": 352790,
+            "adIncome": 64,
+            "weeklyAds": 17,
+            "trust": 100
+          },
+          {
+            "week": 104,
+            "subscribers": 5683,
+            "views": 1323891,
+            "adIncome": 1519,
+            "weeklyAds": 49,
+            "trust": 100
+          }
+        ]
+      },
+      {
+        "initialSubscribers": 0,
+        "seed": 2,
+        "route": "FREE_CONTENT_BUDGET_60E",
+        "uploads": 416,
+        "spentEnergy": 6240,
+        "points": [
+          {
+            "week": 4,
+            "subscribers": 29,
+            "views": 12174,
+            "adIncome": 0,
+            "weeklyAds": 0,
+            "trust": 67
+          },
+          {
+            "week": 12,
+            "subscribers": 114,
+            "views": 45207,
+            "adIncome": 0,
+            "weeklyAds": 0,
+            "trust": 91
+          },
+          {
+            "week": 26,
+            "subscribers": 371,
+            "views": 127603,
+            "adIncome": 0,
+            "weeklyAds": 0,
+            "trust": 100
+          },
+          {
+            "week": 52,
+            "subscribers": 1190,
+            "views": 355074,
+            "adIncome": 56,
+            "weeklyAds": 16,
+            "trust": 100
+          },
+          {
+            "week": 104,
+            "subscribers": 5803,
+            "views": 1349711,
+            "adIncome": 1556,
+            "weeklyAds": 42,
+            "trust": 100
+          }
+        ]
+      },
+      {
+        "initialSubscribers": 0,
+        "seed": 3,
+        "route": "FREE_CONTENT_BUDGET_60E",
+        "uploads": 416,
+        "spentEnergy": 6240,
+        "points": [
+          {
+            "week": 4,
+            "subscribers": 26,
+            "views": 11693,
+            "adIncome": 0,
+            "weeklyAds": 0,
+            "trust": 67
+          },
+          {
+            "week": 12,
+            "subscribers": 113,
+            "views": 45212,
+            "adIncome": 0,
+            "weeklyAds": 0,
+            "trust": 91
+          },
+          {
+            "week": 26,
+            "subscribers": 372,
+            "views": 128170,
+            "adIncome": 0,
+            "weeklyAds": 0,
+            "trust": 100
+          },
+          {
+            "week": 52,
+            "subscribers": 1199,
+            "views": 356812,
+            "adIncome": 65,
+            "weeklyAds": 15,
+            "trust": 100
+          },
+          {
+            "week": 104,
+            "subscribers": 5704,
+            "views": 1330355,
+            "adIncome": 1526,
+            "weeklyAds": 41,
+            "trust": 100
+          }
+        ]
+      },
+      {
+        "initialSubscribers": 0,
+        "seed": 4,
+        "route": "FREE_CONTENT_BUDGET_60E",
+        "uploads": 416,
+        "spentEnergy": 6240,
+        "points": [
+          {
+            "week": 4,
+            "subscribers": 29,
+            "views": 12288,
+            "adIncome": 0,
+            "weeklyAds": 0,
+            "trust": 67
+          },
+          {
+            "week": 12,
+            "subscribers": 115,
+            "views": 45864,
+            "adIncome": 0,
+            "weeklyAds": 0,
+            "trust": 91
+          },
+          {
+            "week": 26,
+            "subscribers": 360,
+            "views": 125196,
+            "adIncome": 0,
+            "weeklyAds": 0,
+            "trust": 100
+          },
+          {
+            "week": 52,
+            "subscribers": 1176,
+            "views": 351610,
+            "adIncome": 59,
+            "weeklyAds": 17,
+            "trust": 100
+          },
+          {
+            "week": 104,
+            "subscribers": 5421,
+            "views": 1269828,
+            "adIncome": 1417,
+            "weeklyAds": 42,
+            "trust": 100
+          }
+        ]
+      },
+      {
+        "initialSubscribers": 0,
+        "seed": 5,
+        "route": "FREE_CONTENT_BUDGET_60E",
+        "uploads": 416,
+        "spentEnergy": 6240,
+        "points": [
+          {
+            "week": 4,
+            "subscribers": 28,
+            "views": 11998,
+            "adIncome": 0,
+            "weeklyAds": 0,
+            "trust": 67
+          },
+          {
+            "week": 12,
+            "subscribers": 110,
+            "views": 43784,
+            "adIncome": 0,
+            "weeklyAds": 0,
+            "trust": 91
+          },
+          {
+            "week": 26,
+            "subscribers": 357,
+            "views": 123285,
+            "adIncome": 0,
+            "weeklyAds": 0,
+            "trust": 100
+          },
+          {
+            "week": 52,
+            "subscribers": 1166,
+            "views": 347626,
+            "adIncome": 56,
+            "weeklyAds": 13,
+            "trust": 100
+          },
+          {
+            "week": 104,
+            "subscribers": 5572,
+            "views": 1297944,
+            "adIncome": 1474,
+            "weeklyAds": 44,
+            "trust": 100
+          }
+        ]
+      },
+      {
+        "initialSubscribers": 0,
+        "seed": 1,
+        "route": "BOOSTED_CONTENT_BUDGET_180E",
+        "uploads": 1248,
+        "spentEnergy": 18720,
+        "points": [
+          {
+            "week": 4,
+            "subscribers": 34,
+            "views": 17350,
+            "adIncome": 0,
+            "weeklyAds": 0,
+            "trust": 67
+          },
+          {
+            "week": 12,
+            "subscribers": 142,
+            "views": 64667,
+            "adIncome": 0,
+            "weeklyAds": 0,
+            "trust": 91
+          },
+          {
+            "week": 26,
+            "subscribers": 477,
+            "views": 186152,
+            "adIncome": 0,
+            "weeklyAds": 0,
+            "trust": 100
+          },
+          {
+            "week": 52,
+            "subscribers": 1655,
+            "views": 533405,
+            "adIncome": 219,
+            "weeklyAds": 20,
+            "trust": 100
+          },
+          {
+            "week": 104,
+            "subscribers": 8766,
+            "views": 2089769,
+            "adIncome": 2343,
+            "weeklyAds": 72,
+            "trust": 100
+          }
+        ]
+      },
+      {
+        "initialSubscribers": 0,
+        "seed": 2,
+        "route": "BOOSTED_CONTENT_BUDGET_180E",
+        "uploads": 1248,
+        "spentEnergy": 18720,
+        "points": [
+          {
+            "week": 4,
+            "subscribers": 33,
+            "views": 17491,
+            "adIncome": 0,
+            "weeklyAds": 0,
+            "trust": 67
+          },
+          {
+            "week": 12,
+            "subscribers": 142,
+            "views": 64940,
+            "adIncome": 0,
+            "weeklyAds": 0,
+            "trust": 91
+          },
+          {
+            "week": 26,
+            "subscribers": 464,
+            "views": 183122,
+            "adIncome": 0,
+            "weeklyAds": 0,
+            "trust": 100
+          },
+          {
+            "week": 52,
+            "subscribers": 1612,
+            "views": 524316,
+            "adIncome": 200,
+            "weeklyAds": 18,
+            "trust": 100
+          },
+          {
+            "week": 104,
+            "subscribers": 9453,
+            "views": 2226248,
+            "adIncome": 2589,
+            "weeklyAds": 92,
+            "trust": 100
+          }
+        ]
+      },
+      {
+        "initialSubscribers": 0,
+        "seed": 3,
+        "route": "BOOSTED_CONTENT_BUDGET_180E",
+        "uploads": 1248,
+        "spentEnergy": 18720,
+        "points": [
+          {
+            "week": 4,
+            "subscribers": 36,
+            "views": 18311,
+            "adIncome": 0,
+            "weeklyAds": 0,
+            "trust": 67
+          },
+          {
+            "week": 12,
+            "subscribers": 143,
+            "views": 65378,
+            "adIncome": 0,
+            "weeklyAds": 0,
+            "trust": 91
+          },
+          {
+            "week": 26,
+            "subscribers": 469,
+            "views": 185480,
+            "adIncome": 0,
+            "weeklyAds": 0,
+            "trust": 100
+          },
+          {
+            "week": 52,
+            "subscribers": 1631,
+            "views": 529581,
+            "adIncome": 212,
+            "weeklyAds": 23,
+            "trust": 100
+          },
+          {
+            "week": 104,
+            "subscribers": 8960,
+            "views": 2125550,
+            "adIncome": 2411,
+            "weeklyAds": 80,
+            "trust": 100
+          }
+        ]
+      },
+      {
+        "initialSubscribers": 0,
+        "seed": 4,
+        "route": "BOOSTED_CONTENT_BUDGET_180E",
+        "uploads": 1248,
+        "spentEnergy": 18720,
+        "points": [
+          {
+            "week": 4,
+            "subscribers": 34,
+            "views": 17307,
+            "adIncome": 0,
+            "weeklyAds": 0,
+            "trust": 67
+          },
+          {
+            "week": 12,
+            "subscribers": 139,
+            "views": 63470,
+            "adIncome": 0,
+            "weeklyAds": 0,
+            "trust": 91
+          },
+          {
+            "week": 26,
+            "subscribers": 459,
+            "views": 181614,
+            "adIncome": 0,
+            "weeklyAds": 0,
+            "trust": 100
+          },
+          {
+            "week": 52,
+            "subscribers": 1630,
+            "views": 526389,
+            "adIncome": 207,
+            "weeklyAds": 20,
+            "trust": 100
+          },
+          {
+            "week": 104,
+            "subscribers": 9040,
+            "views": 2139379,
+            "adIncome": 2438,
+            "weeklyAds": 76,
+            "trust": 100
+          }
+        ]
+      },
+      {
+        "initialSubscribers": 0,
+        "seed": 5,
+        "route": "BOOSTED_CONTENT_BUDGET_180E",
+        "uploads": 1248,
+        "spentEnergy": 18720,
+        "points": [
+          {
+            "week": 4,
+            "subscribers": 34,
+            "views": 17201,
+            "adIncome": 0,
+            "weeklyAds": 0,
+            "trust": 67
+          },
+          {
+            "week": 12,
+            "subscribers": 146,
+            "views": 65713,
+            "adIncome": 0,
+            "weeklyAds": 0,
+            "trust": 91
+          },
+          {
+            "week": 26,
+            "subscribers": 462,
+            "views": 182343,
+            "adIncome": 0,
+            "weeklyAds": 0,
+            "trust": 100
+          },
+          {
+            "week": 52,
+            "subscribers": 1578,
+            "views": 514008,
+            "adIncome": 185,
+            "weeklyAds": 24,
+            "trust": 100
+          },
+          {
+            "week": 104,
+            "subscribers": 9156,
+            "views": 2162678,
+            "adIncome": 2474,
+            "weeklyAds": 67,
+            "trust": 100
+          }
+        ]
+      },
+      {
+        "initialSubscribers": 1000,
+        "seed": 1,
+        "route": "FREE_CONTENT_BUDGET_60E",
+        "uploads": 416,
+        "spentEnergy": 6240,
+        "points": [
+          {
+            "week": 4,
+            "subscribers": 1030,
+            "views": 12639,
+            "adIncome": 13,
+            "weeklyAds": 4,
+            "trust": 67
+          },
+          {
+            "week": 12,
+            "subscribers": 1117,
+            "views": 46049,
+            "adIncome": 51,
+            "weeklyAds": 5,
+            "trust": 91
+          },
+          {
+            "week": 26,
+            "subscribers": 1362,
+            "views": 125242,
+            "adIncome": 151,
+            "weeklyAds": 8,
+            "trust": 100
+          },
+          {
+            "week": 52,
+            "subscribers": 2185,
+            "views": 352797,
+            "adIncome": 462,
+            "weeklyAds": 17,
+            "trust": 100
+          },
+          {
+            "week": 104,
+            "subscribers": 6683,
+            "views": 1323898,
+            "adIncome": 1917,
+            "weeklyAds": 49,
+            "trust": 100
+          }
+        ]
+      },
+      {
+        "initialSubscribers": 1000,
+        "seed": 2,
+        "route": "FREE_CONTENT_BUDGET_60E",
+        "uploads": 416,
+        "spentEnergy": 6240,
+        "points": [
+          {
+            "week": 4,
+            "subscribers": 1029,
+            "views": 12181,
+            "adIncome": 12,
+            "weeklyAds": 3,
+            "trust": 67
+          },
+          {
+            "week": 12,
+            "subscribers": 1114,
+            "views": 45222,
+            "adIncome": 51,
+            "weeklyAds": 6,
+            "trust": 91
+          },
+          {
+            "week": 26,
+            "subscribers": 1371,
+            "views": 127620,
+            "adIncome": 156,
+            "weeklyAds": 9,
+            "trust": 100
+          },
+          {
+            "week": 52,
+            "subscribers": 2190,
+            "views": 355091,
+            "adIncome": 466,
+            "weeklyAds": 16,
+            "trust": 100
+          },
+          {
+            "week": 104,
+            "subscribers": 6803,
+            "views": 1349728,
+            "adIncome": 1966,
+            "weeklyAds": 42,
+            "trust": 100
+          }
+        ]
+      },
+      {
+        "initialSubscribers": 1000,
+        "seed": 3,
+        "route": "FREE_CONTENT_BUDGET_60E",
+        "uploads": 416,
+        "spentEnergy": 6240,
+        "points": [
+          {
+            "week": 4,
+            "subscribers": 1026,
+            "views": 11704,
+            "adIncome": 11,
+            "weeklyAds": 3,
+            "trust": 67
+          },
+          {
+            "week": 12,
+            "subscribers": 1113,
+            "views": 45227,
+            "adIncome": 51,
+            "weeklyAds": 5,
+            "trust": 91
+          },
+          {
+            "week": 26,
+            "subscribers": 1372,
+            "views": 128185,
+            "adIncome": 157,
+            "weeklyAds": 9,
+            "trust": 100
+          },
+          {
+            "week": 52,
+            "subscribers": 2199,
+            "views": 356827,
+            "adIncome": 469,
+            "weeklyAds": 15,
+            "trust": 100
+          },
+          {
+            "week": 104,
+            "subscribers": 6704,
+            "views": 1330370,
+            "adIncome": 1930,
+            "weeklyAds": 41,
+            "trust": 100
+          }
+        ]
+      },
+      {
+        "initialSubscribers": 1000,
+        "seed": 4,
+        "route": "FREE_CONTENT_BUDGET_60E",
+        "uploads": 416,
+        "spentEnergy": 6240,
+        "points": [
+          {
+            "week": 4,
+            "subscribers": 1029,
+            "views": 12295,
+            "adIncome": 12,
+            "weeklyAds": 4,
+            "trust": 67
+          },
+          {
+            "week": 12,
+            "subscribers": 1115,
+            "views": 45873,
+            "adIncome": 51,
+            "weeklyAds": 5,
+            "trust": 91
+          },
+          {
+            "week": 26,
+            "subscribers": 1360,
+            "views": 125206,
+            "adIncome": 151,
+            "weeklyAds": 8,
+            "trust": 100
+          },
+          {
+            "week": 52,
+            "subscribers": 2176,
+            "views": 351620,
+            "adIncome": 460,
+            "weeklyAds": 17,
+            "trust": 100
+          },
+          {
+            "week": 104,
+            "subscribers": 6421,
+            "views": 1269838,
+            "adIncome": 1818,
+            "weeklyAds": 42,
+            "trust": 100
+          }
+        ]
+      },
+      {
+        "initialSubscribers": 1000,
+        "seed": 5,
+        "route": "FREE_CONTENT_BUDGET_60E",
+        "uploads": 416,
+        "spentEnergy": 6240,
+        "points": [
+          {
+            "week": 4,
+            "subscribers": 1028,
+            "views": 12007,
+            "adIncome": 12,
+            "weeklyAds": 3,
+            "trust": 67
+          },
+          {
+            "week": 12,
+            "subscribers": 1110,
+            "views": 43797,
+            "adIncome": 48,
+            "weeklyAds": 5,
+            "trust": 91
+          },
+          {
+            "week": 26,
+            "subscribers": 1357,
+            "views": 123302,
+            "adIncome": 148,
+            "weeklyAds": 8,
+            "trust": 100
+          },
+          {
+            "week": 52,
+            "subscribers": 2166,
+            "views": 347643,
+            "adIncome": 451,
+            "weeklyAds": 13,
+            "trust": 100
+          },
+          {
+            "week": 104,
+            "subscribers": 6572,
+            "views": 1297961,
+            "adIncome": 1869,
+            "weeklyAds": 44,
+            "trust": 100
+          }
+        ]
+      },
+      {
+        "initialSubscribers": 1000,
+        "seed": 1,
+        "route": "BOOSTED_CONTENT_BUDGET_180E",
+        "uploads": 1248,
+        "spentEnergy": 18720,
+        "points": [
+          {
+            "week": 4,
+            "subscribers": 1034,
+            "views": 17361,
+            "adIncome": 16,
+            "weeklyAds": 5,
+            "trust": 67
+          },
+          {
+            "week": 12,
+            "subscribers": 1142,
+            "views": 64687,
+            "adIncome": 67,
+            "weeklyAds": 8,
+            "trust": 91
+          },
+          {
+            "week": 26,
+            "subscribers": 1477,
+            "views": 186175,
+            "adIncome": 208,
+            "weeklyAds": 11,
+            "trust": 100
+          },
+          {
+            "week": 52,
+            "subscribers": 2655,
+            "views": 533428,
+            "adIncome": 642,
+            "weeklyAds": 20,
+            "trust": 100
+          },
+          {
+            "week": 104,
+            "subscribers": 9766,
+            "views": 2089792,
+            "adIncome": 2766,
+            "weeklyAds": 72,
+            "trust": 100
+          }
+        ]
+      },
+      {
+        "initialSubscribers": 1000,
+        "seed": 2,
+        "route": "BOOSTED_CONTENT_BUDGET_180E",
+        "uploads": 1248,
+        "spentEnergy": 18720,
+        "points": [
+          {
+            "week": 4,
+            "subscribers": 1034,
+            "views": 17501,
+            "adIncome": 16,
+            "weeklyAds": 5,
+            "trust": 67
+          },
+          {
+            "week": 12,
+            "subscribers": 1143,
+            "views": 64952,
+            "adIncome": 66,
+            "weeklyAds": 7,
+            "trust": 91
+          },
+          {
+            "week": 26,
+            "subscribers": 1465,
+            "views": 183134,
+            "adIncome": 202,
+            "weeklyAds": 12,
+            "trust": 100
+          },
+          {
+            "week": 52,
+            "subscribers": 2613,
+            "views": 524328,
+            "adIncome": 625,
+            "weeklyAds": 18,
+            "trust": 100
+          },
+          {
+            "week": 104,
+            "subscribers": 10454,
+            "views": 2226260,
+            "adIncome": 3014,
+            "weeklyAds": 92,
+            "trust": 100
+          }
+        ]
+      },
+      {
+        "initialSubscribers": 1000,
+        "seed": 3,
+        "route": "BOOSTED_CONTENT_BUDGET_180E",
+        "uploads": 1248,
+        "spentEnergy": 18720,
+        "points": [
+          {
+            "week": 4,
+            "subscribers": 1036,
+            "views": 18325,
+            "adIncome": 17,
+            "weeklyAds": 5,
+            "trust": 67
+          },
+          {
+            "week": 12,
+            "subscribers": 1143,
+            "views": 65403,
+            "adIncome": 66,
+            "weeklyAds": 8,
+            "trust": 91
+          },
+          {
+            "week": 26,
+            "subscribers": 1469,
+            "views": 185507,
+            "adIncome": 207,
+            "weeklyAds": 10,
+            "trust": 100
+          },
+          {
+            "week": 52,
+            "subscribers": 2631,
+            "views": 529608,
+            "adIncome": 634,
+            "weeklyAds": 23,
+            "trust": 100
+          },
+          {
+            "week": 104,
+            "subscribers": 9960,
+            "views": 2125577,
+            "adIncome": 2833,
+            "weeklyAds": 80,
+            "trust": 100
+          }
+        ]
+      },
+      {
+        "initialSubscribers": 1000,
+        "seed": 4,
+        "route": "BOOSTED_CONTENT_BUDGET_180E",
+        "uploads": 1248,
+        "spentEnergy": 18720,
+        "points": [
+          {
+            "week": 4,
+            "subscribers": 1034,
+            "views": 17316,
+            "adIncome": 16,
+            "weeklyAds": 5,
+            "trust": 67
+          },
+          {
+            "week": 12,
+            "subscribers": 1139,
+            "views": 63485,
+            "adIncome": 64,
+            "weeklyAds": 7,
+            "trust": 91
+          },
+          {
+            "week": 26,
+            "subscribers": 1459,
+            "views": 181630,
+            "adIncome": 201,
+            "weeklyAds": 11,
+            "trust": 100
+          },
+          {
+            "week": 52,
+            "subscribers": 2630,
+            "views": 526405,
+            "adIncome": 631,
+            "weeklyAds": 20,
+            "trust": 100
+          },
+          {
+            "week": 104,
+            "subscribers": 10040,
+            "views": 2139395,
+            "adIncome": 2862,
+            "weeklyAds": 76,
+            "trust": 100
+          }
+        ]
+      },
+      {
+        "initialSubscribers": 1000,
+        "seed": 5,
+        "route": "BOOSTED_CONTENT_BUDGET_180E",
+        "uploads": 1248,
+        "spentEnergy": 18720,
+        "points": [
+          {
+            "week": 4,
+            "subscribers": 1034,
+            "views": 17212,
+            "adIncome": 15,
+            "weeklyAds": 5,
+            "trust": 67
+          },
+          {
+            "week": 12,
+            "subscribers": 1146,
+            "views": 65732,
+            "adIncome": 66,
+            "weeklyAds": 8,
+            "trust": 91
+          },
+          {
+            "week": 26,
+            "subscribers": 1462,
+            "views": 182364,
+            "adIncome": 199,
+            "weeklyAds": 10,
+            "trust": 100
+          },
+          {
+            "week": 52,
+            "subscribers": 2578,
+            "views": 514029,
+            "adIncome": 607,
+            "weeklyAds": 24,
+            "trust": 100
+          },
+          {
+            "week": 104,
+            "subscribers": 10156,
+            "views": 2162699,
+            "adIncome": 2896,
+            "weeklyAds": 67,
+            "trust": 100
+          }
+        ]
+      }
+    ],
+    "mature": [
+      {
+        "subscribers": 1000,
+        "observedWeeklyViews": 2500,
+        "audience": {
+          "week": 1248,
+          "eligiblePeople": 4611678787,
+          "eligiblePayers": 3212093776,
+          "referenceCpm": 15.159924604819855,
+          "weeklyAdBudget": 5596087761,
+          "purchasingPower": 0.9267159225580264,
+          "weeklySpendPerPerson": 2.3167898063950663,
+          "subscribers": 1000,
+          "observedWeeklyViews": 2500,
+          "engagedPeople": 1430,
+          "newPeopleRemaining": 4611677787
+        },
+        "brand": {
+          "payout": 43,
+          "bonusViews": 2500,
+          "basis": {
+            "version": 1,
+            "qualifiedViews": 1625,
+            "buyerBudget": 43
+          }
+        },
+        "merch": {
+          "tier": "BASIC",
+          "grossRevenue": 115,
+          "productionCost": 5084,
+          "netProfit": -4969,
+          "result": "UNDERPERFORMED"
+        },
+        "live": {
+          "views": 514,
+          "donations": 10,
+          "newSubscribers": 2
+        },
+        "membership": {
+          "members": 1,
+          "paidMembers": 1,
+          "revenue": 4
+        }
+      },
+      {
+        "subscribers": 1000000,
+        "observedWeeklyViews": 1000000,
+        "audience": {
+          "week": 1248,
+          "eligiblePeople": 4611678787,
+          "eligiblePayers": 3212093776,
+          "referenceCpm": 15.159924604819855,
+          "weeklyAdBudget": 5596087761,
+          "purchasingPower": 0.9267159225580264,
+          "weeklySpendPerPerson": 2.3167898063950663,
+          "subscribers": 1000000,
+          "observedWeeklyViews": 1000000,
+          "engagedPeople": 572000,
+          "newPeopleRemaining": 4610678787
+        },
+        "brand": {
+          "payout": 11370,
+          "bonusViews": 1000000,
+          "basis": {
+            "version": 1,
+            "qualifiedViews": 650000,
+            "buyerBudget": 17352
+          }
+        },
+        "merch": {
+          "tier": "BASIC",
+          "grossRevenue": 46382,
+          "productionCost": 38396,
+          "netProfit": 7986,
+          "result": "SOLD_OUT"
+        },
+        "live": {
+          "views": 86100,
+          "donations": 1723,
+          "newSubscribers": 392
+        },
+        "membership": {
+          "members": 603,
+          "paidMembers": 603,
+          "revenue": 2412
+        }
+      },
+      {
+        "subscribers": 100000000,
+        "observedWeeklyViews": 40000000,
+        "audience": {
+          "week": 1248,
+          "eligiblePeople": 4611678787,
+          "eligiblePayers": 3212093776,
+          "referenceCpm": 15.159924604819855,
+          "weeklyAdBudget": 5596087761,
+          "purchasingPower": 0.9267159225580264,
+          "weeklySpendPerPerson": 2.3167898063950663,
+          "subscribers": 100000000,
+          "observedWeeklyViews": 40000000,
+          "engagedPeople": 22880000,
+          "newPeopleRemaining": 4511678787
+        },
+        "brand": {
+          "payout": 395674,
+          "bonusViews": 40000000,
+          "basis": {
+            "version": 1,
+            "qualifiedViews": 26000000,
+            "buyerBudget": 694099
+          }
+        },
+        "merch": {
+          "tier": "BASIC",
+          "grossRevenue": 1381941,
+          "productionCost": 999999,
+          "netProfit": 381942,
+          "result": "SOLD_OUT"
+        },
+        "live": {
+          "views": 3432300,
+          "donations": 68704,
+          "newSubscribers": 15311
+        },
+        "membership": {
+          "members": 24161,
+          "paidMembers": 24161,
+          "revenue": 96644
+        }
+      },
+      {
+        "subscribers": 10000000000,
+        "observedWeeklyViews": 0,
+        "audience": {
+          "week": 1248,
+          "eligiblePeople": 4611678787,
+          "eligiblePayers": 3212093776,
+          "referenceCpm": 15.159924604819855,
+          "weeklyAdBudget": 5596087761,
+          "purchasingPower": 0.9267159225580264,
+          "weeklySpendPerPerson": 2.3167898063950663,
+          "subscribers": 4611678787,
+          "observedWeeklyViews": 0,
+          "engagedPeople": 7171226,
+          "newPeopleRemaining": 0
+        },
+        "brand": {
+          "payout": 19182,
+          "bonusViews": 1792806,
+          "basis": {
+            "version": 1,
+            "qualifiedViews": 1165324,
+            "buyerBudget": 217549
+          }
+        },
+        "merch": {
+          "tier": "BASIC",
+          "grossRevenue": 581491,
+          "productionCost": 423674,
+          "netProfit": 157817,
+          "result": "SOLD_OUT"
+        },
+        "live": {
+          "views": 1075983,
+          "donations": 21538,
+          "newSubscribers": 0
+        },
+        "membership": {
+          "members": 7572,
+          "paidMembers": 7572,
+          "revenue": 30288
+        }
+      }
+    ]
+  },
+  "performance": {
+    "scope": "Node service only, not native device frame timing",
+    "retainedVideos": 5000,
+    "samplesMs": [
+      3.0415840000000003,
+      3.333459000000005,
+      3.5104999999999933,
+      3.610209000000001,
+      3.744125000000004,
+      5.972833999999995,
+      6.875958000000001
+    ],
+    "medianMs": 3.610209000000001,
+    "maxMs": 6.875958000000001,
+    "boundedHistory": 104,
+    "status": "PASS"
+  },
+  "weekAndSaveFlow": {
+    "world": {
+      "week": 1251,
+      "eligiblePeople": 4614212300,
+      "eligiblePayers": 3213901799,
+      "referenceCpm": 15.15769793578084,
+      "weeklyAdBudget": 5574244164,
+      "purchasingPower": 0.926730216909538,
+      "weeklySpendPerPerson": 2.572794756669713
+    },
+    "observations": [
+      {
+        "week": 1,
+        "subscribers": 10000000000,
+        "totalViews": 3480061,
+        "money": 1418527,
+        "paidMembers": 44186,
+        "weeklyFanSpend": 176744
+      },
+      {
+        "week": 2,
+        "subscribers": 10000000000,
+        "totalViews": 6174190,
+        "money": 1618707,
+        "paidMembers": 44748,
+        "weeklyFanSpend": 178992
+      },
+      {
+        "week": 3,
+        "subscribers": 10000000000,
+        "totalViews": 7583046,
+        "money": 1773922,
+        "paidMembers": 38003,
+        "weeklyFanSpend": 152012
+      },
+      {
+        "week": 4,
+        "subscribers": 10000000000,
+        "totalViews": 8596624,
+        "money": 1897846,
+        "paidMembers": 30405,
+        "weeklyFanSpend": 121620
+      },
+      {
+        "week": 5,
+        "subscribers": 10000000000,
+        "totalViews": 9270103,
+        "money": 1990601,
+        "paidMembers": 22806,
+        "weeklyFanSpend": 91224
+      },
+      {
+        "week": 6,
+        "subscribers": 10000000000,
+        "totalViews": 9663519,
+        "money": 2052315,
+        "paidMembers": 15205,
+        "weeklyFanSpend": 60820
+      }
+    ],
+    "status": "PASS"
+  },
+  "weeklyAudienceEvents": {
+    "status": "PASS",
+    "rows": [
+      {
+        "subscribers": 100000000,
+        "bonus": 496,
+        "afterSubscribers": 100000436
+      },
+      {
+        "subscribers": 10000000000,
+        "bonus": 3339,
+        "afterSubscribers": 10000000000
+      },
+      {
+        "subscribers": 10000000000,
+        "bonus": 0,
+        "afterSubscribers": 10000000000,
+        "case": "VIRAL_YEAR_ROLLOVER",
+        "views": 4700389
+      }
+    ]
+  },
+  "browser": {
+    "status": "PASS",
+    "uploads": {
+      "count": 6,
+      "trust": 63,
+      "mood": 63,
+      "energy": 5,
+      "subscribers": 1000175,
+      "totalViews": 335791
+    },
+    "signedContractPayout": 2900000000,
+    "zeroEnergyPostsBlocked": true,
+    "liveAndMerchSettlement": true,
+    "membershipActivation": true,
+    "reloadRetainsLedger": true,
+    "pageErrors": []
+  },
+  "commitPreflight": {
+    "baseHead": "09edec4bf958d12c201b9ef848e1c5bcacc7e39e",
+    "scope": "Creator and social economy plus related future sponsorship valuation; unrelated pending changes excluded",
+    "status": "PASS",
+    "fullTypecheckHeapMiB": 3072,
+    "productionBuildSeconds": 30.6,
+    "productionBuildPeakOwnedTreeRssMiB": 1705.7,
+    "sponsorshipCases": 17,
+    "unchangedInitiallyDirtyTrackedFiles": 67
+  }
+}

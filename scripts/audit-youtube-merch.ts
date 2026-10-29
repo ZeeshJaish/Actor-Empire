@@ -42,7 +42,7 @@ const makePlayer = (overrides: Partial<Player> = {}): Player => {
 
 const player = makePlayer();
 const quote = calculateYoutubeMerchQuote(player, 'BASIC', () => 0.5);
-if (quote.grossRevenue <= quote.productionCost || quote.netProfit !== quote.grossRevenue - quote.productionCost) {
+if (quote.productionCost < YOUTUBE_MERCH_TIERS.BASIC.cost || quote.netProfit !== quote.grossRevenue - quote.productionCost) {
     throw new Error('Merch quote should expose gross, production cost, and exact net profit.');
 }
 
@@ -53,7 +53,7 @@ if (!resolved.success || !resolved.quote) {
 if (resolved.player.money !== player.money + resolved.quote.netProfit) {
     throw new Error('Merch net profit should be credited to player cash exactly once.');
 }
-if (resolved.player.youtube.lifetimeEarnings !== player.youtube.lifetimeEarnings + resolved.quote.netProfit) {
+if (resolved.player.youtube.lifetimeEarnings !== player.youtube.lifetimeEarnings + Math.max(0,resolved.quote.netProfit)) {
     throw new Error('Profitable merch should increase creator lifetime earnings by net profit.');
 }
 if (resolved.player.youtube.lastMerchOutcome?.netProfit !== resolved.quote.netProfit) {

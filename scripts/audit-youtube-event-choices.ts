@@ -95,7 +95,7 @@ const apology = resolveSerializedChoice(
     createYoutubeBacklashEvent('Audit Video', 80),
     'POST_APOLOGY'
 );
-assert(apology.updatedPlayer.youtube.audienceTrust === 67, 'Apology must restore trust');
+assert(apology.updatedPlayer.youtube.audienceTrust === 63, 'Apology must restore trust within the shared weekly reward budget');
 assert(apology.updatedPlayer.youtube.controversy === 18, 'Apology must lower controversy');
 assert(apology.effects?.some(effect => effect.label === 'Controversy' && effect.value === '-12'), 'Apology must show its controversy change');
 

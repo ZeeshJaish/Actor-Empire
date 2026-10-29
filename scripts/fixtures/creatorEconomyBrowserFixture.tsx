@@ -1,0 +1,10 @@
+import React,{useState} from 'react';
+import {createRoot} from 'react-dom/client';
+import '../../index.css';
+import {INITIAL_PLAYER,type Player} from '../../types';
+import {YoutubeApp} from '../../views/mobile/YoutubeApp';
+import {XApp} from '../../views/mobile/XApp';
+const key='qa.creator-economy-only';
+const fresh=()=>{const p=structuredClone(INITIAL_PLAYER);p.age=25;p.currentWeek=5;p.money=1000000;p.stats.fame=40;p.stats.skills.charisma=80;p.stats.skills.improvisation=80;p.stats.reputation=70;p.youtube.subscribers=1e6;p.youtube.isMonetized=true;p.youtube.audienceTrust=60;p.youtube.fanMood=60;p.youtube.videos=[];p.youtube.totalChannelViews=305000;p.energy={current:100,max:100};p.flags.weeklyBaseEnergyRemaining=100;p.flags.bonusEnergyBank=0;return p;};
+function QA(){const [p,setP]=useState<Player>(()=>JSON.parse(localStorage.getItem(key)||'null')||fresh());const[app,setApp]=useState('YOUTUBE');const commit=(n:Player)=>{localStorage.setItem(key,JSON.stringify(n));setP(n)};(window as any).creatorQA={player:()=>structuredClone(p),reset:()=>commit(fresh()),app:setApp,set:(n:Player)=>commit(n)};return <div className="h-screen text-white bg-black max-w-[430px] mx-auto">{app==='YOUTUBE'?<YoutubeApp player={p} onBack={()=>setApp('X')} onUpdatePlayer={commit}/>:<XApp player={p} onBack={()=>setApp('YOUTUBE')} onUpdatePlayer={commit}/>}</div>};
+createRoot(document.getElementById('root')!).render(<QA/>);

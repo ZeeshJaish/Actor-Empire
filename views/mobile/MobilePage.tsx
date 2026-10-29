@@ -1,3 +1,4 @@
+import { readCreatorWorld } from '../../services/creatorEconomy';
 
 import React, { useEffect, useState } from 'react';
 import { Player, Commitment, InstaPostType, NPCActor, InteractionType, Agent, Manager, Message, SponsorshipActionType, AuditionOpportunity, DatingMatch, InstaPost, Relationship, SponsorshipOffer, NegotiationData, ContractFilm, YoutubeBrandDeal, YoutubeCollabOffer, YoutubeMusicVideoFeatureOffer, PregnancyCarrier } from '../../types';
@@ -562,7 +563,8 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
           if (!hasEnergyFor(collaborationSigningEnergyCost, 'sign this music video feature')) return;
           spendPlayerEnergy(updatedPlayer, collaborationSigningEnergyCost, `Music feature signing: ${offer.artistName}`);
           const messy = Math.random() < Math.min(0.28, offer.reputationRisk / 28);
-          const followerGain = Math.max(0, Math.round(offer.followerGain * (messy ? 0.55 : 1)));
+          const reachableAudience = readCreatorWorld(updatedPlayer).eligiblePeople;
+          const followerGain = Math.min(Math.max(0,reachableAudience-Math.max(updatedPlayer.stats.followers,updatedPlayer.instagram.followers||0)),Math.max(0, Math.round(offer.followerGain * (messy ? 0.55 : 1))));
           updatedPlayer.money += offer.appearanceFee;
           updatedPlayer.stats = {
               ...updatedPlayer.stats,
@@ -572,7 +574,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
           };
           updatedPlayer.x = {
               ...updatedPlayer.x,
-              followers: Math.max(0, (updatedPlayer.x?.followers || 0) + Math.floor(followerGain * 0.45)),
+              followers: Math.max(0, (updatedPlayer.x?.followers || 0) + Math.min(Math.floor(followerGain * 0.45),Math.max(0,reachableAudience-(updatedPlayer.x?.followers||0)))),
               feed: [{
                   id: `x_music_feature_${Date.now()}`,
                   authorId: 'music_video_watch',

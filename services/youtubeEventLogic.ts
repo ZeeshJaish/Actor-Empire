@@ -1,3 +1,6 @@
+import { quoteYoutubeUpload, quoteYoutubeNewSubscribers, settleYoutubeActivity } from './youtubeEconomy';
+import { readCreatorLedger } from './creatorEconomy';
+import { getAbsoluteWeek } from './legacyLogic';
 import {
     EventImpactSignal,
     LegalCase,
@@ -12,6 +15,7 @@ import { getGenderedAvatar } from './npcLogic';
 export type YoutubeEventResolution =
     | {
         domain: 'YOUTUBE';
+        eventId?: string;
         kind: 'COPYRIGHT';
         payload: {
             videoTitle: string;
@@ -21,6 +25,7 @@ export type YoutubeEventResolution =
     }
     | {
         domain: 'YOUTUBE';
+        eventId?: string;
         kind: 'BACKLASH';
         payload: {
             videoTitle: string;
@@ -29,6 +34,7 @@ export type YoutubeEventResolution =
     }
     | {
         domain: 'YOUTUBE';
+        eventId?: string;
         kind: 'CREATOR_INVITE';
         payload: {
             inviteKind: 'PODCAST' | 'CREATOR_GALA' | 'PLATFORM_SUMMIT';
@@ -37,6 +43,7 @@ export type YoutubeEventResolution =
     }
     | {
         domain: 'YOUTUBE';
+        eventId?: string;
         kind: 'RIVALRY';
         payload: {
             rivalName: string;
@@ -356,7 +363,7 @@ const resolveBacklashChoice = (
             player.stats.reputation = clamp(player.stats.reputation + 1);
             return 'You posted a grounded apology. The heat cooled before it became a career fire.';
         case 'PR_TEAM': {
-            const recoveryViews = Math.floor(Math.max(1200, player.youtube.subscribers * (0.05 + random() * 0.08)));
+            const recoveryViews = quoteYoutubeUpload(player,{qualityScore:75,uploadPlan:'SAFE',type:'VLOG'} as any,Math.floor(Math.max(1200, player.youtube.subscribers * (0.05 + random() * 0.08))));
             const video = player.youtube.videos.find(candidate => candidate.title === videoTitle);
             if (video) {
                 video.views += recoveryViews;
@@ -371,7 +378,7 @@ const resolveBacklashChoice = (
             return `Your PR team turned the backlash into a mature comeback and recovered ${recoveryViews.toLocaleString()} views.`;
         }
         case 'DOUBLE_DOWN': {
-            const spikeViews = Math.floor(Math.max(1000, player.youtube.subscribers * (0.08 + random() * 0.14)));
+            const spikeViews = quoteYoutubeUpload(player,{qualityScore:65,uploadPlan:'VIRAL_BAIT',type:'VLOG'} as any,Math.floor(Math.max(1000, player.youtube.subscribers * (0.08 + random() * 0.14))));
             const video = player.youtube.videos.find(candidate => candidate.title === videoTitle);
             if (video) {
                 video.views += spikeViews;
@@ -418,9 +425,9 @@ const resolveCreatorInviteChoice = (
             player.x.followers += inviteKind === 'PLATFORM_SUMMIT' ? 12000 : 6000;
             return `${venue} became a clean creator reputation win.`;
         case 'CHASE_VIRAL': {
-            const bonusViews = Math.floor(Math.max(15000, player.youtube.subscribers * (0.18 + random() * 0.25)));
+            const bonusViews = quoteYoutubeUpload(player,{qualityScore:75,uploadPlan:'BTS',type:'VLOG'} as any,Math.floor(Math.max(15000, player.youtube.subscribers * (0.18 + random() * 0.25))));
             player.youtube.totalChannelViews += bonusViews;
-            player.youtube.subscribers += Math.floor(bonusViews / 120);
+            player.youtube.subscribers += quoteYoutubeNewSubscribers(player,bonusViews,75);
             player.youtube.fanMood = clamp((player.youtube.fanMood ?? 55) + 5);
             player.youtube.controversy = clamp((player.youtube.controversy ?? 0) + 12);
             player.youtube.audienceTrust = clamp((player.youtube.audienceTrust ?? 55) - 4);
@@ -429,9 +436,9 @@ const resolveCreatorInviteChoice = (
             return `${venue} gave you a viral creator spike with ${bonusViews.toLocaleString()} new channel views.`;
         }
         case 'GOLDEN_HANDLER': {
-            const bonusViews = Math.floor(Math.max(22000, player.youtube.subscribers * (0.22 + random() * 0.25)));
+            const bonusViews = quoteYoutubeUpload(player,{qualityScore:75,uploadPlan:'BTS',type:'VLOG'} as any,Math.floor(Math.max(22000, player.youtube.subscribers * (0.22 + random() * 0.25))));
             player.youtube.totalChannelViews += bonusViews;
-            player.youtube.subscribers += Math.floor(bonusViews / 95);
+            player.youtube.subscribers += quoteYoutubeNewSubscribers(player,bonusViews,80);
             player.youtube.audienceTrust = clamp((player.youtube.audienceTrust ?? 55) + 8);
             player.youtube.fanMood = clamp((player.youtube.fanMood ?? 55) + 6);
             player.youtube.controversy = clamp((player.youtube.controversy ?? 0) - 8);
@@ -468,8 +475,8 @@ const resolveRivalryChoice = (
             player.x.feed = player.x.feed.slice(0, 50);
             return `You ignored ${rivalName}'s bait. The channel stayed cleaner, but the moment lost some energy.`;
         case 'CLAP_BACK': {
-            const bonusViews = Math.floor(baseReach * (0.65 + random() * 0.55));
-            const bonusSubs = Math.floor(bonusViews / 110);
+            const bonusViews = quoteYoutubeUpload(player,{qualityScore:75,uploadPlan:'BTS',type:'VLOG'} as any,Math.floor(baseReach * (0.65 + random() * 0.55)));
+            const bonusSubs = quoteYoutubeNewSubscribers(player,bonusViews,75);
             player.youtube.totalChannelViews += bonusViews;
             player.youtube.subscribers += bonusSubs;
             player.youtube.fanMood = clamp((player.youtube.fanMood ?? 55) + 5);
@@ -489,9 +496,9 @@ const resolveRivalryChoice = (
             return `You clapped back at ${rivalName}. The response gained ${bonusViews.toLocaleString()} views and ${bonusSubs.toLocaleString()} subscribers, but raised the heat.`;
         }
         case 'MEDIATED_COLLAB': {
-            const bonusViews = Math.floor(baseReach * (0.85 + random() * 0.75));
+            const bonusViews = quoteYoutubeUpload(player,{qualityScore:75,uploadPlan:'BTS',type:'VLOG'} as any,Math.floor(baseReach * (0.85 + random() * 0.75)));
             player.youtube.totalChannelViews += bonusViews;
-            player.youtube.subscribers += Math.floor(bonusViews / 90);
+            player.youtube.subscribers += quoteYoutubeNewSubscribers(player,bonusViews,80);
             player.youtube.audienceTrust = clamp((player.youtube.audienceTrust ?? 55) + 8);
             player.youtube.fanMood = clamp((player.youtube.fanMood ?? 55) + 8);
             player.youtube.controversy = clamp((player.youtube.controversy ?? 0) - 12);
@@ -522,6 +529,9 @@ export const resolveYoutubeEventChoice = (
     }
 
     ensureYoutubeState(player);
+    const eventKey = `youtube-event:${resolution.eventId || `${resolution.kind}:${JSON.stringify(resolution.payload)}`}:${getAbsoluteWeek(player.age,player.currentWeek)}`;
+    if (readCreatorLedger(player).publicationKeys.includes(eventKey)) return {updatedPlayer:player,log:'This creator event was already resolved.',effects:[]};
+    const beforePlayer: Player = {...player,stats:{...player.stats},youtube:{...player.youtube}};
     const language = getPlayerLanguage(player);
     const before = snapshotYoutubeImpact(player);
     let log = '';
@@ -541,6 +551,7 @@ export const resolveYoutubeEventChoice = (
             break;
     }
 
+    player = settleYoutubeActivity(beforePlayer,player,eventKey,Math.max(0,player.youtube.totalChannelViews-before.views));
     const logRef = getYoutubeLogRef(resolution, choiceId, log);
     const localizedLog = logRef.logKey ? t(language, logRef.logKey, logRef.logVars) : log;
 

@@ -1,3 +1,4 @@
+import { quoteSponsorshipValue } from './sponsorshipEconomy';
 import { getCareerCommercialMultiplier, resolveCareerOfferRole } from './actorCareerBalance';
 
 import { Agent, Manager, Player, SponsorshipOffer, SponsorshipCategory, SponsorshipActionType, AuditionOpportunity, BudgetTier, ProjectType, SponsorshipFrequency, TeamMember, RoleType } from '../types';
@@ -450,48 +451,17 @@ export const generateManagerOffer = (player: Player): SponsorshipOffer | null =>
     // Calculate Total Required for contract (e.g., 1 post per week approx)
     const totalRequired = duration; // 1 per week standard
 
-    // --- UPDATED PAY CALCULATION (Balanced) ---
-    const fame = player.stats.fame;
-    let baseWeekly = 0;
-
-    // TIERED PAY SCALE
-    if (fame < 20) {
-        // Rookie: $500 - $1,500 per week
-        baseWeekly = 500 + (fame * 50); 
-    } else if (fame < 50) {
-        // Rising Star: $2,000 - $8,000 per week
-        baseWeekly = 2000 + ((fame - 20) * 200);
-    } else if (fame < 80) {
-        // A-List: $10,000 - $40,000 per week
-        baseWeekly = 10000 + ((fame - 50) * 1000);
-    } else {
-        // Icon: $50,000 - $150,000 per week (Excellent but not movie replacement)
-        baseWeekly = 50000 + ((fame - 80) * 5000);
-    }
-
-    // Follower Bonus (Small kicker on top)
-    const followerBonus = Math.floor(player.stats.followers * 0.05); // $0.05 per follower per week
-    
-    let weeklyPay = baseWeekly + followerBonus;
-    if (player.youtube?.subscribers >= 10000) {
-        const creatorPayMultiplier = 0.88 + Math.min(0.34, creatorScore / 250);
-        weeklyPay = Math.floor(weeklyPay * creatorPayMultiplier);
-    }
-
-    // Future commercial offers reflect demonstrated work/reach; signed sponsorships are unchanged.
-    weeklyPay *= getCareerCommercialMultiplier(player);
-
-    // Manager Multiplier (Power 1-10 -> 0.8x to 1.5x)
-    const managerMult = 0.8 + (manager.sponsorshipPower * 0.07);
-    weeklyPay = Math.floor(weeklyPay * managerMult);
-
-    if (type === 'SHOOT') weeklyPay *= 1.5;
-
-    // Exclusivity logic: High tier brands want exclusivity
     const isLuxury = ['LUXURY', 'AUTOMOTIVE', 'TECH'].includes(cat);
     const isExclusive = isLuxury || Math.random() > 0.7;
-    
-    if (isExclusive) weeklyPay *= 2.0;
+    const { weeklyPay, valueBasis } = quoteSponsorshipValue(player, {
+        source: 'MANAGER', brandName: brand, category: cat, type,
+        durationWeeks: duration, totalRequired, isExclusive,
+        negotiationPower: manager.sponsorshipPower,
+        commercialMultiplier: getCareerCommercialMultiplier(player),
+        creatorMultiplier: player.youtube?.subscribers >= 10000
+            ? 0.88 + Math.min(0.34, creatorScore / 250) : 1,
+    });
+    if (weeklyPay <= 0) return null;
 
     // Penalty Calculation (High risk for high reward)
     const penalty = Math.floor(weeklyPay * 4.0); // 1 month worth of pay as penalty
@@ -501,6 +471,7 @@ export const generateManagerOffer = (player: Player): SponsorshipOffer | null =>
         brandName: brand,
         category: cat,
         weeklyPay,
+        valueBasis,
         durationWeeks: duration,
         // Updated Requirements Structure
         requirements: { 

@@ -1,3 +1,4 @@
+import { readCreatorWorld } from './creatorEconomy';
 import { GameLanguage, InstaPostType, Player, SponsorshipCategory } from '../types';
 import { getPlayerLanguage, t } from './i18n';
 
@@ -263,23 +264,25 @@ export const clampInstagramStat = (value: number): number => Math.max(0, Math.mi
 export const calculateInstagramPostOutcome = (player: Player, type: InstaPostType, postsThisWeek: number, language: GameLanguage = getPlayerLanguage(player)) => {
     const config = INSTAGRAM_POST_CONFIGS[type];
     const publicFollowers = Math.max(player.stats.followers || 0, player.instagram?.followers || 0);
-    const baseAudience = Math.max(80, publicFollowers);
+    const world = readCreatorWorld(player);
+    const remaining = Math.max(0,world.eligiblePeople-publicFollowers);
+    const baseAudience = Math.max(80,Math.min(publicFollowers,Math.sqrt(publicFollowers)*300,world.eligiblePeople*.15));
     const fameBoost = 1 + (player.stats.fame / 120);
     const repBoost = 1 + (Math.max(0, player.stats.reputation) / 180);
     const aestheticBoost = 1 + ((player.instagram?.aesthetic ?? 50) - 50) / 250;
     const authenticityBoost = 1 + ((player.instagram?.authenticity ?? 50) - 50) / 300;
-    const fatigue = Math.max(0.45, 1 - postsThisWeek * 0.16);
+    const fatigue = 1 / (1 + postsThisWeek * .55) ** 1.3;
     const newbieLift = publicFollowers < 1000 ? 1.25 : 1;
     const volatileLift = type === 'CONTROVERSIAL' ? 1.25 : 1;
     const randomness = 0.82 + Math.random() * 0.42;
     const reach = Math.floor(baseAudience * config.baseReach * fameBoost * repBoost * aestheticBoost * authenticityBoost * fatigue * newbieLift * volatileLift * randomness);
     const floorReach = publicFollowers < 1000 ? 35 + Math.floor(Math.random() * 70) : 0;
-    const visibleReach = Math.max(floorReach, reach);
+    const visibleReach = Math.min(world.eligiblePeople,Math.max(floorReach, reach));
     const likes = Math.max(3, Math.floor(visibleReach * (0.18 + Math.random() * 0.16)));
     const comments = Math.max(1, Math.floor(likes * (type === 'CONTROVERSIAL' ? 0.16 : 0.06 + Math.random() * 0.04)));
     const shares = Math.max(0, Math.floor(likes * (type === 'REEL' || type === 'CONTROVERSIAL' ? 0.12 : 0.035)));
     const saves = Math.max(0, Math.floor(likes * (type === 'CAROUSEL' || type === 'RED_CARPET' || type === 'BRAND_FIT' ? 0.1 : 0.035)));
-    let followerGain = Math.floor(likes * config.followerConversion);
+    let followerGain = Math.floor(likes * config.followerConversion * (world.eligiblePeople ? remaining/world.eligiblePeople : 0));
 
     if (publicFollowers < 1000) {
         followerGain += Math.floor(Math.random() * 8) + 2;
@@ -289,7 +292,7 @@ export const calculateInstagramPostOutcome = (player: Player, type: InstaPostTyp
     }
 
     const maxOrganicGain = publicFollowers < 1000 ? 120 : Math.max(100, Math.floor(publicFollowers * 0.12));
-    followerGain = Math.max(1, Math.min(maxOrganicGain, followerGain));
+    followerGain = Math.max(0, Math.min(remaining,maxOrganicGain, followerGain));
 
     const commentCount = type === 'CONTROVERSIAL' ? 7 : 5;
     return {
@@ -301,11 +304,11 @@ export const calculateInstagramPostOutcome = (player: Player, type: InstaPostTyp
         commentList: getInstagramPostComments(type, commentCount, language),
         engagementScore: Math.min(100, Math.round((likes + comments * 2 + shares * 3 + saves * 2) / Math.max(1, baseAudience) * 100)),
         statDeltas: {
-            aesthetic: config.aesthetic,
-            authenticity: config.authenticity,
+            aesthetic: config.aesthetic > 0 && postsThisWeek >= 2 ? 0 : config.aesthetic,
+            authenticity: config.authenticity > 0 && postsThisWeek >= 2 ? 0 : config.authenticity,
             controversy: config.controversy,
-            fashionInfluence: config.fashionInfluence,
-            fanLoyalty: config.fanLoyalty
+            fashionInfluence: config.fashionInfluence > 0 && postsThisWeek >= 2 ? 0 : config.fashionInfluence,
+            fanLoyalty: config.fanLoyalty > 0 && postsThisWeek >= 2 ? 0 : config.fanLoyalty
         }
     };
 };

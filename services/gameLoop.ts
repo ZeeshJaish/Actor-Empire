@@ -1,3 +1,6 @@
+import { quoteYoutubeMemberships, readYoutubeEconomy, readYoutubeAudience, quoteYoutubeCreatorBonus, settleYoutubeActivity } from './youtubeEconomy';
+import { creatorPositiveReward, recordCreatorSpend, readCreatorWorld } from './creatorEconomy';
+import { quoteSponsorshipValue } from './sponsorshipEconomy';
 import { ensureActorCareerBalance, getCareerLearningGain, getCareerPassivePreparation, getCareerFinalPerformance, getCareerPublicityGain, getCareerProductionStartPerformance, isPersonalCareerActing, getCareerFameDecay, applyCareerReleaseRecognition, getCareerReportedOutcome } from './actorCareerBalance';
 import { createSeriesStreamingBids, quoteSeriesStreamingRights } from './seriesStreamingValue';
 import { settleStockCash } from './stockSettlement';
@@ -877,6 +880,8 @@ const getYoutubeIdentityTuning = (identity?: string) => {
     }
 };
 
+let youtubeEventResolutionSequence = 0;
+
 const createYoutubeChoiceImpact = (resolution: YoutubeEventResolution, choiceId: string) =>
     (player: Player) => resolveYoutubeEventChoice(player, resolution, choiceId);
 
@@ -889,6 +894,7 @@ export const createYoutubeCopyrightEvent = (
     const editingFee = Math.max(100, Math.round(claimAmount * 0.35));
     const resolution: YoutubeEventResolution = {
         domain: 'YOUTUBE',
+        eventId: `yt_resolution_${Date.now()}_${++youtubeEventResolutionSequence}`,
         kind: 'COPYRIGHT',
         payload: { videoTitle, claimAmount, evidenceStrength }
     };
@@ -974,6 +980,7 @@ export const createYoutubeBacklashEvent = (
 ): ScheduledEvent => {
     const resolution: YoutubeEventResolution = {
         domain: 'YOUTUBE',
+        eventId: `yt_resolution_${Date.now()}_${++youtubeEventResolutionSequence}`,
         kind: 'BACKLASH',
         payload: { videoTitle, severity }
     };
@@ -1064,6 +1071,7 @@ export const createYoutubeCreatorInviteEvent = (
     const copy = eventCopy[kind];
     const resolution: YoutubeEventResolution = {
         domain: 'YOUTUBE',
+        eventId: `yt_resolution_${Date.now()}_${++youtubeEventResolutionSequence}`,
         kind: 'CREATOR_INVITE',
         payload: { inviteKind: kind, venue: copy.venue }
     };
@@ -1145,7 +1153,7 @@ export const createYoutubeRivalryEvent = (player: Player, random: () => number =
     const rivalName = YOUTUBE_RIVAL_NAMES[Math.floor(random() * YOUTUBE_RIVAL_NAMES.length)];
     const creatorScore = calculateYoutubeCreatorScore(player);
     const publicImage = getYoutubePublicImageLabel(player);
-    const baseReach = Math.max(25000, player.youtube.subscribers * (0.25 + random() * 0.35));
+    const baseReach = Math.min(readYoutubeAudience(player).eligiblePeople,Math.max(25000,readYoutubeAudience(player).engagedPeople * (0.25 + random() * 0.35)));
     const topicKey = player.youtube.creatorIdentity === 'CONTROVERSY_MAGNET' || publicImage === 'Volatile'
         ? 'controversy'
         : player.youtube.creatorIdentity === 'PRESTIGE_FILMMAKER'
@@ -1153,6 +1161,7 @@ export const createYoutubeRivalryEvent = (player: Player, random: () => number =
             : 'copying';
     const resolution: YoutubeEventResolution = {
         domain: 'YOUTUBE',
+        eventId: `yt_resolution_${Date.now()}_${++youtubeEventResolutionSequence}`,
         kind: 'RIVALRY',
         payload: { rivalName, baseReach }
     };
@@ -2312,8 +2321,12 @@ export const processGameWeek = async (
         const ytResult = processYoutubeChannel(nextPlayer);
         nextPlayer.youtube = ytResult.channel;
         const recentVideo = nextPlayer.youtube.videos?.[0];
-        const trustDrift = recentVideo ? Math.sign(ensureFiniteNumber(recentVideo.trustImpact, 0)) : 0;
-        nextPlayer.youtube.audienceTrust = Math.max(0, Math.min(100, ensureFiniteNumber(nextPlayer.youtube.audienceTrust, 55) + trustDrift + identityTuning.trustDrift));
+        const recentUploadAge = recentVideo ? (nextPlayer.age - (recentVideo.yearUploaded ?? nextPlayer.age)) * 52 + nextPlayer.currentWeek - recentVideo.weekUploaded : Infinity;
+        const response = recentVideo && recentUploadAge <= 1 && recentVideo.views > 0;
+        const trustDrift = response ? (ensureFiniteNumber(recentVideo.qualityScore,50) >= 65 ? 1 : ensureFiniteNumber(recentVideo.qualityScore,50) < 40 ? -1 : 0) : Math.min(0,identityTuning.trustDrift);
+        const trustReward = creatorPositiveReward(nextPlayer,'trust',trustDrift,3);
+        nextPlayer = trustReward.player;
+        nextPlayer.youtube = {...nextPlayer.youtube,audienceTrust:Math.max(0,Math.min(100,ensureFiniteNumber(nextPlayer.youtube.audienceTrust,55)+trustReward.delta))};
         nextPlayer.youtube.fanMood = Math.max(0, Math.min(100, ensureFiniteNumber(nextPlayer.youtube.fanMood, 55) - 1 + (ytResult.newSubs > 0 ? 1 : 0) + identityTuning.moodDrift));
         nextPlayer.youtube.controversy = Math.max(0, Math.min(100, ensureFiniteNumber(nextPlayer.youtube.controversy, 0) - 2 + (recentVideo?.uploadPlan === 'VIRAL_BAIT' ? 1 : 0) + identityTuning.heatDrift));
 
@@ -2331,15 +2344,11 @@ export const processGameWeek = async (
         ytResult.notifications.forEach(note => logsToAdd.push({ msg: note, type: 'positive' }));
 
         if (nextPlayer.youtube.membershipsActive) {
-            const trust = ensureFiniteNumber(nextPlayer.youtube.audienceTrust, 55);
-            const mood = ensureFiniteNumber(nextPlayer.youtube.fanMood, 55);
-            const controversy = ensureFiniteNumber(nextPlayer.youtube.controversy, 0);
-            const memberMultiplier = Math.max(0.35, 1 + identityTuning.memberBoost);
-            const targetMembers = Math.max(0, Math.floor(nextPlayer.youtube.subscribers * (0.006 + (trust / 10000) + (mood / 14000) - (controversy / 16000)) * memberMultiplier));
-            const currentMembers = ensureFiniteNumber(nextPlayer.youtube.members, 0);
-            const nextMembers = Math.max(0, Math.floor((currentMembers * 0.82) + (targetMembers * 0.18)));
-            const memberRevenue = Math.floor(nextMembers * 4);
-            nextPlayer.youtube.members = nextMembers;
+            const membership = quoteYoutubeMemberships(nextPlayer);
+            const nextMembers = membership.members;
+            const memberRevenue = membership.revenue;
+            nextPlayer.youtube = {...nextPlayer.youtube,members:nextMembers,economy:{...readYoutubeEconomy(nextPlayer.youtube),paidMembers:membership.paidMembers}};
+            nextPlayer = recordCreatorSpend(nextPlayer,memberRevenue);
             if (memberRevenue > 0) {
                 addTransaction(memberRevenue, 'BUSINESS', t(language, 'services.gameLoop.youtubeWeekly.finance.memberships'));
                 nextPlayer.youtube.lifetimeEarnings += memberRevenue;
@@ -2455,6 +2464,9 @@ export const processGameWeek = async (
         const identityTuning = getYoutubeIdentityTuning(nextPlayer.youtube?.creatorIdentity);
         const subscriberCount = Math.max(0, ensureFiniteNumber(nextPlayer.youtube.subscribers, 0));
         const hasAudienceForCreatorEvent = subscriberCount >= 1000;
+        const eventAudience = readYoutubeAudience(nextPlayer);
+        const beforeAudienceEvent: Player = {...nextPlayer,stats:{...nextPlayer.stats},x:{...nextPlayer.x},youtube:{...nextPlayer.youtube}};
+
 
         const earlyChannelEventChance = Math.max(0.42, Math.min(0.68, 0.42 + channelVideos.length * 0.025 + subscriberCount / 5000));
 
@@ -2479,7 +2491,7 @@ export const processGameWeek = async (
                     : Math.min(8, Math.max(1, Math.floor(bonusViews / 28)));
                 pickedVideo.views = ensureFiniteNumber(pickedVideo.views, 0) + bonusViews;
                 pickedVideo.likes = ensureFiniteNumber(pickedVideo.likes, 0) + Math.max(1, Math.floor(bonusViews * 0.08));
-                pickedVideo.weeklyHistory = [...(pickedVideo.weeklyHistory || []), bonusViews];
+                pickedVideo.weeklyHistory = [...(pickedVideo.weeklyHistory || []), bonusViews].slice(-104);
                 pickedVideo.comments = [
                     t(language, 'services.gameLoop.youtubeEarly.comment.smallFound'),
                     t(language, 'services.gameLoop.youtubeEarly.comment.deservesMore'),
@@ -2501,7 +2513,7 @@ export const processGameWeek = async (
                 const bonusSubs = subscriberCount >= 75 ? Math.min(6, Math.max(1, Math.floor(bonusViews / 34))) : (Math.random() < 0.45 ? 1 : 0);
                 pickedVideo.views = ensureFiniteNumber(pickedVideo.views, 0) + bonusViews;
                 pickedVideo.likes = ensureFiniteNumber(pickedVideo.likes, 0) + Math.max(1, Math.floor(bonusViews * 0.06));
-                pickedVideo.weeklyHistory = [...(pickedVideo.weeklyHistory || []), bonusViews];
+                pickedVideo.weeklyHistory = [...(pickedVideo.weeklyHistory || []), bonusViews].slice(-104);
                 pickedVideo.comments = [t(language, 'services.gameLoop.youtubeEarly.comment.tinyRepost'), ...(pickedVideo.comments || [])].slice(0, 5);
                 nextPlayer.youtube.subscribers += bonusSubs;
                 nextPlayer.youtube.totalChannelViews += bonusViews;
@@ -2538,7 +2550,7 @@ export const processGameWeek = async (
                 const bonusSubs = Math.min(10, Math.max(1, Math.floor(bonusViews / 30)));
                 pickedVideo.views = ensureFiniteNumber(pickedVideo.views, 0) + bonusViews;
                 pickedVideo.likes = ensureFiniteNumber(pickedVideo.likes, 0) + Math.max(2, Math.floor(bonusViews * 0.09));
-                pickedVideo.weeklyHistory = [...(pickedVideo.weeklyHistory || []), bonusViews];
+                pickedVideo.weeklyHistory = [...(pickedVideo.weeklyHistory || []), bonusViews].slice(-104);
                 pickedVideo.comments = [
                     t(language, 'services.gameLoop.youtubeEarly.comment.clipBestPart'),
                     t(language, 'services.gameLoop.youtubeEarly.comment.shortVersion'),
@@ -2560,7 +2572,7 @@ export const processGameWeek = async (
                 const bonusSubs = Math.random() < 0.65 ? Math.min(4, Math.max(1, Math.floor(bonusViews / 40))) : 0;
                 pickedVideo.views = ensureFiniteNumber(pickedVideo.views, 0) + bonusViews;
                 pickedVideo.likes = ensureFiniteNumber(pickedVideo.likes, 0) + Math.max(1, Math.floor(bonusViews * 0.07));
-                pickedVideo.weeklyHistory = [...(pickedVideo.weeklyHistory || []), bonusViews];
+                pickedVideo.weeklyHistory = [...(pickedVideo.weeklyHistory || []), bonusViews].slice(-104);
                 pickedVideo.comments = [
                     t(language, 'services.gameLoop.youtubeEarly.comment.thumbnailClick'),
                     t(language, 'services.gameLoop.youtubeEarly.comment.thumbnailBetter'),
@@ -2582,7 +2594,7 @@ export const processGameWeek = async (
                 const bonusSubs = Math.random() < 0.5 ? 1 : 0;
                 pickedVideo.views = ensureFiniteNumber(pickedVideo.views, 0) + bonusViews;
                 pickedVideo.likes = ensureFiniteNumber(pickedVideo.likes, 0) + Math.max(1, Math.floor(bonusViews * 0.05));
-                pickedVideo.weeklyHistory = [...(pickedVideo.weeklyHistory || []), bonusViews];
+                pickedVideo.weeklyHistory = [...(pickedVideo.weeklyHistory || []), bonusViews].slice(-104);
                 pickedVideo.comments = [t(language, 'services.gameLoop.youtubeEarly.comment.consistentUpload'), ...(pickedVideo.comments || [])].slice(0, 5);
                 nextPlayer.youtube.subscribers += bonusSubs;
                 nextPlayer.youtube.totalChannelViews += bonusViews;
@@ -2619,7 +2631,7 @@ export const processGameWeek = async (
             const recentVideos = channelVideos.slice(0, Math.min(channelVideos.length, 6));
             const pickedVideo = recentVideos[Math.floor(Math.random() * recentVideos.length)];
             const quality = ensureFiniteNumber(pickedVideo.qualityScore, 50);
-            const subscriberBase = subscriberCount;
+            const subscriberBase = eventAudience.engagedPeople;
             const audienceTrust = ensureFiniteNumber(nextPlayer.youtube.audienceTrust, 55);
             const fanMood = ensureFiniteNumber(nextPlayer.youtube.fanMood, 55);
             const controversy = ensureFiniteNumber(nextPlayer.youtube.controversy, 0);
@@ -2632,7 +2644,7 @@ export const processGameWeek = async (
                 const bonusSubs = Math.max(1, Math.floor(bonusViews / 120));
                 pickedVideo.views += bonusViews;
                 pickedVideo.likes += Math.floor(bonusViews * 0.06);
-                pickedVideo.weeklyHistory = [...(pickedVideo.weeklyHistory || []), bonusViews];
+                pickedVideo.weeklyHistory = [...(pickedVideo.weeklyHistory || []), bonusViews].slice(-104);
                 pickedVideo.comments = [
                     t(language, 'services.gameLoop.youtubeAudience.comment.viralEverywhere'),
                     t(language, 'services.gameLoop.youtubeAudience.comment.algorithmFound'),
@@ -2665,7 +2677,8 @@ export const processGameWeek = async (
                     type: 'positive'
                 });
             } else if (nextPlayer.youtube.isMonetized && audienceTrust >= 50 && eventRoll < 0.56) {
-                const payout = Math.floor(Math.max(500, nextPlayer.youtube.subscribers * (0.04 + Math.random() * 0.08)));
+                const payout = quoteYoutubeCreatorBonus(nextPlayer);
+                if (payout > 0) {
                 const payoutAmount = `$${payout.toLocaleString()}`;
                 addTransaction(payout, 'BUSINESS', t(language, 'services.gameLoop.youtubeAudience.finance.creatorBonus'));
                 nextPlayer.youtube.lifetimeEarnings += payout;
@@ -2682,6 +2695,7 @@ export const processGameWeek = async (
                     expiresIn: 4
                 });
                 logsToAdd.push({ msg: t(language, 'services.gameLoop.youtubeAudience.log.creatorBonus', { amount: payoutAmount }), type: 'positive' });
+                }
             } else if (eventRoll < backlashThreshold) {
                 const lostSubs = Math.max(1, Math.floor(subscriberBase * (0.015 + Math.random() * 0.025)));
                 nextPlayer.youtube.subscribers = Math.max(0, nextPlayer.youtube.subscribers - lostSubs);
@@ -2725,6 +2739,14 @@ export const processGameWeek = async (
             nextPlayer.news = nextPlayer.news.slice(0, 50);
             nextPlayer.x.feed = nextPlayer.x.feed.slice(0, 50);
         }
+
+        if (nextPlayer.flags.lastYoutubeEventAbsWeek === currentAbs && lastYoutubeEventAbs !== currentAbs) {
+            const subscriberGain = nextPlayer.youtube.subscribers - beforeAudienceEvent.youtube.subscribers;
+            if (subscriberGain > 0) nextPlayer.youtube.subscribers = beforeAudienceEvent.youtube.subscribers + Math.min(subscriberGain,eventAudience.newPeopleRemaining);
+            const xGain = nextPlayer.x.followers - beforeAudienceEvent.x.followers;
+            if (xGain > 0) nextPlayer.x.followers = beforeAudienceEvent.x.followers + Math.min(xGain,Math.max(0,eventAudience.eligiblePeople-beforeAudienceEvent.x.followers));
+            nextPlayer = settleYoutubeActivity(beforeAudienceEvent,nextPlayer,`weekly-pulse:${currentAbs}`,Math.max(0,nextPlayer.youtube.totalChannelViews-beforeAudienceEvent.youtube.totalChannelViews));
+        }
     } catch (error) {
         console.error('YouTube event simulation failed during week processing:', error);
     }
@@ -2732,7 +2754,7 @@ export const processGameWeek = async (
     try {
         const currentAbs = getAbsoluteWeek(nextPlayer.age, nextPlayer.currentWeek);
         const lastInstagramEventAbs = ensureFiniteNumber(nextPlayer.flags.lastInstagramMicroEventAbsWeek, 0);
-        const instagramFollowers = Math.max(0, ensureFiniteNumber(nextPlayer.instagram.followers, nextPlayer.stats.followers || 0));
+        const instagramFollowers = Math.max(0, ensureFiniteNumber(nextPlayer.instagram.followers, 0), ensureFiniteNumber(nextPlayer.stats.followers, 0));
         const recentPosts = (nextPlayer.instagram.posts || []).filter(post => getWeeksSince(post.week || 0, post.year || nextPlayer.age, nextPlayer.currentWeek, nextPlayer.age) <= 8);
 
         if (recentPosts.length > 0 && currentAbs - lastInstagramEventAbs >= 3 && instagramFollowers < 100000 && Math.random() < 0.34) {
@@ -2828,6 +2850,7 @@ export const processGameWeek = async (
                 message = t(language, 'services.gameLoop.instagramMicro.log.pulse');
             }
 
+            followerGain = Math.min(followerGain,Math.max(0,readCreatorWorld(nextPlayer).eligiblePeople-instagramFollowers));
             if (followerGain > 0) {
                 nextPlayer.instagram.followers = instagramFollowers + followerGain;
                 nextPlayer.stats.followers = ensureFiniteNumber(nextPlayer.stats.followers, 0) + followerGain;
@@ -2988,42 +3011,19 @@ export const processGameWeek = async (
                     hasMet: false,
                     chatHistory: []
                 };
-                const recentProjectBudgets = [
-                    ...(nextPlayer.activeReleases || []).map(rel => ensureFiniteNumber(rel.budget, 0)),
-                    ...(nextPlayer.commitments || []).map(commitment => ensureFiniteNumber(commitment.projectDetails?.estimatedBudget, 0)),
-                    ...(nextPlayer.pastProjects || []).filter(project => !project.isQaArchive).slice(-5).map(project => ensureFiniteNumber(project.budget, 0))
-                ];
-                const recentProjectEarnings = [
-                    ...(nextPlayer.commitments || []).map(commitment => Math.max(ensureFiniteNumber(commitment.income, 0) * 8, ensureFiniteNumber(commitment.lumpSum, 0))),
-                    ...(nextPlayer.pastProjects || []).filter(project => !project.isQaArchive).slice(-5).map(project => ensureFiniteNumber(project.earnings, 0))
-                ];
-                const topProjectBudget = Math.max(0, ...recentProjectBudgets);
-                const topProjectEarnings = Math.max(0, ...recentProjectEarnings);
-                const influenceScore = ensureFiniteNumber(nextPlayer.instagram.aesthetic, 50)
-                    + ensureFiniteNumber(nextPlayer.instagram.fashionInfluence, 10)
-                    + ensureFiniteNumber(nextPlayer.instagram.fanLoyalty, 45);
-                const categoryMultiplier: Record<SponsorshipCategory, number> = {
-                    FASHION: 1,
-                    FITNESS: 0.95,
-                    TECH: 1.15,
-                    BEVERAGE: 0.9,
-                    LUXURY: 1.45,
-                    AUTOMOTIVE: 1.35
-                };
-                const audienceQuote = publicFollowers * (0.025 + Math.min(0.02, influenceScore / 8000));
-                const fameQuote = Math.pow(Math.max(0, nextPlayer.stats.fame), 1.35) * 28;
-                const projectQuote = topProjectBudget * 0.00012;
-                const earningsQuote = topProjectEarnings * 0.01;
-                const rawWeeklyPay = (300 + audienceQuote + fameQuote + projectQuote + earningsQuote) * categoryMultiplier[category];
-                const roundingStep = rawWeeklyPay >= 10000 ? 1000 : rawWeeklyPay >= 3000 ? 500 : 50;
-                const weeklyPay = Math.max(250, Math.floor(rawWeeklyPay / roundingStep) * roundingStep);
                 const durationWeeks = 4 + Math.floor(Math.random() * 5);
-                const totalRequired = weeklyPay >= 15000 ? 4 : weeklyPay >= 5000 ? 3 : 2;
+                const totalRequired = Math.ceil(durationWeeks / 2);
+                const { weeklyPay, valueBasis } = quoteSponsorshipValue(nextPlayer, {
+                    source: 'INSTAGRAM_DM', brandName: brand.name, brandFollowers: brand.followers,
+                    category, type: 'POST', durationWeeks, totalRequired, isExclusive: false,
+                });
+                if (weeklyPay > 0) {
                 const offer: SponsorshipOffer = {
                     id: `ig_brand_${Date.now()}_${Math.random()}`,
                     brandName: brand.name,
                     category,
                     weeklyPay,
+                    valueBasis,
                     durationWeeks,
                     requirements: { type: 'POST', energyCost: 8, totalRequired, progress: 0 },
                     isExclusive: false,
@@ -3061,6 +3061,7 @@ export const processGameWeek = async (
                     lastInteractionWeek: nextPlayer.currentWeek
                 };
                 logsToAdd.push({ msg: t(language, 'services.gameLoop.instagramDm.log.brandOffer', { brandHandle: brand.handle, weeklyPay: weeklyPayText }), type: 'positive' });
+                }
             } else {
                 const npcPool = NPC_DATABASE.filter(npc => (
                     (npc.occupation === 'ACTOR' || npc.occupation === 'DIRECTOR')
@@ -3757,11 +3758,12 @@ export const processGameWeek = async (
     // --- ORGANIC FOLLOWER GROWTH ---
     if (nextPlayer.stats.fame > 10) {
         const organicGrowthIG = Math.floor(nextPlayer.stats.fame * 50 + (nextPlayer.stats.reputation * 10));
-        nextPlayer.stats.followers += organicGrowthIG;
+        const remainingInstagramAudience = Math.max(0,readCreatorWorld(nextPlayer).eligiblePeople-nextPlayer.stats.followers);
+        nextPlayer.stats.followers += Math.min(organicGrowthIG,remainingInstagramAudience);
 
         const currentX = nextPlayer.x.followers || 0;
         const organicGrowthX = Math.floor(nextPlayer.stats.fame * 30 + (nextPlayer.stats.reputation * 5));
-        nextPlayer.x.followers = currentX + organicGrowthX;
+        nextPlayer.x.followers = currentX + Math.min(organicGrowthX,Math.max(0,readCreatorWorld(nextPlayer).eligiblePeople-currentX));
     }
 
     // --- PASSIVE SOCIAL MEDIA ENGAGEMENT GROWTH ---

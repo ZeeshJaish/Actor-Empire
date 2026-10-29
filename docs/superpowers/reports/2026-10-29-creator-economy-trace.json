@@ -1,0 +1,791 @@
+{
+  "sourceHead": "09edec4bf958d12c201b9ef848e1c5bcacc7e39e",
+  "sourceHashes": {
+    "services/youtubeLogic.ts": "dd868476fd403b35b46ae0456383b1a473597c73833a29573717778620de9093",
+    "views/mobile/YoutubeApp.tsx": "64a4d8e3a0ab2867a82e439a1aa1b8f378543c0a2b94d6c03bbfb8a78994db09",
+    "services/youtubeEventLogic.ts": "a6365dd95a21b7c2ebfb6182e9aa1e661ffe010112303dbfa5a8670a9dd0d972",
+    "services/instagramLogic.ts": "0ae40b784da7f3758492268eca8c26602d8263a374e3a61c95f38b0980ad19ed",
+    "views/mobile/XApp.tsx": "87ee64e7725adac0c9deec49af836460d267dfc2144a09beddfdee1be6e2b931",
+    "services/gameLoop.ts": "0401d646ff4db282e45c21d37f079f0bc6689a4aaadb7c644c31c2d21baaa3f1",
+    "services/sponsorshipEconomy.ts": "3f435a645bbd4d4752a4c4d9af03f35cc747ef72cb7de60732a694ac3a2294a5",
+    "types.ts": "292d8b09a824d69f1e83e6fcf774a14be7db4ef65b9ac73204031b866c625305"
+  },
+  "youtubeAndInstagram": {
+    "scope": "Read-only current-code analysis using isolated synthetic players; no user saves or production source edits",
+    "quotes": [
+      {
+        "subscribers": 1000,
+        "uploadedVideos": 0,
+        "brandDeal": null,
+        "luxuryMerch": {
+          "tier": "LUXURY",
+          "grossRevenue": 790,
+          "productionCost": 100000,
+          "netProfit": -99210,
+          "result": "UNDERPERFORMED"
+        }
+      },
+      {
+        "subscribers": 1000000,
+        "uploadedVideos": 0,
+        "brandDeal": {
+          "payout": 290000,
+          "promisedViews": 210000
+        },
+        "luxuryMerch": {
+          "tier": "LUXURY",
+          "grossRevenue": 949719,
+          "productionCost": 100000,
+          "netProfit": 849719,
+          "result": "SOLD_OUT"
+        }
+      },
+      {
+        "subscribers": 100000000,
+        "uploadedVideos": 0,
+        "brandDeal": {
+          "payout": 28999999,
+          "promisedViews": 21000000
+        },
+        "luxuryMerch": {
+          "tier": "LUXURY",
+          "grossRevenue": 94971944,
+          "productionCost": 100000,
+          "netProfit": 94871944,
+          "result": "SOLD_OUT"
+        }
+      },
+      {
+        "subscribers": 10000000000,
+        "uploadedVideos": 0,
+        "brandDeal": {
+          "payout": 2900000000,
+          "promisedViews": 2100000000
+        },
+        "luxuryMerch": {
+          "tier": "LUXURY",
+          "grossRevenue": 9497194444,
+          "productionCost": 100000,
+          "netProfit": 9497094444,
+          "result": "SOLD_OUT"
+        }
+      }
+    ],
+    "merchRepeat": {
+      "initialCash": 1000000,
+      "firstCashIncrease": 9497094444,
+      "sameWeekBlocked": true,
+      "sixWeeksLaterCashIncrease": 9765416666,
+      "firstLedger": [
+        {
+          "amount": 9497194444,
+          "category": "BUSINESS"
+        },
+        {
+          "amount": -100000,
+          "category": "EXPENSE"
+        }
+      ],
+      "sourceUnchanged": true
+    },
+    "dormantVideo": {
+      "ageWeeks": 520,
+      "subscribersBefore": 100000000,
+      "weeklyViews": 615000,
+      "newSubscribers": 7687,
+      "weeklyAds": 1230
+    },
+    "quality": [
+      {
+        "quality": 0,
+        "newViews": 375000,
+        "newSubscribers": 2500
+      },
+      {
+        "quality": 1,
+        "newViews": 81000,
+        "newSubscribers": 540
+      },
+      {
+        "quality": 50,
+        "newViews": 375000,
+        "newSubscribers": 2500
+      },
+      {
+        "quality": 100,
+        "newViews": 675000,
+        "newSubscribers": 8437
+      }
+    ],
+    "library": [
+      {
+        "tenYearOldVideos": 0,
+        "weeklyViews": 0,
+        "newSubscribers": 0,
+        "weeklyAdRevenue": 0
+      },
+      {
+        "tenYearOldVideos": 1,
+        "weeklyViews": 6149,
+        "newSubscribers": 76,
+        "weeklyAdRevenue": 12
+      },
+      {
+        "tenYearOldVideos": 10,
+        "weeklyViews": 61490,
+        "newSubscribers": 760,
+        "weeklyAdRevenue": 120
+      },
+      {
+        "tenYearOldVideos": 100,
+        "weeklyViews": 614900,
+        "newSubscribers": 7600,
+        "weeklyAdRevenue": 1200
+      }
+    ],
+    "upload": [
+      {
+        "subscribers": 1000,
+        "safeTrailerInitialViews": 0,
+        "projectPromoInitialViews": 695
+      },
+      {
+        "subscribers": 1000000,
+        "safeTrailerInitialViews": 0,
+        "projectPromoInitialViews": 695
+      },
+      {
+        "subscribers": 100000000,
+        "safeTrailerInitialViews": 0,
+        "projectPromoInitialViews": 695
+      },
+      {
+        "subscribers": 10000000000,
+        "safeTrailerInitialViews": 0,
+        "projectPromoInitialViews": 695
+      }
+    ],
+    "youtubeCurves": [
+      {
+        "seed": 1,
+        "uploadsPerWeek": 1,
+        "quality": 90,
+        "startSubscribers": 1000,
+        "milestones": [
+          {
+            "weeks": 52,
+            "subscribers": 7458,
+            "weeklyAds": 12,
+            "storedVideos": 52
+          },
+          {
+            "weeks": 104,
+            "subscribers": 25536,
+            "weeklyAds": 71,
+            "storedVideos": 104
+          },
+          {
+            "weeks": 260,
+            "subscribers": 6060074,
+            "weeklyAds": 35587,
+            "storedVideos": 260
+          },
+          {
+            "weeks": 414,
+            "subscribers": 10197134002,
+            "weeklyAds": 75804761,
+            "storedVideos": 414
+          }
+        ],
+        "evidence": "YouTube subsystem only; no energy, upload-cost or career feasibility claim; output histories omitted to bound audit RAM"
+      },
+      {
+        "seed": 2,
+        "uploadsPerWeek": 1,
+        "quality": 90,
+        "startSubscribers": 1000,
+        "milestones": [
+          {
+            "weeks": 52,
+            "subscribers": 7648,
+            "weeklyAds": 12,
+            "storedVideos": 52
+          },
+          {
+            "weeks": 104,
+            "subscribers": 26865,
+            "weeklyAds": 66,
+            "storedVideos": 104
+          },
+          {
+            "weeks": 260,
+            "subscribers": 5809262,
+            "weeklyAds": 32102,
+            "storedVideos": 260
+          },
+          {
+            "weeks": 416,
+            "subscribers": 10433778450,
+            "weeklyAds": 76982228,
+            "storedVideos": 416
+          }
+        ],
+        "evidence": "YouTube subsystem only; no energy, upload-cost or career feasibility claim; output histories omitted to bound audit RAM"
+      },
+      {
+        "seed": 3,
+        "uploadsPerWeek": 1,
+        "quality": 90,
+        "startSubscribers": 1000,
+        "milestones": [
+          {
+            "weeks": 52,
+            "subscribers": 7518,
+            "weeklyAds": 15,
+            "storedVideos": 52
+          },
+          {
+            "weeks": 104,
+            "subscribers": 25586,
+            "weeklyAds": 69,
+            "storedVideos": 104
+          },
+          {
+            "weeks": 260,
+            "subscribers": 5839957,
+            "weeklyAds": 33566,
+            "storedVideos": 260
+          },
+          {
+            "weeks": 415,
+            "subscribers": 10202126404,
+            "weeklyAds": 79236058,
+            "storedVideos": 415
+          }
+        ],
+        "evidence": "YouTube subsystem only; no energy, upload-cost or career feasibility claim; output histories omitted to bound audit RAM"
+      },
+      {
+        "seed": 1,
+        "uploadsPerWeek": 5,
+        "quality": 90,
+        "startSubscribers": 1000,
+        "milestones": [
+          {
+            "weeks": 52,
+            "subscribers": 492011,
+            "weeklyAds": 7708,
+            "storedVideos": 260
+          },
+          {
+            "weeks": 104,
+            "subscribers": 407343912,
+            "weeklyAds": 7444299,
+            "storedVideos": 520
+          },
+          {
+            "weeks": 127,
+            "subscribers": 10513560762,
+            "weeklyAds": 209411827,
+            "storedVideos": 635
+          }
+        ],
+        "evidence": "YouTube subsystem only; no energy, upload-cost or career feasibility claim; output histories omitted to bound audit RAM"
+      },
+      {
+        "seed": 2,
+        "uploadsPerWeek": 5,
+        "quality": 90,
+        "startSubscribers": 1000,
+        "milestones": [
+          {
+            "weeks": 52,
+            "subscribers": 458329,
+            "weeklyAds": 7384,
+            "storedVideos": 260
+          },
+          {
+            "weeks": 104,
+            "subscribers": 367037896,
+            "weeklyAds": 6806004,
+            "storedVideos": 520
+          },
+          {
+            "weeks": 128,
+            "subscribers": 11027192126,
+            "weeklyAds": 216535209,
+            "storedVideos": 640
+          }
+        ],
+        "evidence": "YouTube subsystem only; no energy, upload-cost or career feasibility claim; output histories omitted to bound audit RAM"
+      },
+      {
+        "seed": 3,
+        "uploadsPerWeek": 5,
+        "quality": 90,
+        "startSubscribers": 1000,
+        "milestones": [
+          {
+            "weeks": 52,
+            "subscribers": 451245,
+            "weeklyAds": 7121,
+            "storedVideos": 260
+          },
+          {
+            "weeks": 104,
+            "subscribers": 329022073,
+            "weeklyAds": 6249320,
+            "storedVideos": 520
+          },
+          {
+            "weeks": 129,
+            "subscribers": 11455902545,
+            "weeklyAds": 226378085,
+            "storedVideos": 645
+          }
+        ],
+        "evidence": "YouTube subsystem only; no energy, upload-cost or career feasibility claim; output histories omitted to bound audit RAM"
+      },
+      {
+        "seed": 1,
+        "uploadsPerWeek": 20,
+        "quality": 90,
+        "startSubscribers": 1000,
+        "milestones": [
+          {
+            "weeks": 45,
+            "subscribers": 13728039458,
+            "weeklyAds": 647526136,
+            "storedVideos": 900
+          }
+        ],
+        "evidence": "YouTube subsystem only; no energy, upload-cost or career feasibility claim; output histories omitted to bound audit RAM"
+      },
+      {
+        "seed": 2,
+        "uploadsPerWeek": 20,
+        "quality": 90,
+        "startSubscribers": 1000,
+        "milestones": [
+          {
+            "weeks": 44,
+            "subscribers": 10215956044,
+            "weeklyAds": 481063635,
+            "storedVideos": 880
+          }
+        ],
+        "evidence": "YouTube subsystem only; no energy, upload-cost or career feasibility claim; output histories omitted to bound audit RAM"
+      },
+      {
+        "seed": 3,
+        "uploadsPerWeek": 20,
+        "quality": 90,
+        "startSubscribers": 1000,
+        "milestones": [
+          {
+            "weeks": 45,
+            "subscribers": 14583349639,
+            "weeklyAds": 695130098,
+            "storedVideos": 900
+          }
+        ],
+        "evidence": "YouTube subsystem only; no energy, upload-cost or career feasibility claim; output histories omitted to bound audit RAM"
+      }
+    ],
+    "igCurves": [
+      {
+        "seed": 1,
+        "postsPerWeek": 1,
+        "fame": 80,
+        "reputation": 80,
+        "startFollowers": 1000,
+        "milestones": [
+          {
+            "weeks": 52,
+            "followers": 1427
+          },
+          {
+            "weeks": 260,
+            "followers": 6009
+          },
+          {
+            "weeks": 520,
+            "followers": 38971
+          },
+          {
+            "weeks": 1040,
+            "followers": 1599878
+          }
+        ],
+        "evidence": "Instagram subsystem only; fixed established profile, not a fresh-life/energy-verified route"
+      },
+      {
+        "seed": 2,
+        "postsPerWeek": 1,
+        "fame": 80,
+        "reputation": 80,
+        "startFollowers": 1000,
+        "milestones": [
+          {
+            "weeks": 52,
+            "followers": 1423
+          },
+          {
+            "weeks": 260,
+            "followers": 6022
+          },
+          {
+            "weeks": 520,
+            "followers": 38419
+          },
+          {
+            "weeks": 1040,
+            "followers": 1587272
+          }
+        ],
+        "evidence": "Instagram subsystem only; fixed established profile, not a fresh-life/energy-verified route"
+      },
+      {
+        "seed": 3,
+        "postsPerWeek": 1,
+        "fame": 80,
+        "reputation": 80,
+        "startFollowers": 1000,
+        "milestones": [
+          {
+            "weeks": 52,
+            "followers": 1437
+          },
+          {
+            "weeks": 260,
+            "followers": 6414
+          },
+          {
+            "weeks": 520,
+            "followers": 42015
+          },
+          {
+            "weeks": 1040,
+            "followers": 1738717
+          }
+        ],
+        "evidence": "Instagram subsystem only; fixed established profile, not a fresh-life/energy-verified route"
+      },
+      {
+        "seed": 1,
+        "postsPerWeek": 5,
+        "fame": 80,
+        "reputation": 80,
+        "startFollowers": 1000,
+        "milestones": [
+          {
+            "weeks": 52,
+            "followers": 2695
+          },
+          {
+            "weeks": 260,
+            "followers": 229320
+          },
+          {
+            "weeks": 520,
+            "followers": 65942232
+          },
+          {
+            "weeks": 754,
+            "followers": 10137282230
+          }
+        ],
+        "evidence": "Instagram subsystem only; fixed established profile, not a fresh-life/energy-verified route"
+      },
+      {
+        "seed": 2,
+        "postsPerWeek": 5,
+        "fame": 80,
+        "reputation": 80,
+        "startFollowers": 1000,
+        "milestones": [
+          {
+            "weeks": 52,
+            "followers": 2795
+          },
+          {
+            "weeks": 260,
+            "followers": 240054
+          },
+          {
+            "weeks": 520,
+            "followers": 63567896
+          },
+          {
+            "weeks": 756,
+            "followers": 10104538836
+          }
+        ],
+        "evidence": "Instagram subsystem only; fixed established profile, not a fresh-life/energy-verified route"
+      },
+      {
+        "seed": 3,
+        "postsPerWeek": 5,
+        "fame": 80,
+        "reputation": 80,
+        "startFollowers": 1000,
+        "milestones": [
+          {
+            "weeks": 52,
+            "followers": 2760
+          },
+          {
+            "weeks": 260,
+            "followers": 228662
+          },
+          {
+            "weeks": 520,
+            "followers": 63381205
+          },
+          {
+            "weeks": 754,
+            "followers": 10094911880
+          }
+        ],
+        "evidence": "Instagram subsystem only; fixed established profile, not a fresh-life/energy-verified route"
+      }
+    ],
+    "modeledPopulation": 9845634922,
+    "eligibleInternetPeople": 5462262217.738559
+  },
+  "counterAndQuotes": {
+    "viewCounterReset": {
+      "eventViewsBeforeNextWeek": 305000,
+      "viewsAfterNextWeek": 0,
+      "subscribersBeforeNextWeek": 1002541,
+      "subscribersAfterNextWeek": 1002541
+    },
+    "serviceReplay": {
+      "sameWeekServiceFirstViews": 616000,
+      "sameWeekServiceSecondViews": 1235727,
+      "scope": "Pure helper has no replay marker; this is not a proven app double-advance exploit"
+    },
+    "cases": [
+      {
+        "subscribers": 1000000,
+        "seedQuotes": [
+          {
+            "brandQuote": 366624,
+            "merchProfit": 808456
+          },
+          {
+            "brandQuote": 257342,
+            "merchProfit": 735491
+          },
+          {
+            "brandQuote": 389286,
+            "merchProfit": 1054043
+          },
+          {
+            "brandQuote": 225570,
+            "merchProfit": 554027
+          },
+          {
+            "brandQuote": 397523,
+            "merchProfit": 850285
+          }
+        ],
+        "managerQuote": {
+          "weekly": 42453,
+          "basis": {
+            "version": 1,
+            "source": "MANAGER",
+            "audienceBasis": "ESTIMATED_REACH",
+            "absoluteWeek": 2047,
+            "eligiblePeople": 5409819382.220923,
+            "reachablePeople": 1666375.4997331335,
+            "qualifiedImpressions": 999825.2998398801,
+            "referenceCpm": 14.693365396234913,
+            "weeklyBuyerBudget": 57069.537179226434,
+            "perDeliverableValue": 84907.16731414774,
+            "estimatedContractValue": 339624
+          }
+        },
+        "instagramDmWeekly": 242
+      },
+      {
+        "subscribers": 100000000,
+        "seedQuotes": [
+          {
+            "brandQuote": 36662437,
+            "merchProfit": 90745610
+          },
+          {
+            "brandQuote": 25734221,
+            "merchProfit": 83449173
+          },
+          {
+            "brandQuote": 38928608,
+            "merchProfit": 115304355
+          },
+          {
+            "brandQuote": 22557010,
+            "merchProfit": 65302778
+          },
+          {
+            "brandQuote": 39752325,
+            "merchProfit": 94928557
+          }
+        ],
+        "managerQuote": {
+          "weekly": 94747,
+          "basis": {
+            "version": 1,
+            "source": "MANAGER",
+            "audienceBasis": "ESTIMATED_REACH",
+            "absoluteWeek": 2047,
+            "eligiblePeople": 5409819382.220923,
+            "reachablePeople": 13529685.405889364,
+            "qualifiedImpressions": 8117811.243533618,
+            "referenceCpm": 14.693365396234913,
+            "weeklyBuyerBudget": 463360.6797617319,
+            "perDeliverableValue": 189494.33567010378,
+            "estimatedContractValue": 757976
+          }
+        },
+        "instagramDmWeekly": 1198
+      },
+      {
+        "subscribers": 10000000000,
+        "seedQuotes": [
+          {
+            "brandQuote": 3666243796,
+            "merchProfit": 9084461034
+          },
+          {
+            "brandQuote": 2573422131,
+            "merchProfit": 8354817325
+          },
+          {
+            "brandQuote": 3892860803,
+            "merchProfit": 11540335580
+          },
+          {
+            "brandQuote": 2255701034,
+            "merchProfit": 6540177805
+          },
+          {
+            "brandQuote": 3975232518,
+            "merchProfit": 9502755712
+          }
+        ],
+        "managerQuote": {
+          "weekly": 4784587,
+          "basis": {
+            "version": 1,
+            "source": "MANAGER",
+            "audienceBasis": "ESTIMATED_REACH",
+            "absoluteWeek": 2047,
+            "eligiblePeople": 5409819382.220923,
+            "reachablePeople": 1077465799.1897566,
+            "qualifiedImpressions": 646479479.5138539,
+            "referenceCpm": 14.693365396234913,
+            "weeklyBuyerBudget": 36900731.2553817,
+            "perDeliverableValue": 9569175.582516018,
+            "estimatedContractValue": 38276696
+          }
+        },
+        "instagramDmWeekly": 1198
+      }
+    ]
+  },
+  "actualWeekAndVerifiedReload": {
+    "status": "PASS",
+    "beforeNextWeek": {
+      "week": 20,
+      "views": 305000,
+      "subscribers": 1002541
+    },
+    "afterNextWeek": {
+      "week": 21,
+      "views": 0,
+      "subscribers": 1002541
+    },
+    "merchSaveReload": {
+      "subscribers": 10000000000,
+      "money": 9498094444,
+      "verifiedSaveStatus": "CURRENT",
+      "sameWeekRepeatAfterReloadBlocked": true
+    },
+    "scope": "One actual engine week and isolated verified memory save; no user save slots accessed"
+  },
+  "xGrowth": {
+    "scope": "Actual X post-growth math, fixed fame80, no weekly organic fame bonus, no energy feasibility claim, no player saves",
+    "curves": [
+      {
+        "seed": 1,
+        "postsPerWeek": 5,
+        "startFollowers": 1000,
+        "milestones": [
+          {
+            "week": 52,
+            "followers": 2453
+          },
+          {
+            "week": 260,
+            "followers": 9028
+          },
+          {
+            "week": 520,
+            "followers": 19157
+          },
+          {
+            "week": 1040,
+            "followers": 51865
+          }
+        ]
+      },
+      {
+        "seed": 2,
+        "postsPerWeek": 5,
+        "startFollowers": 1000,
+        "milestones": [
+          {
+            "week": 52,
+            "followers": 2310
+          },
+          {
+            "week": 260,
+            "followers": 8654
+          },
+          {
+            "week": 520,
+            "followers": 18720
+          },
+          {
+            "week": 1040,
+            "followers": 49733
+          }
+        ]
+      },
+      {
+        "seed": 3,
+        "postsPerWeek": 5,
+        "startFollowers": 1000,
+        "milestones": [
+          {
+            "week": 52,
+            "followers": 2242
+          },
+          {
+            "week": 260,
+            "followers": 8351
+          },
+          {
+            "week": 520,
+            "followers": 18413
+          },
+          {
+            "week": 1040,
+            "followers": 51677
+          }
+        ]
+      }
+    ]
+  }
+}

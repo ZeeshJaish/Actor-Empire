@@ -1,7 +1,9 @@
+import { quoteYoutubeUpload, quoteYoutubeNewSubscribers, quoteYoutubeLive, quoteYoutubeMemberships, settleYoutubeActivity, readYoutubeAudience } from '../../services/youtubeEconomy';
+import { recordCreatorSpend, readCreatorLedger } from '../../services/creatorEconomy';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ClothingItem, Player, Property, Vehicle, YoutubeBrandDeal, YoutubeCollabOffer, YoutubeCreatorIdentity, YoutubeMerchTier, YoutubeUploadPlan, YoutubeVideo, YoutubeVideoType } from '../../types';
-import { calculateYoutubeCreatorScore, generateYoutubeFeed, getWeeksSinceYoutubeUpload, getYoutubeMerchDropFailure, getYoutubePublicImageLabel, resolveYoutubeMerchDrop, YOUTUBE_MERCH_COOLDOWN_WEEKS, YOUTUBE_MERCH_TIERS, YOUTUBE_MONETIZATION_SUBS, YOUTUBE_MONETIZATION_VIEWS } from '../../services/youtubeLogic';
+import { calculateYoutubeMerchQuote, calculateYoutubeCreatorScore, generateYoutubeFeed, getWeeksSinceYoutubeUpload, getYoutubeMerchDropFailure, getYoutubePublicImageLabel, resolveYoutubeMerchDrop, YOUTUBE_MERCH_COOLDOWN_WEEKS, YOUTUBE_MERCH_TIERS, YOUTUBE_MONETIZATION_SUBS, YOUTUBE_MONETIZATION_VIEWS } from '../../services/youtubeLogic';
 import { spendPlayerEnergy } from '../../services/premiumLogic';
 import { loadMediaBlob, pruneMediaStore, saveMediaBlob } from '../../services/mediaStorage';
 import { AIRCRAFT_CATALOG, BOAT_CATALOG, CAR_CATALOG, CLOTHING_CATALOG, MOTORCYCLE_CATALOG, PROPERTY_CATALOG } from '../../services/lifestyleLogic';
@@ -561,6 +563,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
 
     const formatNumber = (num: number) => {
         if (!isFinite(num)) return '0';
+        if (num >= 1000000000) return (num / 1000000000).toFixed(1) + 'B';
         if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
         if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
         return Math.floor(num).toLocaleString();
@@ -586,6 +589,13 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
     const canEarnLivestreamDonations = channel.isMonetized && channel.subscribers >= 1000;
     const currentIdentityKey = channel.creatorIdentity || 'ACTOR_VLOGGER';
     const currentIdentity = getCreatorIdentityConfig(currentIdentityKey);
+    const previewUploadTrust = (planTrust: number) => {
+        const delta = planTrust + currentIdentity.trust;
+        const ledger = readCreatorLedger(player);
+        return delta > 0
+            ? Math.min(delta, Math.max(0, 3 - (ledger.rewardSpent.trust || 0)), ledger.actions.YOUTUBE < 2 ? 100 : 0, 100 - channel.audienceTrust)
+            : Math.max(-channel.audienceTrust, delta);
+    };
     const identityCooldownWeeks = 12;
     const identityWeeksRemaining = Math.max(0, identityCooldownWeeks - (absoluteWeek - (channel.lastIdentityChangeWeek || 0)));
     const canChangeIdentity = identityWeeksRemaining === 0 || !channel.lastIdentityChangeWeek;
@@ -833,7 +843,8 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
         uploadPlan: YoutubeUploadPlan = 'SAFE',
         extraComments: string[] = [],
         thumbnailMediaId?: string,
-        assetContext?: YoutubeVideo['assetContext']
+        assetContext?: YoutubeVideo['assetContext'],
+        committedReach = false
     ): YoutubeVideo => {
         const plan = getUploadPlanConfig(uploadPlan);
         const identity = getCreatorIdentityConfig(currentIdentityKey);
@@ -844,7 +855,8 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
         const qualityScore = Math.min(100, baseQuality + variance + qualityBoost + plan.qualityBoost + identity.qualityBoost + (assetContext?.qualityBonus || 0));
         const colors = ['bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-yellow-500', 'bg-pink-500', 'bg-indigo-500'];
         const thumbnailColor = colors[Math.floor(Math.random() * colors.length)];
-        const finalSeededViews = Math.floor((seededViews + (assetContext?.viewBoost || 0) + Math.floor(plan.viewBoost * (0.75 + Math.random() * 0.6))) * identity.viewMultiplier);
+        const planViews = Math.floor((seededViews + (assetContext?.viewBoost || 0) + Math.floor(plan.viewBoost * (0.75 + Math.random() * 0.6))) * identity.viewMultiplier);
+        const finalSeededViews = quoteYoutubeUpload(player, {qualityScore, type:videoType, uploadPlan} as YoutubeVideo, planViews, committedReach);
 
         return {
             id: `vid_${Date.now()}_${Math.random()}`,
@@ -1003,7 +1015,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
         }
         if (!beginYoutubeMoneyAction('memberships')) return;
 
-        const startingMembers = Math.max(25, Math.floor(channel.subscribers * 0.004 * (1 + currentIdentity.memberBoost)));
+        const startingMembers = quoteYoutubeMemberships(player).paidMembers;
         onUpdatePlayer({
             ...player,
             youtube: {
@@ -1035,9 +1047,10 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
         const trust = channel.audienceTrust ?? 55;
         const mood = channel.fanMood ?? 55;
         const heat = channel.controversy ?? 0;
-        const liveViews = Math.floor(Math.max(1200, channel.subscribers * (0.08 + Math.random() * 0.14) * currentIdentity.viewMultiplier));
-        const donations = Math.floor(liveViews * (0.08 + mood / 700) * (1 + currentIdentity.memberBoost));
-        const subs = Math.floor(liveViews / (trust >= 65 ? 95 : 130));
+        const live = quoteYoutubeLive(player,currentIdentity.viewMultiplier,currentIdentity.memberBoost);
+        const liveViews = live.views;
+        const donations = live.donations;
+        const subs = live.newSubscribers;
         const messy = Math.random() < Math.max(0.05, Math.min(0.62, (heat > 55 ? 0.32 : 0.12) + currentIdentity.liveRisk));
 
         const nextPlayer = {
@@ -1072,7 +1085,8 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
             }]
         };
         spendPlayerEnergy(nextPlayer, energyCost, 'YouTube: Livestream');
-        onUpdatePlayer(nextPlayer);
+        const settled = settleYoutubeActivity(player,nextPlayer,`live:${absoluteWeek}`,liveViews);
+        onUpdatePlayer(recordCreatorSpend(settled,donations));
     };
 
     const handleMerchDrop = (tierKey: YoutubeMerchTier) => {
@@ -1109,6 +1123,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
             return;
         }
 
+        if (!beginYoutubeMoneyAction('upload')) return;
         setIsThumbnailProcessing(true);
         let thumbnailMediaId: string | undefined;
         try {
@@ -1126,6 +1141,8 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
             console.error('Thumbnail processing failed', err);
             setThumbnailError(tr('youtube.thumbnail.saveError'));
             setIsThumbnailProcessing(false);
+            youtubeActionLockRef.current = null;
+            setYoutubeActionInProgress(null);
             return;
         }
 
@@ -1137,6 +1154,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
 
         const updatedChannel = {
             ...channel,
+            subscribers: channel.subscribers + quoteYoutubeNewSubscribers(player,newVideo.views,newVideo.qualityScore),
             totalChannelViews: (channel.totalChannelViews || 0) + newVideo.views,
             audienceTrust: Math.max(0, Math.min(100, (channel.audienceTrust ?? 55) + plan.trust + currentIdentity.trust)),
             fanMood: Math.max(0, Math.min(100, (channel.fanMood ?? 55) + plan.mood + currentIdentity.mood)),
@@ -1151,7 +1169,8 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
             logs: [...player.logs, { week: player.currentWeek, year: player.age, message: selectedAssetContext ? tr('youtube.log.uploadedWithAsset', { plan: plan.label, title, asset: selectedAssetContext.assetName }) : tr('youtube.log.uploaded', { plan: plan.label, title }), type: selectedPlan === 'VIRAL_BAIT' || selectedPlan === 'SPONSOR_HEAVY' ? 'neutral' : 'positive' }]
         };
         spendPlayerEnergy(nextPlayer, typeConfig.energy, `YouTube upload: ${title.trim()}`);
-        const promotion = linkedVideo.promotedProjectId ? applyProjectPromotionAttribution(nextPlayer, {
+        const activityPlayer = settleYoutubeActivity(player,nextPlayer,`upload:${linkedVideo.id}`,linkedVideo.views);
+        const promotion = linkedVideo.promotedProjectId ? applyProjectPromotionAttribution(activityPlayer, {
             projectId: linkedVideo.promotedProjectId,
             publicationId: linkedVideo.id,
             channel: 'YOUTUBE',
@@ -1169,7 +1188,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                     promotionAttributionId: promotion.attribution!.id,
                 } : video),
             },
-        } : (promotion?.player || nextPlayer);
+        } : (promotion?.player || activityPlayer);
         onUpdatePlayer(attributedPlayer);
 
         setView('MAIN');
@@ -1192,9 +1211,9 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
 
         const realizedBaseViews = Math.floor(collab.bonusViews * (0.85 + Math.random() * 0.35));
         const realizedBaseSubscribers = Math.floor(collab.bonusSubscribers * (0.85 + Math.random() * 0.35));
-        const newVideo = createYoutubeVideo(collab.conceptTitle, collab.requiredType, collab.qualityBonus, realizedBaseViews, 'BTS', [tr('youtube.comment.collab.carried', { creator: collab.creatorName }), tr('youtube.comment.collab.duo')]);
+        const newVideo = createYoutubeVideo(collab.conceptTitle, collab.requiredType, collab.qualityBonus, realizedBaseViews, 'BTS', [tr('youtube.comment.collab.carried', { creator: collab.creatorName }), tr('youtube.comment.collab.duo')], undefined, undefined, true);
         const outcome = getCollabOutcome(newVideo, collab);
-        const finalBonusViews = Math.max(0, outcome.bonusViews);
+        const finalBonusViews = Math.max(0,Math.min(outcome.bonusViews,readYoutubeAudience(player).eligiblePeople-newVideo.views));
         const finalBonusSubscribers = outcome.bonusSubs;
         newVideo.views += finalBonusViews;
         newVideo.likes += Math.floor(finalBonusViews * 0.06);
@@ -1202,8 +1221,8 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
 
         const updatedChannel = {
             ...channel,
-            subscribers: Math.max(0, channel.subscribers + realizedBaseSubscribers + finalBonusSubscribers),
-            totalChannelViews: (channel.totalChannelViews || 0) + realizedBaseViews + finalBonusViews,
+            subscribers: channel.subscribers + Math.max(0,Math.min(realizedBaseSubscribers + finalBonusSubscribers,quoteYoutubeNewSubscribers(player,newVideo.views,newVideo.qualityScore))),
+            totalChannelViews: (channel.totalChannelViews || 0) + newVideo.views,
             audienceTrust: Math.max(0, Math.min(100, (channel.audienceTrust ?? 55) + outcome.reputation + 1)),
             fanMood: Math.max(0, Math.min(100, (channel.fanMood ?? 55) + outcome.fame + 2)),
             controversy: Math.max(0, Math.min(100, (channel.controversy ?? 0) + (outcome.logType === 'negative' ? 5 : -2))),
@@ -1240,7 +1259,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
             logs: [...player.logs, { week: player.currentWeek, year: player.age, message: tr('youtube.log.collabOutcome', { label: outcome.label, log: outcome.log }), type: outcome.logType }]
         };
         spendPlayerEnergy(nextPlayer, collab.energyCost, `YouTube collab: ${collab.creatorName}`);
-        onUpdatePlayer(nextPlayer);
+        onUpdatePlayer(settleYoutubeActivity(player,nextPlayer,`collab:${collab.id}`,newVideo.views));
     };
 
     const handleCompleteBrandDeal = (deal: YoutubeBrandDeal) => {
@@ -1253,16 +1272,17 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
 
         const titleForVideo = `${deal.brandName} x ${player.name} - ${deal.requiredType.replace(/_/g, ' ')}`;
         const realizedBaseViews = Math.floor(deal.bonusViews * (0.85 + Math.random() * 0.35));
-        const newVideo = createYoutubeVideo(titleForVideo, deal.requiredType, 6, realizedBaseViews, 'SPONSOR_HEAVY', [tr('youtube.comment.brand.loud', { brand: deal.brandName }), tr('youtube.comment.brand.production')]);
+        const newVideo = createYoutubeVideo(titleForVideo, deal.requiredType, 6, realizedBaseViews, 'SPONSOR_HEAVY', [tr('youtube.comment.brand.loud', { brand: deal.brandName }), tr('youtube.comment.brand.production')], undefined, undefined, true);
         const outcome = getBrandOutcome(newVideo, deal);
         const finalPayout = Math.floor(deal.payout * outcome.payoutMultiplier);
-        newVideo.views += outcome.bonusViews;
-        newVideo.likes += Math.floor(outcome.bonusViews * 0.045);
-        newVideo.weeklyHistory = [...newVideo.weeklyHistory, outcome.bonusViews];
+        const bonusViews = Math.max(0,Math.min(outcome.bonusViews,readYoutubeAudience(player).eligiblePeople-newVideo.views));
+        newVideo.views += bonusViews;
+        newVideo.likes += Math.floor(bonusViews * 0.045);
+        newVideo.weeklyHistory = [...newVideo.weeklyHistory, bonusViews];
 
         const updatedChannel = {
             ...channel,
-            totalChannelViews: (channel.totalChannelViews || 0) + realizedBaseViews + outcome.bonusViews,
+            totalChannelViews: (channel.totalChannelViews || 0) + newVideo.views,
             lifetimeEarnings: channel.lifetimeEarnings + finalPayout,
             audienceTrust: Math.max(0, Math.min(100, (channel.audienceTrust ?? 55) + outcome.reputation - 1)),
             fanMood: Math.max(0, Math.min(100, (channel.fanMood ?? 55) + (outcome.logType === 'negative' ? -4 : 1))),
@@ -1299,7 +1319,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
             logs: [...player.logs, { week: player.currentWeek, year: player.age, message: tr('youtube.log.brandOutcome', { label: outcome.label, log: outcome.log, payout: finalPayout.toLocaleString() }), type: outcome.logType }]
         };
         spendPlayerEnergy(nextPlayer, deal.energyCost, `YouTube brand: ${deal.brandName}`);
-        onUpdatePlayer(nextPlayer);
+        onUpdatePlayer(settleYoutubeActivity(player,nextPlayer,`brand:${deal.id}`,newVideo.views));
     };
 
     const VideoCard: React.FC<{ video: YoutubeVideo }> = ({ video }) => (
@@ -1387,7 +1407,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
     const selectedThumbnailTheme = thumbnailThemeByType[selectedType] || thumbnailThemeByType.VLOG;
     const strategySignal = [
         { label: tr('youtube.forecast.views'), value: selectedUploadPlan.viewBoost > 600 ? tr('youtube.value.high') : selectedUploadPlan.viewBoost > 0 ? tr('youtube.value.medium') : tr('youtube.value.steady'), color: 'text-red-300' },
-        { label: tr('youtube.forecast.trust'), value: `${selectedUploadPlan.trust >= 0 ? '+' : ''}${selectedUploadPlan.trust}`, color: selectedUploadPlan.trust >= 0 ? 'text-emerald-300' : 'text-rose-300' },
+        { label: tr('youtube.forecast.trust'), value: `${previewUploadTrust(selectedUploadPlan.trust) >= 0 ? '+' : ''}${previewUploadTrust(selectedUploadPlan.trust)}`, color: selectedUploadPlan.trust >= 0 ? 'text-emerald-300' : 'text-rose-300' },
         { label: tr('youtube.forecast.heat'), value: selectedUploadPlan.controversy > 6 ? tr('youtube.value.risky') : selectedUploadPlan.controversy > 0 ? tr('youtube.value.warm') : tr('youtube.value.low'), color: selectedUploadPlan.controversy > 0 ? 'text-orange-300' : 'text-blue-300' }
     ];
 
@@ -1547,7 +1567,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                                                     <div className={`text-xs mt-1 ${isSelected ? 'text-red-100' : 'text-zinc-500'}`}>{plan.description}</div>
                                                 </div>
                                                 <div className={`text-[10px] font-mono shrink-0 ${isSelected ? 'text-white' : 'text-zinc-500'}`}>
-                                                    {tr('youtube.trustValue', { value: `${plan.trust >= 0 ? '+' : ''}${plan.trust}` })}
+                                                    {tr('youtube.trustValue', { value: `${previewUploadTrust(plan.trust) >= 0 ? '+' : ''}${previewUploadTrust(plan.trust)}` })}
                                                 </div>
                                             </div>
                                         </button>
@@ -1676,7 +1696,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                     <div className="pointer-events-none absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black via-black to-transparent px-4 pt-10 pb-8">
                         <button
                             onClick={handleUpload}
-                            disabled={!title.trim() || isThumbnailProcessing}
+                            disabled={!title.trim() || isThumbnailProcessing || player.energy.current < selectedVideoType.energy || player.money < selectedVideoType.cost}
                             className="pointer-events-auto w-full py-4 bg-gradient-to-r from-red-600 to-orange-500 text-white font-black rounded-[1.4rem] disabled:opacity-50 disabled:from-zinc-800 disabled:to-zinc-800 disabled:text-zinc-500 transition-colors shadow-[0_18px_45px_rgba(220,38,38,0.28)] flex items-center justify-center gap-2 active:scale-[0.99]"
                         >
                             <MonitorPlay size={20} /> {isThumbnailProcessing ? tr('youtube.savingThumbnail') : tr('youtube.publishVideo')}
@@ -2100,7 +2120,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                                     </div>
                                     <div className="text-right">
                                         <div className="text-[10px] text-zinc-500 uppercase font-bold">Members</div>
-                                        <div className="font-black text-emerald-400">{formatNumber(channel.members || 0)}</div>
+                                        <div className="font-black text-emerald-400">{formatNumber(channel.economy?.paidMembers ?? channel.members ?? 0)}</div>
                                     </div>
                                 </div>
 
@@ -2115,7 +2135,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                                 ) : (
                                     <div className="mb-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-3">
                                         <div className="text-xs font-bold text-emerald-300">Memberships Active</div>
-                                        <div className="text-[11px] text-zinc-400 mt-1">Weekly income scales with trust, fan mood, and subscriber base.</div>
+                                        <div className="text-[11px] text-zinc-400 mt-1">Weekly income follows active paid members, trust, fan mood, and audience spending.</div>
                                     </div>
                                 )}
 
@@ -2138,6 +2158,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                                     {(Object.keys(YOUTUBE_MERCH_TIERS) as YoutubeMerchTier[]).map(tierKey => {
                                         const tier = getMerchTierConfig(tierKey);
                                         const failure = getYoutubeMerchDropFailure(player, tierKey);
+                                        const estimatedCost = calculateYoutubeMerchQuote(player,tierKey,()=>.5).productionCost;
                                         const disabled = Boolean(failure) || !!youtubeActionInProgress;
                                         const requirement = failure === 'TRUST_REQUIRED'
                                             ? tr('youtube.trustValue', { value: tier.trustReq })
@@ -2147,7 +2168,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                                                     ? tr('youtube.merch.requirement.cash', { cash: moneyShort(tier.cost) })
                                                     : failure === 'COOLDOWN'
                                                         ? tr('youtube.merch.requirement.cooldown')
-                                                        : `${moneyShort(tier.cost)} • ${tier.energy}E`;
+                                                        : `Est. ${moneyShort(estimatedCost)} total • ${tier.energy}E`;
                                         return (
                                             <button
                                                 key={tierKey}
