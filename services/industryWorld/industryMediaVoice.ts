@@ -80,6 +80,17 @@ const PLATFORM_OPINIONS: Partial<Record<IndustryEventFact['type'], { against: st
         for: 'The new look finally matches the service it has become.',
         neutral: 'Viewers will judge the new look in the app, not in the announcement.',
     },
+    /* #200 */
+    PLATFORM_EXECUTIVE_LEFT: {
+        against: 'People do not leave a company that has its act together.',
+        for: 'Every service loses people. New blood is rarely the worst thing that can happen.',
+        neutral: 'The real story is who takes the chair next.',
+    },
+    PLATFORM_EXECUTIVE_HIRED: {
+        against: 'A new name at the table is not a plan.',
+        for: 'A serious hire. It says the service is serious about what comes next.',
+        neutral: 'A new chief gets a year; the numbers will say the rest.',
+    },
     PLATFORM_APP_REDESIGNED: {
         against: 'Moving everything around annoys the people who pay; habits are a feature.',
         for: 'The new home screen puts the shows first. Finding something to watch is faster.',
@@ -127,6 +138,8 @@ const PLATFORM_ANALYSIS: Partial<Record<IndustryEventFact['type'], string>> = {
     PLATFORM_QUALITY_GAP: 'Viewers who chase picture weigh the best on offer; the gap will show in who signs up.',
     PLATFORM_REBRANDED: 'A new look earns its cost only if it brings in sign-ups.',
     PLATFORM_APP_REDESIGNED: 'A home screen earns its keep in how fast viewers press play.',
+    PLATFORM_EXECUTIVE_LEFT: 'An empty chair slows what that chair ran; how long it stays empty is the number to watch.',
+    PLATFORM_EXECUTIVE_HIRED: 'A new chief changes what a service does first; it takes a year to show in the numbers.',
     PLATFORM_FREE_TIER: 'A free tier widens the door; the money is in how many walk on to a paid plan.',
     PLATFORM_OFFER_CHANGED: 'How a service sells itself decides who it reaches; the weeks ahead will show who it lost.',
     PLATFORM_VALUE_PRAISED: 'Price-minded homes compare plans line by line; this one wins that comparison today.',

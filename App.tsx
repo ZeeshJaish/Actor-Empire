@@ -13,6 +13,7 @@ import { NewPlayerTutorialOverlay } from './components/NewPlayerTutorialOverlay'
 import { ProductionCrisisModal } from './components/ProductionCrisisModal';
 import { LifeEventModal } from './components/LifeEventModal';
 import { StreamingIncidentEventModal } from './components/StreamingIncidentEventModal';
+import { StreamingDecisionEventModal } from './components/StreamingDecisionEventModal';
 import { StockControlEventModal } from './components/StockControlEventModal';
 import { SaveRecoveryModal } from './components/SaveRecoveryModal';
 import { WeekProcessingRecoveryModal } from './components/WeekProcessingRecoveryModal';
@@ -53,7 +54,7 @@ import {
 import { ensureTrackingPermission } from './services/trackingService';
 import { createDeferredSaveSlotSummary, createSaveSlotSummary, deleteVerifiedGameData, getGameSaveSummary, listGameDataKeys, loadVerifiedGameData, peekVerifiedPreviousGameData, recoverPreviousGameData, saveVerifiedGameData, writeGameSaveSummary, type SaveSlotSummary } from './services/storage';
 import { buildLegacyStudioInheritance, createBloodlineSnapshot, getAbsoluteWeek, getLegacyInheritancePreview, getRelationshipAge, inferStreamingStartWeekAbsolute, inheritActorSkills, LEGACY_MIN_PLAYABLE_AGE } from './services/legacyLogic';
-import { handoffOwnedStreamingPlatformToHeir } from './services/streamingLegacy';
+import { getStreamingEstate, handoffOwnedStreamingPlatformToHeir, type StreamingHandoffChoice } from './services/streamingLegacy';
 import { applyPremiumPurchase, getRequiredPremiumProductForAsset, hasNoAds, isNonConsumablePremiumProduct, PremiumProductId, restoreWeeklyEnergy, spendPlayerEnergy, syncEnergyDisplay, syncWeeklyEnergyForCommitments } from './services/premiumLogic';
 import { purchasePremiumProduct, restorePremiumPurchases, startIOSPurchaseUpdatesListener, type IOSPurchaseUpdate } from './services/iapService';
 import { sanitizeAwardRecords } from './services/awardLogic';
@@ -488,7 +489,7 @@ class GameErrorBoundary extends React.Component<GameErrorBoundaryProps, GameErro
 export const App: React.FC = () => {
   const [player, setPlayer] = useState<Player>(() => migratePlayerSave(INITIAL_PLAYER));
   const [activePage, setActivePage] = useState<Page>(Page.HOME);
-  const [lifestyleInitialView, setLifestyleInitialView] = useState<'MAIN' | 'ASSETS' | 'ACTIVITIES' | 'BUSINESS' | 'PRODUCTION_WIZARD' | 'PRODUCTION_GAME' | 'STREAMING_PLATFORM' | 'STREAMING_FINANCE' | 'STREAMING_STATUS' | null>(null);
+  const [lifestyleInitialView, setLifestyleInitialView] = useState<'MAIN' | 'ASSETS' | 'ACTIVITIES' | 'BUSINESS' | 'PRODUCTION_WIZARD' | 'PRODUCTION_GAME' | 'STREAMING_PLATFORM' | 'STREAMING_FINANCE' | 'STREAMING_STATUS' | 'STREAMING_TEAM' | 'STREAMING_OWNERSHIP' | null>(null);
   const [rightsMarketOpportunityId, setRightsMarketOpportunityId] = useState<string | null>(null);
   const [streamingContentOfferId, setStreamingContentOfferId] = useState<string | null>(null);
   const [studioContinuationTarget, setStudioContinuationTarget] = useState<{ studioId: string; scriptId: string } | null>(null);
@@ -2846,8 +2847,10 @@ export const App: React.FC = () => {
       handleGenericUpdate(prev => writeNewPlayerTutorialState(prev, state));
   };
 
-  const handleContinueAsChild = (child: any) => {
+  const handleContinueAsChild = (child: any, streamingChoice?: StreamingHandoffChoice) => {
       const inheritancePreview = getLegacyInheritancePreview(player);
+      /* #207: the estate on the streaming stake, if it is paid from the cash inherited */
+      const streamingEstate = getStreamingEstate(player, streamingChoice);
       const inheritedRelationships: Relationship[] = [];
       player.relationships.forEach(rel => {
           if (rel.id === child.id) return; // Skip self
@@ -2914,7 +2917,8 @@ export const App: React.FC = () => {
           currentWeek: player.currentWeek,
           gender: child.gender || player.gender,
           avatar: child.image || INITIAL_PLAYER.avatar,
-          money: inheritancePreview.inheritedMoney,
+          money: Math.max(0, inheritancePreview.inheritedMoney - (streamingEstate?.cashPaid || 0)),
+          soldStreamingCompanies: player.soldStreamingCompanies,
           assets: [...player.assets],
           customItems: clone(player.customItems),
           assetStates: clone(player.assetStates || []),
@@ -2932,6 +2936,7 @@ export const App: React.FC = () => {
               child,
               playableChildAge,
               player.currentWeek,
+              streamingChoice,
           ),
           relationships: advancedRelationships,
           flags: {
@@ -3425,6 +3430,22 @@ export const App: React.FC = () => {
                   /* #75: the popup leads to STATUS; the incident stays open there */
                   resolveQueuedEventSafely(player, player, player.pendingEvents?.[0]?.id, `${player.pendingEvents?.[0]?.title || 'An incident'}: opened STATUS.`);
                   setLifestyleInitialView('STREAMING_STATUS');
+                  setActivePage(Page.LIFESTYLE);
+              }}
+          />
+      )}
+
+      {/* #210: a decision that needs you: answered here, or on its page */}
+      {player.pendingEvents && player.pendingEvents.length > 0 && player.pendingEvents[0].type === 'STREAMING_DECISION' && (
+          <StreamingDecisionEventModal
+              key={player.pendingEvents[0].id}
+              player={player}
+              event={player.pendingEvents[0]}
+              onResolve={(updatedPlayer, log) => resolveQueuedEventSafely(player, updatedPlayer, player.pendingEvents?.[0]?.id, log)}
+              onOpenRoom={room => {
+                  /* the decision stays open on its page */
+                  resolveQueuedEventSafely(player, player, player.pendingEvents?.[0]?.id, `${player.pendingEvents?.[0]?.title || 'A decision'}: opened ${room}.`);
+                  setLifestyleInitialView(room === 'TEAM' ? 'STREAMING_TEAM' : 'STREAMING_OWNERSHIP');
                   setActivePage(Page.LIFESTYLE);
               }}
           />

@@ -1,3 +1,6 @@
+import type { OwnedStreamingExecutiveAppointment } from '../types';
+import { streamingExitPriceMove } from './team/teamExits';
+import { streamingDirectorExitPriceMove } from './streamingBoard';
 import { valueOwnedStreamingPlatform } from './valuation/streamingValuation';
 import { nextSharePrice } from './valuation/sharePrice';
 import { settleStreamingBuybackWeek, streamingBuybackTranche } from './streamingBuybacks';
@@ -46,6 +49,11 @@ export const STREAMING_IPO_BELL_ENERGY = 25;
 export const STREAMING_EARNINGS_CALL_ENERGY = 10;
 /** weeks after a report that a call can still be held */
 export const STREAMING_EARNINGS_CALL_WEEKS = 2;
+/** #200: who an exit was, for the market: the chief executive, the CFO, or another chair */
+export const streamingExitRole = (appointment: Pick<OwnedStreamingExecutiveAppointment, 'role' | 'exit'>): 'CEO' | 'CFO' | 'OTHER' => (
+    appointment.role === 'CEO' || appointment.exit?.wasCeo ? 'CEO' : appointment.role === 'CFO' ? 'CFO' : 'OTHER'
+);
+
 /** a resolution's result: the share price (percent) and the board's confidence */
 const VOTE_EFFECTS: Record<OwnedStreamingShareholderVote['type'], Record<'passed' | 'failed', { price: number; board: number; words: string }>> = {
     DIRECTOR_MANDATE: {
@@ -83,7 +91,10 @@ const settleShareholderVote = (
         ? roundPercent(vote.institutionalSupport)
         : roundPercent((founderVote === 'FOR' ? founderWeight : 0) + publicWeight * vote.institutionalSupport / 100);
     const approved = finalSupport >= 50;
-    const effect = VOTE_EFFECTS[vote.type][approved ? 'passed' : 'failed'];
+    /* #209: a vote on the founder's own pay: it moves their pay, not the team's */
+    const founderPay = vote.founderPayWeekly !== undefined || vote.founderBonus !== undefined;
+    const base = VOTE_EFFECTS[vote.type][approved ? 'passed' : 'failed'];
+    const effect = founderPay ? { ...base, words: approved ? "The shareholders agreed the founder's pay." : "The shareholders turned down the founder's pay." } : base;
     const founderDelta = founderVote === null ? -2 : approved === (founderVote === 'FOR') ? 2 : -3;
     const settled: OwnedStreamingShareholderVote = {
         ...vote,
@@ -95,12 +106,21 @@ const settleShareholderVote = (
         priceEffectPercent: effect.price,
         priceAppliedAtAbsoluteWeek: null,
     };
-    const raisePay = vote.type === 'EXECUTIVE_PAY' && approved;
+    const raisePay = vote.type === 'EXECUTIVE_PAY' && approved && !founderPay;
+    const founderMoney = platform.governance.founderMoney || { weeklySalary: 0, salaryPaid: 0, bonusPaid: 0, takenOut: 0, dividendsPaid: 0 };
     const ledger = publicLedger(platform, absoluteWeek, `shareholder-vote:${vote.id}`, 'SHAREHOLDER_VOTE_RESOLVED',
         `${vote.title} ${approved ? 'passed' : 'failed'} with ${finalSupport.toFixed(1)}% support${founderVote === null ? ': the public decided' : ''}.`, { finalSupport });
     return {
         ...platform,
-        governance: { ...platform.governance, boardConfidence: Math.round(clamp(platform.governance.boardConfidence + effect.board + founderDelta, 0, 100)) },
+        governance: {
+            ...platform.governance,
+            boardConfidence: Math.round(clamp(platform.governance.boardConfidence + effect.board + founderDelta, 0, 100)),
+            ...(founderPay && approved ? { founderMoney: {
+                ...founderMoney,
+                ...(vote.founderPayWeekly !== undefined ? { weeklySalary: vote.founderPayWeekly } : {}),
+                ...(vote.founderBonus !== undefined ? { pendingBonus: (founderMoney.pendingBonus || 0) + vote.founderBonus } : {}),
+            } } : {}),
+        },
         leadership: raisePay ? {
             ...platform.leadership,
             appointments: platform.leadership.appointments.map(item => (item.status === 'ACTIVE' ? { ...item, weeklyCompensation: Math.round(item.weeklyCompensation * 1.05) } : item)),
@@ -296,6 +316,8 @@ export interface StreamingOwnTicker {
     /** what a share is worth by the valuation engine */
     valuePerShare: number;
     listedAtAbsoluteWeek: number;
+    /** #209: what a share pays in a year, in % */
+    dividendYield: number;
 }
 
 export const getStreamingOwnTicker = (player: Player): StreamingOwnTicker | null => {
@@ -319,6 +341,8 @@ export const getStreamingOwnTicker = (player: Player): StreamingOwnTicker | null
         publicPercent: floatHolder ? floatHolder.ownershipPercent : roundPercent(listing.publicShares / Math.max(1, listing.sharesOutstanding) * 100),
         valuePerShare: getStreamingEquityValuation(platform) / Math.max(1, listing.sharesOutstanding),
         listedAtAbsoluteWeek: listing.listedAtAbsoluteWeek,
+        /* #209: what a share pays in a year, at this price */
+        dividendYield: price > 0 ? Math.round((platform.governance.dividend?.perShareQuarter || 0) * 4 / price * 1000) / 10 : 0,
     };
 };
 
@@ -397,7 +421,8 @@ export const getStreamingPublicMarkets = (player: Player): StreamingPublicMarket
         readinessScore,
         canStartRoadshow: platform.publicCompany.lifecycle === 'PRIVATE' && hardGatesPassed && readinessScore >= 67,
         valuation,
-        suggestedTicker: suggestTicker(platform.identity?.name || 'Streaming'),
+        /* #215: the one you chose, else one from the name */
+        suggestedTicker: platform.publicCompany.proposedTicker || suggestTicker(platform.identity?.name || 'Streaming'),
         activeGuidance: [...platform.publicCompany.guidance].reverse().find(item => item.status === 'ACTIVE') || null,
         openVote: [...platform.publicCompany.shareholderVotes].reverse().find(item => item.status === 'OPEN') || null,
         activeActivist: [...platform.publicCompany.activistCampaigns].reverse().find(item => item.status === 'ACTIVE') || null,
@@ -966,6 +991,17 @@ export const commitStreamingPublicMarketWeek = (
         && entry.absoluteWeek > lastQuoteWeek && entry.absoluteWeek <= snapshot.absoluteWeek);
     const successor = successorFact ? platform.leadership.appointments.find(item => item.executiveId === successorFact.metadata?.executiveId) : null;
     const successorMove = successor ? clamp((successor.skill - 60) / 800, -0.05, 0.05) : 0;
+    /* #200: an executive's exit, priced once */
+    const exits = platform.leadership.appointments.filter(item => item.exit && item.exit.pricedAtAbsoluteWeek === undefined);
+    const exitMove = exits.reduce((sum, item) => sum + streamingExitPriceMove(item.exit!.reason, streamingExitRole(item)), 0);
+    /* #201: a director going, priced once */
+    const directorExits = platform.governance.directors.filter(item => item.exit && item.exit.pricedAtAbsoluteWeek === undefined);
+    const directorMove = directorExits.reduce((sum, item) => sum + streamingDirectorExitPriceMove(item.exit!.reason), 0);
+    /* #209: a dividend raised or cut, once */
+    const pendingMoves = platform.governance.pendingPriceMoves || [];
+    const pendingMove = pendingMoves.reduce((sum, item) => sum + item.move, 0);
+    /* #207: the founder's death, once */
+    const founderDeath = platform.governance.founderDeath && platform.governance.founderDeath.pricedAtAbsoluteWeek === undefined ? platform.governance.founderDeath : null;
     const fairPerShare = getStreamingEquityValuation(platform) / Math.max(1, listing.sharesOutstanding) * (1 + standing);
     const step = nextSharePrice({
         previous: previousClose,
@@ -973,7 +1009,7 @@ export const commitStreamingPublicMarketWeek = (
         lastMove: (previous?.changePercent || 0) / 100,
         sector: 'MEDIA',
         absoluteWeek: snapshot.absoluteWeek,
-        events: earningsReaction + (voteNudge + callNudge) / 100 + (buyback ? 0.004 * buyback.percent : 0) + successorMove,
+        events: earningsReaction + (voteNudge + callNudge) / 100 + (buyback ? 0.004 * buyback.percent : 0) + successorMove + exitMove + directorMove + (founderDeath?.move || 0) + pendingMove,
         volatility: 0.03,
         seed: `${platform.simulationSeed}:public-quote`,
     });
@@ -996,6 +1032,11 @@ export const commitStreamingPublicMarketWeek = (
             ...(voteNudge ? ['A shareholder vote'] : []),
             ...(buyback ? ['The company buying back shares'] : []),
             ...(successor ? ['A new chief executive'] : []),
+            ...(founderDeath ? ["The founder's death"] : []),
+            ...pendingMoves.map(item => item.reason),
+            ...(directorExits.some(item => item.exit!.reason === 'PROTEST') ? ['A director resigning in protest'] : []),
+            ...(directorExits.some(item => item.exit!.reason === 'REMOVED') ? ['A director removed from the board'] : []),
+            ...(exits.some(item => item.exit!.sudden) ? [`Losing the ${streamingExitRole(exits.find(item => item.exit!.sudden)!) === 'CFO' ? 'finance chief' : streamingExitRole(exits.find(item => item.exit!.sudden)!) === 'CEO' ? 'chief executive' : 'team'}`] : []),
             /* #185: the pull towards what the company is worth */
             ...(step.pull >= 0.01 ? ['Priced below its value'] : step.pull <= -0.01 ? ['Priced above its value'] : []),
             snapshot.netSubscriberMovement >= 0 ? 'Subscriber momentum' : 'Subscriber pressure',
@@ -1017,6 +1058,19 @@ export const commitStreamingPublicMarketWeek = (
     } : {};
     platform = {
         ...platform,
+        /* #200, #201: priced now, never again */
+        governance: directorExits.length || founderDeath || pendingMoves.length ? {
+            ...platform.governance,
+            ...(pendingMoves.length ? { pendingPriceMoves: [] } : {}),
+            ...(founderDeath ? { founderDeath: { ...founderDeath, pricedAtAbsoluteWeek: snapshot.absoluteWeek } } : {}),
+            directors: platform.governance.directors.map(item => (item.exit && item.exit.pricedAtAbsoluteWeek === undefined
+                ? { ...item, exit: { ...item.exit, pricedAtAbsoluteWeek: snapshot.absoluteWeek } } : item)),
+        } : platform.governance,
+        leadership: exits.length ? {
+            ...platform.leadership,
+            appointments: platform.leadership.appointments.map(item => (item.exit && item.exit.pricedAtAbsoluteWeek === undefined
+                ? { ...item, exit: { ...item.exit, pricedAtAbsoluteWeek: snapshot.absoluteWeek } } : item)),
+        } : platform.leadership,
         publicCompany: {
             ...platform.publicCompany,
             quoteHistory: [...platform.publicCompany.quoteHistory, quote],

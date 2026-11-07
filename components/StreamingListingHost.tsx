@@ -3,6 +3,7 @@
  * moved out of it: MARKETS' Ring the bell starts it (`beginStreamingListing`: 25⚡, or a listing under way resumes
  * for nothing) and opens its five chapters here; when the bell rings, public life lands on MARKETS.
  */
+import { streamingTickerProblem } from '../services/streamingTicker';
 import { useMemo, useState } from 'react';
 import type { Gender, Player } from '../types';
 import { markOwnedStreamingCinematicStatus } from '../services/ownedStreamingPlatform';
@@ -224,6 +225,7 @@ export default function StreamingListingHost({ player, onUpdatePlayer, onClose, 
             inputs={ipoPresentationInputs}
             initialCheckpoint={platform.publicCompany.ipoJourney as StreamingListingCheckpoint | null}
             onCheckpoint={checkpointListing}
+            tickerProblem={ticker => streamingTickerProblem(player, ticker)}
             onBack={onClose}
             onDone={finishListing}
           />

@@ -16,19 +16,28 @@
 import React, { useState } from 'react';
 import css from './presentation/screens/Boardroom/BoardroomOwnership.module.css';
 import { cx } from './presentation/cx';
-import type { StreamingOwnershipHolder, StreamingOwnershipView, StreamingTermSheet } from '../../services/streamingInvestorOffers';
+import { STREAMING_ROUND_MIN_PERCENT, streamingRoundEnergy, type StreamingOwnershipHolder, type StreamingOwnershipView, type StreamingRoundView, type StreamingTermSheet } from '../../services/streamingInvestorOffers';
+import { streamingBuyoutChance } from '../../services/streamingOwnShares';
 import type { Gender, OwnedStreamingSaleBid, StreamingInvestorRoundSize } from '../../types';
 import type { StreamingSaleView } from '../../services/streamingCompanySale';
 import { PersonFace } from './PersonFace';
+import { BoardRow, type BoardroomBoardActions } from './BoardroomBoard';
+import type { StreamingStakeView } from '../../services/streamingControl';
 
-export interface BoardroomOwnershipActions {
+export interface BoardroomOwnershipActions extends BoardroomBoardActions {
     sign: (offerId: string) => { ok: boolean; message?: string };
     decline: (offerId: string) => void;
     /** #186: call a round */
-    callRound: (size: StreamingInvestorRoundSize) => { ok: boolean; message?: string };
-    /** #187: buy an investor out (private); buy back shares (listed) */
-    buyOut: (holderId: string) => { ok: boolean; message?: string };
+    callRound: (ask: StreamingInvestorRoundSize | number) => { ok: boolean; message?: string };
+    /** #187: buy an investor out (private); #202: at your own price; buy back shares (listed) */
+    buyOut: (holderId: string, offer?: number) => { ok: boolean; message?: string };
     startBuyback: (percent: number) => { ok: boolean; message?: string };
+    /** #209: your salary, a bonus, taking money out */
+    openYourMoney?: () => void;
+    /** #205: your own stake */
+    hireStakeBankers?: (percent: number) => { ok: boolean; message?: string };
+    acceptStakeOffer?: () => { ok: boolean; message?: string };
+    declineStakeOffer?: () => { ok: boolean; message?: string };
     /** #190: sell the company */
     hireBankers?: () => { ok: boolean; message?: string };
     acceptBid?: (bidId: string) => { ok: boolean; message?: string };
@@ -46,7 +55,7 @@ const shortMoney = (value: number) => (value >= 1e9 || value < 1e8 ? money(value
 /* the cap table's colours: you in the brand's own, investors in a fixed order */
 const TONES = ['#d9b25f', '#5aa9e6', '#b48cf2', '#56c596', '#f08a5d', '#7f8ea3', '#e66a9a'];
 
-const KindIcon = ({ kind }: { kind: StreamingOwnershipHolder['kind'] }) => {
+const KindIcon = ({ kind }: { kind: StreamingOwnershipHolder['kind'] | 'BOARD' }) => {
     const paths: Record<string, React.ReactNode> = {
         CELEBRITY: <path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6-5.3-3-5.3 3 1.2-6L3.4 9.3l6-.7z" />,
         FUND: <><path d="M4 20V9l8-5 8 5v11" /><path d="M9 20v-6h6v6" /></>,
@@ -55,6 +64,7 @@ const KindIcon = ({ kind }: { kind: StreamingOwnershipHolder['kind'] }) => {
         FOUNDER: <path d="M12 3c3 2 5 6 5 10l-2 3H9l-2-3c0-4 2-8 5-10zM9 16l-2 4M15 16l2 4" />,
         PUBLIC: <path d="M4 19h16M6 16V9M10 16V6M14 16v-5M18 16V8" />,
         YOU: <><circle cx="12" cy="8" r="4" /><path d="M4 20c1.5-4 4.5-6 8-6s6.5 2 8 6" /></>,
+        BOARD: <path d="M7 3v9h10V3M7 12v9M17 12v9M7 17h10" />,
         TEAM: <><circle cx="9" cy="9" r="3" /><circle cx="16" cy="10" r="2.5" /><path d="M3 19c1-3 3.5-5 6-5s5 2 6 5M14 15c2.5 0 5 1.5 6 4" /></>,
     };
     return (
@@ -65,7 +75,7 @@ const KindIcon = ({ kind }: { kind: StreamingOwnershipHolder['kind'] }) => {
 };
 
 const Face = ({ initials, tone, kind, big, name, gender, src }: {
-    initials: string; tone: string; kind: StreamingOwnershipHolder['kind']; big?: boolean;
+    initials: string; tone: string; kind: StreamingOwnershipHolder['kind'] | 'BOARD'; big?: boolean;
     /* #179: a person's portrait (the founder's own picture, an investor of the industry); firms keep their initials */
     name?: string; gender?: Gender | null; src?: string | null;
 }) => (
@@ -161,27 +171,40 @@ const TermSheet: React.FC<TermSheetProps> = ({ sheet, founderPercent, founderNam
     );
 };
 
-/* #187: an investor's stake bought back: the price, the premium, what you hold after */
+/* #187: an investor's stake bought back: the price, the premium, what you hold after. #202: at your own price */
 const Buyout = ({ holder, actions, onNote }: { holder: StreamingOwnershipHolder; actions: BoardroomOwnershipActions; onNote: (note: string) => void }) => {
     const [armed, setArmed] = useState(false);
     const quote = holder.buyout!;
+    const step = Math.max(1_000_000, Math.round(quote.price * 0.05 / 1_000_000) * 1_000_000);
+    const [offer, setOffer] = useState(quote.price);
+    const chance = Math.round(streamingBuyoutChance(offer, quote.price) * 100);
+    const first = holder.name.split(' ')[0];
+    const canPay = offer <= quote.mostYouCanPay;
     return (
         <div className={css.buyout}>
-            <span>{armed
-                ? `Buy back ${holder.name.split(' ')[0]}'s ${percent(quote.percent)} for ${money(quote.price)} (${Math.round((quote.premium - 1) * 100)}% over our value): you hold ${percent(quote.founderAfter)}${holder.boardSeat ? ', their seat ends' : ''}.`
-                : quote.blocked ? `${money(quote.price)} to buy out: ${quote.blocked.charAt(0).toLowerCase()}${quote.blocked.slice(1)}`
-                    : `Buy out for ${money(quote.price)} · you hold ${percent(quote.founderAfter)}`}</span>
-            {!quote.blocked && (armed ? (
-                <span className={css.buyoutActions}>
-                    <button type="button" className={css.buyoutYes} onClick={() => { const result = actions.buyOut(holder.id); onNote(result.message || (result.ok ? 'Bought out.' : 'That could not be done.')); setArmed(false); }}>Buy out</button>
-                    <button type="button" className={css.buyoutNo} onClick={() => setArmed(false)}>Keep</button>
-                </span>
-            ) : <button type="button" className={css.buyoutBtn} onClick={() => setArmed(true)}>Buy out</button>)}
+            {!armed && <span>{quote.blocked ? `${money(quote.price)} to buy out: ${quote.blocked.charAt(0).toLowerCase()}${quote.blocked.slice(1)}` : `Buy out for ${money(quote.price)} · you hold ${percent(quote.founderAfter)}`}</span>}
+            {!quote.blocked && !armed && <button type="button" className={css.buyoutBtn} onClick={() => setArmed(true)}>Buy out</button>}
+            {armed && (
+                <div className={css.buyoutOffer}>
+                    <div className={css.buyoutRow}>
+                        <button type="button" aria-label="Offer less" disabled={offer - step < quote.price * 0.6} onClick={() => setOffer(offer - step)}>−</button>
+                        <div className={css.buyoutValue}><b>{money(offer)}</b><small>{first} asks {money(quote.price)}</small></div>
+                        <button type="button" aria-label="Offer more" onClick={() => setOffer(offer + step)}>+</button>
+                    </div>
+                    <p className={css.buyoutChance}>{!canPay ? 'That would take the treasury under the cash floor.'
+                        : chance >= 100 ? `${first} sells, and you hold ${percent(quote.founderAfter)}.`
+                            : chance <= 0 ? `Too low: ${first} says no, and you wait 13 weeks.`
+                                : `${chance}% ${first} sells. A no means 13 weeks before you can ask again.`}</p>
+                    <span className={css.buyoutActions}>
+                        <button type="button" className={css.buyoutYes} disabled={!canPay} onClick={() => { const result = actions.buyOut(holder.id, offer); onNote(result.message || (result.ok ? 'Bought out.' : 'That could not be done.')); setArmed(false); }}>Offer {money(offer)}</button>
+                        <button type="button" className={css.buyoutNo} onClick={() => setArmed(false)}>Keep</button>
+                    </span>
+                </div>
+            )}
         </div>
     );
 };
 
-/* #190 (plan §22.4): selling the company: hire the bankers, then 3–5 bids with your share of each and who approves */
 const BUYER_WORDS: Record<OwnedStreamingSaleBid['buyerKind'], string> = { RIVAL: 'Rival platform', MEDIA: 'Media group', TECH: 'Tech giant', PRIVATE_EQUITY: 'Private equity' };
 const PAY_WORDS: Record<OwnedStreamingSaleBid['payment'], string> = { CASH: 'All cash', SHARES: 'In their shares', MIXED: 'Cash and shares' };
 const SellTheCompany = ({ sale, companyName, actions, onNote }: { sale: StreamingSaleView; companyName: string; actions: BoardroomOwnershipActions; onNote: (note: string) => void }) => {
@@ -192,15 +215,19 @@ const SellTheCompany = ({ sale, companyName, actions, onNote }: { sale: Streamin
             : 'Listed, a bid is a tender: the shareholders vote.';
     const weeks = (n: number) => `${n} week${n === 1 ? '' : 's'}`;
     return (
-        <section className={css.sec}>
-            <div className={css.head}><h2>Sell the company</h2><span>worth about {money(sale.worth)}</span></div>
+        <>
             {sale.status === 'IDLE' && (
-                <div className={css.saleCard}>
-                    <p>Bankers bring 3–5 bids in 4 weeks: rival platforms, media groups, tech giants and private equity, each at a premium over our value, more the better our numbers. {who}</p>
-                    <button type="button" className={css.saleBtn} onClick={() => {
+                <div className={css.roundBox}>
+                    <div className={css.roundFacts}>
+                        <span><small>WORTH ABOUT</small><b>{money(sale.worth)}</b></span>
+                        <span><small>YOUR SHARE</small><b>{money(sale.worth * sale.founderPercent / 100)}</b></span>
+                        <span><small>ENERGY</small><b>⚡{sale.energy}</b></span>
+                    </div>
+                    <p className={css.fine}>Everyone sells, and the company goes to the buyer. Bankers bring 3–5 bids in 4 weeks, each above our value. {who}</p>
+                    <button type="button" className={css.callRound} onClick={() => {
                         const result = actions.hireBankers!();
                         onNote(result.message || (result.ok ? 'The bankers are calling buyers.' : 'That could not be done.'));
-                    }}>Hire bankers <i>⚡{sale.energy}</i></button>
+                    }}>Hire bankers</button>
                 </div>
             )}
             {sale.status === 'COOLDOWN' && <p className={css.empty}>You turned the last bids down. The bankers can be called again in {weeks(sale.weeksLeft)}.</p>}
@@ -260,7 +287,7 @@ const SellTheCompany = ({ sale, companyName, actions, onNote }: { sale: Streamin
                     <p>{companyName} goes to {sale.closing.buyerName} for {money(sale.closing.price)}. You will be paid {money(sale.closing.founderCash)} for your {percent(sale.founderPercent)}, in cash; every holder is paid their share.</p>
                 </div>
             )}
-        </section>
+        </>
     );
 };
 
@@ -298,6 +325,138 @@ const Buyback = ({ view, actions, onNote }: { view: StreamingOwnershipView; acti
 };
 
 /* #186: Raise money: what investors read, and the three rounds */
+/* #205: after stepping down, while private: your own shares, some or all, through bankers */
+const SellStake = ({ stake, actions, onNote }: { stake: StreamingStakeView; actions: BoardroomOwnershipActions; onNote: (note: string) => void }) => {
+    const [size, setSize] = useState(stake.founderPercent);
+    const [armed, setArmed] = useState(false);
+    const after = Math.max(0, stake.founderPercent - size);
+    const weeks = (n: number) => `${n} week${n === 1 ? '' : 's'}`;
+    const say = (result?: { ok: boolean; message?: string }) => { if (result?.message) onNote(result.message); setArmed(false); };
+    const warn = stake.status === 'OFFER'
+        ? (stake.endsIt ? 'These are your last shares and you hold no office: you would be out of the company for good, and could found a new one in 2 years.'
+            : stake.crossesControl ? 'You would lose control: the board could outvote you.' : null)
+        : (after <= 0.005 ? (stake.offBoard ? 'Selling all of it, with no office, puts you out of the company.' : 'You would keep your seat as chair, with no shares.') : stake.founderPercent >= 51 && after < 51 ? 'Under 51%, the board could outvote you.' : null);
+    return (
+        <>
+            {stake.status === 'WAIT' && <p className={css.empty}>You can call the bankers again in {weeks(stake.weeksLeft)}.</p>}
+            {stake.status === 'BANKERS' && (
+                <div className={css.roundCard}>
+                    <b>THE BANKERS ARE LOOKING FOR A BUYER</b>
+                    <p>For {percent(stake.percent)} of the company. An offer in {weeks(stake.weeksLeft)}.</p>
+                </div>
+            )}
+            {stake.status === 'OFFER' && (
+                <div className={css.roundBox}>
+                    <div className={css.roundFacts}>
+                        <span><small>BUYER</small><b className={css.stakeName}>{stake.buyerName}</b></span>
+                        <span><small>FOR</small><b>{percent(stake.percent)}</b></span>
+                        <span><small>PAYS YOU</small><b>{money(stake.price || 0)}</b></span>
+                    </div>
+                    {warn && <p className={css.stakeWarn}>{warn}</p>}
+                    <p className={css.fine}>The offer stands {weeks(stake.weeksLeft)}.</p>
+                    <div className={css.stakeRow}>
+                        <button type="button" className={css.callRound} onClick={() => {
+                            if (warn && !armed) { setArmed(true); return; }
+                            say(actions.acceptStakeOffer?.());
+                        }}>{armed ? 'Tap again to sell' : 'Sell'}</button>
+                        <button type="button" className={css.stakeNo} onClick={() => say(actions.declineStakeOffer?.())}>Turn down</button>
+                    </div>
+                </div>
+            )}
+            {stake.status === 'IDLE' && (
+                <div className={css.roundBox}>
+                    <div className={css.roundRow}>
+                        <button type="button" aria-label="Sell less" disabled={size <= 1} onClick={() => setSize(Math.max(1, Math.round(size - 5)))}>−</button>
+                        <div className={css.roundValue}><b className={css.stakeSize}>{percent(size)}</b></div>
+                        <button type="button" aria-label="Sell more" disabled={size >= stake.founderPercent} onClick={() => setSize(Math.min(stake.founderPercent, Math.round(size + 5)))}>+</button>
+                    </div>
+                    <div className={css.roundFacts}>
+                        <span><small>WORTH ABOUT</small><b>{money(stake.worth * size / 100)}</b></span>
+                        <span><small>YOU KEEP</small><b>{percent(after)}</b></span>
+                        <span><small>ENERGY</small><b>⚡{stake.energy}</b></span>
+                    </div>
+                    {warn && <p className={css.stakeWarn}>{warn}</p>}
+                    <p className={css.fine}>Only your shares, and the company carries on. {stake.line}</p>
+                    <button type="button" className={css.callRound} onClick={() => say(actions.hireStakeBankers?.(size))}>Hire bankers</button>
+                </div>
+            )}
+        </>
+    );
+};
+
+/* #218: one place to sell, the whole company or only your stake, one switch and one way of hiring the bankers */
+const Sell = ({ sale, stake, listed, companyName, actions, onNote }: {
+    sale: StreamingSaleView | null; stake: StreamingStakeView | null; listed: boolean; companyName: string; actions: BoardroomOwnershipActions; onNote: (note: string) => void;
+}) => {
+    const stakeBusy = stake?.status === 'BANKERS' || stake?.status === 'OFFER';
+    const saleBusy = sale?.status === 'BANKERS' || sale?.status === 'BIDS' || sale?.status === 'CLOSING';
+    const [picked, setPicked] = useState<'COMPANY' | 'STAKE'>(stake && !sale ? 'STAKE' : 'COMPANY');
+    /* a sale under way shows itself */
+    const mode = stakeBusy ? 'STAKE' : saleBusy ? 'COMPANY' : picked;
+    if (!sale && !stake) return null;
+    return (
+        <section className={css.sec}>
+            <div className={css.head}><h2>Sell</h2>{sale && <span>worth about {money(sale.worth)}</span>}</div>
+            <div className={cx(css.roundUnit, css.sellSwitch)} role="group" aria-label="What to sell">
+                <button type="button" className={mode === 'COMPANY' ? css.roundUnitOn : ''} aria-pressed={mode === 'COMPANY'} onClick={() => setPicked('COMPANY')}>The whole company</button>
+                <button type="button" className={mode === 'STAKE' ? css.roundUnitOn : ''} aria-pressed={mode === 'STAKE'} onClick={() => setPicked('STAKE')}>Only your stake</button>
+            </div>
+            {mode === 'COMPANY' && (sale && actions.hireBankers
+                ? stakeBusy ? <p className={css.empty}>Your bankers are selling your stake first.</p> : <SellTheCompany sale={sale} companyName={companyName} actions={actions} onNote={onNote} />
+                : <p className={css.empty}>Buyers wait until the service is live.</p>)}
+            {mode === 'STAKE' && (stake
+                ? saleBusy ? <p className={css.empty}>The bankers are selling the whole company.</p> : <SellStake stake={stake} actions={actions} onNote={onNote} />
+                : <p className={css.empty}>{listed ? 'Listed, your shares sell in the Stocks app, after the lock-up.' : 'You can sell only your stake once you have stepped down. Until then, the company is yours to run.'}</p>)}
+        </section>
+    );
+};
+const initialsOf = (name: string) => name.split(/\s+/).map(word => word[0] || '').join('').slice(0, 2).toUpperCase();
+/* #202: a round of your own size, in % or in dollars; what it raises, what you keep, its energy, all live */
+const RoundSize = ({ custom, actions, onNote }: { custom: StreamingRoundView['custom']; actions: BoardroomOwnershipActions; onNote: (note: string) => void }) => {
+    const start = Math.min(5, custom.maxPercent);
+    const [percentAsked, setPercentAsked] = useState(start);
+    const [unit, setUnit] = useState<'PERCENT' | 'DOLLARS'>('PERCENT');
+    const [typed, setTyped] = useState<string | null>(null);
+    const clampPercent = (value: number) => Math.round(Math.max(STREAMING_ROUND_MIN_PERCENT, Math.min(custom.maxPercent, value)) * 10) / 10;
+    const millions = (value: number) => Math.round(custom.worth * value / 100 / 1e6);
+    const shown = typed ?? (unit === 'PERCENT' ? String(percentAsked) : String(millions(percentAsked)));
+    const setFromText = (text: string) => {
+        setTyped(text);
+        const value = Number(text);
+        if (!Number.isFinite(value) || value <= 0) return;
+        setPercentAsked(clampPercent(unit === 'PERCENT' ? value : value * 1e6 / custom.worth * 100));
+    };
+    const step = (direction: 1 | -1) => { setTyped(null); setPercentAsked(clampPercent(percentAsked + direction)); };
+    const energy = streamingRoundEnergy(percentAsked);
+    const after = custom.founder * (1 - percentAsked / 100);
+    return (
+        <div className={css.roundBox}>
+            <div className={css.roundRow}>
+                <button type="button" aria-label="A smaller round" disabled={percentAsked <= STREAMING_ROUND_MIN_PERCENT} onClick={() => step(-1)}>−</button>
+                <label className={css.roundValue}>
+                    {unit === 'DOLLARS' && <i>$</i>}
+                    <input inputMode="decimal" style={{ width: `${Math.max(1, shown.length) + 0.4}ch` }} aria-label={unit === 'PERCENT' ? 'Percent of the company to sell' : 'Millions of dollars to raise'} value={shown} onChange={event => setFromText(event.target.value)} onBlur={() => setTyped(null)} />
+                    <i>{unit === 'PERCENT' ? '%' : 'M'}</i>
+                </label>
+                <button type="button" aria-label="A bigger round" disabled={percentAsked >= custom.maxPercent} onClick={() => step(1)}>+</button>
+            </div>
+            <div className={css.roundUnit} role="radiogroup" aria-label="Type it in">
+                <button type="button" role="radio" aria-checked={unit === 'PERCENT'} className={cx(unit === 'PERCENT' && css.roundUnitOn)} onClick={() => { setUnit('PERCENT'); setTyped(null); }}>% of the company</button>
+                <button type="button" role="radio" aria-checked={unit === 'DOLLARS'} className={cx(unit === 'DOLLARS' && css.roundUnitOn)} onClick={() => { setUnit('DOLLARS'); setTyped(null); }}>Dollars</button>
+            </div>
+            <div className={css.roundFacts}>
+                <span><small>UP TO</small><b>{percent(percentAsked)}</b></span>
+                <span><small>RAISES ABOUT</small><b>{money(custom.worth * percentAsked / 100)}</b></span>
+                <span><small>YOU KEEP</small><b>{percent(after)}</b></span>
+            </div>
+            <button type="button" className={css.callRound} disabled={Boolean(custom.blocked)} onClick={() => {
+                const result = actions.callRound(percentAsked);
+                onNote(result.message || (result.ok ? 'The round is called.' : 'That could not be done.'));
+            }}>{custom.blocked || <>Call the round <small>⚡{energy}</small></>}</button>
+        </div>
+    );
+};
+
 const RaiseMoney = ({ view, actions, onNote }: { view: StreamingOwnershipView; actions: BoardroomOwnershipActions; onNote: (note: string) => void }) => {
     const round = view.round;
     return (
@@ -332,26 +491,7 @@ const RaiseMoney = ({ view, actions, onNote }: { view: StreamingOwnershipView; a
                             <span key={check.id} className={cx(css.chk, check.passed && css.chkOn)}>{check.passed ? '✓' : '✗'} {check.label}</span>
                         ))}
                     </div>
-                    <div className={css.sizes}>
-                        {round.sizes.map(size => (
-                            <button
-                                key={size.id}
-                                type="button"
-                                className={css.size}
-                                disabled={Boolean(size.blocked)}
-                                onClick={() => {
-                                    const result = actions.callRound(size.id);
-                                    onNote(result.message || (result.ok ? 'The round is called.' : 'That could not be done.'));
-                                }}
-                            >
-                                <span className={css.sizeName}>{size.label.toUpperCase()}</span>
-                                <span className={css.sizePct}><small>up to</small>{size.upToPercent}%</span>
-                                <span className={css.sizeAbout}>≈ {money(size.about)}</span>
-                                <span className={css.sizeKeep}>you keep {percent(size.founderAfter)}{size.capped ? ' (the line)' : ''}</span>
-                                {size.blocked ? <span className={css.sizeBlocked}>{size.blocked}</span> : <span className={css.sizeCost}>⚡{size.energy}</span>}
-                            </button>
-                        ))}
-                    </div>
+                    <RoundSize custom={round.custom} actions={actions} onNote={onNote} />
                     <p className={css.fine}>Your bankers call the industry's investors: 2 to 6 offers in 3 weeks, more and better the more of these you pass. They stand 6 weeks; sign as many as the round allows.</p>
                 </>
             )}
@@ -359,8 +499,10 @@ const RaiseMoney = ({ view, actions, onNote }: { view: StreamingOwnershipView; a
     );
 };
 
-export const BoardroomOwnership = ({ view, companyName, founderName, actions, sale }: {
+export const BoardroomOwnership = ({ view, companyName, founderName, actions, sale, onOpenBoard }: {
     view: StreamingOwnershipView; companyName: string; founderName: string; actions: BoardroomOwnershipActions;
+    /** #217: the board's own sheet */
+    onOpenBoard?: () => void;
     /** #190: selling the company */
     sale?: StreamingSaleView | null;
 }) => {
@@ -398,6 +540,7 @@ export const BoardroomOwnership = ({ view, companyName, founderName, actions, sa
                             <span>{holder.kind === 'YOU' ? 'since week 1' : holder.invested > 0 ? `${money(holder.invested)} · wk ${holder.sinceWeek}` : `since wk ${holder.sinceWeek}`}</span>
                         </div>
                         {holder.buyout && <Buyout holder={holder} actions={actions} onNote={setToast} />}
+                        {holder.kind === 'YOU' && actions.openYourMoney && <button type="button" className={css.yourMoney} onClick={actions.openYourMoney}>Your money: salary, bonus, taking money out ›</button>}
                     </div>
                 ))}
                 <p className={cx(css.control, (you?.percent ?? 100) > 50 ? css.safe : css.risk)}>
@@ -407,6 +550,7 @@ export const BoardroomOwnership = ({ view, companyName, founderName, actions, sa
                 </p>
             </section>
 
+            {view.board && onOpenBoard && <BoardRow board={view.board} onOpen={onOpenBoard} />}
             <RaiseMoney view={view} actions={actions} onNote={setToast} />
             {view.buyback && <Buyback view={view} actions={actions} onNote={setToast} />}
 
@@ -426,7 +570,7 @@ export const BoardroomOwnership = ({ view, companyName, founderName, actions, sa
                 {toast && <p className={css.toast} role="status">{toast}</p>}
             </section>
 
-            {sale && actions.hireBankers && <SellTheCompany sale={sale} companyName={companyName} actions={actions} onNote={setToast} />}
+            <Sell sale={sale ?? null} stake={view.stake ?? null} listed={view.listed} companyName={companyName} actions={actions} onNote={setToast} />
         </div>
     );
 };

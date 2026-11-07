@@ -837,6 +837,7 @@
 @keyframes ak-flip{from{transform:rotateX(80deg);opacity:.2}}
 .ls .akplate em{font-size:7px;font-weight:900;font-style:normal;letter-spacing:.22em;color:#8a7650}
 .ls .akchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
+.ls .aknote{margin-top:7px;font-size:10.5px;font-weight:700;line-height:1.4;color:var(--epx-lsalert)}
 .ls .akchip{min-width:54px;padding:8px 12px;border-radius:99px;text-align:center;font-size:11px;font-weight:900;letter-spacing:.12em;
   color:#c9d0db;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.14);transition:transform .12s,background .15s}
 .ls .akchip:active{transform:scale(.95)}
@@ -909,6 +910,12 @@
 .ls .tbseat.against .tbseatface{box-shadow:0 0 0 2px var(--epx-lsalert)}
 .ls .tbseat.targeted{border-color:var(--epx-lsamber);box-shadow:0 0 0 3px rgba(245,179,1,.14)}
 .ls .tbreply{margin-top:10px;font-size:11px;line-height:1.45;font-style:italic;color:#c9d0db}
+.ls .tbexecs.tbexecsone{grid-template-columns:minmax(0,1fr)}
+.ls .tbtopline{padding:2px 34px;text-align:center}
+.ls .tbwhat{margin-top:6px;font-size:12px;line-height:1.45;color:#9aa6bb}
+.ls .tbwhy{display:flex;flex-direction:column;gap:5px;list-style:none;padding:0 2px 4px}
+.ls .tbwhy li{font-size:11px;line-height:1.4;color:#9aa6bb}
+.ls .tbwhy b{font-weight:900;color:#e8eaf0}
 .ls .tbresult{margin-top:10px;padding:7px;border-radius:8px;text-align:center;font-size:13px;font-weight:900;letter-spacing:.22em;animation:ak-flip .3s ease-out backwards}
 .ls .tbresult.ok{color:#062012;background:var(--epx-lsgreen)}
 .ls .tbresult.bad{color:#fff;background:var(--epx-lsalert)}

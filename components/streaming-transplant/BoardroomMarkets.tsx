@@ -2,8 +2,8 @@
  * #173 (plan §21.17): MARKETS, the IPO in this update.
  *
  *   Before listing: THE ROAD TO THE BELL, the six gates as steps on a rail, each with the room that clears it (two are
- *   musts); YOUR LISTING, the ticker on an exchange plate and what a 10–30% float would raise and leave you (#189: both
- *   are chosen in the listing's ask); RING THE BELL (25⚡), which opens the listing (a listing under way resumes for
+ *   musts); YOUR LISTING, your symbol on an exchange plate (#215: tap it to choose) and what a 10–30% float would raise
+ *   and leave you (#189: chosen in the listing's ask); RING THE BELL (25⚡), which opens the listing (a listing under way resumes for
  *   nothing).
  *   After listing: the price and its line, the market's value and your stake's; the quarter's guidance and who set it;
  *   the last report with its optional earnings call (10⚡); the open shareholder vote as a ballot that closes on its
@@ -19,19 +19,58 @@ import css from './presentation/screens/Boardroom/BoardroomMarkets.module.css';
 import { cx } from './presentation/cx';
 import type { StreamingGuidanceTone } from '../../types';
 import type { StreamingListingDeskView, StreamingListingRoom } from '../../services/streamingListingDesk';
+import { STREAMING_TICKER_MAX, STREAMING_TICKER_MIN, cleanStreamingTicker } from '../../services/streamingTicker';
+import { streamingTickerOptions } from './streamingIpoPresentationModel';
 
 export interface BoardroomMarketsActions {
     ringBell: () => { ok: boolean; message?: string };
+    /** #215: your name on the stock market */
+    setTicker?: (ticker: string) => { ok: boolean; message?: string };
     holdCall: () => { ok: boolean; message?: string };
     vote: (voteId: string, choice: 'FOR' | 'AGAINST') => { ok: boolean; message?: string };
     /** #188: the promise for the next report */
     promise: (tone: StreamingGuidanceTone) => { ok: boolean; message?: string };
     openRoom: (room: StreamingListingRoom) => void;
+    /** #209: what a share pays each quarter */
+    setDividend?: (perShareQuarter: number) => { ok: boolean; message?: string };
 }
+
+/* #209: the dividend: what a share pays each quarter, changed whenever you like; a raise lifts the price, a cut hurts it */
+const Dividend = ({ dividend, onSet }: { dividend: NonNullable<StreamingListingDeskView['dividend']>; onSet: (perShare: number) => { ok: boolean; message?: string } }) => {
+    const [perShareNow, setPerShareNow] = useState(dividend.perShare);
+    const [note, setNote] = useState<string | null>(null);
+    const step = dividend.price >= 20 ? 0.05 : 0.01;
+    const yearly = dividend.price > 0 ? Math.round(perShareNow * 4 / dividend.price * 1000) / 10 : 0;
+    const cost = perShareNow * dividend.shares;
+    const changed = Math.abs(perShareNow - dividend.perShare) > 0.0001;
+    return (
+        <section className={css.sec}>
+            <div className={css.head}><h2>The dividend</h2><span>{dividend.perShare > 0 ? `next in ${dividend.nextInWeeks} week${dividend.nextInWeeks === 1 ? '' : 's'}` : 'none yet'}</span></div>
+            <div className={css.card}>
+                <div className={css.dividendRow}>
+                    <button type="button" aria-label="A smaller dividend" disabled={perShareNow <= 0 || !dividend.canSet} onClick={() => setPerShareNow(Math.max(0, Math.round((perShareNow - step) * 100) / 100))}>−</button>
+                    <div className={css.dividendValue}><b>${perShareNow.toFixed(2)}</b><small>a share, each quarter</small></div>
+                    <button type="button" aria-label="A bigger dividend" disabled={!dividend.canSet} onClick={() => setPerShareNow(Math.round((perShareNow + step) * 100) / 100)}>+</button>
+                </div>
+                <div className={css.dividendFacts}>
+                    <span><small>A YEAR</small><b>{yearly}%</b></span>
+                    <span><small>A QUARTER</small><b>{money(cost)}</b></span>
+                    <span><small>TO YOU</small><b>{money(cost * dividend.yourShare)}</b></span>
+                </div>
+                {dividend.canSet && <button type="button" className={css.dividendGo} disabled={!changed} onClick={() => {
+                    const result = onSet(perShareNow);
+                    setNote(result.message || (result.ok ? 'Done.' : 'That could not be done.'));
+                }}>{changed ? (perShareNow > dividend.perShare ? 'Raise the dividend' : perShareNow > 0 ? 'Cut the dividend' : 'End the dividend') : 'The dividend now'}</button>}
+                <p className={css.fine}>{dividend.line}</p>
+                {note && <p className={css.fine}>{note}</p>}
+            </div>
+        </section>
+    );
+};
 
 const money = (value: number): string => {
     const abs = Math.abs(value);
-    const text = abs >= 1e9 ? `$${(abs / 1e9).toFixed(1).replace(/\.0$/, '')}B` : abs >= 1e6 ? `$${(abs / 1e6).toFixed(1).replace(/\.0$/, '')}M` : `$${Math.round(abs / 1e3)}K`;
+    const text = abs >= 1e9 ? `$${(abs / 1e9).toFixed(1).replace(/\.0$/, '')}B` : abs >= 1e6 ? `$${(abs / 1e6).toFixed(1).replace(/\.0$/, '')}M` : abs >= 500 ? `$${Math.round(abs / 1e3)}K` : '$0';
     return value < 0 ? `−${text}` : text;
 };
 const people = (value: number) => (value >= 1e6 ? `${(value / 1e6).toFixed(1).replace(/\.0$/, '')}M` : `${Math.round(value / 1e3)}K`);
@@ -54,6 +93,48 @@ const Plate = ({ ticker, sub }: { ticker: string; sub?: string }) => (
         {sub && <span className={css.plateSub}>{sub}</span>}
     </div>
 );
+
+/** #215: the plate is yours to change until the listing begins: a tap, its suggestions, or your own letters */
+const TickerChoice = ({ ticker, from, onSet }: { ticker: string; from: string; onSet: (ticker: string) => { ok: boolean; message?: string } }) => {
+    const [open, setOpen] = useState(false);
+    const [draft, setDraft] = useState('');
+    const [note, setNote] = useState<string | null>(null);
+    const options = [...new Set([ticker, ...streamingTickerOptions(from)])].slice(0, 4);
+    const use = (value: string) => {
+        const result = onSet(value);
+        if (!result.ok) { setNote(result.message || 'That could not be used.'); return; }
+        setDraft('');
+        setNote(null);
+        setOpen(false);
+    };
+    return (
+        <>
+            <button type="button" className={css.tickerBtn} aria-expanded={open} aria-label={`Your stock symbol is ${ticker}. Change it`} onClick={() => { setOpen(!open); setNote(null); }}>
+                <Plate ticker={ticker} sub="EMPIRE EXCHANGE" />
+                <span className={css.tickerWords}><b>Your name on the stock market</b><small>{open ? 'Pick one, or write your own' : 'Tap to change it'}</small></span>
+            </button>
+            {open && (
+                <div className={css.tickerPick}>
+                    <div className={css.tickerChips}>
+                        {options.map(option => <button type="button" key={option} className={cx(css.tickerChip, option === ticker && css.tickerChipOn)} onClick={() => use(option)}>{option}</button>)}
+                    </div>
+                    <div className={css.tickerOwn}>
+                        <input
+                            aria-label="Your own stock symbol"
+                            placeholder={`${STREAMING_TICKER_MIN} to ${STREAMING_TICKER_MAX} letters`}
+                            maxLength={STREAMING_TICKER_MAX}
+                            value={draft}
+                            onChange={event => { setDraft(cleanStreamingTicker(event.target.value)); setNote(null); }}
+                            onKeyDown={event => { if (event.key === 'Enter' && draft.length >= STREAMING_TICKER_MIN) use(draft); }}
+                        />
+                        <button type="button" disabled={draft.length < STREAMING_TICKER_MIN} onClick={() => use(draft)}>Use it</button>
+                    </div>
+                    {note && <p className={css.tickerNote} role="status">{note}</p>}
+                </div>
+            )}
+        </>
+    );
+};
 
 /** the price's line; #188: with what a share is worth as a dashed line */
 const Line = ({ values, up, worth }: { values: number[]; up: boolean; worth?: number }) => {
@@ -91,8 +172,8 @@ export const BoardroomMarkets = ({ view, actions }: { view: StreamingListingDesk
                             <li key={gate.id} className={cx(css.step, gate.passed && css.stepDone)} style={{ ['--i' as string]: index } as React.CSSProperties}>
                                 <i className={css.node} aria-hidden="true">{gate.passed ? '✓' : index + 1}</i>
                                 <div className={css.stepBody}>
-                                    <b>{gate.label}{gate.hardGate && <em className={css.must}>MUST</em>}</b>
-                                    <span>{gate.passed ? gate.value : gate.requirement}</span>
+                                    <b>{gate.label}</b>
+                                    <span>{gate.hardGate && <em className={css.must}>MUST</em>}{gate.passed ? gate.value : gate.requirement}</span>
                                     {!gate.passed && <small>Cleared by {gate.where}</small>}
                                 </div>
                                 <button type="button" className={css.roomChip} onClick={() => actions.openRoom(gate.room)} aria-label={`Open ${ROOM_WORDS[gate.room]}`}>
@@ -106,13 +187,15 @@ export const BoardroomMarkets = ({ view, actions }: { view: StreamingListingDesk
                 <section className={css.sec}>
                     <div className={css.head}><h2>Your listing</h2><span>worth about {money(view.valuation)}</span></div>
                     <div className={css.listing}>
-                        <Plate ticker={view.ticker} sub={view.resume ? 'EMPIRE EXCHANGE · IN THE LISTING' : 'EMPIRE EXCHANGE · PROPOSED'} />
-                        {/* #189: the ticker, the price and how much you sell are chosen in the listing's ask, nowhere else */}
+                        {view.tickerFrom && actions.setTicker
+                            ? <TickerChoice ticker={view.ticker} from={view.tickerFrom} onSet={actions.setTicker} />
+                            : <Plate ticker={view.ticker} sub={view.resume ? 'EMPIRE EXCHANGE · IN THE LISTING' : 'EMPIRE EXCHANGE'} />}
+                        {/* #189: the price and how much you sell are chosen in the listing's ask */}
                         <div className={css.readouts}>
                             <div><span>{view.range.low.percent}–{view.range.high.percent}% RAISES</span><b className={css.rangeB}>{money(view.range.low.raise)}–{money(view.range.high.raise)}</b></div>
                             <div><span>YOU KEEP</span><b className={css.rangeB}>{view.range.high.keep}–{view.range.low.keep}%</b></div>
                         </div>
-                        <p className={css.fine}>In the listing you choose the ticker, what we are worth and how much to sell. New shares sell a little under what we are worth. Under 51% the board can outvote you.</p>
+                        <p className={css.fine}>In the listing you choose what we are worth and how much to sell. New shares sell a little under what we are worth. Under 51% the board can outvote you.</p>
                     </div>
                     <button type="button" className={cx(css.bell, !view.ready && css.bellLocked)} disabled={!view.ready} onClick={() => {
                         const result = actions.ringBell();
@@ -163,6 +246,8 @@ export const BoardroomMarkets = ({ view, actions }: { view: StreamingListingDesk
                     <div><span>YOUR STAKE</span><b>{share.stakePercent.toFixed(1)}%</b><small>{money(share.stakeValue)}</small></div>
                 </div>
             </section>
+
+            {view.dividend && actions.setDividend && <Dividend dividend={view.dividend} onSet={actions.setDividend} />}
 
             <section className={css.sec}>
                 <div className={css.head}><h2>The next report</h2><span>{view.nextReportInWeeks === 0 ? 'this week' : `in ${view.nextReportInWeeks} week${view.nextReportInWeeks === 1 ? '' : 's'}`}</span></div>

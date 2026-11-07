@@ -56,7 +56,7 @@ async function main() {
     assert.ok(desk.range.low.raise > 0 && desk.range.high.raise > desk.range.low.raise && desk.range.high.keep < desk.range.low.keep && desk.range.low.keep < desk.founderPercent);
     pass(`the road to the bell: ${desk.cleared} of 6 cleared (${desk.gates.map(gate => `${gate.passed ? '✓' : '○'} ${gate.label} → ${gate.room}`).join(', ')}); selling 10–30% raises $${(desk.range.low.raise / 1e9).toFixed(1)}–${(desk.range.high.raise / 1e9).toFixed(1)}B, you keep ${desk.range.high.keep}–${desk.range.low.keep}%`);
     const before = text(renderToStaticMarkup(<BoardroomMarkets view={desk} actions={actions} />));
-    for (const words of ['The road to the bell', 'MUST', 'Your listing', 'RAISES', 'YOU KEEP', 'you choose the ticker', 'Ring the bell', '⚡25', 'Money ›', 'Team ›']) assert.ok(before.includes(words), `MARKETS shows "${words}"`);
+    for (const words of ['The road to the bell', 'MUST', 'Your listing', 'RAISES', 'YOU KEEP', 'you choose what we are worth', 'Ring the bell', '⚡25', 'Money ›', 'Team ›']) assert.ok(before.includes(words), `MARKETS shows "${words}"`);
     pass('MARKETS before listing renders the rail, the plate, what a 10–30% float would raise, and the bell');
 
     /* ── ringing the bell ── */

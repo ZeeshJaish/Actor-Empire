@@ -23,7 +23,9 @@ export default function StreamingSoldScreen({ player, onUpdatePlayer, onBack }: 
   const sale = platform.governance.sale || null;
   const bid = sale?.bids.find(item => item.id === sale.acceptedBidId) || null;
   const wait = getStreamingNewCompanyWait(player) ?? STREAMING_NEW_COMPANY_WEEKS;
-  const soldAt = sale?.soldAtAbsoluteWeek ?? null;
+  /* #205: you can also have left altogether: your last shares sold, and no office */
+  const departure = platform.governance.departure || null;
+  const soldAt = departure?.atAbsoluteWeek ?? sale?.soldAtAbsoluteWeek ?? null;
   const weeksAgo = soldAt === null ? 0 : Math.max(0, getAbsoluteWeek(player.age, player.currentWeek) - soldAt);
   const progress = Math.min(1, Math.max(0, (STREAMING_NEW_COMPANY_WEEKS - wait) / STREAMING_NEW_COMPANY_WEEKS));
   const name = platform.identity?.name || 'EMPIRE+';
@@ -38,15 +40,15 @@ export default function StreamingSoldScreen({ player, onUpdatePlayer, onBack }: 
       </header>
       <main className="sold-main">
         <section className="sold-hero">
-          <i className="sold-stamp" aria-hidden="true">SOLD</i>
+          <i className="sold-stamp" aria-hidden="true">{departure ? 'LEFT' : 'SOLD'}</i>
           <h1>{name}</h1>
-          <p>to {buyer} for {money(bid?.price || 0)} · {weeksAgo ? `${weeks(weeksAgo)} ago` : 'this week'}</p>
+          <p>{departure ? 'You hold no shares and no office' : `to ${buyer} for ${money(bid?.price || 0)}`} · {weeksAgo ? `${weeks(weeksAgo)} ago` : 'this week'}</p>
         </section>
 
         <section className="sold-card">
           <span>YOUR STAKE</span>
-          <b>{money(sale?.founderCash || 0)}</b>
-          <p>Paid in cash for your {(sale?.founderPercentAtSale ?? 0).toFixed(1)}%; every holder was paid their share. The service carries on under {buyer}.</p>
+          <b>{money(departure ? departure.proceeds : sale?.founderCash || 0)}</b>
+          <p>{departure ? 'What your last shares brought. The service carries on without you.' : `Paid in cash for your ${(sale?.founderPercentAtSale ?? 0).toFixed(1)}%; every holder was paid their share. The service carries on under ${buyer}.`}</p>
         </section>
 
         <section className="sold-card">
@@ -54,7 +56,7 @@ export default function StreamingSoldScreen({ player, onUpdatePlayer, onBack }: 
           {wait > 0 ? (
             <>
               <b>in {weeks(wait)}</b>
-              <p>Two years after a sale you may found a new streaming company.</p>
+              <p>Two years after {departure ? 'leaving' : 'a sale'} you may found a new streaming company.</p>
               <i className="sold-bar" aria-hidden="true"><em style={{ width: `${progress * 100}%` }} /></i>
             </>
           ) : (

@@ -34,6 +34,7 @@ import { getStreamingServerSite } from './streamingServerSites';
 import { STREAMING_DAY_ONE_REGION_LABELS } from './streamingDayOneMarkets';
 import type { StreamingPricingChangeKind } from './streamingPricingChange';
 import { streamingBrandLookChangeText } from './streamingBrandStudio';
+import { STREAMING_EXECUTIVE_ROLE_LABELS } from './streamingLeadershipGovernance';
 
 /* how far back a pass looks, so a save from before the news makes no stories of its history */
 const LOOKBACK_WEEKS = 2;
@@ -258,7 +259,57 @@ export const collectOwnedStreamingPlatformFacts = (
             key: incident.idempotencyKey || incident.id, detected: incident.detectedAtAbsoluteWeek, resolved: incident.resolvedAtAbsoluteWeek, story: incidentStory(incident, name),
         })),
     ], name, inWindow);
-    return [...actions, ...outages].map(fact => createIndustryEventFact({
+    /* #200: a chief leaves, or joins */
+    const people = (platform.leadership?.appointments || []).flatMap<PlatformFact>(item => {
+        const title = item.exit?.wasCeo ? 'Chief Executive' : STREAMING_EXECUTIVE_ROLE_LABELS[item.role] || 'executive';
+        const big = item.exit?.wasCeo || item.role === 'CEO' || item.role === 'CFO' || item.role === 'CHIEF_CONTENT_OFFICER' || item.role === 'CTO';
+        if (item.status !== 'ACTIVE' && item.exit && inWindow(item.endedAtAbsoluteWeek)) {
+            const { reason, to } = item.exit;
+            const headline = reason === 'RIVAL_OFFER' && to ? `${name}'s ${title} leaves for ${to}`
+                : reason === 'LET_GO' ? `${name} lets its ${title} go`
+                    : reason === 'RETIRING' ? `${name}'s ${title} retires`
+                        : `${name}'s ${title} steps down`;
+            const detail = reason === 'RIVAL_OFFER' ? `${item.nameAtAppointment} goes after a better offer.`
+                : reason === 'UNDERPAID' ? `${item.nameAtAppointment} leaves over pay.`
+                    : reason === 'HARD_QUARTER' ? `${item.nameAtAppointment} goes after a hard quarter.`
+                        : reason === 'RETIRING' ? `${item.nameAtAppointment} retires after a long career.`
+                            : reason === 'LET_GO' ? `${item.nameAtAppointment} is out, and the chair is empty.`
+                                : `${item.nameAtAppointment} is leaving the company.`;
+            return [{ key: `exec-left:${item.id}`, type: 'PLATFORM_EXECUTIVE_LEFT' as const, importance: big && item.exit.sudden ? 'HIGH' as const : 'MEDIUM' as const, headline, detail }];
+        }
+        if (item.status === 'ACTIVE' && item.origin === 'PLAYER_HIRED' && inWindow(item.appointedAtAbsoluteWeek)) {
+            return [{ key: `exec-hired:${item.id}`, type: 'PLATFORM_EXECUTIVE_HIRED' as const, importance: 'MEDIUM' as const,
+                headline: `${name} names ${item.nameAtAppointment} its ${title}`, detail: `${item.nameAtAppointment} joins the team as ${title}.` }];
+        }
+        return [];
+    });
+    /* #201: the board */
+    const directors = (platform.governance?.directors || []).flatMap<PlatformFact>(item => {
+        if (item.status !== 'ACTIVE' && item.exit && inWindow(item.endedAtAbsoluteWeek)) {
+            return [item.exit.reason === 'REMOVED'
+                ? { key: `director-left:${item.id}`, type: 'PLATFORM_EXECUTIVE_LEFT', importance: 'HIGH', headline: `${name} removes ${item.name} from its board`, detail: `${item.name} was dropped as an independent director before the term was up. Investors will ask why.` }
+                : item.exit.reason === 'PROTEST'
+                ? { key: `director-left:${item.id}`, type: 'PLATFORM_EXECUTIVE_LEFT', importance: 'HIGH', headline: `A director quits ${name}'s board in protest`, detail: `${item.name} has resigned, saying the board has lost confidence in where the company is going.` }
+                : { key: `director-left:${item.id}`, type: 'PLATFORM_EXECUTIVE_LEFT', importance: 'MEDIUM', headline: `${item.name} leaves ${name}'s board`, detail: `${item.name} steps down at the end of a full term.` }];
+        }
+        if (item.status === 'ACTIVE' && item.seatType === 'INDEPENDENT' && inWindow(item.appointedAtAbsoluteWeek)) {
+            return [{ key: `director-joined:${item.id}`, type: 'PLATFORM_EXECUTIVE_HIRED', importance: 'MEDIUM', headline: `${name} adds ${item.name} to its board`, detail: `${item.name} joins as an independent director.` }];
+        }
+        return [];
+    });
+    /* #205: who controls it, and who runs it */
+    const control = (platform.eventLedger || []).flatMap<PlatformFact>(entry => {
+        /* the handoff is stamped the week the heir begins */
+        if (!inWindow(entry.absoluteWeek) && !(entry.type === 'GENERATION_HANDOFF' && entry.absoluteWeek >= from && entry.absoluteWeek <= absoluteWeek)) return [];
+        if (entry.type === 'SUCCESSOR_APPOINTED') return [{ key: entry.idempotencyKey, type: 'PLATFORM_EXECUTIVE_HIRED', importance: 'HIGH', headline: `${name} has a new chief executive`, detail: entry.summary }];
+        /* #207: the news names the service and who runs it now */
+        if (entry.type === 'GENERATION_HANDOFF') return [{ key: entry.idempotencyKey, type: 'PLATFORM_EXECUTIVE_LEFT', importance: 'HIGH', headline: entry.metadata?.died ? `${name}'s founder has died` : `${name}'s founder hands over to the next generation`, detail: entry.summary }];
+        if (entry.type !== 'FOUNDER_ROLE_CHANGED') return [];
+        if (entry.metadata?.kind === 'LOST_CONTROL') return [{ key: entry.idempotencyKey, type: 'PLATFORM_EXECUTIVE_LEFT', importance: 'HIGH', headline: `${name}'s founder gives up control`, detail: entry.summary }];
+        if (entry.metadata?.kind === 'BOARD_MOVED') return [{ key: entry.idempotencyKey, type: 'PLATFORM_EXECUTIVE_LEFT', importance: 'HIGH', headline: `The board moves ${name}'s founder aside`, detail: entry.summary }];
+        return [];
+    });
+    return [...actions, ...outages, ...people, ...directors, ...control].map(fact => createIndustryEventFact({
         idempotencyKey: `owned-platform:${slug}:${fact.key}`,
         absoluteWeek,
         type: fact.type,

@@ -14,6 +14,7 @@ import type {
     StreamingExecutiveRole,
     StreamingExecutiveStrategy,
 } from '../types';
+import { streamingTeamPayAfterLevel } from './team/teamOutcomes';
 import { createDeterministicId, createDeterministicRng } from './deterministicRandom';
 import { getAbsoluteWeek } from './legacyLogic';
 import {
@@ -133,6 +134,7 @@ export const STREAMING_EXECUTIVE_ROLE_LABELS: Record<StreamingExecutiveRole, str
     ADVERTISING_HEAD: 'Advertising Head',
     INTERNATIONAL_HEAD: 'International Head',
     SECURITY_TRUST_HEAD: 'Security & Trust Head',
+    CEO: 'Chief Executive',
 };
 
 export const STREAMING_INTERNAL_PROMOTION_CANDIDATES: StreamingInternalPromotionCandidate[] = [
@@ -435,6 +437,8 @@ export const completeDueStreamingExecutiveDevelopment = (
                 next.level = Math.min(5, next.level + 1) as 1 | 2 | 3 | 4 | 5;
                 next.skill = clamp(next.skill + 4, 0, 100);
                 next.experience = Math.max(next.experience, 18 * (next.level - 1));
+                /* #197: a bigger job pays more (real promotions are commonly 10–20%) */
+                next.weeklyCompensation = streamingTeamPayAfterLevel(next.weeklyCompensation);
                 return;
             }
             if (program.track === 'ROLE_MASTERY') {

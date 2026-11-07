@@ -218,7 +218,9 @@ assert(
     heirPlatform.identity?.name === 'Northstar+'
     && heirPlatform.legacy.endlessMode
     && heirPlatform.legacy.currentEraNumber === 3
-    && heirPlatform.leadership.currentCeo.holderType === 'FOUNDER',
+    /* #207: the chief executive in place stays; the heir holds the shares */
+    && heirPlatform.leadership.currentCeo.holderType === 'EXECUTIVE'
+    && heirPlatform.leadership.currentCeo.executiveId === 'phase24-coo',
     'The existing family handoff should preserve the platform and open a new family era.',
 );
 assert(

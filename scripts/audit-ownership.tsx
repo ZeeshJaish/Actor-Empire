@@ -72,6 +72,17 @@ async function main() {
     assert.equal(callStreamingInvestorRound(withEnergy(player, 5), 'GROWTH').reason, 'ENERGY');
     const listedPlayer: Player = { ...player, ownedStreamingPlatform: { ...platformOf(player), publicCompany: { ...platformOf(player).publicCompany, lifecycle: 'PUBLIC' } } };
     assert.equal(callStreamingInvestorRound(listedPlayer, 'GROWTH').reason, 'LISTED');
+    /* #202: a round of your own size: its band sets the energy */
+    for (const [ask, energy] of [[3, 5], [5, 5], [7.5, 8], [10, 8], [15, 10]] as const) {
+        const tried = callStreamingInvestorRound(player, ask);
+        assert.ok(tried.changed, tried.message);
+        assert.equal(player.energy.current - tried.player.energy.current, energy, `${ask}%: ⚡${energy}`);
+        assert.equal(platformOf(tried.player).governance.investorRound?.upToPercent, Math.min(ask, 100 - 51 / (platformOf(player).founderOwnershipPercent / 100)) === ask ? ask : platformOf(tried.player).governance.investorRound?.upToPercent, 'the size you chose');
+    }
+    const tooBig = callStreamingInvestorRound(player, 50);
+    assert.ok(tooBig.changed && platformOf(tooBig.player).governance.investorRound!.upToPercent <= 20, 'never over 20%');
+    const tiny = callStreamingInvestorRound(player, 0.2);
+    assert.ok(tiny.changed && platformOf(tiny.player).governance.investorRound!.upToPercent >= 1, 'never under 1%');
     const called = callStreamingInvestorRound(player, 'GROWTH');
     assert.ok(called.changed, called.message);
     assert.equal(player.energy.current - called.player.energy.current, 8, '⚡8');
@@ -221,12 +232,12 @@ async function main() {
     assert.ok(getStreamingOwnershipView(noCfoOpen).offers.every(item => !item.canSign && item.blocked === 'Signing needs a CFO at the table.'));
     /* before any round: the five checks and the three rounds */
     const fresh186 = text(renderToStaticMarkup(<BoardroomOwnership view={getStreamingOwnershipView(base)} companyName="NORTHSTAR+" founderName={base.name} actions={actions} />));
-    for (const words of ['Raise money', 'Members growing', 'Ready for a listing', 'SMALL', 'GROWTH', 'BIG', 'up to', '⚡5', '⚡8', '⚡10', 'you keep', 'Call a round above']) {
+    for (const words of ['Raise money', 'Members growing', 'Ready for a listing', '% of the company', 'Dollars', 'UP TO', 'RAISES ABOUT', 'YOU KEEP', 'Call the round', '⚡5', 'Call a round above']) {
         assert.ok(fresh186.includes(words), `Raise money shows "${words}"`);
     }
     const running = text(renderToStaticMarkup(<BoardroomOwnership view={getStreamingOwnershipView(called.player)} companyName="NORTHSTAR+" founderName={base.name} actions={actions} />));
     assert.ok(running.includes('Your bankers are calling'), 'the bankers\' card while it runs');
-    pass('OWNERSHIP renders Raise money (the checks, the three rounds), the bankers\' card, the cap table and the term sheets; without a CFO each sheet says why it cannot be signed');
+    pass('OWNERSHIP renders Raise money (the checks, a round of your own size), the bankers\' card, the cap table and the term sheets; without a CFO each sheet says why it cannot be signed');
 
     console.log(`Ownership audit passed in ${Math.round((performance.now() - started) / 1000)} s.`);
 }

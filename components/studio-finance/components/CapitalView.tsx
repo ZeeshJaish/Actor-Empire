@@ -25,15 +25,17 @@ type RouteKey = 'founder' | 'equity' | 'public';
 interface Props {
   data: StudioFinanceData;
   handlers: StudioFinanceHandlers;
-  initialRoute?: 'founder' | 'equity';
+  initialRoute?: 'founder' | 'equity' | 'you';
   /** Fired after a confirmed capital action so the shell can play the cash move. */
   onCashMoved: (amount: number, label: string) => void;
 }
 
 export function CapitalView({ data, handlers, initialRoute, onCashMoved }: Props) {
   const [injecting, setInjecting] = useState(initialRoute === 'founder');
+  /* #220: Capital's two pages, on one switch */
+  const [pane, setPane] = useState<'company' | 'you'>(initialRoute === 'founder' || initialRoute === 'you' ? 'you' : 'company');
   const [reviewing, setReviewing] = useState(initialRoute === 'equity');
-  const [expanded, setExpanded] = useState<RouteKey | null>(initialRoute ?? null);
+  const [expanded, setExpanded] = useState<RouteKey | null>(initialRoute === 'founder' || initialRoute === 'equity' ? initialRoute : null);
   const publicRef = useRef<HTMLLIElement>(null);
   const { capital } = data;
 
@@ -54,6 +56,97 @@ export function CapitalView({ data, handlers, initialRoute, onCashMoved }: Props
       publicRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
   };
+
+  /* #195: the host keeps owners and the listing in its own rooms: this page is the company's cash and your own money */
+  if (founderOnly && capital.story) {
+    const story = capital.story;
+    const putIn = story.sources.reduce((sum, item) => sum + item.amount, 0);
+    return (
+      <div className="sf-view cp">
+        {handlers.renderYourMoney && (
+          <div className="cp-switch" role="group" aria-label="Whose money">
+            <button type="button" className={pane === 'company' ? 'is-on' : ''} aria-pressed={pane === 'company'} onClick={() => setPane('company')}>The company</button>
+            <button type="button" className={pane === 'you' ? 'is-on' : ''} aria-pressed={pane === 'you'} onClick={() => setPane('you')}>Your money</button>
+          </div>
+        )}
+        {pane === 'you' && handlers.renderYourMoney ? handlers.renderYourMoney({
+          startPutIn: initialRoute === 'founder',
+          putIn: (amount) => {
+            const result = handlers.onFounderInjection?.(amount);
+            if (!result || result.ok) onCashMoved(amount, 'Your money, into the company');
+            return { ok: !result || result.ok, message: result ? result.message : undefined };
+          },
+        }) : (
+        <>
+        <section className="cp-hero">
+          <p className="sf-eyebrow">Company cash</p>
+          <strong className="cp-cash">{money(data.cash)}</strong>
+          <p className={`cp-pace ${story.weeklyNet >= 0 ? 'is-up' : 'is-down'}`}>
+            {money(story.weeklyNet, { sign: true })} a week
+            {data.runwayWeeks != null ? ` · ${data.runwayWeeks} weeks of runway` : ' · making money'}
+          </p>
+          {putIn > 0 && (
+            <>
+              <div className="cp-bar" role="img" aria-label={story.sources.map((item) => `${item.label} ${money(item.amount)}`).join(', ')}>
+                {story.sources.map((item) => <i key={item.id} className={`cp-src-${item.id.toLowerCase()}`} style={{ flexGrow: item.amount }} />)}
+              </div>
+              <ul className="cp-legend">
+                {story.sources.map((item) => (
+                  <li key={item.id}>
+                    <span className={`cp-dot cp-src-${item.id.toLowerCase()}`} aria-hidden="true" />
+                    <span>{item.label}</span>
+                    <strong>{money(item.amount)}</strong>
+                  </li>
+                ))}
+              </ul>
+              <p className="cp-note">
+                {story.earned >= 0
+                  ? `That is the money put in. The service has earned ${money(story.earned)} on top.`
+                  : `That is the money put in. The service has spent ${money(-story.earned)} of it.`}
+              </p>
+            </>
+          )}
+        </section>
+
+        {(handlers.onOpenOwnership || handlers.onOpenMarkets) && (
+          <section className="cp-doors" aria-label="In the Boardroom">
+            {handlers.onOpenOwnership && (
+              <button type="button" className="cp-door" onClick={() => handlers.onOpenOwnership?.()}>
+                <span className="sf-eyebrow">Owners</span>
+                <strong>{story.ownersLine}</strong>
+                <small>Raise money, buy out, sell ›</small>
+              </button>
+            )}
+            {handlers.onOpenMarkets && (
+              <button type="button" className="cp-door" onClick={() => handlers.onOpenMarkets?.()}>
+                <span className="sf-eyebrow">Going public</span>
+                <strong>{story.marketLine}</strong>
+                <small>The bell, the stock ›</small>
+              </button>
+            )}
+          </section>
+        )}
+
+        {story.moves.length > 0 && (
+          <section className="cp-card">
+            <header className="cp-head"><h2>Last moves</h2></header>
+            <ul className="cp-moves">
+              {story.moves.map((move) => (
+                <li key={move.id}>
+                  <span className="cp-move-week">Wk {move.week}</span>
+                  <span className="cp-move-label">{move.label}</span>
+                  <strong className={move.amount >= 0 ? 'sf-tone-good' : 'sf-tone-warn'}>{money(move.amount, { sign: true })}</strong>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        </>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="sf-view">

@@ -8,7 +8,7 @@ import { createDeterministicId } from '../deterministicRandom';
 import { projectStreamingCommercialOffers } from '../streamingCommercialOffers';
 import { normalizeStreamingPricingConfiguration } from '../streamingPricingEconomy';
 import { STREAMING_FREE_TIER_PIRACY, streamingFreeTierChoiceFactor } from '../streamingPlanOffer';
-import { evaluatePlayerStreamingTitleRoute } from '../streamingContentAvailability';
+import { createPlayerStreamingTitleRouteEvaluator, evaluatePlayerStreamingTitleRoute } from '../streamingContentAvailability';
 import { evaluateStreamingStoreBuyer } from '../streamingTitleAccess';
 import { normalizeWorldPopulationState } from './worldPopulation';
 import { normalizeWorldAudienceEconomyState } from './worldAudienceCohorts';
@@ -397,12 +397,20 @@ export const normalizeWorldStreamingAudienceChoiceState = (
 };
 
 /** Explicit C4 transaction hook: never infer a purchase from opportunity counts alone. */
+type PreparedEntitlementSettlement = {
+    routeFor: ReturnType<typeof createPlayerStreamingTitleRouteEvaluator>;
+    storeOffer: ReturnType<typeof projectStreamingCommercialOffers>['storeOffer'];
+    windowWeeks: number;
+};
+
 export const recordPlayerStreamingAudienceEntitlement = (
     state: WorldStreamingAudienceChoiceState,
     player: Player,
     transaction: Omit<WorldStreamingAudienceEntitlement, 'platformId' | 'expiresAtAbsoluteWeek'> & {
         buyerPlanId?: string | null;
     },
+    /** One settlement's reads, for one unchanging player: same answers, not asked again per sale. */
+    prepared?: PreparedEntitlementSettlement,
 ): WorldStreamingAudienceChoiceState => {
     if (state.entitlements.some(row => row.transactionId === transaction.transactionId)
         || (state.recordedTransactions?.absoluteWeek === state.lastProcessedAbsoluteWeek
@@ -413,10 +421,12 @@ export const recordPlayerStreamingAudienceEntitlement = (
         || transaction.purchasedAtAbsoluteWeek !== state.lastProcessedAbsoluteWeek) {
         throw new Error('Invalid streaming entitlement transaction');
     }
-    const route = evaluatePlayerStreamingTitleRoute(player, transaction.titleId, transaction.countryId,
-        transaction.purchasedAtAbsoluteWeek, { kind: transaction.kind });
+    const route = prepared
+        ? prepared.routeFor(transaction.titleId, transaction.countryId, { kind: transaction.kind })
+        : evaluatePlayerStreamingTitleRoute(player, transaction.titleId, transaction.countryId,
+            transaction.purchasedAtAbsoluteWeek, { kind: transaction.kind });
     if (!route.allowed) throw new Error(`Streaming title access denied: ${route.reasonCode}`);
-    const storeOffer = projectStreamingCommercialOffers(
+    const storeOffer = prepared ? prepared.storeOffer : projectStreamingCommercialOffers(
         player.ownedStreamingPlatform.serviceConfiguration.pricing).storeOffer;
     const country = state.countries[transaction.countryId];
     const customers = player.world.worldStreamingCustomers;
@@ -447,7 +457,7 @@ export const recordPlayerStreamingAudienceEntitlement = (
     const recordedTransactions = { absoluteWeek: state.lastProcessedAbsoluteWeek,
         ids: [...(state.recordedTransactions?.absoluteWeek === state.lastProcessedAbsoluteWeek
             ? state.recordedTransactions.ids : []), transaction.transactionId] };
-    const windowWeeks = normalizeStreamingPricingConfiguration(
+    const windowWeeks = prepared ? prepared.windowWeeks : normalizeStreamingPricingConfiguration(
         player.ownedStreamingPlatform.serviceConfiguration.pricing,
     ).rentals.windowWeeks;
     const { buyerPlanId: _buyerPlanId, ...sale } = transaction;
@@ -481,6 +491,7 @@ export const settleWorldStreamingAudienceEntitlements = (player: Player, absolut
         throw new Error('Streaming store transactions do not reconcile to platform viewing revenue');
     }
     let nextChoice = choice;
+    let prepared: PreparedEntitlementSettlement | undefined;
     const transactionTotals = new Map<string, number>();
     transactions.forEach(row => {
         const key = JSON.stringify([row.countryId, row.titleId, row.kind]);
@@ -496,7 +507,13 @@ export const settleWorldStreamingAudienceEntitlements = (player: Player, absolut
         ]))) {
             throw new Error('Streaming store transaction does not reconcile to licensed country title');
         }
-        nextChoice = recordPlayerStreamingAudienceEntitlement(nextChoice, player, transaction);
+        const pricing = player.ownedStreamingPlatform.serviceConfiguration.pricing;
+        prepared ??= {
+            routeFor: createPlayerStreamingTitleRouteEvaluator(player, absoluteWeek),
+            storeOffer: projectStreamingCommercialOffers(pricing).storeOffer,
+            windowWeeks: normalizeStreamingPricingConfiguration(pricing).rentals.windowWeeks,
+        };
+        nextChoice = recordPlayerStreamingAudienceEntitlement(nextChoice, player, transaction, prepared);
     }
     return { ...player, world: { ...player.world,
         worldStreamingAudienceChoice: { ...nextChoice, settledViewingFingerprint: viewing.sourceFingerprint } } };

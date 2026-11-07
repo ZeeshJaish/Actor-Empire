@@ -86,11 +86,31 @@ export const streamingTeamAmbitionActions = (ambition: number) => (ambition >= 8
 
 export const STREAMING_TEAM_RAISE_PERCENT = 8;
 const RAISE_WEEKS = 26;
-/** an ambitious executive's raise falls due every 26 weeks at our table; the period numbers each ask */
+const REVIEW_WEEKS = 52;
+/** #197: what one level up adds to their pay */
+export const STREAMING_TEAM_LEVEL_RAISE_PERCENT = 15;
+const roundPay = (weekly: number) => Math.round(weekly / 5_000) * 5_000;
+export const streamingTeamPayAfterLevel = (weekly: number) => roundPay(weekly * (1 + STREAMING_TEAM_LEVEL_RAISE_PERCENT / 100));
+
+/** #197: an executive's raise falls due at each yearly review, and for the ambitious (75+) every 26 weeks; the period numbers each ask */
 export const streamingTeamRaiseDue = (appointment: OwnedStreamingExecutiveAppointment, absoluteWeek: number): number | null => {
     const served = absoluteWeek - appointment.appointedAtAbsoluteWeek;
-    if (appointment.ambition < 75 || served < RAISE_WEEKS || served % RAISE_WEEKS !== 0) return null;
-    return served / RAISE_WEEKS;
+    const every = appointment.ambition >= 75 ? RAISE_WEEKS : REVIEW_WEEKS;
+    if (served < every || served % every !== 0) return null;
+    return served / every;
+};
+
+/** #197: what they ask at a review: 3–8%, by ambition and by how their year went */
+export const streamingTeamRaiseAsk = (appointment: Pick<OwnedStreamingExecutiveAppointment, 'ambition' | 'performance'>) => (
+    appointment.ambition >= 75 ? STREAMING_TEAM_RAISE_PERCENT
+        : Math.round(clamp(3 + (appointment.ambition - 40) * 0.05 + (appointment.performance - 50) * 0.04, 3, 8))
+);
+
+/** #197: less than they asked costs loyalty by the gap (10 for nothing at all), and what you do give still counts */
+export const streamingTeamRaiseAnswerLoyalty = (askedWeekly: number, currentWeekly: number, givenWeekly: number) => {
+    const asked = Math.max(1, askedWeekly - currentWeekly);
+    const share = clamp((givenWeekly - currentWeekly) / asked, 0, 1.5);
+    return share >= 1 ? 5 + Math.round((share - 1) * 10) : -Math.round((1 - share) * 10);
 };
 
 /** low ethics: each quarter at our table, a chance of padded expenses (two weeks of their pay) */
@@ -114,19 +134,21 @@ export const streamingTeamStatMeaning = (executive: Pick<OwnedStreamingExecutive
         skill: `${budget > 0 ? `Jobs ${budget}% under budget` : budget < 0 ? `Jobs ${-budget}% over budget` : 'Jobs on budget'} · great move ${Math.round(streamingTeamGreatChance(executive.skill) * 100)}% · slip ${Math.round(streamingTeamSlipChance(executive.skill) * 100)}%`,
         ambition: executive.ambition >= 80 ? 'One more job a week · asks for a raise every 6 months'
             : executive.ambition >= 75 ? 'Asks for a raise every 6 months'
-                : executive.ambition < 40 ? 'One job fewer a week' : 'Content with the role',
+                : executive.ambition < 40 ? 'One job fewer a week · a yearly review' : 'A yearly review',
         ethics: executive.ethics < 45 ? `May pad expenses: about ${Math.round(streamingTeamEthicsChance(executive.ethics) * 100)}% a quarter` : executive.ethics >= 80 ? 'Clean books' : 'Plays it straight',
         /* #183: loyalty's own line (the rival risk is its chip) */
         loyalty: executive.loyalty < 45 ? 'May quit after a hard quarter: 1 in 4' : executive.loyalty >= 80 ? 'Stays through hard times' : 'Stays through a hard quarter',
     };
 };
 
-/** a raise approved: their pay follows, and they are a little more loyal */
-export const executeStreamingTeamRaise = (player: Player, action: StreamingTeamAction): { player: Player; changed: boolean; reason?: string } => {
+/** a raise approved: their pay follows, and their loyalty by how it met the ask (#197: your own figure, more or less) */
+export const executeStreamingTeamRaise = (player: Player, action: StreamingTeamAction, givenWeekly?: number): { player: Player; changed: boolean; reason?: string; loyalty?: number } => {
     if (action.kind !== 'RAISE') return { player, changed: false, reason: 'Not a raise.' };
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     const appointment = platform.leadership.appointments.find(item => item.id === action.appointmentId && item.status === 'ACTIVE');
     if (!appointment) return { player, changed: false, reason: 'They are no longer at the table.' };
+    const weekly = Math.max(appointment.weeklyCompensation, roundPay(givenWeekly ?? action.weekly));
+    const loyalty = streamingTeamRaiseAnswerLoyalty(action.weekly, appointment.weeklyCompensation, weekly);
     return {
         player: {
             ...player,
@@ -135,10 +157,11 @@ export const executeStreamingTeamRaise = (player: Player, action: StreamingTeamA
                 leadership: {
                     ...platform.leadership,
                     appointments: platform.leadership.appointments.map(item => (item.id === appointment.id
-                        ? { ...item, weeklyCompensation: action.weekly, loyalty: Math.min(100, item.loyalty + 5) } : item)),
+                        ? { ...item, weeklyCompensation: weekly, loyalty: clamp(item.loyalty + loyalty, 0, 100) } : item)),
                 },
             }, player.id),
         },
         changed: true,
+        loyalty,
     };
 };

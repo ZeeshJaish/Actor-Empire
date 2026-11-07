@@ -124,7 +124,7 @@
 @keyframes sheetFade{from{opacity:0}}
 @keyframes sheetUp{from{transform:translateY(40px);opacity:0}}
 .sheetHandle{display:block;width:38px;height:4px;margin:2px auto 12px;border-radius:4px;background:rgba(255,255,255,.22)}
-.sheetHead{display:grid;grid-template-columns:46px minmax(0,1fr) auto;align-items:center;gap:11px}
+.sheetHead{position:sticky;top:-8px;z-index:4;display:grid;grid-template-columns:46px minmax(0,1fr) auto;align-items:center;gap:11px;margin:0 -16px;padding:8px 16px 10px;background:#10131b}
 .sheetFlag{display:block;width:46px;height:32px;border-radius:6px;overflow:hidden;box-shadow:0 0 0 1px rgba(255,255,255,.22),0 8px 18px rgba(0,0,0,.45)}
 .sheetFlag svg{display:block;width:100%;height:100%}
 .sheetHead small{display:block;font:800 7.5px/1.2 'Archivo','Inter',sans-serif;letter-spacing:.13em;color:#7d8698;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

@@ -1,0 +1,42 @@
+/* #209: YOUR MONEY. #220: inside Studio Finance › Capital, so it wears Studio Finance's tokens and its cards (.cp-card);
+   gold for what is yours. Buttons need a doubled class: `.sf button` resets every button. */
+.panel{display:flex;flex-direction:column;gap:var(--sf-3)}
+.wallet{display:flex;gap:8px}
+.wallet > div{flex:1 1 0;min-width:0;padding:12px;border-radius:14px;background:linear-gradient(160deg,rgba(214,172,92,.12),rgba(255,255,255,.02));border:1px solid rgba(214,172,92,.3)}
+.wallet small{display:block;font-size:8.5px;font-weight:800;letter-spacing:.1em;color:#a08a5c}
+.wallet b{display:block;margin-top:5px;font:400 26px/1 var(--sf-font-display);color:#f6d78f;white-space:nowrap}
+
+.head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:var(--sf-2)}
+.head h2{min-width:0}
+.head span{flex:none;font-size:11px;color:var(--sf-fg-4)}
+
+.seg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;margin-bottom:var(--sf-2);padding:3px;border-radius:11px;background:var(--sf-raised);border:1px solid var(--sf-line-hair)}
+.seg.seg button{padding:8px 6px;border-radius:8px;text-align:center;font-size:12px;font-weight:700;color:var(--sf-fg-3)}
+.seg.seg .segOn{color:#1d1607;background:#f6d78f}
+
+.amount{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;gap:8px;align-items:center}
+.amount.amount button{display:flex;align-items:center;justify-content:center;height:44px;padding:0;border-radius:11px;font-size:20px;font-weight:900;color:var(--sf-fg-max);background:var(--sf-raised);border:1px solid var(--sf-line)}
+.amount.amount button:disabled{opacity:.35}
+.amountValue{display:flex;align-items:center;justify-content:center;gap:2px;min-width:0}
+.amountValue input{max-width:130px;min-width:0;padding:0;border:0;background:transparent;text-align:center;font:400 30px/1.1 var(--sf-font-display);color:#f6d78f;outline:none}
+.amountValue i{font-style:normal;font-size:11px;font-weight:700;color:var(--sf-fg-3);white-space:nowrap}
+.amountValue i:first-child{font:400 22px/1 var(--sf-font-display);color:#f6d78f}
+.go.go{display:flex;align-items:center;justify-content:center;width:100%;margin-top:var(--sf-2)}
+.line.line{margin-top:var(--sf-2);font-size:12px;line-height:1.45;color:var(--sf-fg-4)}
+
+.facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:var(--sf-2)}
+.facts span{display:flex;flex-direction:column;gap:4px;min-width:0;padding:8px 6px;border-radius:10px;text-align:center;background:var(--sf-raised)}
+.facts small{font-size:8px;font-weight:800;letter-spacing:.08em;color:var(--sf-fg-4)}
+.facts b{font:400 16px/1 var(--sf-font-display);color:var(--sf-fg-max);white-space:nowrap}
+
+.door.door{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;margin-top:var(--sf-2);padding:10px 12px;border-radius:12px;text-align:left;background:rgba(246,215,143,.06);border:1px solid rgba(246,215,143,.28)}
+.door span{min-width:0}
+.door b{display:block;font-size:13px;font-weight:700;color:var(--sf-fg-max)}
+.door small{display:block;margin-top:2px;font-size:11px;line-height:1.35;color:var(--sf-fg-4)}
+.door em{flex:none;font-style:normal;font-size:18px;color:#f6d78f}
+
+.rows{display:flex;flex-direction:column;gap:7px}
+.rows > div{display:flex;align-items:baseline;justify-content:space-between;gap:10px;font-size:13px;color:var(--sf-fg-2)}
+.rows b{font-weight:700;color:var(--sf-fg-max);white-space:nowrap}
+.rowTax{padding-top:7px;border-top:1px solid var(--sf-line-hair);color:#ffc2c4!important}
+.toast{position:sticky;bottom:8px;padding:10px 12px;border-radius:12px;font-size:12px;font-weight:700;line-height:1.4;text-align:center;color:var(--sf-fg-max);background:var(--sf-overlay);border:1px solid rgba(246,215,143,.35)}

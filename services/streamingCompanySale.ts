@@ -12,6 +12,7 @@
  * the buyer: SOLD. Rejecting every bid (or letting them lapse) costs the board's confidence, the share price if
  * listed, and 26 weeks before the bankers can be called again. Two years after a sale, a new company can be founded.
  */
+import { spendStreamingApproval, streamingApprovalGate, type StreamingApprovalVote } from './streamingApproval';
 import type { OwnedStreamingCompanySale, OwnedStreamingPlatformState, OwnedStreamingSaleBid, Player } from '../types';
 import { getAbsoluteWeek } from './legacyLogic';
 import { createDeterministicId, createDeterministicRng } from './deterministicRandom';
@@ -80,16 +81,19 @@ export const makeStreamingSaleBids = (player: Player, platform: OwnedStreamingPl
             if (buyer) chosen.push(buyer);
         }
     }
-    /* #192: the premium is paid on the business; the treasury's cash (less debt) is bought at face, so cash parked in
-       the company before a sale earns no premium */
+    /* #192: the treasury's cash (less debt) is bought at face, so cash parked in the company before a sale earns no premium.
+       #208: the premium is paid on the business alone (what it earns, and its franchises); the library, the technology and
+       the pipeline are bought at book, so buying a catalogue before a sale earns none either */
     const valuation = valueOwnedStreamingPlatform(platform);
     const worth = valuation.equityValue;
     const net = worth - valuation.enterpriseValue;
+    const business = (valuation.parts.operating + valuation.parts.franchise) * (1 - valuation.riskDiscount);
+    const atBook = Math.max(0, valuation.enterpriseValue - business);
     return chosen.map((buyer, index) => {
         const kind = KINDS[buyer.kind];
         /* the premium: a floor, the buyer's fit, the competition between bidders, and the buyer's own view */
         const premium = clamp(1.1 + kind.fit + 0.03 * (chosen.length - 3) + (rng() - 0.35) * 0.12, 1.1, 1.45);
-        const price = Math.round((valuation.enterpriseValue * premium + net) / 10_000_000) * 10_000_000;
+        const price = Math.round((business * premium + atBook + net) / 10_000_000) * 10_000_000;
         return {
             id: createDeterministicId('streaming_sale_bid', platform.simulationSeed, `${sale.id}:${index}`),
             buyerName: buyer.name,
@@ -123,7 +127,7 @@ export const getStreamingSaleApproval = (platform: OwnedStreamingPlatformState, 
     return { by: 'BOARD', support: Math.round(clamp(40 + (bid.premium - 1.1) * 100 + (platform.governance.boardConfidence - 50) * 0.4, 0, 100)) };
 };
 
-export interface StreamingSaleResult { player: Player; changed: boolean; message: string }
+export interface StreamingSaleResult { player: Player; changed: boolean; message: string; vote?: StreamingApprovalVote }
 
 /** OWNERSHIP › Sell the company › Hire bankers: ⚡10 now, the bids in 4 weeks */
 export const hireStreamingSaleBankers = (player: Player): StreamingSaleResult => {
@@ -132,6 +136,8 @@ export const hireStreamingSaleBankers = (player: Player): StreamingSaleResult =>
     const state = getStreamingSaleState(platform, absoluteWeek);
     if (!platform.identity || platform.lifecycle !== 'ACTIVE' || !platform.launchCommit) return { player, changed: false, message: 'Buyers wait until the service is live.' };
     if (state.status === 'BANKERS' || state.status === 'BIDS' || state.status === 'CLOSING') return { player, changed: false, message: 'A sale is already under way.' };
+    /* #218 */
+    if (platform.governance.stakeSale?.status === 'BANKERS' || platform.governance.stakeSale?.status === 'OFFER') return { player, changed: false, message: 'Your bankers are selling your stake first.' };
     if (state.status === 'COOLDOWN') return { player, changed: false, message: `After the last bids were turned down, the bankers can be called again in ${state.weeksLeft} week${state.weeksLeft === 1 ? '' : 's'}.` };
     if ((player.energy?.current || 0) < STREAMING_SALE_BANKERS_ENERGY) return { player, changed: false, message: `Hiring the bankers takes ⚡${STREAMING_SALE_BANKERS_ENERGY}.` };
     const sale: OwnedStreamingCompanySale = {
@@ -161,13 +167,18 @@ export const acceptStreamingSaleBid = (player: Player, bidId: string): Streaming
     const bid = sale?.status === 'BIDS' ? sale.bids.find(item => item.id === bidId && item.status === 'OPEN') : null;
     if (!sale || !bid) return { player, changed: false, message: 'That bid is no longer on the table.' };
     const approval = getStreamingSaleApproval(platform, bid);
-    if (approval.support < 50) {
-        const voted: OwnedStreamingCompanySale = { ...sale, bids: sale.bids.map(item => (item.id === bid.id ? { ...item, status: 'VOTED_DOWN' as const } : item)) };
-        return {
-            changed: true,
-            message: approval.by === 'BOARD' ? `The board voted it down (${approval.support}% for).` : `The shareholders voted it down (${approval.support}% for).`,
-            player: save(player, withSale(platform, voted)),
-        };
+    const ask = { kind: 'SALE_BID' as const, refId: bid.id };
+    if (approval.by !== 'YOURS' && streamingApprovalGate(platform, ask, absoluteWeek).state !== 'CARRIED') {
+        const listing = platform.publicCompany.listing;
+        const others = 100 - platform.founderOwnershipPercent;
+        return { player, changed: false, message: '', vote: { ask, context: {
+            premium: bid.premium,
+            publicFor: listing ? clamp((approval.support - platform.founderOwnershipPercent) / Math.max(0.01, others), 0, 1) : undefined,
+            headline: moneyWords(bid.price),
+            chip: `+${Math.round((bid.premium - 1) * 100)}% over our value`,
+            what: `${bid.buyerName} buys the whole company. Everyone sells at the same price.`,
+            title: `${bid.buyerName} buys the company for ${moneyWords(bid.price)}. Closing in ${STREAMING_SALE_CLOSING_WEEKS} weeks`,
+        } } };
     }
     const closing: OwnedStreamingCompanySale = {
         ...sale,
@@ -177,7 +188,15 @@ export const acceptStreamingSaleBid = (player: Player, bidId: string): Streaming
         bids: sale.bids.map(item => (item.id === bid.id ? { ...item, status: 'ACCEPTED' as const } : item.status === 'OPEN' ? { ...item, status: 'LAPSED' as const } : item)),
     };
     const by = approval.by === 'YOURS' ? 'You hold the control' : approval.by === 'BOARD' ? `The board approved it (${approval.support}% for)` : `The shareholders approved the tender (${approval.support}% for)`;
-    return { changed: true, message: `${by}: ${bid.buyerName} buys the company for ${moneyWords(bid.price)}. Closing in ${STREAMING_SALE_CLOSING_WEEKS} weeks.`, player: save(player, withSale(platform, closing)) };
+    return { changed: true, message: `${by}: ${bid.buyerName} buys the company for ${moneyWords(bid.price)}. Closing in ${STREAMING_SALE_CLOSING_WEEKS} weeks.`, player: save(player, withSale(spendStreamingApproval(platform, ask), closing)) };
+};
+
+/** #228: the table said no to this bid */
+export const voteDownStreamingSaleBid = (player: Player, bidId: string): Player => {
+    const platform = platformOf(player);
+    const sale = platform.governance.sale;
+    if (sale?.status !== 'BIDS') return player;
+    return save(player, withSale(platform, { ...sale, bids: sale.bids.map(item => (item.id === bidId ? { ...item, status: 'VOTED_DOWN' as const } : item)) }));
 };
 
 /** every bid turned down: the board's confidence falls, and the bankers wait 26 weeks */
@@ -248,7 +267,8 @@ export const processStreamingCompanySaleWeek = (player: Player): Player => {
 /** §22.7 Q4: two years after the sale, the founding starts again; the sold company is kept on record */
 export const getStreamingNewCompanyWait = (player: Player): number | null => {
     const platform = platformOf(player);
-    const soldAt = platform.governance.sale?.soldAtAbsoluteWeek;
+    /* #205: or two years after leaving altogether */
+    const soldAt = platform.governance.departure?.atAbsoluteWeek ?? platform.governance.sale?.soldAtAbsoluteWeek;
     if (platform.lifecycle !== 'SOLD' || soldAt === null || soldAt === undefined) return null;
     return Math.max(0, soldAt + STREAMING_NEW_COMPANY_WEEKS - getAbsoluteWeek(player.age, player.currentWeek));
 };
@@ -257,15 +277,22 @@ export const startNewStreamingCompany = (player: Player): StreamingSaleResult =>
     const platform = platformOf(player);
     const wait = getStreamingNewCompanyWait(player);
     const sale = platform.governance.sale;
-    if (wait === null || !sale) return { player, changed: false, message: 'There is no sold company.' };
+    const departure = platform.governance.departure;
+    if (wait === null || (!sale && !departure)) return { player, changed: false, message: 'There is no sold company.' };
     if (wait > 0) return { player, changed: false, message: `A new company can be founded in ${wait} week${wait === 1 ? '' : 's'}.` };
-    const bid = sale.bids.find(item => item.id === sale.acceptedBidId);
-    const record = {
+    const bid = sale?.bids.find(item => item.id === sale.acceptedBidId);
+    const record = departure ? {
         name: platform.identity?.name || 'EMPIRE+',
-        soldAtAbsoluteWeek: sale.soldAtAbsoluteWeek || 0,
+        soldAtAbsoluteWeek: departure.atAbsoluteWeek,
+        buyerName: 'You sold out and left',
+        price: departure.proceeds,
+        founderCash: departure.proceeds,
+    } : {
+        name: platform.identity?.name || 'EMPIRE+',
+        soldAtAbsoluteWeek: sale?.soldAtAbsoluteWeek || 0,
         buyerName: bid?.buyerName || 'A buyer',
         price: bid?.price || 0,
-        founderCash: sale.founderCash || 0,
+        founderCash: sale?.founderCash || 0,
     };
     const fresh = normalizeOwnedStreamingPlatformState(undefined, player.id);
     return {

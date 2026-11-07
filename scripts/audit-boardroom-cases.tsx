@@ -43,7 +43,7 @@ const brand: Brand = {
 const noop = () => undefined;
 const ok = () => ({ ok: true });
 const teamActions: BoardroomTeamActions = {
-    setMode: noop, setLimits: noop, hire: ok, train: ok, dismiss: noop, approve: ok, decline: noop, change: noop, nameSuccessor: noop,
+    setMode: noop, setLimits: noop, walkAway: noop, hire: ok, train: ok, dismiss: noop, approve: ok, decline: noop, change: noop, nameSuccessor: noop,
 };
 const fresh = (id: string): Player => {
     const player = migratePlayerSave({ ...structuredClone(INITIAL_PLAYER), id, name: 'Boardroom Cases', age: 15, currentWeek: 1 });

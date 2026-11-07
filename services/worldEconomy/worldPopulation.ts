@@ -324,11 +324,14 @@ const createSnapshot = (
     };
 };
 
-export const createWorldPopulationState = (absoluteWeek: number): WorldPopulationState => {
+/** #206: how many weeks an heir's clock has been moved back against the world's */
+const clockOffsetOf = (input: unknown) => Math.max(0, Math.round(Number((input as { clockOffsetWeeks?: unknown } | null)?.clockOffsetWeeks) || 0));
+
+export const createWorldPopulationState = (absoluteWeek: number, clockOffset = 0): WorldPopulationState => {
     const targetWeek = Math.max(WORLD_POPULATION_EPOCH_ABSOLUTE_WEEK, Math.round(Number(absoluteWeek) || 0));
     const countries = Object.fromEntries(WORLD_COUNTRY_DEFINITIONS.map(definition => [
         definition.id,
-        projectCountry(definition, targetWeek),
+        projectCountry(definition, targetWeek + clockOffset),
     ]));
     const { regions, global } = buildSummaries(countries);
     return {
@@ -340,6 +343,7 @@ export const createWorldPopulationState = (absoluteWeek: number): WorldPopulatio
         regions,
         global,
         snapshots: [createSnapshot(targetWeek, countries, global)],
+        ...(clockOffset ? { clockOffsetWeeks: clockOffset } : {}),
     };
 };
 
@@ -389,11 +393,13 @@ export const advanceWorldPopulationToWeek = (
     absoluteWeek: number,
 ): WorldPopulationState => {
     const targetWeek = Math.max(WORLD_POPULATION_EPOCH_ABSOLUTE_WEEK, Math.round(Number(absoluteWeek) || 0));
-    if (!isUsableState(input)) return createWorldPopulationState(targetWeek);
+    if (!isUsableState(input)) return createWorldPopulationState(targetWeek, clockOffsetOf(input));
     if (targetWeek <= input.lastProcessedAbsoluteWeek) return input;
+    /* #206: the long curves read the world's own clock, which an heir's younger age does not turn back */
+    const offset = clockOffsetOf(input);
     const countries = Object.fromEntries(WORLD_COUNTRY_DEFINITIONS.map(definition => [
         definition.id,
-        projectCountry(definition, targetWeek),
+        projectCountry(definition, targetWeek + offset),
     ]));
     const { regions, global } = buildSummaries(countries);
     const crossedYear = Math.floor((targetWeek - WORLD_POPULATION_EPOCH_ABSOLUTE_WEEK) / 52)
@@ -411,6 +417,7 @@ export const advanceWorldPopulationToWeek = (
         regions,
         global,
         snapshots,
+        ...(offset ? { clockOffsetWeeks: offset } : {}),
     };
 };
 
@@ -421,7 +428,7 @@ export const normalizeWorldPopulationState = (
     const targetWeek = Math.max(WORLD_POPULATION_EPOCH_ABSOLUTE_WEEK, Math.round(Number(absoluteWeek) || 0));
     if (isWorldEconomyStateCanonical(input, targetWeek)) return input as WorldPopulationState;
     const normalized = !isUsableState(input)
-        ? createWorldPopulationState(targetWeek)
+        ? createWorldPopulationState(targetWeek, clockOffsetOf(input))
         : advanceWorldPopulationToWeek(input, targetWeek);
     return markWorldEconomyStateCanonical(normalized, targetWeek);
 };

@@ -1,5 +1,8 @@
+import { payOffStreamingEstate } from '../services/streamingEstatePlan';
+import { ChairSubtitleContext } from './streaming-transplant/RoomSubtitle';
+import { setStreamingProposedTicker } from '../services/streamingTicker';
 import { getStreamingHqViewingSpotlight } from '../services/streamingAudienceMetrics';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useStreamingView } from './streaming-transplant/useStreamingView';
 import { advanceStreamingPresentationCursor } from '../services/streamingPresentationInputs';
 import {Building2, Check, ChevronRight, CircleDot, Clapperboard, Compass, Crown, Film, Globe2, Home, Layers3, LockKeyhole, Play, RadioTower, Server, ShieldCheck, Sparkles, WalletCards, X, type LucideIcon} from 'lucide-react';
@@ -46,8 +49,14 @@ import StreamingCampusConstruction from './StreamingCampusConstruction';
 
 /* #188: the listing's own host; MARKETS replaced the Public markets desk */
 import StreamingListingHost, { beginStreamingListing } from './StreamingListingHost';
-import { acceptStreamingSaleBid, getStreamingSaleView, hireStreamingSaleBankers, rejectStreamingSaleBids } from '../services/streamingCompanySale';
-import { getStreamingStepDownView, returnAsStreamingCeo, stepDownFromStreamingCompany } from '../services/streamingStepDown';
+import StreamingApprovalTable from './streaming-transplant/StreamingApprovalTable';
+import type { StreamingApprovalVote } from '../services/streamingApproval';
+import { getStreamingApprovalMeeting, settleStreamingApproval, type StreamingApprovalCall, type StreamingApprovalMeeting } from '../services/streamingApprovalMeeting';
+import { acceptStreamingSaleBid, getStreamingSaleView, hireStreamingSaleBankers, rejectStreamingSaleBids, voteDownStreamingSaleBid } from '../services/streamingCompanySale';
+import { getStreamingStepDownView, replaceStreamingCeo, returnAsStreamingCeo, stepDownFromStreamingCompany, streamingChairMayAct } from '../services/streamingStepDown';
+import { getStreamingChairRule } from '../services/streamingChair';
+import { payStreamingFounderBonus, setStreamingDividend, setStreamingFounderSalary, takeStreamingMoneyOut } from '../services/streamingYourMoney';
+import { acceptStreamingStakeOffer, declineStreamingStakeOffer, hireStreamingStakeBankers } from '../services/streamingControl';
 import StreamingIncidentCommand from './StreamingIncidentCommand';
 import StreamingVisualScene from './StreamingVisualScene';
 import AccessibleDialog from './AccessibleDialog';
@@ -80,6 +89,7 @@ import { AUDIENCE_ATLAS_WARMUP } from './streaming-transplant/AudienceAtlas';
 import { warmNetworkMap } from './streaming-transplant/NetworkMap';
 import { Boardroom as StreamingBoardroom } from './streaming-transplant/StreamingBoardroomExperience';
 import { callStreamingInvestorRound, getStreamingOwnershipView } from '../services/streamingInvestorOffers';
+import { appointStreamingBoardDirector, removeStreamingBoardDirector, renewStreamingBoardDirector } from '../services/streamingBoard';
 import { buyOutStreamingInvestor, startStreamingBuyback } from '../services/streamingOwnShares';
 import { getStreamingListingDesk } from '../services/streamingListingDesk';
 import { getStreamingCashSummary } from '../services/streamingStudioFinance';
@@ -100,6 +110,7 @@ import {
   getStreamingTeamWaitingCount,
   nameStreamingTeamSuccessor,
   hireStreamingTeamCandidate,
+  walkAwayFromStreamingCandidate,
   setStreamingTeamJobMode,
   setStreamingTeamLimits,
   trainStreamingTeamExecutive,
@@ -275,7 +286,7 @@ interface Props {
   onOpenOriginalProduction?: (target: { studioId: string; scriptId: string; commissionId: string }) => void;
   onOpenBank?: () => void;
   /** #75: STATUS opens the Platform room on its STATUS tab (the incident popup's "Open STATUS") */
-  initialDestination?: 'HOME' | 'FINANCE' | 'STATUS';
+  initialDestination?: 'HOME' | 'FINANCE' | 'STATUS' | 'TEAM' | 'OWNERSHIP';
   initialContentMarketOfferId?: string;
   onContentMarketOfferConsumed?: () => void;
 }
@@ -383,7 +394,79 @@ const PRODUCT_PAUSE_REFUSAL: Partial<Record<NonNullable<StreamingProductActionRe
   ALREADY_LAUNCHED: 'Nothing changed.',
 };
 
-export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedMarketUpdate, onBack, onReturnToGame, onOpenOriginalProduction, onOpenProductionHouse, onOpenBank, initialDestination = 'HOME', initialContentMarketOfferId, onContentMarketOfferConsumed }: Props) {
+/* #204: while someone else runs the company, every room still opens, a slim line says who runs it, and only what a chair
+   may do reaches the save; anything else says who runs it */
+const ChairAllowContext = React.createContext<(run: () => void) => void>(run => run());
+/* #229: an action that needs someone else's yes opens the table; the action runs after the count, on what the count wrote */
+interface TableRequest { vote: StreamingApprovalVote; run: (next: Player) => { player: Player; changed: boolean; message?: string }; no?: (next: Player) => Player }
+const ApprovalTableContext = React.createContext<(request: TableRequest) => void>(() => undefined);
+const CHAIR_NOTE: React.CSSProperties = {
+  position: 'fixed', left: 16, right: 16, bottom: 'calc(env(safe-area-inset-bottom, 0px) + 84px)', zIndex: 10000, padding: '10px 14px', borderRadius: 12,
+  font: "700 12px/1.4 'Inter',system-ui,sans-serif", textAlign: 'center', color: '#eef0f5', background: 'rgba(18,21,30,.97)', border: '1px solid rgba(246,215,143,.35)', pointerEvents: 'none',
+};
+
+/* the rooms' own buttons that change something: stopped before they run, so a room never says "Fix under way" for a fix
+   that cannot happen (the save's guard below catches whatever these words miss) */
+const CHAIR_STOPPED = /^(repair|fix\b|wait it out|take it down|file takedowns|let it run|order|upgrade|level|renew|license|commission|buy\b|bid|launch|start|stop|extend|set\b|pay\b|complete|add\b|remove|install|apply|save|confirm|pause|resume|change pricing|put money|take money|run |greenlight|sign\b)/i;
+
+export default function StreamingPlatformHQ(props: React.ComponentProps<typeof StreamingPlatformHQInner>) {
+  const rule = getStreamingChairRule(props.player);
+  const open = useRef(false);
+  const [note, setNote] = useState<string | null>(null);
+  const noteTimer = useRef<number | undefined>(undefined);
+  const [table, setTable] = useState<{ request: TableRequest; meeting: StreamingApprovalMeeting } | null>(null);
+  const openTable = useCallback((request: TableRequest) => {
+    setTable({ request, meeting: getStreamingApprovalMeeting(props.player, request.vote.ask, request.vote.context) });
+  }, [props.player]);
+  const tableCounted = (call: StreamingApprovalCall | null) => {
+    const { request, meeting } = table!;
+    const counted = settleStreamingApproval(props.player, meeting, call);
+    const done = counted.carried ? request.run(counted.player) : null;
+    const next = done?.changed ? done.player : !counted.carried && request.no ? request.no(counted.player) : counted.player;
+    allow(() => props.onUpdatePlayer?.(next));
+    return { carried: counted.carried, message: done?.message?.replace(/\.$/, '') || request.vote.context.title };
+  };
+  const allow = useCallback((run: () => void) => {
+    open.current = true;
+    try { run(); } finally { open.current = false; }
+  }, []);
+  const say = () => {
+    if (!rule) return;
+    setNote(rule.note);
+    window.clearTimeout(noteTimer.current);
+    noteTimer.current = window.setTimeout(() => setNote(null), 2400);
+  };
+  const guard = <T extends ((next: Player) => void) | undefined>(write: T): T => {
+    if (!write || !rule) return write;
+    return ((next: Player) => {
+      if (open.current) { write(next); return; }
+      say();
+    }) as T;
+  };
+  return (
+    <ChairAllowContext.Provider value={allow}>
+      <ApprovalTableContext.Provider value={openTable}>
+      <ChairSubtitleContext.Provider value={rule?.subtitle ?? null}>
+      <div style={{ display: 'contents' }} onClickCapture={rule ? event => {
+        const button = (event.target as HTMLElement).closest?.('button');
+        /* #220: your own money is yours to move, in the chair too; its rules are in the service */
+        if (button && !button.closest('[data-chair-ok]') && CHAIR_STOPPED.test((button.innerText || '').trim())) {
+          event.preventDefault();
+          event.stopPropagation();
+          say();
+        }
+      } : undefined}>
+        <StreamingPlatformHQInner {...props} onUpdatePlayer={guard(props.onUpdatePlayer)} onTrustedMarketUpdate={guard(props.onTrustedMarketUpdate)} />
+      </div>
+      {note && <div style={CHAIR_NOTE} role="status">{note}</div>}
+      {table && <StreamingApprovalTable key={table.meeting.ask.kind} meeting={table.meeting} onCounted={tableCounted} onClose={() => setTable(null)} />}
+      </ChairSubtitleContext.Provider>
+      </ApprovalTableContext.Provider>
+    </ChairAllowContext.Provider>
+  );
+}
+
+function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdate, onBack, onReturnToGame, onOpenOriginalProduction, onOpenProductionHouse, onOpenBank, initialDestination = 'HOME', initialContentMarketOfferId, onContentMarketOfferConsumed }: Props) {
   const projectionSourceRef = useRef<ReturnType<typeof advanceStreamingPresentationCursor> | undefined>(undefined);
   projectionSourceRef.current = advanceStreamingPresentationCursor(projectionSourceRef.current, player);
   const readPlayer: Player = projectionSourceRef.current.source;
@@ -495,7 +578,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
   const [buildInitialSheet, setBuildInitialSheet] = useState<'money' | 'build' | undefined>(undefined);
   const [showFinanceRoom, setShowFinanceRoom] = useState(initialDestination === 'FINANCE');
   const [financeInitialTab, setFinanceInitialTab] = useState<'SNAPSHOT' | 'CAPITAL'>('SNAPSHOT');
-  const [financeInitialCapitalView, setFinanceInitialCapitalView] = useState<'DESK' | 'INJECT' | 'EQUITY'>('DESK');
+  const [financeInitialCapitalView, setFinanceInitialCapitalView] = useState<'DESK' | 'INJECT' | 'EQUITY' | 'YOUR_MONEY'>('DESK');
   const [showCinematicPremiere, setShowCinematicPremiere] = useState(Boolean(pendingLaunchReveal));
   /* A launch committed in this mounted session can finish its cinematic. A
      queued reveal reopened from a save must show immutable launch facts, not
@@ -555,7 +638,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
 
   const openFinanceRoom = (
     tab: 'SNAPSHOT' | 'CAPITAL' = 'SNAPSHOT',
-    capitalView: 'DESK' | 'INJECT' | 'EQUITY' = 'DESK',
+    capitalView: 'DESK' | 'INJECT' | 'EQUITY' | 'YOUR_MONEY' = 'DESK',
   ) => {
     setFinanceInitialTab(tab);
     setFinanceInitialCapitalView(capitalView);
@@ -779,6 +862,33 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
         line: `${openIncident.title}${openIncident.stage === 'REPAIRING' ? ' · being repaired' : openIncident.waiting ? ' · waiting it out' : ''}`,
         tone: openIncident.major ? 'urgent' : 'warn',
         meta: 'STATUS',
+        compact: true,
+      });
+    }
+    /* #219: while someone else runs it, the HQ says so; anything more urgent comes first */
+    const chairRuleNow = getStreamingChairRule(readPlayer);
+    if (chairRuleNow) {
+      events.push({
+        id: 'CHAIR',
+        priority: 3,
+        label: chairRuleNow.chair ? 'You chair the board' : 'You left the board',
+        line: `${chairRuleNow.ceoName} runs ${readPlatform.identity?.name || 'the company'}`,
+        tone: 'brand',
+        meta: 'TEAM',
+        compact: true,
+      });
+    }
+    /* #200: someone on notice, and the chair they leave */
+    const onNotice = readPlatform.leadership.appointments.find(item => item.status === 'ACTIVE' && item.notice);
+    if (onNotice?.notice) {
+      const weeks = Math.max(0, onNotice.notice.leavesAtAbsoluteWeek - absoluteWeek);
+      events.push({
+        id: 'TEAM_NOTICE',
+        priority: 2,
+        label: 'Notice',
+        line: `${onNotice.nameAtAppointment} leaves ${weeks <= 0 ? 'this week' : `in ${weeks} week${weeks === 1 ? '' : 's'}`}`,
+        tone: 'warn',
+        meta: 'TEAM',
         compact: true,
       });
     }
@@ -1360,6 +1470,36 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
   const persist = (nextPlayer: Player) => {
     if (nextPlayer !== player) onUpdatePlayer?.(nextPlayer);
   };
+  /* #220: Your money is a page of Studio Finance › Capital */
+  const openYourMoney = () => openFinanceRoom('CAPITAL', 'YOUR_MONEY');
+  /* #204: what a chair may do goes through; the rest says who runs it. Selling, listing and replacing are yours at 51%, else the board's */
+  const chairAllow = useContext(ChairAllowContext);
+  const openTable = useContext(ApprovalTableContext);
+  /* #229: the one way an approved action runs: straight through, or to the table first */
+  const orTable = (
+    result: { player: Player; changed: boolean; message?: string; vote?: StreamingApprovalVote },
+    run: TableRequest['run'],
+    no?: TableRequest['no'],
+  ) => {
+    if (result.vote) {
+      openTable({ vote: result.vote, run, no });
+      return { ok: true, message: 'That went to the table.' };
+    }
+    if (result.changed) chairAllow(() => persist(result.player));
+    return { ok: result.changed, message: result.message || '' };
+  };
+  const chairRule = getStreamingChairRule(player);
+  const chairOwnerCan = !chairRule || (chairRule.chair && streamingChairMayAct(platform));
+  const chairActions = <T extends object>(actions: T, allowed: Array<keyof T>, ownerOnly: Array<keyof T> = []): T => {
+    if (!chairRule) return actions;
+    return Object.fromEntries(Object.entries(actions).map(([key, run]) => {
+      if (typeof run !== 'function') return [key, run];
+      const isOwner = ownerOnly.includes(key as keyof T);
+      if (isOwner && !chairOwnerCan) return [key, () => ({ ok: false, message: chairRule.chair ? 'Under 51%, the board decides that: it needs 60 confidence.' : 'Off the board, you cannot do that.' })];
+      if (!isOwner && !allowed.includes(key as keyof T)) return [key, () => ({ ok: false, message: chairRule.note })];
+      return [key, (...args: unknown[]) => { let out: unknown; chairAllow(() => { out = (run as (...inner: unknown[]) => unknown)(...args); }); return out; }];
+    })) as T;
+  };
   // These callers use canonical streaming services against the migrated live
   // player. Preserve normal autosave while avoiding load/import migration on taps.
   const persistCanonical = (nextPlayer: Player) => {
@@ -1439,7 +1579,14 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
   /* #75: the incident popup's "Open STATUS" lands on the Platform room's STATUS tab, once */
   const openedStatus = useRef(false);
   useEffect(() => {
-    if (openedStatus.current || initialDestination !== 'STATUS' || !readPlatform.launchCommit) return;
+    if (openedStatus.current || !readPlatform.launchCommit) return;
+    /* #210: a decision's door opens its Boardroom room */
+    if (initialDestination === 'TEAM' || initialDestination === 'OWNERSHIP') {
+      openedStatus.current = true;
+      openBoardroom(initialDestination === 'TEAM' ? 'TABLE' : 'OWNERSHIP');
+      return;
+    }
+    if (initialDestination !== 'STATUS') return;
     openedStatus.current = true;
     openPlatformTab('STATUS');
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1825,6 +1972,8 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
     if (room === 'IPO') return openBoardroom('MARKETS');
     /* #168: a pitch taken opens the commissioning desk on its brief */
     if (room === 'PITCH') return setShowOriginalCommissioning(true);
+    /* #204: name someone to run it */
+    if (room === 'SUCCESSION') return openBoardroom('TABLE');
     return undefined;
   };
   const teamCardRoom = (action: StreamingTeamAction): { room: string; focusId?: string } | null => {
@@ -1856,7 +2005,11 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
     hire: (seatId, candidateId, offer) => {
       const result = hireStreamingTeamCandidate(player, seatId, candidateId, offer);
       if (result.changed) persist(result.player);
-      return { ok: result.changed && result.reason !== 'REFUSED', message: result.message, refused: result.reason === 'REFUSED' };
+      return { ok: result.changed && result.reason !== 'REFUSED' && result.reason !== 'COUNTERED', message: result.message, refused: result.reason === 'REFUSED', countered: result.reason === 'COUNTERED' };
+    },
+    walkAway: (candidateId) => {
+      const result = walkAwayFromStreamingCandidate(player, candidateId);
+      if (result.changed) persist(result.player);
     },
     train: (seatId) => {
       const result = trainStreamingTeamExecutive(player, seatId);
@@ -1866,9 +2019,10 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
     dismiss: (seatId) => {
       const result = dismissStreamingTeamExecutive(player, seatId);
       if (result.changed) persist(result.player);
+      return { ok: result.changed, message: result.message };
     },
-    approve: (cardId, answer) => {
-      const result = approveStreamingTeamCard(player, cardId, answer);
+    approve: (cardId, answer, givenWeekly) => {
+      const result = approveStreamingTeamCard(player, cardId, answer, givenWeekly);
       if (result.changed) persist(result.player);
       if (result.openRoom) openTeamRoom(result.openRoom.room, result.openRoom.focusId);
       return { ok: result.changed, message: result.message };
@@ -1891,11 +2045,9 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
       if (result.changed) persist(result.player);
       return { ok: result.changed, message: result.message };
     },
-    returnAsCeo: () => {
-      const result = returnAsStreamingCeo(player);
-      if (result.changed) persist(result.player);
-      return { ok: result.changed, message: result.message };
-    },
+    returnAsCeo: () => orTable(returnAsStreamingCeo(player), returnAsStreamingCeo),
+    /* #204: as chair, replace the chief executive */
+    replaceCeo: (type, candidateId) => orTable(replaceStreamingCeo(player, type, candidateId), next => replaceStreamingCeo(next, type, candidateId)),
   };
 
   /* #163: Decline on an investor's term sheet; the investor is not offered again */
@@ -1938,7 +2090,8 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
 
   const selectSection = (section: StreamingHqSection) => {
     setActiveSection(section);
-    persistCanonical(visitStreamingHqSection(player, section));
+    /* #219: walking between rooms changes nothing about the company, so the chair's note has nothing to say */
+    chairAllow(() => persistCanonical(visitStreamingHqSection(player, section)));
     mainRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -1946,12 +2099,12 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
     setShowWelcome(false);
     setShowTourComplete(false);
     setActiveSection('HOME');
-    persistCanonical(beginStreamingHqTour(player));
+    chairAllow(() => persistCanonical(beginStreamingHqTour(player)));
   };
 
   const skipTour = () => {
     setShowWelcome(false);
-    persistCanonical(skipStreamingHqTour(player));
+    chairAllow(() => persistCanonical(skipStreamingHqTour(player)));
   };
 
   /* NO ENTRY POINT. Its only caller was the "Replay HQ orientation" button in
@@ -1963,14 +2116,14 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
   const replayTour = () => {
     setActiveSection('HOME');
     setShowTourComplete(false);
-    persistCanonical(replayStreamingHqTour(player));
+    chairAllow(() => persistCanonical(replayStreamingHqTour(player)));
     mainRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const nextTourStep = () => {
     const currentStep = onboarding.currentStep;
     const nextStep = currentStep + 1;
-    persistCanonical(advanceStreamingHqTour(player));
+    chairAllow(() => persistCanonical(advanceStreamingHqTour(player)));
     if (nextStep >= STREAMING_HQ_TOUR_STEPS.length) {
       setShowTourComplete(true);
       return;
@@ -2001,28 +2154,29 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
   const finishOriginalReveal = (status: 'VIEWED' | 'DISMISSED') => {
     setShowOriginalReveal(false);
     if (!pendingOriginalReveal) return;
-    persist({
+    /* #204: a scene watched is marked in the chair too */
+    chairAllow(() => persist({
       ...player,
       ownedStreamingPlatform: markOwnedStreamingCinematicStatus(
         platform,
         pendingOriginalReveal.id,
         status,
       ),
-    });
+    }));
   };
 
   const finishPremiereNight = (status: 'VIEWED' | 'DISMISSED' = 'VIEWED') => {
     setShowCinematicPremiere(false);
     setPremiereStartedHere(false);
     if (!pendingLaunchReveal) return;
-    persist({
+    chairAllow(() => persist({
       ...player,
       ownedStreamingPlatform: markOwnedStreamingCinematicStatus(
         platform,
         pendingLaunchReveal.id,
         status,
       ),
-    });
+    }));
   };
 
   const renderTourCoach = () => {
@@ -2159,6 +2313,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
 
   const openCommandEvent = (event: StreamingCommandEvent) => {
     if (event.id === 'INCIDENT') return openPlatformTab('STATUS');
+    if (event.id === 'TEAM_NOTICE' || event.id === 'CHAIR') return openBoardroom('TABLE');
     if (event.id === 'LAUNCH') {
       if (openingProgramme().commissioned && !platform.launchCommit) {
         setOpeningProgrammeFocus('OVERVIEW');
@@ -2537,21 +2692,52 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
         mnaRivals={(platform.competitiveWorld.rivals || []).map(rival => rival.platformName)}
         boardReview={boardReviewView()}
         team={teamView()}
-        teamActions={teamActions}
+        teamActions={chairActions(teamActions, chairRule?.chair ? ['stepDown', 'returnAsCeo', 'replaceCeo', 'approve', 'decline', 'change'] : ['returnAsCeo', 'change'])}
         /* #172: OWNERSHIP signs and declines on the term sheet itself; your bank and founder capital beside it */
         ownership={getStreamingOwnershipView(player)}
-        ownershipActions={{
+        ownershipActions={chairActions({
+          /* Back from Your money comes back to OWNERSHIP */
+          openYourMoney: () => { setBoardroomTab('OWNERSHIP'); openYourMoney(); },
           sign: offerId => acceptFinanceInvestment(offerId),
           decline: offerId => declineFinanceInvestment(offerId),
           /* #186: OWNERSHIP › Raise money: the energy now, the offers in 3 weeks */
-          callRound: size => {
-            const result = callStreamingInvestorRound(player, size);
+          callRound: ask => {
+            const result = callStreamingInvestorRound(player, ask);
             if (result.changed) persist(result.player);
             return { ok: result.changed, message: result.message };
           },
+          /* #205: your own stake */
+          hireStakeBankers: percent => {
+            const result = hireStreamingStakeBankers(player, percent);
+            if (result.changed) persist(result.player);
+            return { ok: result.changed, message: result.message };
+          },
+          acceptStakeOffer: () => {
+            const result = acceptStreamingStakeOffer(player);
+            if (result.changed) persist(result.player);
+            return { ok: result.changed, message: result.message };
+          },
+          declineStakeOffer: () => {
+            const result = declineStreamingStakeOffer(player);
+            if (result.changed) persist(result.player);
+            return { ok: result.changed, message: result.message };
+          },
+          /* #201: a director takes a seat */
+          appointDirector: personId => {
+            const result = appointStreamingBoardDirector(player, personId);
+            if (result.changed) persist(result.player);
+            return { ok: result.changed, message: result.message };
+          },
+          /* #217: a term renewed, a director removed */
+          renewDirector: directorId => {
+            const result = renewStreamingBoardDirector(player, directorId);
+            if (result.changed) persist(result.player);
+            return { ok: result.changed, message: result.message };
+          },
+          removeDirector: directorId => orTable(removeStreamingBoardDirector(player, directorId), next => removeStreamingBoardDirector(next, directorId)),
           /* #187: buy an investor out (private); buy back shares (listed) */
-          buyOut: holderId => {
-            const result = buyOutStreamingInvestor(player, holderId);
+          buyOut: (holderId, offer) => {
+            const result = buyOutStreamingInvestor(player, holderId, offer);
             if (result.changed) persist(result.player);
             return { ok: result.changed, message: result.message };
           },
@@ -2566,24 +2752,20 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
             if (result.changed) persist(result.player);
             return { ok: result.changed, message: result.message };
           },
-          acceptBid: bidId => {
-            const result = acceptStreamingSaleBid(player, bidId);
-            if (result.changed) persist(result.player);
-            return { ok: result.changed, message: result.message };
-          },
+          acceptBid: bidId => orTable(acceptStreamingSaleBid(player, bidId), next => acceptStreamingSaleBid(next, bidId), next => voteDownStreamingSaleBid(next, bidId)),
           rejectBids: () => {
             const result = rejectStreamingSaleBids(player);
             if (result.changed) persist(result.player);
             return { ok: result.changed, message: result.message };
           },
-        }}
+        }, chairRule?.chair ? ['openYourMoney', 'appointDirector', 'renewDirector', 'removeDirector', 'hireStakeBankers', 'acceptStakeOffer', 'declineStakeOffer'] : ['openYourMoney', 'hireStakeBankers', 'acceptStakeOffer', 'declineStakeOffer'], ['hireBankers', 'acceptBid', 'rejectBids'])}
         sale={getStreamingSaleView(player)}
         stepDown={getStreamingStepDownView(player)}
         /* #175: MONEY's cash line and the one runway, from the same books as Studio Finance */
         cash={cashSummary()}
         /* #173: MARKETS: the road to the bell, then public life */
         listingDesk={getStreamingListingDesk(player)}
-        listingActions={{
+        listingActions={chairActions({
           ringBell: () => {
             const result = beginStreamingListing(player);
             if (!result.ok) return { ok: false, message: result.message };
@@ -2610,7 +2792,15 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
             if (result.changed) persist(result.player);
             return { ok: result.changed, message: result.reason };
           },
-        }}
+          /* #215: your name on the stock market */
+          setTicker: ticker => {
+            const result = setStreamingProposedTicker(player, ticker);
+            if (result.changed) persist(result.player);
+            return { ok: result.changed, message: result.message };
+          },
+          /* #209: what a share pays */
+          setDividend: perShare => orTable(setStreamingDividend(player, perShare), next => setStreamingDividend(next, perShare)),
+        }, ['vote', 'openRoom'], ['ringBell', 'setDividend', 'setTicker'])}
       /></React.Fragment>
     );
     return renderHome();
@@ -2798,7 +2988,21 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
         player={player}
         initialTab={financeInitialTab}
         initialCapitalView={financeInitialCapitalView}
-        onInjectCapital={injectFinanceCapital}
+        onInjectCapital={amount => {
+          let result: { ok: boolean; message: string } = { ok: false, message: '' };
+          chairAllow(() => { result = injectFinanceCapital(amount); });
+          return result;
+        }}
+        yourMoneyActions={{
+          setSalary: weekly => orTable(setStreamingFounderSalary(player, weekly), next => setStreamingFounderSalary(next, weekly)),
+          payBonus: amount => orTable(payStreamingFounderBonus(player, amount), next => payStreamingFounderBonus(next, amount)),
+          takeOut: toYou => orTable(takeStreamingMoneyOut(player, toYou), next => takeStreamingMoneyOut(next, toYou)),
+          payOffEstate: () => {
+            const result = payOffStreamingEstate(player);
+            if (result.changed) chairAllow(() => persist(result.player));
+            return { ok: result.changed, message: result.message };
+          },
+        }}
         onAcceptInvestment={acceptFinanceInvestment}
         onDeclineInvestment={declineFinanceInvestment}
         onOpenBuild={() => {
@@ -3189,7 +3393,7 @@ export default function StreamingPlatformHQ({ player, onUpdatePlayer, onTrustedM
       {showListing ? (
         <StreamingListingHost
           player={player}
-          onUpdatePlayer={persist}
+          onUpdatePlayer={next => chairAllow(() => persist(next))}
           onClose={() => setShowListing(false)}
           /* when the bell rings, public life lands on MARKETS */
           onListed={() => { setShowListing(false); openBoardroom('MARKETS'); }}

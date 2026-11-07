@@ -69,7 +69,7 @@ import {
     calculateStreamingRunwayFromTrailingCosts,
     calculateStreamingSubscriptionRevenueFullCurrency,
 } from './streamingEconomyCore';
-import { evaluatePlayerStreamingTitleRoute } from './streamingContentAvailability';
+import { createPlayerStreamingTitleRouteEvaluator } from './streamingContentAvailability';
 import { getWorldStreamingPlayerOutcome } from './worldEconomy/worldStreamingCompetition';
 import { getWorldStreamingPlayerCustomerOutcome } from './worldEconomy/worldStreamingCustomers';
 import { getWorldStreamingPlayerViewingOutcome } from './worldEconomy/worldStreamingViewing';
@@ -849,6 +849,7 @@ export const processOwnedStreamingPlatformWeek = (
     const worldViewingIncrementalRevenue = roundMoney(worldViewingOutcome?.revenue.totalIncrementalRevenue || 0);
     const worldViewingCommercialOperatingCost = roundMoney(worldViewingOutcome?.revenue.commercialOperatingCost || 0);
     const totalOperatingRevenue = subscriptionRevenue + productRevenue + worldViewingIncrementalRevenue;
+    let storeRoutes: ReturnType<typeof createPlayerStreamingTitleRouteEvaluator> | null = null;
     const contractRoyaltyAllocations = calculateStreamingSignedRoyaltyAllocations({
         licenses: platform.catalogLicenses.map(license => player.world.streamingRightsContracts?.[license.id] || license),
         receipts: [...(worldViewingOutcome ? player.world.worldStreamingViewing?.royaltyReceipts || [] : [])
@@ -858,7 +859,8 @@ export const processOwnedStreamingPlatformWeek = (
             (['RENTAL', 'PURCHASE'] as const).flatMap(kind => {
                 const grossReceipts = kind === 'RENTAL' ? country.revenue.rentalRevenue : country.revenue.purchaseRevenue;
                 if (grossReceipts <= 0) return [];
-                const route = evaluatePlayerStreamingTitleRoute(player, title.projectId, country.countryId, absoluteWeek, {kind});
+                storeRoutes ??= createPlayerStreamingTitleRouteEvaluator(player, absoluteWeek);
+                const route = storeRoutes(title.projectId, country.countryId, {kind});
                 return route.allowed && route.contractId ? [{receiptId:JSON.stringify([absoluteWeek,country.countryId,title.projectId,kind]),
                     contractId: route.contractId, sourceKind: kind, grossReceipts}] : [];
             })))],

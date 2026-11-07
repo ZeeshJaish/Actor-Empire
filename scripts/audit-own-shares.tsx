@@ -20,7 +20,7 @@ import { getStreamingOwnershipView } from '../services/streamingInvestorOffers';
 import { getStreamingGovernanceWeeklyCost } from '../services/streamingLeadershipGovernance';
 import { getStreamingFinanceRoom } from '../services/streamingFinanceRoom';
 import { PUBLIC_FLOAT_HOLDER } from '../services/streamingBuybacks';
-import { buyOutStreamingInvestor, getStreamingBuyoutQuote, quoteOwnShareTrade, startStreamingBuyback, tradeOwnStreamingShares } from '../services/streamingOwnShares';
+import { buyOutStreamingInvestor, getStreamingBuyoutQuote, quoteOwnShareTrade, startStreamingBuyback, streamingBuyoutChance, tradeOwnStreamingShares } from '../services/streamingOwnShares';
 import { getStreamingTeamCashFloor } from '../services/team/teamState';
 import { BoardroomOwnership, type BoardroomOwnershipActions } from '../components/streaming-transplant/BoardroomOwnership';
 
@@ -69,6 +69,18 @@ async function main() {
     assert.ok(getStreamingGovernanceWeeklyCost(after, 100_000_000) < costBefore, 'her share of profit ends');
     assert.ok(getStreamingFinanceRoom(bought.player, 'ALL').ledger.some(entry => entry.label === 'Shares bought back' && entry.cashDelta === -quote.price), 'in the books');
     pass(`bought out Sofia Laurent's ${sofia.ownershipPercent.toFixed(2)}% for ${money(quote.price)} (${Math.round((quote.premium - 1) * 100)}% over our value): you ${before.founderOwnershipPercent.toFixed(2)}% → ${after.founderOwnershipPercent.toFixed(2)}%, her seat and profit share end, the cap table at ${capTotal(after).toFixed(2)}%`);
+    /* #202: at your own price */
+    const more = buyOutStreamingInvestor(rich, sofia.id, quote.price + 100_000_000);
+    assert.ok(more.changed && platformOf(more.player).treasuryCash === platformOf(rich).treasuryCash - quote.price - 100_000_000, 'above their price: yes, and you pay it');
+    assert.ok(!platformOf(more.player).finance.equityHolders.some(holder => holder.id === sofia.id), 'and the stake is retired');
+    assert.equal(streamingBuyoutChance(quote.price, quote.price), 1);
+    assert.equal(streamingBuyoutChance(quote.price * 0.75, quote.price), 0);
+    const insulted = buyOutStreamingInvestor(rich, sofia.id, Math.round(quote.price * 0.7));
+    assert.ok(insulted.changed && /said no/.test(insulted.message || ''), 'far under: a no');
+    assert.ok(platformOf(insulted.player).finance.equityHolders.some(holder => holder.id === sofia.id), 'they still hold it');
+    assert.equal(platformOf(insulted.player).treasuryCash, platformOf(rich).treasuryCash, 'and nothing was paid');
+    assert.match(getStreamingBuyoutQuote(platformOf(insulted.player), sofia.id)!.blocked || '', /Said no: ask again in 13 weeks/, 'and you wait');
+    pass(`your own price: over ${money(quote.price)} is a yes at what you offered; 30% under it is a no, and 13 weeks before asking again`);
     const privateHtml = text(renderToStaticMarkup(<BoardroomOwnership view={getStreamingOwnershipView(rich)} companyName="NORTHSTAR+" founderName={player.name} actions={actions} />));
     assert.ok(privateHtml.includes('Buy out for'), 'OWNERSHIP offers it on the row');
 

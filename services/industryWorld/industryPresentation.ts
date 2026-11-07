@@ -66,6 +66,9 @@ const editorialPriority = (event: IndustryEventFact): number => {
         PLATFORM_CHART_MOMENT: 93,
         /* #149 */
         PLATFORM_CAMPAIGN_MOMENT: 95,
+        /* #200 */
+        PLATFORM_EXECUTIVE_LEFT: 91,
+        PLATFORM_EXECUTIVE_HIRED: 72,
     } as Partial<Record<IndustryEventFact['type'], number>>)[event.type] || 0;
     return importance + consequence;
 };
@@ -85,6 +88,8 @@ const PLATFORM_STORY_GROUP: Partial<Record<IndustryEventFact['type'], string>> =
     PLATFORM_VALUE_CRITICISED: 'PLATFORM_VALUE',
     PLATFORM_CHART_MOMENT: 'PLATFORM_CHART',
     PLATFORM_CAMPAIGN_MOMENT: 'PLATFORM_CAMPAIGN',
+    PLATFORM_EXECUTIVE_LEFT: 'PLATFORM_PEOPLE',
+    PLATFORM_EXECUTIVE_HIRED: 'PLATFORM_PEOPLE',
 };
 
 /* #162 (Zeesh: "campaign ke hisab se reaction … news me dikhna chaiye"): the player's own campaigns have their own place
@@ -138,6 +143,8 @@ const shouldPublishNews = (event: IndustryEventFact): boolean => (
         'PROJECT_SOLD', 'PROJECT_CANCELLED', 'RIGHTS_DEAL', 'RIGHTS_TRANSFER', 'RIGHTS_SALE_ANNOUNCED',
         /* #161: a campaign's stories (its first week, its fatigue, its result) are news too; people's posts carry it on X */
         'PLATFORM_CAMPAIGN_MOMENT',
+        /* #200: who runs a service is news, both ways */
+        'PLATFORM_EXECUTIVE_LEFT', 'PLATFORM_EXECUTIVE_HIRED',
     ].includes(event.type))
 );
 

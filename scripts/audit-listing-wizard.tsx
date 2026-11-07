@@ -65,7 +65,7 @@ async function main() {
             initialCheckpoint={checkpoint ? ({ ask: 6_600_000_000, shares: 125_000_000, revision: 1, bankId: null, marks: [], omit: {}, answers: {}, attempt: 1, diligenceWeeks: 0, cut: 0, lowPrice: 0, highPrice: 0, anchorDiscountAccepted: null, employeeQuotaPercent: 2, interviewMove: 0, book: null, closePrice: 0, ticker: 'NSTR', ...checkpoint } as StreamingListingCheckpoint) : null} />,
     );
     const ask = text(render(null));
-    for (const words of ['Shape the listing', 'THE TICKER', 'EMPIRE EXCHANGE', 'TYPE', 'WHAT IT IS WORTH', '1.00× our value', 'Our value: $6.60B', 'HOW MUCH YOU SELL', '20%', '125.0M new shares', 'A SHARE', 'RAISES', 'YOU KEEP', 'TAKE IT TO THE TABLE'])
+    for (const words of ['Shape the listing', 'YOUR NAME ON THE STOCK MARKET', 'EMPIRE EXCHANGE', 'YOUR OWN', 'WHAT IT IS WORTH', '1.00× our value', 'Our value: $6.60B', 'HOW MUCH YOU SELL', '20%', '125.0M new shares', 'A SHARE', 'RAISES', 'YOU KEEP', 'TAKE IT TO THE TABLE'])
         assert.ok(ask.includes(words), `THE ASK shows "${words}"`);
     pass('THE ASK: the ticker on the plate with four suggestions and TYPE, the worth from our value ($6.60B, 1.00×), the float at 20% (125.0M new shares), one gold action');
 

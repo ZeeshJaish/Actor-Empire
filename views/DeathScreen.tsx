@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { getStreamingEstate, type StreamingHandoffChoice } from '../services/streamingLegacy';
 import { Player, Relationship } from '../types';
 import { Skull, ArrowRight, RefreshCw, Trophy, DollarSign, Film, Crown, Users, Quote, Sparkles, ChevronLeft, HeartPulse } from 'lucide-react';
 import { calculateDynastyScore, calculateLegacyScore, getLegacyArchetype, getLegacyObituary, getLegacyTributes, getRelationshipAge } from '../services/legacyLogic';
@@ -7,7 +8,7 @@ import { getPlayerLanguage } from '../services/i18n';
 
 interface DeathScreenProps {
     player: Player;
-    onContinueAsChild: (child: Relationship) => void;
+    onContinueAsChild: (child: Relationship, choice?: StreamingHandoffChoice) => void;
     onStartNewGame: () => void;
     isPreview?: boolean;
     onClosePreview?: () => void;
@@ -30,6 +31,12 @@ export const DeathScreen: React.FC<DeathScreenProps> = ({
 }) => {
     const language = getPlayerLanguage(player);
     const children = player.relationships.filter(r => r.relation === 'Child');
+    /* #207: the streaming company goes with the heir: the estate and who runs it, asked here */
+    const [heir, setHeir] = useState<Relationship | null>(null);
+    /* #221: with too little cash, the choice starts on over time, which keeps the shares */
+    const [payment, setPayment] = useState<'PAY_CASH' | 'SELL_SHARES' | 'OVER_TIME'>(() => (getStreamingEstate(player)?.canPayCash === false ? 'OVER_TIME' : 'PAY_CASH'));
+    const [run, setRun] = useState<'HEIR' | 'SUCCESSOR'>('HEIR');
+    const estateNow = getStreamingEstate(player, { estate: payment });
     const totalAwards = player.awards?.length || 0;
     const totalProjects = player.pastProjects.length;
     const businessCount = player.businesses?.length || 0;
@@ -225,7 +232,9 @@ export const DeathScreen: React.FC<DeathScreenProps> = ({
                                             key={child.id}
                                             onClick={() => {
                                                 if (isPreview) return;
-                                                onContinueAsChild(child);
+                                                /* #207: with a company to hand on, the heir first answers for it */
+                                                if (estateNow) setHeir(child);
+                                                else onContinueAsChild(child);
                                             }}
                                             className={`w-full p-4 bg-white/[0.03] border rounded-2xl transition-all flex items-center justify-between group ${
                                                 isPreview
@@ -281,6 +290,64 @@ export const DeathScreen: React.FC<DeathScreenProps> = ({
                     </div>
                 </div>
             </div>
+            {heir && estateNow && (
+                <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70" role="dialog" aria-label={`${estateNow.company} goes to ${heir.name}`}>
+                    <div className="w-full max-w-xl max-h-[88dvh] overflow-y-auto rounded-t-[1.75rem] border border-white/10 bg-zinc-950 p-5 pb-[calc(env(safe-area-inset-bottom,0px)+20px)]">
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-300">The estate</p>
+                        <h3 className="mt-1 text-xl font-black text-white">{estateNow.company} goes to {heir.name}</h3>
+                        <p className="mt-2 text-sm leading-relaxed text-zinc-400">
+                            Your {estateNow.stakePercent.toFixed(1)}% is worth {formatCompactMoney(estateNow.stakeValue)}. The estate owes 25% of that: {formatCompactMoney(estateNow.tax)}.
+                        </p>
+                        <div className="mt-4 grid grid-cols-1 gap-2">
+                            <button
+                                type="button"
+                                disabled={!estateNow.canPayCash}
+                                onClick={() => setPayment('PAY_CASH')}
+                                className={`min-w-0 rounded-2xl border p-3 text-left transition-colors disabled:opacity-40 ${estateNow.estate === 'PAY_CASH' ? 'border-amber-400 bg-amber-400/10' : 'border-white/10 bg-white/[0.03]'}`}
+                            >
+                                <span className="block text-sm font-black text-white">Pay it in cash</span>
+                                <span className="mt-1 block text-[11px] leading-snug text-zinc-400">{estateNow.canPayCash ? `Keep ${estateNow.stakePercent.toFixed(1)}%. ${formatCompactMoney(estateNow.inheritedMoney - estateNow.tax)} of cash left.` : `The ${formatCompactMoney(estateNow.inheritedMoney)} inherited does not cover it.`}</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setPayment('OVER_TIME')}
+                                className={`min-w-0 rounded-2xl border p-3 text-left transition-colors ${estateNow.estate === 'OVER_TIME' ? 'border-amber-400 bg-amber-400/10' : 'border-white/10 bg-white/[0.03]'}`}
+                            >
+                                <span className="block text-sm font-black text-white">Over {estateNow.overTime.quarters / 4} years</span>
+                                <span className="mt-1 block text-[11px] leading-snug text-zinc-400">Keep {estateNow.stakePercent.toFixed(1)}% and all the cash. {formatCompactMoney(estateNow.overTime.quarterly)} a quarter from your wallet, at {estateNow.overTime.ratePercent}% a year. What it cannot cover, shares are sold for.</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setPayment('SELL_SHARES')}
+                                className={`min-w-0 rounded-2xl border p-3 text-left transition-colors ${estateNow.estate === 'SELL_SHARES' ? 'border-amber-400 bg-amber-400/10' : 'border-white/10 bg-white/[0.03]'}`}
+                            >
+                                <span className="block text-sm font-black text-white">Sell shares</span>
+                                <span className="mt-1 block text-[11px] leading-snug text-zinc-400">Keep {estateNow.percentIfSold.toFixed(1)}% and all {formatCompactMoney(estateNow.inheritedMoney)} of the cash.</span>
+                            </button>
+                        </div>
+                        <p className="mt-5 text-[10px] font-black uppercase tracking-[0.2em] text-amber-300">Who runs it</p>
+                        {estateNow.ceoStays && <p className="mt-2 text-sm leading-relaxed text-zinc-300">{estateNow.ceoStays} keeps running it. {heir.name} holds the shares, and can take over at 51% or more, or with the board behind them.</p>}
+                        {estateNow.heirChooses && (
+                            <div className="mt-2 grid grid-cols-2 gap-2">
+                                <button type="button" onClick={() => setRun('HEIR')} className={`min-w-0 rounded-2xl border p-3 text-left ${run === 'HEIR' ? 'border-amber-400 bg-amber-400/10' : 'border-white/10 bg-white/[0.03]'}`}>
+                                    <span className="block text-sm font-black text-white">{heir.name.split(' ')[0]} runs it</span>
+                                    <span className="mt-1 block text-[11px] leading-snug text-zinc-400">At 51% or more, it is theirs to run.</span>
+                                </button>
+                                <button type="button" disabled={!estateNow.successor} onClick={() => setRun('SUCCESSOR')} className={`min-w-0 rounded-2xl border p-3 text-left disabled:opacity-40 ${run === 'SUCCESSOR' ? 'border-amber-400 bg-amber-400/10' : 'border-white/10 bg-white/[0.03]'}`}>
+                                    <span className="block text-sm font-black text-white">{estateNow.successor ? `${estateNow.successor.name.split(' ')[0]} runs it` : 'No one named'}</span>
+                                    <span className="mt-1 block text-[11px] leading-snug text-zinc-400">{estateNow.successor ? 'The successor you named. The heir chairs the board.' : 'You did not name a successor.'}</span>
+                                </button>
+                            </div>
+                        )}
+                        {estateNow.boardPicks && <p className="mt-2 text-sm leading-relaxed text-zinc-300">Under 51%, the board decides: {estateNow.boardPicks.name} takes over. {heir.name} holds the shares and chairs the board.</p>}
+                        <p className="mt-4 text-[11px] leading-relaxed text-zinc-500">The board and, once listed, the market take the news badly at first.</p>
+                        <div className="sticky bottom-0 -mx-1 mt-4 grid grid-cols-[1fr_auto] gap-2 bg-zinc-950 px-1 pt-2">
+                            <button type="button" onClick={() => onContinueAsChild(heir, { estate: estateNow.estate, run })} className="rounded-2xl bg-amber-400 px-4 py-3 text-sm font-black text-black">Continue as {heir.name.split(' ')[0]}</button>
+                            <button type="button" onClick={() => setHeir(null)} className="rounded-2xl border border-white/10 px-4 py-3 text-sm font-bold text-zinc-300">Back</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

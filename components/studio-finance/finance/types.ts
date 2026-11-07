@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 /* ============================================================================
    STUDIO FINANCE — data contract
    ----------------------------------------------------------------------------
@@ -182,6 +183,23 @@ export interface CapitalState {
     unlocked: boolean;
     requirements: IpoRequirement[];
   };
+  /** #195: the host's Capital page: who put money in, what the service earned, the last moves and two live facts */
+  story?: CapitalStory;
+}
+
+/** #195: what the Capital page tells. */
+export interface CapitalStory {
+  /** the average operating net of the last 4 weeks */
+  weeklyNet: number;
+  /** who put money in, largest first; only the ones that did */
+  sources: Array<{ id: 'FOUNDER' | 'INVESTORS' | 'PUBLIC' | 'LOANS'; label: string; amount: number }>;
+  /** the cash less all the money put in and paid out: what the service itself has made (or spent, when negative) */
+  earned: number;
+  moves: Array<{ id: string; week: number; label: string; amount: number }>;
+  /** "You 79% · 3 others" */
+  ownersLine: string;
+  /** "6 of 6 steps cleared", or "NORT · $8.21" once listed */
+  marketLine: string;
 }
 
 /** The three list cuts, for one reporting window. */
@@ -248,5 +266,7 @@ export interface StudioFinanceHandlers {
   onOpenMarket?: (marketId: string) => void;
   /** #175: with capitalScope 'founder', where owners and investors live, and where the company goes public. */
   onOpenOwnership?: () => void;
+  /** #220: with capitalScope 'founder', Capital's second page: your money, drawn by the host */
+  renderYourMoney?: (tools: { startPutIn: boolean; putIn: (amount: number) => { ok: boolean; message?: string } }) => ReactNode;
   onOpenMarkets?: () => void;
 }

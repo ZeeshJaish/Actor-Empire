@@ -1,3 +1,4 @@
+/* #193: the HQ shell's `.streaming-hq-shell button{font:inherit}` comes later with more weight than one class, so a button's own font rule needs a doubled class to count (`.seg.seg button`). Without it every button here drew at 16px. */
 /* #172: OWNERSHIP. The cap table as one bar and a row each (a face, a stake, a seat, a share of profit), the investors'
    offers as term sheets signed on their line (#175: your bank is in Studio Finance). */
 
@@ -82,7 +83,7 @@
 .scribble path{fill:none;stroke:#1f3a8a;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:440;stroke-dashoffset:440;animation:own-pen .6s ease-out forwards}
 @keyframes own-pen{to{stroke-dashoffset:0}}
 .sheetActions{display:flex;gap:8px;margin-top:12px}
-.sheetActions button{flex:1 1 0;display:flex;align-items:center;justify-content:center;min-height:42px;border-radius:10px;font-size:12px;font-weight:900;text-align:center}
+.sheetActions.sheetActions button{flex:1 1 0;display:flex;align-items:center;justify-content:center;min-height:42px;border-radius:10px;font-size:12px;font-weight:900;text-align:center}
 .sign{flex-grow:2 !important;color:#fff;background:linear-gradient(#2f8a55,#1f6b42);box-shadow:0 3px 8px rgba(31,107,66,.3)}
 .sign:disabled{opacity:.4;box-shadow:none}
 .decline{color:#9a2a22;background:transparent;border:1px solid rgba(154,42,34,.4)}
@@ -106,18 +107,6 @@
 .chk{display:inline-flex;align-items:center;gap:4px;padding:4px 8px;border-radius:999px;font-size:9.5px;font-weight:800;color:#8b93a5;
   background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08)}
 .chkOn{color:#bfe8cf;border-color:rgba(61,220,132,.35);background:rgba(61,220,132,.07)}
-.sizes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
-.size{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0;padding:12px 6px 10px;border-radius:13px;text-align:center;
-  background:linear-gradient(170deg,#171b24,#0f1218);border:1px solid rgba(214,172,92,.3);transition:transform .12s}
-.size:active:not(:disabled){transform:scale(.96)}
-.size:disabled{opacity:.55;cursor:default}
-.sizeName{font-size:8.5px;font-weight:900;letter-spacing:.16em;color:#efd396}
-.sizePct{display:flex;flex-direction:column;align-items:center;font:400 22px/1 'Anton','Archivo',sans-serif;color:#f1f4f8}
-.sizePct small{font:800 7.5px/1.2 'Inter',system-ui,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#7d8698}
-.sizeAbout{font-size:10px;font-weight:800;color:#c3cad6}
-.sizeKeep{font-size:8.5px;color:#7d8698}
-.sizeCost{margin-top:2px;padding:3px 9px;border-radius:999px;font-size:10px;font-weight:900;color:#2a1a00;background:linear-gradient(#ffd27a,#f2a516)}
-.sizeBlocked{margin-top:2px;font-size:8.5px;font-weight:800;line-height:1.25;color:#9aa3b5}
 .fine{margin-top:9px;font-size:10px;line-height:1.5;color:#7d8698}
 .roundCard{padding:13px;border-radius:14px;background:linear-gradient(160deg,rgba(214,172,92,.10),rgba(255,255,255,.02));border:1px solid rgba(214,172,92,.3)}
 .roundCard b{display:block;font-size:9px;font-weight:900;letter-spacing:.16em;color:#efd396}
@@ -130,7 +119,7 @@
 .buyout{grid-column:1 / -1;display:flex;align-items:center;justify-content:space-between;gap:9px;margin-top:-2px;padding:8px 10px;border-radius:10px;
   font-size:10px;line-height:1.4;color:#a9b1bf;background:rgba(214,172,92,.06);border:1px solid rgba(214,172,92,.18)}
 .buyout > span:first-child{min-width:0;overflow-wrap:anywhere}
-.buyoutBtn,.buyoutYes,.buyoutNo{flex:0 0 auto;min-height:30px;padding:0 11px;border-radius:9px;font-size:10.5px;font-weight:900}
+.buyoutBtn.buyoutBtn,.buyoutYes.buyoutYes,.buyoutNo.buyoutNo{flex:0 0 auto;min-height:30px;padding:0 11px;border-radius:9px;font-size:10.5px;font-weight:900}
 .buyoutBtn{color:#efd396;border:1px solid rgba(214,172,92,.45);background:transparent}
 .buyoutActions{flex:0 0 auto;display:flex;gap:6px}
 .buyoutYes{color:#2a1a00;background:linear-gradient(#ffd27a,#f2a516)}
@@ -138,13 +127,9 @@
 .sizes4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
 .sizes4 .sizeAbout{white-space:nowrap}
 
-/* ── #190: selling the company ── */
-.saleCard{padding:13px 14px;border-radius:14px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.09)}
-.saleCard p{font-size:11px;line-height:1.5;color:#aeb6c4}
-.saleBtn{display:inline-flex;align-items:center;gap:8px;margin-top:10px;padding:9px 14px;border-radius:10px;font-size:12px;font-weight:900;
-  color:#efd39a;background:rgba(214,172,92,.1);border:1px solid rgba(214,172,92,.45)}
-.saleBtn i{font-style:normal;padding:2px 7px;border-radius:99px;color:#1d1607;background:#e2c06f}
-.saleBtn:active{transform:scale(.97)}
+/* ── #190: selling the company; #218: one switch over both ways to sell ── */
+.sellSwitch{margin:0 0 10px}
+.sellSwitch + .roundBox{margin-top:0}
 .bid{margin-bottom:8px;padding:12px 13px;border-radius:14px;background:linear-gradient(160deg,rgba(214,172,92,.07),rgba(255,255,255,.02));border:1px solid rgba(214,172,92,.25)}
 .bidOff{opacity:.55;background:rgba(255,255,255,.02);border-color:rgba(255,255,255,.08)}
 .bidTop{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px}
@@ -163,4 +148,45 @@
 .bidActions{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
 .bidActions span{flex:1 1 100%;font-size:11px;font-weight:700;color:#eef0f5}
 .saleFoot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:2px;font-size:10.5px;color:#8b93a5}
-.saleLink{font-size:10.5px;font-weight:800;color:#ff8d91;text-decoration:underline;text-underline-offset:3px}
+.saleLink.saleLink{font-size:10.5px;font-weight:800;color:#ff8d91;text-decoration:underline;text-underline-offset:3px}
+
+/* ── #202: a round of your own size ── */
+.roundBox{margin-top:10px;padding:12px;border-radius:14px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08)}
+.roundRow{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;gap:8px;align-items:center}
+.roundRow.roundRow button{display:flex;align-items:center;justify-content:center;height:44px;padding:0;border-radius:11px;font-size:20px;font-weight:900;color:#eef0f5;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12)}
+.roundRow.roundRow button:disabled{opacity:.35}
+.roundValue{display:flex;align-items:center;justify-content:center;gap:3px;min-width:0}
+.roundValue input{max-width:130px;min-width:0;padding:0;border:0;background:transparent;text-align:center;font:400 34px/1.1 'Anton','Archivo',sans-serif;color:#f6d78f;outline:none}
+.roundValue i{font:400 18px/1 'Anton','Archivo',sans-serif;font-style:normal;color:#a7afbd}
+.roundUnit{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;margin-top:9px;padding:3px;border-radius:10px;background:rgba(0,0,0,.28)}
+.roundUnit.roundUnit button{display:flex;align-items:center;justify-content:center;padding:7px 6px;border-radius:8px;font-size:10.5px;font-weight:800;color:#8b93a5;background:transparent}
+.roundUnit.roundUnit .roundUnitOn{color:#101218;background:#f6d78f}
+.roundFacts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:10px}
+.roundFacts span{display:flex;flex-direction:column;gap:4px;min-width:0;padding:8px 6px;border-radius:10px;text-align:center;background:rgba(0,0,0,.24)}
+.roundFacts small{font:800 7.5px/1 'Inter',system-ui,sans-serif;letter-spacing:.1em;color:#7d8698}
+.roundFacts b{font:400 15px/1 'Anton','Archivo',sans-serif;color:#eef0f5;white-space:nowrap}
+.callRound.callRound{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;margin-top:10px;padding:11px 8px;border-radius:12px;font-size:13px;font-weight:900;line-height:1.25;color:#2a1a00;background:linear-gradient(#ffd27a,#f2a516)}
+.callRound small{font-size:10px;font-weight:800;color:rgba(42,26,0,.75)}
+.callRound:disabled{color:#a7afbd;background:rgba(255,255,255,.06);font-size:11px;font-weight:700}
+
+/* ── #202: a buyout at your own price ── */
+.buyoutOffer{display:flex;flex-direction:column;gap:7px;width:100%}
+.buyoutRow{display:grid;grid-template-columns:36px minmax(0,1fr) 36px;gap:6px;align-items:center}
+.buyoutRow.buyoutRow button{display:flex;align-items:center;justify-content:center;height:36px;padding:0;border-radius:9px;font-size:16px;font-weight:900;color:#eef0f5;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12)}
+.buyoutRow.buyoutRow button:disabled{opacity:.35}
+.buyoutValue{text-align:center;min-width:0}
+.buyoutValue b{display:block;font:400 19px/1.1 'Anton','Archivo',sans-serif;color:#f6d78f}
+.buyoutValue small{display:block;margin-top:2px;font-size:9.5px;color:#8b93a5}
+.buyoutChance{margin:0;font-size:10.5px;line-height:1.4;color:#c9d0db}
+
+/* ── #205: your own stake ── */
+.stakeName{font:800 11px/1.2 'Inter',system-ui,sans-serif!important;white-space:normal!important;overflow-wrap:anywhere}
+.stakeSize{font:400 34px/1.1 'Anton','Archivo',sans-serif;color:#f6d78f}
+.stakeWarn{margin:9px 0 0;padding:8px 10px;border-radius:10px;font-size:10.5px;line-height:1.4;color:#ffc2c4;background:rgba(255,90,95,.08);border:1px solid rgba(255,90,95,.3)}
+.stakeRow{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:7px;align-items:stretch}
+.stakeRow .callRound{margin-top:10px}
+.stakeNo.stakeNo{margin-top:10px;border-radius:12px;font-size:12px;font-weight:800;color:#c3cad6;background:transparent;border:1px solid rgba(255,255,255,.14)}
+
+/* ── #209: the door to your own money ── */
+.yourMoney.yourMoney{grid-column:1 / -1;display:block;width:100%;margin-top:-2px;padding:8px 10px;border-radius:10px;text-align:left;font-size:10.5px;font-weight:800;color:#efd396;background:rgba(214,172,92,.07);border:1px solid rgba(214,172,92,.3)}
+

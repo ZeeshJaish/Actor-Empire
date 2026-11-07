@@ -38,7 +38,7 @@ const TABS: Array<{ key: FinanceTab; label: string }> = [
 export interface StudioFinanceProps extends StudioFinanceHandlers {
   data: StudioFinanceData;
   initialTab?: FinanceTab;
-  initialCapitalRoute?: 'founder' | 'equity';
+  initialCapitalRoute?: 'founder' | 'equity' | 'you';
   /** Set to show the end-of-period close moment; clear it on dismiss. */
   closeReport?: CloseReportData | null;
   onDismissCloseReport?: () => void;

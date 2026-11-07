@@ -30,7 +30,7 @@ interface LifestylePageProps {
   onPremiumPurchase: (productId: PremiumProductId) => void;
   onReturnHome?: () => void;
   onNavVisibilityChange?: (visible: boolean) => void;
-  initialView?: 'MAIN' | 'ASSETS' | 'ACTIVITIES' | 'BUSINESS' | 'PRODUCTION_WIZARD' | 'PRODUCTION_GAME' | 'STREAMING_PLATFORM' | 'STREAMING_FINANCE' | 'STREAMING_STATUS' | 'CINEMA_CHAIN';
+  initialView?: 'MAIN' | 'ASSETS' | 'ACTIVITIES' | 'BUSINESS' | 'PRODUCTION_WIZARD' | 'PRODUCTION_GAME' | 'STREAMING_PLATFORM' | 'STREAMING_FINANCE' | 'STREAMING_STATUS' | 'STREAMING_TEAM' | 'STREAMING_OWNERSHIP' | 'CINEMA_CHAIN';
   onInitialViewConsumed?: () => void;
   onOpenBank?: () => void;
   initialRightsMarketOpportunityId?: string;
@@ -68,7 +68,7 @@ export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem,
   const [selectedCustomizations, setSelectedCustomizations] = useState<CustomizationOption[]>([]);
   const [purchaseCelebrationAsset, setPurchaseCelebrationAsset] = useState<ShareableAsset | null>(null);
   const [streamingOriginalTarget, setStreamingOriginalTarget] = useState<{ studioId: string; scriptId: string; commissionId: string } | null>(null);
-  const [streamingDestination, setStreamingDestination] = useState<'HOME' | 'FINANCE' | 'STATUS'>('HOME');
+  const [streamingDestination, setStreamingDestination] = useState<'HOME' | 'FINANCE' | 'STATUS' | 'TEAM' | 'OWNERSHIP'>('HOME');
   const language = getPlayerLanguage(player);
   const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
   const trFallback = (key: string, fallback: string) => {
@@ -90,9 +90,9 @@ export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem,
 
   useEffect(() => {
       if (!initialView) return;
-      if (initialView === 'STREAMING_FINANCE' || initialView === 'STREAMING_STATUS') {
-          /* #75: the incident popup's "Open STATUS" opens the Platform room on STATUS */
-          setStreamingDestination(initialView === 'STREAMING_STATUS' ? 'STATUS' : 'FINANCE');
+      if (initialView === 'STREAMING_FINANCE' || initialView === 'STREAMING_STATUS' || initialView === 'STREAMING_TEAM' || initialView === 'STREAMING_OWNERSHIP') {
+          /* #75: the incident popup's "Open STATUS" opens the Platform room on STATUS; #210: a decision's door, its Boardroom room */
+          setStreamingDestination(initialView === 'STREAMING_STATUS' ? 'STATUS' : initialView === 'STREAMING_TEAM' ? 'TEAM' : initialView === 'STREAMING_OWNERSHIP' ? 'OWNERSHIP' : 'FINANCE');
           setView('STREAMING_PLATFORM');
       } else {
           if (initialView === 'STREAMING_PLATFORM') setStreamingDestination('HOME');

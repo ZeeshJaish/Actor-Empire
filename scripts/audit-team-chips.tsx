@@ -116,7 +116,7 @@ async function main() {
         card('fix', { seatId: 'TECHNOLOGY', jobId: 'INCIDENTS', cost: 2_000_000, action: { kind: 'INCIDENT_REPAIR', source: 'CRISIS', incidentId: 'x', option: 'FIX' } }),
     ];
     const actions: BoardroomTeamActions = {
-        setMode: () => undefined, setLimits: () => undefined, hire: noop, train: noop, dismiss: () => undefined,
+        setMode: () => undefined, setLimits: () => undefined, walkAway: () => undefined, hire: noop, train: noop, dismiss: () => undefined,
         approve: noop, decline: () => undefined, change: () => undefined, nameSuccessor: () => undefined,
     };
     const trayText = text(renderToStaticMarkup(<TeamSheets team={{ ...view, tray }} sheet={{ kind: 'TRAY' }} onClose={() => undefined} onOpen={() => undefined} actions={actions} />));

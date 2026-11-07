@@ -14,6 +14,8 @@
  *   - The offers stand 6 weeks. Several may be signed, up to the round's size. Signing issues new shares: every holder
  *     is diluted, not the founder alone (`acceptStreamingCelebrityInvestment`).
  */
+import { getStreamingStakeView, type StreamingStakeView } from './streamingControl';
+import { getStreamingBoardView, type StreamingBoardView } from './streamingBoard';
 import type { Gender, OwnedStreamingInvestorOffer, OwnedStreamingPlatformState, Player, StreamingExecutiveStrategy } from '../types';
 import { createDeterministicId, createDeterministicRng } from './deterministicRandom';
 import { getAbsoluteWeek } from './legacyLogic';
@@ -141,10 +143,21 @@ export const getStreamingRoundState = (platform: OwnedStreamingPlatformState, ab
 
 export interface StreamingRoundCallResult { player: Player; changed: boolean; reason?: string; message?: string }
 
-/** OWNERSHIP › Raise money › Call a round: the energy is spent now, the offers come in 3 weeks */
-export const callStreamingInvestorRound = (player: Player, size: StreamingInvestorRoundSize): StreamingRoundCallResult => {
+/** #202: a round can sell any 1–20% of the company */
+export const STREAMING_ROUND_MIN_PERCENT = 1;
+export const STREAMING_ROUND_MAX_PERCENT = 20;
+/** #202: the band a round's size falls in, and so its energy: ⚡5 up to 5%, ⚡8 up to 10%, ⚡10 above */
+export const streamingRoundSizeFor = (percent: number): StreamingInvestorRoundSize => (percent <= 5 ? 'SMALL' : percent <= 10 ? 'GROWTH' : 'BIG');
+export const streamingRoundEnergy = (percent: number) => STREAMING_ROUND_SIZES[streamingRoundSizeFor(percent)].energy;
+
+/** OWNERSHIP › Raise money › Call a round: the energy is spent now, the offers come in 3 weeks. #202: any size you choose */
+export const callStreamingInvestorRound = (player: Player, ask: StreamingInvestorRoundSize | number): StreamingRoundCallResult => {
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+    const percent = typeof ask === 'number'
+        ? Math.max(STREAMING_ROUND_MIN_PERCENT, Math.min(STREAMING_ROUND_MAX_PERCENT, Math.round(ask * 10) / 10))
+        : STREAMING_ROUND_SIZES[ask].upToPercent;
+    const size = streamingRoundSizeFor(percent);
     const terms = STREAMING_ROUND_SIZES[size];
     if (!platform.identity || platform.lifecycle !== 'ACTIVE' || !platform.launchCommit) return { player, changed: false, reason: 'NOT_LIVE', message: 'Investors wait until the service is live.' };
     if (platform.publicCompany.lifecycle === 'PUBLIC') return { player, changed: false, reason: 'LISTED', message: 'You are listed: new money comes from the market.' };
@@ -157,7 +170,7 @@ export const callStreamingInvestorRound = (player: Player, size: StreamingInvest
     const round: OwnedStreamingInvestorRound = {
         id: createDeterministicId('streaming_round', platform.simulationSeed, `${size}:${absoluteWeek}`),
         size,
-        upToPercent: Math.min(terms.upToPercent, roomAboveControl(platform.founderOwnershipPercent)),
+        upToPercent: Math.min(percent, roomAboveControl(platform.founderOwnershipPercent)),
         calledAtAbsoluteWeek: absoluteWeek,
         offersAtAbsoluteWeek: absoluteWeek + STREAMING_ROUND_WEEKS,
         closesAtAbsoluteWeek: null,
@@ -304,8 +317,8 @@ export interface StreamingRoundView {
     nextInWeeks: number;
     /** what investors read before they offer */
     standing: { score: number; checks: Array<{ id: string; label: string; passed: boolean }> };
-    /** upToPercent: what the round may sell, after the 51% line; capped: the line made it smaller */
-    sizes: Array<{ id: StreamingInvestorRoundSize; label: string; upToPercent: number; capped: boolean; energy: number; about: number; founderAfter: number; blocked: string | null }>;
+    /** #202: your own size: from 1% up to the most the 51% line and 20% allow; why you cannot call one now */
+    custom: { maxPercent: number; worth: number; founder: number; blocked: string | null };
 }
 
 export interface StreamingOwnershipView {
@@ -318,6 +331,10 @@ export interface StreamingOwnershipView {
     /** the founder's own money, to put in without giving a stake */
     founderCash: number;
     round: StreamingRoundView;
+    /** #201: the board */
+    board: StreamingBoardView;
+    /** #205: selling your own stake, once you have stepped down */
+    stake: StreamingStakeView | null;
     /** #187: a listed company's buybacks */
     buyback: {
         allowance: number;
@@ -446,21 +463,13 @@ export const getStreamingOwnershipView = (player: Player): StreamingOwnershipVie
     const listed = platform.publicCompany.lifecycle === 'PUBLIC';
     const room = roomAboveControl(platform.founderOwnershipPercent);
     const energy = Math.max(0, Math.round(player.energy?.current || 0));
-    const order = Object.keys(STREAMING_ROUND_SIZES) as StreamingInvestorRoundSize[];
-    const sizes = order.map((id, index) => {
-        const terms = STREAMING_ROUND_SIZES[id];
-        const upTo = Math.min(terms.upToPercent, room);
-        /* a bigger round the 51% line cuts to a smaller one's size would only cost more energy */
-        const smaller = index > 0 ? STREAMING_ROUND_SIZES[order[index - 1]] : null;
-        const blocked = listed ? 'Listed: the market is your investor'
-            : !cfo ? 'Needs a CFO'
-                : roundState.status === 'RUNNING' || roundState.status === 'OPEN' ? 'A round is under way'
-                    : roundState.status === 'GAP' ? `Next in ${roundState.nextInWeeks} wk`
-                        : upTo < 1 ? 'Under 51%'
-                            : smaller && upTo <= Math.min(smaller.upToPercent, room) ? `The 51% line: ${smaller.label.toLowerCase()} sells as much`
-                                : energy < terms.energy ? `Needs ⚡${terms.energy}` : null;
-        return { id, label: terms.label, upToPercent: Math.round(upTo * 10) / 10, capped: upTo < terms.upToPercent, energy: terms.energy, about: Math.round(worth * upTo / 100 * 0.88), founderAfter: founderAfterNewShares(platform.founderOwnershipPercent, upTo), blocked };
-    });
+    /* #202: your own size */
+    const customBlocked = listed ? 'Listed: the market is your investor'
+        : !cfo ? 'Calling a round needs a CFO at the table.'
+            : roundState.status === 'RUNNING' || roundState.status === 'OPEN' ? 'A round is under way.'
+                : roundState.status === 'GAP' ? `The next round can be called in ${roundState.nextInWeeks} week${roundState.nextInWeeks === 1 ? '' : 's'}.`
+                    : room < STREAMING_ROUND_MIN_PERCENT ? 'Selling any more would take you under 51%.' : null;
+    const custom = { maxPercent: Math.round(Math.min(STREAMING_ROUND_MAX_PERCENT, room) * 10) / 10, worth, founder: platform.founderOwnershipPercent, blocked: customBlocked };
     /* #187: a listed company's buybacks: 1, 2, 5 or 10% within this year's 10% */
     const buybackState = listed ? getStreamingBuybackState(platform, absoluteWeek) : null;
     const price = platform.publicCompany.quoteHistory.at(-1)?.close || listing?.offerPrice || 0;
@@ -478,6 +487,8 @@ export const getStreamingOwnershipView = (player: Player): StreamingOwnershipVie
         }),
     } : null;
     return {
+        board: getStreamingBoardView(player),
+        stake: getStreamingStakeView(player),
         worth,
         founderPercent: platform.founderOwnershipPercent,
         listed,
@@ -487,6 +498,7 @@ export const getStreamingOwnershipView = (player: Player): StreamingOwnershipVie
         founderCash: Math.max(0, Math.round(player.money || 0)),
         buyback,
         round: {
+            custom,
             status: roundState.status,
             label: round ? STREAMING_ROUND_SIZES[round.size].label : null,
             upToPercent: round?.upToPercent || 0,
@@ -496,7 +508,6 @@ export const getStreamingOwnershipView = (player: Player): StreamingOwnershipVie
             standsWeeks: roundState.standsWeeks,
             nextInWeeks: roundState.nextInWeeks,
             standing: (() => { const standing = getStreamingRoundStanding(platform); return { score: standing.score, checks: standing.checks }; })(),
-            sizes,
         },
     };
 };

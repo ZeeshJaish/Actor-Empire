@@ -385,7 +385,12 @@ const buildLedger = (
                         ? 'Shares bought back'
                         : action.type === 'FOUNDER_SHARE_TRADE'
                             ? action.personalCashDelta < 0 ? 'You bought shares on the market' : 'You sold shares on the market'
-                            : 'Outside equity issued';
+                            /* #209 */
+                            : action.type === 'FOUNDER_WITHDRAWAL'
+                                ? 'You took money out'
+                                : action.type === 'DIVIDEND_PAID'
+                                    ? 'A dividend paid'
+                                    : 'Outside equity issued';
         entries.push({
             id: action.id,
             absoluteWeek: action.absoluteWeek,

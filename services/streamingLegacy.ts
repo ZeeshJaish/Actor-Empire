@@ -1,3 +1,6 @@
+import { STREAMING_ESTATE_QUARTERS, STREAMING_ESTATE_RATE, startStreamingEstatePlan, streamingEstateQuarterly } from './streamingEstatePlan';
+import { rebaseLegacyWeeks } from './legacyWorldClock';
+import type { OwnedStreamingExecutiveAppointment } from '../types';
 import type {
     OwnedStreamingCompanyEra,
     OwnedStreamingLedgerEntry,
@@ -10,8 +13,11 @@ import type {
     StreamingFounderOfficeRole,
     StreamingLegacyIdentity,
 } from '../types';
-import { createDeterministicId } from './deterministicRandom';
-import { getAbsoluteWeek, getRelationshipAge } from './legacyLogic';
+import { createDeterministicId, createDeterministicRng } from './deterministicRandom';
+import { getAbsoluteWeek, getLegacyInheritancePreview, getRelationshipAge } from './legacyLogic';
+import { getIndustryPeople } from './industry/industryPeople';
+import { getStreamingEquityValuation } from './streamingPublicMarkets';
+import { PUBLIC_FLOAT_HOLDER } from './streamingBuybacks';
 import {
     compactOwnedStreamingPlatformForPersistence,
     normalizeOwnedStreamingPlatformState,
@@ -143,10 +149,52 @@ export const getStreamingLegacyMilestones = (platform: OwnedStreamingPlatformSta
         .slice(-16);
 };
 
+/* #203: who from your connections can be named, and what the board thinks of them */
+const CONNECTION_NOTE: Partial<Record<Relationship['relation'], string>> = {
+    Child: 'Family, not an operator',
+    Spouse: 'Family, not an operator',
+    Partner: 'Family, not an operator',
+    Parent: 'Family, not an operator',
+    Sibling: 'Family, not an operator',
+    Friend: 'A friend, not an operator',
+};
+const CONNECTION_SKILL_MOST = 78;
+/** 35 + closeness × 0.15 + (age − 18, up to 30) × 0.5, ±10 from the career's seed, 78 at most */
+export const streamingConnectionSkill = (seed: string, relationship: Pick<Relationship, 'id' | 'closeness'>, age: number) => {
+    const swing = (createDeterministicRng(`${seed}:connection:${relationship.id}`)() - 0.5) * 20;
+    return Math.round(Math.min(CONNECTION_SKILL_MOST, Math.max(20, 35 + (relationship.closeness || 0) * 0.15 + Math.min(30, Math.max(0, age - 18)) * 0.5 + swing)));
+};
+const connectionPay = (skill: number) => Math.round((60_000 + skill * 2_000) / 5_000) * 5_000;
+/** someone from your connections as chief executive: paid by their skill, with no chair at the table */
+export const streamingConnectionCeo = (platform: OwnedStreamingPlatformState, relationship: Relationship, skill: number, absoluteWeek: number): OwnedStreamingExecutiveAppointment => {
+    const key = `connection:${relationship.id}`;
+    return {
+        id: createDeterministicId('streaming_executive', platform.simulationSeed, `${key}:${absoluteWeek}`),
+        executiveId: key,
+        role: 'CEO',
+        nameAtAppointment: relationship.name,
+        status: 'ACTIVE',
+        origin: 'INTERNAL_PROMOTION',
+        appointedAtAbsoluteWeek: absoluteWeek,
+        endedAtAbsoluteWeek: null,
+        weeklyCompensation: connectionPay(skill),
+        skill,
+        loyalty: Math.round(clamp(relationship.closeness || 50)),
+        ambition: 50,
+        ethics: 70,
+        preferredStrategy: 'BALANCED',
+        founderRelationship: Math.round(clamp(relationship.closeness || 50)),
+        internalRelationship: 50,
+        performance: 55,
+        level: 2,
+        experience: 0,
+    };
+};
+
 export const getStreamingSuccessionCandidates = (player: Player): StreamingSuccessionCandidate[] => {
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     const executives = platform.leadership.appointments
-        .filter(item => item.status === 'ACTIVE')
+        .filter(item => item.status === 'ACTIVE' && item.role !== 'CEO')
         .map(item => {
             const readiness = Math.round(clamp(
                 item.skill * 0.28
@@ -165,18 +213,17 @@ export const getStreamingSuccessionCandidates = (player: Player): StreamingSucce
                 canOperateNow: true,
             };
         });
-    const family = player.relationships
-        .filter(item => item.relation === 'Child')
+    const family = (player.relationships || [])
+        .filter(item => CONNECTION_NOTE[item.relation])
         .map(item => {
             const age = getRelationshipAge(item, player.age, player.currentWeek);
-            const readiness = Math.round(clamp((item.closeness || 50) * 0.55 + Math.min(30, age) * 1.5));
             return {
                 id: item.id,
                 type: 'FAMILY_HEIR' as const,
                 name: item.name,
-                role: age >= 18 ? `Family heir • age ${age}` : `Designated heir • age ${age}`,
-                readinessScore: readiness,
-                readinessNote: age >= 18 ? 'Eligible through the existing family legacy handoff' : 'May be designated now; operations wait until adulthood',
+                role: `${item.relation} · age ${age}`,
+                readinessScore: streamingConnectionSkill(platform.simulationSeed, item, age),
+                readinessNote: age >= 18 ? CONNECTION_NOTE[item.relation]! : 'Can take over at 18',
                 canOperateNow: age >= 18,
             };
         });
@@ -311,15 +358,23 @@ const appendEraFacts = (
 export const enactStreamingSuccession = (
     player: Player,
     founderRoleAfter: Exclude<StreamingFounderOfficeRole, 'FOUNDER_CEO'>,
-): { player: Player; changed: boolean; reason?: 'NO_PLAN' | 'ALREADY_TRANSITIONED' | 'FAMILY_HANDOFF_REQUIRED' | 'EXECUTIVE_NOT_ACTIVE' } => {
+): { player: Player; changed: boolean; reason?: 'NO_PLAN' | 'ALREADY_TRANSITIONED' | 'TOO_YOUNG' | 'EXECUTIVE_NOT_ACTIVE' } => {
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     const plan = platform.legacy.successionPlan;
     if (!plan) return { player, changed: false, reason: 'NO_PLAN' };
     if (plan.status === 'TRANSITIONED') return { player, changed: false, reason: 'ALREADY_TRANSITIONED' };
-    if (plan.candidateType === 'FAMILY_HEIR') return { player, changed: false, reason: 'FAMILY_HANDOFF_REQUIRED' };
-    const executive = platform.leadership.appointments.find(item => item.executiveId === plan.candidateId && item.status === 'ACTIVE');
-    if (!executive) return { player, changed: false, reason: 'EXECUTIVE_NOT_ACTIVE' };
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+    /* #203: someone from your connections: they come on as chief executive, without a chair at the table */
+    let joining: OwnedStreamingExecutiveAppointment | null = null;
+    if (plan.candidateType === 'FAMILY_HEIR') {
+        const relationship = (player.relationships || []).find(item => item.id === plan.candidateId);
+        const candidate = getStreamingSuccessionCandidates(player).find(item => item.type === 'FAMILY_HEIR' && item.id === plan.candidateId);
+        if (!relationship || !candidate) return { player, changed: false, reason: 'EXECUTIVE_NOT_ACTIVE' };
+        if (!candidate.canOperateNow) return { player, changed: false, reason: 'TOO_YOUNG' };
+        joining = streamingConnectionCeo(platform, relationship, candidate.readinessScore, absoluteWeek);
+    }
+    const executive = joining || platform.leadership.appointments.find(item => item.executiveId === plan.candidateId && item.status === 'ACTIVE');
+    if (!executive) return { player, changed: false, reason: 'EXECUTIVE_NOT_ACTIVE' };
     const closedEra = buildClosedEra(player, platform, absoluteWeek, 'FOUNDER_TRANSITION');
     const eraFacts = appendEraFacts(platform, absoluteWeek, closedEra, executive.nameAtAppointment, plan.mandate, 'FOUNDER_TRANSITION');
     const successionKey = `streaming-successor-appointed:${absoluteWeek}:${executive.executiveId}`;
@@ -341,6 +396,7 @@ export const enactStreamingSuccession = (
                 ...platform,
                 leadership: {
                     ...platform.leadership,
+                    ...(joining ? { appointments: [...platform.leadership.appointments, joining] } : {}),
                     currentCeo: { holderType: 'EXECUTIVE', executiveId: executive.executiveId, sinceAbsoluteWeek: absoluteWeek },
                 },
                 legacy: {
@@ -490,23 +546,6 @@ export const getStreamingEraWeeklyEffects = (platform: OwnedStreamingPlatformSta
     playbackBoost: 0,
 });
 
-const rebaseAbsoluteWeeks = (value: unknown, offset: number, key = ''): unknown => {
-    if (Array.isArray(value)) return value.map(item => rebaseAbsoluteWeeks(item, offset));
-    if (value && typeof value === 'object') {
-        return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([childKey, childValue]) => (
-            [childKey, rebaseAbsoluteWeeks(childValue, offset, childKey)]
-        )));
-    }
-    if (
-        typeof value === 'number'
-        && Number.isFinite(value)
-        && (key === 'absoluteWeek' || key.endsWith('AbsoluteWeek'))
-    ) {
-        return Math.max(0, value - offset);
-    }
-    return value;
-};
-
 export const rebaseOwnedStreamingPlatformForLegacy = (
     platformValue: OwnedStreamingPlatformState,
     fromAbsoluteWeek: number,
@@ -514,7 +553,7 @@ export const rebaseOwnedStreamingPlatformForLegacy = (
 ): OwnedStreamingPlatformState => {
     const offset = Math.max(0, fromAbsoluteWeek - toAbsoluteWeek);
     if (!offset) return platformValue;
-    const rebased = rebaseAbsoluteWeeks(platformValue, offset) as OwnedStreamingPlatformState;
+    const rebased = rebaseLegacyWeeks(platformValue, offset);
     return {
         ...rebased,
         processedWeekKeys: [],
@@ -524,11 +563,106 @@ export const rebaseOwnedStreamingPlatformForLegacy = (
     };
 };
 
+/*
+ * #207 (plan §23.8): what happens to the company when you die. Zeesh (2026-11-04): "agar mai mar jau to mera beta ya koi
+ * bhi takeover kare to kya scene hai", "waisa hi karo jaisa real life me hota agar stake me lagta hai to lagao".
+ *
+ * The estate pays 25% of the stake's value, as cash and shares already do. The heir chooses: pay it from the cash they
+ * inherit (when that covers it) and keep the shares, or sell a quarter of the shares. A chief executive already in place
+ * stays, and the heir holds the shares (and the chair, if you held it). If you ran it: at 51% or more the heir chooses to
+ * run it or hand it to your named successor; under it the board picks. The board loses 5 confidence; once listed the
+ * price falls 3–8% that week, with the new chief executive's skill on top. The next character is still a child: that is
+ * the game's rule.
+ */
+export const STREAMING_ESTATE_TAX = 0.25;
+export interface StreamingHandoffChoice { estate?: 'PAY_CASH' | 'SELL_SHARES' | 'OVER_TIME'; run?: 'HEIR' | 'SUCCESSOR' }
+export interface StreamingEstate {
+    company: string;
+    stakePercent: number;
+    stakeValue: number;
+    tax: number;
+    /** the cash the heir inherits, before this */
+    inheritedMoney: number;
+    canPayCash: boolean;
+    /** the heir's stake if shares are sold to pay it */
+    percentIfSold: number;
+    /** #221: over time, from the wallet */
+    overTime: { quarterly: number; quarters: number; ratePercent: number };
+    /** what the choice comes to */
+    estate: 'PAY_CASH' | 'SELL_SHARES' | 'OVER_TIME';
+    cashPaid: number;
+    percentAfter: number;
+    /** who runs it after you: who is already there, or who you named */
+    ceoStays: string | null;
+    /** you ran it, at 51% or more: the heir chooses; under it: the board picks this person */
+    heirChooses: boolean;
+    successor: { name: string; skill: number } | null;
+    boardPicks: { name: string; skill: number } | null;
+}
+
+/** the successor the handoff would use, for this heir: the one you named, else (for the board) the best of the team */
+const handoffSuccessor = (parent: Player, platform: OwnedStreamingPlatformState, heirId?: string) => {
+    const plan = platform.legacy.successionPlan;
+    const active = platform.leadership.appointments.filter(item => item.status === 'ACTIVE');
+    if (plan?.candidateType === 'EXECUTIVE') {
+        const named = active.find(item => item.executiveId === plan.candidateId);
+        if (named) return { name: named.nameAtAppointment, skill: named.skill, executiveId: named.executiveId, relationship: null as Relationship | null };
+    }
+    if (plan?.candidateType === 'FAMILY_HEIR' && plan.candidateId !== heirId) {
+        const relationship = (parent.relationships || []).find(item => item.id === plan.candidateId);
+        const candidate = getStreamingSuccessionCandidates(parent).find(item => item.type === 'FAMILY_HEIR' && item.id === plan.candidateId);
+        if (relationship && candidate?.canOperateNow) return { name: relationship.name, skill: candidate.readinessScore, executiveId: `connection:${relationship.id}`, relationship };
+    }
+    return null;
+};
+const bestOfTheTeam = (platform: OwnedStreamingPlatformState) => {
+    const best = [...platform.leadership.appointments].filter(item => item.status === 'ACTIVE' && item.role !== 'CEO').sort((a, b) => b.skill - a.skill)[0];
+    return best ? { name: best.nameAtAppointment, skill: best.skill, executiveId: best.executiveId, relationship: null as Relationship | null } : null;
+};
+
+export const getStreamingEstate = (player: Player, choice: StreamingHandoffChoice = {}): StreamingEstate | null => {
+    const source = player.ownedStreamingPlatform;
+    if (!source?.identity || source.lifecycle !== 'ACTIVE' || !source.launchCommit) return null;
+    const platform = normalizeOwnedStreamingPlatformState(source, player.id);
+    const stakePercent = platform.founderOwnershipPercent;
+    if (stakePercent <= 0) return null;
+    const stakeValue = Math.round(getStreamingEquityValuation(platform) * stakePercent / 100);
+    /* #221: what an earlier estate still owes falls due with this one */
+    const tax = Math.round(stakeValue * STREAMING_ESTATE_TAX) + (platform.governance.estatePlan?.owed || 0);
+    const inheritedMoney = getLegacyInheritancePreview(player).inheritedMoney;
+    const canPayCash = tax <= inheritedMoney;
+    const estate = choice.estate === 'OVER_TIME' ? 'OVER_TIME' : choice.estate === 'SELL_SHARES' || !canPayCash ? 'SELL_SHARES' : 'PAY_CASH';
+    const percentIfSold = Math.round(stakePercent * Math.max(0, 1 - tax / Math.max(1, stakeValue)) * 100) / 100;
+    const percentAfter = estate === 'SELL_SHARES' ? percentIfSold : stakePercent;
+    const sitting = platform.leadership.currentCeo.holderType === 'EXECUTIVE'
+        ? platform.leadership.appointments.find(item => item.executiveId === platform.leadership.currentCeo.executiveId && item.status === 'ACTIVE') : null;
+    const named = handoffSuccessor(player, platform);
+    const picks = named || bestOfTheTeam(platform);
+    return {
+        company: platform.identity!.name,
+        stakePercent,
+        stakeValue,
+        tax,
+        inheritedMoney,
+        canPayCash,
+        percentIfSold,
+        overTime: { quarterly: streamingEstateQuarterly(tax), quarters: STREAMING_ESTATE_QUARTERS, ratePercent: STREAMING_ESTATE_RATE * 100 },
+        estate,
+        cashPaid: estate === 'PAY_CASH' ? tax : 0,
+        percentAfter,
+        ceoStays: sitting?.nameAtAppointment || null,
+        heirChooses: !sitting && percentAfter >= 51,
+        successor: named ? { name: named.name, skill: named.skill } : null,
+        boardPicks: !sitting && percentAfter < 51 && picks ? { name: picks.name, skill: picks.skill } : null,
+    };
+};
+
 export const handoffOwnedStreamingPlatformToHeir = (
     parent: Player,
     heir: Pick<Relationship, 'id' | 'name'>,
     heirAge: number,
     heirWeek: number,
+    choice: StreamingHandoffChoice = {},
 ): OwnedStreamingPlatformState => {
     const parentPlatform = normalizeOwnedStreamingPlatformState(parent.ownedStreamingPlatform, parent.id);
     if (!parentPlatform.identity) return parentPlatform;
@@ -538,6 +672,85 @@ export const handoffOwnedStreamingPlatformToHeir = (
         rebaseOwnedStreamingPlatformForLegacy(parentPlatform, parentWeek, heirAbsoluteWeek),
         parent.id,
     );
+    /* a company you sold or left is on record and nothing more */
+    if (parentPlatform.lifecycle !== 'ACTIVE') return compactOwnedStreamingPlatformForPersistence(rebased, parent.id);
+    const died = Boolean(parent.flags?.isDead);
+    const estate = getStreamingEstate(parent, choice);
+    const name = parentPlatform.identity.name;
+
+    /* the estate: from the cash inherited (the app takes it there), or a quarter of the shares */
+    let shares = rebased;
+    if (estate?.estate === 'SELL_SHARES') {
+        const sold = estate.stakePercent - estate.percentIfSold;
+        const listing = rebased.publicCompany.lifecycle === 'PUBLIC' ? rebased.publicCompany.listing : null;
+        const rng = createDeterministicRng(`${rebased.simulationSeed}:estate:${heir.id}`);
+        const buyers = getIndustryPeople(parent).filter(person => person.kind === 'INVESTOR' && !rebased.finance.equityHolders.some(holder => holder.holderName === person.name));
+        const buyer = buyers[Math.floor(rng() * buyers.length) % Math.max(1, buyers.length)]?.name || 'Private buyers';
+        const holderName = listing ? PUBLIC_FLOAT_HOLDER : buyer;
+        const existing = rebased.finance.equityHolders.find(holder => holder.holderName === holderName);
+        shares = {
+            ...rebased,
+            founderOwnershipPercent: estate.percentIfSold,
+            finance: {
+                ...rebased.finance,
+                equityHolders: existing
+                    ? rebased.finance.equityHolders.map(holder => (holder === existing ? { ...holder, ownershipPercent: Math.round((holder.ownershipPercent + sold) * 10_000) / 10_000 } : holder))
+                    : [...rebased.finance.equityHolders, {
+                        id: createDeterministicId('streaming_equity', rebased.simulationSeed, `estate:${heir.id}`),
+                        holderName, ownershipPercent: Math.round(sold * 10_000) / 10_000, investedCapital: Math.round(estate.tax), issuedAtAbsoluteWeek: heirAbsoluteWeek,
+                    }],
+            },
+            publicCompany: listing ? { ...rebased.publicCompany, listing: { ...listing, publicShares: listing.publicShares + Math.round(listing.sharesOutstanding * sold / 100) } } : rebased.publicCompany,
+        };
+    }
+
+    /* who runs it */
+    const sitting = shares.leadership.currentCeo.holderType === 'EXECUTIVE'
+        ? shares.leadership.appointments.find(item => item.executiveId === shares.leadership.currentCeo.executiveId && item.status === 'ACTIVE') || null : null;
+    const heirWasCeo = sitting?.executiveId === `connection:${heir.id}`;
+    let appointments = shares.leadership.appointments;
+    let currentCeo: OwnedStreamingPlatformState['leadership']['currentCeo'] = { holderType: 'FOUNDER', executiveId: null, sinceAbsoluteWeek: heirAbsoluteWeek };
+    let founderOfficeRole: OwnedStreamingPlatformState['legacy']['founderOfficeRole'] = 'FOUNDER_CEO';
+    let newCeo: { name: string; skill: number; executiveId: string } | null = null;
+    let runner = heir.name;
+    if (heirWasCeo) {
+        appointments = appointments.map(item => (item.id === sitting!.id
+            ? { ...item, status: 'RESIGNED' as const, endedAtAbsoluteWeek: heirAbsoluteWeek, exit: { reason: 'RESIGNED' as const, sudden: false, pricedAtAbsoluteWeek: heirAbsoluteWeek, wasCeo: true } } : item));
+    } else if (sitting) {
+        currentCeo = shares.leadership.currentCeo;
+        founderOfficeRole = shares.legacy.founderOfficeRole;
+        runner = sitting.nameAtAppointment;
+    } else {
+        const named = handoffSuccessor(parent, shares, heir.id);
+        const handsOver = shares.founderOwnershipPercent >= 51 ? (choice.run === 'SUCCESSOR' ? named : null) : named || bestOfTheTeam(shares);
+        if (handsOver) {
+            if (handsOver.relationship) appointments = [...appointments, streamingConnectionCeo(shares, handsOver.relationship, handsOver.skill, heirAbsoluteWeek)];
+            currentCeo = { holderType: 'EXECUTIVE', executiveId: handsOver.executiveId, sinceAbsoluteWeek: heirAbsoluteWeek };
+            founderOfficeRole = 'EXECUTIVE_CHAIR';
+            newCeo = handsOver;
+            runner = handsOver.name;
+        }
+    }
+    const handoffWords = sitting && !heirWasCeo ? `${runner} keeps running ${name}; ${heir.name} inherits the founder's shares.`
+        : newCeo ? `${runner} takes over at ${name}; ${heir.name} inherits the founder's shares.`
+            : `${heir.name} inherits ${name}, and will run it.`;
+
+    /* the reaction: the board, and once listed the price, once */
+    const shock = createDeterministicRng(`${rebased.simulationSeed}:founder-death:${heir.id}`)();
+    const deathMove = died ? -(0.03 + shock * 0.05) + (newCeo ? Math.max(-0.05, Math.min(0.05, (newCeo.skill - 60) / 800)) : 0) : 0;
+    const boardAfter = Math.max(0, Math.min(100, shares.governance.boardConfidence - (died ? 5 : 0) + (newCeo ? Math.round((newCeo.skill - 60) / 4) : 0)));
+    const newCeoFact: OwnedStreamingLedgerEntry | null = newCeo ? (() => {
+        const key = `streaming-successor-appointed:${heirAbsoluteWeek}:${newCeo!.executiveId}`;
+        return {
+            id: createDeterministicId('streaming_event', parentPlatform.simulationSeed, key),
+            idempotencyKey: key,
+            absoluteWeek: heirAbsoluteWeek,
+            type: 'SUCCESSOR_APPOINTED',
+            summary: `${newCeo!.name} became Chief Executive after ${parent.name}${died ? "'s death" : ' stepped back'}.`,
+            source: 'SYSTEM',
+            metadata: { executiveId: newCeo!.executiveId, founderRoleAfter: founderOfficeRole, readinessScore: newCeo!.skill },
+        } as OwnedStreamingLedgerEntry;
+    })() : null;
     const closedEra = buildClosedEra(parent, parentPlatform, parentWeek, 'GENERATION_HANDOFF');
     const handoffKey = `streaming-generation-handoff:${parent.id}:${heir.id}:${parentWeek}`;
     const handoffFact: OwnedStreamingLedgerEntry = {
@@ -545,19 +758,27 @@ export const handoffOwnedStreamingPlatformToHeir = (
         idempotencyKey: handoffKey,
         absoluteWeek: heirAbsoluteWeek,
         type: 'GENERATION_HANDOFF',
-        summary: `${heir.name} inherited the operating platform and opened a new family era.`,
+        summary: handoffWords,
         source: 'PLAYER_ACTION',
-        metadata: { parentName: parent.name, heirName: heir.name, eraNumber: parentPlatform.legacy.currentEraNumber + 1 },
+        metadata: { parentName: parent.name, heirName: heir.name, eraNumber: parentPlatform.legacy.currentEraNumber + 1, died },
     };
     return compactOwnedStreamingPlatformForPersistence({
-        ...rebased,
+        ...shares,
+        governance: {
+            ...shares.governance,
+            boardConfidence: boardAfter,
+            ...(deathMove && shares.publicCompany.lifecycle === 'PUBLIC' ? { founderDeath: { move: deathMove } } : {}),
+            /* #221: paid now, or over time; what an earlier estate owed is in this bill */
+            ...(estate ? { estatePlan: estate.estate === 'OVER_TIME' ? startStreamingEstatePlan(estate.tax, heirAbsoluteWeek) : null } : {}),
+        },
         leadership: {
-            ...rebased.leadership,
-            currentCeo: { holderType: 'FOUNDER', executiveId: null, sinceAbsoluteWeek: heirAbsoluteWeek },
+            ...shares.leadership,
+            appointments,
+            currentCeo,
         },
         legacy: {
             ...rebased.legacy,
-            founderOfficeRole: 'FOUNDER_CEO',
+            founderOfficeRole,
             currentEraNumber: parentPlatform.legacy.currentEraNumber + 1,
             currentEraStartedAtAbsoluteWeek: heirAbsoluteWeek,
             currentMandate: parentPlatform.legacy.successionPlan?.candidateType === 'FAMILY_HEIR'
@@ -567,12 +788,12 @@ export const handoffOwnedStreamingPlatformToHeir = (
             successionPlan: null,
             closedEras: [
                 ...rebased.legacy.closedEras,
-                { ...(rebaseAbsoluteWeeks(closedEra, parentWeek - heirAbsoluteWeek) as OwnedStreamingCompanyEra) },
+                { ...(rebaseLegacyWeeks(closedEra, parentWeek - heirAbsoluteWeek) as OwnedStreamingCompanyEra) },
             ],
             endlessMode: true,
             transitionCount: rebased.legacy.transitionCount + 1,
         },
-        eventLedger: [...rebased.eventLedger, handoffFact],
+        eventLedger: [...rebased.eventLedger, handoffFact, ...(newCeoFact ? [newCeoFact] : [])],
         cinematicQueue: [...rebased.cinematicQueue, {
             id: createDeterministicId('streaming_scene', parentPlatform.simulationSeed, handoffKey),
             idempotencyKey: `streaming-generation-keynote:${handoffKey}`,

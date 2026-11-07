@@ -180,8 +180,12 @@ import { processOwnedStreamingPlatformWeek } from './streamingWeeklyLoop';
 import { runStreamingTeamWeek } from './team/streamingTeam';
 import { processStreamingInvestorRoundsWeek } from './streamingInvestorOffers';
 import { processStreamingCompanySaleWeek } from './streamingCompanySale';
+import { processStreamingStakeSaleWeek } from './streamingControl';
+import { processStreamingFounderMoneyWeek } from './streamingYourMoney';
+import { processStreamingEstatePlanWeek } from './streamingEstatePlan';
 import { processIndustryPeopleWeek } from './industry/industryPeople';
 import { queueStreamingIncidentEvents } from './streamingIncidentEvent';
+import { queueStreamingDecisionEvents } from './streamingDecisionEvent';
 import { advanceStreamingMarketClearances } from './streamingMarkets';
 import {
     appendStreamingOpeningProgrammeTransitions,
@@ -6776,6 +6780,11 @@ export const processGameWeek = async (
             nextPlayer = processStreamingInvestorRoundsWeek(nextPlayer);
             /* #190: a sale's bids come in, lapse, or close (the company goes to the buyer) */
             nextPlayer = processStreamingCompanySaleWeek(nextPlayer);
+            /* #205: the buyer for your own stake */
+            nextPlayer = processStreamingStakeSaleWeek(nextPlayer);
+            /* #209: your salary, a bonus voted, the quarter's dividend */
+            nextPlayer = processStreamingFounderMoneyWeek(nextPlayer);
+            nextPlayer = processStreamingEstatePlanWeek(nextPlayer);
             nextPlayer = runStreamingTeamWeek(nextPlayer);
             emitLoopStage('streaming_team_done');
         } catch (error) {
@@ -6787,6 +6796,14 @@ export const processGameWeek = async (
         nextPlayer = processIndustryPeopleWeek(nextPlayer);
     } catch (error) {
         console.error('Industry people week failed', error);
+    }
+    /* #210: what needs you this week comes up as a popup, after the team has done what it can */
+    if (ownedStreamingResult.processed) {
+        try {
+            nextPlayer = queueStreamingDecisionEvents(nextPlayer, ownedStreamingResult.snapshot?.absoluteWeek);
+        } catch (error) {
+            console.error('Streaming decisions failed', error);
+        }
     }
 
     if (nextPlayer.relationships) {

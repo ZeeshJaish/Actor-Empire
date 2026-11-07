@@ -44,6 +44,7 @@ import {
 } from './streamingIpoPresentationModel';
 import { MarketDesk, Segment } from './StreamingMarketDesk';
 import { PersonFace } from './PersonFace';
+import { TableBoard, type TableSeatView } from './TheTable';
 
 /* ============================================================
    THE SHAPE
@@ -294,7 +295,9 @@ const ListingAsk: React.FC<{
   ask: number; setAsk: (n: number) => void;
   shares: number; setShares: (n: number) => void;
   onGo: () => void;
-}> = ({ brand, inputs, f, ticker, setTicker, ask, setAsk, shares, setShares, onGo }) => {
+  /** #215: why a symbol cannot be used */
+  tickerProblem?: (ticker: string) => string | null;
+}> = ({ brand, inputs, f, ticker, setTicker, ask, setAsk, shares, setShares, onGo, tickerProblem }) => {
   const total = inputs.preIpoShares + shares;
   const price = ask / total;
   const raise = shares * price;
@@ -315,9 +318,12 @@ const ListingAsk: React.FC<{
   const [options, setOptions] = useState(() => [...new Set([ticker, ...tickerOptions(brand.name)])].slice(0, 4));
   const [typing, setTyping] = useState(false);
   const [draft, setDraft] = useState('');
+  const [tickerNote, setTickerNote] = useState<string | null>(null);
   const commitTicker = () => {
     const clean = draft.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 5);
-    if (clean.length >= 2) {
+    const problem = clean.length >= 2 ? tickerProblem?.(clean) || null : null;
+    setTickerNote(problem);
+    if (clean.length >= 2 && !problem) {
       setTicker(clean);
       setOptions(list => (list.includes(clean) ? list : [...list.slice(0, 3), clean]));
     }
@@ -337,7 +343,7 @@ const ListingAsk: React.FC<{
         </div>
 
         <section className={css.aksec}>
-          <div className={css.aklabel}><b>1</b><span>THE TICKER</span></div>
+          <div className={css.aklabel}><b>1</b><span>YOUR NAME ON THE STOCK MARKET</span></div>
           <div className={css.akplate} aria-label={`Ticker ${ticker}`}>
             <span>{ticker.split('').map((letter, index) => <i key={`${letter}${index}`}>{letter}</i>)}</span>
             <em>EMPIRE EXCHANGE</em>
@@ -351,9 +357,10 @@ const ListingAsk: React.FC<{
                 onChange={e => setDraft(e.target.value.toUpperCase().replace(/[^A-Z]/g, ''))}
                 onBlur={commitTicker} onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }} />
             ) : (
-              <button type="button" className={cx(css.akchip, css.aktype)} onClick={() => setTyping(true)}>TYPE</button>
+              <button type="button" className={cx(css.akchip, css.aktype)} onClick={() => setTyping(true)}>YOUR OWN</button>
             )}
           </div>
+          {tickerNote && <p className={css.aknote} role="status">{tickerNote}</p>}
         </section>
 
         <section className={css.aksec}>
@@ -493,33 +500,31 @@ const ListingTable: React.FC<{
 
         <div className={css.tbexecs}>{exec('cfo')}{exec('cto')}</div>
 
-        <div className={css.tbboard}>
-          <div className={css.tbtally}>
-            <span className={css.for}>FOR <b>{forCount}</b></span>
-            <i>THE BOARD · CARRIES ON 4</i>
-            <span className={css.against}><b>{againstCount}</b> AGAINST</span>
-          </div>
-          <div className={css.tbseats}>
-            {seats.map((seat, index) => {
-              const done = index < resolved;
-              /* the first seat is yours, the chair: you do not lobby yourself */
-              const face = faceOf(inputs, seat.name);
-              return (
-                <button key={seat.id} type="button"
-                  className={cx(css.tbseat, done && (seat.lean > 0 ? css.for : css.against), target === seat.id && css.targeted)}
-                  disabled={heard < 3 || voting || used || index === 0}
-                  onClick={() => setTarget(current => (current === seat.id ? null : seat.id))}>
-                  <PersonFace className={css.tbseatface} name={seat.name} gender={face?.gender} src={face?.avatar} />
-                  <b>{index === 0 ? 'You' : seat.name.split(' ')[0]}</b>
-                  <span>{seat.kind.replace(' · CHAIR', '').replace('INVESTOR NOMINEE', 'INVESTOR')}</span>
-                  <em>{!done ? '·' : seat.lean > 0 ? 'FOR' : 'AGAINST'}</em>
-                </button>
-              );
-            })}
-          </div>
-          {reply && <p className={css.tbreply}>{reply}</p>}
-          {finished && <div className={cx(css.tbresult, carried ? css.ok : css.bad)}>{carried ? 'CARRIED' : 'NOT CARRIED'}</div>}
-        </div>
+        <TableBoard
+          center="THE BOARD · CARRIES ON 4"
+          forCount={forCount}
+          againstCount={againstCount}
+          /* the first seat is yours, the chair: you do not lobby yourself */
+          seats={seats.map((seat, index): TableSeatView => {
+            const done = index < resolved;
+            const face = faceOf(inputs, seat.name);
+            return {
+              id: seat.id,
+              name: seat.name,
+              who: index === 0 ? 'You' : seat.name.split(' ')[0],
+              role: seat.kind.replace(' · CHAIR', '').replace('INVESTOR NOMINEE', 'INVESTOR'),
+              gender: face?.gender,
+              avatar: face?.avatar,
+              verdict: !done ? null : seat.lean > 0 ? 'FOR' : 'AGAINST',
+              tone: !done ? null : seat.lean > 0 ? 'for' : 'against',
+              disabled: heard < 3 || voting || used || index === 0,
+            };
+          })}
+          targetId={target}
+          onSeat={id => setTarget(current => (current === id ? null : id))}
+          reply={reply}
+          result={finished ? carried : null}
+        />
 
         {target && !voting && (
           <div className={css.lslobby}>
@@ -1591,7 +1596,8 @@ export const Listing: React.FC<{
   onDone: (r: IpoResult) => void; onBack?: () => void;
   initialCheckpoint?: StreamingListingCheckpoint | null;
   onCheckpoint?: (checkpoint: StreamingListingCheckpoint) => void;
-}> = ({ brand, inputs, onDone, onBack, initialCheckpoint, onCheckpoint }) => {
+  tickerProblem?: (ticker: string) => string | null;
+}> = ({ brand, inputs, onDone, onBack, initialCheckpoint, onCheckpoint, tickerProblem }) => {
   const c = brandColor(brand);
   const hex = hslHex(brand.hue, brand.sat, 58);
   const f = useMemo(() => fundamentalsOf(inputs), [inputs]);
@@ -1767,7 +1773,7 @@ export const Listing: React.FC<{
       </div>
 
       {scene === 'ASK' &&
-        <ListingAsk brand={brand} inputs={inputs} f={f} ticker={ticker} setTicker={setTicker}
+        <ListingAsk brand={brand} inputs={inputs} f={f} ticker={ticker} setTicker={setTicker} tickerProblem={tickerProblem}
           ask={ask} setAsk={setAsk} shares={shares} setShares={setShares} onGo={() => setScene('TABLE')} />}
 
       {scene === 'TABLE' &&

@@ -6,6 +6,7 @@ import { Mark, brandColor, type Brand } from './StreamingBrandVisuals';
 import type { StreamingTeamView } from '../../services/team/streamingTeam';
 import { TeamBar, TeamSheets, TeamTab, type BoardroomTeamActions, type TeamSheet } from './BoardroomTeam';
 import { BoardroomOwnership, type BoardroomOwnershipActions } from './BoardroomOwnership';
+import { BoardSheet } from './BoardroomBoard';
 import type { StreamingSaleView } from '../../services/streamingCompanySale';
 import type { StreamingStepDownView } from '../../services/streamingStepDown';
 import type { StreamingOwnershipView } from '../../services/streamingInvestorOffers';
@@ -14,6 +15,7 @@ import { BoardroomDeals } from './BoardroomDeals';
 import type { StreamingListingDeskView } from '../../services/streamingListingDesk';
 import type { StreamingCashSummary } from '../../services/streamingStudioFinance';
 import type { Gender } from '../../types';
+import { RoomSubtitle } from './RoomSubtitle';
 
 export interface LedgerLine { id: string; label: string; amount: number; note?: string }
 
@@ -85,6 +87,7 @@ interface Props {
   onFileIpo?: () => void;
   onOpenLegacy?: () => void;
   onOpenFinance?: () => void;
+  /** #209: your salary, a bonus, taking money out */
   onOpenTable?: () => void;
   onOpenOwnership?: () => void;
   /** Mergers & acquisitions (main's prop names); without it the DEALS tab is not shown. */
@@ -199,6 +202,9 @@ export const Boardroom = ({
   founderAvatar, founderGender,
 }: Props) => {
   const [teamSheet, setTeamSheet] = useState<TeamSheet | null>(null);
+  /* #217: the board's own sheet, over OWNERSHIP */
+  const [boardOpen, setBoardOpen] = useState(false);
+  const closeBoard = useCallback(() => setBoardOpen(false), []);
   const closeTeamSheet = useCallback(() => setTeamSheet(null), []);
   const hasTeam = Boolean(team && teamActions);
   const accent = brandColor(brand);
@@ -264,7 +270,7 @@ export const Boardroom = ({
         <button className={css.brback} onClick={onBack} aria-label="Back">←</button>
         <div className={css.brtitle}>
           <b>BOARDROOM</b>
-          <span>{hasTeam ? 'MONEY · TEAM · OWNERSHIP' : 'MONEY · PEOPLE · OWNERSHIP'}</span>
+          <RoomSubtitle>{hasTeam ? 'MONEY · TEAM · OWNERSHIP' : 'MONEY · PEOPLE · OWNERSHIP'}</RoomSubtitle>
         </div>
         <span className={css.brmark}><Mark brand={brand} /></span>
       </div>
@@ -385,7 +391,7 @@ export const Boardroom = ({
             )}
 
             <section className={css.brsec}>
-              {door('Studio Finance', 'The full books: statements, every title, the ledger and your own money', onOpenFinance)}
+              {door('Studio Finance', 'The books, and your own money: salary, bonus, taking it out', onOpenFinance)}
             </section>
           </>
         )}
@@ -460,7 +466,7 @@ export const Boardroom = ({
 
         {/* ── OWNERSHIP ── */}
         {tab === 'OWNERSHIP' && ownership && ownershipActions && (
-          <BoardroomOwnership view={ownership} companyName={brand.name} founderName={founderName} actions={ownershipActions} sale={sale} />
+          <BoardroomOwnership view={ownership} companyName={brand.name} founderName={founderName} actions={ownershipActions} sale={sale} onOpenBoard={() => setBoardOpen(true)} />
         )}
         {tab === 'OWNERSHIP' && !(ownership && ownershipActions) && (
           <section className={css.brsec}>
@@ -540,6 +546,7 @@ export const Boardroom = ({
       {/* #165: the in-tray and the week's report, pinned under the TEAM tab */}
       {tab === 'TABLE' && hasTeam && <TeamBar team={team!} onOpen={setTeamSheet} />}
       {hasTeam && <TeamSheets team={team!} sheet={teamSheet} onClose={closeTeamSheet} onOpen={setTeamSheet} actions={teamActions!} stepDown={stepDown} />}
+      {boardOpen && ownership?.board && ownershipActions && <BoardSheet board={ownership.board} actions={ownershipActions} onClose={closeBoard} />}
     </div>
   );
 };

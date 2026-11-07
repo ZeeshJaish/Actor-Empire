@@ -31,7 +31,7 @@ const brand: Brand = {
 } as Brand;
 const noop = () => undefined;
 const actions: BoardroomTeamActions = {
-    setMode: noop, setLimits: noop, hire: () => ({ ok: true }), train: () => ({ ok: true }), dismiss: noop,
+    setMode: noop, setLimits: noop, walkAway: noop, hire: () => ({ ok: true }), train: () => ({ ok: true }), dismiss: noop,
     approve: () => ({ ok: true }), decline: noop, change: noop, nameSuccessor: noop,
 };
 const fresh = (id: string): Player => {
@@ -122,7 +122,7 @@ async function main() {
     trust.candidates.forEach(candidate => assert.ok(hire.includes(candidate.name)));
     /* #180: each CV asks for its own package, with two offers */
     assert.equal((hire.match(/Hire at their ask ⚡15/g) || []).length, 3);
-    assert.equal((hire.match(/15% less/g) || []).length, 3);
+    assert.equal((hire.match(/Make an offer/g) || []).length, 3);
     assert.ok(hire.includes('PAY') && hire.includes('TO SIGN') && hire.includes('OPTIONS'), 'the ask: pay, signing, options');
     assert.match(hire, /\+ /);
     assert.match(hire, /− /);

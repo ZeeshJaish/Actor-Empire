@@ -1427,3 +1427,53 @@
   .sf-health { grid-template-columns: 1fr; }
   .sf-flow-value { font-size: var(--sf-t-2); }
 }
+
+/* ============================================================================
+   #195: Capital for a host that keeps owners and the listing in its own rooms:
+   the company's cash on top, who put it there, your own money, two doors, the
+   last moves. Every block on one width; every pair of tiles two equal halves.
+   ========================================================================== */
+.cp { gap: var(--sf-3); }
+/* #220: The company / Your money */
+.cp-switch { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; padding: 4px; border-radius: 13px; background: var(--sf-raised); border: 1px solid var(--sf-line-hair); }
+.sf .cp-switch button { padding: 10px 6px; border-radius: 10px; text-align: center; font-size: 13px; font-weight: 700; color: var(--sf-fg-3); }
+.sf .cp-switch button.is-on { color: var(--sf-fg-max); background: var(--sf-surface); box-shadow: inset 0 0 0 1px var(--sf-line-strong); }
+.cp-hero { padding: var(--sf-4); border-radius: 16px; border: 1px solid var(--sf-line);
+  background: radial-gradient(120% 90% at 50% 0%, var(--sf-brand-wash, rgba(255,255,255,.05)), transparent 70%), var(--sf-surface); }
+.cp-cash { display: block; margin-top: 4px; font: 400 clamp(38px, 12vw, 48px)/1.05 var(--sf-font-display); letter-spacing: .01em; color: var(--sf-fg-max); }
+.cp-pace { margin-top: 4px; font-size: 13px; font-weight: 600; }
+.cp-pace.is-up { color: var(--sf-good-tint); }
+.cp-pace.is-down { color: #ffc27a; }
+.cp-bar { display: flex; gap: 2px; height: 12px; margin-top: var(--sf-3); border-radius: 6px; overflow: hidden; background: var(--sf-raised); }
+.cp-bar i { display: block; min-width: 3px; flex-basis: 0; }
+.cp-src-founder { background: var(--sf-gold); }
+.cp-src-investors { background: #6f9cff; }
+.cp-src-public { background: #48c98a; }
+.cp-src-loans { background: #ff8a6b; }
+.cp-legend { list-style: none; margin: var(--sf-2) 0 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 14px; }
+.cp-legend li { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 12px; color: var(--sf-fg-3); }
+.cp-legend strong { margin-left: auto; font-weight: 700; color: var(--sf-fg); white-space: nowrap; }
+.cp-dot { flex: 0 0 8px; width: 8px; height: 8px; border-radius: 50%; }
+.cp-note { margin-top: var(--sf-2); font-size: 12px; line-height: 1.45; color: var(--sf-fg-4); }
+.cp-card { padding: var(--sf-3) var(--sf-4) var(--sf-4); border-radius: 16px; border: 1px solid var(--sf-line); background: var(--sf-surface); }
+.cp-head h2 { font: 400 18px/1.2 var(--sf-font-display); letter-spacing: .03em; color: var(--sf-fg-max); text-transform: uppercase; }
+.cp-two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: var(--sf-2); }
+.cp-two > div { min-width: 0; padding: 10px 12px; border-radius: 12px; background: var(--sf-raised); border: 1px solid var(--sf-line-hair); }
+.cp-two span { display: block; font-size: 11px; color: var(--sf-fg-4); }
+.cp-two strong { display: block; margin-top: 3px; font: 400 21px/1.1 var(--sf-font-display); color: var(--sf-fg-max); }
+.cp-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: var(--sf-2); }
+.cp-actions .sf-btn { width: 100%; white-space: nowrap; }
+.cp-actions .sf-btn:only-child { grid-column: 1 / -1; }
+.cp-doors { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.sf .cp-door { display: flex; flex-direction: column; gap: 5px; min-width: 0; padding: 12px; border-radius: 14px; text-align: left; color: inherit;
+  border: 1px solid var(--sf-line); background: var(--sf-surface); }
+.sf .cp-door:active { transform: scale(.98); }
+.cp-door strong { font-size: 14px; font-weight: 700; line-height: 1.25; color: var(--sf-fg-max); overflow-wrap: anywhere; }
+.cp-door small { font-size: 11px; color: var(--sf-fg-4); }
+.cp-moves { list-style: none; margin: var(--sf-2) 0 0; padding: 0; }
+.cp-moves li { display: grid; grid-template-columns: 46px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 9px 0; border-top: 1px solid var(--sf-line-hair); font-size: 13px; }
+.cp-moves li:first-child { border-top: 0; }
+.cp-move-week { font-size: 11px; color: var(--sf-fg-4); }
+.cp-move-label { min-width: 0; color: var(--sf-fg-2); }
+.cp-moves strong { font-weight: 700; white-space: nowrap; }
+

@@ -27,6 +27,8 @@ export interface CompanyFundamentals {
     revenueRunRate: number;
     /** a year's operating earnings (negative for a loss); each adapter says how it measures them */
     earningsTtm: number;
+    /** #208: the profit the earnings multiple is paid on, when it is stricter than that: real, booked profit */
+    bookProfitTtm?: number;
     cash: number;
     debt: number;
     /** streaming: the share of members leaving in a month, in % */
@@ -85,9 +87,10 @@ export const valueCompany = (input: CompanyFundamentals): CompanyValuation => {
     const margin = revenue > 0 ? clamp(input.earningsTtm / revenue, -1, 0.6) : input.earningsTtm < 0 ? -1 : 0;
     const multiple = MULTIPLES[input.kind];
     const revenueMultiple = clamp(multiple.revenue + growth * multiple.growth + margin * multiple.margin, 0.3, 12);
-    const earningsMultiple = input.earningsTtm > 0 ? clamp(multiple.earnings + growth * multiple.earningsGrowth, 5, 40) : 0;
+    const profit = input.bookProfitTtm ?? input.earningsTtm;
+    const earningsMultiple = profit > 0 ? clamp(multiple.earnings + growth * multiple.earningsGrowth, 5, 40) : 0;
     const track = clamp(1 + 0.04 * (positive(input.recentHits) - positive(input.recentFlops)), 0.8, 1.25);
-    const operating = (0.5 * revenue * revenueMultiple + 0.5 * positive(input.earningsTtm) * earningsMultiple) * track;
+    const operating = (0.5 * revenue * revenueMultiple + 0.5 * positive(profit) * earningsMultiple) * track;
     const assets = positive(input.libraryValue) + positive(input.technologyValue);
     const pipeline = positive(input.pipelineValue);
     /* brands and prestige rise and fall with the record too */

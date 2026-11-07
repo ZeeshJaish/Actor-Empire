@@ -23,8 +23,9 @@ import {
     getStreamingTeamView,
     hireStreamingTeamCandidate,
     runStreamingTeamWeek,
+    walkAwayFromStreamingCandidate,
 } from '../services/team/streamingTeam';
-import { TEAM_OPTIONS_HOLDER, streamingCandidateAsk, streamingCompanyAppeal } from '../services/team/teamHiring';
+import { TEAM_OPTIONS_HOLDER, streamingCandidateAsk, streamingCompanyAppeal, streamingOfferChance } from '../services/team/teamHiring';
 
 const fresh = (id: string, name = 'Hiring Audit'): Player => {
     const player = migratePlayerSave({ ...structuredClone(INITIAL_PLAYER), id, name, age: 15, currentWeek: 1 });
@@ -38,6 +39,7 @@ const later = (player: Player, weeks: number): Player => {
     return withEnergy({ ...player, age: player.age + Math.floor(total / 52), currentWeek: (total % 52) + 1 });
 };
 const pass = (label: string) => console.log(`✓ ${label}`);
+const money = (value: number) => `$${Math.round(value / 1_000)}K`;
 const millions = (value: number) => `$${(value / 1e6).toFixed(2)}M`;
 
 async function main() {
@@ -128,12 +130,27 @@ async function main() {
         probe = runStreamingTeamWeek(later(probe, 3));
         const offer = getStreamingTeamCandidates(probe, 'TRUST')[0];
         if (!offer) continue;
-        const result = hireStreamingTeamCandidate(withEnergy(probe), 'TRUST', offer.id, 'LOWER');
-        if (result.reason === 'REFUSED') {
+        const result = hireStreamingTeamCandidate(withEnergy(probe), 'TRUST', offer.id, offer.lower);
+        if (result.reason === 'COUNTERED') {
             no += 1;
             assert.equal(result.player.energy.current, 85, 'a no still spends the energy');
-            const again = hireStreamingTeamCandidate(withEnergy(result.player), 'TRUST', offer.id, 'LOWER');
-            assert.equal(again.reason, 'NOT_ON_OFFER', 'and they are gone for the set');
+            const asked = getStreamingTeamCandidates(result.player, 'TRUST').find(item => item.id === offer.id)!;
+            assert.ok(asked.counter, 'a no comes with a counter');
+            assert.ok(asked.counter!.weekly > offer.lower.weekly && asked.counter!.weekly <= offer.ask.weekly, 'the counter sits between your offer and their ask');
+            assert.ok(asked.counter!.optionsPercent > 0, 'and keeps its options');
+            /* the answer is set: the same offer gets the same no */
+            const again = hireStreamingTeamCandidate(withEnergy(result.player), 'TRUST', offer.id, offer.lower);
+            assert.equal(again.reason, 'COUNTERED', 'asking again changes nothing');
+            /* taking it costs no more energy */
+            const taken = hireStreamingTeamCandidate(withEnergy(result.player), 'TRUST', offer.id, 'COUNTER');
+            assert.ok(taken.changed, taken.message);
+            assert.equal(taken.player.energy.current, 100, 'the counter costs no more energy');
+            assert.equal(platformOf(taken.player).leadership.appointments.find(item => item.executiveId === offer.id && item.status === 'ACTIVE')!.weeklyCompensation, asked.counter!.weekly, 'hired at the counter');
+            /* walking away ends it */
+            const gone = walkAwayFromStreamingCandidate(result.player, offer.id);
+            assert.ok(gone.changed, 'you can walk away');
+            assert.ok(!getStreamingTeamCandidates(gone.player, 'TRUST').some(item => item.id === offer.id), 'and they are gone for the set');
+            probe = gone.player;
         } else {
             assert.ok(result.changed, result.message);
             yes += 1;
@@ -143,7 +160,28 @@ async function main() {
         }
     }
     assert.ok(yes + no > 0, 'lower offers were made');
-    pass(`15% less: ${yes} took it, ${no} said no (each no spent ⚡15 and left them gone for the set)`);
+    pass(`15% less: ${yes} took it, ${no} said no (each no spent ⚡15, came with a counter, and left them gone once you walked away)`);
+
+    /* #198: above their ask buys loyalty; far under it, no talks */
+    {
+        const open = runStreamingTeamWeek(later(withEnergy(player), 60));
+        const person = getStreamingTeamCandidates(open, 'TRUST')[0];
+        assert.ok(person, 'a person to offer to');
+        const basis = person.offerBasis;
+        assert.equal(streamingOfferChance(basis, basis.ask), 1, 'their ask is a yes');
+        assert.ok(Math.abs(streamingOfferChance(basis, { weekly: person.lower.weekly, signing: person.lower.signing, optionsPercent: person.lower.optionsPercent }) - basis.lowerChance) < 0.12, '15% under keeps the chance on the CV');
+        assert.equal(streamingOfferChance(basis, { weekly: 5_000, signing: 0, optionsPercent: 0 }), 0, 'far under is no talks');
+        const generous = { ...basis.ask, weekly: Math.round(basis.ask.weekly * 1.3 / 5_000) * 5_000 };
+        const glad = hireStreamingTeamCandidate(withEnergy(open), 'TRUST', person.id, generous);
+        assert.ok(glad.changed, glad.message);
+        const signed = platformOf(glad.player).leadership.appointments.find(item => item.executiveId === person.id && item.status === 'ACTIVE')!;
+        assert.equal(signed.weeklyCompensation, generous.weekly, 'your figure is their pay');
+        assert.ok(signed.loyalty > person.loyalty, 'more than they asked buys loyalty');
+        const insulted = hireStreamingTeamCandidate(withEnergy(open), 'TRUST', person.id, { weekly: 5_000, signing: 0, optionsPercent: 0 });
+        assert.equal(insulted.reason, 'REFUSED', 'no talks');
+        assert.ok(!getStreamingTeamCandidates(insulted.player, 'TRUST').some(item => item.id === person.id), 'and they are gone for the set');
+        pass(`Your own offer: ${money(generous.weekly)} against an ask of ${money(basis.ask.weekly)} buys loyalty ${person.loyalty} → ${signed.loyalty}; ${money(5_000)} gets no talks`);
+    }
 
     /* ── never under 51% ── */
     const controlled = (() => {

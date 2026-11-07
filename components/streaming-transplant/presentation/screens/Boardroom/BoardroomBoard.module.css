@@ -1,0 +1,67 @@
+/* #217: THE BOARD. One short row on OWNERSHIP, and a sheet of its own, in TEAM's sheet.
+   Buttons need a doubled class: the HQ shell resets every button's font (see BoardroomOwnership.module.css). */
+
+.meter{position:relative;display:block;height:8px;border-radius:999px;background:rgba(255,255,255,.08)}
+.meter i{display:block;height:100%;border-radius:999px;transition:width .3s ease}
+.meter u{position:absolute;top:-2px;bottom:-2px;width:2px;border-radius:2px;background:rgba(255,255,255,.3)}
+.meterGood{background:linear-gradient(90deg,#2f8a55,#3ddc84)}
+.meterWarn{background:linear-gradient(90deg,#b77a12,#f2a516)}
+.meterBad{background:linear-gradient(90deg,#a3262a,#ff5a5f)}
+
+/* ── the row on OWNERSHIP ── */
+.row.row{display:block;width:100%;margin-top:16px;padding:12px 13px;border-radius:14px;text-align:left;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.09);transition:transform .12s}
+.row.row:active{transform:scale(.99)}
+.rowAsk.rowAsk{background:rgba(246,215,143,.06);border-color:rgba(246,215,143,.4)}
+.rowTop{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+.rowTop b{flex:1;min-width:0;font-size:16px;font-weight:900;letter-spacing:-.01em;color:#f1f4f8}
+.rowTop em{flex:none;font-style:normal;font-size:18px;line-height:1;color:#8b93a5}
+.faces{flex:none;display:flex}
+.faces i{display:block;width:24px;height:24px;margin-left:-7px;border-radius:50%;overflow:hidden;background:#1a1d25;box-shadow:0 0 0 2px #0a0c11}
+.faces i:first-child{margin-left:0}
+.rowFoot{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-top:8px;font-size:10px;line-height:1.3;color:#8b93a5}
+.rowFoot span{min-width:0}
+.rowFoot span:last-child{text-align:right}
+
+/* ── the sheet ── */
+.confidence{margin-top:12px;padding:12px;border-radius:14px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08)}
+.confidenceTop{display:flex;align-items:center;gap:11px;margin-bottom:9px}
+.confidenceTop b{flex:none;font:400 30px/1 'Anton','Archivo',sans-serif;color:#f6d78f}
+.confidenceTop small{font:800 11px/1 'Inter',system-ui,sans-serif;color:#7d8698}
+.confidenceTop span{min-width:0;font-size:11.5px;font-weight:700;line-height:1.35;color:#dfe4ec}
+.about{margin-top:10px;list-style:none}
+.about li{position:relative;padding-left:11px;font-size:11px;line-height:1.45;color:#a7afbd}
+.about li + li{margin-top:5px}
+.about li::before{content:'';position:absolute;left:0;top:6px;width:4px;height:4px;border-radius:50%;background:#c9a86a}
+
+.director{margin-bottom:7px;border-radius:13px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08)}
+.directorAsk{border-color:rgba(246,215,143,.4)}
+.directorTop.directorTop{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;width:100%;padding:10px 11px;text-align:left}
+.who{min-width:0}
+.who b{display:block;font-size:13px;font-weight:800;line-height:1.25;color:#eef0f5;overflow-wrap:anywhere}
+.who small{display:block;margin-top:2px;font-size:10px;line-height:1.35;color:#8b93a5}
+.term{text-align:right}
+.term b{display:block;font:400 16px/1 'Anton','Archivo',sans-serif;color:#f1f4f8;white-space:nowrap}
+.term small{display:block;margin-top:3px;font-size:9px;color:#7d8698;white-space:nowrap}
+.renew{padding:0 11px 11px}
+.renew p{font-size:11px;line-height:1.45;color:#f0dcae}
+.more{padding:0 11px 11px}
+.line{margin-top:8px;font-size:10.5px;line-height:1.45;color:#8b93a5}
+.go.go{display:block;width:100%;margin-top:9px;padding:10px 8px;border-radius:11px;text-align:center;font-size:12.5px;font-weight:900;line-height:1.2;color:#2a1a00;background:linear-gradient(#ffd27a,#f2a516)}
+.go.go:active{transform:scale(.98)}
+.remove.remove{display:block;width:100%;margin-top:9px;padding:9px 8px;border-radius:11px;text-align:center;font-size:11.5px;font-weight:800;color:#ff9a9e;background:transparent;border:1px solid rgba(255,90,95,.35)}
+.arm{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:7px;margin-top:9px}
+.removeYes.removeYes{padding:10px 6px;border-radius:11px;text-align:center;font-size:12px;font-weight:900;color:#fff;background:linear-gradient(#d9484d,#a3262a)}
+.keep.keep{padding:10px 6px;border-radius:11px;text-align:center;font-size:12px;font-weight:800;color:#c3cad6;border:1px solid rgba(255,255,255,.14)}
+.toast{margin:4px 0 8px;padding:9px 12px;border-radius:10px;font-size:11px;font-weight:700;line-height:1.4;color:#bfe8cf;background:rgba(61,220,132,.08);border:1px solid rgba(61,220,132,.28)}
+
+.find.find{display:flex;flex-direction:column;align-items:center;gap:3px;width:100%;padding:11px;border-radius:13px;text-align:center;font-size:13px;font-weight:900;color:#f6d78f;background:rgba(246,215,143,.08);border:1px solid rgba(246,215,143,.35)}
+.find small{font-size:9.5px;font-weight:700;color:#a7afbd}
+.person{margin-bottom:8px;padding:11px;border-radius:14px;background:linear-gradient(160deg,rgba(214,172,92,.07),rgba(255,255,255,.02));border:1px solid rgba(214,172,92,.22)}
+.person header{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px}
+.grade{padding:3px 7px;border-radius:99px;font-style:normal;font-size:8.5px;font-weight:900;letter-spacing:.08em;color:#c9d0db;background:rgba(255,255,255,.06)}
+.gradeStar{color:#2a1a00;background:#f6d78f}
+.facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:9px}
+.facts span{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0;padding:7px 4px;border-radius:10px;background:rgba(0,0,0,.24)}
+.facts small{font:800 7.5px/1 'Inter',system-ui,sans-serif;letter-spacing:.1em;color:#7d8698}
+.facts b{font:400 16px/1 'Anton','Archivo',sans-serif;color:#eef0f5;white-space:nowrap}
+.facts i{font-style:normal;font-size:9px;line-height:1;color:#8b93a5}

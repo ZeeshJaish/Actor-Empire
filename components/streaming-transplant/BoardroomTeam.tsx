@@ -29,7 +29,9 @@ import type {
     StreamingTeamJobMode,
     StreamingTeamSeatId,
 } from '../../types';
-import type { StreamingTeamSeatView, StreamingTeamView } from '../../services/team/streamingTeam';
+import type { StreamingTeamCandidate, StreamingTeamSeatView, StreamingTeamView } from '../../services/team/streamingTeam';
+import { streamingOfferChance, streamingOfferRatio, type StreamingHireOffer } from '../../services/team/teamHiring';
+import type { IndustryCareerView } from '../../services/industry/industryCareer';
 import { PersonFace } from './PersonFace';
 import type { StreamingStepDownRole, StreamingStepDownView } from '../../services/streamingStepDown';
 
@@ -38,16 +40,19 @@ export interface BoardroomTeamResult { ok: boolean; message?: string; /** #180: 
 export interface BoardroomTeamActions {
     setMode: (seatId: StreamingTeamSeatId, jobId: StreamingTeamJobId, mode: StreamingTeamJobMode) => void;
     setLimits: (seatId: StreamingTeamSeatId, patch: Partial<Pick<OwnedStreamingTeamSeat, 'weeklyMoney' | 'actionMoney' | 'weeklyEnergy'>>) => void;
-    /** #180: at their ask, or 15% less */
-    hire: (seatId: StreamingTeamSeatId, candidateId: string, offer?: 'ASK' | 'LOWER') => BoardroomTeamResult;
+    /** #180: at their ask; #198: or your own offer, or their counter to it */
+    hire: (seatId: StreamingTeamSeatId, candidateId: string, offer?: 'ASK' | 'COUNTER' | StreamingHireOffer) => BoardroomTeamResult & { countered?: boolean };
+    walkAway: (candidateId: string) => void;
     train: (seatId: StreamingTeamSeatId) => BoardroomTeamResult;
-    dismiss: (seatId: StreamingTeamSeatId) => void;
-    approve: (cardId: string, answer?: StreamingRivalResponseId) => BoardroomTeamResult;
+    dismiss: (seatId: StreamingTeamSeatId) => BoardroomTeamResult;
+    approve: (cardId: string, answer?: StreamingRivalResponseId, givenWeekly?: number) => BoardroomTeamResult;
     decline: (cardId: string) => void;
     /** Change: the room the card is about, to do it your way */
     change: (card: OwnedStreamingTeamCard) => void;
     /** #166: name who takes over if you step down */
     nameSuccessor: (type: 'EXECUTIVE' | 'FAMILY_HEIR', candidateId: string) => void;
+    /** #204: as chair, replace the chief executive */
+    replaceCeo?: (type: 'EXECUTIVE' | 'FAMILY_HEIR', candidateId: string) => BoardroomTeamResult;
     /** #191: step down (Executive Chair, or leave the board), and come back as CEO */
     stepDown?: (role: StreamingStepDownRole) => BoardroomTeamResult;
     returnAsCeo?: () => BoardroomTeamResult;
@@ -252,7 +257,7 @@ export const TeamTab = ({
                     ) : (
                         <span className={css.rowId}>
                             <span className={css.eyebrow}>IF YOU STEP DOWN</span>
-                            <b>{team.succession.plan ? team.succession.plan.name : 'Nobody named'}</b>
+                            <b>{team.succession.plan ? team.succession.plan.name : 'Nobody chosen'}</b>
                             <span>{team.succession.plan ? `${team.succession.plan.role} · readiness ${team.succession.plan.readiness}` : 'The board would choose for you. Name a successor.'}</span>
                         </span>
                     )}
@@ -300,7 +305,8 @@ export const TeamSheets = ({
         <div className={css.scrim} onClick={onClose}>
             <div className={css.sheet} role="dialog" aria-modal="true" onClick={event => event.stopPropagation()}>
                 <span className={css.grip} aria-hidden="true" />
-                <button type="button" className={css.close} onClick={onClose} aria-label="Close">✕</button>
+                {/* #214: stays on screen while the sheet scrolls */}
+                <div className={css.sheetBar}><button type="button" className={css.close} onClick={onClose} aria-label="Close">✕</button></div>
                 {sheet.kind === 'SEAT' && seat?.executive && <Dossier seat={seat} team={team} actions={actions} onClose={onClose} />}
                 {sheet.kind === 'SEAT' && seat && !seat.executive && <Hire seat={seat} team={team} actions={actions} onDone={() => onOpen({ kind: 'SEAT', seatId: seat.seatId })} />}
                 {sheet.kind === 'HIRE' && seat && <Hire seat={seat} team={team} actions={actions} onDone={() => onOpen({ kind: 'SEAT', seatId: seat.seatId })} />}
@@ -358,7 +364,8 @@ const Dossier = ({ seat, team, actions, onClose }: {
     const first = exec.name.split(' ')[0];
     return (
         <div className={css.dossier}>
-            <div className={css.folderTab}>{exec.roleLabel.toUpperCase()}</div>
+            {/* #193: the role centred above the card, on the close button's line; no corner tab */}
+            <div className={css.sheetRole}>{exec.roleLabel.toUpperCase()}</div>
             {/* #183: a symmetric player card: the portrait in the middle, its level as the ring around it */}
             <div className={css.card}>
                 <span className={cx(css.portrait, css[`st_${seat.status}`])} style={{ ['--xp' as string]: `${xpPct}%` }}>
@@ -368,6 +375,8 @@ const Dossier = ({ seat, team, actions, onClose }: {
                 <h3 className={css.cardName}>{exec.name}</h3>
                 <p className={css.cardLine}>{strategy.label} · {strategy.line}</p>
                 <small className={css.cardXp}>{exec.level >= 5 ? 'Top level' : `${Math.max(0, exec.experience - xpFrom)}/18 to level ${exec.level + 1}`}</small>
+                {/* #200: working out their notice */}
+                {exec.notice && <span className={css.cardNotice}>Leaves {exec.notice.weeksLeft <= 0 ? 'this week' : `in ${exec.notice.weeksLeft} week${exec.notice.weeksLeft === 1 ? '' : 's'}`}</span>}
             </div>
 
             <div className={css.tiles}>
@@ -382,13 +391,17 @@ const Dossier = ({ seat, team, actions, onClose }: {
                     <b>{money(exec.salary)}<i>/wk</i></b>
                     {/* #180: their options, and how much has vested */}
                     <em>{exec.options ? `options ${exec.options.percent}%, ${Math.round(exec.options.vested * 100)}% vested` : 'no options'}</em>
+                    {/* #197: a level up raises their pay */}
+                    {seat.train && !training && <em>{money(seat.train.payAfter)} at level {seat.train.nextLevel}</em>}
                 </span>
                 <span className={cx(css.chip, leave > 0 && css.chipWarn)}>
                     <small>RIVAL RISK</small>
                     <b>{leave}%</b>
-                    <em>{leave > 0 ? 'if a rival calls' : 'rivals rarely lure them'}</em>
+                    <em>{exec.underpaid ? `underpaid: the market pays ${money(exec.underpaid.market)}` : leave > 0 ? 'if a rival calls' : 'rivals rarely lure them'}</em>
                 </span>
             </div>
+
+            {exec.career && <CareerList career={exec.career} />}
 
             <h4 className={css.subhead}>Runs for you</h4>
             {seat.jobs.map(job => (
@@ -435,7 +448,7 @@ const Dossier = ({ seat, team, actions, onClose }: {
                 <button type="button" className={css.trainBtn} disabled={training || !seat.train} onClick={() => {
                     if (!seat.train) return;
                     const result = actions.train(seat.seatId);
-                    setNote(result.ok ? `Training started: level ${seat.train.nextLevel} in ${seat.train.weeks} weeks.` : result.message || 'Could not start training.');
+                    setNote(result.ok ? `Training started: level ${seat.train.nextLevel} in ${seat.train.weeks} weeks, and ${money(seat.train.payAfter)} a week from then.` : result.message || 'Could not start training.');
                 }}>
                     {training ? <>In training<small>level {exec.level + 1} in {trainWeeks} wk</small></>
                         : seat.train ? <>Train to level {seat.train.nextLevel}<small>{money(seat.train.cash)} · ⚡{seat.train.energy} · {seat.train.weeks} wk</small></>
@@ -443,9 +456,10 @@ const Dossier = ({ seat, team, actions, onClose }: {
                 </button>
                 <button type="button" className={cx(css.letGo, confirmGo && css.letGoArmed)} onClick={() => {
                     if (!confirmGo) { setConfirmGo(true); return; }
-                    actions.dismiss(seat.seatId);
-                    onClose();
-                }}>{confirmGo ? <>Tap again<small>to let {first} go</small></> : <>Let go<small>the chair empties</small></>}</button>
+                    const result = actions.dismiss(seat.seatId);
+                    if (result.ok) onClose();
+                    else { setConfirmGo(false); setNote(result.message || 'Could not let them go.'); }
+                }}>{confirmGo ? <>Tap again<small>{money(exec.severance)} severance</small></> : <>Let go<small>{money(exec.severance)} severance</small></>}</button>
             </div>
         </div>
     );
@@ -453,15 +467,80 @@ const Dossier = ({ seat, team, actions, onClose }: {
 
 /* ---- the CVs ---- */
 
+/* #199: where they have worked: the two latest, the rest on a tap */
+export const CareerList = ({ career }: { career: IndustryCareerView }) => {
+    const [open, setOpen] = useState(false);
+    const shown = open ? career.jobs : career.jobs.slice(0, 2);
+    const more = career.jobs.length - shown.length;
+    return (
+        <div className={css.career}>
+            <div className={css.careerHead}>
+                <small>CAREER · {career.years} YR{career.years === 1 ? '' : 'S'}</small>
+                {career.alumOf && <em>{career.alumOf}</em>}
+            </div>
+            <ol className={css.careerJobs}>
+                {shown.map((job, index) => (
+                    <li key={`${job.company}-${index}`} className={cx(job.now && css.careerNow, job.ours && css.careerOurs)}>
+                        <div className={css.careerLine}><b>{job.company}</b><span>{job.now ? `now · ${job.span}` : job.span}</span></div>
+                        <small>{job.title}</small>
+                        <p>{job.result}</p>
+                    </li>
+                ))}
+            </ol>
+            {more > 0 && <button type="button" className={css.careerMore} onClick={() => setOpen(true)}>{more} earlier job{more === 1 ? '' : 's'}</button>}
+        </div>
+    );
+};
+
+/* #198: one line of your own offer: their ask as the mark, − and + around your number */
+const OfferLine = ({ label, value, ask, shown, step, min, onChange }: {
+    label: string; value: number; ask: string; shown: string; step: number; min: number; onChange: (next: number) => void;
+}) => (
+    <div className={css.offerLine}>
+        <span className={css.offerLabel}><b>{label}</b><small>asks {ask}</small></span>
+        <button type="button" aria-label={`Less ${label.toLowerCase()}`} disabled={value <= min} onClick={() => onChange(Math.max(min, Math.round((value - step) / step) * step))}>−</button>
+        <b className={css.offerValue}>{shown}</b>
+        <button type="button" aria-label={`More ${label.toLowerCase()}`} onClick={() => onChange(Math.round((value + step) / step) * step)}>+</button>
+    </div>
+);
+
+const OfferPanel = ({ candidate, energy, onSend, onBack }: {
+    candidate: StreamingTeamCandidate; energy: number; onSend: (offer: StreamingHireOffer) => void; onBack: () => void;
+}) => {
+    const basis = candidate.offerBasis;
+    const [offer, setOffer] = useState<StreamingHireOffer>(basis.ask);
+    const chance = Math.round(streamingOfferChance(basis, offer) * 100);
+    const ratio = streamingOfferRatio(basis, offer);
+    const first = candidate.name.split(' ')[0];
+    return (
+        <div className={css.offer}>
+            <OfferLine label="Pay a week" value={offer.weekly} ask={money(basis.ask.weekly)} shown={money(offer.weekly)} step={5_000} min={5_000} onChange={weekly => setOffer({ ...offer, weekly })} />
+            <OfferLine label="To sign" value={offer.signing} ask={money(basis.ask.signing)} shown={money(offer.signing)} step={50_000} min={0} onChange={signing => setOffer({ ...offer, signing })} />
+            <OfferLine label="Options" value={Math.round(offer.optionsPercent * 100)} ask={`${basis.ask.optionsPercent}%`} shown={`${offer.optionsPercent}%`} step={5} min={0} onChange={next => setOffer({ ...offer, optionsPercent: next / 100 })} />
+            <div className={css.offerChance}>
+                <i aria-hidden="true"><em style={{ width: `${chance}%` }} /></i>
+                <span>{chance >= 100 ? (ratio > 1.001 ? `${first} says yes, and it buys loyalty` : `${first} says yes`) : chance <= 0 ? `Too far under: ${first} will not talk` : `${chance}% ${first} says yes. A no comes with a counter`}</span>
+            </div>
+            <div className={css.offerRow}>
+                <button type="button" className={css.hireBtn} onClick={() => onSend(offer)}>Send the offer<small>⚡{energy}</small></button>
+                <button type="button" className={css.lowerBtn} onClick={onBack}>Back</button>
+            </div>
+        </div>
+    );
+};
+
 const Hire = ({ seat, team, actions, onDone }: {
     seat: StreamingTeamSeatView; team: StreamingTeamView; actions: BoardroomTeamActions; onDone: () => void;
 }) => {
     const [signed, setSigned] = useState<string | null>(null);
     const [refused, setRefused] = useState<string[]>([]);
     const [note, setNote] = useState<string | null>(null);
-    const hire = (candidateId: string, offer: 'ASK' | 'LOWER') => {
+    const [offering, setOffering] = useState<string | null>(null);
+    const hire = (candidateId: string, offer: 'ASK' | 'COUNTER' | StreamingHireOffer) => {
         const result = actions.hire(seat.seatId, candidateId, offer);
+        setOffering(null);
         if (result.refused) { setRefused(current => [...current, candidateId]); setNote(result.message || 'They said no.'); return; }
+        if (result.countered) { setNote(result.message || 'They made a counter.'); return; }
         if (!result.ok) { setNote(result.message || 'That hire could not be completed.'); return; }
         setSigned(candidateId);
         setNote(result.message || null);
@@ -494,20 +573,35 @@ const Hire = ({ seat, team, actions, onDone }: {
                     <p className={css.cvPlus}>+ {candidate.strength}</p>
                     <p className={css.cvMinus}>− {candidate.caution}</p>
                     {/* #180: their own package, by who they are and who we are */}
+                    {/* #199: where they have worked */}
+                    <CareerList career={candidate.career} />
                     <div className={css.ask}>
                         <span><small>PAY</small><b>{money(candidate.ask.weekly)}<i>/wk</i></b></span>
                         <span><small>TO SIGN</small><b>{money(candidate.ask.signing)}</b></span>
                         <span><small>OPTIONS</small><b>{candidate.ask.optionsPercent}%</b><i>≈ {money(candidate.ask.optionsValue)}</i></span>
                     </div>
                     <p className={css.askWhy}>{candidate.why}</p>
+                    {candidate.counter && !refused.includes(candidate.id) ? (
+                        <div className={css.counter}>
+                            <b>{candidate.name.split(' ')[0]} would take</b>
+                            <p>{money(candidate.counter.weekly)} a week · {money(candidate.counter.signing)} to sign · {candidate.counter.optionsPercent}% in options</p>
+                            <div className={css.offerRow}>
+                                <button type="button" className={css.hireBtn} disabled={Boolean(signed)} onClick={() => hire(candidate.id, 'COUNTER')}>Take the counter<small>no more energy</small></button>
+                                <button type="button" className={css.lowerBtn} onClick={() => { actions.walkAway(candidate.id); setRefused(current => [...current, candidate.id]); }}>Walk away<small>gone for this set</small></button>
+                            </div>
+                        </div>
+                    ) : offering === candidate.id ? (
+                        <OfferPanel candidate={candidate} energy={team.hireEnergy} onBack={() => setOffering(null)} onSend={offer => hire(candidate.id, offer)} />
+                    ) : (
                     <div className={css.hireRow}>
                         <button type="button" className={css.hireBtn} disabled={Boolean(signed) || refused.includes(candidate.id)} onClick={() => hire(candidate.id, 'ASK')}>
                             Hire at their ask<small>⚡{team.hireEnergy}</small>
                         </button>
-                        <button type="button" className={css.lowerBtn} disabled={Boolean(signed) || refused.includes(candidate.id)} onClick={() => hire(candidate.id, 'LOWER')}>
-                            15% less<small>{Math.round(candidate.lower.chance * 100)}% say yes · ⚡{team.hireEnergy}</small>
+                        <button type="button" className={css.lowerBtn} disabled={Boolean(signed) || refused.includes(candidate.id)} onClick={() => setOffering(candidate.id)}>
+                            Make an offer<small>your own numbers</small>
                         </button>
                     </div>
+                    )}
                     {signed === candidate.id && <span className={css.stamp} aria-hidden="true">SIGNED</span>}
                     {refused.includes(candidate.id) && <span className={cx(css.stamp, css.stampNo)} aria-hidden="true">NO</span>}
                 </article>
@@ -526,6 +620,7 @@ const ANSWERS: Array<{ id: StreamingRivalResponseId; label: string }> = [
 
 /* #171: the button says what approving does: open a room, set a price, or approve at its price */
 const OPEN_LABELS: Record<string, string> = {
+    SUCCESSION: 'Choose someone',
     OWNERSHIP: 'Open the term sheet', NETWORK: 'Open Network', LOCALIZATION: 'Open Localization', ORIGINALS: 'Open the Originals desk',
 };
 const approveLabel = (card: OwnedStreamingTeamCard): string => {
@@ -536,7 +631,27 @@ const approveLabel = (card: OwnedStreamingTeamCard): string => {
     return `Approve${card.cost > 0 ? ` ${money(card.cost)}` : card.energy > 0 ? ` ⚡${card.energy}` : ''}`;
 };
 
+/* #197: a raise answered with your own figure: less than asked costs some loyalty, more buys some */
+const RaiseFigure = ({ card, onGive, onCancel }: { card: OwnedStreamingTeamCard; onGive: (weekly: number) => void; onCancel: () => void }) => {
+    const asked = card.action.kind === 'RAISE' ? card.action.weekly : card.action.kind === 'NOTICE' ? card.action.wants || 0 : 0;
+    const current = card.action.kind === 'RAISE' ? Math.round(asked / (1 + card.action.percent / 100) / 5_000) * 5_000
+        : card.action.kind === 'NOTICE' ? card.action.weekly : 0;
+    const counter = card.action.kind === 'NOTICE';
+    const [weekly, setWeekly] = useState(asked);
+    const percent = current > 0 ? Math.round((weekly / current - 1) * 100) : 0;
+    return (
+        <div className={css.figure}>
+            <button type="button" aria-label="Five thousand less" disabled={weekly <= current} onClick={() => setWeekly(Math.max(current, weekly - 5_000))}>−</button>
+            <div className={css.figureValue}><b>{money(weekly)}<i>/wk</i></b><small>{percent > 0 ? `+${percent}%` : 'no rise'} · {counter ? 'they want' : 'they asked'} {money(asked)}</small></div>
+            <button type="button" aria-label="Five thousand more" onClick={() => setWeekly(weekly + 5_000)}>+</button>
+            <button type="button" className={css.figureGive} onClick={() => onGive(weekly)}>{counter ? `Offer ${money(weekly)}` : `Give ${money(weekly)}`}</button>
+            <button type="button" className={css.figureBack} onClick={onCancel}>Back</button>
+        </div>
+    );
+};
+
 const Tray = ({ team, actions }: { team: StreamingTeamView; actions: BoardroomTeamActions }) => {
+    const [figuring, setFiguring] = useState<string | null>(null);
     const [ghosts, setGhosts] = useState<Array<{ card: OwnedStreamingTeamCard; stamp: 'APPROVED' | 'DECLINED' }>>([]);
     const [note, setNote] = useState<string | null>(null);
     const names = useMemo(() => new Map(team.seats.flatMap(seat => seat.executive ? [[seat.executive.appointmentId, seat.executive.name] as const] : [])), [team.seats]);
@@ -545,7 +660,9 @@ const Tray = ({ team, actions }: { team: StreamingTeamView; actions: BoardroomTe
         setGhosts(current => [...current, { card, stamp }]);
         window.setTimeout(() => setGhosts(current => current.filter(item => item.card.id !== card.id)), 900);
     };
-    const live = team.tray.filter(card => !ghosts.some(ghost => ghost.card.id === card.id));
+    /* #200: someone giving notice comes first */
+    const live = team.tray.filter(card => !ghosts.some(ghost => ghost.card.id === card.id))
+        .sort((left, right) => Number(right.action.kind === 'NOTICE') - Number(left.action.kind === 'NOTICE'));
     const shown = [...ghosts.map(ghost => ({ card: ghost.card, stamp: ghost.stamp })), ...live.map(card => ({ card, stamp: null as null }))];
     return (
         <div className={css.trayWrap}>
@@ -560,12 +677,14 @@ const Tray = ({ team, actions }: { team: StreamingTeamView; actions: BoardroomTe
                 const pitch = card.action.kind === 'ORIGINAL_PITCH';
                 /* #181: an ambitious executive asks for a raise */
                 const raise = card.action.kind === 'RAISE';
+                /* #200: someone has given notice */
+                const notice = card.action.kind === 'NOTICE';
                 const weeksLeft = Math.max(0, card.expiresAtAbsoluteWeek - team.absoluteWeek);
                 return (
                     <article key={card.id} className={cx(css.memo, call && css.memoCall, pitch && css.memoPitch, stamp && css.memoLeaving)}>
                         <header className={css.memoHead}>
-                            <span>{call ? 'URGENT CALL' : pitch ? 'PITCH · ORIGINAL' : raise ? 'PAY REVIEW' : 'MEMO'}</span>
-                            <span>{weeksLeft === 0 ? 'answer this week' : `waits ${weeksLeft} week${weeksLeft === 1 ? '' : 's'}`}</span>
+                            <span>{call ? 'URGENT CALL' : pitch ? 'PITCH · ORIGINAL' : raise ? 'PAY REVIEW' : notice ? 'NOTICE' : 'MEMO'}</span>
+                            <span>{notice ? (weeksLeft === 0 ? 'leaves this week' : `leaves in ${weeksLeft} week${weeksLeft === 1 ? '' : 's'}`) : weeksLeft === 0 ? 'answer this week' : `waits ${weeksLeft} week${weeksLeft === 1 ? '' : 's'}`}</span>
                         </header>
                         <p className={css.memoFrom}><b>From</b> {from}, {seatLabel(card.seatId)} · <b>To</b> You</p>
                         {pitch ? (
@@ -601,17 +720,33 @@ const Tray = ({ team, actions }: { team: StreamingTeamView; actions: BoardroomTe
                                 }}>Take it to the desk</button>
                                 <button type="button" className={css.no} onClick={() => { actions.decline(card.id); leave(card, 'DECLINED'); }}>Pass</button>
                             </div>
+                        ) : notice && figuring !== card.id ? (
+                            <div className={css.memoActions}>
+                                {card.action.kind === 'NOTICE' && card.action.wants
+                                    ? <button type="button" className={css.approve} onClick={() => setFiguring(card.id)}>Counter</button>
+                                    : null}
+                                <button type="button" className={css.no} onClick={() => { actions.decline(card.id); leave(card, 'DECLINED'); }}>Let them go</button>
+                            </div>
+                        ) : (raise || notice) && figuring === card.id ? (
+                            <RaiseFigure card={card} onCancel={() => setFiguring(null)} onGive={weekly => {
+                                const result = actions.approve(card.id, undefined, weekly);
+                                setFiguring(null);
+                                if (result.message) setNote(result.message);
+                                if (result.ok) leave(card, 'APPROVED'); else setNote(result.message || 'That could not be done.');
+                            }} />
                         ) : (
                             <div className={css.memoActions}>
                                 <button type="button" className={css.approve} onClick={() => {
                                     const result = actions.approve(card.id);
                                     if (result.ok) leave(card, 'APPROVED'); else setNote(result.message || 'That could not be done.');
                                 }}>{approveLabel(card)}</button>
-                                {!raise && <button type="button" className={css.change} onClick={() => actions.change(card)}>Change</button>}
+                                {raise
+                                    ? <button type="button" className={css.change} onClick={() => setFiguring(card.id)}>Your figure</button>
+                                    : <button type="button" className={css.change} onClick={() => actions.change(card)}>Change</button>}
                                 <button type="button" className={css.no} onClick={() => { actions.decline(card.id); leave(card, 'DECLINED'); }}>No</button>
                             </div>
                         ))}
-                        {stamp && <span className={cx(css.stamp, stamp === 'DECLINED' && css.stampNo)} aria-hidden="true">{pitch ? (stamp === 'APPROVED' ? 'TAKEN' : 'PASSED') : stamp}</span>}
+                        {stamp && <span className={cx(css.stamp, stamp === 'DECLINED' && css.stampNo)} aria-hidden="true">{pitch ? (stamp === 'APPROVED' ? 'TAKEN' : 'PASSED') : notice ? 'ANSWERED' : stamp}</span>}
                     </article>
                 );
             })}
@@ -634,7 +769,7 @@ const StepDown = ({ view, actions }: { view: StreamingStepDownView; actions: Boa
                 <span className={css.eyebrow}>CHIEF EXECUTIVE</span>
                 <b>{view.ceo.name} runs the company</b>
                 <p>{view.role === 'EXECUTIVE_CHAIR' ? 'You chair the board and keep your shares.' : 'You keep your shares; you left the board.'} The team does every job it can itself.</p>
-                <p className={css.stepDownWho}>{view.returnBy === 'YOURS' ? 'At 51% or more, coming back is yours to decide.' : `Under 51%, the board decides: it agrees from 60 confidence (now ${view.boardConfidence}).`}</p>
+                <p className={css.stepDownWho}>{view.returnLine}</p>
                 {armed === 'RETURN' ? (
                     <div className={css.stepDownActions}>
                         <button type="button" className={css.stepDownYes} onClick={() => act(actions.returnAsCeo!())}>Come back as CEO</button>
@@ -648,7 +783,7 @@ const StepDown = ({ view, actions }: { view: StreamingStepDownView; actions: Boa
     return (
         <div className={css.stepDown}>
             <span className={css.eyebrow}>STEP DOWN</span>
-            <b>{view.successor ? `${view.successor.name} takes over` : 'Name a successor below'}</b>
+            <b>{view.successor ? `${view.successor.name} takes over` : 'Choose a successor below'}</b>
             <p>They run the company through the team: every job they can do themselves, they do. The board{view.successor ? ` (and the market, once listed) react${view.successor.skill >= 60 ? 's well' : 's warily'} to them` : ' reacts to who they are'}. You can come back as CEO.</p>
             {view.stepDownBlocked ? <p className={css.stepDownWho}>{view.stepDownBlocked}</p> : armed && armed !== 'RETURN' ? (
                 <div className={css.stepDownActions}>
@@ -659,11 +794,44 @@ const StepDown = ({ view, actions }: { view: StreamingStepDownView; actions: Boa
             ) : (
                 <div className={css.stepDownChoices}>
                     <button type="button" className={css.stepDownChoice} onClick={() => setArmed('EXECUTIVE_CHAIR')}><b>Executive Chair</b><span>Keep your shares and your seat</span></button>
-                    <button type="button" className={css.stepDownChoice} onClick={() => setArmed('LEAVE_BOARD')}><b>Leave the board</b><span>Keep your shares only</span></button>
+                    <button type="button" className={css.stepDownChoice} onClick={() => setArmed('LEAVE_BOARD')}><b>Leave the board</b><span>{view.noShares ? 'You hold no shares: you would be out' : 'Keep your shares only'}</span></button>
                 </div>
             )}
             {note && <p className={css.toast} role="status">{note}</p>}
         </div>
+    );
+};
+
+/* #204: who else could run it: the same two groups; yours at 51%, else the board's */
+const ReplaceCeo = ({ team, stepDown, actions }: { team: StreamingTeamView; stepDown: StreamingStepDownView; actions: BoardroomTeamActions }) => {
+    const [note, setNote] = useState<string | null>(null);
+    const [armed, setArmed] = useState<string | null>(null);
+    const people = team.succession.candidates.filter(candidate => candidate.name !== stepDown.ceo.name);
+    return (
+        <>
+            <h4 className={css.subhead}>Replace {stepDown.ceo.name.split(' ')[0]}</h4>
+            <p className={css.sheetLine}>{stepDown.returnLine} The board and the market react to who you name.</p>
+            {people.map(candidate => {
+                const key = `${candidate.type}:${candidate.id}`;
+                return (
+                    <div key={key} className={css.heir}>
+                        <span className={css.rowAv}><PersonFace name={candidate.name} gender={candidate.gender} /></span>
+                        <span className={css.rowId}>
+                            <b>{candidate.name}</b>
+                            <span>{candidate.role} · {candidate.readinessNote}</span>
+                            <i className={css.readiness}><em style={{ width: `${Math.max(0, Math.min(100, candidate.readinessScore))}%` }} /></i>
+                        </span>
+                        <button type="button" className={css.nameBtn} onClick={() => {
+                            if (armed !== key) { setArmed(key); return; }
+                            const result = actions.replaceCeo!(candidate.type, candidate.id);
+                            setArmed(null);
+                            setNote(result.message || (result.ok ? 'Done.' : 'That could not be done.'));
+                        }}>{armed === key ? 'Tap again' : `Appoint · ${candidate.readinessScore}`}</button>
+                    </div>
+                );
+            })}
+            {note && <p className={css.toast} role="status">{note}</p>}
+        </>
     );
 };
 
@@ -673,22 +841,38 @@ const Succession = ({ team, actions, stepDown }: { team: StreamingTeamView; acti
         <h3 className={css.sheetTitle}>If you step down</h3>
         {stepDown && actions.stepDown && actions.returnAsCeo && <StepDown view={stepDown} actions={actions} />}
         {/* #191: while someone else runs the company, there is no one to name */}
-        {!(stepDown && !stepDown.ceo.you) && <p className={css.sheetLine}>Name who would run the company. You keep your shares; naming someone changes nothing until you hand over.</p>}
-        {!(stepDown && !stepDown.ceo.you) && team.succession.candidates.length === 0 && <p className={css.empty}>No one to name yet. Hire a team, or wait for your family to grow.</p>}
-        {!(stepDown && !stepDown.ceo.you) && team.succession.candidates.map(candidate => {
-            const named = team.succession.plan?.candidateId === candidate.id && team.succession.plan.type === candidate.type;
+        {!(stepDown && !stepDown.ceo.you) && <p className={css.sheetLine}>Choose who would run the company. You keep your shares, and nothing changes until you hand over. The number is how ready they are.</p>}
+        {!(stepDown && !stepDown.ceo.you) && team.succession.candidates.length === 0 && <p className={css.empty}>No one to choose yet. Hire a team, or make some connections.</p>}
+        {/* #204: as chair, replace them */}
+        {stepDown && !stepDown.ceo.you && stepDown.role === 'EXECUTIVE_CHAIR' && actions.replaceCeo && <ReplaceCeo team={team} stepDown={stepDown} actions={actions} />}
+        {/* #203: your team, and the people from your connections */}
+        {!(stepDown && !stepDown.ceo.you) && (['EXECUTIVE', 'FAMILY_HEIR'] as const).map(type => {
+            const people = team.succession.candidates.filter(candidate => candidate.type === type);
+            if (!people.length) return null;
             return (
-                <div key={`${candidate.type}:${candidate.id}`} className={cx(css.heir, named && css.heirNamed)}>
-                    <span className={css.rowAv}><PersonFace name={candidate.name} gender={candidate.gender} /></span>
-                    <span className={css.rowId}>
-                        <b>{candidate.name}</b>
-                        <span>{candidate.role} · {candidate.readinessNote}</span>
-                        <i className={css.readiness}><em style={{ width: `${Math.max(0, Math.min(100, candidate.readinessScore))}%` }} /></i>
-                    </span>
-                    {named
-                        ? <em className={css.namedChip}>Named</em>
-                        : <button type="button" className={css.nameBtn} onClick={() => actions.nameSuccessor(candidate.type, candidate.id)}>Name · {candidate.readinessScore}</button>}
-                </div>
+                <React.Fragment key={type}>
+                    <h4 className={css.subhead}>{type === 'EXECUTIVE' ? 'Your team' : 'Your connections'}</h4>
+                    {people.map(candidate => {
+                        const named = team.succession.plan?.candidateId === candidate.id && team.succession.plan.type === candidate.type;
+                        return (
+                            <div key={`${candidate.type}:${candidate.id}`} className={cx(css.heir, named && css.heirNamed)}>
+                                <span className={css.rowAv}><PersonFace name={candidate.name} gender={candidate.gender} /></span>
+                                <span className={css.rowId}>
+                                    <b>{candidate.name}</b>
+                                    <span>{candidate.role} · {candidate.readinessNote}</span>
+                                    {/* #216: how ready they are, beside its bar; the button only chooses */}
+                                    <span className={css.readyRow}>
+                                        <i className={css.readiness}><em style={{ width: `${Math.max(0, Math.min(100, candidate.readinessScore))}%` }} /></i>
+                                        <b>{candidate.readinessScore}</b>
+                                    </span>
+                                </span>
+                                {named
+                                    ? <em className={css.namedChip}>Chosen</em>
+                                    : <button type="button" className={css.nameBtn} onClick={() => actions.nameSuccessor(candidate.type, candidate.id)}>Choose</button>}
+                            </div>
+                        );
+                    })}
+                </React.Fragment>
             );
         })}
     </div>

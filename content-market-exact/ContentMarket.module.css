@@ -14,7 +14,8 @@
 .mkwrap .mkglow{position:fixed;inset:0;pointer-events:none;z-index:0;
   background:radial-gradient(110% 46% at 50% -6%,rgba(255,190,110,.13),transparent 62%)}
 
-.mkwrap .mktop{position:relative;z-index:1;display:flex;align-items:center;gap:12px;padding:16px 0 12px}
+.mkwrap .mktop{position:sticky;top:0;z-index:6;display:flex;align-items:center;gap:12px;margin:0 -14px;padding:16px 14px 12px;
+  background:radial-gradient(110% 46% at 50% -6%,rgba(255,190,110,.13),transparent 62%) fixed,#07080b}
 .mkwrap .mkback{width:44px;height:44px;flex-shrink:0;border-radius:11px;font-size:15px;color:#eceef3;
   background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.11)}
 .mkwrap .mkmast b{display:block;font-size:13px;font-weight:900;letter-spacing:.2em}
@@ -169,7 +170,7 @@
     0 42px 70px -26px rgba(0,0,0,.92),
     0 24px 90px -34px hsl(var(--epx-mkwrap-dh) 80% 52% / .75)}
 @keyframes epx-mkrise{from{opacity:0;transform:translateY(24px) scale(.94)}to{opacity:1;transform:none}}
-.mkwrap .mkfloat{position:absolute;top:16px;left:14px;z-index:3;
+.mkwrap .mkfloat{position:sticky;top:16px;z-index:6;display:block;margin:16px 0 -60px 14px;
   background:rgba(12,14,20,.55);backdrop-filter:blur(10px)}
 .mkwrap .mkbody{position:relative;z-index:2;padding:0 18px;
   animation:epx-mkbodyup .7s .1s cubic-bezier(.16,.84,.3,1) both}
@@ -447,6 +448,7 @@
    this one is a warm room with a light over a table, a person opposite, and
    a sheet of paper between you. Nothing else in the Market looks like it. */
 .mkwrap .mkoffer{background:#0d0a08}
+.mkwrap .mkoffer .mktop{background:radial-gradient(74% 34% at 50% 0%,rgba(255,196,128,.2),transparent 66%) fixed,#0d0a08}
 .mkwrap .mkoffer .mkglow{background:
   radial-gradient(74% 34% at 50% 0%,rgba(255,196,128,.2),transparent 66%),
   radial-gradient(120% 60% at 50% 100%,rgba(0,0,0,.66),transparent)}

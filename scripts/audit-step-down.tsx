@@ -4,6 +4,7 @@
  *  - they run the company through the team: every job they can do themselves is set to Do it;
  *  - the board's confidence and, once listed, the share price react to their skill ("A new chief executive");
  *  - you can come back as CEO: yours at 51% or more; under it the board decides, and agrees from 60 confidence. */
+import { atTheTable } from './fixtures/atTheTable';
 import assert from 'node:assert/strict';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -39,7 +40,7 @@ async function main() {
     player = { ...player, energy: { current: 100, max: 100 } };
 
     /* ── a successor first ── */
-    assert.equal(stepDownFromStreamingCompany(player, 'EXECUTIVE_CHAIR').message, 'Name a successor first.');
+    assert.equal(stepDownFromStreamingCompany(player, 'EXECUTIVE_CHAIR').message, 'Choose a successor first.');
     const candidate = getStreamingTeamView(player).succession.candidates.find(item => item.type === 'EXECUTIVE')!;
     assert.ok(candidate, 'an executive can be named');
     const named = nameStreamingTeamSuccessor(player, 'EXECUTIVE', candidate.id);
@@ -114,10 +115,12 @@ async function main() {
     const total = back.player.currentWeek - 1 + 26;
     const halfYear = { ...back.player, age: back.player.age + Math.floor(total / 52), currentWeek: (total % 52) + 1 };
     assert.ok(stepDownFromStreamingCompany(halfYear, 'EXECUTIVE_CHAIR').changed, 'and can take over again after 26 weeks');
-    const minority = withPlatform(chair.player, platform => ({ ...platform, founderOwnershipPercent: 40, governance: { ...platform.governance, boardConfidence: 45 } }));
-    assert.match(returnAsStreamingCeo(minority).message, /^The board backs .+: it wants them to stay \(confidence 45, it needs 60\)\.$/);
-    const trusted = withPlatform(minority, platform => ({ ...platform, governance: { ...platform.governance, boardConfidence: 70 } }));
-    assert.equal(returnAsStreamingCeo(trusted).message, 'The board agreed: you are Chief Executive again.');
+    const minority = withPlatform(chair.player, platform => ({ ...platform, founderOwnershipPercent: 40, governance: { ...platform.governance, boardConfidence: 5 } }));
+    const asked = atTheTable(minority, returnAsStreamingCeo(minority), returnAsStreamingCeo);
+    assert.ok(!asked.carried, 'an unhappy board keeps the successor');
+    assert.match(returnAsStreamingCeo(asked.player).message, /said no/, 'and will not hear it again for a while');
+    const trusted = withPlatform(minority, platform => ({ ...platform, governance: { ...platform.governance, boardConfidence: 100 } }));
+    assert.equal(atTheTable(trusted, returnAsStreamingCeo(trusted), returnAsStreamingCeo).done?.message, 'The board agreed: you are Chief Executive again.');
     pass(`coming back: yours at 51% or more; under it the board decides (refused at 45 confidence, agreed at 70); the successor stays named; a round trip costs the board (${confidence} → ${backPlatform.governance.boardConfidence}) and the next handover waits 26 weeks`);
 
     console.log(`\nstep down audit passed in ${((performance.now() - started) / 1000).toFixed(1)}s`);

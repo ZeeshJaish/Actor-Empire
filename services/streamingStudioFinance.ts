@@ -1,5 +1,6 @@
-import type { Player } from '../types';
+import type { OwnedStreamingCapitalAction, OwnedStreamingPlatformState, Player } from '../types';
 import type {
+    CapitalStory,
     FinanceEvent,
     MarketFinance,
     PeriodCut,
@@ -135,6 +136,60 @@ const runwayOf = (treasury: number, points: WeekPoint[]) => {
     const weeklyNet = last.length
         ? last.reduce((sum, point) => sum + point.revenue - (point.incurredOperatingCost ?? point.expense), 0) / last.length : 0;
     return { weeklyNet, runwayWeeks: weeklyNet >= 0 ? null : Math.floor(treasury / Math.abs(weeklyNet)) };
+};
+
+const CAPITAL_MOVE_WORDS: Partial<Record<OwnedStreamingCapitalAction['type'], string>> = {
+    INCORPORATION: 'You founded the company',
+    FOUNDER_CONTRIBUTION: 'You put money in',
+    LOAN_DRAW: 'A loan came in',
+    LOAN_REPAYMENT: 'A loan was repaid',
+    EQUITY_ISSUANCE: 'New shares sold',
+    SHARE_BUYBACK: 'Shares bought back',
+    FOUNDER_SHARE_TRADE: 'You traded your own shares',
+    FOUNDER_WITHDRAWAL: 'You took money out',
+    DIVIDEND_PAID: 'A dividend paid',
+    COMPANY_SALE: 'The company was sold',
+};
+
+/** #195: the Capital page's story: who put money in, what the service made of it, and the last moves */
+const capitalStoryOf = (
+    platform: OwnedStreamingPlatformState,
+    weekPoints: WeekPoint[],
+    companyWeek: (absoluteWeek: number) => number,
+    readiness: Array<{ passed: boolean }>,
+): CapitalStory => {
+    const actions = platform.finance.capitalActions;
+    const inflow = (test: (action: OwnedStreamingCapitalAction) => boolean) => actions
+        .filter(test).reduce((sum, action) => sum + Math.max(0, action.treasuryDelta), 0);
+    const listingWeek = platform.publicCompany.listing?.listedAtAbsoluteWeek;
+    const atListing = (action: OwnedStreamingCapitalAction) => action.type === 'EQUITY_ISSUANCE' && listingWeek !== undefined && action.absoluteWeek === listingWeek;
+    const sources: CapitalStory['sources'] = [
+        { id: 'FOUNDER' as const, label: 'You', amount: inflow(action => action.type === 'FOUNDER_CONTRIBUTION' || action.type === 'INCORPORATION') },
+        { id: 'INVESTORS' as const, label: 'Investors', amount: inflow(action => action.type === 'EQUITY_ISSUANCE' && !atListing(action)) },
+        { id: 'PUBLIC' as const, label: 'The public', amount: inflow(atListing) },
+        { id: 'LOANS' as const, label: 'Loans', amount: inflow(action => action.type === 'LOAN_DRAW') },
+    ].filter(item => item.amount > 0).sort((left, right) => right.amount - left.amount);
+    const movedByCapital = actions.reduce((sum, action) => sum + action.treasuryDelta, 0);
+    const moves = [...actions].reverse().filter(action => action.treasuryDelta !== 0 || action.personalCashDelta !== 0).slice(0, 5).map(action => ({
+        id: action.id,
+        week: companyWeek(action.absoluteWeek),
+        label: CAPITAL_MOVE_WORDS[action.type] || 'A capital move',
+        amount: action.treasuryDelta !== 0 ? action.treasuryDelta : action.personalCashDelta,
+    }));
+    const others = platform.finance.equityHolders.filter(holder => holder.ownershipPercent > 0).length;
+    const percent = Math.round(platform.founderOwnershipPercent * 10) / 10;
+    const quote = platform.publicCompany.quoteHistory.at(-1);
+    const listing = platform.publicCompany.listing;
+    return {
+        weeklyNet: runwayOf(platform.treasuryCash, weekPoints).weeklyNet,
+        sources,
+        earned: platform.treasuryCash - movedByCapital,
+        moves,
+        ownersLine: others ? `You ${percent}% · ${others} other${others === 1 ? '' : 's'}` : 'You own all of it',
+        marketLine: listing && platform.publicCompany.lifecycle === 'PUBLIC'
+            ? `${listing.ticker} · $${(quote?.close ?? listing.offerPrice).toFixed(2)}`
+            : `${readiness.filter(item => item.passed).length} of ${readiness.length} steps cleared`,
+    };
 };
 
 export interface StreamingCashSummary {
@@ -307,6 +362,7 @@ export const getStreamingStudioFinanceData = (player: Player, brandHex?: string)
                     detail: item.passed ? item.value : item.requirement,
                 })),
             },
+            story: capitalStoryOf(platform, weekPoints, companyWeek, markets.readiness),
         },
         whatChanged: {
             '4W': models.four.nextAction.detail,

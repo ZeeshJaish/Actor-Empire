@@ -368,7 +368,10 @@ export type IndustryEventType =
         the world's ten, a rival holding six of them */
     | 'PLATFORM_CHART_MOMENT'
     /** #149: a campaign's big moment, famous screen or big result */
-    | 'PLATFORM_CAMPAIGN_MOMENT';
+    | 'PLATFORM_CAMPAIGN_MOMENT'
+    /** #200: a chief leaves, or joins */
+    | 'PLATFORM_EXECUTIVE_LEFT'
+    | 'PLATFORM_EXECUTIVE_HIRED';
 
 export type IndustryEventEvidenceKind =
     | 'COMPANY'
@@ -3715,8 +3718,12 @@ export type StreamingExecutiveRole =
     | 'MARKETING_HEAD'
     | 'ADVERTISING_HEAD'
     | 'INTERNATIONAL_HEAD'
-    | 'SECURITY_TRUST_HEAD';
+    | 'SECURITY_TRUST_HEAD'
+    /** #203: someone from your connections who runs the company, and has no chair at the table */
+    | 'CEO';
 export type StreamingExecutiveAppointmentStatus = 'ACTIVE' | 'RESIGNED' | 'DISMISSED';
+/** #200: why an executive left */
+export type StreamingExecutiveExitReason = 'RIVAL_OFFER' | 'UNDERPAID' | 'BURNT_OUT' | 'PERSONAL' | 'RETIRING' | 'HARD_QUARTER' | 'LET_GO' | 'RESIGNED';
 export type StreamingExecutiveStrategy =
     | 'GROWTH_FIRST'
     | 'CREATIVE_FIRST'
@@ -3752,6 +3759,10 @@ export interface OwnedStreamingExecutiveAppointment {
     options?: { percent: number; grantedAtAbsoluteWeek: number; settledAtAbsoluteWeek?: number };
     /** #180: the signing bonus paid on hiring */
     signingBonus?: number;
+    /** #200: they have given notice, and go on this week */
+    notice?: { reason: StreamingExecutiveExitReason; givenAtAbsoluteWeek: number; leavesAtAbsoluteWeek: number };
+    /** #200: how they left, and when the market priced it */
+    exit?: { reason: StreamingExecutiveExitReason; sudden: boolean; to?: string; pricedAtAbsoluteWeek?: number; wasCeo?: boolean };
 }
 
 export type StreamingExecutiveDevelopmentTrack =
@@ -3849,14 +3860,16 @@ export type StreamingTeamAction =
     /** #168: taking an Original pitch fills the commissioning desk with this draft */
     | { kind: 'ORIGINAL_PITCH'; draft: Record<string, unknown> }
     /** #181: an ambitious executive asks for a raise */
-    | { kind: 'RAISE'; appointmentId: string; percent: number; weekly: number };
+    | { kind: 'RAISE'; appointmentId: string; percent: number; weekly: number }
+    /** #200: an executive has given notice; `wants` is what would keep them (null: nothing would) */
+    | { kind: 'NOTICE'; appointmentId: string; weekly: number; wants: number | null };
 
 export interface OwnedStreamingTeamCard {
     id: string;
     /** one card per target (a campaign, a licence, a region…) */
     dedupeKey: string;
     seatId: StreamingTeamSeatId;
-    jobId: StreamingTeamJobId | 'RIVAL_CALL' | 'RAISE';
+    jobId: StreamingTeamJobId | 'RIVAL_CALL' | 'RAISE' | 'NOTICE';
     appointmentId: string;
     createdAtAbsoluteWeek: number;
     expiresAtAbsoluteWeek: number;
@@ -3875,7 +3888,7 @@ export interface OwnedStreamingTeamReportEntry {
     absoluteWeek: number;
     seatId: StreamingTeamSeatId | null;
     appointmentId: string | null;
-    jobId: StreamingTeamJobId | 'RIVAL_CALL' | 'RAISE' | 'TEAM';
+    jobId: StreamingTeamJobId | 'RIVAL_CALL' | 'RAISE' | 'NOTICE' | 'TEAM';
     /** DONE by the executive · ASKED (a card) · HELD (the cash floor) · APPROVED/DECLINED by the player · NOTE */
     kind: 'DONE' | 'ASKED' | 'HELD' | 'APPROVED' | 'DECLINED' | 'NOTE';
     title: string;
@@ -3905,6 +3918,8 @@ export interface OwnedStreamingTeamMarket {
     shown: Partial<Record<StreamingTeamSeatId, string[]>>;
     seen: Partial<Record<StreamingTeamSeatId, string[]>>;
     refused: Record<string, number>;
+    /** #198: the counter a person made to your offer this set: take it or walk away */
+    counters?: Record<string, { set: number; weekly: number; signing: number; optionsPercent: number }>;
 }
 
 export type StreamingBoardSeatType = 'INDEPENDENT' | 'INVESTOR_NOMINEE';
@@ -3927,6 +3942,10 @@ export interface OwnedStreamingBoardDirector {
     appointedAtAbsoluteWeek: number;
     endedAtAbsoluteWeek: number | null;
     linkedInvestorId: string | null;
+    /** #201: an independent director's term */
+    termEndsAtAbsoluteWeek?: number;
+    /** #201: how they left, and when the market priced it */
+    exit?: { reason: 'TERM' | 'PROTEST' | 'REMOVED'; pricedAtAbsoluteWeek?: number };
 }
 
 export interface OwnedStreamingBoardVote {
@@ -3949,6 +3968,22 @@ export interface OwnedStreamingBoardMotion {
     calledAtAbsoluteWeek: number;
     resolvedAtAbsoluteWeek: number;
     consequence: string;
+}
+
+/** #228: one vote at the table, kept for the 4-week wait and the minutes */
+export interface OwnedStreamingApprovalRecord {
+    key: string;
+    kind: 'SALE_BID' | 'MONEY_OUT' | 'DIVIDEND' | 'SALARY' | 'BONUS' | 'CEO_RETURN' | 'CEO_REPLACE' | 'REMOVE_DIRECTOR';
+    refId?: string;
+    amount?: number;
+    atAbsoluteWeek: number;
+    /** seats on the board, or holders by percent */
+    mode: 'BOARD' | 'HOLDERS';
+    carried: boolean;
+    /** the yes was used */
+    spent?: boolean;
+    forPercent: number;
+    title: string;
 }
 
 export interface OwnedStreamingCelebrityInvestor {
@@ -4020,8 +4055,62 @@ export interface OwnedStreamingGovernanceState {
     investorOfferMilestone?: number;
     /** #186: the latest round the founder called; absent until the first */
     investorRound?: OwnedStreamingInvestorRound | null;
+    /** #202: an investor who said no to your price, and when */
+    buyoutRefusals?: Record<string, number>;
     /** #190: the latest sale of the company: the bankers, the bids, the closing; absent until the first */
     sale?: OwnedStreamingCompanySale | null;
+    /** #205: since when the board has been under 40 confidence while you run the company under 51% */
+    boardLowSinceAbsoluteWeek?: number | null;
+    /** #205: selling your own stake, after stepping down */
+    stakeSale?: OwnedStreamingStakeSale | null;
+    /** #205: you left with no shares and no office */
+    departure?: { atAbsoluteWeek: number; proceeds: number } | null;
+    /** #207: what the founder's death does to the share price, once */
+    founderDeath?: { move: number; pricedAtAbsoluteWeek?: number } | null;
+    /** #209: your salary, and what you have had from the company */
+    founderMoney?: OwnedStreamingFounderMoney | null;
+    /** #209: what a share pays each quarter, once listed */
+    dividend?: { perShareQuarter: number; setAtAbsoluteWeek: number; lastPaidAbsoluteWeek?: number } | null;
+    /** #209: what moves the share price at the next quote, once */
+    pendingPriceMoves?: Array<{ move: number; reason: string }>;
+    /** #221: the estate, paid over time */
+    estatePlan?: OwnedStreamingEstatePlan | null;
+    /** #228: the table's recent votes */
+    approvals?: OwnedStreamingApprovalRecord[];
+}
+
+/** #221: what the heir still owes the state, and how */
+export interface OwnedStreamingEstatePlan {
+    tax: number;
+    owed: number;
+    quarterly: number;
+    quartersLeft: number;
+    startedAtAbsoluteWeek: number;
+    nextDueAbsoluteWeek: number;
+    /** the last payment the wallet could not cover */
+    lastSold?: { atAbsoluteWeek: number; percent: number; amount: number };
+}
+
+/** #209: a founder's own money from the company */
+export interface OwnedStreamingFounderMoney {
+    weeklySalary: number;
+    salaryPaid: number;
+    bonusPaid: number;
+    takenOut: number;
+    dividendsPaid: number;
+    /** a bonus the shareholders agreed, paid at the weekly close */
+    pendingBonus?: number;
+}
+
+/** #205: a founder selling their own stake privately, through bankers */
+export interface OwnedStreamingStakeSale {
+    status: 'BANKERS' | 'OFFER' | 'DECLINED';
+    percent: number;
+    startedAtAbsoluteWeek: number;
+    offerAtAbsoluteWeek: number;
+    standsUntilAbsoluteWeek: number | null;
+    buyerName: string | null;
+    price: number | null;
 }
 
 /** #190 (plan §22.4): a bid for the whole company */
@@ -4596,6 +4685,9 @@ export interface OwnedStreamingShareholderVote {
     /** #173: what the result moves the share price (percent), and the week it reached it */
     priceEffectPercent?: number;
     priceAppliedAtAbsoluteWeek?: number | null;
+    /** #209: a vote on the founder's own pay */
+    founderPayWeekly?: number;
+    founderBonus?: number;
 }
 
 export type StreamingActivistDemand = 'MARGIN_DISCIPLINE' | 'SLATE_REFRESH' | 'BOARD_SEAT' | 'ASSET_REVIEW';
@@ -4642,6 +4734,8 @@ export interface OwnedStreamingPublicCompanyState {
     hostileTakeovers: OwnedStreamingHostileTakeover[];
     /** #187: the company's buyback programmes, the latest last; absent until the first */
     buybacks?: OwnedStreamingBuybackProgram[];
+    /** #215: the symbol you chose on MARKETS, before the listing begins */
+    proposedTicker?: string;
 }
 
 /** #187: a listed company buying back its shares over 4 weeks */
@@ -4919,7 +5013,10 @@ export type StreamingCapitalActionType =
     | 'SHARE_BUYBACK'
     | 'FOUNDER_SHARE_TRADE'
     /* #190: the company sold to a buyer; every holder paid */
-    | 'COMPANY_SALE';
+    | 'COMPANY_SALE'
+    /* #209: money taken out while private, and a listed company's dividend */
+    | 'FOUNDER_WITHDRAWAL'
+    | 'DIVIDEND_PAID';
 
 export interface OwnedStreamingCapitalAction {
     id: string;
@@ -7284,6 +7381,7 @@ export type OwnedStreamingLedgerEventType =
     | 'EXECUTIVE_DEVELOPMENT_COMPLETED'
     | 'DELEGATION_MANDATE_UPDATED'
     | 'BOARD_DIRECTOR_APPOINTED'
+    | 'BOARD_DIRECTOR_REMOVED'
     | 'BOARD_VOTE_RESOLVED'
     | 'CELEBRITY_INVESTMENT_ACCEPTED'
     | 'RIVAL_MOVE_COMMITTED'
@@ -8225,7 +8323,9 @@ export interface RedCarpetInterview {
 
 export type ScheduledEventType = 'AWARD_CEREMONY' | 'PREMIERE' | 'PARTY' | 'PRODUCTION_CRISIS' | 'DIRECTOR_DECISION' | 'LIFE_EVENT' | 'LEGAL_HEARING' | 'SCANDAL' | 'UNDERWORLD_OFFER' | 'STOCK_CONTROL'
     /* #75: a new incident on STATUS, answered in the week's popup */
-    | 'STREAMING_INCIDENT';
+    | 'STREAMING_INCIDENT'
+    /* #210: a decision that needs you, answered in the week's popup or on its page */
+    | 'STREAMING_DECISION';
 
 export type LocalizedTextVars = Record<string, string | number>;
 
@@ -10768,6 +10868,8 @@ export interface WorldPopulationState {
     regions: Record<WorldPopulationRegionId, WorldPopulationRegionSummary>;
     global: WorldPopulationGlobalSummary;
     snapshots: WorldPopulationSnapshot[];
+    /** #206: the weeks an heir's clock has been moved back against the world's */
+    clockOffsetWeeks?: number;
 }
 
 export type WorldAudiencePersonaId =
@@ -11791,6 +11893,10 @@ export interface IndustryPeopleWorldState {
     lastWeek: number;
     /** recent moves, newest last: who left, who joined whom */
     moves: Array<{ personId: string; from: IndustryEmployer; to: IndustryEmployer; absoluteWeek: number }>;
+    /** #199: the week the industry began, so people's years can grow */
+    firstWeek?: number;
+    /** #199: each person's last moves, for their CV: who they joined (name, kind) and when */
+    joins?: Record<string, Array<{ n: string; k: IndustryEmployer['kind']; w: number }>>;
 }
 
 export interface WorldState {

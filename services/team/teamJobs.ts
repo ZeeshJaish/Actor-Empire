@@ -121,5 +121,5 @@ export const STREAMING_TEAM_EXECUTORS: Partial<Record<StreamingTeamAction['kind'
     PRICE_CHANGE: executePriceChange,
     GUIDANCE: executeGuidance,
     /* #181: an ambitious executive's raise */
-    RAISE: executeStreamingTeamRaise,
+    RAISE: (player, action) => executeStreamingTeamRaise(player, action),
 };

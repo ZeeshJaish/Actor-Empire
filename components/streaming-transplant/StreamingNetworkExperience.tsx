@@ -34,6 +34,7 @@ import type { StreamingTechDeskView } from '../../services/streamingTechDesk';
 import type { StreamingTechId } from '../../types';
 import { TechDesk, type TechDeskActions } from './TechDesk';
 import { ProductShowcase } from './ProductShowcase';
+import { RoomSubtitle } from './RoomSubtitle';
 
 /* ============================================================
    MODEL
@@ -271,7 +272,7 @@ export const PlatformDesk: React.FC<{
         <button className={s.nwback} onClick={onBack} aria-label="Back">←</button>
         <div className={s.nwtitle}>
           <b>PLATFORM</b>
-          <span>OFFER · NETWORK · TECHNOLOGY · PRODUCT</span>
+          <RoomSubtitle>OFFER · NETWORK · TECHNOLOGY · PRODUCT</RoomSubtitle>
         </div>
         <span className={s.nwmark}><Mark brand={brand} /></span>
       </div>

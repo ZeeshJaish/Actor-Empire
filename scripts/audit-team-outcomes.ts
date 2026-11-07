@@ -24,7 +24,7 @@ import {
     runStreamingTeamWeek,
     setStreamingTeamJobMode,
 } from '../services/team/streamingTeam';
-import {
+import { streamingTeamRaiseAnswerLoyalty, streamingTeamRaiseDue, streamingTeamRaiseAsk, streamingTeamPayAfterLevel,
     rollStreamingTeamOutcome,
     shiftStreamingTeamOrder,
     streamingTeamEthicsChance,
@@ -117,7 +117,7 @@ async function main() {
     assert.equal(meaning.loyalty, 'Stays through a hard quarter');
     const weakHire = streamingTeamStatMeaning({ skill: 30, loyalty: 30, ambition: 35, ethics: 85 });
     assert.equal(weakHire.skill, 'Jobs 4% over budget · great move 3% · slip 9%');
-    assert.equal(weakHire.ambition, 'One job fewer a week');
+    assert.equal(weakHire.ambition, 'One job fewer a week · a yearly review');
     assert.equal(weakHire.ethics, 'Clean books');
     assert.equal(weakHire.loyalty, 'May quit after a hard quarter: 1 in 4');
     pass(`their page: "${meaning.skill}" / "${meaning.loyalty}" / "${meaning.ambition}" / "${meaning.ethics}"`);
@@ -194,6 +194,23 @@ async function main() {
     assert.equal(raise!.cost, 0);
     const notDue = runStreamingTeamWeek(rerun(withExecutive(base, seatId, { ambition: 60, appointedAtAbsoluteWeek: week - 26 })));
     assert.ok(!platformOf(notDue).leadership.team!.tray.some(item => item.jobId === 'RAISE'), 'ambition 60 does not ask');
+    /* #197: your own figure: less than asked costs loyalty by the gap, the pay follows what you gave */
+    const half = Math.round(((pay + asked) / 2) / 5_000) * 5_000;
+    const partly = approveStreamingTeamCard(due, raise!.id, undefined, half);
+    assert.equal(holderOf(partly.player, seatId)!.weeklyCompensation, half, 'the pay follows your figure');
+    assert.ok(holderOf(partly.player, seatId)!.loyalty < loyalty, `less than asked costs loyalty (${loyalty} → ${holderOf(partly.player, seatId)!.loyalty})`);
+    assert.equal(streamingTeamRaiseAnswerLoyalty(1_100, 1_000, 1_000), -10);
+    assert.equal(streamingTeamRaiseAnswerLoyalty(1_100, 1_000, 1_100), 5);
+    assert.ok(streamingTeamRaiseAnswerLoyalty(1_100, 1_000, 1_150) > 5, 'more than asked buys more');
+    /* #197: everyone has a yearly review, 3–8% by ambition and results */
+    assert.equal(streamingTeamRaiseDue({ ambition: 60, appointedAtAbsoluteWeek: 100 } as OwnedStreamingExecutiveAppointment, 152), 1);
+    assert.equal(streamingTeamRaiseDue({ ambition: 60, appointedAtAbsoluteWeek: 100 } as OwnedStreamingExecutiveAppointment, 126), null);
+    assert.equal(streamingTeamRaiseAsk({ ambition: 90, performance: 50 }), 8);
+    const review = streamingTeamRaiseAsk({ ambition: 60, performance: 60 });
+    assert.ok(review >= 3 && review <= 8, `a review asks 3–8% (${review}%)`);
+    /* #197: a level up pays 15% more */
+    assert.equal(streamingTeamPayAfterLevel(190_000), 220_000);
+    pass(`your figure: ${millions(half)} a week costs loyalty ${loyalty} → ${holderOf(partly.player, seatId)!.loyalty}; a yearly review asks ${review}%; level up $190K → $220K`);
     const gave = approveStreamingTeamCard(due, raise!.id);
     assert.ok(gave.changed);
     assert.equal(holderOf(gave.player, seatId)!.weeklyCompensation, asked, 'their pay follows');
@@ -239,9 +256,10 @@ async function main() {
         cycleReviews: [...platform.cycleReviews, { ...lastReview!, id: reviewId, kind: 'TWELVE_WEEK_REVIEW' as const, performanceTier: tier, endAbsoluteWeek: week - 1 }],
     }));
     const left = runStreamingTeamWeek(rerun(pressured(withExecutive(base, seatId, { loyalty: 30 }), 'UNDER_PRESSURE')));
-    assert.equal(platformOf(left).leadership.appointments.find(item => item.id === probe.id)!.status, 'RESIGNED', 'loyalty 30: they leave');
-    assert.equal(getStreamingTeamView(left).seats.find(seat => seat.seatId === seatId)!.executive, null, 'the chair is empty');
-    assert.ok(platformOf(left).leadership.team!.report.some(item => /resigned after a hard quarter/.test(item.title)), 'the minutes say so');
+    /* #200: they give four weeks' notice first */
+    assert.equal(platformOf(left).leadership.appointments.find(item => item.id === probe.id)!.notice?.reason, 'HARD_QUARTER', 'loyalty 30: they give notice');
+    assert.ok(platformOf(left).leadership.team!.report.some(item => /has given notice/.test(item.title)), 'the minutes say so');
+    assert.ok(platformOf(left).leadership.team!.tray.some(card => card.jobId === 'NOTICE' && card.status === 'WAITING'), 'a card to answer');
     const stayed = runStreamingTeamWeek(rerun(pressured(withExecutive(base, seatId, { loyalty: 60 }), 'UNDER_PRESSURE')));
     assert.equal(holderOf(stayed, seatId)?.id, probe.id, 'loyalty 60: they stay');
     const calm = runStreamingTeamWeek(rerun(pressured(withExecutive(base, seatId, { loyalty: 30 }), 'STEADY')));
@@ -249,7 +267,7 @@ async function main() {
     let leavers = 0;
     for (let index = 0; index < 2_000; index += 1) if (streamingTeamLeavesAfterBadQuarter(seed, { ...probe, loyalty: 30 }, `rate-${index}`)) leavers += 1;
     assert.ok(Math.abs(leavers / 2_000 - 0.25) < 0.03, 'about a quarter of the time');
-    pass(`a quarter under pressure: loyalty 30 leaves ${percent(leavers / 2_000)} of the time (left here, the chair empty, in the minutes); loyalty 60 or a steady quarter, they stay`);
+    pass(`a quarter under pressure: loyalty 30 leaves ${percent(leavers / 2_000)} of the time (notice here, a card and the minutes); loyalty 60 or a steady quarter, they stay`);
 
     /* ── their page ── */
     const view = getStreamingTeamView(withExecutive(base, seatId, { skill: 80, loyalty: 61, ambition: 85, ethics: 30 })).seats.find(seat => seat.seatId === seatId)!;

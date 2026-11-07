@@ -66,6 +66,13 @@ export interface IndustryPerson {
     start: IndustryEmployer;
     /** what they were worth when the registry began */
     baseNetWorth: number;
+    /** #199: a later class of the industry: the years after the career began when they start looking for work */
+    debutYears?: number;
+    /** #199: the years worked at which they retire */
+    retireAtYears?: number;
+    /** #199: skill gained a year, and as far as it goes */
+    growthPerYear?: number;
+    peakSkill?: number;
     /** the id the old lists used, when it differs (investors' records are matched by it or by name) */
     legacyId?: string;
     /** the name the old records kept, when the industry shows another (two old people shared a name) */
@@ -93,6 +100,15 @@ const KEPT_OF_PAY = 0.25;
 /** every 3 weeks a few contracts end and a few people are hired */
 export const INDUSTRY_MARKET_WEEKS = 3;
 const MOVES_KEPT = 24;
+/* #199: a person's last moves, on their CV */
+const JOINS_KEPT = 3;
+/* #199: a new class of people comes up every 10 years, so a long career never runs out of them (they join the market unseen until then) */
+const NEXT_CLASS_YEARS = 10;
+const NEXT_CLASSES = 8;
+const NEXT_CLASS_SIZE = 10;
+const GROWTH_PER_YEAR: Record<IndustryGrade, [number, number]> = { STAR: [0, 0.25], SENIOR: [0.2, 0.6], SOLID: [0.4, 1], RISING: [0.8, 1.6] };
+const PAY_RISE_A_YEAR = 1.02;
+const PAY_RISE_MOST = 2;
 
 /* one label per job, the game's own (the old candidates' short ones too) */
 const ROLE_LABELS: Record<StreamingExecutiveRole | 'CEO', string> = { ...STREAMING_EXECUTIVE_ROLE_LABELS, CEO: 'CEO' };
@@ -216,7 +232,7 @@ const cautionFor = (rng: () => number, person: Pick<IndustryPerson, 'ambition' |
     return pick(rng, ['Slow to change a plan that works.', 'Needs a clear brief.', 'Says no more often than yes.', 'Wants the credit when it works.']);
 };
 
-const generate = (seed: string): IndustryPerson[] => {
+const generate = (seed: string): { people: IndustryPerson[]; nextClasses: IndustryPerson[] } => {
     const rng = createDeterministicRng(`${seed}:people`);
     const taken = new Set<string>(NPC_DATABASE.map(npc => npc.name.toLowerCase()));
     const people: IndustryPerson[] = [];
@@ -266,31 +282,40 @@ const generate = (seed: string): IndustryPerson[] => {
         });
     });
 
+    /* one executive from the career's seed (the draw's order keeps everyone the same in saves made before #199) */
+    const drawExecutive = (role: StreamingExecutiveRole, id: string, rollGrade: () => IndustryGrade, rollStart: () => IndustryEmployer): IndustryPerson => {
+        const grade = rollGrade();
+        const gender: Gender = rng() < 0.5 ? 'FEMALE' : 'MALE';
+        const skill = Math.round(between(rng, GRADE_SKILL[grade]));
+        const ambition = Math.round(grade === 'RISING' ? between(rng, [60, 95]) : between(rng, [30, 90]));
+        const ethics = Math.round(rng() < 0.12 ? between(rng, [35, 50]) : between(rng, [55, 95]));
+        const loyalty = Math.round(between(rng, [38, 92]));
+        const years = Math.round(between(rng, GRADE_YEARS[grade]));
+        const pay = roundTo((ROLE_PAY[role] || 170_000) * GRADE_PAY[grade] * between(rng, [0.92, 1.08]), 5_000);
+        const start = rollStart();
+        const person: IndustryPerson = {
+            id, kind: 'EXECUTIVE',
+            name: freshName(gender), gender, person: true, role, roleLabel: ROLE_LABELS[role], grade,
+            skill, loyalty, ambition, ethics, yearsExperience: years, preferredStrategy: pick(rng, ROLE_STRATEGIES[role] || STRATEGIES),
+            weeklyCompensation: pay, specialty: pick(rng, SPECIALTIES[role] || ['Operations']), style: pick(rng, STYLES),
+            strength: pick(rng, STRENGTHS[role] || ['Gets things done.']), caution: '', formerCompany: pick(rng, formerPool), start,
+            baseNetWorth: roundTo(years * pay * 52 * 0.22, 100_000),
+        };
+        person.caution = cautionFor(rng, person);
+        return person;
+    };
+
     /* the rest of each job, to 25 a job */
     INDUSTRY_SEAT_ROLES.forEach(role => {
         const have = people.filter(item => item.role === role || (role === 'INTERNATIONAL_HEAD' && item.role === 'COO')).length;
         for (let index = have; index < PER_ROLE; index += 1) {
-            const roll = rng();
-            const grade: IndustryGrade = roll < 0.15 ? 'STAR' : roll < 0.45 ? 'SENIOR' : roll < 0.8 ? 'SOLID' : 'RISING';
-            const gender: Gender = rng() < 0.5 ? 'FEMALE' : 'MALE';
-            const skill = Math.round(between(rng, GRADE_SKILL[grade]));
-            const ambition = Math.round(grade === 'RISING' ? between(rng, [60, 95]) : between(rng, [30, 90]));
-            const ethics = Math.round(rng() < 0.12 ? between(rng, [35, 50]) : between(rng, [55, 95]));
-            const loyalty = Math.round(between(rng, [38, 92]));
-            const years = Math.round(between(rng, GRADE_YEARS[grade]));
-            const pay = roundTo((ROLE_PAY[role] || 170_000) * GRADE_PAY[grade] * between(rng, [0.92, 1.08]), 5_000);
-            const where = rng();
-            const start = where < 0.4 ? pick(rng, rivals) : where < 0.65 ? pick(rng, studios) : FREE;
-            const person: IndustryPerson = {
-                id: `exec-${role.toLowerCase().replace(/_/g, '-')}-${String(index).padStart(2, '0')}`, kind: 'EXECUTIVE',
-                name: freshName(gender), gender, person: true, role, roleLabel: ROLE_LABELS[role], grade,
-                skill, loyalty, ambition, ethics, yearsExperience: years, preferredStrategy: pick(rng, ROLE_STRATEGIES[role] || STRATEGIES),
-                weeklyCompensation: pay, specialty: pick(rng, SPECIALTIES[role] || ['Operations']), style: pick(rng, STYLES),
-                strength: pick(rng, STRENGTHS[role] || ['Gets things done.']), caution: '', formerCompany: pick(rng, formerPool), start,
-                baseNetWorth: roundTo(years * pay * 52 * 0.22, 100_000),
-            };
-            person.caution = cautionFor(rng, person);
-            people.push(person);
+            people.push(drawExecutive(role, `exec-${role.toLowerCase().replace(/_/g, '-')}-${String(index).padStart(2, '0')}`, () => {
+                const roll = rng();
+                return roll < 0.15 ? 'STAR' : roll < 0.45 ? 'SENIOR' : roll < 0.8 ? 'SOLID' : 'RISING';
+            }, () => {
+                const where = rng();
+                return where < 0.4 ? pick(rng, rivals) : where < 0.65 ? pick(rng, studios) : FREE;
+            }));
         }
     });
 
@@ -346,15 +371,37 @@ const generate = (seed: string): IndustryPerson[] => {
             profitSharePercent: Math.round(between(rng, KIND_SHARE[template.kind]) * 2) / 2, influenceDemand: template.demand, attentionEffect: template.brings,
         });
     }
-    return people;
+
+    /* #199: the classes still to come (drawn last, so nobody above changes) */
+    const nextClasses: IndustryPerson[] = [];
+    for (let cohort = 1; cohort <= NEXT_CLASSES; cohort += 1) {
+        INDUSTRY_SEAT_ROLES.forEach(role => {
+            for (let index = 0; index < NEXT_CLASS_SIZE; index += 1) {
+                const person = drawExecutive(role, `exec-${role.toLowerCase().replace(/_/g, '-')}-c${cohort}-${index}`, () => (rng() < 0.7 ? 'RISING' : 'SOLID'), () => FREE);
+                person.debutYears = cohort * NEXT_CLASS_YEARS;
+                nextClasses.push(person);
+            }
+        });
+    }
+    /* #199: how each will grow, and when they stop (on a draw of its own, for the same reason) */
+    const growth = createDeterministicRng(`${seed}:growth`);
+    [...people, ...nextClasses].filter(person => person.kind === 'EXECUTIVE' && person.role !== 'CEO').forEach(person => {
+        person.retireAtYears = Math.max(person.yearsExperience + 8, Math.round(38 + growth() * 8));
+        person.growthPerYear = between(growth, GROWTH_PER_YEAR[person.grade]);
+        person.peakSkill = Math.min(97, Math.max(person.skill, Math.round(person.skill + 4 + growth() * 24)));
+    });
+    return { people, nextClasses };
 };
 
-const cache = new Map<string, { people: IndustryPerson[]; byId: Map<string, IndustryPerson> }>();
+const cache = new Map<string, { people: IndustryPerson[]; nextClasses: IndustryPerson[]; byId: Map<string, IndustryPerson> }>();
 const registryOf = (seed: string) => {
     let entry = cache.get(seed);
     if (!entry) {
-        const people = generate(seed);
-        entry = { people, byId: new Map(people.map(person => [person.id, person])) };
+        const { people, nextClasses } = generate(seed);
+        entry = {
+            people, nextClasses,
+            byId: new Map([...people, ...nextClasses].map(person => [person.id, person])),
+        };
         cache.set(seed, entry);
     }
     return entry;
@@ -363,6 +410,46 @@ const registryOf = (seed: string) => {
 /** everyone in the industry, as the career's seed draws them */
 export const getIndustryPeople = (player: Pick<Player, 'id' | 'name'>): IndustryPerson[] => registryOf(industrySeedOf(player)).people;
 export const getIndustryPerson = (player: Pick<Player, 'id' | 'name'>, id: string): IndustryPerson | null => registryOf(industrySeedOf(player)).byId.get(id) || null;
+/** #199: the companies a CV can name */
+export const industryCareerCompanies = () => [...new Set([...rivalEmployers(), ...studioEmployers()].map(item => item.name))];
+
+/** #199: how many years the industry has been running */
+export const industryYearsPassed = (player: Pick<Player, 'world' | 'age' | 'currentWeek'>) => {
+    const first = player.world?.industryPeople?.firstWeek;
+    return typeof first === 'number' ? Math.max(0, (getAbsoluteWeek(player.age, player.currentWeek) - first) / 52) : 0;
+};
+
+/** #199: everyone in the market by now: the first draw, and the later classes that have come up */
+export const getIndustryPeopleNow = (player: Pick<Player, 'id' | 'name' | 'world' | 'age' | 'currentWeek'>): IndustryPerson[] => {
+    const { people, nextClasses } = registryOf(industrySeedOf(player));
+    const passed = industryYearsPassed(player);
+    return passed < NEXT_CLASS_YEARS ? people : [...people, ...nextClasses.filter(person => (person.debutYears || 0) <= passed)];
+};
+
+const GRADE_RANK: Record<IndustryGrade, number> = { RISING: 0, SOLID: 1, SENIOR: 2, STAR: 3 };
+/**
+ * #199: who a person is today: their years grow, their skill grows to their peak (a rising name becomes a solid one),
+ * and the market pays them accordingly, 2% more a year up to twice as much.
+ */
+export const industryPersonNow = (player: Pick<Player, 'world' | 'age' | 'currentWeek'>, person: IndustryPerson): IndustryPerson => {
+    if (person.kind !== 'EXECUTIVE' || person.role === 'CEO') return person;
+    const worked = Math.floor(industryYearsPassed(player) - (person.debutYears || 0));
+    if (worked <= 0) return person;
+    const skill = Math.min(person.peakSkill ?? person.skill, Math.round(person.skill + worked * (person.growthPerYear ?? 0)));
+    const reached = gradeOfSkill(skill);
+    const grade = GRADE_RANK[reached] > GRADE_RANK[person.grade] ? reached : person.grade;
+    const weeklyCompensation = roundTo(person.weeklyCompensation * (GRADE_PAY[grade] / GRADE_PAY[person.grade]) * Math.min(PAY_RISE_MOST, PAY_RISE_A_YEAR ** worked), 5_000);
+    return { ...person, skill, grade, weeklyCompensation, yearsExperience: person.yearsExperience + worked };
+};
+
+/** #199: still working: come up, and not yet retired */
+export const industryPersonWorking = (player: Pick<Player, 'world' | 'age' | 'currentWeek'>, person: IndustryPerson) => {
+    const passed = industryYearsPassed(player);
+    const debut = person.debutYears || 0;
+    if (passed < debut) return false;
+    return person.retireAtYears === undefined || person.yearsExperience + Math.floor(passed - debut) < person.retireAtYears;
+};
+
 /** an investor from the old lists, by the id or the name their records kept */
 export const findIndustryInvestor = (player: Pick<Player, 'id' | 'name'>, legacyIdOrName: string): IndustryPerson | null => (
     getIndustryPeople(player).find(person => person.kind === 'INVESTOR' && [person.legacyId, person.legacyName, person.name, person.id].includes(legacyIdOrName)) || null
@@ -376,7 +463,14 @@ export const readIndustryPeopleState = (player: Pick<Player, 'world'>): Industry
         earned: { ...(stored?.earned || {}) },
         lastWeek: typeof stored?.lastWeek === 'number' ? stored.lastWeek : -1,
         moves: Array.isArray(stored?.moves) ? stored!.moves.slice(-MOVES_KEPT) : [],
+        ...(typeof stored?.firstWeek === 'number' ? { firstWeek: stored.firstWeek } : {}),
+        joins: { ...(stored?.joins || {}) },
     };
+};
+/* #199: a move goes on the person's CV */
+const noteJoin = (state: IndustryPeopleWorldState, personId: string, to: IndustryEmployer, absoluteWeek: number) => {
+    const joins = state.joins || (state.joins = {});
+    joins[personId] = [...(joins[personId] || []), { n: to.name, k: to.kind, w: absoluteWeek }].slice(-JOINS_KEPT);
 };
 
 /** where a person works now */
@@ -399,14 +493,18 @@ export const processIndustryPeopleWeek = (player: Player): Player => {
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
     const state = readIndustryPeopleState(player);
     if (state.lastWeek === absoluteWeek) return player;
+    if (state.firstWeek === undefined) state.firstWeek = absoluteWeek;
     const seed = industrySeedOf(player);
-    const { people, byId } = registryOf(seed);
+    const { byId } = registryOf(seed);
+    const people = getIndustryPeopleNow(player);
+    const working = (person: IndustryPerson) => industryPersonWorking({ world: { ...player.world, industryPeople: state }, age: player.age, currentWeek: player.currentWeek }, person);
     const employerOf = (person: IndustryPerson) => state.employers[person.id] || person.start;
     const move = (person: IndustryPerson, to: IndustryEmployer) => {
         const from = employerOf(person);
         if (from.kind === to.kind && from.id === to.id && from.name === to.name) return;
         state.employers[person.id] = to;
         state.moves.push({ personId: person.id, from, to, absoluteWeek });
+        noteJoin(state, person.id, to, absoluteWeek);
     };
 
     /* our chairs: whoever sits at our table works for us; whoever left is between roles again */
@@ -424,6 +522,7 @@ export const processIndustryPeopleWeek = (player: Player): Player => {
         if (person.kind !== 'EXECUTIVE') return;
         const at = employerOf(person);
         if (at.kind === 'FREE') return;
+        if (at.kind !== 'OURS' && !working(person)) return;
         const pay = at.kind === 'OURS' ? ours.get(person.id)?.weeklyCompensation ?? person.weeklyCompensation : person.weeklyCompensation;
         state.earned[person.id] = Math.round((state.earned[person.id] || 0) + pay * KEPT_OF_PAY);
     });
@@ -433,8 +532,8 @@ export const processIndustryPeopleWeek = (player: Player): Player => {
         const rng = createDeterministicRng(`${seed}:market:${absoluteWeek}`);
         const rivals = rivalEmployers();
         const studios = studioEmployers();
-        const employed = people.filter(person => person.kind === 'EXECUTIVE' && person.role !== 'CEO' && ['RIVAL', 'STUDIO'].includes(employerOf(person).kind));
-        const free = people.filter(person => person.kind === 'EXECUTIVE' && person.role !== 'CEO' && employerOf(person).kind === 'FREE');
+        const employed = people.filter(person => person.kind === 'EXECUTIVE' && person.role !== 'CEO' && working(person) && ['RIVAL', 'STUDIO'].includes(employerOf(person).kind));
+        const free = people.filter(person => person.kind === 'EXECUTIVE' && person.role !== 'CEO' && working(person) && employerOf(person).kind === 'FREE');
         for (let count = 0; count < 2 && employed.length; count += 1) {
             const person = employed.splice(Math.floor(rng() * employed.length), 1)[0];
             move(person, FREE);
@@ -449,6 +548,11 @@ export const processIndustryPeopleWeek = (player: Player): Player => {
     state.moves = state.moves.slice(-MOVES_KEPT);
     /* only people the registry knows are kept */
     Object.keys(state.employers).forEach(id => { if (!byId.has(id)) delete state.employers[id]; });
+    /* #199: a retired person's moves stop mattering */
+    Object.keys(state.joins || {}).forEach(id => {
+        const person = byId.get(id);
+        if (!person || !working(person)) delete state.joins![id];
+    });
     return { ...player, world: { ...player.world, industryPeople: state } };
 };
 
@@ -460,7 +564,9 @@ export const moveIndustryPerson = (player: Player, personId: string, to: Industr
     const from = state.employers[person.id] || person.start;
     if (from.kind === to.kind && from.id === to.id && from.name === to.name) return player;
     state.employers[person.id] = to;
-    state.moves = [...state.moves, { personId: person.id, from, to, absoluteWeek: getAbsoluteWeek(player.age, player.currentWeek) }].slice(-MOVES_KEPT);
+    const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+    state.moves = [...state.moves, { personId: person.id, from, to, absoluteWeek }].slice(-MOVES_KEPT);
+    noteJoin(state, person.id, to, absoluteWeek);
     return { ...player, world: { ...player.world, industryPeople: state } };
 };
 
@@ -476,7 +582,7 @@ const TIER_OF_GRADE: Record<IndustryGrade, NPCTier> = { STAR: 'A_LIST', SENIOR: 
  * joining us puts an executive on the list.
  */
 export const getIndustryNpcs = (player: Player, stakeValueOf?: (person: IndustryPerson) => number, notableOnly = false): NPCActor[] => (
-    getIndustryPeople(player).filter(person => person.person && (!notableOnly
+    getIndustryPeopleNow(player).filter(person => person.person && (!notableOnly
         || person.kind === 'INVESTOR' || person.role === 'CEO' || industryEmployerOf(player, person).kind === 'OURS')).map(person => {
         const employer = industryEmployerOf(player, person);
         const worth = industryNetWorthOf(player, person) + Math.max(0, stakeValueOf?.(person) || 0);

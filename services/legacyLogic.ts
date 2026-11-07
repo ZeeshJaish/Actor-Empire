@@ -1,4 +1,5 @@
 import { rebaseCinemaSavedState } from './boxOffice/boxOfficeClock';
+import { rebaseWorldForLegacy } from './legacyWorldClock';
 import { rebaseStudioSaleHistoryForInheritance } from './studioSaleHistory';
 import { ActorSkills, BloodlineMember, NPCActor, Player, PortfolioItem, Relationship, StreamingState, UniverseId, ProjectType } from '../types';
 import { buildDynastySuccessionState } from './dynastyCareer';
@@ -279,7 +280,8 @@ export const buildLegacyStudioInheritance = (
         targetAbsoluteWeek,
     );
     const inheritedStudio = player.studio ? rewritePlayerSelfReferencesForLegacyParent(player.studio, parentActor) : undefined;
-    const inheritedWorld = player.world ? rewritePlayerSelfReferencesForLegacyParent(player.world, parentActor) : undefined;
+    /* #206: the world's dates move back with the heir, except the clocks moved just below */
+    const inheritedWorld = player.world ? rebaseWorldForLegacy(rewritePlayerSelfReferencesForLegacyParent(player.world, parentActor), Math.max(0, sourceAbsoluteWeek - targetAbsoluteWeek), ['cinemaMarket', 'talentCareer', 'cinemaExposure', 'talentParticipation']) : undefined;
     if(inheritedWorld?.cinemaMarket)inheritedWorld.cinemaMarket=rebaseCinemaSavedState(inheritedWorld.cinemaMarket,targetAbsoluteWeek-sourceAbsoluteWeek);
     const cinemaClockShift=targetAbsoluteWeek-sourceAbsoluteWeek;
     if(inheritedWorld && cinemaClockShift){

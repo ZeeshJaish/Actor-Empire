@@ -11,6 +11,7 @@
  * for the next report (three kinds, each showing what it would set), the earlier reports and votes, and the share
  * register; and from #185, what a share is worth and this week's reasons for the price.
  */
+import { getStreamingDividendView, type StreamingDividendView } from './streamingYourMoney';
 import type { Player, StreamingGuidanceTone } from '../types';
 import { getAbsoluteWeek } from './legacyLogic';
 import { normalizeOwnedStreamingPlatformState } from './ownedStreamingPlatform';
@@ -31,7 +32,7 @@ export type StreamingListingRoom = 'MONEY' | 'TEAM' | 'OWNERSHIP' | 'AUDIENCE' |
 const GATE_ROOMS: Record<StreamingIpoReadinessItem['id'], { room: StreamingListingRoom; where: string }> = {
     LIVE_HISTORY: { room: 'MONEY', where: "the board's 12-week review, on MONEY" },
     CFO: { room: 'TEAM', where: 'the Money chair, on TEAM' },
-    GOVERNANCE: { room: 'OWNERSHIP', where: "an investor's board seat, on OWNERSHIP" },
+    GOVERNANCE: { room: 'OWNERSHIP', where: 'Find a director, on OWNERSHIP' },
     SCALE: { room: 'AUDIENCE', where: 'campaigns and markets, in Audience' },
     RELIABILITY: { room: 'STATUS', where: 'playback, on Platform › STATUS' },
     FINANCE: { room: 'MONEY', where: 'debt and runway, on MONEY' },
@@ -39,7 +40,7 @@ const GATE_ROOMS: Record<StreamingIpoReadinessItem['id'], { room: StreamingListi
 
 /** a listing sells new shares a little under what the company is worth */
 const IPO_DISCOUNT = 0.15;
-/** #189: the float the listing's ask offers (the ticker and the float are chosen only there) */
+/** #189: the float the listing's ask offers (the float is chosen only there; #215: the ticker on MARKETS too) */
 export const STREAMING_LISTING_FLOAT_RANGE = [10, 30] as const;
 
 /** #188: the three promises for the next report */
@@ -51,6 +52,8 @@ const GUIDANCE_TONES: Array<{ tone: StreamingGuidanceTone; label: string; risk: 
 
 export interface StreamingListingDeskView {
     listed: boolean;
+    /** #209: what a share pays each quarter */
+    dividend: StreamingDividendView | null;
     gates: Array<StreamingIpoReadinessItem & { room: StreamingListingRoom; where: string }>;
     cleared: number;
     /** the bell can be rung: the hard gates and two thirds of the rest */
@@ -60,6 +63,8 @@ export interface StreamingListingDeskView {
     bellEnergy: number;
     valuation: number;
     ticker: string;
+    /** #215: the company's name, for the symbols it could take, while the symbol is still yours to choose */
+    tickerFrom: string | null;
     founderPercent: number;
     /** #189: what a 10% and a 30% float would raise, and the stake each leaves you; the listing's ask picks within */
     range: { low: { percent: number; raise: number; keep: number }; high: { percent: number; raise: number; keep: number } };
@@ -128,6 +133,7 @@ export const getStreamingListingDesk = (player: Player): StreamingListingDeskVie
     const founderShares = listing ? Math.round(listing.sharesOutstanding * founder / 100) : 0;
     return {
         listed,
+        dividend: getStreamingDividendView(player),
         gates,
         cleared: gates.filter(gate => gate.passed).length,
         ready: markets.canStartRoadshow || platform.publicCompany.ipoJourney?.status === 'ACTIVE',
@@ -136,6 +142,7 @@ export const getStreamingListingDesk = (player: Player): StreamingListingDeskVie
         valuation: markets.valuation,
         /* a listing under way shows the ticker chosen in it */
         ticker: listing?.ticker || (platform.publicCompany.ipoJourney?.status === 'ACTIVE' && platform.publicCompany.ipoJourney.ticker) || markets.suggestedTicker,
+        tickerFrom: !listing ? platform.identity?.name || 'Streaming' : null,
         founderPercent: founder,
         range: (() => {
             const at = (percent: number) => ({

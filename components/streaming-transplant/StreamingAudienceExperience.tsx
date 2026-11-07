@@ -38,6 +38,7 @@ import type {
   WorldStreamingCustomerAccessPolicy,
 } from '../../types';
 import type { StreamingAudienceMarketView } from '../../services/streamingAudienceMarket';
+import { RoomSubtitle } from './RoomSubtitle';
 
 /* ============================================================
    MODEL
@@ -152,7 +153,7 @@ export const AudienceDesk: React.FC<{
         <button className={css.adback} onClick={onBack} aria-label="Back">←</button>
         <div className={css.adtitle}>
           <b>AUDIENCE</b>
-          <span>WHO WATCHES · WHERE · WHY</span>
+          <RoomSubtitle>WHO WATCHES · WHERE · WHY</RoomSubtitle>
         </div>
         <span className={css.admark}><Mark brand={brand} /></span>
       </div>

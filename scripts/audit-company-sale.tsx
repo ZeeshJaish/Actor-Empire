@@ -5,6 +5,7 @@
  *  - closing in 3 weeks: you are paid your stake in cash; the company is SOLD (no more weeks, no ticker, no stake);
  *  - every bid turned down, or left to lapse: the board's confidence falls and the bankers wait 26 weeks;
  *  - two years after a sale, a new company: the founding starts again, the sold one kept on record. */
+import { atTheTable } from './fixtures/atTheTable';
 import assert from 'node:assert/strict';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -18,7 +19,7 @@ import { getStreamingOwnershipView } from '../services/streamingInvestorOffers';
 import { processOwnedStreamingPlatformWeek } from '../services/streamingWeeklyLoop';
 import { listStreamingCompanyForQa } from '../services/streamingListingQa';
 import {
-    STREAMING_NEW_COMPANY_WEEKS, STREAMING_SALE_COOLDOWN_WEEKS, acceptStreamingSaleBid, getStreamingSaleApproval, getStreamingSaleView,
+    STREAMING_NEW_COMPANY_WEEKS, STREAMING_SALE_COOLDOWN_WEEKS, acceptStreamingSaleBid, getStreamingSaleApproval, getStreamingSaleView, voteDownStreamingSaleBid,
     hireStreamingSaleBankers, makeStreamingSaleBids, processStreamingCompanySaleWeek, rejectStreamingSaleBids, startNewStreamingCompany,
 } from '../services/streamingCompanySale';
 import { valueOwnedStreamingPlatform } from '../services/valuation/streamingValuation';
@@ -46,7 +47,7 @@ async function main() {
     const started = performance.now();
     let player = await buildStreamingFullPlatformQa(fresh('company-sale'), { processWeek: processGameWeek, persistWeek: async next => next });
     player = { ...player, energy: { current: 100, max: 100 }, money: 1_000_000 };
-    assert.ok(ownership(player).includes('Sell the company') && ownership(player).includes('Hire bankers'), 'OWNERSHIP offers the sale');
+    assert.ok(ownership(player).includes('The whole company') && ownership(player).includes('Only your stake') && ownership(player).includes('Hire bankers'), 'OWNERSHIP offers the sale');
 
     /* ── the bankers ── */
     assert.equal(hireStreamingSaleBankers({ ...player, energy: { current: 5, max: 100 } }).message, 'Hiring the bankers takes ⚡10.');
@@ -62,12 +63,15 @@ async function main() {
     const bidding = processStreamingCompanySaleWeek(later(hired.player, 4));
     const sale = platformOf(bidding).governance.sale!;
     const worth = getStreamingEquityValuation(platformOf(bidding));
-    const business = valueOwnedStreamingPlatform(platformOf(bidding)).enterpriseValue;
+    /* #208: the premium is on what the business earns and its franchises; the library, technology and pipeline come at book */
+    const valued = valueOwnedStreamingPlatform(platformOf(bidding));
+    const business = (valued.parts.operating + valued.parts.franchise) * (1 - valued.riskDiscount);
+    const atFace = worth - business;
     assert.equal(sale.status, 'BIDS');
     assert.ok(sale.bids.length >= 3 && sale.bids.length <= 5, `${sale.bids.length} bids`);
     for (const bid of sale.bids) {
         /* #192: the premium is on the business; the cash comes at face */
-        const onBusiness = (bid.price - (worth - business)) / business;
+        const onBusiness = (bid.price - atFace) / business;
         assert.ok(onBusiness >= 1.1 - 0.01 && onBusiness <= 1.45 + 0.01, `premium on the business ${onBusiness.toFixed(3)}`);
         assert.ok(bid.premium > 1 && Math.abs(bid.price - worth * bid.premium) <= worth * 0.006, 'the premium shown is over our whole value');
     }
@@ -88,9 +92,10 @@ async function main() {
     const board = getStreamingSaleApproval(platformOf(minority), { ...top, premium: 1.1 });
     assert.equal(board.by, 'BOARD');
     assert.ok(board.support < 50, 'a thin premium and an unhappy board vote it down');
-    const votedDown = acceptStreamingSaleBid(withPlatform(minority, platform => ({ ...platform, governance: { ...platform.governance, sale: { ...platform.governance.sale!, bids: platform.governance.sale!.bids.map(bid => ({ ...bid, premium: 1.1 })) } } })), top.id);
-    assert.match(votedDown.message, /^The board voted it down/);
-    assert.equal(platformOf(votedDown.player).governance.sale!.bids.find(bid => bid.id === top.id)!.status, 'VOTED_DOWN');
+    const thin = withPlatform(minority, platform => ({ ...platform, governance: { ...platform.governance, boardConfidence: 5, sale: { ...platform.governance.sale!, bids: platform.governance.sale!.bids.map(bid => ({ ...bid, premium: 1.1 })) } } }));
+    const atTable = atTheTable(thin, acceptStreamingSaleBid(thin, top.id), next => acceptStreamingSaleBid(next, top.id));
+    assert.ok(!atTable.carried, 'a thin premium and an unhappy board say no');
+    assert.equal(platformOf(voteDownStreamingSaleBid(atTable.player, top.id)).governance.sale!.bids.find(bid => bid.id === top.id)!.status, 'VOTED_DOWN');
     const listed = listStreamingCompanyForQa(player, { ticker: 'SELL' });
     assert.ok(listed.changed, listed.reason);
     assert.equal(getStreamingSaleApproval(platformOf(listed.player), top).by, 'SHAREHOLDERS');

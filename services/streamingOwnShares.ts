@@ -24,6 +24,7 @@ import {
     streamingCapitalAction,
 } from './streamingBuybacks';
 import { TEAM_OPTIONS_HOLDER } from './team/teamHiring';
+import { STREAMING_LOST_CONTROL_PRICE, streamingFounderHasNoTie, streamingFounderLeaves, streamingLostControl } from './streamingControl';
 import { getStreamingTeamCashFloor } from './team/teamState';
 
 /** your shares stay locked up this long after listing */
@@ -74,9 +75,29 @@ export const quoteOwnShareTrade = (player: Player, side: 'BUY' | 'SELL', percent
         side, percent, shares, pricePerShare, total, founderAfter,
         priceAfter: price * (side === 'BUY' ? 1 + impact : 1 - impact),
         blocked,
-        warning: side === 'SELL' && founderAfter < CONTROL_FLOOR && platform.founderOwnershipPercent >= CONTROL_FLOOR
-            ? 'You would lose control: the board could outvote you.' : null,
+        /* #205: the last shares, with no office: you would be out */
+        warning: side === 'SELL' && streamingFounderHasNoTie(founderAfter, platform)
+            ? 'These are your last shares and you hold no office: you would be out of the company for good, and could found a new one in 2 years.'
+            : side === 'SELL' && founderAfter < CONTROL_FLOOR && platform.founderOwnershipPercent >= CONTROL_FLOOR
+                ? 'You would lose control: the board could outvote you.' : null,
     };
+};
+
+/** #196: how many of our shares a sum buys, the size's impact included: the normal order box's Cash mode */
+export const ownSharesForCash = (player: Player, cash: number): number => {
+    const budget = Math.max(0, Number(cash) || 0);
+    const first = quoteOwnShareTrade(player, 'BUY', 0);
+    if (!first || budget <= 0) return 0;
+    const source = player.ownedStreamingPlatform!;
+    const outstanding = Math.max(1, source.publicCompany.listing!.sharesOutstanding);
+    let low = 0;
+    let high = outstanding;
+    for (let step = 0; step < 40 && high - low > 1; step += 1) {
+        const middle = Math.floor((low + high) / 2);
+        const quote = quoteOwnShareTrade(player, 'BUY', middle / outstanding * 100);
+        if (quote && quote.total <= budget) low = middle; else high = middle;
+    }
+    return low;
 };
 
 export interface OwnShareTradeResult { player: Player; changed: boolean; message: string }
@@ -92,7 +113,10 @@ export const tradeOwnStreamingShares = (player: Player, side: 'BUY' | 'SELL', pe
     const last = quotes.at(-1);
     const before = platform.founderOwnershipPercent;
     const key = `own-shares:${side}:${absoluteWeek}:${platform.finance.capitalActions.length}`;
-    const next: OwnedStreamingPlatformState = {
+    /* #205: selling under 51% is news: the price dips, and the board marks it */
+    const lostControl = side === 'SELL' && before >= CONTROL_FLOOR && quote.founderAfter < CONTROL_FLOOR;
+    const priceAfter = quote.priceAfter * (lostControl ? STREAMING_LOST_CONTROL_PRICE : 1);
+    const traded: OwnedStreamingPlatformState = {
         ...platform,
         founderOwnershipPercent: quote.founderAfter,
         finance: {
@@ -109,18 +133,24 @@ export const tradeOwnStreamingShares = (player: Player, side: 'BUY' | 'SELL', pe
             /* the trade moves the price */
             quoteHistory: last ? [...quotes.slice(0, -1), {
                 ...last,
-                close: round2(quote.priceAfter),
-                high: Math.max(last.high, round2(quote.priceAfter)),
-                low: Math.min(last.low, round2(quote.priceAfter)),
-                marketCap: Math.round(quote.priceAfter * listing.sharesOutstanding),
+                close: round2(priceAfter),
+                high: Math.max(last.high, round2(priceAfter)),
+                low: Math.min(last.low, round2(priceAfter)),
+                marketCap: Math.round(priceAfter * listing.sharesOutstanding),
             }] : quotes,
         },
     };
+    const controlled = lostControl ? streamingLostControl(traded, absoluteWeek, quote.founderAfter) : traded;
+    /* #205: no shares and no office: you are out */
+    const out = side === 'SELL' && streamingFounderHasNoTie(quote.founderAfter, controlled);
+    const next = out ? streamingFounderLeaves(controlled, absoluteWeek, quote.total) : controlled;
     return {
         changed: true,
-        message: side === 'BUY'
-            ? `You bought ${quote.shares.toLocaleString()} shares; you hold ${quote.founderAfter}%.`
-            : `You sold ${quote.shares.toLocaleString()} shares; you hold ${quote.founderAfter}%.`,
+        message: out
+            ? `You sold your last ${quote.shares.toLocaleString()} shares. You have left ${platform.identity?.name || 'the company'}.`
+            : side === 'BUY'
+                ? `You bought ${quote.shares.toLocaleString()} shares; you hold ${quote.founderAfter}%.`
+                : `You sold ${quote.shares.toLocaleString()} shares; you hold ${quote.founderAfter}%.`,
         player: {
             ...player,
             money: (player.money || 0) + (side === 'BUY' ? -quote.total : quote.total),
@@ -162,7 +192,15 @@ export const startStreamingBuyback = (player: Player, percent: number): OwnShare
 
 /* ── buyouts (private) ── */
 
-export interface StreamingBuyoutQuote { holderId: string; name: string; percent: number; price: number; premium: number; founderAfter: number; blocked: string | null }
+export interface StreamingBuyoutQuote { holderId: string; name: string; percent: number; price: number; premium: number; founderAfter: number; blocked: string | null;
+    /** #202: what the treasury could pay without going under the cash floor */
+    mostYouCanPay: number;
+}
+
+/** #202: a no means this long before asking again */
+export const STREAMING_BUYOUT_RETRY_WEEKS = 13;
+/** #202: your price against theirs: theirs or above is a yes; a quarter under it is never */
+export const streamingBuyoutChance = (offer: number, price: number) => Math.max(0, Math.min(1, (offer / Math.max(1, price) - 0.75) / 0.25));
 
 export const getStreamingBuyoutQuote = (platform: OwnedStreamingPlatformState, holderId: string): StreamingBuyoutQuote | null => {
     const holder = platform.finance.equityHolders.find(item => item.id === holderId);
@@ -171,17 +209,39 @@ export const getStreamingBuyoutQuote = (platform: OwnedStreamingPlatformState, h
     const premium = round2(1.05 + 0.2 * createDeterministicRng(`${platform.simulationSeed}:buyout:${holder.id}`)());
     const price = Math.round(getStreamingEquityValuation(platform) * holder.ownershipPercent / 100 * premium / 1_000_000) * 1_000_000;
     const founderAfter = round2(platform.founderOwnershipPercent * 100 / (100 - holder.ownershipPercent));
+    const floor = getStreamingTeamCashFloor(platform).amount;
+    /* #202: a no stands for 13 weeks */
+    const refusedAt = platform.governance.buyoutRefusals?.[holderId];
+    const week = platform.weeklyHistory.at(-1)?.absoluteWeek ?? refusedAt ?? 0;
     const blocked = platform.publicCompany.lifecycle === 'PUBLIC' ? 'Listed: buy back shares instead'
-        : platform.treasuryCash - price < getStreamingTeamCashFloor(platform).amount ? 'It would take the treasury under the cash floor' : null;
-    return { holderId, name: holder.holderName, percent: holder.ownershipPercent, price, premium, founderAfter, blocked };
+        : refusedAt !== undefined && week - refusedAt < STREAMING_BUYOUT_RETRY_WEEKS ? `Said no: ask again in ${STREAMING_BUYOUT_RETRY_WEEKS - (week - refusedAt)} weeks`
+            : platform.treasuryCash - price * 0.75 < floor ? 'It would take the treasury under the cash floor' : null;
+    return { holderId, name: holder.holderName, percent: holder.ownershipPercent, price, premium, founderAfter, blocked, mostYouCanPay: Math.max(0, platform.treasuryCash - floor) };
 };
 
-export const buyOutStreamingInvestor = (player: Player, holderId: string): OwnShareTradeResult => {
+export const buyOutStreamingInvestor = (player: Player, holderId: string, offer?: number): OwnShareTradeResult => {
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
-    const quote = getStreamingBuyoutQuote(platform, holderId);
-    if (!quote) return { player, changed: false, message: 'Only an investor can be bought out.' };
-    if (quote.blocked) return { player, changed: false, message: quote.blocked };
+    const asked = getStreamingBuyoutQuote(platform, holderId);
+    if (!asked) return { player, changed: false, message: 'Only an investor can be bought out.' };
+    if (asked.blocked) return { player, changed: false, message: asked.blocked };
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+    /* #202: your own price: at theirs or above it is a yes; under it, a chance, set for the week; a no stands 13 weeks */
+    const paying = offer === undefined ? asked.price : Math.round(offer / 1_000_000) * 1_000_000;
+    if (paying > asked.mostYouCanPay) return { player, changed: false, message: 'It would take the treasury under the cash floor.' };
+    if (paying < asked.price) {
+        const yes = createDeterministicRng(`${platform.simulationSeed}:buyout-offer:${holderId}:${absoluteWeek}`)() < streamingBuyoutChance(paying, asked.price);
+        if (!yes) {
+            return {
+                changed: true,
+                message: `${asked.name} said no to ${paying >= 1e9 ? `$${(paying / 1e9).toFixed(1)}B` : `$${Math.round(paying / 1e6)}M`}. Ask again in ${STREAMING_BUYOUT_RETRY_WEEKS} weeks.`,
+                player: { ...player, ownedStreamingPlatform: compactOwnedStreamingPlatformForPersistence({
+                    ...platform,
+                    governance: { ...platform.governance, buyoutRefusals: { ...(platform.governance.buyoutRefusals || {}), [holderId]: platform.weeklyHistory.at(-1)?.absoluteWeek ?? absoluteWeek } },
+                }, player.id) },
+            };
+        }
+    }
+    const quote = { ...asked, price: paying };
     const before = platform.founderOwnershipPercent;
     let next = retireStreamingStake(platform, holder => holder.id === holderId, quote.percent);
     const investor = platform.governance.celebrityInvestors.find(item => item.status === 'ACCEPTED' && item.name === quote.name);

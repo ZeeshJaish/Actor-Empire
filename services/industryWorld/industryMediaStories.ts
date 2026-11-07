@@ -60,6 +60,8 @@ export const getIndustryMediaSubjectKey = (event: IndustryEventFact): string => 
     if (event.type === 'PLATFORM_CHART_MOMENT') return `platform-chart:${event.companyId || event.platformId || event.id}`;
     /* #149: a service's campaigns are one running story */
     if (event.type === 'PLATFORM_CAMPAIGN_MOMENT') return `platform-campaign:${event.companyId || event.platformId || event.id}`;
+    /* #200: a service's people are one running story */
+    if (event.type === 'PLATFORM_EXECUTIVE_LEFT' || event.type === 'PLATFORM_EXECUTIVE_HIRED') return `platform-people:${event.companyId || event.platformId || event.id}`;
     /* how a service's picture compares with its rivals' (#70) */
     if (event.type === 'PLATFORM_QUALITY_GAP') return `platform-quality:${event.companyId || event.platformId || event.id}`;
     if (event.projectId) return `project:${event.projectId}`;

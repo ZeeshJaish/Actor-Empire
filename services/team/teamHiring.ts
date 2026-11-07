@@ -9,8 +9,9 @@
  *     leave a job; less from an attractive company, more from a risky one), a signing bonus (2–8 weeks of pay, more
  *     to leave a job) and options (a % of the company, by grade and ambition, more from a small company, fewer once
  *     listed).
- *   - "Offer 15% less": the chance they agree shows on the CV (ambition and our appeal decide it); the answer is set
- *     for that person and set, so asking again changes nothing. A no means they are gone for that set.
+ *   - #198: an offer of your own, above or below their ask: the chance shows live (ambition, our appeal and how close
+ *     it comes decide it); the answer is set for that person and set. A no comes with one counter, halfway: take it
+ *     or walk away. Under 60% of their ask there are no talks, and they are gone for that set.
  *   - Options sit on the cap table as "Team options" and dilute every holder when granted; they vest a sixteenth a
  *     quarter; whoever leaves returns the part not vested.
  *   - Of the people a chair passed on, about a third join a rival or a studio when the set turns.
@@ -26,7 +27,9 @@ import type {
 import { createDeterministicId, createDeterministicRng } from '../deterministicRandom';
 import { getAbsoluteWeek } from '../legacyLogic';
 import {
-    getIndustryPeople,
+    getIndustryPeopleNow,
+    industryPersonNow,
+    industryPersonWorking,
     getIndustryPerson,
     industryEmployerOf,
     industryHirers,
@@ -91,6 +94,36 @@ export const streamingCandidateAsk = (player: Player, platform: OwnedStreamingPl
     return { weekly, signing, optionsPercent, optionsValue: Math.round(getStreamingEquityValuation(platform) * optionsPercent / 100), poached };
 };
 
+/** #198: an offer you make yourself: pay a week, to sign, options in % of the company */
+export interface StreamingHireOffer { weekly: number; signing: number; optionsPercent: number }
+/** what an offer is read against */
+export interface StreamingOfferBasis { ask: StreamingHireOffer; companyValue: number; ambition: number; lowerChance: number }
+
+/* what a package is worth to them: a year's pay, the bonus, and the options (the ambitious weigh options more) */
+const offerWorth = (basis: StreamingOfferBasis, offer: StreamingHireOffer) => (
+    offer.weekly * 52 + offer.signing + basis.companyValue * offer.optionsPercent / 100 * (0.25 + basis.ambition / 200)
+);
+export const streamingOfferRatio = (basis: StreamingOfferBasis, offer: StreamingHireOffer) => offerWorth(basis, offer) / Math.max(1, offerWorth(basis, basis.ask));
+/** at or above their ask: yes. 15% under: the chance on their CV. Under 60%: no talks. */
+export const streamingOfferChance = (basis: StreamingOfferBasis, offer: StreamingHireOffer) => {
+    const ratio = streamingOfferRatio(basis, offer);
+    if (ratio >= 1) return 1;
+    if (ratio < 0.6) return 0;
+    return ratio >= 0.85
+        ? basis.lowerChance + (1 - basis.lowerChance) * (ratio - 0.85) / 0.15
+        : basis.lowerChance * (ratio - 0.6) / 0.25;
+};
+/** better than they asked buys loyalty, up to 10 */
+export const streamingOfferLoyalty = (basis: StreamingOfferBasis, offer: StreamingHireOffer) => (
+    Math.max(0, Math.min(10, Math.round((streamingOfferRatio(basis, offer) - 1) * 50)))
+);
+/** a no comes with what they would take: halfway between your offer and their ask */
+export const streamingOfferCounter = (ask: StreamingHireOffer, offer: StreamingHireOffer): StreamingHireOffer => ({
+    weekly: roundTo((ask.weekly + offer.weekly) / 2, 5_000),
+    signing: Math.round((ask.signing + offer.signing) / 2 / 50_000) * 50_000,
+    optionsPercent: Math.round((ask.optionsPercent + offer.optionsPercent) / 2 * 20) / 20,
+});
+
 /** the chance they take 15% less: the ambitious push back; an attractive company is easier to say yes to */
 export const streamingLowerOfferChance = (person: Pick<IndustryPerson, 'ambition'>, appeal: number) => clamp(0.75 - (person.ambition - 50) / 150 + (appeal - 1), 0.25, 0.9);
 
@@ -114,10 +147,10 @@ export const pickStreamingTeamCandidates = (
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
     const roles = STREAMING_TEAM_SEAT_ROLES[seatId] as string[];
     const away = unavailableIds(platform, absoluteWeek);
-    const eligible = getIndustryPeople(player).filter(person => (
+    const eligible = getIndustryPeopleNow(player).filter(person => (
         person.kind === 'EXECUTIVE' && person.role !== null && roles.includes(person.role) && !away.has(person.id)
-        && industryEmployerOf(player, person).kind !== 'OURS'
-    ));
+        && industryPersonWorking(player, person) && industryEmployerOf(player, person).kind !== 'OURS'
+    )).map(person => industryPersonNow(player, person));
     /* the pool runs dry before anyone is shown twice in a row */
     const fresh = eligible.filter(person => !exclude.has(person.id));
     const pool = shuffled(fresh.length >= 3 ? fresh : eligible, createDeterministicRng(`${industrySeedOf(player)}:candidates:${seatId}:${set}`));
@@ -138,7 +171,7 @@ export const streamingTeamCandidatesFor = (player: Player, platform: OwnedStream
     const away = unavailableIds(platform, absoluteWeek);
     const stored = market && market.set === set ? market.shown[seatId] : undefined;
     const people = stored
-        ? stored.map(id => getIndustryPerson(player, id)).filter((person): person is IndustryPerson => Boolean(person))
+        ? stored.map(id => getIndustryPerson(player, id)).filter((person): person is IndustryPerson => Boolean(person)).map(person => industryPersonNow(player, person))
         : pickStreamingTeamCandidates(player, platform, seatId, set, new Set(market?.seen?.[seatId] || []));
     return people.filter(person => market?.refused?.[person.id] !== set && !away.has(person.id) && industryEmployerOf(player, person).kind !== 'OURS');
 };

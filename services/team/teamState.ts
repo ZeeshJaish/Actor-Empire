@@ -136,7 +136,8 @@ export const streamingTeamSeatHolders = (appointments: OwnedStreamingExecutiveAp
         }
     });
     const seated = new Set([...holders.values()].map(item => item.id));
-    const leftovers = active.filter(item => !seated.has(item.id));
+    /* #203: someone from your connections runs the company without a chair */
+    const leftovers = active.filter(item => !seated.has(item.id) && item.role !== 'CEO');
     return { holders, leftovers };
 };
 
@@ -180,9 +181,9 @@ const normalizeSeat = (
 
 const ACTION_KINDS: StreamingTeamAction['kind'][] = [
     'POACH_ANSWER', 'CAMPAIGN_START', 'CAMPAIGN_STOP', 'CAMPAIGN_EXTEND', 'RENEWAL', 'CATALOGUE_SIGN', 'NETWORK_ORDER',
-    'INCIDENT_REPAIR', 'MARKET_FOLLOW_UP', 'LOCALIZATION_LEVEL', 'GUIDANCE', 'OPEN_ROOM', 'ORIGINAL_PITCH', 'TITLE_LICENSE', 'PRICE_CHANGE', 'RAISE',
+    'INCIDENT_REPAIR', 'MARKET_FOLLOW_UP', 'LOCALIZATION_LEVEL', 'GUIDANCE', 'OPEN_ROOM', 'ORIGINAL_PITCH', 'TITLE_LICENSE', 'PRICE_CHANGE', 'RAISE', 'NOTICE',
 ];
-const JOB_IDS = [...STREAMING_TEAM_JOBS.map(job => job.id), 'RIVAL_CALL', 'RAISE'] as const;
+const JOB_IDS = [...STREAMING_TEAM_JOBS.map(job => job.id), 'RIVAL_CALL', 'RAISE', 'NOTICE'] as const;
 
 const normalizeCard = (value: unknown): OwnedStreamingTeamCard | null => {
     const source = asRecord(value);
@@ -260,11 +261,18 @@ const normalizeMarket = (source: Record<string, unknown>): OwnedStreamingTeamMar
         return Object.fromEntries(STREAMING_TEAM_SEATS.filter(seatId => Array.isArray(record[seatId])).map(seatId => [seatId, ids(record[seatId], limit)]));
     };
     const refused = asRecord(source.refused);
+    const counters = Object.entries(asRecord(source.counters)).slice(-18).flatMap(([id, value]) => {
+        const row = asRecord(value);
+        return typeof row.set === 'number' ? [[id, {
+            set: row.set, weekly: num(row.weekly, 0, 1e9, 0), signing: num(row.signing, 0, 1e10, 0), optionsPercent: typeof row.optionsPercent === 'number' ? Math.max(0, Math.min(50, row.optionsPercent)) : 0,
+        }] as const] : [];
+    });
     return {
         set: num(source.set, 0, Number.MAX_SAFE_INTEGER, 0),
         shown: bySeat(source.shown, 3),
         seen: bySeat(source.seen, 12),
         refused: Object.fromEntries(Object.entries(refused).filter(([, set]) => typeof set === 'number').slice(-24)) as Record<string, number>,
+        ...(counters.length ? { counters: Object.fromEntries(counters) } : {}),
     };
 };
 

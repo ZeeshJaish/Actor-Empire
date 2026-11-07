@@ -1,3 +1,4 @@
+/* #193: the HQ shell's `.streaming-hq-shell button{font:inherit}` comes later with more weight than one class, so a button's own font rule needs a doubled class to count (`.seg.seg button`). Without it every button here drew at 16px. */
 /* #165: the Boardroom's TEAM. A real boardroom seen from above (a walnut table, chairs, brass name plates), an
    in-tray of paper memos with a rubber stamp, an executive's dossier, candidates' CVs, the week's minutes. */
 
@@ -150,7 +151,7 @@
 /* ── the pinned bar ── */
 .bar{flex:0 0 auto;display:flex;gap:8px;padding:10px 14px max(12px,env(safe-area-inset-bottom));background:linear-gradient(#0b0d13,#07080c);
   border-top:1px solid rgba(255,255,255,.08);box-shadow:0 -10px 24px rgba(0,0,0,.45)}
-.barTray,.barReport{flex:1;min-height:44px;padding:0 10px;border-radius:12px;font-size:11px;font-weight:900;letter-spacing:.04em;
+.barTray.barTray,.barReport.barReport{flex:1;min-height:44px;padding:0 10px;border-radius:12px;font-size:11px;font-weight:900;letter-spacing:.04em;
   display:flex;align-items:center;justify-content:center;gap:9px;text-align:center}
 .barTray{color:#2a1a00;background:linear-gradient(#ffc04d,#f2a516);box-shadow:0 6px 16px rgba(255,176,32,.25)}
 .barTrayClear{color:#9aa3b5;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);box-shadow:none}
@@ -171,10 +172,15 @@
   box-shadow:0 -18px 40px rgba(0,0,0,.6);animation:team-up .32s cubic-bezier(.2,.9,.3,1.08) backwards}
 @keyframes team-up{from{transform:translateY(70px);opacity:0}}
 .grip{position:absolute;left:50%;top:8px;width:38px;height:4px;margin-left:-19px;border-radius:2px;background:rgba(255,255,255,.18)}
-.close{position:absolute;right:12px;top:12px;width:30px;height:30px;border-radius:10px;font-size:13px;color:#aab2c0;
-  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);z-index:2}
+/* #214: a bar of no height, pinned to the sheet's top; the ✕ in the middle of its box, on a face the page scrolls under */
+.sheetBar{position:sticky;top:-10px;z-index:5;display:flex;justify-content:flex-end;height:0;margin-top:-10px;margin-bottom:10px}
+.close.close{flex:none;display:grid;place-items:center;width:30px;height:30px;padding:0;border-radius:10px;font-size:13px;line-height:1;text-align:center;color:#aab2c0;
+  background:#1a1e27;border:1px solid rgba(255,255,255,.14);box-shadow:0 2px 10px rgba(0,0,0,.5)}
 .folderTab{display:inline-block;max-width:calc(100% - 44px);padding:5px 10px 4px;border-radius:7px 7px 0 0;font-size:8.5px;font-weight:900;letter-spacing:.16em;
   color:#efd39a;background:linear-gradient(#3a2c14,#2a200f);border:1px solid rgba(214,172,92,.45);border-bottom:none;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* #193: on the close button's line, centred: nothing pokes past the cards' edges */
+.sheetRole{height:30px;margin:-10px 40px 8px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;letter-spacing:.18em;color:#efd39a;text-align:center;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sheetTitle{margin-top:10px;font-size:19px;font-weight:900;letter-spacing:-.01em}
 .sheetLine{margin-top:5px;font-size:11px;line-height:1.5;color:#8b93a5}
@@ -185,7 +191,7 @@
 
 /* ── the dossier: a symmetric player card (#183) ── */
 .dossier{padding-top:2px}
-.card{display:flex;flex-direction:column;align-items:center;text-align:center;padding:20px 14px 15px;border-radius:0 16px 16px 16px;
+.card{display:flex;flex-direction:column;align-items:center;text-align:center;padding:20px 14px 15px;border-radius:16px;
   background:
     radial-gradient(ellipse 85% 70% at 50% 0%,color-mix(in srgb,var(--epx-br-c) 18%,transparent),transparent 70%),
     linear-gradient(170deg,#171b25,#0e1117);
@@ -226,7 +232,7 @@
 .chip b{font:400 17px/1 'Anton','Archivo',sans-serif;color:#eef0f5}
 .chip b i{font:600 9.5px/1 'Inter',system-ui,sans-serif;font-style:normal;color:#7d8698;margin-left:2px}
 .chip em{font-style:normal;font-size:9.5px;line-height:1.3;color:#8b93a5}
-.chipWarn{border-color:rgba(255,176,32,.35)}
+/* #193: the risk speaks through its number; both tiles keep one frame */
 .chipWarn b{color:#ffc04d}
 
 .subhead{margin:18px 0 6px;font-size:9px;font-weight:900;letter-spacing:.16em;color:#8b93a5;text-transform:uppercase}
@@ -237,8 +243,9 @@
 .jobId{min-width:0;display:flex;flex-direction:column;gap:3px}
 .jobId b{font-size:12.5px;font-weight:800}
 .jobId span{font-size:10px;line-height:1.35;color:#7d8698}
-.seg{flex:0 0 auto;display:grid;grid-template-columns:repeat(3,48px);padding:2px;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09)}
-.seg button{padding:7px 0;border-radius:8px;font-size:10px;font-weight:800;color:#8b93a5;white-space:nowrap;text-align:center}
+/* #193: three equal segments with room around the words, whatever font the device gives a button */
+.seg{flex:0 0 auto;display:grid;grid-template-columns:repeat(3,52px);padding:2px;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09)}
+.seg.seg button{width:100%;min-width:0;padding:7px 2px;border-radius:8px;font:800 10px/1.2 'Inter',system-ui,sans-serif;color:#8b93a5;white-space:nowrap;text-align:center;overflow:hidden}
 .seg button:disabled{cursor:default}
 .segGap{display:block}
 .segOn{color:#fff!important}
@@ -253,14 +260,14 @@
 .limitValue{font:400 17px/1.1 'Anton','Archivo',sans-serif;color:#eef0f5;font-feature-settings:'tnum' 1}
 .limitMax{font-size:8.5px;color:#6f7686}
 .stepper{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;width:100%;margin-top:5px}
-.stepper button{height:30px;border-radius:9px;font-size:16px;font-weight:900;color:#e8ecf3;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12)}
+.stepper.stepper button{height:30px;border-radius:9px;font-size:16px;font-weight:900;color:#e8ecf3;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12)}
 .stepper button:disabled{opacity:.35}
 .usage{margin-top:7px;font-size:10px;color:#6f7686;line-height:1.45}
 /* Train | Let go, pinned at the sheet's bottom, the same width */
 .pinned{position:sticky;bottom:calc(-1 * max(22px,env(safe-area-inset-bottom)));z-index:3;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;
   margin:18px -16px calc(-1 * max(22px,env(safe-area-inset-bottom)));padding:10px 16px max(14px,env(safe-area-inset-bottom));
   background:#0b0d12;border-top:1px solid rgba(255,255,255,.08);box-shadow:0 -12px 22px rgba(0,0,0,.5)}
-.trainBtn,.letGo{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:0;min-height:50px;padding:8px;border-radius:12px;
+.trainBtn.trainBtn,.letGo.letGo{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:0;min-height:50px;padding:8px;border-radius:12px;
   font-size:12px;font-weight:900;line-height:1.15;text-align:center;transition:transform .12s}
 .trainBtn small,.letGo small{font-size:9px;font-weight:700;opacity:.8}
 .trainBtn{color:#04121a;background:var(--epx-br-c)}
@@ -286,7 +293,7 @@
 .cvPlus{margin-top:10px;font-size:10.5px;line-height:1.45;color:#8fe0b0}
 .cvMinus{margin-top:3px;font-size:10.5px;line-height:1.45;color:#ffb3b6}
 /* #183: a gold Hire, the same height as 15% less beside it */
-.hireBtn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;width:100%;margin-top:11px;padding:8px;border-radius:11px;
+.hireBtn.hireBtn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;width:100%;margin-top:11px;padding:8px;border-radius:11px;
   font-size:11.5px;font-weight:900;line-height:1.2;text-align:center;color:#2a1a00;background:linear-gradient(#ffd27a,#f2a516);box-shadow:0 6px 16px rgba(255,176,32,.22)}
 .hireBtn small{font-size:8.5px;font-weight:800;color:rgba(42,26,0,.75)}
 .ring_STAR{border-color:#f6d78f!important;box-shadow:0 0 12px rgba(246,215,143,.3)}
@@ -319,7 +326,7 @@
 .memoPrice{display:flex;gap:6px;margin-top:8px}
 .memoPrice span{padding:3px 8px;border-radius:6px;font-size:11px;font-weight:900;color:#2a2520;background:rgba(42,37,32,.08);border:1px solid rgba(42,37,32,.18)}
 .memoActions{display:flex;gap:6px;margin-top:11px;flex-wrap:wrap}
-.memoActions button{flex:1 1 auto;min-height:38px;padding:8px 9px;border-radius:9px;font-size:11px;font-weight:900;text-align:center}
+.memoActions.memoActions button{flex:1 1 auto;min-height:38px;padding:8px 9px;border-radius:9px;font-size:11px;font-weight:900;text-align:center}
 .approve{flex-grow:2!important;color:#fff;background:linear-gradient(#2f8a55,#1f6b42);box-shadow:0 3px 8px rgba(31,107,66,.3)}
 .change{color:#2a2520;background:rgba(42,37,32,.06);border:1px solid rgba(42,37,32,.25)}
 .no{color:#9a2a22;background:transparent;border:1px solid rgba(154,42,34,.35)}
@@ -357,7 +364,7 @@
 .outcomeSlip{color:#fff;background:#d4453b}
 .mkGreat{border-color:rgba(255,192,77,.45)!important;background:rgba(255,192,77,.06)!important}
 .mkSlip{border-color:rgba(212,69,59,.45)!important}
-.toTray{display:block;width:100%;margin-top:13px;padding:12px;border-radius:12px;font-size:11.5px;font-weight:900;text-align:center;color:#2a1a00;background:linear-gradient(#ffc04d,#f2a516)}
+.toTray.toTray{display:block;width:100%;margin-top:13px;padding:12px;border-radius:12px;font-size:11.5px;font-weight:900;text-align:center;color:#2a1a00;background:linear-gradient(#ffc04d,#f2a516)}
 
 /* ── succession (#166) ── */
 .successor{display:flex;align-items:center;gap:11px;width:100%;padding:12px;border-radius:13px;text-align:left;
@@ -369,9 +376,12 @@
 .succession{padding-top:2px}
 .heir{display:flex;align-items:center;gap:11px;margin-top:9px;padding:11px;border-radius:13px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08)}
 .heirNamed{border-color:rgba(214,172,92,.55);background:rgba(214,172,92,.07)}
-.readiness{position:relative;display:block;height:4px;margin-top:4px;border-radius:2px;background:rgba(255,255,255,.07);overflow:hidden}
+/* #216: the score at the bar's end, one line */
+.readyRow{display:flex;align-items:center;gap:7px;margin-top:5px}
+.readyRow b{flex:none;font:400 15px/1 'Anton','Archivo',sans-serif;color:#efd39a}
+.readiness{position:relative;display:block;flex:1 1 auto;min-width:0;height:4px;border-radius:2px;background:rgba(255,255,255,.07);overflow:hidden}
 .readiness em{position:absolute;inset:0 auto 0 0;border-radius:2px;background:#c9a86a}
-.nameBtn{flex:0 0 auto;padding:9px 10px;border-radius:10px;font-size:10.5px;font-weight:900;color:#2a1a00;background:linear-gradient(#efd39a,#c9a86a);white-space:nowrap}
+.nameBtn.nameBtn{flex:0 0 auto;padding:9px 10px;border-radius:10px;font-size:10.5px;font-weight:900;color:#2a1a00;background:linear-gradient(#efd39a,#c9a86a);white-space:nowrap}
 .namedChip{flex:0 0 auto;font-style:normal;padding:6px 9px;border-radius:99px;font-size:10px;font-weight:900;color:#efd39a;border:1px solid rgba(214,172,92,.55)}
 
 @media (prefers-reduced-motion:reduce){
@@ -380,7 +390,8 @@
   .memoLeaving{animation:none;opacity:.4}
 }
 @media (max-width:359px){
-  .seg button{min-width:38px;padding:7px 5px;font-size:9.5px}
+  .seg{grid-template-columns:repeat(3,46px)}
+  .seg.seg button{padding:7px 1px;font-size:9.5px}
   .plate{font-size:7px;letter-spacing:.1em;padding:2px 5px}
   .av,.founderAv{width:38px;height:38px;font-size:11.5px}
 }
@@ -399,7 +410,7 @@
 .askWhy{margin-top:6px;font-size:10px;line-height:1.4;color:#8b93a5}
 .hireRow{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:11px}
 .hireRow .hireBtn{margin-top:0}
-.lowerBtn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:7px 8px;border-radius:11px;font-size:11.5px;font-weight:900;
+.lowerBtn.lowerBtn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:7px 8px;border-radius:11px;font-size:11.5px;font-weight:900;
   color:#e8ecf3;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.16)}
 .lowerBtn small{font-size:8.5px;font-weight:700;color:#8b93a5}
 .lowerBtn:disabled{opacity:.4}
@@ -417,6 +428,57 @@
 .stepDownChoice span{font-size:10px;line-height:1.35;color:#8b93a5}
 .stepDownActions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px}
 .stepDownActions span{flex:1 1 100%;font-size:11.5px;font-weight:800;color:#eef0f5}
-.stepDownYes{padding:9px 14px;border-radius:10px;font-size:12px;font-weight:900;color:#1d1607;background:linear-gradient(#ffd27a,#d9a136)}
-.stepDownNo{padding:9px 14px;border-radius:10px;font-size:12px;font-weight:800;color:#c9d0db;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12)}
-.stepDownBtn{margin-top:10px;padding:9px 14px;border-radius:10px;font-size:12px;font-weight:900;color:#efd39a;background:rgba(214,172,92,.1);border:1px solid rgba(214,172,92,.45)}
+.stepDownYes.stepDownYes{padding:9px 14px;border-radius:10px;font-size:12px;font-weight:900;color:#1d1607;background:linear-gradient(#ffd27a,#d9a136)}
+.stepDownNo.stepDownNo{padding:9px 14px;border-radius:10px;font-size:12px;font-weight:800;color:#c9d0db;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12)}
+.stepDownBtn.stepDownBtn{margin-top:10px;padding:9px 14px;border-radius:10px;font-size:12px;font-weight:900;color:#efd39a;background:rgba(214,172,92,.1);border:1px solid rgba(214,172,92,.45)}
+
+/* ── #197: your own figure on a raise ── */
+.figure{display:grid;grid-template-columns:38px minmax(0,1fr) 38px;gap:6px;margin-top:11px;align-items:center}
+.figure.figure button{min-height:38px;border-radius:9px;font-size:15px;font-weight:900;color:#3b2f1a;background:rgba(58,44,20,.08);border:1px solid rgba(58,44,20,.25)}
+.figure.figure button:disabled{opacity:.4}
+.figureValue{min-width:0;text-align:center}
+.figureValue b{display:block;font:400 20px/1.1 'Anton','Archivo',sans-serif;color:#2a200f}
+.figureValue b i{font:600 10px/1 'Inter',system-ui,sans-serif;font-style:normal;margin-left:2px;color:#6a5a3a}
+.figureValue small{display:block;margin-top:2px;font-size:9.5px;color:#6a5a3a}
+.figure.figure .figureGive{grid-column:1 / 3;font-size:11px;color:#fff;background:linear-gradient(#2f8a55,#1f6b42);border:0}
+.figure.figure .figureBack{grid-column:3;font-size:9.5px}
+
+/* ── #198: your own offer on a CV ── */
+.offer{display:flex;flex-direction:column;gap:7px;margin-top:11px}
+.offerLine{display:grid;grid-template-columns:minmax(0,1fr) 34px 64px 34px;align-items:center;gap:5px;padding:7px 8px;border-radius:11px;background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.07)}
+.offerLine.offerLine button{display:flex;align-items:center;justify-content:center;height:32px;padding:0;border-radius:9px;font-size:16px;font-weight:900;line-height:1;color:#eef0f5;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12)}
+.offerLine.offerLine button:disabled{opacity:.35}
+.offerLabel{display:flex;flex-direction:column;gap:3px;min-width:0;text-align:left}
+.offerLabel b{font-size:10.5px;font-weight:800;color:#eef0f5;white-space:nowrap}
+.offerLabel small{font-size:9px;color:#8b93a5;white-space:nowrap}
+.offerValue{font:400 15px/1 'Anton','Archivo',sans-serif;text-align:center;color:#ffd27a;white-space:nowrap}
+.offerChance{display:flex;flex-direction:column;gap:5px;padding:2px 2px 0}
+.offerChance i{display:block;height:6px;border-radius:999px;overflow:hidden;background:rgba(255,255,255,.1)}
+.offerChance em{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,#f2a516,#3ddc84);transition:width .2s ease}
+.offerChance span{font-size:10.5px;line-height:1.35;color:#c9d0db;text-align:left}
+.offerRow{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.offerRow .hireBtn{margin-top:0}
+.counter{margin-top:11px;padding:10px;border-radius:11px;text-align:left;background:rgba(255,210,122,.08);border:1px solid rgba(255,210,122,.3)}
+.counter > b{display:block;font-size:11.5px;font-weight:900;color:#ffd27a}
+.counter > p{margin:4px 0 9px;font-size:11px;line-height:1.4;color:#eef0f5}
+
+/* ── #199: where they have worked ── */
+.career{margin-top:11px;padding:10px 11px;border-radius:12px;text-align:left;background:rgba(0,0,0,.24);border:1px solid rgba(255,255,255,.07)}
+.careerHead{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.careerHead small{font:800 8px/1 'Inter',system-ui,sans-serif;letter-spacing:.14em;color:#8b93a5}
+.careerHead em{font-size:9.5px;font-weight:800;font-style:normal;color:#ffd27a;white-space:nowrap}
+.careerJobs{list-style:none;margin:9px 0 0;padding:0 0 0 12px;border-left:2px solid rgba(255,255,255,.1);display:flex;flex-direction:column;gap:9px}
+.careerJobs li{position:relative;min-width:0}
+.careerJobs li::before{content:'';position:absolute;left:-16px;top:4px;width:6px;height:6px;border-radius:50%;background:#59617a}
+.careerNow::before{background:#3ddc84!important}
+.careerOurs::before{background:#ffd27a!important}
+.careerLine{display:flex;align-items:baseline;justify-content:space-between;gap:8px;min-width:0}
+.careerLine b{min-width:0;font-size:11.5px;font-weight:800;color:#eef0f5;overflow-wrap:anywhere}
+.careerLine span{flex:none;font-size:9.5px;color:#8b93a5;white-space:nowrap}
+.careerJobs small{display:block;margin-top:1px;font-size:9.5px;color:#a7afbd}
+.careerJobs p{margin:2px 0 0;font-size:10px;line-height:1.35;color:#c9b38a}
+.careerMore.careerMore{display:block;width:100%;margin-top:8px;padding:6px;border-radius:8px;font-size:10px;font-weight:800;color:#c9d0db;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08)}
+
+/* ── #200: on notice ── */
+.cardNotice{display:inline-block;margin-top:7px;padding:4px 9px;border-radius:999px;font-size:9.5px;font-weight:800;color:#2a1a00;background:#ffd27a}
+

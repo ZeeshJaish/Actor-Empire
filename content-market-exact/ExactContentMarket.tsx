@@ -862,8 +862,8 @@ const Detail: React.FC<{
           header strip. It is presented now — framed, lit, and the page takes
           its ambient colour from the title itself, so no two feel alike. */}
       <div className={css.mkbloom} />
+      <button className={cx(css.mkback, css.mkfloat)} onClick={onBack}>←</button>
       <div className={css.mkhero}>
-        <button className={cx(css.mkback, css.mkfloat)} onClick={onBack}>←</button>
         {lot.rows ? (
           <Boxset lot={lot} size="lg" />
         ) : (

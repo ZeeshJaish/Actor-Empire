@@ -1,3 +1,4 @@
+import type { StreamingExecutiveExitReason } from '../types';
 import { normalizeAuctionFutureFunding } from './streamingAuctionTerms';
 import { normalizeStreamingContentMarketDraft } from './streamingContentMarketDraft';
 import {normalizeStreamingContractRoyaltyStatements} from './streamingContractSettlement';
@@ -13,6 +14,7 @@ import {
     type OwnedStreamingExecutiveAppointment,
     type OwnedStreamingExecutiveDevelopment,
     type OwnedStreamingGovernanceState,
+    type OwnedStreamingApprovalRecord,
     type OwnedStreamingBoardDirector,
     type OwnedStreamingBoardMotion,
     type OwnedStreamingCelebrityInvestor,
@@ -279,6 +281,7 @@ const EXECUTIVE_ROLES: StreamingExecutiveRole[] = [
     'ADVERTISING_HEAD',
     'INTERNATIONAL_HEAD',
     'SECURITY_TRUST_HEAD',
+    'CEO',
 ];
 const EXECUTIVE_STRATEGIES: StreamingExecutiveStrategy[] = [
     'GROWTH_FIRST',
@@ -332,6 +335,8 @@ const CAPITAL_ACTION_TYPES: StreamingCapitalActionType[] = [
     /* #187 */
     'SHARE_BUYBACK',
     'FOUNDER_SHARE_TRADE',
+    'FOUNDER_WITHDRAWAL',
+    'DIVIDEND_PAID',
     /* #190 */
     'COMPANY_SALE',
 ];
@@ -479,6 +484,7 @@ const LEDGER_EVENT_TYPES: OwnedStreamingLedgerEventType[] = [
     'EXECUTIVE_DEVELOPMENT_COMPLETED',
     'DELEGATION_MANDATE_UPDATED',
     'BOARD_DIRECTOR_APPOINTED',
+    'BOARD_DIRECTOR_REMOVED',
     'BOARD_VOTE_RESOLVED',
     'CELEBRITY_INVESTMENT_ACCEPTED',
     'RIVAL_MOVE_COMMITTED',
@@ -820,6 +826,25 @@ const normalizeExecutiveAppointment = (
             } };
         })() : {}),
         ...(typeof source.signingBonus === 'number' && Number.isFinite(source.signingBonus) ? { signingBonus: Math.max(0, Math.round(source.signingBonus)) } : {}),
+        /* #200: notice given, and how they left */
+        ...(source.notice && typeof source.notice === 'object' ? (() => {
+            const notice = asRecord(source.notice);
+            return { notice: {
+                reason: notice.reason as StreamingExecutiveExitReason,
+                givenAtAbsoluteWeek: Math.max(0, Math.round(clamp(notice.givenAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER, 0))),
+                leavesAtAbsoluteWeek: Math.max(0, Math.round(clamp(notice.leavesAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER, 0))),
+            } };
+        })() : {}),
+        ...(source.exit && typeof source.exit === 'object' ? (() => {
+            const exit = asRecord(source.exit);
+            return { exit: {
+                reason: exit.reason as StreamingExecutiveExitReason,
+                sudden: Boolean(exit.sudden),
+                ...(typeof exit.to === 'string' && exit.to ? { to: exit.to } : {}),
+                ...(exit.wasCeo ? { wasCeo: true } : {}),
+                ...(typeof exit.pricedAtAbsoluteWeek === 'number' ? { pricedAtAbsoluteWeek: exit.pricedAtAbsoluteWeek } : {}),
+            } };
+        })() : {}),
     };
 };
 
@@ -1108,6 +1133,15 @@ const normalizeBoardDirector = (value: unknown): OwnedStreamingBoardDirector | n
             ? Math.max(appointedAtAbsoluteWeek, Math.round(clamp(source.endedAtAbsoluteWeek, appointedAtAbsoluteWeek, Number.MAX_SAFE_INTEGER, appointedAtAbsoluteWeek)))
             : null,
         linkedInvestorId: cleanText(source.linkedInvestorId, '', 120) || null,
+        /* #201: their term, and how they left */
+        ...(typeof source.termEndsAtAbsoluteWeek === 'number' ? { termEndsAtAbsoluteWeek: Math.max(0, Math.round(source.termEndsAtAbsoluteWeek)) } : {}),
+        ...(source.exit && typeof source.exit === 'object' ? (() => {
+            const exit = asRecord(source.exit);
+            return { exit: {
+                reason: isOneOf(exit.reason, ['TERM', 'PROTEST', 'REMOVED'] as const, 'TERM'),
+                ...(typeof exit.pricedAtAbsoluteWeek === 'number' ? { pricedAtAbsoluteWeek: exit.pricedAtAbsoluteWeek } : {}),
+            } };
+        })() : {}),
     };
 };
 
@@ -1194,6 +1228,83 @@ const normalizeGovernance = (value: unknown): OwnedStreamingGovernanceState => {
             .slice(-12) } : {}),
         ...(source.investorOfferMilestone !== undefined ? { investorOfferMilestone: Math.max(0, Math.round(clamp(source.investorOfferMilestone, 0, Number.MAX_SAFE_INTEGER))) } : {}),
         ...(source.investorRound !== undefined ? { investorRound: normalizeInvestorRound(source.investorRound) } : {}),
+        /* #205: the board's patience, your own stake, and leaving altogether */
+        ...(typeof source.boardLowSinceAbsoluteWeek === 'number' ? { boardLowSinceAbsoluteWeek: Math.max(0, Math.round(source.boardLowSinceAbsoluteWeek)) } : {}),
+        ...(source.stakeSale && typeof source.stakeSale === 'object' ? (() => {
+            const stake = asRecord(source.stakeSale);
+            return { stakeSale: {
+                status: isOneOf(stake.status, ['BANKERS', 'OFFER', 'DECLINED'] as const, 'DECLINED'),
+                percent: Math.max(0, Number(stake.percent) || 0),
+                startedAtAbsoluteWeek: Math.max(0, Math.round(Number(stake.startedAtAbsoluteWeek) || 0)),
+                offerAtAbsoluteWeek: Math.max(0, Math.round(Number(stake.offerAtAbsoluteWeek) || 0)),
+                standsUntilAbsoluteWeek: typeof stake.standsUntilAbsoluteWeek === 'number' ? stake.standsUntilAbsoluteWeek : null,
+                buyerName: typeof stake.buyerName === 'string' ? stake.buyerName : null,
+                price: typeof stake.price === 'number' ? stake.price : null,
+            } };
+        })() : {}),
+        ...(source.departure && typeof source.departure === 'object' ? (() => {
+            const departure = asRecord(source.departure);
+            return { departure: { atAbsoluteWeek: Math.max(0, Math.round(Number(departure.atAbsoluteWeek) || 0)), proceeds: Math.max(0, Math.round(Number(departure.proceeds) || 0)) } };
+        })() : {}),
+        /* #209: your own money, the dividend, and what moves the price next */
+        ...(source.founderMoney && typeof source.founderMoney === 'object' ? (() => {
+            const record = asRecord(source.founderMoney);
+            const amount = (value: unknown) => Math.max(0, Math.round(Number(value) || 0));
+            return { founderMoney: {
+                weeklySalary: amount(record.weeklySalary), salaryPaid: amount(record.salaryPaid), bonusPaid: amount(record.bonusPaid),
+                takenOut: amount(record.takenOut), dividendsPaid: amount(record.dividendsPaid),
+                ...(amount(record.pendingBonus) ? { pendingBonus: amount(record.pendingBonus) } : {}),
+            } };
+        })() : {}),
+        ...(source.dividend && typeof source.dividend === 'object' ? (() => {
+            const dividend = asRecord(source.dividend);
+            return { dividend: {
+                perShareQuarter: Math.max(0, Number(dividend.perShareQuarter) || 0),
+                setAtAbsoluteWeek: Math.max(0, Math.round(Number(dividend.setAtAbsoluteWeek) || 0)),
+                ...(typeof dividend.lastPaidAbsoluteWeek === 'number' ? { lastPaidAbsoluteWeek: dividend.lastPaidAbsoluteWeek } : {}),
+            } };
+        })() : {}),
+        ...(Array.isArray(source.pendingPriceMoves) && source.pendingPriceMoves.length ? { pendingPriceMoves: asArray<unknown>(source.pendingPriceMoves).map(item => {
+            const row = asRecord(item);
+            return { move: Number(row.move) || 0, reason: cleanText(row.reason, 'The market', 60) };
+        }).slice(-6) } : {}),
+        /* #228: the table's recent votes */
+        ...(Array.isArray(source.approvals) && source.approvals.length ? { approvals: asArray<unknown>(source.approvals).map(item => {
+            const row = asRecord(item);
+            return {
+                key: cleanText(row.key, 'vote', 120),
+                kind: cleanText(row.kind, 'MONEY_OUT', 24) as OwnedStreamingApprovalRecord['kind'],
+                ...(typeof row.refId === 'string' ? { refId: row.refId } : {}),
+                ...(typeof row.amount === 'number' ? { amount: row.amount } : {}),
+                atAbsoluteWeek: Math.max(0, Math.round(Number(row.atAbsoluteWeek) || 0)),
+                mode: (row.mode === 'HOLDERS' ? 'HOLDERS' : 'BOARD') as OwnedStreamingApprovalRecord['mode'],
+                carried: row.carried === true,
+                ...(row.spent === true ? { spent: true } : {}),
+                forPercent: Math.max(0, Math.min(100, Number(row.forPercent) || 0)),
+                title: cleanText(row.title, 'A vote', 120),
+            };
+        }).slice(-12) } : {}),
+        /* #207: the founder's death, in the price */
+        /* #221 */
+        ...(source.estatePlan && typeof source.estatePlan === 'object' ? (() => {
+            const plan = asRecord(source.estatePlan);
+            const sold = plan.lastSold && typeof plan.lastSold === 'object' ? asRecord(plan.lastSold) : null;
+            return { estatePlan: {
+                tax: Math.max(0, Math.round(clamp(plan.tax, 0, Number.MAX_SAFE_INTEGER))),
+                owed: Math.max(0, Math.round(clamp(plan.owed, 0, Number.MAX_SAFE_INTEGER))),
+                quarterly: Math.max(0, Math.round(clamp(plan.quarterly, 0, Number.MAX_SAFE_INTEGER))),
+                quartersLeft: Math.max(0, Math.round(clamp(plan.quartersLeft, 0, 400))),
+                startedAtAbsoluteWeek: Math.max(0, Math.round(clamp(plan.startedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
+                nextDueAbsoluteWeek: Math.max(0, Math.round(clamp(plan.nextDueAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
+                ...(sold ? { lastSold: { atAbsoluteWeek: Math.round(Number(sold.atAbsoluteWeek) || 0), percent: Number(sold.percent) || 0, amount: Math.round(Number(sold.amount) || 0) } } : {}),
+            } };
+        })() : {}),
+        ...(source.founderDeath && typeof source.founderDeath === 'object' ? (() => {
+            const death = asRecord(source.founderDeath);
+            return { founderDeath: { move: Number(death.move) || 0, ...(typeof death.pricedAtAbsoluteWeek === 'number' ? { pricedAtAbsoluteWeek: death.pricedAtAbsoluteWeek } : {}) } };
+        })() : {}),
+        /* #202: an investor who said no to your price */
+        ...(source.buyoutRefusals && typeof source.buyoutRefusals === 'object' ? { buyoutRefusals: Object.fromEntries(Object.entries(asRecord(source.buyoutRefusals)).filter(([, week]) => typeof week === 'number').slice(-20)) as Record<string, number> } : {}),
         ...(source.sale !== undefined ? { sale: normalizeCompanySale(source.sale) } : {}),
     };
 };
@@ -2305,6 +2416,8 @@ const normalizePublicCompany = (value: unknown): OwnedStreamingPublicCompanyStat
                 finalSupport: item.finalSupport === null || item.finalSupport === undefined ? null : clamp(item.finalSupport, 0, 100),
                 consequence: cleanText(item.consequence, '', 260) || null,
                 ...(item.decidedBy === 'FOUNDER' || item.decidedBy === 'PUBLIC' ? { decidedBy: item.decidedBy } : {}),
+                ...(typeof item.founderPayWeekly === 'number' ? { founderPayWeekly: Math.max(0, Math.round(item.founderPayWeekly)) } : {}),
+                ...(typeof item.founderBonus === 'number' ? { founderBonus: Math.max(0, Math.round(item.founderBonus)) } : {}),
                 ...(item.priceEffectPercent !== undefined ? {
                     priceEffectPercent: clamp(item.priceEffectPercent, -10, 10),
                     priceAppliedAtAbsoluteWeek: item.priceAppliedAtAbsoluteWeek === null || item.priceAppliedAtAbsoluteWeek === undefined ? null : Math.max(0, Math.round(clamp(item.priceAppliedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
@@ -2347,6 +2460,8 @@ const normalizePublicCompany = (value: unknown): OwnedStreamingPublicCompanyStat
                 consequence: cleanText(item.consequence, '', 260) || null,
             };
         }).filter(item => item.id).slice(-12),
+        /* #215 */
+        ...(cleanText(source.proposedTicker, '', 5) ? { proposedTicker: cleanText(source.proposedTicker, '', 5).toUpperCase() } : {}),
         /* #187 */
         ...(Array.isArray(source.buybacks) ? { buybacks: asArray<unknown>(source.buybacks).map((value): OwnedStreamingBuybackProgram => {
             const item = asRecord(value);

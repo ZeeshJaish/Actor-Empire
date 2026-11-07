@@ -5,7 +5,7 @@ const ts: typeof import('typescript') = createRequire(process.cwd() + '/package.
 import { INITIAL_PLAYER } from '../types';
 import { createBusiness } from '../services/businessLogic';
 import * as legacy from '../services/legacyLogic';
-import { handoffOwnedStreamingPlatformToHeir } from '../services/streamingLegacy';
+import { getStreamingEstate, handoffOwnedStreamingPlatformToHeir } from '../services/streamingLegacy';
 import { migratePlayerSave } from '../services/saveMigration';
 import { GLOBAL_ACTOR_PACKS, createGlobalActorPackNPCs } from '../services/npcLogic';
 import { getEnabledGlobalCreatorProfiles } from '../services/youtubeLogic';
@@ -35,7 +35,7 @@ if (process.argv[2] !== 'series') for (const isDead of [false, true]) for (const
     const child = { id: 'child-test', name: 'Mod Heir', age: 22, gender, relation: 'Child', closeness: 100, image: 'avatar' };
     parent.relationships = [child as any];
     let captured: any;
-    const deps = { ...legacy, player: parent, child, INITIAL_PLAYER, handoffOwnedStreamingPlatformToHeir, migratePlayerSave,
+    const deps = { ...legacy, player: parent, child, INITIAL_PLAYER, handoffOwnedStreamingPlatformToHeir, getStreamingEstate, migratePlayerSave,
         clone: structuredClone, tr: (key: string) => key, syncCurrentSlotSnapshot: () => {}, setPlayer: (p: any) => { captured = p; },
         setGameStatus: () => {}, setActivePage: () => {}, Page: { HOME: 'HOME' }, captured: () => captured };
     new Function(...Object.keys(deps), compiled)(...Object.values(deps));

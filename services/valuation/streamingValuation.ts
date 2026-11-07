@@ -2,7 +2,7 @@
  * #184: the valuation engine's streaming adapters: our own service, from its books and its catalogue, and an AI
  * platform, from the economy the platform AI keeps.
  */
-import type { OwnedStreamingPlatformState, OwnedStreamingWeeklyOperations } from '../../types';
+import type { OwnedStreamingPlatformState, OwnedStreamingTitleWeekPerformance, OwnedStreamingWeeklyOperations } from '../../types';
 import { getStreamingAdditionalOperatingExpense } from '../streamingOperatingExpenses';
 import { valueCompany, type CompanyFundamentals, type CompanyValuation } from './valuationEngine';
 
@@ -21,6 +21,23 @@ const earningsOf = (operations: OwnedStreamingWeeklyOperations) => (
         : number(operations.netCashContribution)
 );
 
+/* #208: what the books say a week brought in: a catalogue bought up front is spread over its life */
+const bookEarningsOf = (operations: OwnedStreamingWeeklyOperations) => (
+    operations.contentAccountingVersion === 1 ? number(operations.accountingContribution) : number(operations.netCashContribution)
+);
+/* #208: what a title has earned, from its own audience */
+const earnedOf = (row: OwnedStreamingTitleWeekPerformance) => (
+    number(row.attributedSubscriptionRevenue) + number(row.advertisingRevenue) + number(row.premiumRevenue) + number(row.rentalRevenue) + number(row.purchaseRevenue)
+    + number(row.dayPassRevenue) + number(row.meteredRevenue) + number(row.patronRevenue) + number(row.sponsorshipRevenue) + number(row.incrementalRevenue)
+);
+/** a hit earns its budget back from its own audience; a flop, after 8 weeks, has not earned a quarter of it */
+const HIT_AT = 1;
+const FLOP_UNDER = 0.25;
+const HIT_MIN_WEEKS = 4;
+const FLOP_MIN_WEEKS = 8;
+/** a follow-up really in the works or out: only then is a franchise worth anything */
+const FOLLOW_UP_STATUSES = new Set(['GREENLIT', 'IN_PRODUCTION', 'DELIVERED', 'RELEASED']);
+
 /** our service's fundamentals, from its last 52 weeks, its catalogue, its Originals, its network and its team */
 export const streamingPlatformFundamentals = (platform: OwnedStreamingPlatformState): CompanyFundamentals => {
     const weeks = (platform.weeklyHistory || []).filter(item => item.operations).slice(-YEAR);
@@ -34,6 +51,10 @@ export const streamingPlatformFundamentals = (platform: OwnedStreamingPlatformSt
         - getStreamingAdditionalOperatingExpense(platform, item.absoluteWeek, item.operations!.additionalOperatingExpense);
     /* a young service is judged as much on its latest quarter as on its year */
     const earningsTtm = (aYear(weeks, weekEarnings) + aYear(quarter, weekEarnings)) / 2;
+    /* #208: the profit multiple is paid on real profit, never on cash a company has merely not spent yet */
+    const weekBookProfit = (item: (typeof weeks)[number]) => bookEarningsOf(item.operations!)
+        - getStreamingAdditionalOperatingExpense(platform, item.absoluteWeek, item.operations!.additionalOperatingExpense);
+    const bookProfitTtm = (aYear(weeks, weekBookProfit) + aYear(quarter, weekBookProfit)) / 2;
     const now = weeks.at(-1)?.absoluteWeek ?? 0;
 
     /* the library: what is left of each licence we paid for, and the Originals we own outright at half their budget */
@@ -44,15 +65,31 @@ export const streamingPlatformFundamentals = (platform: OwnedStreamingPlatformSt
     const originals = platform.originalCommissions || [];
     const released = originals.filter(item => item.status === 'RELEASED');
     const owned = released.reduce((sum, item) => sum + number(item.productionFundingApplied || item.productionBudgetCap) * 0.5, 0);
-    /* the last 8 releases: renewed or made a franchise counts as a hit, cancelled as a flop */
-    const lastEight = released.slice(-8);
-    const recentHits = lastEight.filter(item => item.lifecycleDecision?.type === 'RENEW' || item.lifecycleDecision?.type === 'FRANCHISE').length;
-    const recentFlops = lastEight.filter(item => item.lifecycleDecision?.type === 'CANCEL').length;
-    /* the pipeline: what is commissioned and not yet out, by our record (a hit's chance, Laplace-smoothed) */
+    /* #208: the last 8 releases, judged by their own audience against their budget. Renewing or making a franchise is a
+       decision about the future: it adds nothing by itself. Zeesh (2026-11-04): "i hope ki huamra streaming valutaion
+       looop holes free hai" */
+    const earned = new Map<string, { total: number; weeks: number }>();
+    (platform.weeklyHistory || []).forEach(snapshot => (snapshot.operations?.titlePerformance || []).forEach(row => {
+        const current = earned.get(row.projectId) || { total: 0, weeks: 0 };
+        earned.set(row.projectId, { total: current.total + earnedOf(row), weeks: current.weeks + 1 });
+    }));
+    const judged = released.slice(-8).map(item => {
+        const budget = number(item.productionFundingApplied || item.productionBudgetCap);
+        const title = earned.get(item.canonicalProjectId || '');
+        if (budget <= 0 || !title) return 'NEITHER' as const;
+        if (title.weeks >= HIT_MIN_WEEKS && title.total >= budget * HIT_AT) return 'HIT' as const;
+        if (title.weeks >= FLOP_MIN_WEEKS && title.total < budget * FLOP_UNDER) return 'FLOP' as const;
+        return 'NEITHER' as const;
+    });
+    const recentHits = judged.filter(item => item === 'HIT').length;
+    const recentFlops = judged.filter(item => item === 'FLOP').length;
+    /* #208: the pipeline: what has been paid and is not yet out, at its cost at most, less by a poor record */
     const hitChance = (recentHits + 1) / (recentHits + recentFlops + 2);
     const pipelineValue = originals.filter(item => item.status === 'GREENLIT' || item.status === 'IN_PRODUCTION' || item.status === 'DELIVERED')
-        .reduce((sum, item) => sum + number(item.productionFundingApplied || item.productionBudgetCap) * (0.5 + hitChance), 0);
-    const franchiseValue = released.filter(item => item.lifecycleDecision?.type === 'FRANCHISE')
+        .reduce((sum, item) => sum + number(item.productionFundingApplied) * Math.min(1, 0.5 + hitChance), 0);
+    /* #208: a franchise is worth something only with a follow-up really in the works or out */
+    const franchiseValue = released.filter(item => item.lifecycleDecision?.type === 'FRANCHISE'
+        && originals.some(other => other.parentCommissionId === item.id && FOLLOW_UP_STATUSES.has(other.status)))
         .reduce((sum, item) => sum + number(item.productionFundingApplied || item.productionBudgetCap) * 1.5, 0);
     /* technology: the servers we built (at 60% once built), and the platform's health on top of its revenue */
     const technologyValue = (platform.networkOrders || []).reduce((sum, order) => sum + number(order.capitalCost) * (order.status === 'DONE' ? 0.6 : 0.9), 0)
@@ -64,6 +101,7 @@ export const streamingPlatformFundamentals = (platform: OwnedStreamingPlatformSt
         revenueTtm,
         revenueRunRate,
         earningsTtm,
+        bookProfitTtm,
         cash: number(platform.treasuryCash),
         debt: number(platform.debtPrincipal),
         churnPercent: number(platform.metrics.churnRate) * 100,

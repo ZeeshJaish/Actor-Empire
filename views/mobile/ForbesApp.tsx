@@ -1,6 +1,7 @@
 import { getListedCompanyValuation } from '../../services/stockValuation';
 import { beginPublicControlTransfer } from '../../services/publicStockControl';
 
+import { getOutstandingLoanBalance } from '../../services/loanLogic';
 import React, { useEffect, useRef, useState } from 'react';
 import { Business, NPCActor, Player, TalentCareerProfile } from '../../types';
 import { formatMoney } from '../../services/formatUtils';
@@ -165,7 +166,8 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
           return Math.round(getStreamingEquityValuation(platform) * Math.max(0, platform.founderOwnershipPercent) / 100);
       })()
       : 0;
-  const playerNetWorth = player.money + assetsValue + streamingStake;
+  /* #208: what is owed comes off, so a loan put into the company does not make anyone richer */
+  const playerNetWorth = player.money + assetsValue + streamingStake - getOutstandingLoanBalance(player);
 
   // --- 2. BUILD RANKINGS ---
   

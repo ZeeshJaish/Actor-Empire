@@ -30,6 +30,7 @@ import type { StreamingLocalizationDeskView } from '../../services/streamingLoca
 
 const LIST_PAGE = 10;
 import type { CustomPoster } from '../../types';
+import { RoomSubtitle } from './RoomSubtitle';
 
 /* ============================================================
    MODEL
@@ -300,7 +301,7 @@ export const ContentDesk: React.FC<{
         <button className={s.cdback} onClick={onBack} aria-label="Back">←</button>
         <div className={s.cdtitle}>
           <b>CONTENT DESK</b>
-          <span>LIBRARY · RIGHTS · SLATE · LANGUAGES</span>
+          <RoomSubtitle>LIBRARY · RIGHTS · SLATE · LANGUAGES</RoomSubtitle>
         </div>
         <span className={s.cdmark}><Mark brand={brand} /></span>
       </div>
